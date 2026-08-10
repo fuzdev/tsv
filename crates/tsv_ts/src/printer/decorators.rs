@@ -197,41 +197,55 @@ impl<'a> Printer<'a> {
         Span::new(self.param_start_with_decorators(expr), expr.span().end)
     }
 
-    /// The frozen doc for a DECORATED parameter whose binding an alone-on-line
-    /// format-ignore directive leads (`@dec⏎// prettier-ignore⏎private a:   T`): the
-    /// decorators print normally — with the directive among them, at the author's
-    /// position — and the binding, the node the directive precedes, is emitted
-    /// verbatim. `None` when the parameter carries no decorator or no directive leads
-    /// its binding.
+    /// The span an alone-on-line format-ignore directive between a DECORATED parameter's
+    /// decorators and its binding freezes (`@dec⏎// prettier-ignore⏎private a:   T`) — the
+    /// binding, the node the directive precedes. `None` when the parameter carries no
+    /// decorator or no directive leads its binding.
     ///
     /// This is the inner half of a decorated parameter's two freeze positions; the
     /// parameter-list gap ([`Printer::param_frozen_span`]) covers the outer half, where a
     /// directive before the FIRST decorator freezes the whole parameter, decorators
     /// included. Each freezes exactly what the directive precedes.
     ///
+    /// Named separately from the doc builder below because the parameter list's comment
+    /// seam asks it too: the freeze prints this span RAW, so it is also how far the
+    /// parameter PRINTED, which is the seam's claim anchor
+    /// ([`Printer::element_claim_anchor`]). Reading only the outer half there reports "not
+    /// frozen" for a binding this half emitted verbatim, and the seam re-claims a comment
+    /// inside it.
+    ///
     /// Inlined for the same reason as every gated entry in `printer::ignore`: every
     /// parameter of every document asks this, so a directive-free document must pay the
     /// one predicted branch and never the call.
     #[inline]
-    pub(in crate::printer) fn build_frozen_param_binding_doc(
+    pub(in crate::printer) fn param_binding_frozen_span(
         &self,
         param: &internal::Expression<'_>,
-    ) -> Option<DocId> {
+    ) -> Option<Span> {
         if !self.has_format_ignore {
             return None;
         }
         // `last()` carries the non-empty test — a decorator-less parameter and an empty
         // decorator list are the same `None` here.
         let decorators = param_decorators(param)?;
-        let binding_start = param.span().start;
-        self.member_gap_frozen(decorators.last()?.span.end, binding_start)
-            .then(|| {
-                self.with_param_decorators(
-                    Some(decorators),
-                    self.build_frozen_span_doc(param.span()),
-                    binding_start,
-                )
-            })
+        self.member_gap_frozen(decorators.last()?.span.end, param.span().start)
+            .then(|| param.span())
+    }
+
+    /// The frozen doc for the binding [`Self::param_binding_frozen_span`] selects: the
+    /// decorators print normally — with the directive among them, at the author's
+    /// position — and the binding is emitted verbatim.
+    #[inline]
+    pub(in crate::printer) fn build_frozen_param_binding_doc(
+        &self,
+        param: &internal::Expression<'_>,
+    ) -> Option<DocId> {
+        let frozen = self.param_binding_frozen_span(param)?;
+        Some(self.with_param_decorators(
+            param_decorators(param),
+            self.build_frozen_span_doc(frozen),
+            frozen.start,
+        ))
     }
 
     /// Prefix a parameter binding's doc with its parameter decorators, preserving

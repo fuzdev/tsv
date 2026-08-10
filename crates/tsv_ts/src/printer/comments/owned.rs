@@ -38,6 +38,12 @@ fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> 
         Expression::BinaryExpression(b) => b.left,
         Expression::ConditionalExpression(c) => c.test,
         Expression::AssignmentExpression(a) => a.left,
+        // A destructuring default's binding (`[/* c */ a = 1]`). Its `left` starts where
+        // the pattern does, so without this arm the seam claims the comment here AND again
+        // when the left's own `build_expression_doc` runs — printing it TWICE. The object
+        // pattern's twin never showed it: its property builder prints a shorthand key
+        // directly instead of routing the `AssignmentPattern` through the seam.
+        Expression::AssignmentPattern(a) => a.left,
         Expression::TaggedTemplateExpression(t) => t.tag,
         Expression::SequenceExpression(s) => s.expressions.first()?,
         Expression::TSNonNullExpression(n) => n.expression,
