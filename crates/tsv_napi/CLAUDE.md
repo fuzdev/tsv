@@ -130,10 +130,20 @@ dispatches to the binary (argh's help output — a discriminator the JS mirror
 never prints), that it forwards exit codes, stdout/stderr, and stdin, that
 `--version` through the bin matches the staged package version (a
 binary↔package lockstep gate — a stale binary staged into a fresh package
-fails it), that `npm pack` would ship the binary executable (npm packs the
-on-disk mode), and the degraded paths: binary removed → `cli.js`,
+fails it), and that `npm pack` would ship the binary in the tarball — the
+package.json check covers the `files` declaration and the file on disk, this
+covers what npm actually packs — executable where a mode exists (npm packs
+the on-disk mode). Then the degraded paths: binary removed → `cli.js`,
 present-but-unrunnable → warn + `cli.js`, child killed by a signal →
-re-raised. The shared
+re-raised. The last two are posix-only by nature, not by omission: the
+fallback branch keys on any spawn error, so a Windows staging would re-enter
+an already-proven branch, and signal death has no Windows analogue.
+
+Both CLIs exist here and only here, so this is also where their **flag sets**
+are held together: each side is handed every flag the other advertises and
+must not answer with its unknown-flag error. Recognition, not behavior —
+semantics stay with `scripts/test_npm.ts` and `tests/cli_tests.rs` — which is
+what catches the hand-written mirror going stale against argh. The shared
 `tests/discovery/scenarios.json` parity table runs through **both** bin
 entries: `bin.js` (native discovery via the shim — the real `npx tsv` path)
 and `cli.js` directly (the fallback JS loop over the native `IgnoreStack`,

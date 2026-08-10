@@ -54,14 +54,13 @@ fn temp_dir(name: &str) -> PathBuf {
 
 static BUILD: Once = Once::new();
 
-/// Run the built `tsv` binary with `cwd` as its working directory — needed for
-/// ignore-file tests that pass a relative target like `.` (resolved against the
-/// cwd; the format root is then derived from that target, never the cwd itself),
-/// since the `cargo run` helper above always runs in the workspace root. The
-/// binary is built once on first use.
-/// Test helper; panicking on spawn/build failure is the desired behavior.
+/// Path to the built `tsv` binary, built once on first use. Spelled with
+/// `EXE_SUFFIX` rather than leaning on Windows' implicit `.exe` resolution,
+/// since a test may need the path as a *file* (to copy) and not only as
+/// something to spawn.
+/// Test helper; panicking on build failure is the desired behavior.
 #[allow(clippy::expect_used)]
-fn tsv_in_dir(cwd: &Path, args: &[&str]) -> std::process::Output {
+fn built_tsv() -> PathBuf {
     BUILD.call_once(|| {
         let status = Command::new("cargo")
             .args(["build", "-p", "tsv_cli", "-q"])
@@ -69,8 +68,18 @@ fn tsv_in_dir(cwd: &Path, args: &[&str]) -> std::process::Output {
             .expect("Failed to build tsv_cli");
         assert!(status.success(), "tsv_cli build failed");
     });
-    let bin = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/tsv");
-    Command::new(bin)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("target/debug/tsv{}", std::env::consts::EXE_SUFFIX))
+}
+
+/// Run the built `tsv` binary with `cwd` as its working directory — needed for
+/// ignore-file tests that pass a relative target like `.` (resolved against the
+/// cwd; the format root is then derived from that target, never the cwd itself),
+/// since the `cargo run` helper above always runs in the workspace root.
+/// Test helper; panicking on spawn failure is the desired behavior.
+#[allow(clippy::expect_used)]
+fn tsv_in_dir(cwd: &Path, args: &[&str]) -> std::process::Output {
+    Command::new(built_tsv())
         .args(args)
         .current_dir(cwd)
         .output()
@@ -1009,18 +1018,9 @@ fn test_version_flag() {
 #[test]
 #[allow(clippy::expect_used)]
 fn test_command_name_is_independent_of_argv0() {
-    BUILD.call_once(|| {
-        let status = Command::new("cargo")
-            .args(["build", "-p", "tsv_cli", "-q"])
-            .status()
-            .expect("Failed to build tsv_cli");
-        assert!(status.success(), "tsv_cli build failed");
-    });
-    let suffix = std::env::consts::EXE_SUFFIX;
-    let built = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("target/debug/tsv{suffix}"));
     let dir = temp_dir("argv0_name");
-    let renamed = dir.join(format!("tsv_renamed{suffix}"));
-    fs::copy(&built, &renamed).expect("Failed to copy the tsv binary");
+    let renamed = dir.join(format!("tsv_renamed{}", std::env::consts::EXE_SUFFIX));
+    fs::copy(built_tsv(), &renamed).expect("Failed to copy the tsv binary");
 
     let run = |args: &[&str]| {
         Command::new(&renamed)

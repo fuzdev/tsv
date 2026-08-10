@@ -6,7 +6,9 @@ use argh::FromArgs;
 /// binary is `tsv.exe` on Windows and is invoked through the npm loader's `tsv`
 /// bin everywhere, so a derived name would print `Usage: tsv.exe format` on one
 /// platform and disagree with the JS mirror's hand-written help, which spells
-/// the same contract as `tsv` on every platform.
+/// the same contract as `tsv` on every platform. Running a renamed copy of the
+/// binary is how `tests/cli_tests.rs` holds this — the property is otherwise
+/// only observable on Windows.
 const CMD_NAME: &str = "tsv";
 
 fn main() {

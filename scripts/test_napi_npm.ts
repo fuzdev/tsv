@@ -13,9 +13,11 @@
  * `tsv_cli` binary: that it really dispatches (argh's help output), that it
  * forwards exit codes, stdio, and stdin, that `--version` matches the staged
  * package version (binary↔package lockstep), that `npm pack` would ship the
- * binary executable, that a child's signal death is re-raised, and that with
- * the binary removed or unrunnable it degrades to the shared `cli.js` JS
- * mirror over the native engine. The
+ * binary (executable, where a mode exists), that a child's signal death is
+ * re-raised, and that with the binary removed or unrunnable it degrades to the
+ * shared `cli.js` JS mirror over the native engine. Because both CLIs are
+ * present here and only here, this is also where their FLAG SETS are held
+ * together — the mirror's are hand-written and would otherwise drift. The
  * discovery-parity scenario table runs through BOTH bin entries — the
  * dispatcher (native discovery through the shim, the real `npx tsv` path)
  * and cli.js directly (the fallback JS loop over the native `IgnoreStack`),
@@ -405,21 +407,28 @@ describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () =>
 		assert.equal(result.stdout, `tsv ${loader_pkg.version}\n`);
 	});
 
-	// What npm would actually publish: the pack file list must carry the CLI
-	// binary WITH its execute bit — npm packs the on-disk mode, and npm only
-	// chmods `bin` entries at install, so a 644 here ships a broken npx.
-	// Posix-only: Windows has no mode to pin (and `npm` there is a .cmd,
-	// which spawnSync can't run shell-less).
-	it('npm pack ships the CLI binary, executable', { skip: !posix }, () => {
+	// What npm would actually publish, on every platform — because it is the
+	// one claim the package.json check above can't make. That one proves the
+	// `files` array names this platform's binary and that the file is on disk;
+	// this one proves npm's own packing rules then put it in the TARBALL, which
+	// is what a consumer installs. Without it, `npx tsv` could silently degrade
+	// to the JS mirror on a platform whose staging looked perfect.
+	// The execute bit is posix-only: npm packs the on-disk mode and only chmods
+	// `bin` entries at install, so a 644 there ships a broken npx — on Windows
+	// there is no mode to pin. (`npm` is a .cmd there, hence the shell.)
+	it('npm pack ships the CLI binary', () => {
 		const result = spawnSync('npm', ['pack', '--dry-run', '--json'], {
 			cwd: join(pkg_root, triple),
-			encoding: 'utf-8'
+			encoding: 'utf-8',
+			shell: process.platform === 'win32'
 		});
 		assert.equal(result.status, 0, result.stderr);
 		const [report] = JSON.parse(result.stdout);
 		const entry = report.files.find((f: { path: string }) => f.path === cli_binary_name);
 		assert.ok(entry, `${cli_binary_name} missing from the packed file list`);
-		assert.ok(entry.mode & 0o111, `packed mode ${entry.mode.toString(8)} is not executable`);
+		if (posix) {
+			assert.ok(entry.mode & 0o111, `packed mode ${entry.mode.toString(8)} is not executable`);
+		}
 	});
 
 	it('format --content prints formatted source', () => {
@@ -540,6 +549,69 @@ describe('cli (bin.js): fallback to the JS mirror without the binary', () => {
 		);
 		assert.equal(run_fallback(['format', '--content', 'const =', '--parser', 'ts']).status, 2);
 	});
+});
+
+// Flag-set parity between the two CLIs that serve the same contract. This is
+// the only place both exist at once (the wasm package ships no binary), and the
+// mirror's flag table and help text are hand-written — so a flag added to argh
+// and not to `cli.js`, or left in the mirror after the native CLI dropped it,
+// drifts silently: every other test here drives flags it names itself, and so
+// only ever covers the intersection both sides already agree on.
+//
+// The claim is RECOGNITION, not behavior (each flag's semantics are pinned by
+// the matrix in `scripts/test_npm.ts` and `tests/cli_tests.rs`): each side is
+// handed the bare flag and must not answer with its unknown-flag error. A
+// missing value or missing input is a different error and passes — that is the
+// point, since it means the flag was understood. Scope is the two commands;
+// the top-level `--version` / `--help` have their own tests on both sides.
+
+/** The `--flag`s a help text advertises. Two vacuity checks come with it: a
+ * regex that quietly matched nothing would make every assertion below pass. */
+const advertised_flags = (help: string, source: string): Array<string> => {
+	const options = help.slice(help.indexOf('\nOptions:'));
+	const flags = [...options.matchAll(/^ {2}(--[a-z0-9-]+)/gm)]
+		.map((m) => m[1])
+		// argh generates `--help` for every command; the mirror handles it
+		// without advertising it, so it is the one flag the sets can't share.
+		.filter((flag) => flag !== '--help');
+	assert.ok(flags.length >= 5, `parsed too few flags from ${source}: ${flags}`);
+	assert.ok(flags.includes('--parser'), `parsed no --parser from ${source}: ${flags}`);
+	return flags;
+};
+
+const run_mirror = (args: Array<string>) =>
+	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input: '' });
+
+describe('flag parity: the native CLI and cli.js recognize the same flags', () => {
+	for (const command of ['format', 'parse']) {
+		it(`${command}: every flag the native CLI advertises, cli.js recognizes`, () => {
+			const help = run_cli(['help', command], '');
+			assert.equal(help.status, 0, help.stderr);
+			const flags = advertised_flags(help.stdout, `argh's \`${command}\` help`);
+			for (const flag of flags) {
+				const result = run_mirror([command, flag]);
+				assert.doesNotMatch(
+					result.stderr,
+					/Unknown option/,
+					`cli.js does not know \`${command} ${flag}\`, which the native CLI advertises`
+				);
+			}
+		});
+
+		it(`${command}: every flag cli.js advertises, the native CLI recognizes`, () => {
+			const help = run_mirror(['help', command]);
+			assert.equal(help.status, 0, help.stderr);
+			const flags = advertised_flags(help.stdout, `cli.js's \`${command}\` help`);
+			for (const flag of flags) {
+				const result = run_cli([command, flag], '');
+				assert.doesNotMatch(
+					result.stderr,
+					/Unrecognized argument/,
+					`the native CLI does not know \`${command} ${flag}\`, which cli.js advertises`
+				);
+			}
+		});
+	}
 });
 
 // The degraded-binary paths, posix-only (see the staging comment): a binary
