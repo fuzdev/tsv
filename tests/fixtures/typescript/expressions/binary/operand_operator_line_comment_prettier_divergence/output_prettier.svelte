@@ -23,6 +23,15 @@
 		x instanceof // c
 		C;
 
+	// a pair the author glued onto one line keeps that line in the run before the
+	// operator, the same rule every comment run reads
+	// (syntax/comments/separator_glued_run)
+	const f =
+		g +
+		/* c1 */ /* c2 */
+		// c3
+		h;
+
 	// a same-line block comment stays inline (not a divergence)
 	const e = 1 /* c */ + 2;
 </script>

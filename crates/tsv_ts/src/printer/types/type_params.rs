@@ -810,7 +810,7 @@ impl<'a> Printer<'a> {
             } else {
                 // Last param: trailing comments before `>`
                 let before_close = span.end - 1;
-                inner_parts.extend(self.build_trailing_comments_multiline(param_end, before_close));
+                inner_parts.extend(self.build_trailing_gap_comments(param_end, before_close));
                 prev_end = before_close;
             }
         }

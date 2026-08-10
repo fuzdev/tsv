@@ -419,7 +419,7 @@ pub(crate) fn should_force_expansion_for_comments(
     // Check if any block comment is truly standalone (not inline with the next code).
     // `next_code_pos` bounds the gap, so an item always follows: every caller scans either
     // the `(`→first-argument gap or an inter-argument one, and the trailing position past
-    // the last argument belongs to `has_own_line_block_comment_after`.
+    // the last argument belongs to `Printer::has_own_line_block_comment_before_closer`.
     for comment in comments_to_emit_in_range(printer.comments, start, next_code_pos) {
         if comment.is_block && printer.block_comment_owns_its_line(comment, true) {
             return true;
@@ -475,7 +475,21 @@ pub(super) fn any_comment_forces_expansion(
         // Line comments or standalone block comments force expansion.
         // Inline block comments (same line as previous arg or inline with next arg)
         // do not force expansion — the group/fits mechanism decides layout.
-        if should_force_expansion_for_comments(printer, arg_end, next_boundary) {
+        //
+        // The LAST argument's gap runs to the `)`, where no item is left to lead, so the
+        // closer sharing a comment's line is not glue — the trailing position's own
+        // predicate ([`Printer::has_own_line_block_comment_before_closer`], which carries
+        // that argument). `should_force_expansion_for_comments` states the same rule for a
+        // gap an item DOES follow, and the two must agree with what
+        // `emit_last_arg_trailing_comments` trails: a gate that opens the list around a
+        // comment the emitter puts back on the argument's line opens it around nothing.
+        let forces = if i < call.arguments.len() - 1 {
+            should_force_expansion_for_comments(printer, arg_end, next_boundary)
+        } else {
+            printer.has_line_comments_between(arg_end, next_boundary)
+                || printer.has_own_line_block_comment_before_closer(arg_end, next_boundary)
+        };
+        if forces {
             return true;
         }
     }
@@ -673,6 +687,14 @@ pub(crate) fn emit_first_arg_leading_comments(
 /// doc deliberately leaves for its parent), then the ordinary gap between the argument's
 /// end and `)`. The second keeps the plain `arg.span().end` anchor: widening it to reach
 /// the interior is what claims the spread's own share a second time.
+///
+/// The gap is partitioned with [`PartitionedComments::for_closer_gap`], not
+/// [`PartitionedComments::new`]: it holds the list's own **comma**, which under
+/// `trailingComma: 'none'` is never re-emitted, so a comment the author wrote after a
+/// comma pushed onto its own line (`fn(a⏎, /* c */)`) trails the argument and has no line
+/// of its own to keep. The delimiter-line reading calls it own-line and dangles it below
+/// the argument, force-opening a call that fits (`docs/comments.md` §Own-line-ness is a
+/// SOURCE question).
 pub(crate) fn emit_last_arg_trailing_comments(
     printer: &Printer<'_>,
     parts: &mut DocBuf,
@@ -688,12 +710,7 @@ pub(crate) fn emit_last_arg_trailing_comments(
     if !printer.has_comments_to_emit_between(arg_end, paren_close) {
         return;
     }
-    let mut pc = PartitionedComments::new(
-        printer.comments,
-        printer.comment_line_breaks,
-        arg_end,
-        paren_close,
-    );
+    let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
     pc.demote_trailing_line_after_deferred(printer.defers_trailing_line_comment(last_arg));
     pc.emit_last_arg_comments(parts, printer);
 }
@@ -753,12 +770,18 @@ where
 ///
 /// Uses `SmallVec` to avoid heap allocations for the common case (0-2 comments per range).
 ///
-/// ⚠️ **The two constructors ask different questions, and the gap's shape picks one.**
-/// [`Self::for_item_gap`] — the gap holding the list's own **comma** — takes its split
-/// from [`Printer::trailing_comment_run`], the same walk the object literal, both
-/// destructuring patterns, the enum and the array literal partition their element→comma
-/// gaps with, so the call family cannot answer the seam differently. [`Self::new`] — a
-/// **delimiter** gap (`(`→first argument, last argument→`)`) — keeps the same-line
+/// ⚠️ **The three constructors ask different questions, and the gap's shape picks one.**
+/// The split between them is where the gap's `start` sits: past a `(` it is an ITEM's end,
+/// and the claim reads the SOURCE; at the `(` itself it is the delimiter's.
+/// [`Self::for_item_gap`] — an **inter-item** gap — takes its split from
+/// [`Printer::trailing_comment_run`], the same walk the object literal, both destructuring
+/// patterns, the enum and the array literal partition their element→comma gaps with, so
+/// the call family cannot answer the seam differently. [`Self::for_closer_gap`] — a
+/// **last-item→`)`** gap, whether or not a comma sits in it — takes
+/// [`Printer::closer_trailing_comment_run`], which differs from that walk on exactly one
+/// thing (a `//` written against the comma `trailingComma: 'none'` deletes).
+/// [`Self::new`] — a
+/// **delimiter** gap (`(`→first argument) — keeps the same-line
 /// reading of `tsv_lang::ClassifiedComments`, shared with the ternary
 /// (`conditional.rs`) and member-chain (`chain/builder/helpers.rs`) gap printers, whose
 /// gaps likewise hold an operator or a `.` rather than a comma. Each constructor's own
@@ -789,11 +812,19 @@ impl<'a> PartitionedComments<'a> {
     /// IS the delimiter (`docs/comments.md` §The delimiter-line question). It is blind to
     /// the two kinds of text no item span covers — the list's own **comma** and a stripped
     /// paren shell's `)` — so it must not be used where the answer decides which ITEM a
-    /// comment binds to. An **inter-item** gap takes [`Self::for_item_gap`], and so does a
-    /// last-item→`)` gap whose emitter claims a trailing RUN
-    /// (`build_inline_trailing_comments`): a comment behind a stripped `)`, or behind a
-    /// comma the author pushed onto its own line, still trails that item and this reading
-    /// would leave it unclaimed.
+    /// comment binds to. An **inter-item** gap takes [`Self::for_item_gap`] and a
+    /// **last-item→`)`** gap [`Self::for_closer_gap`]: a comment behind a stripped `)`, or
+    /// behind a comma the author pushed onto its own line, still trails that item and this
+    /// reading would leave it unclaimed.
+    ///
+    /// ⚠️ **A comma-less gap is no exception, and reading it as one was a bug.** The two
+    /// comma-less single-argument shapes — `require('x')` and a `import(…)` with no options
+    /// — were held here on the argument that their gap holds nothing the two readings
+    /// disagree about. It holds one thing: another comment's `*/`. A comment the author
+    /// glued behind it follows content on its line but not on the ARGUMENT's, so this
+    /// reading dangled it below the argument and split a pair written as one. Every gap
+    /// past a `(` now takes an item constructor, which leaves this one purely the
+    /// **delimiter**-gap reading its name describes.
     pub fn new(
         comments: &'a [internal::Comment],
         line_breaks: &[u32],
@@ -840,10 +871,51 @@ impl<'a> PartitionedComments<'a> {
     /// which this would call trailing — pulling it onto the delimiter's line *and* leaving
     /// it for the first item's leading run to print again. Use [`Self::new`] there.
     pub fn for_item_gap(printer: &Printer<'a>, start: u32, end: u32) -> Self {
+        Self::from_trailing_run(
+            printer.trailing_comment_run(start, end),
+            printer,
+            start,
+            end,
+        )
+    }
+
+    /// Partition a **last-item→`)`** gap — the one that holds the comma
+    /// `trailingComma: 'none'` deletes — into the argument's **trailing** run and the
+    /// **dangling** comments below it.
+    ///
+    /// [`Printer::closer_trailing_comment_run`] rather than the inter-item walk: a block
+    /// takes the same source reading (the deleted comma is still content the author wrote
+    /// against), while a `//` written after a comma the author gave its own line keeps
+    /// that line — the sanctioned divergence that walk's doc carries. [`Self::new`]'s
+    /// delimiter reading answers neither: it calls a comma-glued block own-line and
+    /// dangles it below the argument, force-opening a call that fits.
+    ///
+    /// Taken by every last-argument gap, **including the comma-less ones** — `require('x')`
+    /// and a `import(…)` with no options. The comma is not what makes the source reading
+    /// necessary, only the loudest byte that needs it: a preceding comment's `*/` is text no
+    /// argument span covers too, and a comment glued behind one is exactly as mis-read.
+    pub fn for_closer_gap(printer: &Printer<'a>, item_end: u32, end: u32) -> Self {
+        Self::from_trailing_run(
+            printer.closer_trailing_comment_run(item_end, end),
+            printer,
+            item_end,
+            end,
+        )
+    }
+
+    /// Split a gap at its trailing RUN: the run's blocks and its (at most one) line
+    /// comment trail, everything past it leads. Shared by the two item-gap constructors so
+    /// only the run's own rule differs between them.
+    fn from_trailing_run(
+        run: impl Iterator<Item = &'a internal::Comment>,
+        printer: &Printer<'a>,
+        start: u32,
+        end: u32,
+    ) -> Self {
         let mut trailing_line: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
         let mut trailing_block: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
         let mut run_end = start;
-        for comment in printer.trailing_comment_run(start, end) {
+        for comment in run {
             if comment.is_block {
                 trailing_block.push(comment);
             } else {
@@ -895,6 +967,21 @@ impl<'a> PartitionedComments<'a> {
 
     pub fn has_trailing_line(&self) -> bool {
         !self.trailing_line.is_empty()
+    }
+
+    /// Whether a **last-item→`)`** gap's comments force the parens open — asked of a
+    /// [`Self::for_closer_gap`] partition, whose emitter is [`Self::emit_last_arg_comments`].
+    ///
+    /// Two things need a line the flat layout cannot give them: a `//` runs to end of line
+    /// and would swallow the `)`, and an own-line comment (everything the trailing run did
+    /// not claim, which is what `leading` holds here) keeps the line the author gave it via
+    /// a `hardline` that a flat group has nowhere to put.
+    ///
+    /// One question, one predicate: the gate and the emitter partition the same gap, so a
+    /// gate that opened the parens around a comment the emitter puts back on the item's
+    /// line would open them around nothing.
+    pub fn forces_closer_break(&self) -> bool {
+        self.has_trailing_line() || !self.leading.is_empty()
     }
 
     /// Reclassify this gap's same-line LINE comments as own-line when the node the gap
@@ -1030,29 +1117,35 @@ impl<'a> PartitionedComments<'a> {
     /// comment.
     ///
     /// The separator goes BEFORE each comment (`docs/comments.md` §Trailing and dangling
-    /// runs) and is asked of the **source**, like
-    /// [`Printer::push_trailing_comments_in_range`]: a comment the author glued to the
-    /// previous one's line (`/* c */ // t`, `/* c1 */ /* c2 */`) stays on that line.
-    /// Giving each its own line unconditionally reads as the safer rule and is not — the
-    /// run re-collapses on the next pass, because a comment printed onto a fresh line is
-    /// no longer glued when it is reparsed, so the output never reaches a fixed point
-    /// (F1). The first comment's separator is unconditional: either it is own-line by
-    /// construction (that is what put it in `leading`), or
-    /// [`Self::demote_trailing_line_after_deferred`] moved it here precisely because it
-    /// needs a line the previous node's deferred `//` denies it.
+    /// runs) and is the shared trailing-run one
+    /// ([`Printer::push_trailing_run_separator`]): a comment the author glued to the
+    /// previous one's line (`/* c */ // t`, `/* c1 */ /* c2 */`) stays on that line, and
+    /// everything else takes the blank-preserving break. Giving each its own line
+    /// unconditionally reads as the safer rule and is not — the run re-collapses on the
+    /// next pass, because a comment printed onto a fresh line is no longer glued when it is
+    /// reparsed, so the output never reaches a fixed point (F1). The first comment's
+    /// separator is unconditional: either it is own-line by construction (that is what put
+    /// it in `leading`), or [`Self::demote_trailing_line_after_deferred`] moved it here
+    /// precisely because it needs a line the previous node's deferred `//` denies it —
+    /// which is exactly what a `None` predecessor answers.
+    ///
+    /// ⚠️ Despite the name this is not a *dangling* run in the
+    /// [`Printer::push_dangling_comment_run`] sense (a container's only content, whose
+    /// separator is unconditional): an argument precedes these, so the glue question
+    /// applies. This walk asked it correctly — between the two comments — before the
+    /// question was named, and that is the spelling
+    /// [`Printer::trailing_run_hugs_previous`] adopted; the "what follows the `*/`" one is
+    /// the paraphrase that breaks on a deleted comma.
     pub fn emit_dangling_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
-        let d = printer.d();
         let mut prev_end = self.start;
-        for (i, comment) in self.leading.iter().enumerate() {
-            if i > 0 && !printer.has_newline_between(prev_end, comment.span.start) {
-                parts.push(d.text(" "));
-            } else {
-                // Preserve an author blank line before an own-line trailing comment
-                // (`arg⏎⏎/* c */` before the closing `)`), matching prettier.
-                printer.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
-            }
+        let mut prev_comment: Option<&internal::Comment> = None;
+        for comment in &self.leading {
+            // Preserves an author blank line before an own-line trailing comment
+            // (`arg⏎⏎/* c */` before the closing `)`), matching prettier.
+            printer.push_trailing_run_separator(parts, prev_comment, prev_end, comment.span.start);
             parts.push(printer.build_comment_doc(comment));
             prev_end = comment.span.end;
+            prev_comment = Some(comment);
         }
     }
 
