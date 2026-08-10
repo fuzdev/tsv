@@ -382,17 +382,24 @@ impl<'a> Printer<'a> {
     /// the blank outside the measured range. Deriving this per site is how the literal
     /// and the pattern came to ask it on two different axes — the one thing `printObject`
     /// printing both through one path says they must not do.
+    ///
+    /// ⚠️ The scan starts at the previous item's SHELL end ([`Self::element_shell_end`]),
+    /// not at `prev_end` itself. This is the seam's **distance** half: `prev_end` is a
+    /// CLAIM anchor and stops where the item's doc stops printing, which for an item whose
+    /// span was extended over a stripped paren is *inside* the erased shell — and a
+    /// distance measured from there reads the shell's own line breaks as an author blank
+    /// (`{ k: (1⏎⏎), b }` grew one, in the literal and the pattern alike). The peel steps
+    /// over `)` and whitespace only and **stops at the first comment**, so a blank the
+    /// author wrote ahead of a comment in that shell is still measured — the two answers
+    /// this function must give differ by exactly that, and one anchor gives both.
     pub(crate) fn push_item_blank_separator(
         &self,
         parts: &mut DocBuf,
         prev_end: u32,
         item_start: u32,
     ) {
-        self.push_next_line_empty_hardline(
-            parts,
-            prev_end,
-            self.item_gap_blank_bound(prev_end, item_start),
-        );
+        let (from, bound) = self.item_gap_blank_scan(prev_end, item_start);
+        self.push_next_line_empty_hardline(parts, from, bound);
     }
 
     /// Whether the author left a blank line in an item gap — the predicate half of
@@ -402,17 +409,30 @@ impl<'a> Printer<'a> {
     /// A soft `line` cannot carry a blank, so a list whose separator is one has to know:
     /// the blank is authorship the list preserves, and preserving it means taking the
     /// hardline separator (which forces the break) rather than the `line`. Both halves read
-    /// the same bound, so the decision and the emission cannot disagree.
+    /// the same range, so the decision and the emission cannot disagree.
     pub(crate) fn item_gap_has_blank_line(&self, prev_end: u32, item_start: u32) -> bool {
-        self.is_next_line_empty(prev_end, self.item_gap_blank_bound(prev_end, item_start))
+        let (from, bound) = self.item_gap_blank_scan(prev_end, item_start);
+        self.is_next_line_empty(from, bound)
     }
 
-    /// Where an item gap's blank-line scan stops: the first comment **in source**, or the
-    /// item itself. See [`Self::push_item_blank_separator`] for why the bound is physical.
-    fn item_gap_blank_bound(&self, prev_end: u32, item_start: u32) -> u32 {
-        self.comments_in_source_between(prev_end, item_start)
+    /// The range an item gap's blank-line scan reads: from the previous item's SHELL end
+    /// to the first comment **in source** (else the item itself). Both ends in one place
+    /// because both halves above need both — deriving either separately is how a predicate
+    /// and its emitter drift into disagreeing about the same gap.
+    ///
+    /// See [`Self::push_item_blank_separator`] for why the start is peeled and why the
+    /// bound is physical.
+    pub(in crate::printer) fn item_gap_blank_scan(
+        &self,
+        prev_end: u32,
+        item_start: u32,
+    ) -> (u32, u32) {
+        let from = self.element_shell_end(prev_end, item_start);
+        let bound = self
+            .comments_in_source_between(from, item_start)
             .next()
-            .map_or(item_start, |c| c.span.start)
+            .map_or(item_start, |c| c.span.start);
+        (from, bound)
     }
 
     /// Whether `[from, next)` holds a **truly blank line** — two newlines with nothing

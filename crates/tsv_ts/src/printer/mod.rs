@@ -1074,11 +1074,22 @@ impl<'a> Printer<'a> {
     /// `{…}`. Every such list is one delimiter byte at each end, which is the only shape
     /// assumption here — a caller whose node span runs PAST the closer (an object pattern's
     /// `: T` annotation) trims it back to the closer before calling.
+    ///
+    /// ⚠️ `get_printed_span` yields the item's **PRINTED** span, not necessarily its node
+    /// span: the "inside an element" test below asks whether the ELEMENT'S OWN DOC prints
+    /// the comment, and where a node's span was extended over an erased closer
+    /// (`docs/comments.md` §The element-comma seam) it does not. The two coincide for most
+    /// callers — a grouping paren is no node, so an argument's or a type item's span never
+    /// swallows one — and differ exactly where the destructuring patterns' element ends
+    /// past a stripped shell, which is why they narrow it
+    /// ([`crate::ast::internal::Expression::printed_end`]). Handing back the node span
+    /// there counts a shell-interior comment as the element's, and it reaches no gate at
+    /// all while the seam emits it.
     pub(crate) fn has_own_line_block_comments_in_bracket_list<T, F>(
         &self,
         span: Span,
         items: &[T],
-        get_span: F,
+        get_printed_span: F,
     ) -> bool
     where
         F: Fn(&T) -> Span,
@@ -1094,7 +1105,7 @@ impl<'a> Printer<'a> {
 
             // Skip comments that are inside an element (they belong to that element, not this list)
             let inside_element = items.iter().any(|e| {
-                let s = get_span(e);
+                let s = get_printed_span(e);
                 comment.span.start >= s.start && comment.span.end <= s.end
             });
             if inside_element {
@@ -1118,7 +1129,7 @@ impl<'a> Printer<'a> {
             // see.
             let next_elem_start = items
                 .iter()
-                .map(|e| get_span(e).start)
+                .map(|e| get_printed_span(e).start)
                 .find(|&start| start >= comment.span.end);
 
             match next_elem_start {

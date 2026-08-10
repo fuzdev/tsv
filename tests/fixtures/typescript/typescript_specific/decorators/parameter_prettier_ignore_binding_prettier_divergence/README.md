@@ -14,7 +14,16 @@ Prettier honors neither position here:
 - at a plain **binding** (`@dec1⏎@dec2⏎// prettier-ignore⏎c: T`) it re-binds the
   directive *past the name* — trailing `c`, freezing only the `: T` annotation —
   and that form is not self-stable: its own second pass floats the directive up to
-  trail `@dec2` and **loses the freeze** (pinned by `audit_signature.txt`).
+  trail `@dec2` and **loses the freeze** (pinned by `audit_signature.txt`);
+- at a **default** whose value carries redundant parens
+  (`@dec⏎// prettier-ignore⏎e = (1 /* c */)`) it collapses the list instead.
+
+That last case also pins the parameter list's comment seam against the freeze:
+the frozen slice prints the shell and the comment inside it, so the seam must
+claim nothing there. Its anchor is the end of whichever freeze fired — this
+position or the list gap — and reading only the list gap prints the comment a
+second time on every pass
+([comments.md §The element-comma seam](../../../../../../docs/comments.md#the-element-comma-seam-the-two-runs-must-partition-the-gap)).
 
 ## Reason
 

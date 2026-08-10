@@ -29,6 +29,7 @@
 use super::{CommentVec, Printer};
 use smallvec::SmallVec;
 use tsv_lang::Comment;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -114,6 +115,30 @@ impl TrailingComments<'_> {
 }
 
 impl<'a> Printer<'a> {
+    /// Where a list element's trailing-comment scan starts: its PRINTED end
+    /// ([`crate::ast::internal::Expression::printed_end`], which carries the argument),
+    /// except under a format-ignore FREEZE, where it is the end of the frozen slice.
+    ///
+    /// The freeze arm is the whole reason this is a named question rather than a field
+    /// read. A frozen element prints its source **verbatim**, stripped-paren shell and
+    /// interior comment included, so the anchor must be the end of what that slice PRINTED;
+    /// an inner anchor hands the seam a comment already on the page and prints it TWICE —
+    /// and once more on every later pass, since the emitted form still carries the
+    /// directive and re-freezes.
+    ///
+    /// ⚠️ **The slice, not a `bool` plus the node's span end.** The two agree at every
+    /// freeze site today, but "did something freeze?" and "how far did we print?" are one
+    /// question here, and asking the first is how the second gets answered by the wrong
+    /// arm: a parameter has TWO freeze positions — the list gap
+    /// ([`Self::param_frozen_span`]) and the decorators→binding gap
+    /// ([`Self::param_binding_frozen_span`]) — and the outer one alone reports "not
+    /// frozen" for a binding the inner one printed raw. Each family resolves its own
+    /// `Option<Span>` and hands it here.
+    #[inline]
+    pub(in crate::printer) fn element_claim_anchor(frozen: Option<Span>, printed_end: u32) -> u32 {
+        frozen.map_or(printed_end, |slice| slice.end)
+    }
+
     /// `elem_end` advanced past the closers of a stripped paren shell — source the
     /// element's doc CONSUMED but did not print, and which no span covers.
     ///

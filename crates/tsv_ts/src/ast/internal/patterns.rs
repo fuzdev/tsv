@@ -32,6 +32,22 @@ pub struct ObjectPattern<'arena> {
     pub span: Span,
 }
 
+impl ObjectPattern<'_> {
+    /// Where the `{…}` body ENDS — the closing brace, or the start of a `: T` annotation
+    /// the pattern's span swallowed.
+    ///
+    /// The bound every comment scan over the pattern takes, and the link is load-bearing:
+    /// the annotation prints its own comments, so a range run to `span.end` claims one the
+    /// annotation's doc also prints. A `?` is inside the body either way (it precedes the
+    /// annotation and rides inside `span`), which is the pre-existing reading — no comment
+    /// can sit between the `}` and it that the brace scan doesn't already own.
+    pub fn body_end(&self) -> u32 {
+        self.type_annotation
+            .as_ref()
+            .map_or(self.span.end, |t| t.span.start)
+    }
+}
+
 /// Object pattern property - either a regular property or a rest element
 #[derive(Debug, Clone)]
 pub enum ObjectPatternProperty<'arena> {
@@ -44,6 +60,23 @@ impl<'arena> ObjectPatternProperty<'arena> {
         match self {
             ObjectPatternProperty::Property(p) => p.span,
             ObjectPatternProperty::RestElement(r) => r.span,
+        }
+    }
+
+    /// Where the property's doc STOPS PRINTING — the pattern counterpart of
+    /// [`super::ObjectProperty::value_end`], and the anchor its trailing-comment scan
+    /// takes (`Expression::printed_end` carries the argument).
+    ///
+    /// Always the VALUE's end, never the key's, even for a shorthand property: `{a = (1)}`
+    /// is shorthand with an `AssignmentPattern` value, so a key anchor would open the scan
+    /// over `= 1` — text the property's own doc prints, and where a comment before the `=`
+    /// (`{a /* c */ = 1}`) would then be printed twice. The object literal can take the key
+    /// there only because its shorthand carries no value text at all.
+    pub fn value_end(&self) -> u32 {
+        match self {
+            ObjectPatternProperty::Property(p) => p.value.printed_end(),
+            // The rest element's own end: its stripped-paren interior is its doc's share.
+            ObjectPatternProperty::RestElement(r) => r.span.end,
         }
     }
 }
@@ -72,6 +105,16 @@ pub struct ArrayPattern<'arena> {
     /// emitted last in the wire, matching acorn.
     pub decorators: Option<&'arena [Decorator<'arena>]>,
     pub span: Span,
+}
+
+impl ArrayPattern<'_> {
+    /// Where the `[…]` body ENDS — the object pattern's [`ObjectPattern::body_end`] in its
+    /// bracket spelling, and load-bearing for the same reason.
+    pub fn body_end(&self) -> u32 {
+        self.type_annotation
+            .as_ref()
+            .map_or(self.span.end, |t| t.span.start)
+    }
 }
 
 /// Assignment pattern for default values in destructuring: `a = 1`

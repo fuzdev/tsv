@@ -248,10 +248,17 @@ impl<'a> Printer<'a> {
             // "is there a blank before me?" at property `i`, and "before the next one?" when
             // emitting `i`'s separator — which is the same gap, and computing it twice invites
             // the two answers to drift apart.
+            //
+            // Through the shared predicate rather than a raw `is_next_line_empty`, for the
+            // stripped-shell anchor it carries (`Printer::item_gap_has_blank_line`): a value's
+            // erased grouping parens are not an author blank (`{ k: (1⏎⏎), b }`), and a copy
+            // of this scan is how the comment-bearing path above and this one came to answer
+            // that differently. With no comment in the gap the bound is the next property
+            // either way, so the two spellings agree by construction.
             let gap_blank: SmallVec<[bool; 8]> = obj
                 .properties
                 .windows(2)
-                .map(|pair| self.is_next_line_empty(pair[0].value_end(), pair[1].span().start))
+                .map(|pair| self.item_gap_has_blank_line(pair[0].value_end(), pair[1].span().start))
                 .collect();
 
             for (i, prop) in obj.properties.iter().enumerate() {

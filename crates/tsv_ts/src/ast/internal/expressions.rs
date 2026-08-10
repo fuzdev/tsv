@@ -118,6 +118,37 @@ impl<'arena> Expression<'arena> {
         }
     }
 
+    /// Where this expression's doc STOPS PRINTING, which is its span end minus any
+    /// trailing stripped-paren shell the span swallowed.
+    ///
+    /// The two differ at exactly one kind of node: one whose span was extended over a
+    /// grouping paren the printer erases, without the closer belonging to any child.
+    /// An `AssignmentPattern` is that node — `a = (1)` spans through the `)` while its
+    /// doc stops at the value — and a `TSParameterProperty` inherits it through the
+    /// parameter it wraps. The region between the two ends therefore holds nothing but
+    /// `)`, whitespace and comments.
+    ///
+    /// This is the anchor a list element's TRAILING-COMMENT scan takes (`docs/comments.md`
+    /// §The element-comma seam): starting at the span end begins the scan *past* the
+    /// shell's interior, and since the element's own doc never reaches there either, a
+    /// comment inside the shell is claimed by nobody and DROPPED. ⚠️ Not the anchor for a
+    /// scan that measures a DISTANCE across the shell (a blank-line scan wants
+    /// [`crate::printer::Printer::element_shell_end`], the other end of the same
+    /// difference), and ⚠️ not for an element the format-ignore directive FROZE — a frozen
+    /// element prints its raw source, the shell and its comment included, so shifting the
+    /// anchor there DOUBLE-PRINTS it.
+    ///
+    /// A spread / rest element is deliberately untouched by this: its stripped-paren
+    /// interior is its own doc's share to print (§A stripped-paren interior is a partition
+    /// too), so its span end is already its printed end.
+    pub fn printed_end(&self) -> u32 {
+        match self {
+            Expression::AssignmentPattern(assign) => assign.right.printed_end(),
+            Expression::TSParameterProperty(param_prop) => param_prop.parameter.printed_end(),
+            _ => self.span().end,
+        }
+    }
+
     /// Peel type-assertion wrappers (`as` / `satisfies` / non-null `!` / `<T>`),
     /// returning the innermost wrapped expression (e.g. the `x` in `(x as T)!`).
     /// The single source of truth for "what counts as a type assertion" used by

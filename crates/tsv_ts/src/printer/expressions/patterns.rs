@@ -311,10 +311,7 @@ impl<'a> Printer<'a> {
             // pre-check gates both comment-scanning hints (blank lines are
             // comment-independent, so `formatting_hints` still runs to detect them).
             let should_expand = object_pattern_should_expand(obj, context);
-            let boundary = obj
-                .type_annotation
-                .as_ref()
-                .map_or(obj.span.end, |t| t.span.start);
+            let boundary = obj.body_end();
             let has_comments = self.has_comments_on_page_between(obj.span.start, boundary);
             let (has_line_comments, has_blank_lines) =
                 self.object_pattern_formatting_hints(obj, has_comments);
@@ -345,16 +342,18 @@ impl<'a> Printer<'a> {
 
                     parts.push(self.build_object_pattern_property_doc(prop));
 
-                    let prop_end = prop.span().end;
+                    // The property's PRINTED end, not its span end — see
+                    // `Printer::element_claim_anchor`, which this path asks unguarded
+                    // because nothing freezes here: every format-ignore spelling carries a
+                    // comment that routes the pattern to the expanded builder instead.
+                    let prop_end = prop.value_end();
                     let is_last = i == obj.properties.len() - 1;
 
                     // Collect trailing comments (stop at next property or type annotation)
                     let upper_bound = obj
                         .properties
                         .get(i + 1)
-                        .map(|next| next.span().start)
-                        .or_else(|| obj.type_annotation.as_ref().map(|t| t.span.start))
-                        .unwrap_or(obj.span.end);
+                        .map_or_else(|| obj.body_end(), |next| next.span().start);
                     let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
                     // Separator comma between properties; no trailing comma on the last
@@ -414,10 +413,7 @@ impl<'a> Printer<'a> {
         prev_end: u32,
     ) -> DocId {
         let d = self.d();
-        let boundary = obj
-            .type_annotation
-            .as_ref()
-            .map_or(obj.span.end, |t| t.span.start);
+        let boundary = obj.body_end();
 
         let mut parts = DocBuf::new();
         for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
@@ -503,13 +499,16 @@ impl<'a> Printer<'a> {
         elements: &[T],
         has_comments: bool,
         get_span: impl Fn(&T) -> Span,
+        get_printed_end: impl Fn(&T) -> u32,
     ) -> (bool, bool) {
         let mut has_line_comments = false;
         let mut has_blank_lines = false;
         let mut prev_end = collection_start + 1; // After opening bracket/brace
+        let mut prev_span_end = prev_end;
 
         for elem in elements {
-            let elem_start = get_span(elem).start;
+            let span = get_span(elem);
+            let elem_start = span.start;
 
             // Blank-line detection is comment-independent; when the collection has
             // no comments the first-comment lookup is a no-op (check_pos == elem_start).
@@ -521,7 +520,12 @@ impl<'a> Printer<'a> {
             } else {
                 elem_start
             };
-            if self.has_blank_line_between(prev_end, check_pos) {
+            // ⚠️ The blank scan keeps the SPAN end while the comment scan takes the printed
+            // one: they are opposite questions about the same stripped-paren shell
+            // (`docs/comments.md` §The element-comma seam). Measuring the distance from
+            // inside the shell reads its own line breaks as an author blank and expands a
+            // pattern prettier keeps inline (`{a = (1⏎⏎), b}`).
+            if self.has_blank_line_between(prev_span_end, check_pos) {
                 has_blank_lines = true;
             }
 
@@ -540,7 +544,8 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            prev_end = get_span(elem).end;
+            prev_end = get_printed_end(elem);
+            prev_span_end = span.end;
         }
 
         // Check comments after last element
@@ -563,16 +568,14 @@ impl<'a> Printer<'a> {
         obj: &internal::ObjectPattern<'_>,
         has_comments: bool,
     ) -> (bool, bool) {
-        let boundary = obj
-            .type_annotation
-            .as_ref()
-            .map_or(obj.span.end, |t| t.span.start);
+        let boundary = obj.body_end();
         self.collection_formatting_hints(
             obj.span.start,
             boundary,
             obj.properties,
             has_comments,
             ObjectPatternProperty::span,
+            ObjectPatternProperty::value_end,
         )
     }
 
@@ -585,16 +588,12 @@ impl<'a> Printer<'a> {
         &self,
         obj: &internal::ObjectPattern<'_>,
     ) -> bool {
-        let boundary = obj
-            .type_annotation
-            .as_ref()
-            .map_or(obj.span.end, |t| t.span.start);
+        let boundary = obj.body_end();
         let span = Span::new(obj.span.start, boundary);
-        self.has_own_line_block_comments_in_bracket_list(
-            span,
-            obj.properties,
-            ObjectPatternProperty::span,
-        )
+        self.has_own_line_block_comments_in_bracket_list(span, obj.properties, |prop| {
+            // The property's PRINTED span — see the array pattern's twin.
+            Span::new(prop.span().start, prop.value_end())
+        })
     }
 
     /// Build doc for empty object pattern: `{}` with optional `?` + type annotation
@@ -603,10 +602,7 @@ impl<'a> Printer<'a> {
         // Bound the comment scan to the braces (before any `?`/`: Type`), mirroring
         // `build_empty_array_pattern_doc`. Scanning the full span would pull a
         // comment out of the type annotation into the empty `{}` and duplicate it.
-        let body_end = obj
-            .type_annotation
-            .as_ref()
-            .map_or(obj.span.end, |t| t.span.start);
+        let body_end = obj.body_end();
         let body_doc =
             self.build_empty_braces_inline_with_comments_doc(Span::new(obj.span.start, body_end));
         let tail =
@@ -630,10 +626,7 @@ impl<'a> Printer<'a> {
         // reach this branch via nesting with no line comment, and the loop must
         // still emit it. The expansion decision itself runs earlier and is
         // unaffected. Canonical reference: build_params_doc_with_comments.
-        let boundary = obj
-            .type_annotation
-            .as_ref()
-            .map_or(obj.span.end, |t| t.span.start);
+        let boundary = obj.body_end();
         let has_comments = self.has_comments_to_emit_between(obj.span.start, boundary);
 
         // A comment trailing the opening `{` on its own line is kept on the `{`
@@ -668,22 +661,22 @@ impl<'a> Printer<'a> {
 
             // A preceding format-ignore directive keeps the property's source verbatim
             // (trailing comment/comma handled normally)
-            if has_comments && self.member_gap_frozen(prev_end, prop_start) {
-                prop_parts.push(self.raw_source_doc(prop.span()));
-            } else {
-                prop_parts.push(self.build_object_pattern_property_doc(prop));
+            let frozen = has_comments
+                .then(|| self.gap_frozen_span(prev_end, prop.span()))
+                .flatten();
+            match frozen {
+                Some(slice) => prop_parts.push(self.raw_source_doc(slice)),
+                None => prop_parts.push(self.build_object_pattern_property_doc(prop)),
             }
 
-            let prop_end = prop.span().end;
+            let prop_end = Self::element_claim_anchor(frozen, prop.value_end());
             let is_last = i == obj.properties.len() - 1;
 
             // Collect trailing comments (stop at next property or type annotation)
             let upper_bound = obj
                 .properties
                 .get(i + 1)
-                .map(|next| next.span().start)
-                .or_else(|| obj.type_annotation.as_ref().map(|t| t.span.start))
-                .unwrap_or(obj.span.end);
+                .map_or_else(|| obj.body_end(), |next| next.span().start);
             let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
             // Separator comma between properties; no trailing comma on the last
@@ -870,25 +863,34 @@ impl<'a> Printer<'a> {
         // DROPPED outright (fixture `array_own_line_multiline_comment_expand`).
         // `has_own_line_block_comments_in_bracket_list` deliberately skips multi-line
         // comments — the multi-line question is this separate predicate's, not its.
-        let boundary = arr
-            .type_annotation
-            .as_ref()
-            .map_or(arr.span.end, |t| t.span.start);
+        let boundary = arr.body_end();
         let has_comments = self.has_comments_on_page_between(arr.span.start, boundary);
         let (has_line_comments, has_multiline_block, has_own_line_block) = if has_comments {
             // Flatten once (skip holes) and share across the scans.
             let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
+            // Only the line-comment half: an array pattern does NOT force-expand on a
+            // blank line (the object pattern does), so `.1` is deliberately discarded
+            // rather than forgotten — the shared scan just answers one question more
+            // than this caller asks.
             let has_line_comments = self
-                .collection_formatting_hints(arr.span.start, boundary, &non_null, true, |elem| {
-                    elem.span()
-                })
+                .collection_formatting_hints(
+                    arr.span.start,
+                    boundary,
+                    &non_null,
+                    true,
+                    |elem| elem.span(),
+                    |elem| elem.printed_end(),
+                )
                 .0;
             let has_multiline_block =
                 self.has_multiline_block_comments_on_page_between(arr.span.start, boundary);
             let has_own_line_block = self.has_own_line_block_comments_in_bracket_list(
                 Span::new(arr.span.start, boundary),
                 &non_null,
-                |elem| elem.span(),
+                // The element's PRINTED span: a comment in a stripped shell's interior is
+                // NOT "inside the element" for this gate, because the element's doc does
+                // not print it — the same widening the trailing seam takes.
+                |elem| Span::new(elem.span().start, elem.printed_end()),
             );
             (has_line_comments, has_multiline_block, has_own_line_block)
         } else {
@@ -906,10 +908,7 @@ impl<'a> Printer<'a> {
     fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
         let d = self.d();
         // For array patterns with type annotations, the body ends before the annotation
-        let body_end = arr
-            .type_annotation
-            .as_ref()
-            .map_or(arr.span.end, |t| t.span.start);
+        let body_end = arr.body_end();
 
         let body_doc =
             self.build_empty_brackets_inline_with_comments_doc_range(arr.span.start, body_end);
@@ -946,18 +945,19 @@ impl<'a> Printer<'a> {
 
                 parts.push(self.build_expression_doc(e));
 
-                let elem_end = e.span().end;
+                // Unguarded for the same reason as the object pattern's grouped twin: a
+                // freeze needs a directive comment, which routes the pattern to the
+                // expanded builder before this path is reached.
+                let elem_end = e.printed_end();
 
-                // Collect trailing comments (stop at next element or type annotation).
-                // The annotation link is load-bearing: an `ArrayPattern`'s span swallows its
-                // `: T` tail, so without it the last element's trailing range runs past the
-                // `]` and claims a comment the annotation's own doc also prints.
+                // Collect trailing comments, bounded by the next element or (past the
+                // last) the body's end — `ArrayPattern::body_end` carries why that bound
+                // is not `span.end`.
                 let upper_bound = arr
                     .elements
                     .get(i + 1)
                     .and_then(|opt| opt.as_ref().map(|e| e.span().start))
-                    .or_else(|| arr.type_annotation.as_ref().map(|t| t.span.start))
-                    .unwrap_or(arr.span.end);
+                    .unwrap_or_else(|| arr.body_end());
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
                 // Block comments around the comma (line comments force the expanded
@@ -992,10 +992,7 @@ impl<'a> Printer<'a> {
         // sides partition the gap. A line comment routes to the expanded path, so only
         // blocks reach here.
         if has_comments && arr.elements.last().is_some_and(Option::is_none) {
-            let boundary = arr
-                .type_annotation
-                .as_ref()
-                .map_or(arr.span.end, |t| t.span.start);
+            let boundary = arr.body_end();
             for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
@@ -1057,29 +1054,27 @@ impl<'a> Printer<'a> {
                 // format-ignore directive in the element's gap freezes it verbatim
                 // (Rule A) — the array literal's expanding printer does the same, and
                 // either spelling of an own-line comment routes the pattern here.
-                let element_doc =
-                    match self.element_frozen_span(arr.span.start + 1, arr.elements, i) {
-                        Some(frozen) => self.build_frozen_arg_doc(e, frozen),
-                        None => self.build_expression_doc(e),
-                    };
+                let frozen_span = self.element_frozen_span(arr.span.start + 1, arr.elements, i);
+                let element_doc = match frozen_span {
+                    Some(frozen) => self.build_frozen_arg_doc(e, frozen),
+                    None => self.build_expression_doc(e),
+                };
                 parts.push(self.build_list_element_group_from_comments(
                     leading_comments.iter().copied(),
                     elem_start,
                     element_doc,
                 ));
 
-                let elem_end = e.span().end;
+                let elem_end = Self::element_claim_anchor(frozen_span, e.printed_end());
 
-                // Collect trailing comments (stop at next element or type annotation).
-                // The annotation link is load-bearing: an `ArrayPattern`'s span swallows its
-                // `: T` tail, so without it the last element's trailing range runs past the
-                // `]` and claims a comment the annotation's own doc also prints.
+                // Collect trailing comments, bounded by the next element or (past the
+                // last) the body's end — `ArrayPattern::body_end` carries why that bound
+                // is not `span.end`.
                 let upper_bound = arr
                     .elements
                     .get(i + 1)
                     .and_then(|opt| opt.as_ref().map(|e| e.span().start))
-                    .or_else(|| arr.type_annotation.as_ref().map(|t| t.span.start))
-                    .unwrap_or(arr.span.end);
+                    .unwrap_or_else(|| arr.body_end());
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
                 // Separator comma between elements; no trailing comma on the last
@@ -1093,12 +1088,18 @@ impl<'a> Printer<'a> {
                     let next_elem = arr.elements.get(i + 1).and_then(|opt| opt.as_ref());
                     if let Some(next) = next_elem {
                         let next_start = next.span().start;
-                        // **in source**: bounds a raw blank-line scan (see `blank_scan_end`).
-                        let check_pos = self
-                            .comments_in_source_between(trailing.end_pos, next_start)
-                            .next()
-                            .map_or(next_start, |c| c.span.start);
-                        if self.has_blank_line_between(trailing.end_pos, check_pos) {
+                        // The same range every other family's separator reads
+                        // ([`Printer::item_gap_blank_scan`]): from the previous element's
+                        // DISTANCE anchor (its shell end, not its claim anchor) to the first
+                        // comment in source. ⚠️ Only the PREDICATE is still this loop's own —
+                        // the array pattern counts newlines (`has_blank_line_between`) where
+                        // every other family asks prettier's `isNextLineEmpty`, which reads a
+                        // blank after an own-line comma differently. That difference is the
+                        // one thing left to reconcile here, and it is now a single call away
+                        // rather than buried in a hand-rolled copy of the range.
+                        let (from, check_pos) =
+                            self.item_gap_blank_scan(trailing.end_pos, next_start);
+                        if self.has_blank_line_between(from, check_pos) {
                             parts.push(d.literalline());
                         }
                     }
@@ -1116,10 +1117,7 @@ impl<'a> Printer<'a> {
         }
 
         // Check for dangling comments after the last element (before `]`)
-        let boundary = arr
-            .type_annotation
-            .as_ref()
-            .map_or(arr.span.end, |t| t.span.start);
+        let boundary = arr.body_end();
         let past_elision = arr.elements.last().is_some_and(Option::is_none);
         parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary, past_elision));
 
@@ -1155,7 +1153,15 @@ impl<'a> Printer<'a> {
             // — prettier's shouldBreak excludes an AssignmentPattern parent (object.js),
             // so `{ a: { b } = {} }` (and deeper) stays inline. Width-based breaking
             // still applies. (Array-pattern lefts don't expand on nesting.)
-            self.build_object_pattern_doc_with_context(obj, PatternContext::AssignmentDefault)
+            //
+            // This arm REASSEMBLES the left instead of routing it through
+            // `build_expression_doc`, so it must claim the comment the left OWNS itself —
+            // `docs/comments.md` hazard 1. The `AssignmentPattern` above it hands the claim
+            // down (`left_spine_child`), and with nothing catching it here
+            // `[/* c */ {a} = 1]` DROPS the comment outright.
+            let obj_doc =
+                self.build_object_pattern_doc_with_context(obj, PatternContext::AssignmentDefault);
+            self.prepend_owned_leading_comment_at(obj.span.start, obj_doc)
         } else {
             self.build_expression_doc(pattern.left)
         };
