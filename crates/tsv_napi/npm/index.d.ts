@@ -1,5 +1,5 @@
 /**
- * Hand-written types for `@fuzdev/tsv_napi` — mirrors `@fuzdev/tsv_wasm`'s
+ * Hand-written types for `@fuzdev/tsv` — mirrors `@fuzdev/tsv_wasm`'s
  * surface (same option interfaces, same overloads, same `tsv_ast` re-export)
  * minus the bench-only `parse_internal_*` family, so the two packages
  * type-check interchangeably.

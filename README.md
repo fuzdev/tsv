@@ -86,7 +86,7 @@ Future features (unknown order):
 
 ## Install
 
-tsv ships three WASM packages to npm (native builds will arrive with the v0.4 release):
+tsv ships three WASM packages to npm (native builds arrive with the v0.4 release, as `@fuzdev/tsv`):
 
 - [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) - the full tool (formatter + parser) with a `tsv` CLI
 - [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) - formatter only (smaller)

@@ -21,7 +21,7 @@ acorn-style `{locations?, goal?}` bag, read in Rust (`read_options` in
 serves the format exports, so the two families can't drift — see
 [Format Options](#format-options)). ⚠️ A **third copy** of these semantics
 lives in [../tsv_napi/npm/index.js](../tsv_napi/npm/index.js) — the
-`@fuzdev/tsv_napi` loader mirrors this reader key for key, error string for
+`@fuzdev/tsv` loader mirrors this reader key for key, error string for
 error string, as its parity contract (asserted by `scripts/test_napi_npm.ts`'s
 exact-string tests). A semantics or message change here must update that
 mirror and its tests in the same edit.

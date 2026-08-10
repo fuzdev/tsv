@@ -1,4 +1,4 @@
-# @fuzdev/tsv_napi
+# @fuzdev/tsv
 
 > native formatter and parser for Svelte, TypeScript, and CSS (N-API)
 
@@ -11,7 +11,7 @@ Source of truth, full docs, and conformance notes: [github.com/fuzdev/tsv](https
 ## Install
 
 ```bash
-npm i @fuzdev/tsv_napi
+npm i @fuzdev/tsv
 ```
 
 The right platform binary installs automatically (per-platform `optionalDependencies`). Prebuilt platforms:
@@ -27,7 +27,7 @@ On any other platform the import throws with a pointer at `@fuzdev/tsv_wasm`.
 CommonJS and ESM both work; no initialization step:
 
 ```javascript
-import {format_svelte, format_typescript, parse_typescript} from '@fuzdev/tsv_napi';
+import {format_svelte, format_typescript, parse_typescript} from '@fuzdev/tsv';
 
 const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 const ast = parse_typescript('const x = 1;'); // acorn-typescript-shaped JSON AST

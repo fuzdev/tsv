@@ -165,7 +165,7 @@ lang_bindings!(
 // `tsv_wasm` doesn't share this SHAPE: there the goal is one key of a per-call
 // options bag threaded through its own `lang_bindings!`. Coverage matches,
 // though — `format_typescript_with_goal` below is the flat counterpart of
-// `tsv_wasm`'s `format_typescript(source, {goal})`, and the `@fuzdev/tsv_napi`
+// `tsv_wasm`'s `format_typescript(source, {goal})`, and the `@fuzdev/tsv`
 // loader presents the same options bag over all of these flat exports (see this
 // crate's CLAUDE.md §Public API).
 
