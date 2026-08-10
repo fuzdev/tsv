@@ -32,4 +32,9 @@ Per Comment Position Philosophy, tsv keeps the leading block on the `=` line whe
 the author wrote it. The `unformatted_ours_*` variants verify the paren shells are
 idempotent under tsv.
 
+`variant_paren` is the paren authoring's own terminal, where prettier keeps
+`/* b */ // c` **glued** on one line: dual-stable, because tsv holds a pair the author
+glued onto one line wherever a comment run is emitted (`docs/comments.md` §Trailing and
+dangling runs) rather than splitting it into a third form.
+
 See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

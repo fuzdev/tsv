@@ -137,12 +137,12 @@ pub(super) fn build_import_expression_doc(
     // If no options, check for trailing comments on the sole source arg.
     let Some(options) = &import_expr.options else {
         if printer.has_comments_to_emit_between(source_end, paren_close) {
-            let pc = PartitionedComments::new(
-                printer.comments,
-                printer.comment_line_breaks,
-                source_end,
-                paren_close,
-            );
+            // A last-item→`)` gap, comma or not: the claim is the source reading
+            // (`for_closer_gap`). The delimiter reading is blind to every byte no argument
+            // span covers, and a preceding comment's `*/` is one — so a comment the author
+            // glued behind it read as own-line and dangled below the argument, splitting a
+            // pair written as one (`docs/comments.md` §Own-line-ness is a SOURCE question).
+            let pc = PartitionedComments::for_closer_gap(printer, source_end, paren_close);
 
             // Trailing region after the arg: same-line block/line comments inline, then
             // own-line comments each on their own line (dangling — import takes no

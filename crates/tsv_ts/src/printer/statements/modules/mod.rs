@@ -983,13 +983,13 @@ impl<'a> Printer<'a> {
         let literal_start = ext_ref.expression.span.start;
         let close_paren = ext_ref.span.end.saturating_sub(1);
 
-        // The literal plus whatever trails it inside the parens.
-        let close = PartitionedComments::new(
-            self.comments,
-            self.comment_line_breaks,
-            ext_ref.expression.span.end,
-            close_paren,
-        );
+        // The literal plus whatever trails it inside the parens. A last-item→`)` gap, so
+        // the claim is the source reading (`for_closer_gap`) even though no comma can sit
+        // in it: a preceding comment's `*/` is text no argument span covers either, and the
+        // delimiter reading dangles a comment glued behind it below the literal
+        // (`docs/comments.md` §Own-line-ness is a SOURCE question).
+        let close =
+            PartitionedComments::for_closer_gap(self, ext_ref.expression.span.end, close_paren);
         let mut value: DocBuf = smallvec![self.build_literal_doc(&ext_ref.expression)];
         close.emit_last_arg_comments(&mut value, self);
         let value_doc = d.concat(&value);

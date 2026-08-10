@@ -841,6 +841,7 @@ impl<'a> Printer<'a> {
 
         // Keep each comment where the author wrote it, then break before the operator.
         let mut pos = operand_end;
+        let mut prev_comment: Option<&internal::Comment> = None;
         for (i, comment) in
             comments_to_emit_in_range(self.comments, operand_end, op_start).enumerate()
         {
@@ -849,11 +850,15 @@ impl<'a> Printer<'a> {
                 // so a long comment never forces the preceding operand group to break.
                 parts.push(self.build_trailing_comment_doc(comment));
             } else {
-                // On its own line — preserve an author blank line before it.
-                self.push_blank_preserving_hardline(parts, pos, comment.span.start);
+                // On its own line — unless the author GLUED it to the previous comment,
+                // which keeps that line. Otherwise an author blank before it is preserved.
+                // The shared run separator ([`Printer::push_trailing_run_separator`]), so
+                // this gap answers the glue question the same way every other run does.
+                self.push_trailing_run_separator(parts, prev_comment, pos, comment.span.start);
                 parts.push(self.build_comment_doc(comment));
             }
             pos = comment.span.end;
+            prev_comment = Some(comment);
         }
 
         parts.push(d.hardline());
@@ -932,6 +937,7 @@ impl<'a> Printer<'a> {
         // its line; authored blank lines are preserved. A trailing comment glued to the
         // operand (no newline after it) stays inline-leading it.
         let mut pos = op_end;
+        let mut prev_comment: Option<&internal::Comment> = None;
         for (i, comment) in comments.iter().enumerate() {
             let is_first = i == 0;
             // Comment-adjacency read (real even in canonical mode): decides
@@ -946,11 +952,15 @@ impl<'a> Printer<'a> {
                 // inline, width counted.
                 parts.push(self.build_trailing_comment_doc(comment));
             } else {
-                // Comment on its own line (preserve an author blank line before it).
-                self.push_blank_preserving_hardline(parts, pos, comment.span.start);
+                // Comment on its own line — unless the author GLUED it to the previous
+                // one, which keeps that line; otherwise an author blank before it is
+                // preserved. The shared run separator
+                // ([`Printer::push_trailing_run_separator`]).
+                self.push_trailing_run_separator(parts, prev_comment, pos, comment.span.start);
                 parts.push(self.build_comment_doc(comment));
             }
             pos = comment.span.end;
+            prev_comment = Some(comment);
         }
 
         // Operand: on its own line when the last comment has a newline after it

@@ -1,0 +1,1129 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 919,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment the author GLUED to the previous trailing comment's `*/` trails the member",
+			"start": 20,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " it was written behind, the same rule the union's member gap reads. A block stays on",
+			"start": 109,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " its side of the `&`; a line comment trails the operator, which is the only lossless",
+			"start": 197,
+			"end": 283,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " place for it.",
+			"start": 285,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment glued past a multiline block, before the `&`.",
+			"start": 304,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 379,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 12
+				},
+				"end": {
+					"line": 9,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 391,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 6
+				},
+				"end": {
+					"line": 9,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 404,
+			"end": 409,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment glued past a multiline block trails the `&`.",
+			"start": 417,
+			"end": 477,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 490,
+			"end": 501,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 12
+				},
+				"end": {
+					"line": 15,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 504,
+			"end": 509,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 8
+				},
+				"end": {
+					"line": 15,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - a comment the author gave a line of its own keeps it.",
+			"start": 517,
+			"end": 583,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 596,
+			"end": 607,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 12
+				},
+				"end": {
+					"line": 20,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 612,
+			"end": 620,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank the author left before the comment does not cross the `&` with it; one",
+			"start": 628,
+			"end": 709,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " between two comments is theirs and stays.",
+			"start": 711,
+			"end": 755,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 772,
+			"end": 777,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 781,
+			"end": 786,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 2
+				},
+				"end": {
+					"line": 29,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - the union's member gap answers both the same way.",
+			"start": 794,
+			"end": 856,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 873,
+			"end": 884,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 6
+				},
+				"end": {
+					"line": 35,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 885,
+			"end": 893,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 6
+				},
+				"end": {
+					"line": 35,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 896,
+			"end": 901,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 2
+				},
+				"end": {
+					"line": 36,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 918,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 909,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 38,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 368,
+					"end": 414,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 373,
+						"end": 374,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 377,
+						"end": 413,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 377,
+								"end": 378,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 10
+									},
+									"end": {
+										"line": 8,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 377,
+									"end": 378,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 10
+										},
+										"end": {
+											"line": 8,
+											"column": 11
+										}
+									},
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1\nc2 ",
+										"start": 379,
+										"end": 390
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 412,
+								"end": 413,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 412,
+									"end": 413,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c3 ",
+										"start": 391,
+										"end": 399
+									},
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 404,
+										"end": 409
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment the author GLUED to the previous trailing comment's `*/` trails the member",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " it was written behind, the same rule the union's member gap reads. A block stays on",
+							"start": 109,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " its side of the `&`; a line comment trails the operator, which is the only lossless",
+							"start": 197,
+							"end": 283
+						},
+						{
+							"type": "Line",
+							"value": " place for it.",
+							"start": 285,
+							"end": 301
+						},
+						{
+							"type": "Line",
+							"value": " Block comment glued past a multiline block, before the `&`.",
+							"start": 304,
+							"end": 366
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 479,
+					"end": 514,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 484,
+						"end": 485,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "J"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 488,
+						"end": 513,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 10
+							},
+							"end": {
+								"line": 16,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 488,
+								"end": 489,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 10
+									},
+									"end": {
+										"line": 14,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 488,
+									"end": 489,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 10
+										},
+										"end": {
+											"line": 14,
+											"column": 11
+										}
+									},
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1\nc2 ",
+										"start": 490,
+										"end": 501
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 512,
+								"end": 513,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 512,
+									"end": 513,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 504,
+										"end": 509
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment glued past a multiline block trails the `&`.",
+							"start": 417,
+							"end": 477
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 585,
+					"end": 625,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 590,
+						"end": 591,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 7
+							}
+						},
+						"name": "K"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 594,
+						"end": 624,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 10
+							},
+							"end": {
+								"line": 22,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 594,
+								"end": 595,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 10
+									},
+									"end": {
+										"line": 19,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 594,
+									"end": 595,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 10
+										},
+										"end": {
+											"line": 19,
+											"column": 11
+										}
+									},
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1\nc2 ",
+										"start": 596,
+										"end": 607
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 623,
+								"end": 624,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 623,
+									"end": 624,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c3 ",
+										"start": 612,
+										"end": 620
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - a comment the author gave a line of its own keeps it.",
+							"start": 517,
+							"end": 583
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 757,
+					"end": 791,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 762,
+						"end": 763,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 6
+							},
+							"end": {
+								"line": 26,
+								"column": 7
+							}
+						},
+						"name": "M"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 766,
+						"end": 790,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 10
+							},
+							"end": {
+								"line": 30,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 766,
+								"end": 767,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 10
+									},
+									"end": {
+										"line": 26,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 766,
+									"end": 767,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 10
+										},
+										"end": {
+											"line": 26,
+											"column": 11
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 789,
+								"end": 790,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 789,
+									"end": 790,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 2
+										},
+										"end": {
+											"line": 30,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 772,
+										"end": 777
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 781,
+										"end": 786
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank the author left before the comment does not cross the `&` with it; one",
+							"start": 628,
+							"end": 709
+						},
+						{
+							"type": "Line",
+							"value": " between two comments is theirs and stays.",
+							"start": 711,
+							"end": 755
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 858,
+					"end": 908,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 863,
+						"end": 864,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 6
+							},
+							"end": {
+								"line": 33,
+								"column": 7
+							}
+						},
+						"name": "L"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 869,
+						"end": 907,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 2
+							},
+							"end": {
+								"line": 37,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 871,
+								"end": 872,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 4
+									},
+									"end": {
+										"line": 34,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 871,
+									"end": 872,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 4
+										},
+										"end": {
+											"line": 34,
+											"column": 5
+										}
+									},
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1\nc2 ",
+										"start": 873,
+										"end": 884
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 906,
+								"end": 907,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 4
+									},
+									"end": {
+										"line": 37,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 906,
+									"end": 907,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 4
+										},
+										"end": {
+											"line": 37,
+											"column": 5
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c3 ",
+										"start": 885,
+										"end": 893
+									},
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 896,
+										"end": 901
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - the union's member gap answers both the same way.",
+							"start": 794,
+							"end": 856
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -368,12 +368,26 @@ impl<'a> Printer<'a> {
                     indent_comment_parts.push(self.build_comment_doc(comment));
                     // Preserve an author blank line before the next comment, or before
                     // the value itself (`type X =⏎/* c */⏎⏎Y`), matching prettier.
-                    let next = comments.get(idx + 1).map_or(type_start, |c| c.span.start);
-                    self.push_blank_preserving_hardline(
-                        &mut indent_comment_parts,
-                        comment.span.end,
-                        next,
-                    );
+                    //
+                    // The separator is emitted AFTER each comment here, so the glue
+                    // question is asked of the comment that FOLLOWS — the only safe
+                    // spelling of it, and asked ONLY when a comment does follow: past the
+                    // last one the `next` is the value, whose placement is the
+                    // leading-side question this loop does not own.
+                    let next_comment = comments.get(idx + 1);
+                    let next = next_comment.map_or(type_start, |c| c.span.start);
+                    if next_comment.is_some()
+                        && self.trailing_run_hugs_previous(Some(comment), next)
+                    {
+                        // The author glued the pair onto one line — keep it.
+                        indent_comment_parts.push(d.text(" "));
+                    } else {
+                        self.push_blank_preserving_hardline(
+                            &mut indent_comment_parts,
+                            comment.span.end,
+                            next,
+                        );
+                    }
                 }
             }
 

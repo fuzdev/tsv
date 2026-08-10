@@ -1,0 +1,1527 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1086,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A pair the author GLUED onto one line keeps that line wherever a comment RUN is",
+			"start": 20,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " emitted, not only at a container's end (body_trailing_glued_run,",
+			"start": 104,
+			"end": 171,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing_gap_glued_run). The separator between two comments is one question.",
+			"start": 173,
+			"end": 252,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Export specifier list, after the last item.",
+			"start": 255,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 332,
+			"end": 340,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 341,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 11
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Own-line blocks a spread's stripped grouping parens left behind.",
+			"start": 356,
+			"end": 423,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 438,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 447,
+			"end": 455,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 11
+				},
+				"end": {
+					"line": 16,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Binary chain, after the operator.",
+			"start": 462,
+			"end": 498,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 521,
+			"end": 529,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 530,
+			"end": 538,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 11
+				},
+				"end": {
+					"line": 22,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 541,
+			"end": 546,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Ternary branch, after the `?`.",
+			"start": 557,
+			"end": 590,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 611,
+			"end": 619,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 4
+				},
+				"end": {
+					"line": 28,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 620,
+			"end": 628,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 13
+				},
+				"end": {
+					"line": 28,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 632,
+			"end": 637,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 3
+				},
+				"end": {
+					"line": 29,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type alias value, after the `=`.",
+			"start": 652,
+			"end": 687,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 700,
+			"end": 708,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 709,
+			"end": 717,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 11
+				},
+				"end": {
+					"line": 35,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 720,
+			"end": 725,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 2
+				},
+				"end": {
+					"line": 36,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Leading run before a non-first parameter.",
+			"start": 733,
+			"end": 777,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 800,
+			"end": 808,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 2
+				},
+				"end": {
+					"line": 42,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 809,
+			"end": 817,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 11
+				},
+				"end": {
+					"line": 42,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 820,
+			"end": 825,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 2
+				},
+				"end": {
+					"line": 43,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Array element - a last spread's stripped-paren interior, past the `]` scan.",
+			"start": 838,
+			"end": 916,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 1
+				},
+				"end": {
+					"line": 47,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 939,
+			"end": 947,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 2
+				},
+				"end": {
+					"line": 50,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 948,
+			"end": 956,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 11
+				},
+				"end": {
+					"line": 50,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - two lines the author gave two comments stay two lines.",
+			"start": 963,
+			"end": 1030,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 1
+				},
+				"end": {
+					"line": 53,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 1043,
+			"end": 1051,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 2
+				},
+				"end": {
+					"line": 55,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 1054,
+			"end": 1062,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 2
+				},
+				"end": {
+					"line": 56,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 1065,
+			"end": 1070,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 2
+				},
+				"end": {
+					"line": 57,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1085,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1076,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 59,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 303,
+					"end": 315,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 309,
+							"end": 314,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 309,
+								"end": 310,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 313,
+								"end": 314,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A pair the author GLUED onto one line keeps that line wherever a comment RUN is",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " emitted, not only at a container's end (body_trailing_glued_run,",
+							"start": 104,
+							"end": 171
+						},
+						{
+							"type": "Line",
+							"value": " trailing_gap_glued_run). The separator between two comments is one question.",
+							"start": 173,
+							"end": 252
+						},
+						{
+							"type": "Line",
+							"value": " Export specifier list, after the last item.",
+							"start": 255,
+							"end": 301
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 317,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 328,
+							"end": 329,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 3
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 328,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 328,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": null
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 425,
+					"end": 459,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 425,
+						"end": 458,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 425,
+							"end": 427,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 431,
+								"end": 435,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 6
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 434,
+									"end": 435,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 5
+										},
+										"end": {
+											"line": 15,
+											"column": 6
+										}
+									},
+									"name": "b"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c1 ",
+							"start": 332,
+							"end": 340
+						},
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 341,
+							"end": 349
+						},
+						{
+							"type": "Line",
+							"value": " Own-line blocks a spread's stripped grouping parens left behind.",
+							"start": 356,
+							"end": 423
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 500,
+					"end": 554,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 506,
+							"end": 553,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 506,
+								"end": 507,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 512,
+								"end": 553,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 6
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 512,
+									"end": 516,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 2
+										},
+										"end": {
+											"line": 21,
+											"column": 6
+										}
+									},
+									"name": "aaaa"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 549,
+									"end": 553,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 6
+										}
+									},
+									"name": "bbbb",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 521,
+											"end": 529
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 530,
+											"end": 538
+										},
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 541,
+											"end": 546
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c1 ",
+							"start": 438,
+							"end": 446
+						},
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 447,
+							"end": 455
+						},
+						{
+							"type": "Line",
+							"value": " Binary chain, after the operator.",
+							"start": 462,
+							"end": 498
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 592,
+					"end": 649,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 598,
+							"end": 648,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 31,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 598,
+								"end": 599,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 602,
+								"end": 648,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 11
+									},
+									"end": {
+										"line": 31,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 602,
+									"end": 606,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 11
+										},
+										"end": {
+											"line": 27,
+											"column": 15
+										}
+									},
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 641,
+									"end": 642,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 3
+										},
+										"end": {
+											"line": 30,
+											"column": 4
+										}
+									},
+									"name": "e",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 611,
+											"end": 619
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 620,
+											"end": 628
+										},
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 632,
+											"end": 637
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 647,
+									"end": 648,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 4
+										},
+										"end": {
+											"line": 31,
+											"column": 5
+										}
+									},
+									"name": "f"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Ternary branch, after the `?`.",
+							"start": 557,
+							"end": 590
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 689,
+					"end": 730,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 694,
+						"end": 695,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 6
+							},
+							"end": {
+								"line": 34,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 728,
+						"end": 729,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 2
+							},
+							"end": {
+								"line": 37,
+								"column": 3
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 728,
+							"end": 729,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 2
+								},
+								"end": {
+									"line": 37,
+									"column": 3
+								}
+							},
+							"name": "A"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 700,
+								"end": 708
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 709,
+								"end": 717
+							},
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 720,
+								"end": 725
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type alias value, after the `=`.",
+							"start": 652,
+							"end": 687
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 779,
+					"end": 835,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 45,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 788,
+						"end": 791,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 10
+							},
+							"end": {
+								"line": 40,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 795,
+							"end": 796,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 2
+								},
+								"end": {
+									"line": 41,
+									"column": 3
+								}
+							},
+							"name": "g"
+						},
+						{
+							"type": "Identifier",
+							"start": 828,
+							"end": 829,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 2
+								},
+								"end": {
+									"line": 44,
+									"column": 3
+								}
+							},
+							"name": "h",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 800,
+									"end": 808
+								},
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 809,
+									"end": 817
+								},
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 820,
+									"end": 825
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 833,
+						"end": 835,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 3
+							},
+							"end": {
+								"line": 45,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Leading run before a non-first parameter.",
+							"start": 733,
+							"end": 777
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 918,
+					"end": 960,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 51,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 924,
+							"end": 959,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 7
+								},
+								"end": {
+									"line": 51,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 924,
+								"end": 925,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 7
+									},
+									"end": {
+										"line": 48,
+										"column": 8
+									}
+								},
+								"name": "i"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 928,
+								"end": 959,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 11
+									},
+									"end": {
+										"line": 51,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 932,
+										"end": 936,
+										"loc": {
+											"start": {
+												"line": 49,
+												"column": 2
+											},
+											"end": {
+												"line": 49,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 935,
+											"end": 936,
+											"loc": {
+												"start": {
+													"line": 49,
+													"column": 5
+												},
+												"end": {
+													"line": 49,
+													"column": 6
+												}
+											},
+											"name": "j"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 939,
+												"end": 947
+											},
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 948,
+												"end": 956
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Array element - a last spread's stripped-paren interior, past the `]` scan.",
+							"start": 838,
+							"end": 916
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1032,
+					"end": 1075,
+					"loc": {
+						"start": {
+							"line": 54,
+							"column": 1
+						},
+						"end": {
+							"line": 58,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1037,
+						"end": 1038,
+						"loc": {
+							"start": {
+								"line": 54,
+								"column": 6
+							},
+							"end": {
+								"line": 54,
+								"column": 7
+							}
+						},
+						"name": "U"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 1073,
+						"end": 1074,
+						"loc": {
+							"start": {
+								"line": 58,
+								"column": 2
+							},
+							"end": {
+								"line": 58,
+								"column": 3
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 1073,
+							"end": 1074,
+							"loc": {
+								"start": {
+									"line": 58,
+									"column": 2
+								},
+								"end": {
+									"line": 58,
+									"column": 3
+								}
+							},
+							"name": "B"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 1043,
+								"end": 1051
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 1054,
+								"end": 1062
+							},
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 1065,
+								"end": 1070
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - two lines the author gave two comments stay two lines.",
+							"start": 963,
+							"end": 1030
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -419,7 +419,7 @@ pub(crate) fn should_force_expansion_for_comments(
     // Check if any block comment is truly standalone (not inline with the next code).
     // `next_code_pos` bounds the gap, so an item always follows: every caller scans either
     // the `(`→first-argument gap or an inter-argument one, and the trailing position past
-    // the last argument belongs to `has_own_line_block_comment_after`.
+    // the last argument belongs to `Printer::has_own_line_block_comment_before_closer`.
     for comment in comments_to_emit_in_range(printer.comments, start, next_code_pos) {
         if comment.is_block && printer.block_comment_owns_its_line(comment, true) {
             return true;
@@ -770,12 +770,16 @@ where
 ///
 /// Uses `SmallVec` to avoid heap allocations for the common case (0-2 comments per range).
 ///
-/// ⚠️ **The two constructors ask different questions, and the gap's shape picks one.**
-/// [`Self::for_item_gap`] — the gap holding the list's own **comma** — takes its split
-/// from [`Printer::trailing_comment_run`], the same walk the object literal, both
-/// destructuring patterns, the enum and the array literal partition their element→comma
-/// gaps with, so the call family cannot answer the seam differently — and the last
-/// argument→`)` gap is one of them, holding the comma `trailingComma: 'none'` deletes.
+/// ⚠️ **The three constructors ask different questions, and the gap's shape picks one.**
+/// The split between them is where the gap's `start` sits: past a `(` it is an ITEM's end,
+/// and the claim reads the SOURCE; at the `(` itself it is the delimiter's.
+/// [`Self::for_item_gap`] — an **inter-item** gap — takes its split from
+/// [`Printer::trailing_comment_run`], the same walk the object literal, both destructuring
+/// patterns, the enum and the array literal partition their element→comma gaps with, so
+/// the call family cannot answer the seam differently. [`Self::for_closer_gap`] — a
+/// **last-item→`)`** gap, whether or not a comma sits in it — takes
+/// [`Printer::closer_trailing_comment_run`], which differs from that walk on exactly one
+/// thing (a `//` written against the comma `trailingComma: 'none'` deletes).
 /// [`Self::new`] — a
 /// **delimiter** gap (`(`→first argument) — keeps the same-line
 /// reading of `tsv_lang::ClassifiedComments`, shared with the ternary
@@ -808,12 +812,19 @@ impl<'a> PartitionedComments<'a> {
     /// IS the delimiter (`docs/comments.md` §The delimiter-line question). It is blind to
     /// the two kinds of text no item span covers — the list's own **comma** and a stripped
     /// paren shell's `)` — so it must not be used where the answer decides which ITEM a
-    /// comment binds to. Both an **inter-item** gap and a **last-item→`)`** gap take
-    /// [`Self::for_item_gap`]: a comment behind a stripped `)`, or behind a comma the
-    /// author pushed onto its own line, still trails that item and this reading would
-    /// leave it unclaimed. The only surviving `new` callers past a `(` are the two
-    /// comma-less single-argument shapes — `require('x')` and the `import(…)` type —
-    /// where the gap holds nothing the two readings disagree about.
+    /// comment binds to. An **inter-item** gap takes [`Self::for_item_gap`] and a
+    /// **last-item→`)`** gap [`Self::for_closer_gap`]: a comment behind a stripped `)`, or
+    /// behind a comma the author pushed onto its own line, still trails that item and this
+    /// reading would leave it unclaimed.
+    ///
+    /// ⚠️ **A comma-less gap is no exception, and reading it as one was a bug.** The two
+    /// comma-less single-argument shapes — `require('x')` and a `import(…)` with no options
+    /// — were held here on the argument that their gap holds nothing the two readings
+    /// disagree about. It holds one thing: another comment's `*/`. A comment the author
+    /// glued behind it follows content on its line but not on the ARGUMENT's, so this
+    /// reading dangled it below the argument and split a pair written as one. Every gap
+    /// past a `(` now takes an item constructor, which leaves this one purely the
+    /// **delimiter**-gap reading its name describes.
     pub fn new(
         comments: &'a [internal::Comment],
         line_breaks: &[u32],
@@ -878,6 +889,11 @@ impl<'a> PartitionedComments<'a> {
     /// that line — the sanctioned divergence that walk's doc carries. [`Self::new`]'s
     /// delimiter reading answers neither: it calls a comma-glued block own-line and
     /// dangles it below the argument, force-opening a call that fits.
+    ///
+    /// Taken by every last-argument gap, **including the comma-less ones** — `require('x')`
+    /// and a `import(…)` with no options. The comma is not what makes the source reading
+    /// necessary, only the loudest byte that needs it: a preceding comment's `*/` is text no
+    /// argument span covers too, and a comment glued behind one is exactly as mis-read.
     pub fn for_closer_gap(printer: &Printer<'a>, item_end: u32, end: u32) -> Self {
         Self::from_trailing_run(
             printer.closer_trailing_comment_run(item_end, end),

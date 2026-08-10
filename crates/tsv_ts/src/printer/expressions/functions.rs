@@ -1634,7 +1634,7 @@ impl<'a> Printer<'a> {
     fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
         self.comments_on_page_between(start, end).any(|c| {
             // `end` is the next param's start, so an item always follows; the trailing
-            // position past the last param is `has_own_line_block_comment_after`'s.
+            // position past the last param is `has_own_line_block_comment_before_closer`'s.
             !c.is_block || self.block_comment_owns_its_line(c, true)
         })
     }
@@ -1867,6 +1867,15 @@ impl<'a> Printer<'a> {
                     // Non-first param (legacy): own-line comment gets a hardline,
                     // preserving a blank line the author left between the two comments.
                     self.push_blank_preserving_hardline(&mut parts, prev_pos, comment.span.start);
+                } else {
+                    // Glued to the previous comment — keep the line the author wrote them
+                    // on, exactly as the first-param arm above does. ⚠️ Emitting NOTHING
+                    // here (the arm this replaces) is the run separator's worst answer, not
+                    // its safest: the two comments come out WELDED (`/* c1 *//* c2 */`),
+                    // which reparses as the same two comments byte for byte, so the ledger,
+                    // the census, F1 and the fuzzer are all blind and only a prettier
+                    // `compare` shows it (`docs/comments.md` §Trailing and dangling runs).
+                    parts.push(d.text(" "));
                 }
             }
             parts.push(self.build_comment_doc(comment));

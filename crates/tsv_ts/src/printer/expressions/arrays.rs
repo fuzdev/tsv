@@ -783,9 +783,19 @@ impl<'a> Printer<'a> {
 
         let mut inner_parts: DocBuf = smallvec![d.softline(), d.concat(&parts)];
         if !trailing_own_line_comments.is_empty() {
+            let mut prev_comment: Option<&internal::Comment> = None;
             for comment in &trailing_own_line_comments {
-                inner_parts.push(d.line());
+                // A pair the author GLUED onto one line keeps that line
+                // ([`Printer::trailing_run_hugs_previous`], the rule every comment run
+                // reads); everything else takes the group's break, which `should_break`
+                // below makes unconditional.
+                if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
+                    inner_parts.push(d.text(" "));
+                } else {
+                    inner_parts.push(d.line());
+                }
                 inner_parts.push(self.build_comment_doc(comment));
+                prev_comment = Some(comment);
             }
             should_break = true;
         }
