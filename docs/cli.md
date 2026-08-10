@@ -5,7 +5,7 @@
 The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 
 - Each command is a `FromArgs` struct in its own module under `src/cli/commands/`
-- `cli::TopLevel` holds a top-level `--version` switch plus the `Subcommand` enum (`Option` solely so a bare `--version` parses; a bare `tsv` reproduces argh's required-subcommand error — see `TopLevel::run`); `main.rs` calls `argh::from_env()` and dispatches
+- `cli::TopLevel` holds a top-level `--version` switch plus the `Subcommand` enum (`Option` solely so a bare `--version` parses; a bare `tsv` reproduces argh's required-subcommand error — see `TopLevel::run`); `main.rs` parses argv and dispatches
 - argh has no struct-flattening attribute, so the shared input fields (`--content`, `--stdin`, `--parser`, file path) are declared per command and assembled into `cli::input::InputArgs` for resolution
 
 **Adding Commands**: Create `src/cli/commands/newcmd.rs` with a `FromArgs` struct and a `run()` method, add a variant to `Subcommand` in `cli/mod.rs`.

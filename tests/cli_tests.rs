@@ -1001,6 +1001,54 @@ fn test_version_flag() {
     assert!(output.stderr.is_empty());
 }
 
+/// The command name in usage/help/error text is pinned to `tsv`, never derived
+/// from `argv[0]` — which is what `argh::from_env` does, and what printed
+/// `Usage: tsv.exe format` on Windows. Running a renamed copy varies exactly
+/// that dimension on any platform, so the property is provable here rather than
+/// only in a Windows CI leg.
+#[test]
+#[allow(clippy::expect_used)]
+fn test_command_name_is_independent_of_argv0() {
+    BUILD.call_once(|| {
+        let status = Command::new("cargo")
+            .args(["build", "-p", "tsv_cli", "-q"])
+            .status()
+            .expect("Failed to build tsv_cli");
+        assert!(status.success(), "tsv_cli build failed");
+    });
+    let suffix = std::env::consts::EXE_SUFFIX;
+    let built = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("target/debug/tsv{suffix}"));
+    let dir = temp_dir("argv0_name");
+    let renamed = dir.join(format!("tsv_renamed{suffix}"));
+    fs::copy(&built, &renamed).expect("Failed to copy the tsv binary");
+
+    let run = |args: &[&str]| {
+        Command::new(&renamed)
+            .args(args)
+            .output()
+            .expect("Failed to execute the renamed tsv binary")
+    };
+
+    let help = run(&["help", "format"]);
+    assert_eq!(help.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&help.stdout);
+    assert!(
+        stdout.starts_with("Usage: tsv format"),
+        "renamed binary must still name itself `tsv`: {stdout}"
+    );
+
+    // The error path carries the same name (argh's `Run <cmd> --help` line).
+    let bad = run(&["format", "--parser", "bogus", "--content", "x"]);
+    assert_eq!(bad.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&bad.stderr);
+    assert!(
+        stderr.contains("Run tsv --help for more information."),
+        "stderr: {stderr}"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn test_version_is_top_level_only() {
     // Subcommands don't take --version — an unrecognized-argument error, like
