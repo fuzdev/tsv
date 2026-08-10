@@ -947,7 +947,7 @@ impl<'a> Printer<'a> {
         // Breaking path: a line comment in either in-bracket gap forces the bracket
         // to break so the `//` can't swallow the key or `]`, preserving each comment
         // in place. `[`→key: a `[`-line comment is pulled onto the `[` line, an
-        // own-line one stays on its own line (`build_leading_comments_multiline*`,
+        // own-line one stays on its own line (`build_list_leading_comments*`,
         // the shared open-delimiter leading-comment builder, hugging a same-line
         // block to the key). key→`]`: a same-line comment trails the key with a
         // space, an own-line comment keeps its own line. Prettier relocates instead

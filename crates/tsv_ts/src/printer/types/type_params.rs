@@ -661,10 +661,12 @@ impl<'a> Printer<'a> {
     /// builder's zero-comment fast gate): `false` proves every gap below is
     /// comment-free, so neither the comment searches nor the `find_list_comma` byte
     /// scans that bound them run — a comment-free `<T, U>` builds with no source
-    /// scanning at all (the printed `,` is static text). Line comments and own-line
-    /// blocks never reach here (each family's expansion predicate routes them to
-    /// [`Self::build_angle_list_with_line_comments`] first), so only inline block
-    /// comments remain to preserve.
+    /// scanning at all (the printed `,` is static text). Line comments and blocks the
+    /// author ISOLATED on a line never reach here (each family's expansion predicate
+    /// routes them to [`Self::build_angle_list_with_line_comments`] first) — but a block
+    /// merely written *below* the previous item does, and takes the soft `line` this
+    /// list's own group then decides. That is why the leading run goes through the shared
+    /// emitter rather than a spacing enum: the separator is not a property of the layout.
     pub(in crate::printer) fn build_angle_list_doc(
         &self,
         span: Span,
@@ -685,16 +687,20 @@ impl<'a> Printer<'a> {
                 inner_parts.push(d.line());
             }
 
-            // Leading block comments (after the previous comma or `<`)
-            if has_comments
-                && let Some(leading) = self.build_comments_between_filtered_opt(
+            // Leading comments (after the previous comma or `<`), through the shared
+            // emitter so each separator is prettier's `printLeadingComment`. The soft
+            // `line` is the one that matters here: a glued run the author gave its own
+            // line (`<A,⏎/* c1 */ /* c2 */⏎B>`) collapses onto the item when this list
+            // fits and breaks above it when it doesn't — one fixed point for both
+            // authorings. A hardcoded space reached the second, and the expansion gate
+            // ([`Printer::block_comment_owns_its_line`]) used to hide that by routing
+            // every own-line run to the all-hardline builder instead.
+            if has_comments {
+                inner_parts.extend(self.build_list_leading_comments(
                     prev_end,
                     item_span(i).start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::BlockOnly,
-                )
-            {
-                inner_parts.push(leading);
+                    None,
+                ));
             }
 
             // Rule A: an alone-on-line directive in this item's gap freezes the item
@@ -787,11 +793,7 @@ impl<'a> Printer<'a> {
             // drop comments pulled onto the `<` line (emitted as the angle-line
             // prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline(
-                prev_end,
-                param_start,
-                skip_delim,
-            ));
+            inner_parts.extend(self.build_list_leading_comments(prev_end, param_start, skip_delim));
 
             // Rule A: an alone-on-line directive in this item's gap freezes the
             // item; the directive itself was just emitted by the leading run above.

@@ -43,8 +43,8 @@ pub(crate) enum BlankRule {
 /// union-vs-intersection split [`Printer::is_own_line_comment`] carries.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum StandaloneGlue {
-    /// The SOURCE reading, asked of the RUN ([`Printer::comment_run_hugs_next`]): anything
-    /// after the `*/` on that line glues the comment, the container's own comma included.
+    /// The SOURCE reading ([`Printer::comment_hugs_next`]): anything after the `*/` on
+    /// that line glues the comment, the container's own comma included.
     /// The **object literal** and **object pattern**, whose separator is re-emitted
     /// structure outside every property span — so `{ a: 1⏎/* c */,⏎b: 2 }` collapses
     /// inline, as prettier collapses it, instead of expanding on pass 1 and collapsing on
@@ -103,21 +103,25 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build the leading-comment run over `[start, end)` for a list whose comments have
-    /// forced it multiline (tuples, type params/args, function-type params, unions, the
-    /// bracket-break shell, the broken cast).
+    /// Build the leading-comment run over `[start, end)` for one item of a list — the
+    /// bracketed families (tuples, type params/args, function-type params, unions, the
+    /// bracket-break shell, the broken cast), on both their layouts: the all-hardline
+    /// builder a line comment forces, and the width-decided one beside it.
     ///
     /// A thin adapter over the shared leading-comment emitter
     /// ([`Printer::push_leading_comment_run`]), so the separator after each comment
     /// follows prettier's `printLeadingComment` (space / soft `line` / hardline, keyed on
-    /// the source around *that* comment, never on where `end` is).
+    /// the source around *that* comment, never on where `end` is). The soft `line` is why
+    /// the width-decided layout must route here too: it is the separator that renders
+    /// differently in the two layouts, so a hardcoded space there gives the same document
+    /// a second fixed point (`docs/comments.md` §Own-line-ness is a SOURCE question).
     ///
     /// `skip_delim` drops the comments sharing `pos`'s source line: they were already
     /// emitted as a trailing prefix on the opening delimiter's line (see
     /// [`Self::delimiter_line_comment_prefix`]), so emitting them here too would
     /// **duplicate** them. Pass the `Option<u32>` that helper returns — gated to the list's
     /// first element, `None` for the rest, and `None` where no delimiter is involved.
-    pub(in crate::printer) fn build_leading_comments_multiline(
+    pub(in crate::printer) fn build_list_leading_comments(
         &self,
         start: u32,
         end: u32,
@@ -170,7 +174,7 @@ impl<'a> Printer<'a> {
     /// Builds the run here so the separator policy every array-family element shares
     /// (`LeadingGlue::Adjacent`, no continuation indent) is stated once rather than at each
     /// call. The range-holding sibling is
-    /// [`Self::build_leading_comments_multiline`].
+    /// [`Self::build_list_leading_comments`].
     pub(crate) fn build_list_element_group_from_comments<'c>(
         &self,
         comments: impl Iterator<Item = &'c internal::Comment>,
@@ -221,7 +225,7 @@ impl<'a> Printer<'a> {
     /// glue arm — the state before this seam was unified — split a pair the author wrote on
     /// one line, and that was a real divergence). A gap whose anchor genuinely IS the
     /// delimiter keeps the delimiter reading and does not belong here
-    /// ([`Self::has_own_line_block_comment_after`]).
+    /// ([`Self::delimiter_line_comment_prefix`]'s question, not this walk's).
     ///
     /// Used wherever such a gap is already broken across lines: the tuple, type
     /// parameters and arguments, both parameter lists, and the angle-bracket cast.
@@ -292,33 +296,11 @@ impl<'a> Printer<'a> {
             .collect()
     }
 
-    /// True when a block comment in `(search_start, end)` sits on its own line —
-    /// i.e. not on the same source line as `line_ref`.
-    ///
-    /// Used to force a parameter/element list to multiline when an own-line block comment
-    /// fills the opening-delimiter→first-element gap (`line_ref` = the delimiter,
-    /// `search_start` = just past it) — the DELIMITER-line question, whose anchor is the
-    /// delimiter itself (`docs/comments.md` §The delimiter-line question). Line comments in
-    /// the same position are detected separately (they always force a break).
-    ///
-    /// ⚠️ **Not for the last-element→closer gap**, which holds the list's own comma: there
-    /// the anchor is an ITEM and the reading goes blind to every byte no item span covers.
-    /// [`Self::has_own_line_block_comment_before_closer`] is that position's predicate.
-    pub(crate) fn has_own_line_block_comment_after(
-        &self,
-        line_ref: u32,
-        search_start: u32,
-        end: u32,
-    ) -> bool {
-        self.comments_on_page_between(search_start, end)
-            .any(|c| c.is_block && !self.is_same_line(line_ref, c.span.start))
-    }
-
     /// True when a block comment in the LAST item→closer gap `(start, end)` owns its line,
-    /// so the list must open around it — the trailing counterpart of
-    /// [`Self::has_own_line_block_comment_after`], asked by the value-level parameter list
-    /// ([`Printer::has_trailing_line_comment_in_params`]) and the type-level one
-    /// (`type_params_force_multiline`).
+    /// so the list must open around it — the trailing counterpart of the leading-run walk
+    /// ([`Printer::has_leading_own_line_comment_in_params`]), asked by the value-level
+    /// parameter list ([`Printer::has_trailing_line_comment_in_params`]) and the type-level
+    /// one (`type_params_force_multiline`).
     ///
     /// The classification is the shared one ([`Printer::block_comment_owns_its_line`]) with
     /// `item_follows: false`: no item is left to lead, so the closer sharing the comment's
@@ -780,8 +762,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let (line_prefix, pull_pos) = self.delimiter_line_comment_prefix(bracket_char, body_start);
-        let mut inner =
-            self.build_leading_comments_multiline(bracket_char + 1, body_start, pull_pos);
+        let mut inner = self.build_list_leading_comments(bracket_char + 1, body_start, pull_pos);
         inner.push(body);
         d.group_break(d.concat(&[
             d.text(open),

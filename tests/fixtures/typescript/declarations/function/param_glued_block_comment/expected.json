@@ -1,0 +1,857 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 777,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A glued pair of block comments takes a soft line before the param, so a list that fits",
+			"start": 20,
+			"end": 109,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keeps the pair on the param's line.",
+			"start": 111,
+			"end": 149,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 164,
+			"end": 172,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 14
+				},
+				"end": {
+					"line": 4,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 173,
+			"end": 181,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 23
+				},
+				"end": {
+					"line": 4,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same between params.",
+			"start": 190,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 235,
+			"end": 243,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 17
+				},
+				"end": {
+					"line": 7,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 244,
+			"end": 252,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 26
+				},
+				"end": {
+					"line": 7,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block the author isolated on its own line takes a hardline instead, so it forces",
+			"start": 261,
+			"end": 346,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the list open.",
+			"start": 348,
+			"end": 365,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 383,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At exactly 100 columns the list still fits, so the pair keeps the param's line.",
+			"start": 403,
+			"end": 485,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 500,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 14
+				},
+				"end": {
+					"line": 17,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 509,
+			"end": 517,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 23
+				},
+				"end": {
+					"line": 17,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " One column more and the list breaks - the soft line breaks with it.",
+			"start": 588,
+			"end": 658,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 676,
+			"end": 684,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 685,
+			"end": 693,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 11
+				},
+				"end": {
+					"line": 21,
+					"column": 19
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 776,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 767,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 151,
+					"end": 187,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 37
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 160,
+						"end": 163,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 4,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 182,
+							"end": 183,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 32
+								},
+								"end": {
+									"line": 4,
+									"column": 33
+								}
+							},
+							"name": "a",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 164,
+									"end": 172
+								},
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 173,
+									"end": 181
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 185,
+						"end": 187,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 35
+							},
+							"end": {
+								"line": 4,
+								"column": 37
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued pair of block comments takes a soft line before the param, so a list that fits",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " keeps the pair on the param's line.",
+							"start": 111,
+							"end": 149
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 219,
+					"end": 258,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 40
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 228,
+						"end": 231,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 232,
+							"end": 233,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 14
+								},
+								"end": {
+									"line": 7,
+									"column": 15
+								}
+							},
+							"name": "a",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 235,
+									"end": 243
+								}
+							]
+						},
+						{
+							"type": "Identifier",
+							"start": 253,
+							"end": 254,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 35
+								},
+								"end": {
+									"line": 7,
+									"column": 36
+								}
+							},
+							"name": "b",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 244,
+									"end": 252
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 256,
+						"end": 258,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 38
+							},
+							"end": {
+								"line": 7,
+								"column": 40
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same between params.",
+							"start": 190,
+							"end": 217
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 367,
+					"end": 400,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 376,
+						"end": 379,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"name": "fn3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 393,
+							"end": 394,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 3
+								}
+							},
+							"name": "a",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 383,
+									"end": 390
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 398,
+						"end": 400,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 3
+							},
+							"end": {
+								"line": 14,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block the author isolated on its own line takes a hardline instead, so it forces",
+							"start": 261,
+							"end": 346
+						},
+						{
+							"type": "Line",
+							"value": " the list open.",
+							"start": 348,
+							"end": 365
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 487,
+					"end": 585,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 496,
+						"end": 499,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 10
+							},
+							"end": {
+								"line": 17,
+								"column": 13
+							}
+						},
+						"name": "fn4"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 518,
+							"end": 581,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 32
+								},
+								"end": {
+									"line": 17,
+									"column": 95
+								}
+							},
+							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaLong",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 573,
+								"end": 581,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 87
+									},
+									"end": {
+										"line": 17,
+										"column": 95
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 575,
+									"end": 581,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 89
+										},
+										"end": {
+											"line": 17,
+											"column": 95
+										}
+									}
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 500,
+									"end": 508
+								},
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 509,
+									"end": 517
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 583,
+						"end": 585,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 97
+							},
+							"end": {
+								"line": 17,
+								"column": 99
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At exactly 100 columns the list still fits, so the pair keeps the param's line.",
+							"start": 403,
+							"end": 485
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 660,
+					"end": 766,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 669,
+						"end": 672,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 10
+							},
+							"end": {
+								"line": 20,
+								"column": 13
+							}
+						},
+						"name": "fn5"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 696,
+							"end": 760,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 66
+								}
+							},
+							"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaLong",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 752,
+								"end": 760,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 58
+									},
+									"end": {
+										"line": 22,
+										"column": 66
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 754,
+									"end": 760,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 60
+										},
+										"end": {
+											"line": 22,
+											"column": 66
+										}
+									}
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 676,
+									"end": 684
+								},
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 685,
+									"end": 693
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 764,
+						"end": 766,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 3
+							},
+							"end": {
+								"line": 23,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " One column more and the list breaks - the soft line breaks with it.",
+							"start": 588,
+							"end": 658
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

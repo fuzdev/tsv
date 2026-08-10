@@ -115,6 +115,14 @@ pub(crate) enum LeadingGlue {
     /// across a source newline — prettier's assignment/call pull-up
     /// ([`build_rhs_comments_glued_opt`](Printer::build_rhs_comments_glued_opt)).
     AdjacentGlued,
+    /// `Adjacent`, plus a block whose only company on its line is a grouping paren the
+    /// printer STRIPPED hugs across the newline that paren left behind — the nested
+    /// JSDoc-cast shape `/** @type {A} */ (⏎/** @type {B} */ (expr))`, where the author
+    /// glued the comment to a `(` that is not in the output, so
+    /// [`Printer::comment_hugs_next`] alone reads the pair as broken and splits it.
+    /// The call-argument leading run's mode, since paren stripping is what puts two casts
+    /// in one gap.
+    AdjacentStrippedParen,
     /// `Adjacent`, but an author **blank** line after a glued block's `*/` does not
     /// force the comment onto its own line — it yields with the soft `line` like a
     /// plain newline. The **value-gap** mode: the gap between a head (`=`, `:`, `as`,
@@ -207,8 +215,12 @@ impl<'a> Printer<'a> {
     /// ([`Self::is_own_line_comment`], no glue half) because prettier's union printer
     /// genuinely expands a block adjacent to its member where the intersection collapses
     /// it — see `union_has_own_line_member_comment`.
+    ///
+    /// The kind clause is the only thing this adds to
+    /// [`Self::block_comment_owns_its_line`] (with an item following), which the
+    /// list-expansion gates call directly because they filter on kind themselves.
     pub(crate) fn comment_isolated_on_its_line(&self, c: &Comment) -> bool {
-        !c.is_block || (!self.comment_follows_content_on_its_line(c) && !self.comment_hugs_next(c))
+        !c.is_block || self.block_comment_owns_its_line(c, true)
     }
 
     /// Whether a *block* comment is glued to what follows it (`/* c */ X` — nothing but
@@ -237,82 +249,50 @@ impl<'a> Printer<'a> {
         comment.is_block && !has_newline_after_position(self.source, comment.span.end)
     }
 
-    /// The RUN form of [`Self::comment_hugs_next`]: does `comment` — or the glued run it
-    /// **heads** — end up against code on its line, rather than ending the line?
-    ///
-    /// ⚠️ **A LAYOUT gate over a gap must ask this one, never the per-comment form.** A
-    /// run the author glued is one object: in `<A,⏎/* c1 */ /* c2 */⏎B>` the head hugs `c2`
-    /// and `c2` is not a head at all (content precedes it on its line), so a per-comment
-    /// `any()` over the gap finds nothing own-line and calls a run the author gave its own
-    /// line inline — the same suffix-vs-per-comment trap
-    /// [`Self::split_glued_comments`] names, one question over. Walking the glued chain and
-    /// asking the LAST link is what makes the run's own line visible.
-    ///
-    /// The walk is structural (the comment list), not a re-lex: a following comment is part
-    /// of the run when nothing but horizontal whitespace separates the two, which is
-    /// exactly the gap `comment_hugs_next` just proved holds no newline. It terminates
-    /// because each link starts strictly after the previous one ends.
-    ///
-    /// The *emitters* keep the per-comment form — they walk a run comment by comment and
-    /// each link's own glue is what they need ([`Self::push_leading_comment_run`]).
-    pub(crate) fn comment_run_hugs_next(&self, comment: &Comment) -> bool {
-        let mut current = comment;
-        loop {
-            if !self.comment_hugs_next(current) {
-                return false;
-            }
-            let glued_next = tsv_lang::comments_in_source_after(self.comments, current.span.end)
-                .next()
-                .filter(|next| {
-                    self.source[current.span.end as usize..next.span.start as usize]
-                        .bytes()
-                        .all(|b| b == b' ' || b == b'\t')
-                });
-            match glued_next {
-                Some(next) => current = next,
-                // Glued to code, not to another comment — the run hugs.
-                None => return true,
-            }
-        }
-    }
-
     /// Whether a **block** comment OWNS its line — the classification every list-EXPANSION
     /// gate applies, stated once. Four families spell the surrounding scan differently
     /// (what bounds the gap, what counts as an item, whether a multi-line block is in
     /// scope), and the one thing they must not spell differently is this.
     ///
-    /// Both halves read the SOURCE: nothing before the `/*` on its line
-    /// ([`Self::comment_follows_content_on_its_line`]) and nothing after the `*/` there,
-    /// asked of the RUN ([`Self::comment_run_hugs_next`]). Every list here flattens when it
-    /// fits, so the author's line break *around* the comma is layout, not own-line-ness —
-    /// an item-boundary reading of either half calls a comma-glued comment own-line and
-    /// reaches a third fixed point neither the bare authoring nor prettier produces
-    /// (`docs/comments.md` §Own-line-ness is a SOURCE question).
+    /// Both halves read the SOURCE, per comment: nothing before the `/*` on its line
+    /// ([`Self::comment_follows_content_on_its_line`]) and nothing after the `*/` there
+    /// ([`Self::comment_hugs_next`]) — prettier's `printLeadingComment` hardline condition,
+    /// which is the only separator of its three that ends the line unconditionally. Every
+    /// list here flattens when it fits, so the author's line break *around* the comma is
+    /// layout, not own-line-ness — an item-boundary reading of either half calls a
+    /// comma-glued comment own-line and reaches a third fixed point neither the bare
+    /// authoring nor prettier produces (`docs/comments.md` §Own-line-ness is a SOURCE
+    /// question).
+    ///
+    /// ⚠️ **A glued RUN given its own line does not own it.** In `<A,⏎/* c1 */ /* c2 */⏎B>`
+    /// only `c1` has a newline before it and only `c2` has one after, so neither takes the
+    /// hardline: `c1` glues to `c2` and `c2` takes the **soft `line`** that collapses when
+    /// the list fits and breaks when it doesn't. Asking the RUN instead — "does the object
+    /// the author glued end the line?" — is the reading this gate used to take, and it
+    /// forces open a list prettier keeps flat at every one of these families (params, type
+    /// params, type args, function-type params, call args, tuples, intersections, all
+    /// measured). The soft `line` is what makes the two authorings one fixed point, and it
+    /// lives in the emitters ([`Self::push_leading_comment_run`]); a gate that pre-empts it
+    /// with a forced break is answering a question the emitter already answers better.
     ///
     /// `item_follows` is the caller's fact about the range it scanned, not a default: with
     /// no item left to lead, the comment is DANGLING and the container's closer sharing its
     /// line is not glue (`{ a: 1⏎/* c */ }`, `[a,⏎/* c */ ]` — prettier expands both). A
     /// gap bounded by the next item passes `true`, and the families whose trailing position
-    /// belongs to a separate predicate ([`Self::has_own_line_block_comment_after`]) always
-    /// do.
+    /// belongs to a separate predicate ([`Self::has_own_line_block_comment_before_closer`])
+    /// always do.
     ///
     /// The caller filters on kind first: a **line** comment forces every one of these lists
     /// open on its own, and each family says so in its own clause rather than here.
-    ///
-    /// ⚠️ **Not a spelling of [`Self::comment_isolated_on_its_line`], and the two must not
-    /// be unified.** They differ on exactly one thing — this asks the glue question of the
-    /// RUN, that one per comment — and prettier genuinely answers a glued run given its own
-    /// line two ways: a LIST expands around it (`<A,⏎/* c1 */ /* c2 */⏎B>`), while a value
-    /// gap keeps its value inline (`type:⏎/* c1 */ /* c2 */⏎'json'`). A gate asking the
-    /// per-comment form calls the run inline; a value gap asking the run form hangs a value
-    /// both prettier and the fits-inline reading keep put.
+    /// [`Self::comment_isolated_on_its_line`] is this same question with that clause folded
+    /// in, for the callers that don't pre-filter.
     pub(crate) fn block_comment_owns_its_line(
         &self,
         comment: &Comment,
         item_follows: bool,
     ) -> bool {
         !self.comment_follows_content_on_its_line(comment)
-            && (!item_follows || !self.comment_run_hugs_next(comment))
+            && (!item_follows || !self.comment_hugs_next(comment))
     }
 
     /// Split a comment run into the ones that stay in the RUN and the ones
@@ -541,12 +521,20 @@ impl<'a> Printer<'a> {
     /// past it: [`blank_scan_end`](Self::blank_scan_end) finds the first physical
     /// comment in `(comment.end, emit_next)`, then a same-line block hugs it with a
     /// space ([`comment_hugs_next`](Self::comment_hugs_next)) and everything else takes
-    /// the blank-preserving hardline. The single statement of that rule for the
+    /// the blank-preserving hardline. The single statement of that rule for the two
     /// hand-rolled leading-run emitters whose surrounding loop can't route through
     /// [`push_leading_comment_run`](Self::push_leading_comment_run)
-    /// (`build_eq_comment_break_rhs`, `append_keyword_value_line_comments`,
-    /// `emit_leading_comments_inline_aware`) — so a run the author glued stays glued
-    /// and a multiline owned comment's own newline is never read as an author blank line.
+    /// (`build_eq_comment_break_rhs`, `append_keyword_value_line_comments`) — so a run the
+    /// author glued stays glued and a multiline owned comment's own newline is never read
+    /// as an author blank line.
+    ///
+    /// ⚠️ **Two states, so it belongs only where the break is already FORCED.** Both
+    /// callers sit past a `//` that has taken the line, inside an `indent_hardline` /
+    /// forced continuation, where prettier's third separator — the soft `line` — would
+    /// render as the hardline anyway. A site whose enclosing group can still be flat needs
+    /// [`push_leading_comment_run`](Self::push_leading_comment_run) instead: reaching for
+    /// this one there forces the group open around a run prettier keeps inline, which is
+    /// exactly what the call family's leading emitter did before it was converged.
     pub(crate) fn push_leading_run_separator(
         &self,
         parts: &mut DocBuf,
@@ -948,19 +936,38 @@ impl<'a> Printer<'a> {
     /// after-comma comments as leading comments on the next item. Shared by the
     /// variable-declarator, for-init, and heritage inter-item sites; see
     /// [`Self::is_stranded_after_comma_block`].
+    ///
+    /// Returns `Some(end)` — where the next item's **leading** run resumes, past the
+    /// stranded prefix — or `None` when nothing was stranded, leaving the caller's own
+    /// anchor standing. The stranded set is a contiguous prefix of the gap (each member
+    /// sits on the comma's line, and the first that doesn't ends it), so the two halves
+    /// partition it: a caller that emits the run and then resumes before it DOUBLE-PRINTS
+    /// the stranded blocks. Returning the anchor is what keeps the two from being written
+    /// apart — the same coupling [`Self::push_item_trailing_run`] states at the other end
+    /// of the gap. A caller with no leading emitter of its own ignores it.
+    ///
+    /// ⚠️ **`None` is not `comma_pos`.** The gap opens at the previous item's claimed
+    /// trailing run, which ends BEFORE the comma, so a caller handed `comma_pos` on the
+    /// empty case resumes past `[run_end, comma)` — and a comment the author put on its own
+    /// line there (`x: T⏎/* c */, y: U`) is claimed by neither half and DROPPED. Measured,
+    /// by `gaps:audit`, on the change that introduced it.
     pub(crate) fn push_stranded_after_comma_blocks(
         &self,
         parts: &mut DocBuf,
         comma_pos: u32,
         next_start: u32,
-    ) {
+    ) -> Option<u32> {
         let d = self.d();
+        let mut resume = None;
         for comment in comments_to_emit_in_range(self.comments, comma_pos, next_start) {
-            if self.is_stranded_after_comma_block(comment, comma_pos, next_start) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
+            if !self.is_stranded_after_comma_block(comment, comma_pos, next_start) {
+                break;
             }
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+            resume = Some(comment.span.end);
         }
+        resume
     }
 
     /// Build a Doc for inline comments between two positions with specified spacing and filter
@@ -1433,7 +1440,7 @@ impl<'a> Printer<'a> {
     /// arrow-body run, the member-leading sites (interface / intersection members),
     /// the comma-separated inter-item gaps (declarators, for-init, heritage,
     /// switch cases), the forced-multiline lists via
-    /// [`build_leading_comments_multiline`](Self::build_leading_comments_multiline)
+    /// [`build_list_leading_comments`](Self::build_list_leading_comments)
     /// (tuples, type params/args, function-type params, the union's first member, the
     /// bracket-break shell, the broken `<T>` cast), the array literal / array pattern
     /// element runs, the body/member runs via
@@ -1490,6 +1497,14 @@ impl<'a> Printer<'a> {
                     comment.is_block
                         && (self.is_same_line(comment.span.end, next)
                             || !self.comment_cannot_glue_to_operator(comment))
+                }
+                // `Adjacent`, plus the stripped grouping paren the author glued the
+                // comment to (`/* c */ (⏎…`) — invisible in the output, so the newline it
+                // left behind must not un-glue the pair.
+                LeadingGlue::AdjacentStrippedParen => {
+                    self.comment_hugs_next(comment)
+                        || (comment.is_block
+                            && calls::has_stripped_paren_gap(self.source, comment.span.end, next))
                 }
             };
             if hugs {

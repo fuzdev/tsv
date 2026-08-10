@@ -1,0 +1,1547 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1140,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A glued pair of block comments takes a soft line before the argument, so a list that",
+			"start": 20,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " fits keeps the pair on the argument's line.",
+			"start": 109,
+			"end": 155,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 161,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 5
+				},
+				"end": {
+					"line": 4,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 170,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 14
+				},
+				"end": {
+					"line": 4,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same between arguments.",
+			"start": 185,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 224,
+			"end": 232,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 8
+				},
+				"end": {
+					"line": 7,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 233,
+			"end": 241,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 17
+				},
+				"end": {
+					"line": 7,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `new` takes its own argument printer.",
+			"start": 248,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 302,
+			"end": 310,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 13
+				},
+				"end": {
+					"line": 10,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 311,
+			"end": 319,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 22
+				},
+				"end": {
+					"line": 10,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " So does a member chain long enough to break.",
+			"start": 326,
+			"end": 373,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 390,
+			"end": 398,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 16
+				},
+				"end": {
+					"line": 13,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 399,
+			"end": 407,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 25
+				},
+				"end": {
+					"line": 13,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block the author isolated on its own line takes a hardline instead, so it forces",
+			"start": 414,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the list open.",
+			"start": 501,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 532,
+			"end": 539,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The soft line breaks with the list, so a list too wide to fit keeps the pair on its",
+			"start": 550,
+			"end": 636,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own line.",
+			"start": 638,
+			"end": 650,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 715,
+			"end": 723,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 724,
+			"end": 732,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 11
+				},
+				"end": {
+					"line": 27,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A lone argument in a member chain takes yet another argument printer - the pair",
+			"start": 794,
+			"end": 876,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " stays on its line there too.",
+			"start": 878,
+			"end": 909,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 923,
+			"end": 931,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 13
+				},
+				"end": {
+					"line": 33,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 932,
+			"end": 940,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 22
+				},
+				"end": {
+					"line": 33,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " And drops below the pair when the chain breaks.",
+			"start": 947,
+			"end": 997,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 1021,
+			"end": 1029,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 3
+				},
+				"end": {
+					"line": 39,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 1030,
+			"end": 1038,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 12
+				},
+				"end": {
+					"line": 39,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1139,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1130,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 42,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 157,
+					"end": 182,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 26
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 157,
+						"end": 181,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 25
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 157,
+							"end": 160,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 179,
+								"end": 180,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 23
+									},
+									"end": {
+										"line": 4,
+										"column": 24
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 161,
+										"end": 169
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 170,
+										"end": 178
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued pair of block comments takes a soft line before the argument, so a list that",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " fits keeps the pair on the argument's line.",
+							"start": 109,
+							"end": 155
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 217,
+					"end": 245,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 29
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 217,
+						"end": 244,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 28
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 217,
+							"end": 220,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 4
+								}
+							},
+							"name": "fn2"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 221,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 5
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 224,
+										"end": 232
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 242,
+								"end": 243,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 26
+									},
+									"end": {
+										"line": 7,
+										"column": 27
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 233,
+										"end": 241
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same between arguments.",
+							"start": 185,
+							"end": 215
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 290,
+					"end": 323,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 34
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 290,
+						"end": 322,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 33
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 294,
+							"end": 298,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 5
+								},
+								"end": {
+									"line": 10,
+									"column": 9
+								}
+							},
+							"name": "Comp"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 299,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 10
+									},
+									"end": {
+										"line": 10,
+										"column": 11
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 302,
+										"end": 310
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 320,
+								"end": 321,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 31
+									},
+									"end": {
+										"line": 10,
+										"column": 32
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 311,
+										"end": 319
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `new` takes its own argument printer.",
+							"start": 248,
+							"end": 288
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 375,
+					"end": 411,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 37
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 375,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 36
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 375,
+							"end": 386,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 13,
+									"column": 12
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 375,
+								"end": 383,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 1
+									},
+									"end": {
+										"line": 13,
+										"column": 9
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 375,
+									"end": 381,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 1
+										},
+										"end": {
+											"line": 13,
+											"column": 7
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 375,
+										"end": 378,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 1
+											},
+											"end": {
+												"line": 13,
+												"column": 4
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 379,
+										"end": 381,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 5
+											},
+											"end": {
+												"line": 13,
+												"column": 7
+											}
+										},
+										"name": "m1"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 10
+									},
+									"end": {
+										"line": 13,
+										"column": 12
+									}
+								},
+								"name": "m2"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 387,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 13
+									},
+									"end": {
+										"line": 13,
+										"column": 14
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 390,
+										"end": 398
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 408,
+								"end": 409,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 34
+									},
+									"end": {
+										"line": 13,
+										"column": 35
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 399,
+										"end": 407
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " So does a member chain long enough to break.",
+							"start": 326,
+							"end": 373
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 520,
+					"end": 547,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 520,
+						"end": 546,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 520,
+							"end": 523,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 4
+								}
+							},
+							"name": "fn3"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 527,
+								"end": 528,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 542,
+								"end": 543,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 532,
+										"end": 539
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block the author isolated on its own line takes a hardline instead, so it forces",
+							"start": 414,
+							"end": 499
+						},
+						{
+							"type": "Line",
+							"value": " the list open.",
+							"start": 501,
+							"end": 518
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 652,
+					"end": 791,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 652,
+						"end": 790,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 652,
+							"end": 655,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 1
+								},
+								"end": {
+									"line": 25,
+									"column": 4
+								}
+							},
+							"name": "fn4"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 659,
+								"end": 711,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 54
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaLong"
+							},
+							{
+								"type": "Identifier",
+								"start": 735,
+								"end": 787,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 54
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbLong",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 715,
+										"end": 723
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 724,
+										"end": 732
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The soft line breaks with the list, so a list too wide to fit keeps the pair on its",
+							"start": 550,
+							"end": 636
+						},
+						{
+							"type": "Line",
+							"value": " own line.",
+							"start": 638,
+							"end": 650
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 911,
+					"end": 944,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 34
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 911,
+						"end": 943,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 1
+							},
+							"end": {
+								"line": 33,
+								"column": 33
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 911,
+							"end": 922,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 1
+								},
+								"end": {
+									"line": 33,
+									"column": 12
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 911,
+								"end": 919,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 1
+									},
+									"end": {
+										"line": 33,
+										"column": 9
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 911,
+									"end": 917,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 1
+										},
+										"end": {
+											"line": 33,
+											"column": 7
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 911,
+										"end": 914,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 1
+											},
+											"end": {
+												"line": 33,
+												"column": 4
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 915,
+										"end": 917,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 5
+											},
+											"end": {
+												"line": 33,
+												"column": 7
+											}
+										},
+										"name": "m3"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 920,
+								"end": 922,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 10
+									},
+									"end": {
+										"line": 33,
+										"column": 12
+									}
+								},
+								"name": "m4"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 941,
+								"end": 942,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 31
+									},
+									"end": {
+										"line": 33,
+										"column": 32
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 923,
+										"end": 931
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 932,
+										"end": 940
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A lone argument in a member chain takes yet another argument printer - the pair",
+							"start": 794,
+							"end": 876
+						},
+						{
+							"type": "Line",
+							"value": " stays on its line there too.",
+							"start": 878,
+							"end": 909
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 999,
+					"end": 1129,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 999,
+						"end": 1128,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 1
+							},
+							"end": {
+								"line": 41,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 999,
+							"end": 1016,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 1
+								},
+								"end": {
+									"line": 38,
+									"column": 5
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 999,
+								"end": 1010,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 1
+									},
+									"end": {
+										"line": 37,
+										"column": 7
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 999,
+									"end": 1008,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 1
+										},
+										"end": {
+											"line": 37,
+											"column": 5
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 999,
+										"end": 1002,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 1
+											},
+											"end": {
+												"line": 36,
+												"column": 4
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1006,
+										"end": 1008,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 3
+											},
+											"end": {
+												"line": 37,
+												"column": 5
+											}
+										},
+										"name": "m5"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1014,
+								"end": 1016,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 3
+									},
+									"end": {
+										"line": 38,
+										"column": 5
+									}
+								},
+								"name": "m6"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1042,
+								"end": 1124,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 3
+									},
+									"end": {
+										"line": 40,
+										"column": 85
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaLong",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 1021,
+										"end": 1029
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 1030,
+										"end": 1038
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " And drops below the pair when the chain breaks.",
+							"start": 947,
+							"end": 997
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

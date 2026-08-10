@@ -9,7 +9,7 @@ use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
     build_before_comma_trailing_comments, emit_last_arg_trailing_comments,
     first_arg_has_any_comments, has_inter_argument_comments, has_trailing_comments_on_args,
-    is_comment_inline_with_next, last_arg_has_comments, push_empty_args,
+    last_arg_has_comments, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments, is_block_function,
@@ -58,11 +58,29 @@ fn get_call_type_arguments<'a>(
     })
 }
 
-/// Build inline leading block comments for the first argument (non-expansion path).
+/// The `(`→first-argument gap for the chain's **body-line** paths, as a doc: the blocks the
+/// author left on the `(`'s line, then the rest of the gap through the shared leading
+/// emitter ([`PartitionedComments::emit_leading_comments_inline_aware`]).
 ///
-/// Returns comments that should be emitted inline before the first arg:
-/// - Block comments on the same line as paren_open (trailing_block)
-/// - Block comments on the same line as the first arg (from leading)
+/// ⚠️ **Emitting a FILTERED subset here is a DROP waiting for its gate to move.** The loop
+/// this replaces kept only the comments an item-boundary predicate called inline with the
+/// argument and discarded the rest, on the standing promise that anything else had already
+/// forced the expanded path. The moment the expansion gate stopped calling a glued run given
+/// its own line "own-line" — which is what prettier's own soft `line` says about it —
+/// `obj.m1().m2(⏎/* c1 */ /* c2 */⏎a)` arrived here and BOTH comments vanished, with the
+/// whole fixture suite and every audit green. A gap emitter that can only print PART of what
+/// it is handed is a claim about its gate, and no gate stated that claim.
+///
+/// ⚠️ **It still cannot delegate to
+/// [`super::arg_comments::emit_first_arg_leading_comments`]**, and the reason is
+/// the shape rather than the rules: that emitter has a second output channel for the
+/// `(`-**line** run (a `//` trailing the `(` stays on it), while this one returns a single
+/// doc its callers splice into the argument body. Callers that can reach such a comment
+/// place it themselves and consume this doc only under `!comments_force_expansion` — but
+/// `build_call_args_doc_for_chain_impl` builds it EAGERLY, for arms that then never run, so
+/// "no `(`-line comment reaches here" is false as an invariant on this function even though
+/// it holds at every use. Asserting it fails on `calls/chain_open_paren_comment`, which is
+/// how this note came to be measured rather than guessed.
 fn build_inline_leading_comments(
     printer: &Printer<'_>,
     paren_open: u32,
@@ -77,20 +95,11 @@ fn build_inline_leading_comments(
     );
 
     let mut parts = DocBuf::new();
-
-    // Block comments on same line as paren
     for comment in &pc.trailing_block {
         parts.push(printer.build_comment_doc(comment));
         parts.push(d.text(" "));
     }
-
-    // Block comments effectively inline with first arg
-    for comment in &pc.leading {
-        if comment.is_block && is_comment_inline_with_next(printer, comment.span.end, arg_start) {
-            parts.push(printer.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
-    }
+    pc.emit_leading_comments_inline_aware(&mut parts, printer);
 
     if parts.is_empty() {
         None
@@ -418,8 +427,9 @@ fn build_chain_args_force_expand(
 
     // Special case: single arrow arg with array body — the array expands internally.
     // Layout: `(sig => [\n  items,\n])` — array content on new lines, bracket hugged.
-    // Skip when comments_force_expansion — own-line comments would be lost since
-    // leading_comment_doc only captures inline block comments.
+    // Skip when comments_force_expansion — this layout has no line to put a comment that
+    // must own one on, and the `(`-line channel `leading_comment_doc` cannot carry has no
+    // home here either.
     if call.arguments.len() == 1
         && !comments_force_expansion
         && let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]

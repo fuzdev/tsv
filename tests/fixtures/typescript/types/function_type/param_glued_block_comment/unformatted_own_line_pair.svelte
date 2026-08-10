@@ -40,10 +40,16 @@
 
 	// The break after the pair is a soft line, so a list that fits keeps the pair on the
 	// param's line.
-	type E = (/* c1 */ /* c2 */ a: string) => void;
+	type E = (
+		/* c1 */ /* c2 */
+		a: string
+	) => void;
 
 	// The same in a method signature.
 	interface Inline {
-		m(/* c1 */ /* c2 */ a: string): void;
+		m(
+			/* c1 */ /* c2 */
+			a: string
+		): void;
 	}
 </script>

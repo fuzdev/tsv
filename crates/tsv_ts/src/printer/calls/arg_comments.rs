@@ -7,7 +7,7 @@
 
 use smallvec::SmallVec;
 
-use super::super::{CommentFilter, CommentSpacing, Printer};
+use super::super::{CommentFilter, CommentSpacing, LeadingGlue, Printer};
 use crate::ast::internal;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -355,7 +355,7 @@ pub(crate) fn has_inter_argument_comments_slice(
 ///
 /// Returns false when the paren is on a different line from the comment:
 /// `/* block */\n(expr)` → gap `\n(` has a newline before the paren → NOT inline.
-fn has_stripped_paren_gap(source: &str, start: u32, end: u32) -> bool {
+pub(crate) fn has_stripped_paren_gap(source: &str, start: u32, end: u32) -> bool {
     let s = start as usize;
     let e = end as usize;
     if s >= e || e > source.len() {
@@ -1166,52 +1166,27 @@ impl<'a> PartitionedComments<'a> {
         self.emit_dangling_comments(parts, printer);
     }
 
-    /// Emit leading comments, keeping inline block comments on the same line as the
-    /// gap `end` (the following element's start).
+    /// Emit this gap's leading run, through the shared leading-comment emitter
+    /// ([`Printer::push_leading_comment_run`]) in the stripped-paren glue mode.
     ///
-    /// For comments on the same line as `end`, emits them inline (comment + space).
-    /// For comments on their own line, emits them with hardline after.
+    /// Two things make this run different from a plain one, and both are the mode's:
+    /// paren stripping can put two JSDoc casts in one gap
+    /// (`/** @type {A} */ (⏎/** @type {B} */ (expr))`), where the outer cast is glued to a
+    /// `(` the printer deletes — so the glue test has to see through it, or the pair the
+    /// author wrote as one splits across lines.
     ///
-    /// For nested JSDoc casts like `/** @type {A} */ (\n\t/** @type {B} */ (expr))`,
-    /// after paren stripping both comments become leading. The inner comment is inline
-    /// with the arg, and the outer comment is followed by a stripped `(` on the same line.
-    /// Both should stay inline: `/** @type {A} */ /** @type {B} */ expr`.
+    /// ⚠️ **The run's last separator is prettier's soft `line`, not a hardline.** A
+    /// hand-rolled loop here reached for [`Printer::push_leading_run_separator`], whose
+    /// two states (space or hardline) are right only at an already-broken site: it forced
+    /// an argument list open around a glued pair the author gave its own line
+    /// (`fn(a,⏎/* c1 */ /* c2 */⏎b)`), which prettier keeps flat.
     pub fn emit_leading_comments_inline_aware(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
-        let d = printer.d();
-        let next_pos = self.end;
-
-        // Pre-compute which comments should be inline. Walk backwards: if the last
-        // block comment is inline with next_pos, check preceding block comments — if
-        // they're followed by a stripped open paren on the same line, they're also inline
-        // (nested JSDoc cast pattern).
-        let mut inline_flags: SmallVec<[bool; 4]> = SmallVec::new();
-        inline_flags.resize(self.leading.len(), false);
-
-        let mut next_inline_start = next_pos;
-        for (i, comment) in self.leading.iter().enumerate().rev() {
-            if comment.is_block
-                && is_comment_inline_with_next(printer, comment.span.end, next_inline_start)
-            {
-                inline_flags[i] = true;
-                // This comment is inline — check if the PREVIOUS comment connects
-                // to this one via a stripped paren gap
-                next_inline_start = comment.span.start;
-            } else {
-                break;
-            }
-        }
-
-        for (i, comment) in self.leading.iter().enumerate() {
-            parts.push(printer.build_comment_doc(comment));
-            if inline_flags[i] {
-                parts.push(d.text(" "));
-            } else {
-                printer.push_leading_run_separator(
-                    parts,
-                    comment,
-                    self.leading.get(i + 1).map_or(next_pos, |c| c.span.start),
-                );
-            }
-        }
+        printer.push_leading_comment_run(
+            parts,
+            self.leading.iter().copied(),
+            self.end,
+            LeadingGlue::AdjacentStrippedParen,
+            printer.d().empty(),
+        );
     }
 }
