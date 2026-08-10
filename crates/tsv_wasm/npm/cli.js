@@ -732,17 +732,32 @@ function collect_root(root, cwd, files, errors, warnings) {
 	);
 }
 
-/** Component-wise path ordering matching Rust's `PathBuf` ordering — `/`
- * splits components and a shorter prefix sorts first, so `a/y.ts` precedes
- * `a-b/x.ts` (plain string order would invert them: `-` < `/`). The parity
- * claim is scoped to ASCII/BMP names and `/`-separated paths: JS compares
- * UTF-16 code units while Rust compares UTF-8 bytes, so astral-plane names
- * (≥ U+10000) order differently, and a backslash-spelled Windows root
- * doesn't split into components. */
+/** A path's components, split on either separator spelling where the platform
+ * has two. `\` is a legal filename byte on posix, so it counts only on Windows
+ * — mirroring Rust's `is_sep_byte`. */
+function split_path_components(path) {
+	return sep === '\\' ? path.split(/[/\\]/) : path.split('/');
+}
+
+/** Does `path` already end in a separator? Same platform rule as
+ * `split_path_components` — the `PathBuf::push` test for whether a separator
+ * must be inserted. */
+function ends_with_sep(path) {
+	return path.endsWith('/') || (sep === '\\' && path.endsWith('\\'));
+}
+
+/** Component-wise path ordering matching Rust's `PathBuf` ordering — a
+ * separator splits components and a shorter prefix sorts first, so `a/y.ts`
+ * precedes `a-b/x.ts` (plain string order would invert them: `-` < `/`). The
+ * parity claim is scoped to ASCII/BMP names: JS compares UTF-16 code units
+ * while Rust compares UTF-8 bytes, so astral-plane names (≥ U+10000) order
+ * differently. A Windows path's drive prefix rides along as one leading
+ * component where Rust splits it into `Prefix` + `RootDir`, which reaches the
+ * same verdict for every pair sharing a root. */
 function compare_paths(a, b) {
 	if (a === b) return 0;
-	const as = a.split('/');
-	const bs = b.split('/');
+	const as = split_path_components(a);
+	const bs = split_path_components(b);
 	const len = Math.min(as.length, bs.length);
 	for (let i = 0; i < len; i++) {
 		if (as[i] !== bs[i]) return as[i] < bs[i] ? -1 : 1;
@@ -839,10 +854,14 @@ function collect_recursive(
 	const child_heuristic = heuristic_active && !git_pushed;
 
 	for (const entry of entries) {
-		// PathBuf::push parity: only insert a separator when the dir doesn't
-		// already end with one, so a trailing-slash root (`tsv format src/`)
-		// yields `src/a.ts`, not `src//a.ts`
-		const path = dir.endsWith('/') ? `${dir}${entry.name}` : `${dir}/${entry.name}`;
+		// PathBuf::push parity: insert the platform separator, and only when the
+		// dir doesn't already end with one — so a trailing-slash root (`tsv
+		// format src/`) yields `src/a.ts`, not `src//a.ts`, on either platform.
+		// The separator has to be `sep` rather than a hardcoded `/`: discovered
+		// paths are what the CLI prints and hands to the formatter, and the
+		// native CLI's `entry.path()` spells them natively, so a `/` here makes
+		// the two CLIs disagree on Windows over the same tree.
+		const path = ends_with_sep(dir) ? `${dir}${entry.name}` : `${dir}${sep}${entry.name}`;
 		// `path` relative to the format root, for matching ('' = the format root)
 		const child_rel = dir_rel === '' ? entry.name : `${dir_rel}/${entry.name}`;
 		if (entry.isDirectory()) {

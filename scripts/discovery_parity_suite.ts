@@ -33,6 +33,17 @@ const materialize = (root: string, tree: Record<string, string | null>): void =>
 	}
 };
 
+/**
+ * Separators normalized to `/`, the spelling `expected` is written in.
+ * Discovery emits *native* separators (`PathBuf::push` parity), so on Windows
+ * both the reported paths and the tempdir root prefix come back `\`-joined and
+ * the strip below would never match — every case reading back absolute. The
+ * native harness (`tests/discovery_parity.rs`) normalizes the same two sides
+ * for the same reason; `\` is a legal posix filename byte, but no scenario
+ * name uses one.
+ */
+const to_posix = (path: string): string => path.replaceAll('\\', '/');
+
 /** Register the parity table as a `describe` block driving `cli_path`. */
 export const register_discovery_parity_suite = (
 	name: string,
@@ -49,7 +60,7 @@ export const register_discovery_parity_suite = (
 				const root = mkdtempSync(join(tmpdir(), 'tsv-parity-'));
 				try {
 					materialize(root, scenario.tree);
-					const prefix = `${root}/`;
+					const prefix = `${to_posix(root)}/`;
 					for (const { target, expected, error } of scenario.cases) {
 						const arg = target === '' ? root : join(root, target);
 						const result = spawnSync(process.execPath, [cli_path, 'format', '--list', arg], {
@@ -72,6 +83,7 @@ export const register_discovery_parity_suite = (
 						const actual = result.stdout
 							.split('\n')
 							.filter((line) => line !== '')
+							.map(to_posix)
 							.map((line) => (line.startsWith(prefix) ? line.slice(prefix.length) : line));
 						assert.deepEqual(actual, expected, `${scenario.name} [target=${target}]`);
 					}

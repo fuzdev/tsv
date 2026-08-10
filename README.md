@@ -86,9 +86,8 @@ Future features (unknown order):
 
 ## Install
 
-tsv ships to npm as a native package for Node.js and Bun, plus three WASM
-packages — the universal fallback for browsers, Deno, and platforms without a
-prebuilt binary:
+tsv ships to npm as a native package for Node and Bun, plus three WASM
+packages for browsers, Deno, and platforms without a prebuilt binary:
 
 - [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser) with a `tsv` CLI, as a prebuilt native N-API addon
 - [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) - the full tool with the same `tsv` CLI, as WASM
