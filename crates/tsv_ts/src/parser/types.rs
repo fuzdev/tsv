@@ -1589,30 +1589,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::NoSubstitutionTemplate => {
                 // Simple template with no interpolation: `hello world`
                 let (elem_start, elem_end) = self.current_pos();
-                let raw = self.current_value();
-
-                // Extract content between backticks
-                let (content, raw_span) = if raw.len() >= 2 {
-                    (
-                        &raw[1..raw.len() - 1],
-                        Span::new(elem_start as u32 + 1, elem_end as u32 - 1),
-                    )
-                } else {
-                    ("", Span::new(elem_start as u32, elem_start as u32))
-                };
-                let has_newline = content.contains('\n');
-
-                let cooked = self.template_cooked(content, false)?;
+                let token = Span::new(elem_start as u32, elem_end as u32);
+                let element = self.template_element(token, true, false)?;
 
                 self.advance()?;
 
-                quasis.push(TemplateElement {
-                    raw_span,
-                    cooked,
-                    has_newline,
-                    tail: true,
-                    span: Span::new(elem_start as u32, elem_end as u32),
-                });
+                quasis.push(element);
 
                 Ok(TemplateLiteralType {
                     quasis: quasis.into_bump_slice(),
@@ -1623,30 +1605,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::TemplateHead => {
                 // Template with interpolation: `hello ${string}...`
                 let (elem_start, elem_end) = self.current_pos();
-                let raw = self.current_value();
-
-                // Extract content: remove leading ` and trailing ${
-                let (content, raw_span) = if raw.len() >= 3 {
-                    (
-                        &raw[1..raw.len() - 2],
-                        Span::new(elem_start as u32 + 1, elem_end as u32 - 2),
-                    )
-                } else {
-                    ("", Span::new(elem_start as u32, elem_start as u32))
-                };
-                let has_newline = content.contains('\n');
-
-                let cooked = self.template_cooked(content, false)?;
+                let token = Span::new(elem_start as u32, elem_end as u32);
+                let element = self.template_element(token, false, false)?;
 
                 self.advance()?;
 
-                quasis.push(TemplateElement {
-                    raw_span,
-                    cooked,
-                    has_newline,
-                    tail: false,
-                    span: Span::new(elem_start as u32, elem_end as u32),
-                });
+                quasis.push(element);
 
                 // Parse types and remaining template parts
                 loop {
@@ -1655,7 +1619,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     types.push(ts_type);
 
                     // Expect closing } of the interpolation
-                    let (brace_start, _) = self.current_pos();
                     if !self.check(&TokenKind::BraceClose) {
                         return Err(self.error_expected("'}' after type in template literal"));
                     }
@@ -1670,32 +1633,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         TokenKind::TemplateTail => {
                             // Final part: }content`
                             let (tail_start, tail_end) = self.current_pos();
-                            let tail_raw = self.current_value();
-
-                            // Extract content: remove leading } and trailing `.
-                            // The node span starts at the prior `}` (brace_start); the
-                            // raw content span uses the token's own start (tail_start).
-                            let (tail_content, raw_span) = if tail_raw.len() >= 2 {
-                                (
-                                    &tail_raw[1..tail_raw.len() - 1],
-                                    Span::new(tail_start as u32 + 1, tail_end as u32 - 1),
-                                )
-                            } else {
-                                ("", Span::new(tail_start as u32, tail_start as u32))
-                            };
-                            let has_newline = tail_content.contains('\n');
-
-                            let tail_cooked = self.template_cooked(tail_content, false)?;
+                            let element = self.template_element(
+                                Span::new(tail_start as u32, tail_end as u32),
+                                true,
+                                false,
+                            )?;
 
                             self.advance()?;
 
-                            quasis.push(TemplateElement {
-                                raw_span,
-                                cooked: tail_cooked,
-                                has_newline,
-                                tail: true,
-                                span: Span::new(brace_start as u32, tail_end as u32),
-                            });
+                            quasis.push(element);
 
                             return Ok(TemplateLiteralType {
                                 quasis: quasis.into_bump_slice(),
@@ -1706,32 +1652,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         TokenKind::TemplateMiddle => {
                             // Middle part: }content${
                             let (mid_start, mid_end) = self.current_pos();
-                            let mid_raw = self.current_value();
-
-                            // Extract content: remove leading } and trailing ${.
-                            // The node span starts at the prior `}` (brace_start); the
-                            // raw content span uses the token's own start (mid_start).
-                            let (mid_content, raw_span) = if mid_raw.len() >= 3 {
-                                (
-                                    &mid_raw[1..mid_raw.len() - 2],
-                                    Span::new(mid_start as u32 + 1, mid_end as u32 - 2),
-                                )
-                            } else {
-                                ("", Span::new(mid_start as u32, mid_start as u32))
-                            };
-                            let has_newline = mid_content.contains('\n');
-
-                            let mid_cooked = self.template_cooked(mid_content, false)?;
+                            let element = self.template_element(
+                                Span::new(mid_start as u32, mid_end as u32),
+                                false,
+                                false,
+                            )?;
 
                             self.advance()?;
 
-                            quasis.push(TemplateElement {
-                                raw_span,
-                                cooked: mid_cooked,
-                                has_newline,
-                                tail: false,
-                                span: Span::new(brace_start as u32, mid_end as u32),
-                            });
+                            quasis.push(element);
                             // Continue loop for next interpolation
                         }
                         _ => {

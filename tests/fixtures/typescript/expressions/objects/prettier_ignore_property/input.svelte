@@ -46,4 +46,26 @@
 		// prettier-ignore
 		m(  a, b  ) {}
 	};
+
+	// a comment inside a paren shell the frozen slice already printed is NOT
+	// re-claimed by the trailing-comma seam
+	const obj9 = {
+		// prettier-ignore
+		a: (b /* comment */),
+		c: 1
+	};
+
+	// the same on the last property, whose comma is never emitted
+	const obj10 = {
+		// prettier-ignore
+		a: (b /* comment */)
+	};
+
+	// a line comment in that position keeps the closer on its own line
+	const obj11 = {
+		// prettier-ignore
+		a: (b // comment
+		),
+		c: 1
+	};
 </script>

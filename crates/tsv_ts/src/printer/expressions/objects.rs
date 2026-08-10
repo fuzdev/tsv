@@ -168,12 +168,15 @@ impl<'a> Printer<'a> {
                 // Same window as the leading scan: a directive trailing the previous
                 // property is inert by the placement floor (`is_honored_directive`), not
                 // by where the window starts.
-                let prop_doc = if self.member_gap_frozen(prev_end, prop_start) {
-                    self.raw_source_doc(prop.span())
-                } else {
-                    self.build_object_property_doc(prop, has_comments)
-                };
-                parts.push(prop_doc);
+                // Resolved once as the SLICE rather than a bool, because the trailing
+                // seam below needs the same answer (`Printer::element_claim_anchor`).
+                let frozen_span = self
+                    .member_gap_frozen(prev_end, prop_start)
+                    .then(|| prop.span());
+                parts.push(match frozen_span {
+                    Some(slice) => self.raw_source_doc(slice),
+                    None => self.build_object_property_doc(prop, has_comments),
+                });
 
                 // Trailing comments around the separator comma — block comments
                 // before the comma, the comma, an after-comma block on the last
@@ -181,7 +184,13 @@ impl<'a> Printer<'a> {
                 // comments as a suffix. Shared with the destructuring-pattern
                 // builders via `collect_trailing_comments` /
                 // `push_element_comma_trailing`.
-                let prop_end = prop.value_end();
+                // Under a freeze the verbatim slice has already printed the property's
+                // stripped-paren interior, so the seam must start at the END of that
+                // slice — `value_end()` is inside it, and re-claiming a comment already
+                // on the page prints it twice, then three times, then four: the emitted
+                // form still carries the directive, so it re-freezes and the run grows
+                // on every pass.
+                let prop_end = Self::element_claim_anchor(frozen_span, prop.value_end());
                 let upper_bound = obj
                     .properties
                     .get(i + 1)
