@@ -3,12 +3,15 @@
  * loader over a real platform package, consumed the way npm lays them out.
  *
  * `scripts/test_napi.ts` covers the raw addon boundary; this covers the
- * PACKAGE surface a consumer installs: the loader's platform resolution, the
- * ESM-imports-CJS named interop (the loader is CommonJS with static
- * `exports.<name> =` assignments — importing it as ESM here proves the named
- * bindings resolve), the wasm-parity `(source, options?)` bags with their
+ * PACKAGE surface a consumer installs: the loader's platform resolution, that
+ * both an ESM and a CommonJS host can load it (the loader is ESM, like the
+ * wasm packages; the platform `.node` rides a `createRequire` shim), the
+ * wasm-parity `(source, options?)` bags with their
  * exact error strings, the `_json` string variants, the package.json
- * selection fields, and the unsupported-platform error.
+ * selection fields, the unsupported-platform error, and the `tsv` bin
+ * (the shared `cli.js` bound to the native engine): the CLI contract plus
+ * the discovery-parity scenario table, mirroring `scripts/test_npm.ts`'s
+ * CLI coverage over the wasm copy.
  *
  * Stages `crates/tsv_napi/pkg/{napi,<triple>}` into a temp `node_modules`
  * (the loader's `require('@fuzdev/tsv-<triple>')` resolves upward from
@@ -22,6 +25,7 @@
 
 import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import {
 	cpSync,
 	existsSync,
@@ -29,12 +33,15 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
-	rmSync
+	rmSync,
+	writeFileSync
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 
 const pkg_root = 'crates/tsv_napi/pkg';
 if (!existsSync(join(pkg_root, 'napi'))) {
@@ -83,7 +90,7 @@ after(() => {
 });
 
 const loader_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'index.js');
-// ESM import of the CJS loader — named bindings must resolve via the interop.
+// ESM import of the ESM loader — the ordinary consumer path.
 const api = await import(pathToFileURL(loader_path).href);
 
 /** Assert `fn` throws an Error whose message contains `needle` exactly. */
@@ -129,6 +136,22 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			api.parse_css_json('a { color: red }'),
 			'CSS wire has no loc, so the option is inert'
 		);
+	});
+
+	// The span-only wire and the helper that makes it usable ship together —
+	// the pure-JS `locations.js` is copied in from the wasm packages, so this
+	// asserts the copy landed AND that its output matches the loc-bearing wire
+	// this same package emits by default.
+	it('the locations helpers ship alongside the span-only wire', () => {
+		const source = 'const x = 1;\nconst y = 2;\n';
+		const spans = api.parse_typescript(source, { locations: false });
+		assert.equal(spans.body[1].loc, undefined, 'span-only wire starts without loc');
+		assert.equal(api.reconstruct_locations(spans, source), spans, 'mutates and returns the ast');
+		assert.deepEqual(spans.body[1].loc, api.parse_typescript(source).body[1].loc);
+		// The amortized entry point over the same source.
+		const locator = api.create_locator(source);
+		assert.deepEqual(locator.loc_of(spans.body[1]), spans.body[1].loc);
+		assert.deepEqual(api.loc_of(spans.body[1], source), spans.body[1].loc);
 	});
 
 	it('the TypeScript goal axis reaches parse AND format', () => {
@@ -186,6 +209,36 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		);
 	});
 
+	// The discovery matcher rides the package as a class. The `undefined`
+	// assertions are the load-bearing ones: napi-rs maps `None` to `null` by
+	// default, so the binding spells these `Either<String, Undefined>` to match
+	// what wasm-bindgen hands a caller. A regression here is silent under
+	// truthiness checks and only bites a consumer testing `=== undefined`.
+	it('IgnoreStack mirrors the wasm discovery surface', () => {
+		const stack = new api.IgnoreStack();
+		assert.equal(stack.is_empty(), true);
+		stack.push_gitignore('', 'dist/\n');
+		assert.equal(stack.is_empty(), false);
+		assert.equal(stack.is_ignored('dist', true), true);
+		assert.equal(stack.is_ignored('src/a.ts', false), false);
+		assert.equal(stack.classify_dir('node_modules', 'node_modules', false), 'prune');
+		assert.equal(stack.classify_dir('src', 'src', false), 'descend');
+		assert.equal(stack.should_format_file('a.ts', 'src/a.ts'), true);
+		assert.equal(stack.should_format_file('a.txt', 'src/a.txt'), false);
+		assert.equal(stack.is_path_pruned('node_modules/x.ts'), true);
+		// A formattable extension yields no error, spelled `undefined` like wasm's.
+		assert.strictEqual(stack.unsupported_extension_error('a.ts'), undefined);
+		assert.match(stack.unsupported_extension_error('a.txt')!, /unsupported file extension/);
+		assert.strictEqual(stack.prettierignore_shadowed_warning('d', true, false, false), undefined);
+		assert.match(stack.prettierignore_shadowed_warning('d', true, true, true)!, /shadowed/);
+		assert.strictEqual(
+			stack.prettierignore_outside_repo_warning('d', true, true, false),
+			undefined
+		);
+		stack.pop_gitignore();
+		assert.equal(stack.is_empty(), true);
+	});
+
 	it('parse errors and engine errors are thrown JS errors', () => {
 		assert.throws(() => api.parse_typescript('const = ;'));
 		assert.throws(() => api.format_svelte('<div {'));
@@ -198,10 +251,16 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.equal(api.format_typescript(formatted), formatted);
 	});
 
-	it('CJS require of the package works too', () => {
+	// The loader is ESM, so a CommonJS host reaches it by dynamic import — the
+	// path that works on every Node the package supports. (Node >= 22.12 also
+	// allows a plain `require()` of ESM, but the `engines` floor is 22.0, so the
+	// universal path is what's gated here.) `createRequire` still resolves the
+	// specifier from a CJS context, which is what makes this a CJS-host test.
+	it('a CommonJS host can load the package', async () => {
 		const req = createRequire(loader_path);
-		const cjs = req('@fuzdev/tsv');
-		assert.equal(cjs.format_typescript('const   x=1'), 'const x = 1;\n');
+		const resolved = req.resolve('@fuzdev/tsv');
+		const from_cjs = await import(pathToFileURL(resolved).href);
+		assert.equal(from_cjs.format_typescript('const   x=1'), 'const x = 1;\n');
 	});
 
 	it('package.json selection fields and pins are coherent', () => {
@@ -254,3 +313,114 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		});
 	});
 });
+
+// The `tsv` bin — the SAME cli.js the wasm package ships, staged here so its
+// `./index.js` import resolves to the native loader. The full flag/exit-code
+// matrix lives in `scripts/test_npm.ts` over the wasm copy (one source, one
+// contract); this asserts the native binding end to end — wiring, each
+// subcommand against the native engine, and the parity flags whose handling
+// differs by mode.
+const cli_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'cli.js');
+const run_cli = (args: Array<string>, stdin?: string) =>
+	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input: stdin });
+
+describe('cli (cli.js): the tsv bin over the native engine', () => {
+	it('is wired as the package bin', () => {
+		const pkg = JSON.parse(readFileSync(join(dirname(cli_path), 'package.json'), 'utf8'));
+		assert.deepEqual(pkg.bin, { tsv: './cli.js' });
+	});
+
+	it('format --content prints formatted source', () => {
+		const result = run_cli(['format', '--content', 'const   x=1', '--parser', 'ts']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stdout, 'const x = 1;\n');
+	});
+
+	it('format --stdin reads stdin', () => {
+		const result = run_cli(['format', '--stdin', '--parser', 'css'], 'a{color:red}');
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stdout, 'a {\n\tcolor: red;\n}\n');
+	});
+
+	it('format --check --content exits 1 on would-change, 0 on clean', () => {
+		assert.equal(
+			run_cli(['format', '--check', '--content', 'const   x=1', '--parser', 'ts']).status,
+			1
+		);
+		assert.equal(
+			run_cli(['format', '--check', '--content', 'const x = 1;\n', '--parser', 'ts']).status,
+			0
+		);
+	});
+
+	it('format on invalid syntax exits 2', () => {
+		const result = run_cli(['format', '--content', 'const =', '--parser', 'ts']);
+		assert.equal(result.status, 2);
+		assert.match(result.stderr, /Parse error/);
+	});
+
+	it('a bad --parser value exits 1 in both commands (argument-parsing error)', () => {
+		for (const command of ['format', 'parse']) {
+			const result = run_cli([command, '--content', 'const x = 1;', '--parser', 'bogus']);
+			assert.equal(result.status, 1);
+			assert.match(result.stderr, /Unknown parser type/);
+		}
+	});
+
+	it('parse --content emits the wire; --no-locations omits loc', () => {
+		const full = run_cli(['parse', '--content', 'const x = 1;', '--parser', 'ts']);
+		assert.equal(full.status, 0, full.stderr);
+		assert.match(full.stdout, /"loc"/);
+		assert.equal(JSON.parse(full.stdout).type, 'Program');
+		const bare = run_cli([
+			'parse',
+			'--no-locations',
+			'--content',
+			'const x = 1;',
+			'--parser',
+			'ts'
+		]);
+		assert.equal(bare.status, 0, bare.stderr);
+		assert.doesNotMatch(bare.stdout, /"loc"/);
+	});
+
+	it('path mode formats in place; --jobs is accepted and ignored', () => {
+		const root = mkdtempSync(join(tmpdir(), 'tsv-napi-cli-'));
+		try {
+			writeFileSync(join(root, 'a.ts'), 'const   a=1\n');
+			writeFileSync(join(root, 'b.ts'), 'const b = 1;\n');
+			const result = run_cli(['format', '--jobs', '4', root]);
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(result.stdout, `${join(root, 'a.ts')}\n`);
+			assert.equal(readFileSync(join(root, 'a.ts'), 'utf8'), 'const a = 1;\n');
+			assert.match(result.stderr, /1 formatted, 1 unchanged/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('--jobs with --content exits 2 (native-CLI parity)', () => {
+		const result = run_cli([
+			'format',
+			'--jobs',
+			'2',
+			'--content',
+			'const x = 1;',
+			'--parser',
+			'ts'
+		]);
+		assert.equal(result.status, 2);
+	});
+
+	it('help exits 0 (mirrors argh)', () => {
+		const result = run_cli(['help', 'format']);
+		assert.equal(result.status, 0);
+		assert.match(result.stdout, /Usage: tsv format/);
+	});
+});
+
+// Discovery parity — this suite is the third consumer of the shared scenario
+// table (see `scripts/discovery_parity_suite.ts`): here cli.js runs over the
+// NATIVE `IgnoreStack` (the `#[napi]` twin), so the addon's discovery verdicts
+// can't drift from the wasm binding's or the native CLI's.
+register_discovery_parity_suite('discovery parity (cli.js): the native IgnoreStack', cli_path);

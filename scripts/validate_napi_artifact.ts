@@ -25,7 +25,8 @@ const { values: args } = parseArgs({
 
 /** [min, max] bytes per triple. Measured = ±8% around a real artifact. */
 const BOUNDS: Record<string, [number, number]> = {
-	// measured 3,636,240 on linux (napi profile: release + unwind), ±8%
+	// band anchored at a measured 3,636,240 on linux (napi profile: release +
+	// unwind), ±8% — the anchor, not a running figure
 	'linux-x64-gnu': [3_345_000, 3_927_000],
 	// PROVISIONAL — tighten to ±8% after the first release-matrix run
 	'linux-arm64-gnu': [2_500_000, 5_500_000],

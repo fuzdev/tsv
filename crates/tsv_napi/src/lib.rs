@@ -26,6 +26,9 @@
 //! `tsv_ffi` / `tsv_wasm`).
 
 use napi_derive::napi;
+
+#[cfg(feature = "format")]
+use napi::bindgen_prelude::{Either, Undefined};
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
 use tsv_arena::with_ast_arena;
@@ -236,6 +239,201 @@ pub fn format_typescript_with_goal(source: String, goal: String) -> napi::Result
     })
 }
 
+//
+// Discovery: the gitignore-aware matcher + its `tsv_discover` verdicts
+//
+// A hand-mirrored twin of `tsv_wasm`'s `IgnoreStack` — same method names, same
+// argument order, same return shapes — so `npm/cli.js`, which imports its
+// engine from `./index.js`, drives either package's copy unchanged. The point
+// is agreement by construction with the native CLI: one matcher and one prune
+// decision behind every surface. Format-only, like the wasm side; discovery
+// exists to feed the formatter.
+//
+// ⚠️ `Option<String>` is deliberately spelled `Either<String, Undefined>`.
+// napi-rs maps `None` to JS `null`, wasm-bindgen maps it to `undefined`, and a
+// package that swaps for the other must not change which of the two a caller
+// sees. `Undefined` is napi-rs's `()`, so the none arm allocates nothing.
+
+/// The gitignore-aware matcher stack, mirroring `tsv_wasm`'s `IgnoreStack`.
+///
+/// Holds `.gitignore` and tsv (`.formatignore` / `.prettierignore`) layers
+/// pushed shallowest-first, answers the per-path ignore status
+/// (`is_ignored`), and delegates the discovery verdicts (`classify_dir`,
+/// `should_format_file`, `is_path_pruned`) plus the shared warning strings to
+/// `tsv_discover`.
+#[cfg(feature = "format")]
+#[napi]
+pub struct IgnoreStack {
+    inner: tsv_ignore::IgnoreStack,
+}
+
+#[cfg(feature = "format")]
+#[napi]
+impl IgnoreStack {
+    /// An empty stack (ignores nothing until layers are added).
+    #[napi(constructor, catch_unwind)]
+    #[allow(clippy::new_without_default)] // napi exports the constructor
+    pub fn new() -> IgnoreStack {
+        IgnoreStack {
+            inner: tsv_ignore::IgnoreStack::new(),
+        }
+    }
+
+    /// Push one directory's `.gitignore`. `anchor` is the directory relative to
+    /// the format root, `/`-separated (`""` = the root). Push shallowest-first.
+    #[napi(js_name = "push_gitignore", catch_unwind)]
+    pub fn push_gitignore(&mut self, anchor: String, content: String) {
+        self.inner.push_gitignore(&anchor, &content);
+    }
+
+    /// Pop the most recently pushed `.gitignore` layer (a traversal unwinding
+    /// out of a directory).
+    #[napi(js_name = "pop_gitignore", catch_unwind)]
+    pub fn pop_gitignore(&mut self) {
+        self.inner.pop_gitignore();
+    }
+
+    /// Push one directory's tsv file, applied after every `.gitignore`. `anchor`
+    /// is the directory relative to the format root (`""` = root). The caller
+    /// resolves which file's content this is — `.formatignore` hierarchically, or
+    /// a `.prettierignore` (also hierarchical) shadowed by a sibling `.formatignore`.
+    #[napi(js_name = "push_tsv", catch_unwind)]
+    pub fn push_tsv(&mut self, anchor: String, content: String) {
+        self.inner.push_tsv(&anchor, &content);
+    }
+
+    /// Pop the most recently pushed tsv layer (a traversal unwinding out of a
+    /// directory).
+    #[napi(js_name = "pop_tsv", catch_unwind)]
+    pub fn pop_tsv(&mut self) {
+        self.inner.pop_tsv();
+    }
+
+    /// Whether `path` (relative to the format root, `/`-separated) is ignored;
+    /// `is_dir` marks directories so trailing-`/` patterns apply.
+    #[napi(js_name = "is_ignored", catch_unwind)]
+    pub fn is_ignored(&self, path: String, is_dir: bool) -> bool {
+        self.inner.is_ignored(&path, is_dir)
+    }
+
+    /// The discovery verdict for one child **directory**: `"descend"`,
+    /// `"prune"`, or `"prune_warn"`. `name` is the directory's final path
+    /// segment, `child_rel` its format-root-relative `/`-separated path, and
+    /// `heuristic_active` is true while no `.gitignore` governs this level. On
+    /// `"prune_warn"` the caller fetches the message via
+    /// [`heuristic_shadow_warning`](IgnoreStack::heuristic_shadow_warning).
+    ///
+    /// A string tag rather than an enum or a struct — same as the wasm side,
+    /// and it allocates no JS object on the common descend path.
+    #[napi(js_name = "classify_dir", catch_unwind)]
+    pub fn classify_dir(&self, name: String, child_rel: String, heuristic_active: bool) -> String {
+        match tsv_discover::classify_dir(&name, &child_rel, heuristic_active, &self.inner) {
+            tsv_discover::DirVerdict::Descend => "descend".to_string(),
+            tsv_discover::DirVerdict::Prune => "prune".to_string(),
+            tsv_discover::DirVerdict::PruneWithWarning(_) => "prune_warn".to_string(),
+        }
+    }
+
+    /// Whether a child **file** should be formatted (a formattable extension and
+    /// not ignored). `name` is the file's final path segment, `child_rel` its
+    /// format-root-relative `/`-separated path.
+    #[napi(js_name = "should_format_file", catch_unwind)]
+    pub fn should_format_file(&self, name: String, child_rel: String) -> bool {
+        tsv_discover::should_format_file(&name, &child_rel, &self.inner)
+    }
+
+    /// Whether `rel` (a format-root-relative file path) is skipped because some
+    /// ancestor directory would be pruned by discovery — the safety nets, the
+    /// build-output heuristic, or the matcher. A per-file companion to
+    /// `classify_dir` for a consumer with no top-down traversal: it reconstructs
+    /// each ancestor's `heuristic_active` from this stack's own pushed
+    /// `.gitignore` anchors, so it takes no extra arguments. Pair with
+    /// `is_ignored(rel, false)` for the file-level match.
+    #[napi(js_name = "is_path_pruned", catch_unwind)]
+    pub fn is_path_pruned(&self, rel: String) -> bool {
+        tsv_discover::is_path_pruned(&rel, &self.inner)
+    }
+
+    /// The argument error for an explicitly named **file** whose extension tsv
+    /// doesn't format; `undefined` when the extension is formattable. A method
+    /// (not a free function) so it rides the class through the package facade;
+    /// the receiver is unused — an argument check runs before any matcher
+    /// exists. Single source of truth with the native CLI, including the
+    /// rendered extension list, so `npm/cli.js` never hand-mirrors
+    /// `FORMATTABLE_EXTENSIONS`.
+    #[napi(js_name = "unsupported_extension_error", catch_unwind)]
+    pub fn unsupported_extension_error(&self, path: String) -> Either<String, Undefined> {
+        or_undefined(tsv_discover::unsupported_extension_error(&path))
+    }
+
+    /// The heuristic-shadow warning text for a pruned directory `dir`
+    /// (format-root relative). A method (not a free function) so it rides the
+    /// class through the package facade; the receiver is unused. Single source
+    /// of truth with the native CLI — the JS CLI never templates this string.
+    #[napi(js_name = "heuristic_shadow_warning", catch_unwind)]
+    pub fn heuristic_shadow_warning(&self, dir: String) -> String {
+        tsv_discover::heuristic_shadow_warning(&dir)
+    }
+
+    /// The `.prettierignore`-outside-a-repo warning for the target root `dir`
+    /// (its display path); `undefined` unless, outside a git repo, a
+    /// target-root `.prettierignore` is present and unshadowed by a sibling
+    /// `.formatignore`. The JS CLI calls this once at the target root and pushes
+    /// any returned string into its warnings channel — single source of truth
+    /// with the native CLI, never templated in JS.
+    #[napi(js_name = "prettierignore_outside_repo_warning", catch_unwind)]
+    pub fn prettierignore_outside_repo_warning(
+        &self,
+        dir: String,
+        in_repo: bool,
+        has_prettierignore: bool,
+        has_formatignore: bool,
+    ) -> Either<String, Undefined> {
+        or_undefined(tsv_discover::prettierignore_outside_repo_warning(
+            &dir,
+            in_repo,
+            has_prettierignore,
+            has_formatignore,
+        ))
+    }
+
+    /// The heads-up when, inside a git repo, a directory holds both a
+    /// `.formatignore` and a `.prettierignore` — the sibling `.formatignore`
+    /// shadows the `.prettierignore`, so its rules go unread there.
+    /// `undefined` unless both files are present inside a repo.
+    #[napi(js_name = "prettierignore_shadowed_warning", catch_unwind)]
+    pub fn prettierignore_shadowed_warning(
+        &self,
+        dir: String,
+        in_repo: bool,
+        has_prettierignore: bool,
+        has_formatignore: bool,
+    ) -> Either<String, Undefined> {
+        or_undefined(tsv_discover::prettierignore_shadowed_warning(
+            &dir,
+            in_repo,
+            has_prettierignore,
+            has_formatignore,
+        ))
+    }
+
+    /// Whether no layer carries any rule — callers skip per-path matching.
+    #[napi(js_name = "is_empty", catch_unwind)]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+}
+
+/// `Option<String>` as JS `string | undefined` rather than napi-rs's default
+/// `string | null` — the wasm package's shape, which this one must match.
+#[cfg(feature = "format")]
+fn or_undefined(value: Option<String>) -> Either<String, Undefined> {
+    match value {
+        Some(s) => Either::A(s),
+        None => Either::B(()),
+    }
+}
+
 /// Deliberately panic inside the binding — the panic-contract probe.
 ///
 /// Compiled only under the test-only `panic_probe` feature (`deno task
@@ -428,5 +626,57 @@ mod tests {
             formatted,
             "re-format not idempotent across the boundary"
         );
+    }
+
+    // --- discovery: the IgnoreStack wrapper delegates, and `None` is undefined ---
+
+    #[test]
+    #[cfg(feature = "format")]
+    fn ignore_stack_layers_and_verdicts() {
+        let mut stack = IgnoreStack::new();
+        assert!(stack.is_empty());
+        stack.push_gitignore(String::new(), "dist/\n".to_owned());
+        assert!(!stack.is_empty());
+        assert!(stack.is_ignored("dist".to_owned(), true));
+        assert!(!stack.is_ignored("src/a.ts".to_owned(), false));
+        assert_eq!(
+            stack.classify_dir("node_modules".to_owned(), "node_modules".to_owned(), false),
+            "prune"
+        );
+        assert_eq!(
+            stack.classify_dir("src".to_owned(), "src".to_owned(), false),
+            "descend"
+        );
+        assert!(stack.should_format_file("a.ts".to_owned(), "src/a.ts".to_owned()));
+        assert!(!stack.should_format_file("a.txt".to_owned(), "src/a.txt".to_owned()));
+        assert!(stack.is_path_pruned("node_modules/x.ts".to_owned()));
+        stack.pop_gitignore();
+        assert!(stack.is_empty());
+    }
+
+    /// The maybe-a-warning methods must yield JS `undefined`, not `null`, for
+    /// the none arm — wasm-bindgen's shape, which this package promises. The
+    /// `Either::B` variant is what encodes that, so this pins the variant
+    /// rather than the JS value (which only `test_napi_npm.ts` can observe).
+    #[test]
+    #[cfg(feature = "format")]
+    fn absent_warnings_are_the_undefined_variant() {
+        let stack = IgnoreStack::new();
+        assert!(matches!(
+            stack.unsupported_extension_error("a.ts".to_owned()),
+            Either::B(())
+        ));
+        assert!(matches!(
+            stack.unsupported_extension_error("a.txt".to_owned()),
+            Either::A(_)
+        ));
+        assert!(matches!(
+            stack.prettierignore_shadowed_warning("d".to_owned(), true, false, false),
+            Either::B(())
+        ));
+        assert!(matches!(
+            stack.prettierignore_outside_repo_warning("d".to_owned(), true, true, false),
+            Either::B(())
+        ));
     }
 }

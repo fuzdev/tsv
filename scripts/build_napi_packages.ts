@@ -1,9 +1,10 @@
 /**
  * Stage the publishable N-API npm packages into `crates/tsv_napi/pkg/`:
  *
- * - `pkg/napi/` — the `@fuzdev/tsv` loader (index.js + index.d.ts +
- *   tsv_ast.d.ts + README + LICENSE + generated package.json with the
- *   exact-pinned platform `optionalDependencies`).
+ * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (index.js + index.d.ts +
+ *   tsv_ast.d.ts + the shared `locations.js`/`.d.ts` helper + the shared
+ *   `cli.js` wired as the `tsv` bin + README + LICENSE + generated
+ *   package.json with the exact-pinned platform `optionalDependencies`).
  * - `pkg/<triple>/` — ONE platform package, `@fuzdev/tsv-<triple>`: the
  *   built cdylib copied to `tsv_napi.node` (a byte-identical rename) plus a
  *   generated package.json whose `os`/`cpu`/`libc` fields drive install-time
@@ -23,6 +24,8 @@
  */
 
 import { parseArgs } from 'node:util';
+
+import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 
 const { values: args } = parseArgs({
 	options: {
@@ -79,25 +82,6 @@ const cargo_toml = Deno.readTextFileSync('Cargo.toml');
 const version = /\[workspace\.package\][^[]*?version = "([^"]+)"/.exec(cargo_toml)?.[1];
 if (!version) throw new Error('workspace version not found in Cargo.toml');
 
-// Shared npm metadata — mirrors scripts/patch_npm_package.ts so the napi and
-// wasm packages present identically on the registry.
-const shared_metadata = {
-	license: 'MIT',
-	homepage: 'https://github.com/fuzdev/tsv',
-	author: {
-		name: 'Ryan Atkinson',
-		email: 'mail@ryanatkn.com',
-		url: 'https://www.ryanatkn.com/'
-	},
-	repository: {
-		type: 'git',
-		url: 'git+https://github.com/fuzdev/tsv.git'
-	},
-	bugs: 'https://github.com/fuzdev/tsv/issues',
-	funding: 'https://www.ryanatkn.com/funding',
-	engines: { node: '>=20' }
-};
-
 const write_pkg = (dir: string, pkg: Record<string, unknown>): void => {
 	Deno.writeTextFileSync(`${dir}/package.json`, JSON.stringify(pkg, null, '\t') + '\n');
 };
@@ -111,16 +95,50 @@ for (const [from, to] of [
 	['crates/tsv_napi/npm/index.d.ts', 'index.d.ts'],
 	['crates/tsv_napi/npm/README.md', 'README.md'],
 	['crates/tsv_wasm/types/tsv_ast.d.ts', 'tsv_ast.d.ts'],
+	['crates/tsv_wasm/npm/locations.js', 'locations.js'],
+	['crates/tsv_wasm/npm/locations.d.ts', 'locations.d.ts'],
+	// the `tsv` bin — imports its engine from `./index.js`, so the same source
+	// binds to the native loader here and to the wasm engine in @fuzdev/tsv_wasm
+	['crates/tsv_wasm/npm/cli.js', 'cli.js'],
 	['LICENSE', 'LICENSE']
 ]) {
 	Deno.copyFileSync(from, `${loader_dir}/${to}`);
 }
+
+// The `no-locations` reconstruction helpers are pure JS over the span-only
+// wire — no wasm, no addon — so the wasm packages' copy ships here verbatim,
+// which is what the ESM loader bought. The re-export is APPENDED to the staged
+// entry rather than written into `npm/index.js`: the source tree has no
+// sibling `locations.js`, and an import that resolves only after staging is a
+// wart an editor would flag. Names are extracted from the helper rather than
+// listed here, so a fourth entry point can't reach one package and miss the
+// other (`scripts/patch_npm_package.ts` holds the wasm side's copy).
+const locations_source = Deno.readTextFileSync(`${loader_dir}/locations.js`);
+const locations_exports = [...locations_source.matchAll(/^export function (\w+)/gm)].map(
+	(m) => m[1]
+);
+if (!locations_exports.length) {
+	console.error('FAIL: no exports found in locations.js — did the helper change shape?');
+	Deno.exit(1);
+}
+Deno.writeTextFileSync(
+	`${loader_dir}/index.js`,
+	`\nexport { ${locations_exports.join(', ')} } from './locations.js';\n`,
+	{ append: true }
+);
+// `export *`, not `export type *` — the helper's functions AND its types flow
+// through, matching the wasm packages' index.d.ts.
+Deno.writeTextFileSync(`${loader_dir}/index.d.ts`, `\nexport * from './locations';\n`, {
+	append: true
+});
 write_pkg(loader_dir, {
 	name: '@fuzdev/tsv',
 	version,
 	description: 'native formatter and parser for Svelte, TypeScript, and CSS (N-API)',
-	// CommonJS loader (no `type: module`) — the native-addon norm; ESM named
-	// imports work via Node's CJS interop (see npm/index.js).
+	// ESM, matching the wasm packages — one module system across tsv's npm
+	// surface, so shared sources load unchanged in either. The platform `.node`
+	// is still `require`d, via `createRequire` (see npm/index.js).
+	type: 'module',
 	main: 'index.js',
 	types: 'index.d.ts',
 	exports: {
@@ -130,7 +148,17 @@ write_pkg(loader_dir, {
 			default: './index.js'
 		}
 	},
-	files: ['index.js', 'index.d.ts', 'tsv_ast.d.ts', 'README.md', 'LICENSE'],
+	bin: { tsv: './cli.js' },
+	files: [
+		'index.js',
+		'index.d.ts',
+		'locations.js',
+		'locations.d.ts',
+		'tsv_ast.d.ts',
+		'cli.js',
+		'README.md',
+		'LICENSE'
+	],
 	keywords: [
 		'typescript',
 		'svelte',
@@ -140,10 +168,11 @@ write_pkg(loader_dir, {
 		'parser',
 		'ast',
 		'acorn',
+		'cli',
 		'napi',
 		'native'
 	],
-	...shared_metadata,
+	...NPM_SHARED_METADATA,
 	// The loader's top-level platform require IS the side effect.
 	sideEffects: ['./index.js'],
 	optionalDependencies: Object.fromEntries(
@@ -183,7 +212,7 @@ write_pkg(platform_dir, {
 	main: 'tsv_napi.node',
 	files: ['tsv_napi.node', 'README.md', 'LICENSE'],
 	...platform_fields(triple),
-	...shared_metadata
+	...NPM_SHARED_METADATA
 });
 const size = Deno.statSync(`${platform_dir}/tsv_napi.node`).size;
 console.log(
