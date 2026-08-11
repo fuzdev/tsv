@@ -12,6 +12,7 @@ use crate::printer::calls::arg_predicates::arrow_has_trailing_param_comments;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
+use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{CommentSpacing, LeadingGlue};
 use crate::printer::{
@@ -833,6 +834,47 @@ impl<'a> Printer<'a> {
         self.build_params_doc_with_comments(arrow.params, params_start, trailing_comments_end)
     }
 
+    /// Emit an async arrow's `async` keyword and the gap between it and the head of
+    /// its parameters — the type-parameter `<`, the params `(`, or a bare single
+    /// parameter's own start.
+    ///
+    /// A comment there is kept where the author wrote it (prettier relocates it into
+    /// the body, into the parameter list, or not at all, keyed on which of the three
+    /// heads follows — see `docs/conformance_prettier_ts_comments.md` §Comment
+    /// relocation). Nothing else prints the gap, so an emitter here is what keeps the
+    /// comment from being dropped.
+    ///
+    /// Only a **single-line block** comment can occupy the gap: every other kind puts
+    /// a line terminator between `async` and the parameters, which
+    /// `AsyncArrowFunction : async [no LineTerminator here] ArrowFormalParameters`
+    /// forbids and the parser rejects. The shared keyword-gap emitter handles the
+    /// line-comment shapes anyway rather than assuming that stays true.
+    ///
+    /// The gap is scanned from the arrow's own span start rather than from a computed
+    /// end of the `async` token: the keyword cannot contain a comment, so the two
+    /// ranges hold the same comments and this one needs no arithmetic on a keyword
+    /// position. (An async arrow's span starts at `async` — the `<T>async (…)` graft
+    /// acorn admits is a type assertion to tsv and does not parse.)
+    pub(crate) fn push_async_arrow_head(
+        &self,
+        parts: &mut DocBuf,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+    ) {
+        if !arrow.r#async {
+            return;
+        }
+        let d = self.d();
+        parts.push(d.text("async"));
+        let head_start = arrow
+            .type_parameters
+            .as_ref()
+            .map(|tp| tp.span.start)
+            .or(arrow.params_start)
+            .or_else(|| arrow.params.first().map(|p| p.span().start))
+            .unwrap_or_else(|| arrow.body.span().start);
+        parts.push(self.build_keyword_to_name_comments(arrow.span.start, head_start));
+    }
+
     /// Build just the arrow function signature (async + type params + params + return type)
     /// WITHOUT the ` =>` and body. Used by call printer for expand-last-arg pattern.
     ///
@@ -845,10 +887,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
 
-        // Async keyword if present
-        if arrow.r#async {
-            parts.push(d.text("async "));
-        }
+        self.push_async_arrow_head(&mut parts, arrow);
 
         // Type parameters: always their own group so they break independently of
         // the rest of the signature (Prettier's printTypeParameters semantics) —
@@ -1156,23 +1195,25 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
 
-        // Async keyword if present
-        if func.r#async {
-            parts.push(d.text("async "));
-        }
-
-        // Function keyword
-        parts.push(d.text("function"));
-
-        // Generator asterisk
-        if func.generator {
-            parts.push(d.text("*"));
-        }
+        // `async`, the gap before `function`, the keyword and a generator `*` — the
+        // same head the declaration prints. The cursor it returns is where the
+        // keyword→name gap starts; reading that gap from `func.span.start` instead
+        // let it swallow the `async`→`function` comment and reprint it after the
+        // keyword.
+        let head_end = self.push_function_keyword_head(
+            &mut parts,
+            func.span.start,
+            func.id
+                .as_ref()
+                .map_or(func.params_start, |id| id.span.start),
+            FunctionHeadModifier::from_async(func.r#async),
+            func.generator,
+        );
 
         // Optional function name
         if let Some(id) = &func.id {
             // Comments between keywords and the name (same as FunctionDeclaration)
-            parts.push(self.build_keyword_to_name_comments(func.span.start, id.span.start));
+            parts.push(self.build_keyword_to_name_comments(head_end, id.span.start));
             parts.push(self.build_identifier_doc(id));
 
             // Comments between name and type params/parens: `function fn1/* c */ <T>()` or `fn1 /* c */()`
@@ -1197,7 +1238,9 @@ impl<'a> Printer<'a> {
                 .type_parameters
                 .as_ref()
                 .map_or(func.params_start, |tp| tp.span.start);
-            parts.push(self.build_keyword_to_name_comments(func.span.start, next_start));
+            // From `head_end`, not from the span start: the `async`→`function` gap is
+            // already printed, and re-reading it here printed those comments TWICE.
+            parts.push(self.build_keyword_to_name_comments(head_end, next_start));
         }
 
         // Type params, params, return type, and body (signature_doc handles type params)
