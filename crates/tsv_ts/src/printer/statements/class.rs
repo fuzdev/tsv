@@ -179,7 +179,6 @@ impl<'a> Printer<'a> {
             body_is_empty: decl.body.body.is_empty(),
             body_start: decl.body.span.start,
             layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
-            emit_pre_body_comments: true,
             body_frozen: frozen_body.is_some(),
         };
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Comment before method body moves inside
+	// Comment authored at the start of a method body stays there
 	class A {
 		fn() {
 			// comment
