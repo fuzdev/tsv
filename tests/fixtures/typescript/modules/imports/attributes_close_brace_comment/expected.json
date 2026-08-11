@@ -1,0 +1,1036 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 746,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " block comment between the attribute `}` and `;` trails after the `;`",
+			"start": 10,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 126,
+			"end": 133,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 44
+				},
+				"end": {
+					"line": 3,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between the attribute `}` and `;` trails after the `;`",
+			"start": 136,
+			"end": 206,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 251,
+			"end": 255,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 44
+				},
+				"end": {
+					"line": 6,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a whole run in that gap trails as one, in source order",
+			"start": 258,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 1 ",
+			"start": 360,
+			"end": 367,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 44
+				},
+				"end": {
+					"line": 9,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 2",
+			"start": 368,
+			"end": 372,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 52
+				},
+				"end": {
+					"line": 9,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment INSIDE the braces keeps the clause expanded",
+			"start": 375,
+			"end": 436,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 480,
+			"end": 484,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 15
+				},
+				"end": {
+					"line": 13,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " both sides at once: the interior comment expands the clause, the gap comment",
+			"start": 491,
+			"end": 570,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " still trails the `;`",
+			"start": 572,
+			"end": 595,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " interior",
+			"start": 639,
+			"end": 650,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 15
+				},
+				"end": {
+					"line": 19,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " gap",
+			"start": 655,
+			"end": 661,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 4
+				},
+				"end": {
+					"line": 20,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the empty clause has the same gap",
+			"start": 664,
+			"end": 700,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 731,
+			"end": 735,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 30
+				},
+				"end": {
+					"line": 23,
+					"column": 34
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 745,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 736,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 83,
+					"end": 125,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 43
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 90,
+							"end": 91,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 8
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 90,
+								"end": 91,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 97,
+						"end": 102,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 110,
+							"end": 122,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 28
+								},
+								"end": {
+									"line": 3,
+									"column": 40
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 110,
+								"end": 114,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 28
+									},
+									"end": {
+										"line": 3,
+										"column": 32
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 116,
+								"end": 122,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 34
+									},
+									"end": {
+										"line": 3,
+										"column": 40
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment between the attribute `}` and `;` trails after the `;`",
+							"start": 10,
+							"end": 81
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 126,
+							"end": 133
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 208,
+					"end": 250,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 43
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 215,
+							"end": 216,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 8
+								},
+								"end": {
+									"line": 6,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 215,
+								"end": 216,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 8
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "b"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 222,
+						"end": 227,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 15
+							},
+							"end": {
+								"line": 6,
+								"column": 20
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 235,
+							"end": 247,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 28
+								},
+								"end": {
+									"line": 6,
+									"column": 40
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 235,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 28
+									},
+									"end": {
+										"line": 6,
+										"column": 32
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 241,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 34
+									},
+									"end": {
+										"line": 6,
+										"column": 40
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between the attribute `}` and `;` trails after the `;`",
+							"start": 136,
+							"end": 206
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 251,
+							"end": 255
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 317,
+					"end": 359,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 43
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 324,
+							"end": 325,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 8
+								},
+								"end": {
+									"line": 9,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 324,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 8
+									},
+									"end": {
+										"line": 9,
+										"column": 9
+									}
+								},
+								"name": "c"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 331,
+						"end": 336,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 15
+							},
+							"end": {
+								"line": 9,
+								"column": 20
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 344,
+							"end": 356,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 28
+								},
+								"end": {
+									"line": 9,
+									"column": 40
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 344,
+								"end": 348,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 28
+									},
+									"end": {
+										"line": 9,
+										"column": 32
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 350,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 34
+									},
+									"end": {
+										"line": 9,
+										"column": 40
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a whole run in that gap trails as one, in source order",
+							"start": 258,
+							"end": 315
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " 1 ",
+							"start": 360,
+							"end": 367
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 438,
+					"end": 488,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 445,
+							"end": 446,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 8
+								},
+								"end": {
+									"line": 12,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 445,
+								"end": 446,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 8
+									},
+									"end": {
+										"line": 12,
+										"column": 9
+									}
+								},
+								"name": "d"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 452,
+						"end": 457,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 15
+							},
+							"end": {
+								"line": 12,
+								"column": 20
+							}
+						},
+						"value": "./d",
+						"raw": "'./d'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 467,
+							"end": 479,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 467,
+								"end": 471,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 473,
+								"end": 479,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 8
+									},
+									"end": {
+										"line": 13,
+										"column": 14
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 480,
+									"end": 484
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 2",
+							"start": 368,
+							"end": 372
+						},
+						{
+							"type": "Line",
+							"value": " a line comment INSIDE the braces keeps the clause expanded",
+							"start": 375,
+							"end": 436
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 597,
+					"end": 654,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 604,
+							"end": 605,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 8
+								},
+								"end": {
+									"line": 18,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 604,
+								"end": 605,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 8
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"name": "e"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 611,
+						"end": 616,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 15
+							},
+							"end": {
+								"line": 18,
+								"column": 20
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 626,
+							"end": 638,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 19,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 626,
+								"end": 630,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 632,
+								"end": 638,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 8
+									},
+									"end": {
+										"line": 19,
+										"column": 14
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " interior",
+									"start": 639,
+									"end": 650
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " both sides at once: the interior comment expands the clause, the gap comment",
+							"start": 491,
+							"end": 570
+						},
+						{
+							"type": "Line",
+							"value": " still trails the `;`",
+							"start": 572,
+							"end": 595
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " gap",
+							"start": 655,
+							"end": 661
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 702,
+					"end": 730,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 29
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 709,
+							"end": 710,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 8
+								},
+								"end": {
+									"line": 23,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 709,
+								"end": 710,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 8
+									},
+									"end": {
+										"line": 23,
+										"column": 9
+									}
+								},
+								"name": "f"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 716,
+						"end": 721,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 15
+							},
+							"end": {
+								"line": 23,
+								"column": 20
+							}
+						},
+						"value": "./f",
+						"raw": "'./f'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the empty clause has the same gap",
+							"start": 664,
+							"end": 700
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 731,
+							"end": 735
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

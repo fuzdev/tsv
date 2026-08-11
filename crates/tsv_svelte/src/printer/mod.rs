@@ -1278,7 +1278,7 @@ impl<'a> Printer<'a> {
         let mut cuts: SmallVec<[Span; 4]> = hoisted
             .iter()
             .copied()
-            .filter(|h| h.start >= span.start && h.end <= span.end)
+            .filter(|h| span.contains(*h))
             .collect();
         if cuts.is_empty() {
             return self.verbatim_source_doc(span);

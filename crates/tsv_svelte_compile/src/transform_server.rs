@@ -867,7 +867,7 @@ pub(crate) fn compile_server<'arena>(
     }
     for comment in &script_comments {
         for region in &dropped_regions {
-            if comment.span.start >= region.start && comment.span.end <= region.end {
+            if region.contains(comment.span) {
                 return Err(unsupported(Refusal::CommentInRewrittenRuneRegion));
             }
         }

@@ -696,7 +696,7 @@ impl<'a> Printer<'a> {
             // ([`Printer::block_comment_owns_its_line`]) used to hide that by routing
             // every own-line run to the all-hardline builder instead.
             if has_comments {
-                inner_parts.extend(self.build_list_leading_comments(
+                inner_parts.extend(self.build_leading_comments_multiline(
                     prev_end,
                     item_span(i).start,
                     None,
@@ -793,7 +793,11 @@ impl<'a> Printer<'a> {
             // drop comments pulled onto the `<` line (emitted as the angle-line
             // prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
-            inner_parts.extend(self.build_list_leading_comments(prev_end, param_start, skip_delim));
+            inner_parts.extend(self.build_leading_comments_multiline(
+                prev_end,
+                param_start,
+                skip_delim,
+            ));
 
             // Rule A: an alone-on-line directive in this item's gap freezes the
             // item; the directive itself was just emitted by the leading run above.

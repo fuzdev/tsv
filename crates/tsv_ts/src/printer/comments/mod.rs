@@ -1440,7 +1440,7 @@ impl<'a> Printer<'a> {
     /// arrow-body run, the member-leading sites (interface / intersection members),
     /// the comma-separated inter-item gaps (declarators, for-init, heritage,
     /// switch cases), the forced-multiline lists via
-    /// [`build_list_leading_comments`](Self::build_list_leading_comments)
+    /// [`build_leading_comments_multiline`](Self::build_leading_comments_multiline)
     /// (tuples, type params/args, function-type params, the union's first member, the
     /// bracket-break shell, the broken `<T>` cast), the array literal / array pattern
     /// element runs, the body/member runs via
