@@ -2,7 +2,7 @@
 
 use super::Printer;
 use crate::ast::internal;
-use crate::printer::class_common::{ClassHeaderLayout, ClassHeaderOptions};
+use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::{ClassMemberModifiers, CommentSpacing, CommentVec};
 use smallvec::smallvec;
@@ -79,34 +79,13 @@ impl<'a> Printer<'a> {
             decl.implements,
         );
 
-        // Determine group mode: structural reasons OR heritage comments
-        let has_heritage_comments = positions
-            .first_heritage_start
-            .is_some_and(|hs| self.has_comments_on_page_between(positions.pre_heritage_end, hs))
-            || positions.extends_clause_end.is_some_and(|ext_end| {
-                !decl.implements.is_empty()
-                    && self.has_comments_on_page_between(ext_end, decl.implements[0].span.start)
-            });
-        let group_mode = self.should_class_group_mode(
+        // Heritage layout (shared with the class-expression printer).
+        let layout = self.class_header_layout(
+            &positions,
             decl.super_class,
             decl.super_type_parameters.as_ref(),
             decl.implements,
-        ) || has_heritage_comments;
-
-        // Check if heritage line comments force group break.
-        // Line comments consume the rest of the line, so heritage must break to new lines.
-        // We use group_break() instead of break_parent to avoid polluting fits() lookahead
-        // for nested groups (e.g., type params `<T>` would break unnecessarily).
-        let has_heritage_line_comments =
-            positions
-                .first_heritage_start
-                .is_some_and(|heritage_start| {
-                    self.has_line_comments_between(positions.pre_heritage_end, heritage_start)
-                })
-                || positions.extends_clause_end.is_some_and(|ext_end| {
-                    !decl.implements.is_empty()
-                        && self.has_line_comments_between(ext_end, decl.implements[0].span.start)
-                });
+        );
 
         let mut parts = smallvec![];
 
@@ -164,7 +143,7 @@ impl<'a> Printer<'a> {
         );
         let implements_doc = self.build_class_implements_doc(
             decl.implements,
-            group_mode,
+            layout.is_group(),
             positions.implements_keyword_start,
         );
 
@@ -178,7 +157,7 @@ impl<'a> Printer<'a> {
         let header_options = ClassHeaderOptions {
             body_is_empty: decl.body.body.is_empty(),
             body_start: decl.body.span.start,
-            layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
+            layout,
             body_frozen: frozen_body.is_some(),
         };
 
@@ -188,18 +167,11 @@ impl<'a> Printer<'a> {
             // whole declaration one level (uniform declaration-header rule). Block
             // and no-comment cases stay inline.
             let mut header_parts = smallvec![self.identifier_name_doc(id)];
-            // Comments between name and type params: `class A/* c */ <T> {}`
-            // Line comments get a hardline to prevent absorbing type params as comment text
-            if let Some(type_params) = &decl.type_parameters {
-                self.push_name_to_type_params_comments(
-                    &mut header_parts,
-                    id.span.end,
-                    type_params.span.start,
-                    CommentSpacing::Trailing,
-                );
-                // Type params get their own group - break independently of heritage.
-                header_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-            }
+            self.push_class_type_params(
+                &mut header_parts,
+                decl.type_parameters.as_ref(),
+                Some(id.span.end),
+            );
             let header_doc = self.build_class_header_doc(
                 header_parts,
                 &positions,
@@ -222,9 +194,7 @@ impl<'a> Printer<'a> {
 
         // Anonymous class declaration (`export default class {}`): the keyword→body
         // / →heritage gap is handled by the header builder, unchanged.
-        if let Some(type_params) = &decl.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-        }
+        self.push_class_type_params(&mut parts, decl.type_parameters.as_ref(), None);
         let header_doc = self.build_class_header_doc(
             parts,
             &positions,
