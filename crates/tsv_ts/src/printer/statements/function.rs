@@ -1,5 +1,6 @@
 // Function declaration printing for TypeScript
 
+use super::super::types::function_types::group_params_if_should;
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
@@ -8,7 +9,48 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
-use super::super::types::function_types::group_params_if_should;
+/// The modifier keyword that opens a function head, if any.
+///
+/// `async` and `declare` are mutually exclusive by grammar — `declare async function`
+/// is rejected by tsv and by acorn — so one slot expresses both, and
+/// [`Printer::push_function_keyword_head`] owns whichever is present rather than
+/// leaving the caller to print it and orphan the gap behind it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionHeadModifier {
+    None,
+    Async,
+    Declare,
+}
+
+impl FunctionHeadModifier {
+    /// The keyword's source text, or `None` for a bare `function`.
+    fn keyword(self) -> Option<&'static str> {
+        match self {
+            Self::None => None,
+            Self::Async => Some("async"),
+            Self::Declare => Some("declare"),
+        }
+    }
+
+    /// The modifier an `async` flag selects — the shape three of the four callers have,
+    /// since only an ambient `TSDeclareFunction` can carry `declare` at all.
+    pub(crate) fn from_async(is_async: bool) -> Self {
+        Self::from_flags(is_async, false)
+    }
+
+    /// The modifier a node carrying BOTH flags selects.
+    ///
+    /// The two are mutually exclusive by grammar, so the tie-break is unreachable — it
+    /// lives here anyway, beside the claim it rests on, rather than at the one call site
+    /// that has both flags to offer.
+    pub(crate) fn from_flags(is_async: bool, is_declare: bool) -> Self {
+        match (is_async, is_declare) {
+            (true, _) => Self::Async,
+            (false, true) => Self::Declare,
+            (false, false) => Self::None,
+        }
+    }
+}
 
 impl<'a> Printer<'a> {
     /// Build doc for a callable signature (params + return type) with comment handling.
@@ -96,6 +138,92 @@ impl<'a> Printer<'a> {
         (params_doc, return_type_doc, sig_end)
     }
 
+    /// Emit a function-like head — the opening modifier (`async` / `declare`, when
+    /// present), the gap between it and the `function` keyword, `function` itself, and a
+    /// generator `*` — returning the source position just past what was emitted, where
+    /// the keyword→name gap begins.
+    ///
+    /// Shared by the function **declaration**, the function **expression** and the
+    /// bodiless **overload signature**, which used to answer the modifier→`function` gap
+    /// three ways: the declaration emitted it (preserving the author's position,
+    /// `async /* c */ function f() {}`) while the other two pushed a bare `"async "` and
+    /// let the gap's comments fall through to whichever emitter came next — the
+    /// keyword→name gap for a named function, the parameter list for an anonymous one —
+    /// relocating them **across the `function` keyword**. Prettier relocates here too,
+    /// and inconsistently (into the body for an anonymous function, after the keyword for
+    /// a named one), so it is no oracle; the declaration's answer is tsv's, and now there
+    /// is one of it. See `docs/conformance_prettier_ts_comments.md` §Comment relocation.
+    ///
+    /// The `function` keyword is **found**, never computed from the modifier's end: a
+    /// comment may sit between the two, so the keyword's offset is not a constant away.
+    /// (The modifier's own end is arithmetic, which is sound because it opens the span.)
+    /// Returning the cursor is what keeps the caller's next gap from re-claiming this
+    /// one — reading it as `span.start..name.start` is exactly how the expression form
+    /// printed the comment twice.
+    pub(crate) fn push_function_keyword_head(
+        &self,
+        parts: &mut DocBuf,
+        span_start: u32,
+        search_end: u32,
+        modifier: FunctionHeadModifier,
+        is_generator: bool,
+    ) -> u32 {
+        let d = self.d();
+        let mut cursor = span_start;
+
+        // `async` and `declare` are mutually exclusive on a function head — tsv and acorn
+        // both reject `declare async function` — so one slot covers both, and each opens
+        // its node's span, which is what makes the arithmetic sound. Whichever is present
+        // must be emitted HERE rather than by the caller: the gap between it and
+        // `function` belongs to the emitter below, and a caller that printed the modifier
+        // itself left that gap claimed by nobody — a DROP.
+        let modifier_keyword = modifier.keyword();
+        if let Some(word) = modifier_keyword {
+            parts.push(d.text(word));
+            cursor = span_start + word.len() as u32;
+        }
+
+        // Find "function" in source after cursor, skipping comments
+        let function_pos = self.find_keyword_in_range(cursor, search_end, "function");
+        if modifier_keyword.is_some() {
+            // The `async`→`function` gap, through the line-comment-SAFE emitter (it
+            // returns the bare separating space when the gap is empty). An inline
+            // emitter here swallowed the whole declaration head onto a `//`'s line —
+            // reachable because the statement parser used to weld `async⏎function f() {}`
+            // into one async function instead of splitting it per `async [no
+            // LineTerminator here] function`. Both halves are fixed; the emitter stays
+            // the safe one rather than resting on the parser's guarantee.
+            parts.push(self.build_keyword_to_name_comments(cursor, function_pos.unwrap_or(cursor)));
+        }
+        parts.push(d.text("function"));
+        if let Some(fp) = function_pos {
+            cursor = fp + "function".len() as u32;
+        }
+
+        if is_generator {
+            // The `*` is emitted, but the cursor deliberately does NOT step over it: the
+            // gap that may hold a comment is `function`→`*`, and leaving it inside the
+            // caller's following range is what gets it printed — after the `*`, which is
+            // where the spaced spelling already put it and where prettier puts it in a
+            // declaration.
+            //
+            // Advancing the cursor here is what dropped the comment: `cursor + 1` assumed
+            // the `*` was adjacent, so with a comment between the two the cursor landed
+            // INSIDE the comment and the caller's range began past the comment's own
+            // start, where the emitter skips it (`function/* c */*g() {}` →
+            // `function* g() {}`). The spaced spelling survived only because one byte
+            // happened to stop short of the comment.
+            //
+            // Emitting the gap here instead — the other repair — is worse than the bug:
+            // this is an inline position, so a `//` printed here swallows the name and
+            // the parameters onto its own line, trading a lost comment for lost CODE. The
+            // caller's emitter is the line-comment-safe one, so the region belongs to it.
+            parts.push(d.text("*"));
+        }
+
+        cursor
+    }
+
     /// Build a Doc for a function declaration
     pub(super) fn build_function_declaration_doc(
         &self,
@@ -107,35 +235,13 @@ impl<'a> Printer<'a> {
             .id
             .as_ref()
             .map_or(decl.params_start, |id| id.span.start);
-        let mut cursor = decl.span.start;
-
-        if decl.r#async {
-            parts.push(d.text("async"));
-            cursor = decl.span.start + "async".len() as u32;
-        }
-
-        // Find "function" in source after cursor, skipping comments
-        let function_pos = self.find_keyword_in_range(cursor, search_end, "function");
-        if let Some(fp) = function_pos {
-            if let Some(c) = self.build_inline_comments_between_doc_opt(cursor, fp) {
-                parts.push(c);
-            }
-            if cursor > decl.span.start {
-                parts.push(d.text(" "));
-            }
-            parts.push(d.text("function"));
-            cursor = fp + "function".len() as u32;
-        } else {
-            if cursor > decl.span.start {
-                parts.push(d.text(" "));
-            }
-            parts.push(d.text("function"));
-        }
-
-        if decl.generator {
-            parts.push(d.text("*"));
-            cursor += 1;
-        }
+        let cursor = self.push_function_keyword_head(
+            &mut parts,
+            decl.span.start,
+            search_end,
+            FunctionHeadModifier::from_async(decl.r#async),
+            decl.generator,
+        );
 
         // Everything after the keyword→name gap is collected into `tail`, so a
         // *line* comment in that gap can indent the whole continuation one level

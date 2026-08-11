@@ -132,7 +132,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // `async function` is a function declaration
                     // `async () => ...` or `async x => ...` is an expression
                     // peek_kind() skips comments between `async` and `function`
-                    if self.peek_kind() == TokenKind::Keyword(KeywordKind::Function) {
+                    //
+                    // `AsyncFunctionDeclaration : async [no LineTerminator here] function`
+                    // (ecma262), the statement-level face of the rule the expression
+                    // parser applies. A line break — including the one that ends a `//`
+                    // in the gap — demotes `async` to an ordinary identifier expression
+                    // and ASI splits the statement, so `async⏎function add() {}` is an
+                    // expression statement plus a function declaration, as acorn and
+                    // prettier read it, not one async function. Welding them was a
+                    // re-meaning bug that also made the gap unprintable: the head emitter
+                    // renders that gap inline, so a `//` in it swallowed the whole
+                    // declaration head onto the comment's line.
+                    if self.peek_kind() == TokenKind::Keyword(KeywordKind::Function)
+                        && !self.peek_preceded_by_line_terminator()
+                    {
                         self.parse_async_function_declaration()
                     } else {
                         // Async arrow function expression

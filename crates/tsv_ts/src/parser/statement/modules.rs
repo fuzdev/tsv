@@ -169,13 +169,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             // export async function foo() {}
             //
-            // `async` is only a declaration keyword here when `function` follows — there
-            // is no `export async` arrow form. Without this check a stray `export async
-            // foo()` would reach `parse_function_or_overload` on a non-`function` token,
-            // violating its precondition. `peek_kind` skips comments, matching the
-            // statement-position dispatch in `statement/mod.rs`.
+            // `async` is only a declaration keyword here when `function` follows on the
+            // SAME LINE — there is no `export async` arrow form. Without this check a
+            // stray `export async foo()` would reach `parse_function_or_overload` on a
+            // non-`function` token, violating its precondition. `peek_kind` skips
+            // comments, matching the statement-position dispatch in `statement/mod.rs`.
+            //
+            // The line-terminator half is `AsyncFunctionDeclaration : async [no
+            // LineTerminator here] function` (ecma262) again, and unlike its
+            // statement-position and `export default` siblings the break leaves nothing
+            // valid behind: an export needs a Declaration, and a bare `async` is not one.
+            // So `export async⏎function b() {}` is a syntax error rather than two
+            // statements — acorn and Svelte both reject it, where tsv used to weld the two
+            // halves into one async function nobody wrote.
             TokenKind::Keyword(KeywordKind::Async) => {
-                if self.peek_kind() != TokenKind::Keyword(KeywordKind::Function) {
+                if self.peek_kind() != TokenKind::Keyword(KeywordKind::Function)
+                    || self.peek_preceded_by_line_terminator()
+                {
                     return Err(self.error_expected_after("'function'", "export async"));
                 }
                 let decl = self.parse_async_function_declaration()?;

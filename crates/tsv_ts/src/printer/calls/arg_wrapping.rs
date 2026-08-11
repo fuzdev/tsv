@@ -36,9 +36,7 @@ pub(crate) fn build_arrow_inline_signature(
 ) -> DocId {
     let d = printer.d();
     let mut sig_parts = DocBuf::new();
-    if arrow.r#async {
-        sig_parts.push(d.text("async "));
-    }
+    printer.push_async_arrow_head(&mut sig_parts, arrow);
     if arrow.params.is_empty() {
         sig_parts.push(
             printer

@@ -773,14 +773,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Could be async arrow function, async function expression, or just identifier
                 // Look ahead to determine what follows 'async'
                 let peek = self.peek_kind();
-                if peek == TokenKind::Keyword(KeywordKind::Function)
-                    && !self.peek_preceded_by_line_terminator()
-                {
-                    // Async function expression: `async function() {}` — `function` must be on the
-                    // same line (ECMAScript `async [no LineTerminator here] function`); a line break
-                    // demotes `async` to an ordinary identifier expression, so `const x = async⏎
-                    // function () {}` is a syntax error (a bodiless function declaration), matching
-                    // acorn/prettier — not a silently-accepted async function expression.
+                // Every `async`-headed refinement is a `[no LineTerminator here]` production:
+                // `async [no LT] function` and `AsyncArrowFunction : async [no LT]
+                // ArrowFormalParameters` (ecma262). So the break is ONE gate rather than a
+                // condition repeated per shape — it rules out every refinement at once, and
+                // each arm below is then left reading as its own grammar question.
+                //
+                // A line break demotes `async` to an ordinary identifier expression, and
+                // what that leaves is a syntax error in every shape but one —
+                // `const x = async⏎function () {}` is a bodiless function declaration,
+                // `const f = async⏎() => {}` a call to `async` with a stray `=>`,
+                // `const f = async⏎<T>(a: T) => a` a comparison chain — matching
+                // acorn/tsc/prettier, never a silently-accepted async function or arrow. The
+                // exception is a SINGLE parameter (`const f = async⏎a => a`), where ASI
+                // splits the statement and both halves are valid; declining the refinement
+                // is what produces that reading too.
+                if self.peek_preceded_by_line_terminator() {
+                    // `async` used as an identifier reference, demoted by the line break.
+                    self.parse_primary_expression()?
+                } else if peek == TokenKind::Keyword(KeywordKind::Function) {
+                    // Async function expression: `async function() {}`.
                     let (start, _) = self.current_pos();
                     self.advance()?; // consume 'async'
                     let expr = self.parse_async_function_expression(start)?;

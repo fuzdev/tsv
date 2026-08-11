@@ -12,7 +12,7 @@
 
 mod class;
 mod control_flow;
-mod function;
+pub(in crate::printer) mod function;
 mod head_parens;
 mod modules;
 mod restricted_production;

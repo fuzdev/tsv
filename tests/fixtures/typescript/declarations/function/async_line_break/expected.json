@@ -1,0 +1,429 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 669,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " async function declaration — `async` and `function` on the same line (valid)",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `AsyncFunctionDeclaration : async [no LineTerminator here] function` (ecma262):",
+			"start": 155,
+			"end": 237,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line break demotes `async` to an ordinary identifier reference and ASI splits",
+			"start": 239,
+			"end": 321,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the statement into an expression statement plus a plain function declaration",
+			"start": 323,
+			"end": 402,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " under `export` the same break leaves nothing valid — an export needs a",
+			"start": 430,
+			"end": 503,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Declaration, and a bare `async` is not one — so it is a syntax error rather",
+			"start": 505,
+			"end": 583,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " than two statements; `input_invalid_export.svelte` pins that rejection",
+			"start": 585,
+			"end": 658,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 74
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 668,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 659,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 101,
+					"end": 122,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 22
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 116,
+						"end": 117,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 16
+							},
+							"end": {
+								"line": 3,
+								"column": 17
+							}
+						},
+						"name": "a"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 120,
+						"end": 122,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 20
+							},
+							"end": {
+								"line": 3,
+								"column": 22
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " async function declaration — `async` and `function` on the same line (valid)",
+							"start": 20,
+							"end": 99
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 124,
+					"end": 152,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 29
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "FunctionDeclaration",
+						"start": 131,
+						"end": 152,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 8
+							},
+							"end": {
+								"line": 4,
+								"column": 29
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 146,
+							"end": 147,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 23
+								},
+								"end": {
+									"line": 4,
+									"column": 24
+								}
+							},
+							"name": "c"
+						},
+						"expression": false,
+						"generator": false,
+						"async": true,
+						"params": [],
+						"body": {
+							"type": "BlockStatement",
+							"start": 150,
+							"end": 152,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 27
+								},
+								"end": {
+									"line": 4,
+									"column": 29
+								}
+							},
+							"body": []
+						}
+					},
+					"specifiers": [],
+					"source": null
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 404,
+					"end": 410,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 404,
+						"end": 409,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 6
+							}
+						},
+						"name": "async"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `AsyncFunctionDeclaration : async [no LineTerminator here] function` (ecma262):",
+							"start": 155,
+							"end": 237
+						},
+						{
+							"type": "Line",
+							"value": " a line break demotes `async` to an ordinary identifier reference and ASI splits",
+							"start": 239,
+							"end": 321
+						},
+						{
+							"type": "Line",
+							"value": " the statement into an expression statement plus a plain function declaration",
+							"start": 323,
+							"end": 402
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 412,
+					"end": 427,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 16
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 421,
+						"end": 422,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 10,
+								"column": 11
+							}
+						},
+						"name": "b"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 425,
+						"end": 427,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 14
+							},
+							"end": {
+								"line": 10,
+								"column": 16
+							}
+						},
+						"body": []
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " under `export` the same break leaves nothing valid — an export needs a",
+							"start": 430,
+							"end": 503
+						},
+						{
+							"type": "Line",
+							"value": " Declaration, and a bare `async` is not one — so it is a syntax error rather",
+							"start": 505,
+							"end": 583
+						},
+						{
+							"type": "Line",
+							"value": " than two statements; `input_invalid_export.svelte` pins that rejection",
+							"start": 585,
+							"end": 658
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

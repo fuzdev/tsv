@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 346
+# shapes: 335
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -135,15 +135,8 @@ DROPPED	]⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	]⟨⟩/*	line
 DROPPED	`⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	`⟨⟩␣	annotation,block,jsdoc_cast,multiline
-DROPPED	async⟨⟩(	annotation,block,jsdoc_cast,line,multiline
-DROPPED	async⟨⟩()=	annotation,block,jsdoc_cast,line,multiline
-DROPPED	async⟨⟩<	annotation,block,jsdoc_cast,line,multiline
-DROPPED	async⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	class⟨⟩<	annotation,block,jsdoc_cast,line,multiline
 DROPPED	class⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
-DROPPED	function⟨⟩*	annotation,block,jsdoc_cast,line,multiline
-DROPPED	function⟨⟩*/*	annotation,block,jsdoc_cast,line,multiline
-DROPPED	function⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	import⟨⟩(	annotation,block,jsdoc_cast,line,multiline
 DROPPED	import⟨⟩("	annotation,block,jsdoc_cast,line,multiline
 DROPPED	import⟨⟩(".	annotation,block,jsdoc_cast,line,multiline
@@ -185,9 +178,6 @@ DROPPED	␣⟨⟩(	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩((	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩(()	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩(([	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩()	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩():	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩()=	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩([	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩({}	multiline
 DROPPED	␣⟨⟩)	annotation,block,jsdoc_cast,line,multiline
@@ -228,13 +218,14 @@ DOUBLE-PRINTED	IDENT⟨⟩>()	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	IDENT⟨⟩]	line
 DOUBLE-PRINTED	IDENT⟨⟩}</	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	IDENT⟨⟩}{:	annotation,block,jsdoc_cast,line,multiline
+DOUBLE-PRINTED	async⟨⟩␣	multiline
 DOUBLE-PRINTED	}{⟨⟩IDENT	line
 DOUBLE-PRINTED	␣⟨⟩/*	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩//	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	␣⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	␣⟨⟩async	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	␣⟨⟩from	annotation,block,jsdoc_cast,multiline
-DOUBLE-PRINTED	␣⟨⟩␣	line
+DOUBLE-PRINTED	␣⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	((⟨⟩//	line
 SWALLOW	()⟨⟩;	line
@@ -319,7 +310,6 @@ SWALLOW	`,⟨⟩␣	line
 SWALLOW	`⟨⟩);	line
 SWALLOW	`⟨⟩,	line
 SWALLOW	abstract⟨⟩␣	line
-SWALLOW	async⟨⟩␣	line
 SWALLOW	break⟨⟩;	line
 SWALLOW	declare⟨⟩␣	line
 SWALLOW	in⟨⟩//	line
@@ -354,7 +344,6 @@ SWALLOW	␣⟨⟩?	line
 SWALLOW	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	␣⟨⟩[	line
 SWALLOW	␣⟨⟩class	line
-SWALLOW	␣⟨⟩function	line
 SWALLOW	␣⟨⟩in	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	␣⟨⟩new	line
 SWALLOW	␣⟨⟩of	annotation,block,jsdoc_cast,line,multiline

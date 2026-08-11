@@ -369,15 +369,24 @@ fn recurse_children(tree: &SkeletonTree, node: u32, ctx: &mut CommentAttachmentC
             .is_some_and(|first| tree.node_type(first) == "TSTypeParameterDeclaration");
 
     if generic_async_arrow {
-        // Wire order [typeParameters, params…, returnType?, body] → visit
-        // order [returnType?, params…, body, typeParameters]. The returnType
-        // is the arrow's unique direct TSTypeAnnotation child (a param's own
-        // annotation nests inside the param).
+        // Wire order [typeParameters, params…, returnType?, body] → visit order
+        // [typeParameters, returnType?, params…, body]: acorn's
+        // `tsTryParseGenericAsyncArrowFunction` assigns `typeParameters` first (which
+        // is why the writer emits it first), but `parseArrowExpression` stamps
+        // `returnType` on the fresh node before parsing the parameters. The
+        // returnType is the arrow's unique direct TSTypeAnnotation child (a param's
+        // own annotation nests inside the param).
+        //
+        // The `typeParameters`-first half is load-bearing for the `async`→`<T>` gap:
+        // a comment there precedes both the type parameters and the first parameter,
+        // so whichever is visited first claims it as leading, and the canonical parser
+        // attaches it to `typeParameters`.
         let children: Vec<u32> = tree.children(node).collect();
         let return_type = children[1..]
             .iter()
             .copied()
             .find(|&c| tree.node_type(c) == "TSTypeAnnotation");
+        walk_node(tree, children[0], Some(&parent_info), ctx);
         if let Some(rt) = return_type {
             walk_node(tree, rt, Some(&parent_info), ctx);
         }
@@ -386,7 +395,6 @@ fn recurse_children(tree: &SkeletonTree, node: u32, ctx: &mut CommentAttachmentC
                 walk_node(tree, child, Some(&parent_info), ctx);
             }
         }
-        walk_node(tree, children[0], Some(&parent_info), ctx);
     } else {
         for child in tree.children(node) {
             walk_node(tree, child, Some(&parent_info), ctx);
