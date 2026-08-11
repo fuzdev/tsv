@@ -833,14 +833,15 @@ impl<'a> Printer<'a> {
     /// in the delimited list, and an own-line block after the last param. Each of these
     /// would otherwise be swallowed or collapsed by an inline layout.
     ///
-    /// ⚠️ **The `(`→first-param gap does not get a SECOND, wider question.** It used to:
-    /// a `has_own_line_block_comment_after` predicate anchored on the `(`'s line, so a block
-    /// merely written below the `(` forced the list open even when it hugged its param
-    /// (`(⏎/* c */ a: string)`, which prettier collapses) — and it re-answered a gap the
-    /// leading-comment walk already covers with the shared classification. The
-    /// delimiter-line question that predicate exists for is about a comment *on* the
-    /// delimiter's line, which is a `delimiter_line_comment_prefix` concern, not a
-    /// force-multiline one.
+    /// ⚠️ **The `(`→first-param gap does not get a SECOND, wider question.** A predicate
+    /// anchored on the `(`'s LINE — "is this block below the `(`?" — is the one-sided
+    /// reading, so a block merely written below the `(` forced the list open even when it
+    /// hugged its param (`(⏎/* c */ a: string)`, which prettier collapses); the walk above
+    /// already covers that gap with the shared two-sided classification
+    /// ([`Printer::block_comment_owns_its_line`]), which sees the param on the comment's
+    /// line and collapses. The delimiter-line question a `(`-anchored reading belongs to is
+    /// about a comment *on* the delimiter's line, which is a
+    /// [`Printer::delimiter_line_comment_prefix`] concern, not a force-multiline one.
     ///
     /// `comments_present` is the caller's window gate (its window is a superset of every
     /// range asked here), so a comment-free list pays one blank-line scan and nothing else.

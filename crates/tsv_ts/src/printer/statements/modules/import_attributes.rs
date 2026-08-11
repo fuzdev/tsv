@@ -58,6 +58,13 @@ impl<'a> Printer<'a> {
         let close_search_start = attributes.last().map_or(brace_start, |a| a.span.end);
         let brace_close = self.close_brace_offset(close_search_start, stmt_end);
 
+        // The clause's `{…}` span, and the one carrier of where it ENDS. Every window this
+        // function opens, the single-type gate, and the content end returned to the caller
+        // all take that bound from here rather than respelling `brace_close + 1` — the
+        // partition against the caller's post-`;` run is exactly what drifted when they did
+        // (see the expansion gate below).
+        let brace_span = Span::new(brace_start, brace_close + 1);
+
         // Build the `{…}` clause doc (kept as a local so the comment-forced-break
         // handling below can wrap it in `indent`).
         let brace_doc = if attributes.is_empty() {
@@ -77,8 +84,8 @@ impl<'a> Printer<'a> {
             // (`{/* c */}`, delimiter-tight via the `softline` separator) — the empty
             // tuple type's rule, reached through the same call.
             self.build_empty_inline_with_comments_doc(
-                brace_start,
-                brace_close + 1,
+                brace_span.start,
+                brace_span.end,
                 "{}",
                 d.softline(),
             )
@@ -97,7 +104,6 @@ impl<'a> Printer<'a> {
             // the bound from `brace_span` is what keeps that true — restating it here once
             // reached `stmt_end`, giving the gap a second emitter and DOUBLE-PRINTING every
             // comment in it.
-            let brace_span = Span::new(brace_start, brace_close + 1);
             let attr_span = |a: &internal::ImportAttribute<'_>| a.span;
             let has_expanding_comments = self
                 .has_expanding_line_comments_in_bracket_list(brace_span, attributes, attr_span)
@@ -124,7 +130,7 @@ impl<'a> Printer<'a> {
                     attr_span,
                     |a| self.build_import_attribute_doc(a),
                 );
-                if self.is_single_type_attribute(attributes, brace_start, brace_close) {
+                if self.is_single_type_attribute(attributes, brace_span) {
                     // Ordered FIRST because prettier applies `removeLines` *after*
                     // `printObject`: the never-break rule outranks the authored break
                     // below, so `with {⏎ type: 'json'⏎}` still collapses.
@@ -159,7 +165,7 @@ impl<'a> Printer<'a> {
             self.gap_comment_indented_continuation(with_end, brace_start, brace_doc),
         ]);
         parts.push(self.gap_comment_indented_continuation(source_end, with_start, with_clause));
-        brace_close + 1
+        brace_span.end
     }
 
     /// Prettier's `isSingleTypeImportAttributes` (its `printImportAttributes`): a lone
@@ -175,13 +181,13 @@ impl<'a> Printer<'a> {
     /// Comments: prettier asks `hasComment` of the attribute, its key and its value —
     /// between the braces, and nowhere else. The `with`→`{` gap is deliberately not
     /// included (prettier relocates such a comment before `with` and still flattens),
-    /// nor is the `}`→`;` gap. The question is ON-PAGE, so a glued block comment owned
-    /// by the value counts, exactly as prettier's `hasComment(value)` does.
+    /// nor is the `}`→`;` gap — `brace_span` is the whole window, and taking it from the
+    /// caller is what keeps that exclusion true. The question is ON-PAGE, so a glued block
+    /// comment owned by the value counts, exactly as prettier's `hasComment(value)` does.
     fn is_single_type_attribute(
         &self,
         attributes: &[internal::ImportAttribute<'_>],
-        brace_start: u32,
-        brace_close: u32,
+        brace_span: Span,
     ) -> bool {
         let [attribute] = attributes else {
             return false;
@@ -189,7 +195,7 @@ impl<'a> Printer<'a> {
         if !matches!(attribute.value.value, internal::LiteralValue::String(_)) {
             return false;
         }
-        if self.has_comments_on_page_between(brace_start, brace_close + 1) {
+        if self.has_comments_on_page_between(brace_span.start, brace_span.end) {
             return false;
         }
         match &attribute.key {

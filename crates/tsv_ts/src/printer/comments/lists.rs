@@ -43,8 +43,9 @@ pub(crate) enum BlankRule {
 /// union-vs-intersection split [`Printer::is_own_line_comment`] carries.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum StandaloneGlue {
-    /// The SOURCE reading, asked of the RUN ([`Printer::comment_run_hugs_next`]): anything
-    /// after the `*/` on that line glues the comment, the container's own comma included.
+    /// The SOURCE reading (the glue half is [`Printer::comment_hugs_next`], reached through
+    /// the shared [`Printer::block_comment_owns_its_line`]): anything after the `*/` on
+    /// that line glues the comment, the container's own comma included.
     /// The **object literal** and **object pattern**, whose separator is re-emitted
     /// structure outside every property span — so `{ a: 1⏎/* c */,⏎b: 2 }` collapses
     /// inline, as prettier collapses it, instead of expanding on pass 1 and collapsing on
@@ -221,7 +222,7 @@ impl<'a> Printer<'a> {
     /// glue arm — the state before this seam was unified — split a pair the author wrote on
     /// one line, and that was a real divergence). A gap whose anchor genuinely IS the
     /// delimiter keeps the delimiter reading and does not belong here
-    /// ([`Self::has_own_line_block_comment_after`]).
+    /// ([`Self::delimiter_line_comment_prefix`]'s question, not this walk's).
     ///
     /// Used wherever such a gap is already broken across lines: the tuple, type
     /// parameters and arguments, both parameter lists, and the angle-bracket cast.
@@ -292,33 +293,11 @@ impl<'a> Printer<'a> {
             .collect()
     }
 
-    /// True when a block comment in `(search_start, end)` sits on its own line —
-    /// i.e. not on the same source line as `line_ref`.
-    ///
-    /// Used to force a parameter/element list to multiline when an own-line block comment
-    /// fills the opening-delimiter→first-element gap (`line_ref` = the delimiter,
-    /// `search_start` = just past it) — the DELIMITER-line question, whose anchor is the
-    /// delimiter itself (`docs/comments.md` §The delimiter-line question). Line comments in
-    /// the same position are detected separately (they always force a break).
-    ///
-    /// ⚠️ **Not for the last-element→closer gap**, which holds the list's own comma: there
-    /// the anchor is an ITEM and the reading goes blind to every byte no item span covers.
-    /// [`Self::has_own_line_block_comment_before_closer`] is that position's predicate.
-    pub(crate) fn has_own_line_block_comment_after(
-        &self,
-        line_ref: u32,
-        search_start: u32,
-        end: u32,
-    ) -> bool {
-        self.comments_on_page_between(search_start, end)
-            .any(|c| c.is_block && !self.is_same_line(line_ref, c.span.start))
-    }
-
     /// True when a block comment in the LAST item→closer gap `(start, end)` owns its line,
-    /// so the list must open around it — the trailing counterpart of
-    /// [`Self::has_own_line_block_comment_after`], asked by the value-level parameter list
-    /// ([`Printer::has_trailing_line_comment_in_params`]) and the type-level one
-    /// (`type_params_force_multiline`).
+    /// so the list must open around it — the trailing counterpart of the leading-run walk
+    /// ([`Printer::has_leading_own_line_comment_in_params`]), asked by the value-level
+    /// parameter list ([`Printer::has_trailing_line_comment_in_params`]) and the type-level
+    /// one (`type_params_force_multiline`).
     ///
     /// The classification is the shared one ([`Printer::block_comment_owns_its_line`]) with
     /// `item_follows: false`: no item is left to lead, so the closer sharing the comment's
