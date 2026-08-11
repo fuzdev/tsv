@@ -73,6 +73,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         debug_assert!(self.current_value() == "abstract");
         self.advance()?;
 
+        if self.had_line_terminator {
+            // `abstract [no LineTerminator here] class`. The statement path decides this
+            // one token earlier — a break there DEMOTES `abstract` to an identifier
+            // statement, so this arm is unreachable from it — but the `export` path
+            // dispatches straight here, where a break has no valid reading at all: tsc
+            // rejects `export abstract⏎class B {}` (TS1128, `export` left with nothing to
+            // attach to) and so do acorn and prettier. Without this it welded into ONE
+            // exported abstract class, a reading no oracle grants.
+            return Err(self.error_msg("'class' must be on the same line as 'abstract'"));
+        }
+
         let class =
             self.parse_class_declaration_inner_with_start(true, true, abstract_start, false)?;
         Ok(Statement::ClassDeclaration(class))

@@ -29,6 +29,13 @@ The reachable-only-with-a-decorator forms this fixture stands for are
 `@d⏎declare⏎class A {}` (pinned here) and `@d abstract⏎class B {}`, which acorn
 accepts with the same overlapping shape.
 
+The *two-modifier* spelling needs no decorator to lose its reading: bare
+`declare abstract⏎class B {}` is rejected too, since `abstract` binds to `class`
+only on the same line. It sits with the rest of that boundary in
+[declare/line_break](../../declare/line_break/) — one of the few places tsv refuses
+what prettier formats, argued in
+[conformance_prettier_ts.md §tsv rejects what prettier formats](../../../../../../docs/conformance_prettier_ts.md#tsv-rejects-what-prettier-formats).
+
 **Upstream candidate**: @sveltejs/acorn-typescript — `canHaveLeadingDecorator`'s
 `isDeclareClass` / `isAbstractClass` lookaheads skip line terminators, so a decorator
 is admitted in front of a modifier that then fails to bind to the class.

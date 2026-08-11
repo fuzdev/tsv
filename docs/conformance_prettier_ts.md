@@ -167,6 +167,74 @@ and is rejected by acorn and tsv. Every other identifier-shaped word after
 `_svelte_divergence` fixtures (acorn has no `using` declarations at all); only
 the cast keywords diverge from tsc, in tsv's favor of the drop-in oracle.
 
+## tsv rejects what prettier formats
+
+The reverse of the section above, and rarer: prettier parses and prints the input,
+and tsv **refuses** it. The bar is high — tsv is first a formatter, so "prettier
+formats it" is normally the accept test — and it is cleared here only because
+accepting would require tsv's **grammar** to leave ECMAScript, which no amount of
+oracle agreement buys.
+
+**A `declare` head followed on the SAME line by a non-declaration word** —
+`declare async⏎function f(): Promise<void>;`, `declare abstract⏎class B {}`,
+`declare bar⏎function f(): void;`, `declare async⏎class B {}`. Prettier prints each
+as three statements (`declare;` / `<word>;` / the declaration); tsv rejects all four
+— [declare/line_break](../tests/fixtures/typescript/typescript_specific/declare/line_break/),
+whose `input.svelte` pins the accepted side of the same boundary.
+
+That split needs a semicolon between `declare` and the word after it, and
+**ECMAScript does not insert one there**. All three ASI conditions
+([§sec-rules-of-automatic-semicolon-insertion](https://tc39.es/ecma262/#sec-rules-of-automatic-semicolon-insertion))
+require something absent here: a `LineTerminator` before the offending token, an
+offending `}`, or the do-while `)`. The two words are on one line, so no production
+admits the second and no semicolon may be inserted.
+
+Prettier is not an independent witness to the contrary: its `typescript` parser is
+typescript-estree, which wraps **tsc's own parser**, so prettier and tsc are one
+engine here rather than two agreeing ones. And tsc grants the leniency to `declare`
+**alone** — `abstract`, `async`, `public`, `export` and `readonly` all reject the
+identical shape (`abstract bar⏎class B {}` is TS1434), while `declare bar⏎function`
+is accepted with no syntactic diagnostic and both words resolved as ordinary
+identifier references. A rule that applies to one modifier and not the five beside
+it, with nothing to distinguish them, is an oracle slip rather than a judgement.
+**acorn rejects all four**, so the `input_invalid_*` form pins the rejection on both
+parsers.
+
+This is the line: tsv freely defers *static-semantic early errors* to a diagnostics
+layer — that is what makes it permissive, and what the ambient generator / `async`
+entries above rest on. Inserting a semicolon the grammar forbids is not a deferral
+but a change to the productions themselves, and it would leak past TypeScript
+entirely: `declare` is an ordinary identifier in plain JS, so the same leniency would
+make tsv accept `declare foo` unseparated in a `.js` file.
+
+The rule generalizes past `declare`'s own gap to the heads that carry one of their
+own, and there tsv, tsc, prettier and acorn all agree, so those are ordinary
+`input_invalid_*` pins rather than divergences: a `declare namespace`/`module` name
+must be on the keyword's line (tsc's
+`nextTokenIsIdentifierOrStringLiteralOnSameLine`; `declare namespace⏎N {}` is TS1434),
+and `abstract` must reach its `class` on one line. What does **not** carry the
+restriction, and stays accepted everywhere: `declare const⏎enum E {}`,
+`declare global⏎{}`, and a comment — even a multi-line one — wherever a break is
+allowed.
+
+**Behind `export` the same gap is not a divergence at all** — prettier and tsv both
+reject `export declare⏎class B {}` (and every other head), because `export` is then
+left with nothing to attach to. There the odd one out is **acorn**, which welds
+across the break; that case is
+[declare/export_line_break](../tests/fixtures/typescript/typescript_specific/declare/export_line_break_svelte_divergence/),
+catalogued in
+[conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections).
+So the two directions meet at one rule with different dissenters: without `export`,
+prettier accepts a split ECMAScript forbids; with it, acorn accepts a weld tsc calls
+fatal.
+
+The boundary is exactly the line break, and tsv agrees with prettier on both sides of
+it. A break **after** `declare` is ordinary ASI and parses as two statements in both
+(`declare⏎function f(): void;`, `declare⏎async function f(): Promise<void>;` — the
+fixture's `unformatted_asi` variant, which both formatters normalize to `input`).
+Same-line spellings stay one ambient declaration in both (`declare abstract class B
+{}`). Only the mixed form — same-line word, break before the declaration — diverges.
+
 ## TypeScript: Template Literals
 
 For **value-position** interpolations `${...}`, tsv follows Prettier's heuristic (`template-literal.js` `printTemplateExpression`): a `${...}` is kept **on one line** unless its *source* already spans multiple lines, or the expression would render with a newline anyway (a nested function / block body). When neither holds the expression is **atomized** — rendered flat, unable to break — so the interpolation stays inline even past print width, exactly as Prettier does. Only when the interpolation *does* span lines does tsv break it, and then by expression type:

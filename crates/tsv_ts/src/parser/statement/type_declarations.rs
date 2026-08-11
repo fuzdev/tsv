@@ -259,6 +259,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
     ) -> Result<Statement<'arena>, ParseError> {
+        if self.had_line_terminator {
+            // `declare [no LineTerminator here] <declaration>`, uniform across all eight
+            // heads below. The statement path decides this one token earlier
+            // (`peek_starts_ambient_declaration`), where a break DEMOTES `declare` to an
+            // expression statement and the declaration stands alone — so this arm is
+            // unreachable from it. The `export` path dispatches straight here, and there a
+            // break has no valid reading: tsc rejects every `export declare⏎<kind>` with
+            // TS1128, and so does prettier. acorn instead welds across the break, which is
+            // the divergence this rejection accepts deliberately — the drop-in oracle is
+            // for AST *shape*, not for a verdict tsc and prettier both refuse.
+            return Err(self.error_msg("declaration must be on the same line as 'declare'"));
+        }
         match self.current_kind() {
             TokenKind::Keyword(KeywordKind::Function) => self.parse_declare_function(start, false),
             TokenKind::Keyword(KeywordKind::Async) => {
@@ -292,15 +304,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Class)) {
                     return Err(self.error_expected_after("'class'", "declare abstract"));
                 }
-                // TODO: the `abstract`→`class` gap skips the `[no LineTerminator here]`
-                // check the `declare`→head gap gets from `peek_starts_ambient_declaration`,
-                // so `declare abstract⏎class B {}` reads as ONE ambient class here. Both
-                // oracles disagree, and with each other: acorn rejects it outright, while
-                // tsc reads three statements (`declare`, `abstract`, then the class — its
-                // modifier lookaheads bail on the break and both words fall back to
-                // expression statements). tsc's reading is the target. The decorated
-                // analog is gated in `finish_decorated_class`; nothing gates this one —
-                // acorn's suite has no such input.
+                if self.had_line_terminator {
+                    // `abstract [no LineTerminator here] class`, the rule every other
+                    // modifier gap here already honors. Without it `declare abstract⏎class
+                    // B {}` welded into ONE ambient class — a reading NO oracle endorses
+                    // (acorn rejects; tsc splits into three statements), and a silent one:
+                    // the merged output is stable and reparses, so only a prettier
+                    // comparison could ever have seen it.
+                    //
+                    // tsv rejects rather than reproducing tsc's split, because that split
+                    // rests on a semicolon ECMAScript does not insert — `declare` and
+                    // `abstract` sit on ONE line, and none of the three ASI conditions
+                    // hold (ecma262 §sec-rules-of-automatic-semicolon-insertion: a
+                    // preceding LineTerminator, a `}`, or the do-while `)`). tsc grants it
+                    // to `declare` ALONE — `abstract`/`async`/`public`/`export`/`readonly`
+                    // all reject the identical shape — so it is an oracle slip rather than
+                    // a rule, and following it would make tsv's grammar, not merely its
+                    // early-error policy, diverge from the spec. acorn agrees with the
+                    // rejection. See docs/conformance_prettier_ts.md §tsv rejects what
+                    // prettier formats.
+                    return Err(self.error_msg("'class' must be on the same line as 'abstract'"));
+                }
                 self.parse_declare_class(start, true)
             }
             TokenKind::Keyword(KeywordKind::Enum) => {
@@ -323,7 +347,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Identifier
                 if self.current_value() == "namespace" || self.current_value() == "module" =>
             {
-                // declare namespace/module
+                // declare namespace/module. The name must be on the SAME line (tsc
+                // `nextTokenIsIdentifierOrStringLiteralOnSameLine`) — the rule the
+                // statement path spells one level up, where failing it DEMOTES the word
+                // to an identifier. Under `declare` there is no demotion to fall back on,
+                // and a break has no valid reading in any oracle: tsc rejects
+                // `declare namespace⏎N {}` with TS1434, as do acorn and prettier. Without
+                // this the two lines welded into ONE module declaration — tsv alone.
+                // Only `module` also takes a string-literal name (`declare module 'x' {}`).
+                let named_on_same_line = self.peek_is_same_line_name_word()
+                    || (self.current_value() == "module"
+                        && self.peek_kind() == TokenKind::String
+                        && !self.peek_preceded_by_line_terminator());
+                if !named_on_same_line {
+                    return Err(self.error_msg("namespace name must be on the same line"));
+                }
                 self.parse_module_declaration_with_start(true, start)
             }
             TokenKind::Identifier if self.current_value() == "interface" => {
