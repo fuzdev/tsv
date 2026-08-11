@@ -54,10 +54,35 @@ pub(crate) fn next_printed_stmt_start(
     index: usize,
     body_end: u32,
 ) -> u32 {
+    next_printed_stmt(body, index).map_or(body_end, |s| s.span().start)
+}
+
+/// The next statement after `body[index]` that `printStatementSequence` will actually
+/// print — `None` when only dropped `EmptyStatement`s (or nothing) follow. The
+/// `Option` form of [`next_printed_stmt_start`], for the callers whose behavior
+/// differs when nothing prints (the trailing-claim split runs only toward a printed
+/// statement — a comment hugging the body's `}` still trails).
+pub(crate) fn next_printed_stmt<'s, 'arena>(
+    body: &'s [internal::Statement<'arena>],
+    index: usize,
+) -> Option<&'s internal::Statement<'arena>> {
     body[index + 1..]
         .iter()
         .find(|s| !matches!(s, internal::Statement::EmptyStatement(_)))
-        .map_or(body_end, |s| s.span().start)
+}
+
+/// The slot floor for `body[index]`'s trailing gap: past the last dropped
+/// `EmptyStatement` between it and the next printed statement, else the statement's
+/// own end. A comment before a dropped `;` binds inside its own slot and trails the
+/// content before it (`a(); /* c */ ; b();` — prettier reads it the same way), so the
+/// leads-next scan ([`Printer::trailing_claim_end`](super::Printer::trailing_claim_end))
+/// must not reach back across one.
+pub(crate) fn statement_gap_floor(body: &[internal::Statement<'_>], index: usize) -> u32 {
+    body[index + 1..]
+        .iter()
+        .take_while(|s| matches!(s, internal::Statement::EmptyStatement(_)))
+        .last()
+        .map_or_else(|| body[index].span().end, |s| s.span().end)
 }
 
 /// Check if an expression is a module path call that should use fluid assignment wrapping

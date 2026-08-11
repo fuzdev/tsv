@@ -8,7 +8,9 @@
 
 use super::{CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
+use crate::printer::{next_printed_stmt, next_printed_stmt_start, statement_gap_floor};
 use tsv_lang::Span;
+use tsv_lang::comments_in_source_range;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -352,6 +354,126 @@ impl<'a> Printer<'a> {
                 .all(u8::is_ascii_whitespace)
     }
 
+    /// Whether a gap comment LEADS the next printed item rather than trailing the
+    /// previous one: the **glued run** it starts reaches `next_start`'s line — code on
+    /// both sides of the run binds it forward (prettier's remaining-comment placement),
+    /// and per-item line breaks put the whole run on the next item's line, glued
+    /// (`a(); /* c */ b();` → `a();⏎/* c */ b();`).
+    ///
+    /// The reach is a CHAIN, not one `is_same_line` (prettier's `isEndOfLineComment`
+    /// extends the comment's end through every comment glued to it before testing for
+    /// the newline): only a newline **outside comment bytes** breaks it, so a glued run
+    /// whose tail is a multi-line block still leads
+    /// (`a(); /* c */ /* x⏎y */ b();` → both lead `b`), while a run whose closing
+    /// comment ends its line trails whole (`a(); /* c1 */ /* c2 */⏎b();`). The scan is
+    /// the **in-source** axis — an owned comment's bytes glue the chain like any
+    /// other's. Erased structure in the gap (a dropped `;`, a member separator) is
+    /// invisible to the line test, which is why the CLAIM scan opens at its slot floor
+    /// ([`statement_gap_floor`] and kin): a comment bound inside its own slot is
+    /// claimed as trailing and stays behind the cursor, so this test is never asked
+    /// of it.
+    ///
+    /// The one statement of the statement/member-gap split, asked from both sides:
+    /// [`Self::trailing_claim_end`] bounds the trailing emitter's claim with it, and
+    /// [`Self::comment_already_trailed`]'s `leads_target` is its escape on the leading
+    /// side — the two must partition the gap, so neither may re-spell it.
+    ///
+    /// A line comment can never satisfy the test (its own line ends the chain before
+    /// anything follows it), so the deferred-`;` machinery never interacts with it. A
+    /// multi-line block reads its CLOSING line, so `a(); /* x⏎y */ b();` leads too.
+    pub(crate) fn comment_leads_next_item(
+        &self,
+        comment: &tsv_lang::Comment,
+        next_start: u32,
+    ) -> bool {
+        let mut pos = comment.span.end;
+        for c in comments_in_source_range(self.comments, pos, next_start) {
+            if !self.is_same_line(pos, c.span.start) {
+                return false;
+            }
+            pos = c.span.end;
+        }
+        self.is_same_line(pos, next_start)
+    }
+
+    /// Where the previous item's same-line trailing claim ENDS in the gap
+    /// `[gap_start, next_start)`: the start of the first comment (to emit) that
+    /// [`Self::comment_leads_next_item`] hands to the next printed item, or `next_start`
+    /// when every comment in the gap ends its own line — the claim may then run the
+    /// whole gap.
+    ///
+    /// The claim stays a PREFIX by construction: comments are disjoint and ordered, so
+    /// a later comment's glue chain to `next_start` is a suffix of an earlier one's —
+    /// once one comment leads, every later one in the gap leads too.
+    ///
+    /// `gap_start` is the slot floor, not always the item's end: a comment before a
+    /// dropped `EmptyStatement` binds inside its own slot and trails
+    /// (`a(); /* c */ ; b();` — prettier reads it the same way), so statement-list
+    /// callers open the scan past the last dropped `;`
+    /// ([`statement_gap_floor`]); the type-literal
+    /// member gap opens it past the member's source separator for the same reason (a
+    /// comment before the `;` trails its member however the lines fall).
+    ///
+    /// Callers pass the result as the trailing emitter's upper bound and clamp their
+    /// cursor with it (`find_end_with_trailing_comments(..).min(claim_end)`), so the
+    /// leading side finds the handed-over comments still ahead of the cursor.
+    pub(crate) fn trailing_claim_end(&self, gap_start: u32, next_start: u32) -> u32 {
+        comments_to_emit_in_range(self.comments, gap_start, next_start)
+            .find(|c| self.comment_leads_next_item(c, next_start))
+            .map_or(next_start, |c| c.span.start)
+    }
+
+    /// [`Self::trailing_claim_end`] for `body[index]`'s trailing gap: from the gap's
+    /// slot floor ([`statement_gap_floor`]) toward the next printed statement — or
+    /// toward `tail_target` when only dropped `;`s (or nothing) follow: the construct
+    /// past the list's end that gap comments could still lead (a switch consequent's
+    /// next `case` label), `None` where nothing prints there (a body's `}`). With no
+    /// target at all nothing leads and the claim is unbounded (`u32::MAX`), so a
+    /// caller's own scan bound stands unchanged.
+    ///
+    /// The one spelling for every statement-list walk (program, block/namespace body,
+    /// switch consequent — both its printing and orphan arms) so the trailing claim,
+    /// the cursor clamp, and the orphan scan bound cannot drift apart.
+    pub(crate) fn statement_claim_end(
+        &self,
+        body: &[internal::Statement<'_>],
+        index: usize,
+        tail_target: Option<u32>,
+    ) -> u32 {
+        match next_printed_stmt(body, index)
+            .map(|s| s.span().start)
+            .or(tail_target)
+        {
+            Some(target) => self.trailing_claim_end(statement_gap_floor(body, index), target),
+            None => u32::MAX,
+        }
+    }
+
+    /// The whole trailing arm of the statement-gap seam for `body[index]`, shared by
+    /// the program and block walks: emit the statement's same-line trailing run —
+    /// bounded at the next *printed* statement, skipping dropped `;`s, so a comment
+    /// trailing a dropped `;` (`a();; // c`) attaches here rather than being stranded,
+    /// and stopped at the claim split ([`Self::statement_claim_end`]) so a comment
+    /// whose glue chain reaches the next statement leads it instead
+    /// (`a(); /* c */ let b = 1;`), emitted by its leading run. Returns the docs and
+    /// the advanced cursor, clamped to the same split so the handed-over comments
+    /// stay ahead of it for that leading run to find.
+    pub(crate) fn statement_trailing_run(
+        &self,
+        body: &[internal::Statement<'_>],
+        index: usize,
+        list_end: u32,
+    ) -> (DocBuf, u32) {
+        let stmt_end = body[index].span().end;
+        let claim_end = self.statement_claim_end(body, index, None);
+        let bound = next_printed_stmt_start(body, index, list_end).min(claim_end);
+        let docs = self.build_trailing_same_line_comment_docs(stmt_end, bound);
+        let prev_end = self
+            .find_end_with_trailing_comments(stmt_end)
+            .min(claim_end);
+        (docs, prev_end)
+    }
+
     /// Whether `comment` was already emitted as the PREVIOUS item's trailing run — it
     /// shares `anchor`'s source line — so this leading / end-of-body run must skip it.
     ///
@@ -370,13 +492,23 @@ impl<'a> Printer<'a> {
     /// own `;` ([`Self::terminator_defers_line_comment`]) and therefore trailed **nothing**
     /// on that line, which leaves this run the only emitter left for it. Skipping the run
     /// in BOTH places is a dropped comment; trailing it in both is a double-print.
+    ///
+    /// `leads_target` is the printed item this gap's comments could lead — the escape
+    /// matching [`Self::trailing_claim_end`]'s cut on the trailing side: a comment
+    /// [`Self::comment_leads_next_item`] hands forward shares the anchor's line yet was
+    /// NOT claimed, so it must not be skipped here. Pass `None` where nothing prints at
+    /// the range's end (an orphaned/end-of-body run) — there the trailing claim ran the
+    /// whole gap and the line test alone is the answer.
     pub(crate) fn comment_already_trailed(
         &self,
         anchor: Option<u32>,
         comment: &tsv_lang::Comment,
         claims_trailing: bool,
+        leads_target: Option<u32>,
     ) -> bool {
-        !claims_trailing && anchor.is_some_and(|a| self.is_same_line(a, comment.span.start))
+        !claims_trailing
+            && !leads_target.is_some_and(|t| self.comment_leads_next_item(comment, t))
+            && anchor.is_some_and(|a| self.is_same_line(a, comment.span.start))
     }
 
     /// Build docs for trailing same-line comments after a node
@@ -587,7 +719,7 @@ impl<'a> Printer<'a> {
         let mut prev_emitted: Option<&internal::Comment> = None;
 
         for comment in comments_to_emit_in_range(self.comments, prev_end, body_end) {
-            if self.comment_already_trailed(anchor, comment, claims_trailing) {
+            if self.comment_already_trailed(anchor, comment, claims_trailing, None) {
                 // Already emitted as the last item's trailing run — but the cursor still
                 // steps over its BYTES, since the blank-line scan below reads raw source
                 // and would otherwise count a multi-line block's own newlines as a blank.

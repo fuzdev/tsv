@@ -1607,10 +1607,14 @@ impl<'a> Printer<'a> {
     ///   its own line (author blank lines preserved). Diverges from prettier, which
     ///   relocates the line comment to trail the whole statement — tsv preserves the
     ///   author's placement (see [`conformance_prettier_ts_comments.md` §Comment relocation]).
-    /// - **Own-line / multiline block** after `=`: break-after-operator hang, the
-    ///   comment on its own line (matches prettier's `hasLeadingOwnLineComment`).
-    /// - **Inline block** glued to `=`, or no comment: `None` — the caller keeps the
-    ///   value on the `=` line (`= /* c */ value`).
+    /// - **Own-line block, or multiline block the author broke after**: break-after-
+    ///   operator hang, the comment on its own line (matches prettier's
+    ///   `hasLeadingOwnLineComment`; the broke-after multiline case is tsv's own
+    ///   authored-break rule — conformance_prettier_ts_comments.md §Pre-separator
+    ///   multiline block).
+    /// - **Inline block (or glued run, multiline members included) reaching the
+    ///   value**, or no comment: `None` — the caller keeps the value on the `=` line
+    ///   (`= /* c */ value`, `= /* c */ /* x⏎y */ value`).
     pub(crate) fn build_eq_comment_break_rhs(
         &self,
         eq_pos: u32,
@@ -1646,10 +1650,25 @@ impl<'a> Printer<'a> {
                 d.concat(&trailing),
                 d.indent_hardline(d.concat(&[d.concat(&leading), build_value()])),
             ]))
-        } else if self
-            .comments_on_page_between(eq_pos + 1, value_start)
-            .any(|c| self.comment_cannot_glue_to_operator(c))
-        {
+        } else if self.any_comment_on_page_with_next(eq_pos + 1, value_start, |c, next| {
+            // A block the author broke AFTER (a newline toward the next comment, or
+            // the value for the last) — provided it is multiline (the authored-break
+            // rule, conformance_prettier_ts_comments.md §Pre-separator multiline
+            // block) or own-line (`=⏎/* c */⏎v`, prettier's
+            // `hasLeadingOwnLineComment`, which keys on that same trailing newline).
+            // A comment whose glue chain reaches the value hangs nothing, wherever
+            // its own line starts and however many lines its interior spans:
+            // `= /* c */ /* x⏎y */ v` and `=⏎/* c */ /* x⏎y */ v` both collapse
+            // inline, the way prettier keeps them. The bare per-comment `c.multiline`
+            // reading ([`Self::comment_cannot_glue_to_operator`]) hung the run's
+            // head; that spelling stays right only at the arrow-body and unary
+            // sites, where prettier genuinely hangs on any multiline block in the
+            // gap. A glued single-line block trailing the `=` (`= /* c */⏎v`) stays
+            // with the `=` (the `None` arm), not hanging — so the newline test alone
+            // is not the rule either.
+            self.has_newline_between(c.span.end, next)
+                && (c.multiline || self.is_own_line_comment(c))
+        }) {
             // Own-line / multiline block → break-after-operator hang.
             let comments_doc = self
                 .build_rhs_comments_opt(eq_pos + 1, value_start)

@@ -55,7 +55,12 @@ impl<'a> Printer<'a> {
         let leading_comments: CommentVec<'_> = if !is_first {
             all_comments
                 .iter()
-                .filter(|c| !self.comment_already_trailed(Some(prev_end), c, false))
+                .filter(|c| {
+                    // A comment hugging this member's start leads it even from the
+                    // previous member's line (`a: A; /* c */ b: B;` — the predicate's
+                    // `leads_target` escape); the trailing claim stopped there too.
+                    !self.comment_already_trailed(Some(prev_end), c, false, Some(member_start))
+                })
                 .copied()
                 .collect()
         } else {
@@ -138,9 +143,7 @@ impl<'a> Printer<'a> {
         // (newline/ASI-separated members) there is no anchor and all comments are
         // "before". Keying only on `;` here put a comment that followed a `,`
         // separator on the wrong side (`a: 1 /* c */;` instead of `a: 1; /* c */`).
-        let semi = self.find_char_outside_comments(member_end, upper_bound, b';');
-        let comma = self.find_char_outside_comments(member_end, upper_bound, b',');
-        let sep_pos = [semi, comma].into_iter().flatten().min();
+        let sep_pos = self.type_member_separator_pos(member_end, upper_bound);
 
         let (before_semi, after_semi): (Vec<_>, Vec<_>) =
             comments.iter().partition(|c| match sep_pos {
@@ -160,6 +163,77 @@ impl<'a> Printer<'a> {
             docs.push(self.build_trailing_comment_doc(comment));
         }
         docs
+    }
+
+    /// [`Printer::trailing_claim_end`] for the gap after member `i`, from its
+    /// separator floor ([`Self::type_member_gap_floor`]) toward the next member —
+    /// unbounded (`u32::MAX`) after the last member, toward whose `}` nothing leads.
+    /// The one spelling for every reader of a member gap (both force-multiline
+    /// walks' trailing collects, the width-aware trailing collect, and the
+    /// width-aware handed-over run), so the two sides cannot disagree.
+    fn type_member_claim_end(
+        &self,
+        t: &TSTypeLiteral<'_>,
+        i: usize,
+        member_content_end: u32,
+    ) -> u32 {
+        match t.members.get(i + 1) {
+            Some(next) => self.trailing_claim_end(
+                self.type_member_gap_floor(member_content_end, next.span().start),
+                next.span().start,
+            ),
+            None => u32::MAX,
+        }
+    }
+
+    /// Collect the comments a member's trailing run claims in a force-multiline
+    /// walk — the same-line run after its content end, stopped at the claim split
+    /// ([`Self::type_member_claim_end`]): a comment hugging the next member's start
+    /// leads it instead (`a: A; /* c */ b: B;`), emitted by that member's prefix run
+    /// ([`Printer::build_multiline_member_prefix_doc`]'s `leads_target` escape).
+    /// Shared by both force-multiline member walks so the two cannot drift.
+    fn collect_member_trailing_comments(
+        &self,
+        t: &TSTypeLiteral<'_>,
+        i: usize,
+        member_content_end: u32,
+        comments_present: bool,
+    ) -> CommentVec<'_> {
+        if !comments_present {
+            return CommentVec::new();
+        }
+        let upper_bound = t
+            .members
+            .get(i + 1)
+            .map_or(t.span.end, |next| next.span().start);
+        let claim_end = self.type_member_claim_end(t, i, member_content_end);
+        comments_to_emit_in_range(self.comments, member_content_end, upper_bound)
+            .filter(|c| {
+                c.span.start < claim_end && self.is_same_line(member_content_end, c.span.start)
+            })
+            .collect()
+    }
+
+    /// The member's source separator (`;` or `,` — both valid, tsv normalizes to `;`)
+    /// in `[member_end, upper_bound)`, comment-aware so a separator glyph inside a
+    /// comment isn't mistaken for the real one. `None` for newline/ASI-separated
+    /// members.
+    fn type_member_separator_pos(&self, member_end: u32, upper_bound: u32) -> Option<u32> {
+        let semi = self.find_char_outside_comments(member_end, upper_bound, b';');
+        let comma = self.find_char_outside_comments(member_end, upper_bound, b',');
+        [semi, comma].into_iter().flatten().min()
+    }
+
+    /// Where the trailing-claim split ([`Printer::trailing_claim_end`]) opens in the
+    /// gap after a type member: past the member's source separator when one exists,
+    /// else at the member's content end. A comment BEFORE the separator trails its
+    /// member however the lines fall (`a: A /* c */; b: B` keeps `/* c */` with `a`),
+    /// so the leads-next test must not reach it — the separator is this gap's slot
+    /// floor, the same role a dropped `;` plays in a statement list
+    /// ([`statement_gap_floor`](crate::printer::statement_gap_floor)).
+    fn type_member_gap_floor(&self, member_content_end: u32, upper_bound: u32) -> u32 {
+        self.type_member_separator_pos(member_content_end, upper_bound)
+            .map_or(member_content_end, |pos| pos + 1)
     }
 
     //
@@ -559,13 +633,12 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: CommentVec<'_> = if comments_present {
-                    comments_to_emit_in_range(self.comments, member_content_end, upper_bound)
-                        .filter(|c| self.is_same_line(member_content_end, c.span.start))
-                        .collect()
-                } else {
-                    CommentVec::new()
-                };
+                let trailing = self.collect_member_trailing_comments(
+                    t,
+                    i,
+                    member_content_end,
+                    comments_present,
+                );
                 member_parts.extend(self.build_comments_around_semicolon_doc(
                     &trailing,
                     member_content_end,
@@ -636,17 +709,37 @@ impl<'a> Printer<'a> {
         // by the non-last `if_break(empty, " ")` below.
         if !is_first {
             member_parts.push(d.softline());
+            // Comments the previous member's claim handed over lead this member
+            // ([`Self::type_member_claim_end`] over the previous member's gap — the
+            // same call its trailing collect makes, so the two sides cannot
+            // disagree): on the member's own line when broken (`a: A;⏎/* c */ b: B;`),
+            // and between the members when flat — where the emission is
+            // byte-identical to the trailing form, so only the broken layout moves.
+            if comments_present {
+                let prev_content_end = t.members[i - 1].content_end(self.source);
+                let claim_end = self.type_member_claim_end(t, i - 1, prev_content_end);
+                for comment in comments_to_emit_in_range(self.comments, claim_end, m.span().start) {
+                    member_parts.push(self.build_comment_doc(comment));
+                    member_parts.push(d.text(" "));
+                }
+            }
         }
         let mut deferred = DocBuf::new();
         member_parts.push(self.build_type_member_doc_inner(m, &mut deferred));
 
-        // Handle trailing comments - preserve position relative to semicolon
+        // Handle trailing comments - preserve position relative to semicolon.
+        // The claim stops at the split: a comment hugging the next member's start
+        // leads it, emitted ahead of that member in its own segment above — without
+        // the bound both segments would print it.
         let upper_bound = t
             .members
             .get(i + 1)
             .map_or(t.span.end, |next| next.span().start);
         let trailing: CommentVec<'_> = if comments_present {
-            comments_to_emit_in_range(self.comments, member_content_end, upper_bound).collect()
+            let claim_end = self.type_member_claim_end(t, i, member_content_end);
+            comments_to_emit_in_range(self.comments, member_content_end, upper_bound)
+                .filter(|c| c.span.start < claim_end)
+                .collect()
         } else {
             CommentVec::new()
         };
@@ -877,13 +970,12 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: CommentVec<'_> = if comments_present {
-                    comments_to_emit_in_range(self.comments, member_content_end, upper_bound)
-                        .filter(|c| self.is_same_line(member_content_end, c.span.start))
-                        .collect()
-                } else {
-                    CommentVec::new()
-                };
+                let trailing = self.collect_member_trailing_comments(
+                    t,
+                    i,
+                    member_content_end,
+                    comments_present,
+                );
                 member_parts.extend(self.build_comments_around_semicolon_doc(
                     &trailing,
                     member_content_end,

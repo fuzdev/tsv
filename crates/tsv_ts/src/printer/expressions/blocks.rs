@@ -11,7 +11,7 @@
 // expressions/ and statements/ modules.
 
 use crate::ast::internal;
-use crate::printer::{CommentVec, Printer, is_effectively_empty_body, next_printed_stmt_start};
+use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -290,14 +290,19 @@ impl<'a> Printer<'a> {
                 let stmt_end = stmt.span().end;
                 let next_start = body.get(i + 1).map_or(body_end, |s| s.span().start);
                 let search_end = if body_has_comments {
+                    // A comment hugging the next printed statement's start leads it
+                    // (`a(); ; /* c */ b();`) — the orphan run must stop at the claim
+                    // split so that statement's leading run still finds it.
+                    let claim_end = self.statement_claim_end(body, i, None);
                     self.find_end_with_trailing_comments(stmt_end)
                         .min(next_start)
+                        .min(claim_end)
                 } else {
                     stmt_end
                 };
 
                 let mut leading_comments = if body_has_comments {
-                    self.collect_leading_comments(prev_end, search_end, prev_stmt_end, false)
+                    self.collect_leading_comments(prev_end, search_end, prev_stmt_end, false, None)
                 } else {
                     CommentVec::new()
                 };
@@ -332,6 +337,7 @@ impl<'a> Printer<'a> {
                     stmt_start,
                     prev_stmt_end,
                     prev_deferred_line_comment,
+                    Some(stmt_start),
                 )
             } else {
                 CommentVec::new()
@@ -401,14 +407,14 @@ impl<'a> Printer<'a> {
                 // advancing it (what the trailing case does below) would DROP them.
                 prev_end = stmt_end;
             } else if body_has_comments {
-                // Bound at the next *printed* statement, skipping dropped `;`s, so a
-                // same-line comment trailing a dropped `;` (`a();; // c`) attaches here
-                // rather than being stranded (the `;` emits nothing to carry it).
-                let next_start = next_printed_stmt_start(body, i, body_end);
-                body_parts.extend(self.build_trailing_same_line_comment_docs(stmt_end, next_start));
-                // Update prev_end past trailing comments (including comments on the
-                // closing */ line of multi-line block comments)
-                prev_end = self.find_end_with_trailing_comments(stmt_end);
+                // The shared trailing arm of the statement-gap seam: the run bounded at
+                // the next printed statement and stopped at the claim split, the cursor
+                // clamped to the same split ([`Printer::statement_trailing_run`]) — so
+                // a handed-over comment stays ahead of it for the next statement's
+                // leading run to find.
+                let (trailing, new_prev_end) = self.statement_trailing_run(body, i, body_end);
+                body_parts.extend(trailing);
+                prev_end = new_prev_end;
             } else {
                 prev_end = stmt_end;
             }
@@ -425,16 +431,25 @@ impl<'a> Printer<'a> {
     /// Collect leading comments for a statement, filtering out the ones the previous
     /// statement's trailing emitter already took ([`Printer::comment_already_trailed`] —
     /// `claims_trailing` is that predicate's escape hatch).
+    ///
+    /// `leads_target` is `Some(stmt_start)` when the statement at `stmt_start` actually
+    /// prints — a comment hugging its start then leads it even from the previous
+    /// statement's line ([`Printer::comment_leads_next_item`], the trailing claim's
+    /// other half) — and `None` for an orphaned run (a dropped `;`'s comments), where
+    /// nothing follows to lead.
     pub(in crate::printer) fn collect_leading_comments(
         &self,
         prev_end: u32,
         stmt_start: u32,
         prev_stmt_end: Option<u32>,
         claims_trailing: bool,
+        leads_target: Option<u32>,
     ) -> CommentVec<'_> {
         let collected: CommentVec<'_> =
             comments_to_emit_in_range(self.comments, prev_end, stmt_start)
-                .filter(|c| !self.comment_already_trailed(prev_stmt_end, c, claims_trailing))
+                .filter(|c| {
+                    !self.comment_already_trailed(prev_stmt_end, c, claims_trailing, leads_target)
+                })
                 .collect();
         #[cfg(feature = "buffer_stats")]
         crate::printer::buffer_stats::record_leading_comments(collected.len());

@@ -29,4 +29,30 @@
 		/* line1
 		line2 */
 		x;
+
+	// A glued RUN reaching the value collapses too — the multiline block may sit
+	// at the head or the tail of the run.
+	const f = /* line1
+	line2 */ /* c1 */ x;
+	const g = /* c2 */ /* line1
+	line2 */ x;
+	const h = {
+		k: /* c3 */ /* line1
+		line2 */ x
+	};
+	for (
+		let i = /* c5 */ /* line1
+	line2 */ 0;
+		i < 2;
+		i++
+	) {
+		fn1();
+	}
+	let j;
+	j = /* line1
+	line2 */ /* c6 */ x;
+	class D {
+		m = /* line1
+		line2 */ /* c7 */ x;
+	}
 </script>

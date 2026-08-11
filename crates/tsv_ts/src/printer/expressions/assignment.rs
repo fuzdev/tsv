@@ -951,6 +951,13 @@ pub struct RhsCommentInfo {
     /// The operator→RHS gap holds a line comment (or an own-line / multiline block),
     /// forcing `BreakAfterOperator` so the comment and value indent together.
     pub has_line_comment: bool,
+    /// The gap's run is glued through to the value
+    /// ([`Printer::comment_run_glued_through`]), so a `will_break` on `comments` is a
+    /// preserved multiline block's interior — the to-emit twin of
+    /// [`OwnedCommentEffect::Pins`] — and must not hang the value. `false` when the
+    /// run has an own-line separator (a real hardline the value must sit under), or
+    /// when `comments` is `None`.
+    pub pinned: bool,
     /// When `Some`, scan for trailing comments from stripped grouping parens between
     /// the RHS end and this boundary, wrapping in parens if found.
     pub boundary: Option<u32>,
@@ -967,6 +974,7 @@ impl RhsCommentInfo {
         Self {
             comments: None,
             has_line_comment: false,
+            pinned: false,
             boundary: None,
             frozen,
         }
@@ -1032,7 +1040,19 @@ impl<'a> Printer<'a> {
             && let Some(comments_doc) = rhs_info.comments
             && d.will_break(comments_doc)
         {
-            layout = AssignmentLayout::BreakAfterOperator;
+            if rhs_info.pinned {
+                // The break is a preserved multiline block's interior in a run glued
+                // through to the value (`= /* x⏎y */ /* c */ v`) — the to-emit twin of
+                // `OwnedCommentEffect::Pins` below: the operator's line already ends
+                // inside the comment, so a width-decided break at the operator decides
+                // nothing, and prettier keeps the run on the operator's line. Only
+                // `Fluid` converts, exactly as the owned arm does.
+                if layout == AssignmentLayout::Fluid {
+                    layout = AssignmentLayout::NeverBreakAfterOperator;
+                }
+            } else {
+                layout = AssignmentLayout::BreakAfterOperator;
+            }
         }
         // A comment the RHS *owns* (a JSDoc cast, a bundler annotation) is glued to its
         // first token and travels inside its doc, so it is never in `rhs_comments` — the
