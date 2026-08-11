@@ -5,6 +5,7 @@ use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
 use crate::printer::ignore::is_freeze_target;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
+use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
 use smallvec::smallvec;
@@ -804,23 +805,27 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
 
-        // Handle async keyword
-        if decl.r#async {
-            parts.push(d.text("async "));
-        }
-
-        // Handle declare keyword (only for top-level declare functions,
-        // not inside `declare namespace` where it's implicit)
-        if decl.declare {
-            parts.push(d.text("declare "));
-        }
-
-        // Handle function/function* keyword
-        if decl.generator {
-            parts.push(d.text("function*"));
+        // The opening modifier (`async`, or the `declare` a top-level ambient function
+        // carries — implicit, and so absent, inside a `declare namespace`), the gap before
+        // `function`, the keyword and a generator `*`: the same head the declaration and
+        // the expression print. The third site of one gap — this one used to push a bare
+        // `async ` and let the comment fall through to the `function`→name emitter,
+        // relocating it across the keyword (`async /* c */ function f(): T;` →
+        // `async function /* c */ f(): T;`).
+        let modifier = if decl.r#async {
+            FunctionHeadModifier::Async
+        } else if decl.declare {
+            FunctionHeadModifier::Declare
         } else {
-            parts.push(d.text("function"));
-        }
+            FunctionHeadModifier::None
+        };
+        let head_end = self.push_function_keyword_head(
+            &mut parts,
+            decl.span.start,
+            decl.id.span.start,
+            modifier,
+            decl.generator,
+        );
 
         // Find paren position for comment boundary and later comment handling
         let paren_search_start = decl
@@ -889,9 +894,11 @@ impl<'a> Printer<'a> {
         tail.extend(deferred);
 
         // Comments between `function` keyword and name; a line comment indents the
-        // whole continuation (uniform declaration-header rule).
+        // whole continuation (uniform declaration-header rule). From `head_end`, not the
+        // span start: the head already printed the `async`→`function` gap, and re-reading
+        // it here printed those comments twice.
         parts.push(self.build_keyword_to_name_continuation(
-            decl.span.start,
+            head_end,
             decl.id.span.start,
             d.concat(&tail),
         ));
