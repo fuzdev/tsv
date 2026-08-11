@@ -915,17 +915,28 @@ impl<'a> Printer<'a> {
         })
     }
 
+    /// Where the trailing region after `params[index]` ENDS: the next param's printed
+    /// start ([`Self::param_start_with_decorators`]), or — for the last param — the
+    /// list's trailing bound. The one spelling of that bound, shared by the emitters in
+    /// `build_params_doc_with_comments` and by the force-break gate over them
+    /// ([`Self::has_trailing_line_comment_in_params`]), so a comment the gate opens the
+    /// list for is the same set the emitters claim.
+    ///
+    /// A DECORATED next param prints its own decorator region (`build_param_decorators_doc`),
+    /// so this bound stops at its first `@`, never at its binding: the region past the `@`
+    /// is that builder's to claim, and a trailing scan reaching into it prints the
+    /// decorator's comment a second time on the previous param's comma
+    /// (`docs/comments.md` §The element-comma seam).
     fn param_trailing_end(
         &self,
         params: &[internal::Expression<'_>],
         index: usize,
         trailing_comments_end: Option<u32>,
     ) -> u32 {
-        if index + 1 < params.len() {
-            params[index + 1].span().start
-        } else {
-            trailing_comments_end.unwrap_or_else(|| params[index].span().end)
-        }
+        params.get(index + 1).map_or_else(
+            || trailing_comments_end.unwrap_or_else(|| params[index].span().end),
+            |next| self.param_start_with_decorators(next),
+        )
     }
 
     /// Build doc for arrow function body expression.
@@ -1315,10 +1326,19 @@ impl<'a> Printer<'a> {
         // same-line comment forcing expansion, so it always forces the break path
         // below. See conformance_prettier_ts_comments.md §Comment relocation and
         // open_paren_line_comment_prettier_divergence.
+        //
+        // The gap ends where the first param's doc STARTS PRINTING
+        // ([`Printer::param_start_with_decorators`]), not at its binding: a decorated
+        // param prints its own decorator region, comments included
+        // (`build_param_decorators_doc`), so a gap reaching past the `@` is claimed
+        // twice — once here and once by that builder — and one authored comment is
+        // printed twice (`docs/comments.md` §The element-comma seam). The leading run
+        // this pull partitions against (`build_leading_param_comments`) already stops
+        // at the same position, which is why `skip_delim` cannot see, let alone
+        // suppress, a comment pulled from inside the decorators.
         let (paren_prefix, paren_pull_pos) = match params_start {
-            Some(open) if comments_present => {
-                self.delimiter_line_comment_prefix(open, params[0].span().start)
-            }
+            Some(open) if comments_present => self
+                .delimiter_line_comment_prefix(open, self.param_start_with_decorators(&params[0])),
             _ => (DocBuf::new(), None),
         };
 
@@ -1472,12 +1492,11 @@ impl<'a> Printer<'a> {
                 param.printed_end(),
             );
 
-            // Handle trailing same-line comments
-            let search_end = if is_last {
-                self.param_trailing_end(params, i, trailing_comments_end)
-            } else {
-                params[i + 1].span().start
-            };
+            // Handle trailing same-line comments. One spelling for both arms
+            // ([`Self::param_trailing_end`]) — the non-last bound is the next param's
+            // printed start, which is also what the force-break gate reads, so the gate
+            // and these emitters agree by construction rather than by coincidence.
+            let search_end = self.param_trailing_end(params, i, trailing_comments_end);
 
             // Find this param's separator comma, bounded by `search_end` — the next param's
             // start, or (last param) the end of its trailing range. The bound is what makes
@@ -1613,7 +1632,9 @@ impl<'a> Printer<'a> {
             };
 
             // Check if there's a line comment on its own line before this param
-            if self.has_own_line_comment_between(search_start, param.span().start) {
+            if self
+                .has_own_line_comment_between(search_start, self.param_start_with_decorators(param))
+            {
                 return true;
             }
         }
