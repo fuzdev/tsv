@@ -309,9 +309,10 @@ impl<'a> Printer<'a> {
     /// pre-separator gaps — a pattern property's key→`:` and every binding default's
     /// head→`=` ([`Self::route_pre_separator_gap`], `expressions/patterns.rs`) — the
     /// index-signature `]`→value-`:` gap (`build_index_signature_member_doc`), the
-    /// callee→empty argument list gap (`push_empty_args`), and the switch-case
-    /// head→`:` gap (`build_switch_case_doc_inner`, where the tail is the bare `:` and
-    /// the gate is line-comments-only). Adding a site means calling this, never re-deriving
+    /// callee→empty argument list gap (`push_empty_args`), and the switch case label's
+    /// **two** gaps (`build_switch_case_doc_inner`, both gated on line comments only):
+    /// `case`→test, where the tail is the test *and* the `:` after it, and head→`:`,
+    /// where it is the bare `:`. Adding a site means calling this, never re-deriving
     /// `indent(" " + hang_next + tail)`. See conformance_prettier.md
     /// §Uniform Forced-Continuation Indent.
     pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {

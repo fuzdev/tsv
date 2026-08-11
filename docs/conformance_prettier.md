@@ -237,10 +237,12 @@ its tail:
   the shared `append_keyword_value_line_comments`. A union return keeps its own
   break-after-arrow layout. See [Fn/ctor-type `=>`→return-type line
   comment](./conformance_prettier_ts_comments.md#comment-relocation).
-- **Switch case head→`:`** — the case/`default` label's separator
-  (`case x // c⏎\t\t\t:`), where the tail is the bare `:` itself; inlining would
-  swallow the colon into the comment (content loss). See
-  [Switch case head→`:` line comment](./conformance_prettier_ts_comments.md#comment-relocation). A labeled statement's
+- **Switch `case`→test and case head→`:`** — the label's two gaps, one rule. The
+  separator gap (`case x // c⏎\t\t\t:`) hangs the bare `:` itself; the keyword→test
+  gap one step earlier (`case // c⏎\t\t\tx:`) hangs the test *and* that `:`.
+  Inlining either swallows the colon into the comment (content loss). See
+  [Switch `case`→test line comment](./conformance_prettier_ts_comments.md#comment-relocation)
+  and [Switch case head→`:` line comment](./conformance_prettier_ts_comments.md#comment-relocation). A labeled statement's
   name→`:` gap is not a site of this rule — both formatters hoist the comment to
   lead the whole statement there (a match).
 - **Svelte braced heads** — the head→value gap of every `{…}`, uniformly
