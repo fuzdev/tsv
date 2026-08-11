@@ -312,6 +312,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 && self.peek_is(&TokenKind::Keyword(KeywordKind::Function))
                 && !self.peek_preceded_by_line_terminator();
 
+        // `export default abstract⏎class Base {}` — the same rule one keyword over:
+        // `abstract` binds to `class` only on its own line, so a break demotes it to the
+        // default-exported *expression* and the class becomes its own statement (tsc and
+        // prettier both read `export default abstract;` then `class Base {}`). acorn
+        // instead welds across the break into one exported abstract class; tsv followed it
+        // there, which silently deleted the line terminator. Falling through to the
+        // expression arm also makes the bare `export default abstract;` parse, which the
+        // unconditional `class` demand used to reject. Computed before the match for the
+        // same borrow reason as `is_default_interface`.
+        let is_default_abstract_class = self.current_value() == "abstract"
+            && self.peek_is(&TokenKind::Keyword(KeywordKind::Class))
+            && !self.peek_preceded_by_line_terminator();
+
         let (declaration, end) = match self.current_kind() {
             TokenKind::Keyword(KeywordKind::Async) if is_default_async_function => {
                 // export default async function() {}
@@ -360,14 +373,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let end = class.span.end;
                 (ExportDefaultValue::ClassDeclaration(class), end)
             }
-            TokenKind::Identifier if self.current_value() == "abstract" => {
+            TokenKind::Identifier if is_default_abstract_class => {
                 // export default abstract class {}
                 let abstract_start = self.current_pos().0 as u32;
                 self.advance()?; // consume 'abstract'
 
-                if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Class)) {
-                    return Err(self.error_expected_after("'class'", "abstract"));
-                }
+                debug_assert!(matches!(
+                    self.current_kind(),
+                    TokenKind::Keyword(KeywordKind::Class)
+                ));
 
                 let mut class = self.parse_class_declaration_inner(false, true)?;
                 // Update span to include 'abstract' keyword
