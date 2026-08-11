@@ -9,7 +9,7 @@ use tsv_lang::{
     CommentPosition, classify_comment_fast, comments_to_emit_in_range, doc::arena::DocId,
 };
 
-use super::{Printer, next_printed_stmt_start};
+use super::Printer;
 
 impl<'a> Printer<'a> {
     /// Print a TypeScript program
@@ -56,7 +56,11 @@ impl<'a> Printer<'a> {
                     .body
                     .get(stmt_idx + 1)
                     .map_or(program.span.end, |s| s.span().start);
-                let search_end = trailing_end.max(stmt_end).min(next_start);
+                // A comment hugging the next printed statement's start leads it
+                // (`a(); ; /* c */ b();`) — this orphan scan must stop at the claim
+                // split so that statement's leading run still finds it.
+                let claim_end = self.statement_claim_end(program.body, stmt_idx, None);
+                let search_end = trailing_end.max(stmt_end).min(next_start).min(claim_end);
 
                 // Force non-inline: since we're skipping the semicolon, any "inline" comments
                 // (on same line as the semicolon) have nothing to be inline with
@@ -136,16 +140,15 @@ impl<'a> Printer<'a> {
             if prev_deferred_line_comment {
                 prev_end = span.end;
             } else {
-                // Bound the scan by the next *printed* statement's start so a comment only
-                // attaches to the statement it immediately follows — multiple statements
-                // on one source line (`a(); b(); // c`) must not each grab the trailing
-                // comment — while still claiming a comment trailing a dropped `;` on this
-                // line (`a();; // c`), which the erased `;` emits nothing to carry.
-                let next_start = next_printed_stmt_start(program.body, stmt_idx, program.span.end);
-                parts.extend(self.build_trailing_same_line_comment_docs(span.end, next_start));
-                // Update prev_end to be after any trailing same-line comments
-                // This ensures blank line detection works correctly
-                prev_end = self.find_end_with_trailing_comments(span.end);
+                // The shared trailing arm of the statement-gap seam: the run bounded at
+                // the next printed statement and stopped at the claim split, the cursor
+                // clamped to the same split ([`Printer::statement_trailing_run`]) — so
+                // blank-line detection stays honest and a handed-over comment stays
+                // ahead of the cursor for the next statement's leading run.
+                let (trailing, new_prev_end) =
+                    self.statement_trailing_run(program.body, stmt_idx, program.span.end);
+                parts.extend(trailing);
+                prev_end = new_prev_end;
             }
             has_output = true;
         }
@@ -201,8 +204,16 @@ impl<'a> Printer<'a> {
             let position =
                 classify_comment_fast(comment, prev_end, curr_start, self.comment_line_breaks);
 
-            // Skip trailing comments unless this run claims them (see `claims_trailing`).
-            if !claims_trailing && matches!(position, CommentPosition::Trailing) {
+            // Skip trailing comments unless this run claims them (see `claims_trailing`)
+            // — or unless the comment LEADS the statement ([`Self::comment_leads_next_item`]):
+            // the previous statement's trailing claim stopped at it
+            // ([`Self::trailing_claim_end`]), so this run is its only emitter.
+            // `force_non_inline` marks the orphan context (a dropped `;`), where nothing
+            // prints at `curr_start` and nothing can be led.
+            if !claims_trailing
+                && matches!(position, CommentPosition::Trailing)
+                && (force_non_inline || !self.comment_leads_next_item(comment, curr_start))
+            {
                 last_comment_end = comment.span.end;
                 continue;
             }
@@ -211,16 +222,18 @@ impl<'a> Printer<'a> {
             // These stay on the same line, so DON'T set printed_any (no separator needed)
             // Skip this behavior when force_non_inline is true (e.g., empty statements being skipped)
             //
-            // Also handle block comments classified as Trailing that are on the same line as
-            // curr_start when is_first. This happens with consecutive inline block comments
-            // at file start: `/** @type {A} */ /** @type {B} */ expr;` — classify_comment_fast
-            // returns Trailing (same line as prev_end=0) but these should stay inline with
-            // the expression since they're also on the same line as curr_start.
+            // Also handle any block comment whose glue chain reaches curr_start
+            // ([`Self::comment_leads_next_item`]) regardless of classified position:
+            // consecutive inline blocks at file start (`/** @type {A} */ /** @type {B} */
+            // expr;` — classify_comment_fast returns Trailing, same line as prev_end=0), a
+            // comment the previous statement's trailing claim handed over
+            // (`a(); /* c */ let b = 1;`), and a chain head classified LeadingOwnLine
+            // because its own end line differs from curr_start's
+            // (`/* c */ /* x⏎y */ b();` — the multi-line tail is OWNED by `b` and rides
+            // inside its doc, so this run sees only the head and must still glue it).
+            // A Trailing comment that does NOT lead was already skipped above.
             let is_inline = matches!(position, CommentPosition::LeadingInline)
-                || (claims_trailing
-                    && comment.is_block
-                    && matches!(position, CommentPosition::Trailing)
-                    && self.is_same_line(comment.span.end, curr_start));
+                || (comment.is_block && self.comment_leads_next_item(comment, curr_start));
             if !force_non_inline && is_inline {
                 // If a previous comment was printed on a DIFFERENT line, add a line break.
                 // E.g., `// line comment\n/** @type {A} */ expr;` — needs newline after

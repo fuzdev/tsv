@@ -948,17 +948,17 @@ impl<'a> Printer<'a> {
                         .iter()
                         .filter(|c| {
                             // Not claimed by the previous member's trailing run, so it
-                            // leads this one.
-                            if !self.comment_already_trailed(Some(prev_end), c, false) {
-                                return true;
-                            }
-                            // A comment that hugs this member on its line leads it
-                            // (`a: 1, /* c */ b`, single- or multi-line block), even though
-                            // it shares the previous member's line — keep it here rather than
-                            // letting it trail the previous member. A comment with a newline
-                            // after it instead trails the previous member (the `is_same_line`
-                            // is false), matching prettier and the type-literal/class printers.
-                            self.is_same_line(c.span.end, member_start)
+                            // leads this one — including a comment that hugs this member
+                            // on its line (`a: 1, /* c */ b`, the predicate's
+                            // `leads_target` escape), which leads it even from the
+                            // previous member's line, matching prettier and the
+                            // type-literal/class/statement printers.
+                            !self.comment_already_trailed(
+                                Some(prev_end),
+                                c,
+                                false,
+                                Some(member_start),
+                            )
                         })
                         .copied()
                         .collect()
@@ -1005,23 +1005,20 @@ impl<'a> Printer<'a> {
             // Handle trailing inline comments on the same line after the member —
             // single- or multi-line block, matching prettier and the type-literal /
             // class member printers (a multi-line block trailing the last member was
-            // previously skipped here and then dropped entirely).
+            // previously skipped here and then dropped entirely). The claim stops at
+            // the split ([`Printer::trailing_claim_end`] — the member span includes
+            // its separator, so the span end is the gap's slot floor): a comment whose
+            // glue chain reaches the next member's start leads it (`a: A; /* c */ b`),
+            // emitted by the leading filter above, so trailing it here too would
+            // duplicate it.
             if body_has_comments {
-                let upper_bound = members
-                    .get(i + 1)
-                    .map_or(body_end, |next| next.span().start);
-                let next_start = members.get(i + 1).map(|next| next.span().start);
-                for comment in
-                    comments_to_emit_in_range(self.comments, member.span().end, upper_bound)
-                {
-                    if self.is_same_line(member.span().end, comment.span.start) {
-                        // A comment that hugs the next member on its line leads that
-                        // member (`a: 1, /* c */ b`) — the leading filter emits it — so it
-                        // must not also trail this one (which would duplicate it). A comment
-                        // with a newline after it (next member on a later line) trails here.
-                        if next_start.is_some_and(|ns| self.is_same_line(comment.span.end, ns)) {
-                            break;
-                        }
+                let member_end = member.span().end;
+                let claim_end = match members.get(i + 1) {
+                    Some(next) => self.trailing_claim_end(member_end, next.span().start),
+                    None => body_end,
+                };
+                for comment in comments_to_emit_in_range(self.comments, member_end, claim_end) {
+                    if self.is_same_line(member_end, comment.span.start) {
                         parts.push(self.build_trailing_comment_doc(comment));
                     } else {
                         break; // Only same-line comments

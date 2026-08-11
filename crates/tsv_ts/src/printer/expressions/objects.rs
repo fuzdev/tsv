@@ -599,22 +599,25 @@ impl<'a> Printer<'a> {
 
             // A post-colon comment forces break-after-operator when it's a line
             // comment (extends to end of line), an *indentable* block (its reprint is
-            // hard lines, which break the group), or the source put the value on a later
-            // line than the comment (an own-line leading comment); a block glued to the
-            // value stays inline — single-line (`: /* c */ v`) and preserved multi-line
-            // (`: /* line1⏎line2 */ v`) alike, since neither carries a break out.
+            // hard lines, which break the group), or the author broke after it (a
+            // newline toward the next comment, or the value for the last — an own-line
+            // leading comment); a block whose glue chain reaches the value stays
+            // inline — single-line (`: /* c */ v`), preserved multi-line
+            // (`: /* line1⏎line2 */ v`), and a glued run with a multiline member
+            // (`: /* c */ /* line1⏎line2 */ v`) alike, since none carries a break out.
+            // Keying the newline test on `value_start` instead of the next comment
+            // called a run's head own-line whenever a later member spanned lines.
             // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
             //
             // **on page**, not `post_colon_comments` (which is emit-keyed): hanging the
             // value is a LAYOUT decision, so an owned annotation hangs it exactly as any
             // other own-line comment does — even though this gap emits nothing for it (the
             // value's own node prints it, and the `comments_doc` below is empty).
-            let has_own_line_comment_post_colon = self
-                .comments_in_source_between(colon_pos + 1, value_start)
-                .any(|c| {
+            let has_own_line_comment_post_colon =
+                self.any_comment_on_page_with_next(colon_pos + 1, value_start, |c, next| {
                     !c.is_block
                         || self.block_comment_is_indentable(c)
-                        || !self.is_same_line(c.span.end, value_start)
+                        || self.has_newline_between(c.span.end, next)
                 });
 
             // The `:`→value head: an own-line directive there freezes the whole value.
@@ -728,6 +731,11 @@ impl<'a> Printer<'a> {
                             RhsCommentInfo {
                                 comments: rhs_comments,
                                 has_line_comment: false,
+                                // This arm is only reached when the gate above found
+                                // no newline after any gap comment, so the run is
+                                // glued through by construction — computed anyway so
+                                // the two can't drift.
+                                pinned: self.comment_run_glued_through(colon_pos + 1, value_start),
                                 boundary: None,
                                 frozen: value_frozen,
                             },

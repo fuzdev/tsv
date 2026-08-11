@@ -210,6 +210,23 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// The slot floor for a class-member gap: past the LAST stray `;` between the
+    /// members, else the previous member's end. A stray `;` in a class body produces
+    /// no member node yet still closes its slot — a comment before it trails the
+    /// previous member however the lines fall (`a = 1; /* c */ ; b = 2;` — prettier
+    /// binds it the same way), so the leads-next scan
+    /// ([`Printer::trailing_claim_end`]) must not reach back across one. The
+    /// statement lists get the same rule from their dropped `EmptyStatement` nodes
+    /// ([`statement_gap_floor`](crate::printer::statement_gap_floor)); a class body
+    /// has no node to key on, so the floor reads the source.
+    fn class_member_gap_floor(&self, member_end: u32, next_start: u32) -> u32 {
+        let mut floor = member_end;
+        while let Some(pos) = self.find_char_outside_comments(floor, next_start, b';') {
+            floor = pos + 1;
+        }
+        floor
+    }
+
     /// Build a Doc for a class body
     ///
     /// Handles comments between members, blank line preservation, and trailing comments.
@@ -280,6 +297,7 @@ impl<'a> Printer<'a> {
                                 Some(prev_end),
                                 c,
                                 prev_deferred_line_comment,
+                                Some(member_start),
                             )
                         })
                         .copied()
@@ -330,15 +348,30 @@ impl<'a> Printer<'a> {
                 // it (what the trailing case does) would DROP them.
                 prev_end = member_end;
             } else if body_has_comments {
-                let upper_bound = body
-                    .body
-                    .get(i + 1)
-                    .map_or(body.span.end, |next| next.span().start);
-                member_parts
-                    .extend(self.build_trailing_same_line_comment_docs(member_end, upper_bound));
+                // The claim stops at the split: a comment hugging the next member's
+                // start leads it instead (`a = 1; /* c */ b = 2;`), emitted by its
+                // leading run above, and the cursor clamps to the same split so it
+                // stays ahead of it. With no next member nothing leads and the claim
+                // runs to the body's end as before.
+                let (upper_bound, claim_end) = match body.body.get(i + 1) {
+                    Some(next) => {
+                        let next_start = next.span().start;
+                        let floor = self.class_member_gap_floor(member_end, next_start);
+                        (next_start, self.trailing_claim_end(floor, next_start))
+                    }
+                    None => (body.span.end, u32::MAX),
+                };
+                member_parts.extend(
+                    self.build_trailing_same_line_comment_docs(
+                        member_end,
+                        upper_bound.min(claim_end),
+                    ),
+                );
                 // Update prev_end past trailing comments (including comments on the
                 // closing */ line of multi-line block comments)
-                prev_end = self.find_end_with_trailing_comments(member_end);
+                prev_end = self
+                    .find_end_with_trailing_comments(member_end)
+                    .min(claim_end);
             } else {
                 prev_end = member_end;
             }
@@ -637,6 +670,7 @@ impl<'a> Printer<'a> {
                     RhsCommentInfo {
                         comments: rhs_comments,
                         has_line_comment: false,
+                        pinned: self.comment_run_glued_through(eq_pos + 1, value_start),
                         boundary: None,
                         frozen: value_frozen,
                     },
