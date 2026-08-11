@@ -9,7 +9,7 @@
 use crate::ast::internal;
 use crate::printer::ArrowChainContext;
 use crate::printer::calls::arg_predicates::arrow_has_trailing_param_comments;
-use crate::printer::class_common::{ClassHeaderLayout, ClassHeaderOptions};
+use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;
@@ -1891,28 +1891,13 @@ impl<'a> Printer<'a> {
             class_expr.implements,
         );
 
-        // Determine group mode: structural reasons OR heritage comments
-        let has_heritage_comments = positions
-            .first_heritage_start
-            .is_some_and(|hs| self.has_comments_on_page_between(positions.pre_heritage_end, hs))
-            || positions.extends_clause_end.is_some_and(|ext_end| {
-                !class_expr.implements.is_empty()
-                    && self
-                        .has_comments_on_page_between(ext_end, class_expr.implements[0].span.start)
-            });
-        let group_mode = self.should_class_group_mode(
+        // Heritage layout (shared with the class-declaration printer).
+        let layout = self.class_header_layout(
+            &positions,
             class_expr.super_class,
             class_expr.super_type_parameters.as_ref(),
             class_expr.implements,
-        ) || has_heritage_comments;
-
-        let has_heritage_line_comments = positions
-            .first_heritage_start
-            .is_some_and(|hs| self.has_line_comments_between(positions.pre_heritage_end, hs))
-            || positions.extends_clause_end.is_some_and(|ext_end| {
-                !class_expr.implements.is_empty()
-                    && self.has_line_comments_between(ext_end, class_expr.implements[0].span.start)
-            });
+        );
 
         let mut parts = DocBuf::new();
 
@@ -1930,17 +1915,6 @@ impl<'a> Printer<'a> {
             // Comments between `class` keyword and name
             parts.push(self.build_keyword_to_name_comments(class_keyword_start, id.span.start));
             parts.push(self.build_identifier_doc(id));
-
-            // Comments between name and type params: `class A/* c */ <T> {}`
-            // Line comments get a hardline to prevent absorbing type params as comment text
-            if let Some(type_params) = &class_expr.type_parameters {
-                self.push_name_to_type_params_comments(
-                    &mut parts,
-                    id.span.end,
-                    type_params.span.start,
-                    CommentSpacing::Trailing,
-                );
-            }
         }
         // The name→body and `class`→body gaps are NOT emitted here: `header_end` already
         // falls back to the name's end (or the `class` keyword's) when there is no heritage
@@ -1948,11 +1922,14 @@ impl<'a> Printer<'a> {
         // header→`{` gap through the one seam. Emitting them here instead is what made the
         // bare-name and anonymous forms answer that gap differently from their siblings.
 
-        // Type parameters (TypeScript generics): class<T>
-        // Use _wrapping version for width-based line breaking
-        if let Some(type_params) = &class_expr.type_parameters {
-            parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-        }
+        // Type parameters (`class<T>`) and the gap before them — shared with the
+        // declaration printer, which is what keeps the anonymous arm's open gap a
+        // single hole.
+        self.push_class_type_params(
+            &mut parts,
+            class_expr.type_parameters.as_ref(),
+            class_expr.id.as_ref().map(|id| id.span.end),
+        );
 
         // Build heritage docs (shared with the class-declaration printer).
         let extends_doc = self.build_class_extends_doc(
@@ -1962,7 +1939,7 @@ impl<'a> Printer<'a> {
         );
         let implements_doc = self.build_class_implements_doc(
             class_expr.implements,
-            group_mode,
+            layout.is_group(),
             positions.implements_keyword_start,
         );
 
@@ -1980,8 +1957,7 @@ impl<'a> Printer<'a> {
             ClassHeaderOptions {
                 body_is_empty: class_expr.body.body.is_empty(),
                 body_start: class_expr.body.span.start,
-                layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
-
+                layout,
                 body_frozen: frozen_body.is_some(),
             },
         );

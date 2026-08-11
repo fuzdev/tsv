@@ -1,0 +1,381 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 141,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": "c",
+			"start": 36,
+			"end": 39,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 7
+				},
+				"end": {
+					"line": 3,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": "c1",
+			"start": 66,
+			"end": 70,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 7
+				},
+				"end": {
+					"line": 7,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": "c2",
+			"start": 74,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 3
+				},
+				"end": {
+					"line": 8,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 117,
+			"end": 125,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 15
+				},
+				"end": {
+					"line": 11,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 140,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 131,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 20,
+					"end": 48,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 31,
+							"end": 44,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 4
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 43,
+								"end": 44,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 3
+									},
+									"end": {
+										"line": 4,
+										"column": 4
+									}
+								},
+								"name": "A",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": "c",
+										"start": 36,
+										"end": 39
+									}
+								]
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 43,
+								"end": 44,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 3
+									},
+									"end": {
+										"line": 4,
+										"column": 4
+									}
+								},
+								"name": "A"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": null
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 50,
+					"end": 101,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 12
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 61,
+							"end": 88,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 82,
+								"end": 83,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 3
+									},
+									"end": {
+										"line": 9,
+										"column": 4
+									}
+								},
+								"name": "B",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": "c1",
+										"start": 66,
+										"end": 70
+									},
+									{
+										"type": "Line",
+										"value": "c2",
+										"start": 74,
+										"end": 78
+									}
+								]
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 87,
+								"end": 88,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 8
+									},
+									"end": {
+										"line": 9,
+										"column": 9
+									}
+								},
+								"name": "C"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 97,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 8
+							},
+							"end": {
+								"line": 10,
+								"column": 11
+							}
+						},
+						"value": "y",
+						"raw": "'y'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 103,
+					"end": 130,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 28
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 112,
+							"end": 127,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 10
+								},
+								"end": {
+									"line": 11,
+									"column": 25
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 126,
+								"end": 127,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 24
+									},
+									"end": {
+										"line": 11,
+										"column": 25
+									}
+								},
+								"name": "D",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c3 ",
+										"start": 117,
+										"end": 125
+									}
+								]
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 126,
+								"end": 127,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 24
+									},
+									"end": {
+										"line": 11,
+										"column": 25
+									}
+								},
+								"name": "D"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": null
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
