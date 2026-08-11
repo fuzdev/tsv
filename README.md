@@ -311,6 +311,10 @@ Source code of projects similar to tsv was not used by agents
 or consulted by the author unless listed above.
 The author learned Rust in 2015 but wrote only simple programs and some abandoned toys before tsv.
 
+## Contributing
+
+[fuz.dev/contributing](https://www.fuz.dev/contributing)
+
 ## License
 
 [MIT](LICENSE)
