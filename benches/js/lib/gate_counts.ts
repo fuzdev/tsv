@@ -140,8 +140,15 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 214, both_accept: 191 };
  * number, and without a pin nothing anywhere reports it. That is the standing hazard of every
  * over-rejection fix: the new acceptance arrives unguarded. A rise here is not automatically wrong
  * (tsv defers early errors by policy), but it must be a decision, not a side effect.
+ *
+ * Two of them are `asyncDeclare_es{5,6}.ts` — `declare async function foo(): Promise<void>;`,
+ * tsc's TS1040. Like the TS1036 group above it is an ambient-context early error tsv defers: tsc's
+ * PARSER builds the signature with `[DeclareKeyword, AsyncKeyword]` and reports an empty
+ * `parseDiagnostics`, so the TS1xxx code in the baseline is a CHECKER grammar error and this gate's
+ * code-range heuristic reads it as a parser rejection it is not. `accept_parity` is unmoved by
+ * design — a file tsc's baseline calls invalid was never in that bucket.
  */
-export const TS_REPO_PINS = { scanned: 13708, accept_parity: 12284, over_acceptance: 486 };
+export const TS_REPO_PINS = { scanned: 13708, accept_parity: 12284, over_acceptance: 488 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides

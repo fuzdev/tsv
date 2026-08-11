@@ -260,7 +260,31 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
     ) -> Result<Statement<'arena>, ParseError> {
         match self.current_kind() {
-            TokenKind::Keyword(KeywordKind::Function) => self.parse_declare_function(start),
+            TokenKind::Keyword(KeywordKind::Function) => self.parse_declare_function(start, false),
+            TokenKind::Keyword(KeywordKind::Async) => {
+                // `declare async function f(): Promise<void>;` — tsc's parser builds
+                // one `FunctionDeclaration` with `[DeclareKeyword, AsyncKeyword]`
+                // modifiers and no `parseDiagnostics`; the prohibition is TS1040
+                // ("'async' modifier cannot be used in an ambient context"), a
+                // checker grammar error of the ambient-context family tsv defers.
+                // acorn accepts this only behind `export` and rejects it bare — an
+                // inconsistency, not a judgement — so tsc's verdict wins here.
+                self.advance()?;
+                if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Function)) {
+                    return Err(self.error_expected_after("'function'", "declare async"));
+                }
+                if self.had_line_terminator {
+                    // `async [no LineTerminator here] function`. The bare `declare` path
+                    // never arrives here across a break — `peek_starts_ambient_declaration`
+                    // already declined the ambient reading — but `export declare`
+                    // dispatches without that gate, so the rule is re-asked rather than
+                    // assumed. tsc rejects this spelling too (TS1128).
+                    return Err(
+                        self.error_msg("'function' must be on the same line as 'async'")
+                    );
+                }
+                self.parse_declare_function(start, true)
+            }
             TokenKind::Keyword(KeywordKind::Class) => self.parse_declare_class(start, false),
             TokenKind::Identifier if self.current_value() == "abstract" => {
                 // declare abstract class
@@ -337,15 +361,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a top-level `declare function` — always a **bodiless** signature
     /// (`declare function foo(x: number): void;`). Called from `parse_declare_statement`
-    /// where the `declare` keyword is already consumed. The `declare` keyword
+    /// where the `declare` keyword (and an `async` modifier, if any) is already
+    /// consumed. The `declare` keyword
     /// grammatically forbids a body (tsc/prettier reject one), so `semicolon_end`
     /// requires `;`/ASI. A `function` *inside* a `declare namespace` body is NOT parsed
     /// here — it has no `declare` keyword of its own and goes through the ordinary
     /// function-statement path (`parse_statement`), which allows a body (deferring the
     /// ambient TS1183).
-    fn parse_declare_function(&mut self, start: usize) -> Result<Statement<'arena>, ParseError> {
+    ///
+    /// A generator `*` and an `async` modifier are both **accepted and deferred**: tsc
+    /// bars them from an ambient context with TS1221 / TS1040, but both are grammar
+    /// errors its *checker* raises (`grammarErrorOnNode`), not parse errors — its parser
+    /// builds the signature with `asteriskToken` / `AsyncKeyword` set and reports no
+    /// `parseDiagnostics`. They join the ambient-context early errors tsv already defers,
+    /// which is also what makes this position agree with every other one: the same
+    /// bodiless `function*` signature already parses inside a `declare namespace`, a
+    /// `declare global` and an overload set.
+    fn parse_declare_function(
+        &mut self,
+        start: usize,
+        is_async: bool,
+    ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'function' keyword
         self.advance()?;
+
+        // Check for generator: `declare function* g(): Iterator<T>;`
+        let is_generator = self.eat(TokenKind::Star);
 
         // Parse function name. The shared `BindingIdentifier` channel, so an ambient
         // declaration takes the same names the concrete `function string() {}` form
@@ -364,8 +405,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
 
-        // Parse parameters
-        let params = self.parse_parameter_list()?.into_bump_slice();
+        // Parse parameters in the signature's own `[Await]`/`[Yield]` context, as the
+        // overload path (`parse_function_or_overload`) does for the same node type.
+        let params = self
+            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
+            .into_bump_slice();
 
         // Parse return type (may be a type predicate)
         let return_type = self.parse_optional_return_type()?;
@@ -378,8 +422,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             params,
             return_type,
             declare: true,
-            r#async: false,   // declare async function is a separate feature
-            generator: false, // generators not allowed in declare context
+            r#async: is_async,
+            generator: is_generator,
             span: Span::new(start as u32, end),
         }))
     }
