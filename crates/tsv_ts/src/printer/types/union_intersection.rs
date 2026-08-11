@@ -695,7 +695,7 @@ impl<'a> Printer<'a> {
             // `delimiter_line_comment_prefix`, unlike the bracket/angle/paren lists, so
             // no comment was pulled onto a delimiter line to exclude here.
             let mut first_leading = if i == 0 {
-                self.build_leading_comments_multiline(union.span.start, type_start, None)
+                self.build_list_leading_comments(union.span.start, type_start, None)
             } else {
                 DocBuf::new()
             };

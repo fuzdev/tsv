@@ -45,8 +45,14 @@
 
 	// The break after the pair is a soft line, so a list that fits keeps the pair on the
 	// param's line.
-	function fn5</* c1 */ /* c2 */ T>(x: T) {}
+	function fn5<
+		/* c1 */ /* c2 */
+		T
+	>(x: T) {}
 
 	// The same for a class declaration's type parameters.
-	class Inline</* c1 */ /* c2 */ T> {}
+	class Inline<
+		/* c1 */ /* c2 */
+		T
+	> {}
 </script>
