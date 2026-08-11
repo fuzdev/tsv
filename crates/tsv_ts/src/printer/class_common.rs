@@ -8,6 +8,10 @@
 // decorators plus `declare`/`abstract` for declarations, the `class` keyword
 // and anonymous-class comment handling for expressions. Everything from the
 // heritage clauses onward lives here so the two printers can't drift.
+//
+// The header→body `{` gap itself is NOT class-specific — every braced-body
+// declaration crosses it — so it lives in `pre_body.rs`; the class header takes
+// its resolution (`pre_body_gap`) and supplies only the group-relative separator.
 
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
@@ -15,7 +19,6 @@ use crate::printer::HeritageKeyword;
 use crate::printer::Printer;
 use crate::printer::class_expr_has_decorators;
 use smallvec::smallvec;
-use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -275,84 +278,6 @@ impl<'a> Printer<'a> {
             group_mode,
             implements_keyword_start,
         ))
-    }
-
-    /// The header→body `{` gap resolved once: the gap's comment run (`None` when it holds
-    /// none) and whether the gap forces the brace onto its own line.
-    ///
-    /// The brace leaves the line when a `//` is in the gap (it would otherwise swallow the
-    /// brace), when a **multiline** block the author broke after keeps that break, or when
-    /// the body is FROZEN — a directive must keep the own line that makes it honored, since
-    /// a header-trailing placement is inert and would lose the freeze on the second pass.
-    ///
-    /// ⚠️ The comment half is [`Printer::comments_force_own_line_between`] — the shared
-    /// gate, not a line-vs-block reading of its own. Asking `has_line_comments_between` here
-    /// made this gap the one place a broke-after multiline block collapsed, against the rule
-    /// every pre-separator and value gap applies; the run
-    /// ([`Printer::build_pre_body_comments_doc`]) asks the same per-comment predicate, so
-    /// gate and emitter cannot answer differently.
-    ///
-    /// Returned as a pair rather than a finished doc because the two header layouts want
-    /// **different separators** for the same verdict: a plain header hugs with `" "`, while
-    /// the class header's group uses a collapsible `line()` (and `" "` for an empty body).
-    /// That difference is the only thing they may vary — deriving the run or the verdict
-    /// separately is what let the class header drift.
-    fn pre_body_gap(
-        &self,
-        header_end: u32,
-        body_start: u32,
-        body_frozen: bool,
-    ) -> (Option<DocId>, bool) {
-        let comments = self.build_pre_body_comments_doc(header_end, body_start, body_frozen);
-        let breaks = body_frozen || self.comments_force_own_line_between(header_end, body_start);
-        (comments, breaks)
-    }
-
-    /// The header→body `{` gap as a finished doc, for the header layouts that hug the brace
-    /// with a plain space: `interface B /* c */ {`, `function a() // c⏎{`. A bare `" "` when
-    /// the gap holds no comments. The class header takes [`Self::pre_body_gap`] directly,
-    /// because its separator is group-relative.
-    pub(in crate::printer) fn build_header_pre_body_doc(
-        &self,
-        header_end: u32,
-        body_start: u32,
-        body_frozen: bool,
-    ) -> DocId {
-        let d = self.d();
-        match self.pre_body_gap(header_end, body_start, body_frozen) {
-            (Some(comments), true) => d.concat(&[comments, d.hardline()]),
-            (Some(comments), false) => d.concat(&[comments, d.text(" ")]),
-            (None, _) => d.text(" "),
-        }
-    }
-
-    /// A braced-body declaration's header→`{` gap, answered in one call: the pre-`{` doc
-    /// (the gap's comments plus the separator) and the format-ignore verdict for the body.
-    ///
-    /// ⚠️ The two answers must come from **one** resolution of the gap. The header needs
-    /// it to keep an honored directive on its own line — a header-trailing placement is
-    /// inert, so following the ordinary relocation would lose the freeze on tsv's own
-    /// second pass — and the body needs the span to emit verbatim. Resolving it twice is
-    /// two sources of truth for one question.
-    ///
-    /// `interface`, `enum`, `namespace`/`module` and every value-level function definition
-    /// (declaration and expression, class method, getter/setter, constructor, object method
-    /// — via [`Printer::append_body_with_sig_comments`]) take this. The **class** resolves
-    /// the same pair by hand, because its header is assembled inside a group
-    /// ([`Printer::build_class_header_doc`]) and the verdict has to travel there as
-    /// `ClassHeaderOptions::body_frozen`.
-    ///
-    /// A `body` span whose `start` precedes `header_end` — no `{` where one was expected —
-    /// yields the bare `" "` and no freeze: both lookups read the gap as a source range,
-    /// and an inverted range holds nothing.
-    pub(in crate::printer) fn build_declaration_pre_body_doc(
-        &self,
-        header_end: u32,
-        body: Span,
-    ) -> (DocId, Option<Span>) {
-        let frozen = self.gap_frozen_span(header_end, body);
-        let pre_body = self.build_header_pre_body_doc(header_end, body.start, frozen.is_some());
-        (pre_body, frozen)
     }
 
     /// Assemble the class header and wrap it in the header group.

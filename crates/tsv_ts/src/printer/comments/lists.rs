@@ -64,55 +64,6 @@ pub(crate) enum StandaloneGlue {
 }
 
 impl<'a> Printer<'a> {
-    /// Emit the comments in `[start, end)` between a declaration header (after the last
-    /// heritage item, type params, or the signature's `)`) and the body `{`, preserving
-    /// each comment where the author wrote it. The separator after each comment is
-    /// [`Printer::comment_hangs_next`], the one predicate for this question: a line
-    /// comment ends its line, so anything following one is pushed to its own line —
-    /// otherwise it would be absorbed into the line comment's text (`// c1 // c2`
-    /// reparses as a single comment, a content/boundary loss) — and a **multiline** block
-    /// the author broke after keeps that break, the same rule the pre-separator and value
-    /// gaps apply. The first comment, and a comment following one that hangs nothing,
-    /// keep a leading space, matching the single-comment heritage form `J // c`.
-    ///
-    /// Returns `None` when the range has no comments. The caller appends the pre-`{`
-    /// separator itself (`hardline` when the gap hangs, space/`line` otherwise —
-    /// [`Printer::comments_force_own_line_between`] is the gate).
-    /// `own_line_first` breaks before the FIRST comment instead of spacing it onto the
-    /// header's line — set when the gap holds an honored format-ignore directive, whose own
-    /// line is what makes it honored (a header-trailing placement is inert, so the relocated
-    /// form would lose the freeze on the second pass).
-    pub(crate) fn build_pre_body_comments_doc(
-        &self,
-        start: u32,
-        end: u32,
-        own_line_first: bool,
-    ) -> Option<DocId> {
-        let d = self.d();
-        let mut parts = DocBuf::new();
-        let mut prev_hangs = own_line_first;
-        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
-        while let Some(comment) = comments.next() {
-            if prev_hangs {
-                parts.push(d.hardline());
-            } else {
-                parts.push(d.text(" "));
-            }
-            parts.push(self.build_comment_doc(comment));
-            // **in source**: the hang question anchors on the physically next comment, so
-            // an owned comment sitting between two emitted ones can't desync this emitter
-            // from the gate that selected it (both walk the same range).
-            let emit_next = comments.peek().map_or(end, |n| n.span.start);
-            let next = self.blank_scan_end(comment.span.end, emit_next);
-            prev_hangs = self.comment_hangs_next(comment, next);
-        }
-        if parts.is_empty() {
-            None
-        } else {
-            Some(d.concat(&parts))
-        }
-    }
-
     /// Build the leading-comment run over `[start, end)` for a list whose comments have
     /// forced it multiline (tuples, type params/args, function-type params, unions, the
     /// bracket-break shell, the broken cast).
@@ -1093,46 +1044,6 @@ impl<'a> Printer<'a> {
             close_sep,
             d.text(closing),
         ]))
-    }
-
-    /// Append a value-level function definition's body, with the comments the author left
-    /// in the signature→body `{` gap (function declarations and expressions, class methods,
-    /// getters/setters, constructors, object methods).
-    ///
-    /// The gap keeps its comments — a single-line block stays inline with `{` hugging it
-    /// (`gen() /* c */ {}`), while a **line** comment or a **multiline** block the author
-    /// broke after drops `{` to its own line, flush with the head
-    /// (`gen() // c⏎{}`). That is the class/interface/enum/namespace answer to the same gap
-    /// ([`Printer::build_header_pre_body_doc`]), reached through the same gate
-    /// ([`Printer::comments_force_own_line_between`]) and the same per-comment separator
-    /// ([`Printer::comment_hangs_next`]), so every braced-body declaration answers it
-    /// identically.
-    ///
-    /// ⚠️ The brace **must** leave the line when a `//` is in the gap: emitted inline it
-    /// would be swallowed into the comment's text (`gen() // c {`), output that does not
-    /// reparse. This path used to relocate such a comment *into the body* instead — the
-    /// one move across `{` tsv declines everywhere else, and the reason the catalog's
-    /// "consistent with tsv's handling of line comments before block bodies across all
-    /// statement types" was false of exactly this family.
-    ///
-    /// Sharing the emitter is also what gives this gap its **format-ignore** opt-in: a
-    /// directive alone on a line here freezes the body, and keeping it on its own line is
-    /// what keeps it honored on the second pass. While the gap relocated its line comments
-    /// into the body, no directive could reach that state, so the freeze had nothing to
-    /// hook — which is why only the class/interface/enum/namespace half ever had it.
-    pub(crate) fn append_body_with_sig_comments(
-        &self,
-        parts: &mut DocBuf,
-        sig_end: u32,
-        body: &internal::BlockStatement<'_>,
-    ) {
-        let (pre_body, frozen) = self.build_declaration_pre_body_doc(sig_end, body.span);
-        parts.push(pre_body);
-        if let Some(frozen) = frozen {
-            parts.push(self.build_frozen_span_doc(frozen));
-        } else {
-            parts.push(self.build_block_statement_doc(body));
-        }
     }
 
     /// Append the comments between a signature's last content token and the
