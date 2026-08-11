@@ -7,10 +7,10 @@ use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer, next_printed_stmt_start,
 };
 use smallvec::smallvec;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
-use tsv_lang::{comments_to_emit_in_range, has_line_comments_in_range};
 
 impl<'a> Printer<'a> {
     /// Build a doc for a switch statement with proper line-width wrapping
@@ -222,7 +222,6 @@ impl<'a> Printer<'a> {
         let case_label_end = self.get_case_label_end(case);
 
         if let Some(test) = &case.test {
-            parts.push(d.text("case "));
             // An assignment takes clarity parens here exactly as it does in a statement
             // test — prettier parenthesizes an `AssignmentExpression` in every position
             // outside its own allowlist (a for init/update, an expression statement, an
@@ -236,26 +235,34 @@ impl<'a> Printer<'a> {
             // (`case /* c */ (a, b):`), or an earlier block in a run
             // (`case /* p */ /* q */ b:`) — so without this it is dropped. Emitted ahead of
             // any paren this position synthesizes, which is prettier's placement too.
-            //
-            // TODO: a LINE comment in this gap is still dropped (the whole gap is skipped
-            // when one is present, so a mixed run is never reordered). Emitting it inline
-            // would swallow the test and its `:`, so it needs the forced-continuation-indent
-            // treatment the head→`:` gap below uses — and prettier instead keeps the test at
-            // the case's own indent, so the fix owes a `_prettier_divergence` fixture and a
-            // catalog entry rather than being a straight match.
             let test_gap_start = case.span.start + "case".len() as u32;
             let test_start = test.span().start;
-            if !has_line_comments_in_range(self.comments, test_gap_start, test_start)
-                && let Some(comments) = self.build_comments_between_filtered_opt(
+            if self.has_line_comments_between(test_gap_start, test_start) {
+                // A `//` here runs to end-of-line, so emitting the gap inline would swallow
+                // the test AND its `:` into the comment (`case // c x:`, which does not
+                // reparse) — the head→`:` gap's argument one construct earlier. The uniform
+                // forced-continuation indent, and the same emitter: the run trails `case`
+                // (its own space comes from the continuation, so the keyword sheds the one
+                // the inline arm carries) and the test drops one level. Every comment in the
+                // gap goes through it, so a block sharing the gap with a `//` keeps its place
+                // in the run instead of being skipped along with it — a block prints inline
+                // where a line comment defers, so emitting them apart would reorder the two.
+                // Prettier keeps the test flush at the case's own indent instead — see
+                // conformance_prettier_ts_comments.md §Comment relocation.
+                parts.push(d.text("case"));
+                parts.push(self.build_continuation_indent(test_gap_start, test_start, test_doc));
+            } else {
+                parts.push(d.text("case "));
+                if let Some(comments) = self.build_comments_between_filtered_opt(
                     test_gap_start,
                     test_start,
                     CommentSpacing::Trailing,
                     CommentFilter::All,
-                )
-            {
-                parts.push(comments);
+                ) {
+                    parts.push(comments);
+                }
+                parts.push(test_doc);
             }
-            parts.push(test_doc);
         } else {
             parts.push(d.text("default"));
         }
@@ -265,7 +272,7 @@ impl<'a> Printer<'a> {
         // already located as colon+1, so no second scan is needed.
         let colon_pos = case_label_end - 1;
         let head_end = Self::case_head_end(case);
-        if has_line_comments_in_range(self.comments, head_end, colon_pos) {
+        if self.has_line_comments_between(head_end, colon_pos) {
             // A `//` here runs to end-of-line, so emitting the gap inline would swallow
             // the colon into the comment (`case x // c:`, which does not reparse). The
             // uniform forced-continuation indent: the comments trail the head and the
