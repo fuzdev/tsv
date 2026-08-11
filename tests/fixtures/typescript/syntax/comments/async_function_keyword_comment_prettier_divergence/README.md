@@ -28,7 +28,9 @@ head emitter now (`Printer::push_function_keyword_head`), and each caller reads 
 following gap from the cursor that emitter returns: reading it from the node's span
 start instead re-claimed the region and printed the comment twice.
 
-Both positions are dual-stable in our formatter.
+Both positions are dual-stable in our formatter — prettier's output is a fixed
+point of tsv too, pinned by `variant_after_keyword.svelte`, so a file already run
+through prettier does not churn on the way back.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment Position Philosophy and
 [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

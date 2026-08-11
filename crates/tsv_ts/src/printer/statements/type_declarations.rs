@@ -812,18 +812,11 @@ impl<'a> Printer<'a> {
         // `async ` and let the comment fall through to the `function`→name emitter,
         // relocating it across the keyword (`async /* c */ function f(): T;` →
         // `async function /* c */ f(): T;`).
-        let modifier = if decl.r#async {
-            FunctionHeadModifier::Async
-        } else if decl.declare {
-            FunctionHeadModifier::Declare
-        } else {
-            FunctionHeadModifier::None
-        };
         let head_end = self.push_function_keyword_head(
             &mut parts,
             decl.span.start,
             decl.id.span.start,
-            modifier,
+            FunctionHeadModifier::from_flags(decl.r#async, decl.declare),
             decl.generator,
         );
 

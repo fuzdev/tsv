@@ -1,5 +1,6 @@
 // Function declaration printing for TypeScript
 
+use super::super::types::function_types::group_params_if_should;
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
@@ -31,13 +32,25 @@ impl FunctionHeadModifier {
         }
     }
 
-    /// The modifier an `async` flag selects — the shape three of the four callers have.
+    /// The modifier an `async` flag selects — the shape three of the four callers have,
+    /// since only an ambient `TSDeclareFunction` can carry `declare` at all.
     pub(crate) fn from_async(is_async: bool) -> Self {
-        if is_async { Self::Async } else { Self::None }
+        Self::from_flags(is_async, false)
+    }
+
+    /// The modifier a node carrying BOTH flags selects.
+    ///
+    /// The two are mutually exclusive by grammar, so the tie-break is unreachable — it
+    /// lives here anyway, beside the claim it rests on, rather than at the one call site
+    /// that has both flags to offer.
+    pub(crate) fn from_flags(is_async: bool, is_declare: bool) -> Self {
+        match (is_async, is_declare) {
+            (true, _) => Self::Async,
+            (false, true) => Self::Declare,
+            (false, false) => Self::None,
+        }
     }
 }
-
-use super::super::types::function_types::group_params_if_should;
 
 impl<'a> Printer<'a> {
     /// Build doc for a callable signature (params + return type) with comment handling.
@@ -164,14 +177,15 @@ impl<'a> Printer<'a> {
         // must be emitted HERE rather than by the caller: the gap between it and
         // `function` belongs to the emitter below, and a caller that printed the modifier
         // itself left that gap claimed by nobody — a DROP.
-        if let Some(word) = modifier.keyword() {
+        let modifier_keyword = modifier.keyword();
+        if let Some(word) = modifier_keyword {
             parts.push(d.text(word));
             cursor = span_start + word.len() as u32;
         }
 
         // Find "function" in source after cursor, skipping comments
         let function_pos = self.find_keyword_in_range(cursor, search_end, "function");
-        if modifier.keyword().is_some() {
+        if modifier_keyword.is_some() {
             // The `async`→`function` gap, through the line-comment-SAFE emitter (it
             // returns the bare separating space when the gap is empty). An inline
             // emitter here swallowed the whole declaration head onto a `//`'s line —

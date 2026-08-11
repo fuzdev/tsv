@@ -775,17 +775,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let peek = self.peek_kind();
                 // Every `async`-headed refinement is a `[no LineTerminator here]` production:
                 // `async [no LT] function` and `AsyncArrowFunction : async [no LT]
-                // ArrowFormalParameters` (ecma262). A line break demotes `async` to an
-                // ordinary identifier expression, and what that leaves is a syntax error in
-                // every shape but one — `const x = async⏎function () {}` is a bodiless
-                // function declaration, `const f = async⏎() => {}` a call to `async` with a
-                // stray `=>`, `const f = async⏎<T>(a: T) => a` a comparison chain — matching
+                // ArrowFormalParameters` (ecma262). So the break is ONE gate rather than a
+                // condition repeated per shape — it rules out every refinement at once, and
+                // each arm below is then left reading as its own grammar question.
+                //
+                // A line break demotes `async` to an ordinary identifier expression, and
+                // what that leaves is a syntax error in every shape but one —
+                // `const x = async⏎function () {}` is a bodiless function declaration,
+                // `const f = async⏎() => {}` a call to `async` with a stray `=>`,
+                // `const f = async⏎<T>(a: T) => a` a comparison chain — matching
                 // acorn/tsc/prettier, never a silently-accepted async function or arrow. The
                 // exception is a SINGLE parameter (`const f = async⏎a => a`), where ASI
                 // splits the statement and both halves are valid; declining the refinement
                 // is what produces that reading too.
-                let head_same_line = !self.peek_preceded_by_line_terminator();
-                if peek == TokenKind::Keyword(KeywordKind::Function) && head_same_line {
+                if self.peek_preceded_by_line_terminator() {
+                    // `async` used as an identifier reference, demoted by the line break.
+                    self.parse_primary_expression()?
+                } else if peek == TokenKind::Keyword(KeywordKind::Function) {
                     // Async function expression: `async function() {}`.
                     let (start, _) = self.current_pos();
                     self.advance()?; // consume 'async'
@@ -795,8 +801,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // `async(...)` — could be async arrow or call to function named `async`
                     // Scan ahead: if `(...)` is followed by `=>`, it's an async arrow function
                     let paren_start = self.peek_start();
-                    if head_same_line && scan_parens_then_arrow(self.source.as_bytes(), paren_start)
-                    {
+                    if scan_parens_then_arrow(self.source.as_bytes(), paren_start) {
                         let (start, _) = self.current_pos();
                         self.advance()?; // consume 'async'
                         let expr = self.parse_async_arrow_function_after_async(start)?;
@@ -805,9 +810,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         // `async(2)` — call to function named `async`
                         self.parse_primary_expression()?
                     }
-                } else if matches!(peek, TokenKind::Identifier | TokenKind::LessThan)
-                    && head_same_line
-                {
+                } else if matches!(peek, TokenKind::Identifier | TokenKind::LessThan) {
                     // Async arrow function: `async x => ...` or `async <T>() => ...`
                     let (start, _) = self.current_pos();
                     self.advance()?; // consume 'async'
