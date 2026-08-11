@@ -1372,6 +1372,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 | KeywordKind::Class
                 | KeywordKind::Enum,
             ) => true,
+            // `declare async function` — the one starter carrying a `[no
+            // LineTerminator here]` of its OWN, so the ambient reading is refused
+            // here when `function` does not sit on the `async`'s line. Asking a
+            // token later is what keeps this out of the `declare abstract⏎class`
+            // trap (see `parse_declare_statement_kind`), where the ambient reading
+            // is already committed and can no longer split into statements.
+            TokenKind::Keyword(KeywordKind::Async) => {
+                self.peek_followed_by_same_line_function_keyword()
+            }
             TokenKind::Identifier => matches!(
                 self.peek_value(),
                 "abstract" | "namespace" | "module" | "interface" | "type" | "global"
@@ -1406,6 +1415,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let word = &bytes[pos..end];
                 word != b"in" && word != b"instanceof" && word != b"as" && word != b"satisfies"
             }
+    }
+
+    /// Whether the peeked token is followed on the same line by the `function`
+    /// keyword.
+    ///
+    /// Used for `declare async [no LineTerminator here] function`, where the
+    /// keyword sits one token past the peek horizon. tsc's modifier lookahead
+    /// bails on a break before `function`, so `declare async⏎function f(): void;`
+    /// is not one ambient async signature there — and asking a token ahead is what
+    /// lets that reading be declined *before* the `declare` dispatch commits to one
+    /// it could no longer undo, the trap `declare abstract⏎class` sits in.
+    ///
+    /// What becomes of the residue is the ordinary expression-statement path's ASI
+    /// question, which this predicate does not touch: tsc recovers into three
+    /// statements, tsv rejects — as it did before `declare async` was accepted at all.
+    pub(super) fn peek_followed_by_same_line_function_keyword(&mut self) -> bool {
+        self.peek_kind(); // populate the cache
+        let after_peek = self.peek.as_ref().map_or(0, |t| t.end as usize);
+        let bytes = self.source.as_bytes();
+        let pos = scan::skip_whitespace_and_comments(bytes, after_peek);
+        pos < bytes.len()
+            && !self.source[after_peek..pos].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
+            && &bytes[pos..scan::skip_identifier(bytes, pos)] == b"function"
     }
 
     /// Whether the cursor sits at a `using` declaration head — the contextual

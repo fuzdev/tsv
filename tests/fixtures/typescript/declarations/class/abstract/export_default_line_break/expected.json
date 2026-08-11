@@ -1,0 +1,173 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 87,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"module": {
+		"type": "Script",
+		"start": 0,
+		"end": 86,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 35,
+			"end": 77,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 37,
+					"end": 61,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 25
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "Identifier",
+						"start": 52,
+						"end": 60,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 24
+							}
+						},
+						"name": "abstract"
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 63,
+					"end": 76,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 14
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 69,
+						"end": 73,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 11
+							}
+						},
+						"name": "Base"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 74,
+						"end": 76,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 12
+							},
+							"end": {
+								"line": 3,
+								"column": 14
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			},
+			{
+				"type": "Attribute",
+				"start": 18,
+				"end": 34,
+				"name": "context",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 18,
+						"character": 18
+					},
+					"end": {
+						"line": 1,
+						"column": 25,
+						"character": 25
+					}
+				},
+				"value": [
+					{
+						"start": 27,
+						"end": 33,
+						"type": "Text",
+						"raw": "module",
+						"data": "module"
+					}
+				]
+			}
+		]
+	}
+}

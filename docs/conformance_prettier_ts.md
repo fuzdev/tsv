@@ -105,6 +105,9 @@ This input is **valid** by tsv's parse oracle (Svelte / acorn-typescript / `pars
 - `<<` split in a `typeof` query's type arguments (`typeof f<<T>() => void>`) — `';' expected.` — [shift_left_typeof_query](../tests/fixtures/typescript/expressions/binary/shift_left_typeof_query_prettier_divergence/)
 - `using`/`await using` cast (`using as T`, `(await using) satisfies T`) — `',' expected.` — [using/cast](../tests/fixtures/typescript/typescript_specific/using/cast_prettier_divergence/)
 - Bare definite-assignment class property (`b!;` — no type annotation, no initializer) — `Declarations with definite assignment assertions must also have type annotations.` (TS1264; acorn-typescript defers the early error, tsv follows) — [property_definite_no_init](../tests/fixtures/typescript/statements/class/property_definite_no_init_prettier_divergence/)
+- Ambient generator signature (`declare function* g(): Iterator<number>;`) — `Generators are not allowed in an ambient context.` (TS1221; a *checker* grammar error, not a parse error — see below) — [declare/function/generator](../tests/fixtures/typescript/typescript_specific/declare/function/generator_prettier_divergence/)
+- Bodiless generator signature in a namespace body (`declare namespace N { function* g(): void; }`, and the plain-`namespace` spelling) — `A function signature cannot be declared as a generator.` (TS1221 / TS1222) — [namespace/generator_signature](../tests/fixtures/typescript/declarations/namespace/generator_signature_prettier_divergence/)
+- Ambient `async` signature (`declare async function f(): Promise<void>;`) — `'async' modifier cannot be used in an ambient context.` (TS1040; **also** a Svelte divergence, acorn rejecting the bare form) — [declare/function/async](../tests/fixtures/typescript/typescript_specific/declare/function/async_svelte_prettier_divergence/), and with a comment in each gap of the head — the `declare`→`async` one being reachable from no other construct — [declare/function/async_keyword_comment](../tests/fixtures/typescript/typescript_specific/declare/function/async_keyword_comment_svelte_prettier_divergence/)
 - `@supports (margin: 0))` — unbalanced-paren `@supports` prelude; prettier's CSS parser (postcss, not `typescript`) throws — `Unbalanced parenthesis` — [supports_unbalanced_paren](../tests/fixtures/css/at_rules/supports_unbalanced_paren_prettier_divergence/)
 - `url(a\)b)` — unquoted `url()` with an escaped `)`; per CSS Syntax 3 §4.3.6 a url-token ends at the first *unescaped* `)`, so this is valid (parseCss accepts), but prettier's postcss miscounts the escaped `)` and throws — `Unbalanced parenthesis` — [url_escaped_paren](../tests/fixtures/css/values/functions/url_escaped_paren_prettier_divergence/)
 - Own-line format-ignore directive before an **empty** class body (`class Aaa⏎// prettier-ignore⏎{}`) — prettier's own every-comment-printed assertion fires, because its empty-body path emits no member for the relocated directive to lead — `Comment "prettier-ignore" was not printed` — [body_prettier_ignore_empty](../tests/fixtures/typescript/class/body_prettier_ignore_empty_prettier_divergence/)
@@ -130,6 +133,31 @@ instantiation, and type references — are prettier-formattable and covered as
 ordinary fixtures in
 [shift_left_vs_type_args](../tests/fixtures/typescript/expressions/binary/shift_left_vs_type_args/).
 
+**Ambient generator / `async` signatures — a checker rule read as a parse rule**:
+`declare function* g()`, a bodiless `function*` in a namespace body, and `declare
+async function f()` are all barred by TypeScript (TS1221, TS1222, TS1040), but every
+one of those is raised by tsc's **checker** — `checkGrammarFunctionLikeDeclaration`
+calling `grammarErrorOnNode` — not by its parser, which builds the signature with
+`asteriskToken` / `[DeclareKeyword, AsyncKeyword]` set and reports an **empty**
+`parseDiagnostics`. So they are ambient-context early errors of exactly the family
+tsv already defers (`declare` member bodies, initializers, decorators), and the
+error code being a TS1xxx is not evidence to the contrary — the TS1xxx range spans
+both parser and checker grammar diagnostics. typescript-estree promotes them to
+parse failures, which is why prettier throws.
+
+Deferring is also what makes tsv **self-consistent**: the same bodiless `function*`
+signature already parsed in a `declare namespace`, a `declare global` and an overload
+set, so rejecting it under a top-level `declare` was a hole in one position rather
+than a rule. The one member of the family prettier *accepts* is a `declare class`
+generator **method**, an ordinary fixture —
+[declare/class/generator_members](../tests/fixtures/typescript/typescript_specific/declare/class/generator_members/)
+— which is what shows the divergence tracks the bodiless *function signature*, not
+generators in ambient contexts as such.
+
+`async` keeps its `[no LineTerminator here]` throughout: `declare async⏎function
+f(): void;` is not one ambient signature (tsc's modifier lookahead bails on the break
+too), and the rule is enforced *before* the ambient reading is committed to.
+
 **`using`/`await using` cast**: `using as T` / `(await using) satisfies T` is a
 cast of the identifier `using` in acorn-typescript (and so in tsv); tsc instead
 commits to a `using` *declaration* whose binding is named `as`/`satisfies` and
@@ -138,6 +166,74 @@ and is rejected by acorn and tsv. Every other identifier-shaped word after
 `using` is a binding attempt in both parsers — those cases are ordinary
 `_svelte_divergence` fixtures (acorn has no `using` declarations at all); only
 the cast keywords diverge from tsc, in tsv's favor of the drop-in oracle.
+
+## tsv rejects what prettier formats
+
+The reverse of the section above, and rarer: prettier parses and prints the input,
+and tsv **refuses** it. The bar is high — tsv is first a formatter, so "prettier
+formats it" is normally the accept test — and it is cleared here only because
+accepting would require tsv's **grammar** to leave ECMAScript, which no amount of
+oracle agreement buys.
+
+**A `declare` head followed on the SAME line by a non-declaration word** —
+`declare async⏎function f(): Promise<void>;`, `declare abstract⏎class B {}`,
+`declare bar⏎function f(): void;`, `declare async⏎class B {}`. Prettier prints each
+as three statements (`declare;` / `<word>;` / the declaration); tsv rejects all four
+— [declare/line_break](../tests/fixtures/typescript/typescript_specific/declare/line_break/),
+whose `input.svelte` pins the accepted side of the same boundary.
+
+That split needs a semicolon between `declare` and the word after it, and
+**ECMAScript does not insert one there**. All three ASI conditions
+([§sec-rules-of-automatic-semicolon-insertion](https://tc39.es/ecma262/#sec-rules-of-automatic-semicolon-insertion))
+require something absent here: a `LineTerminator` before the offending token, an
+offending `}`, or the do-while `)`. The two words are on one line, so no production
+admits the second and no semicolon may be inserted.
+
+Prettier is not an independent witness to the contrary: its `typescript` parser is
+typescript-estree, which wraps **tsc's own parser**, so prettier and tsc are one
+engine here rather than two agreeing ones. And tsc grants the leniency to `declare`
+**alone** — `abstract`, `async`, `public`, `export` and `readonly` all reject the
+identical shape (`abstract bar⏎class B {}` is TS1434), while `declare bar⏎function`
+is accepted with no syntactic diagnostic and both words resolved as ordinary
+identifier references. A rule that applies to one modifier and not the five beside
+it, with nothing to distinguish them, is an oracle slip rather than a judgement.
+**acorn rejects all four**, so the `input_invalid_*` form pins the rejection on both
+parsers.
+
+This is the line: tsv freely defers *static-semantic early errors* to a diagnostics
+layer — that is what makes it permissive, and what the ambient generator / `async`
+entries above rest on. Inserting a semicolon the grammar forbids is not a deferral
+but a change to the productions themselves, and it would leak past TypeScript
+entirely: `declare` is an ordinary identifier in plain JS, so the same leniency would
+make tsv accept `declare foo` unseparated in a `.js` file.
+
+The rule generalizes past `declare`'s own gap to the heads that carry one of their
+own, and there tsv, tsc, prettier and acorn all agree, so those are ordinary
+`input_invalid_*` pins rather than divergences: a `declare namespace`/`module` name
+must be on the keyword's line (tsc's
+`nextTokenIsIdentifierOrStringLiteralOnSameLine`; `declare namespace⏎N {}` is TS1434),
+and `abstract` must reach its `class` on one line. What does **not** carry the
+restriction, and stays accepted everywhere: `declare const⏎enum E {}`,
+`declare global⏎{}`, and a comment — even a multi-line one — wherever a break is
+allowed.
+
+**Behind `export` the same gap is not a divergence at all** — prettier and tsv both
+reject `export declare⏎class B {}` (and every other head), because `export` is then
+left with nothing to attach to. There the odd one out is **acorn**, which welds
+across the break; that case is
+[declare/export_line_break](../tests/fixtures/typescript/typescript_specific/declare/export_line_break_svelte_divergence/),
+catalogued in
+[conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections).
+So the two directions meet at one rule with different dissenters: without `export`,
+prettier accepts a split ECMAScript forbids; with it, acorn accepts a weld tsc calls
+fatal.
+
+The boundary is exactly the line break, and tsv agrees with prettier on both sides of
+it. A break **after** `declare` is ordinary ASI and parses as two statements in both
+(`declare⏎function f(): void;`, `declare⏎async function f(): Promise<void>;` — the
+fixture's `unformatted_asi` variant, which both formatters normalize to `input`).
+Same-line spellings stay one ambient declaration in both (`declare abstract class B
+{}`). Only the mixed form — same-line word, break before the declaration — diverges.
 
 ## TypeScript: Template Literals
 

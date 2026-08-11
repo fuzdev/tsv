@@ -9,26 +9,33 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
-/// The modifier keyword that opens a function head, if any.
+/// The modifier keywords that open a function head, in source order.
 ///
-/// `async` and `declare` are mutually exclusive by grammar — `declare async function`
-/// is rejected by tsv and by acorn — so one slot expresses both, and
-/// [`Printer::push_function_keyword_head`] owns whichever is present rather than
-/// leaving the caller to print it and orphan the gap behind it.
+/// `declare` and `async` **can co-occur**: `declare async function f(): Promise<void>;`
+/// is one ambient signature to tsc's parser (`[DeclareKeyword, AsyncKeyword]`, no
+/// `parseDiagnostics`), its TS1040 prohibition being a checker grammar error tsv defers.
+/// So this is a keyword *sequence*, not a slot — collapsing it to one keyword printed
+/// `async function` and DROPPED `declare`, since the pair-selecting arm answered with
+/// whichever flag it tested first.
+///
+/// [`Printer::push_function_keyword_head`] owns every keyword here rather than leaving
+/// the caller to print one and orphan the gap behind it.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FunctionHeadModifier {
     None,
     Async,
     Declare,
+    DeclareAsync,
 }
 
 impl FunctionHeadModifier {
-    /// The keyword's source text, or `None` for a bare `function`.
-    fn keyword(self) -> Option<&'static str> {
+    /// The keywords' source text in source order — empty for a bare `function`.
+    fn keywords(self) -> &'static [&'static str] {
         match self {
-            Self::None => None,
-            Self::Async => Some("async"),
-            Self::Declare => Some("declare"),
+            Self::None => &[],
+            Self::Async => &["async"],
+            Self::Declare => &["declare"],
+            Self::DeclareAsync => &["declare", "async"],
         }
     }
 
@@ -39,13 +46,10 @@ impl FunctionHeadModifier {
     }
 
     /// The modifier a node carrying BOTH flags selects.
-    ///
-    /// The two are mutually exclusive by grammar, so the tie-break is unreachable — it
-    /// lives here anyway, beside the claim it rests on, rather than at the one call site
-    /// that has both flags to offer.
     pub(crate) fn from_flags(is_async: bool, is_declare: bool) -> Self {
         match (is_async, is_declare) {
-            (true, _) => Self::Async,
+            (true, true) => Self::DeclareAsync,
+            (true, false) => Self::Async,
             (false, true) => Self::Declare,
             (false, false) => Self::None,
         }
@@ -171,21 +175,31 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut cursor = span_start;
 
-        // `async` and `declare` are mutually exclusive on a function head — tsv and acorn
-        // both reject `declare async function` — so one slot covers both, and each opens
-        // its node's span, which is what makes the arithmetic sound. Whichever is present
-        // must be emitted HERE rather than by the caller: the gap between it and
-        // `function` belongs to the emitter below, and a caller that printed the modifier
-        // itself left that gap claimed by nobody — a DROP.
-        let modifier_keyword = modifier.keyword();
-        if let Some(word) = modifier_keyword {
-            parts.push(d.text(word));
-            cursor = span_start + word.len() as u32;
+        // The head's modifier keywords, in source order. The FIRST opens the node's span,
+        // which is what makes its arithmetic sound; each later one is located by search,
+        // since only the first has a guaranteed position. Every one must be emitted HERE
+        // rather than by the caller: the gap behind each belongs to the emitter below, and
+        // a caller that printed a modifier itself left that gap claimed by nobody — a DROP.
+        let modifier_keywords = modifier.keywords();
+        for (i, word) in modifier_keywords.iter().enumerate() {
+            if i == 0 {
+                parts.push(d.text(word));
+                cursor = span_start + word.len() as u32;
+            } else {
+                // The `declare`→`async` gap, through the same line-comment-SAFE emitter
+                // the `async`→`function` gap uses below.
+                let pos = self
+                    .find_keyword_in_range(cursor, search_end, word)
+                    .unwrap_or(cursor);
+                parts.push(self.build_keyword_to_name_comments(cursor, pos));
+                parts.push(d.text(word));
+                cursor = pos + word.len() as u32;
+            }
         }
 
         // Find "function" in source after cursor, skipping comments
         let function_pos = self.find_keyword_in_range(cursor, search_end, "function");
-        if modifier_keyword.is_some() {
+        if !modifier_keywords.is_empty() {
             // The `async`→`function` gap, through the line-comment-SAFE emitter (it
             // returns the bare separating space when the gap is empty). An inline
             // emitter here swallowed the whole declaration head onto a `//`'s line —
