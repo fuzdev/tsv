@@ -45,11 +45,9 @@ because it's required at the language boundaries. Otherwise `unsafe_code = "forb
 AI disclosure: this codebase is mostly LLM-generated, and the usual caveats apply.
 It's a high-effort project that prioritizes quality.
 
-## Status
-
-pre-alpha - not for production use; the published WASM packages are for feedback
-
 ## About
+
+> **status**: pre-alpha - not for production use; the published WASM packages are for feedback
 
 tsv derives its tools from:
 
