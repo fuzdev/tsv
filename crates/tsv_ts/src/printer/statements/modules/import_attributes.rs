@@ -251,9 +251,7 @@ impl<'a> Printer<'a> {
         brace_close: u32,
     ) -> bool {
         tsv_lang::comments_in_source_range(self.comments, brace_start + 1, brace_close).any(|c| {
-            let inside_attribute = attributes
-                .iter()
-                .any(|a| c.span.start >= a.span.start && c.span.end <= a.span.end);
+            let inside_attribute = attributes.iter().any(|a| a.span.contains(c.span));
             if inside_attribute {
                 return false;
             }

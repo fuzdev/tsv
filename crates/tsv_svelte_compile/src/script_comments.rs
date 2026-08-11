@@ -53,9 +53,8 @@ pub(crate) fn collect_script_comments(
     // otherwise SKIPS them. A comment the oracle keeps (recovered by a preceding
     // block) carries there; the rest drop.
     let module_content = root.module.map(|module| module.content.span);
-    let in_module = |comment: &tsv_lang::Comment| {
-        module_content.is_some_and(|m| comment.span.start >= m.start && comment.span.end <= m.end)
-    };
+    let in_module =
+        |comment: &tsv_lang::Comment| module_content.is_some_and(|m| m.contains(comment.span));
     let Some(script) = root.instance else {
         // No instance script to carry into: any comment that is not a (dropped)
         // module comment is a template comment we don't thread — refuse.

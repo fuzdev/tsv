@@ -1091,10 +1091,9 @@ impl<'a> Printer<'a> {
             }
 
             // Skip comments that are inside an element (they belong to that element, not this list)
-            let inside_element = items.iter().any(|e| {
-                let s = get_printed_span(e);
-                comment.span.start >= s.start && comment.span.end <= s.end
-            });
+            let inside_element = items
+                .iter()
+                .any(|e| get_printed_span(e).contains(comment.span));
             if inside_element {
                 continue;
             }
