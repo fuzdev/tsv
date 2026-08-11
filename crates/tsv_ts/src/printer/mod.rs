@@ -16,6 +16,8 @@
 // - **calls/**: Call and `new` expression formatting (argument wrapping, expand patterns)
 // - **chain/**: Member/call chain linearization, grouping, and rendering
 // - **class_common.rs**: Shared class-header layout for declaration + expression printers
+// - **pre_body.rs**: The head→body `{` seam every braced-body declaration crosses (class,
+//   interface, enum, namespace, and every value-level function definition)
 // - **needs_parens.rs**: Centralized parenthesization logic (`needs_parens(expr, ctx)`)
 // - **layout.rs**: Shared hang-indent "break after operator, then indent continuation" doc shapes
 //
@@ -37,6 +39,7 @@ mod expressions;
 mod ignore;
 mod layout;
 mod needs_parens;
+mod pre_body;
 mod program;
 mod statements;
 mod types;
