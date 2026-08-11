@@ -1050,7 +1050,11 @@ impl<'a> Printer<'a> {
     /// Containers that always break with a dangling comment (class, interface,
     /// and namespace bodies) reach the same emitter through
     /// [`Self::build_empty_body_with_comments_doc`], with `sep` a `hardline`.
-    fn build_empty_inline_with_comments_doc(
+    ///
+    /// The empty import-attribute clause (`with {}`) calls it directly, from
+    /// `statements/modules/import_attributes.rs` — hence `pub(in crate::printer)`
+    /// rather than module-private.
+    pub(in crate::printer) fn build_empty_inline_with_comments_doc(
         &self,
         span_start: u32,
         span_end: u32,
