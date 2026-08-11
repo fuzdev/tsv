@@ -55,17 +55,21 @@ pub(in crate::printer) enum ClassHeaderLayout {
 }
 
 impl ClassHeaderLayout {
-    /// Resolve the layout from the caller's group / heritage-line-comment flags.
+    /// Resolve the layout from the group / heritage-line-comment flags.
     /// `has_heritage_line_comments` is only meaningful in group mode.
-    pub(in crate::printer) fn from_flags(
-        group_mode: bool,
-        has_heritage_line_comments: bool,
-    ) -> Self {
+    fn from_flags(group_mode: bool, has_heritage_line_comments: bool) -> Self {
         match (group_mode, has_heritage_line_comments) {
             (false, _) => Self::Independent,
             (true, false) => Self::Group,
             (true, true) => Self::GroupBreak,
         }
+    }
+
+    /// Whether the heritage sits in one unified group — the `group_mode` flag
+    /// [`Printer::build_class_implements_doc`] takes separately, recovered from the
+    /// layout so the two can't disagree.
+    pub(in crate::printer) fn is_group(&self) -> bool {
+        !matches!(self, Self::Independent)
     }
 }
 
@@ -135,6 +139,79 @@ impl<'a> Printer<'a> {
             extends_clause_end,
             header_end,
         }
+    }
+
+    /// Resolve how a class header lays its heritage out — the whole of the decision
+    /// both class printers used to spell out identically, over the positions
+    /// [`Self::class_heritage_positions`] already computed.
+    ///
+    /// Group mode is the structural rule ([`Self::should_class_group_mode`]) OR a
+    /// comment **on the page** in either heritage gap: name/type-params→first keyword,
+    /// and the extends-clause→`implements` gap. A *line* comment in either gap forces
+    /// the group open, because it consumes the rest of its line — as
+    /// [`ClassHeaderLayout::GroupBreak`] rather than a `break_parent`, so the break
+    /// doesn't pollute `fits()` lookahead for nested groups (a `<T>` list would break
+    /// with it).
+    pub(in crate::printer) fn class_header_layout(
+        &self,
+        positions: &ClassHeritagePositions,
+        super_class: Option<&internal::Expression<'_>>,
+        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
+        implements: &[internal::TSInterfaceHeritage<'_>],
+    ) -> ClassHeaderLayout {
+        // The extends→`implements` gap exists only with both clauses present, which is
+        // already `count > 1` in the structural rule — so that arm can only ever add to
+        // the *line* half below, never to `group_mode`.
+        let extends_to_implements = positions
+            .extends_clause_end
+            .filter(|_| !implements.is_empty())
+            .map(|ext_end| (ext_end, implements[0].span.start));
+        let has_heritage_comments = positions
+            .first_heritage_start
+            .is_some_and(|hs| self.has_comments_on_page_between(positions.pre_heritage_end, hs))
+            || extends_to_implements.is_some_and(|(a, b)| self.has_comments_on_page_between(a, b));
+        let group_mode =
+            self.should_class_group_mode(super_class, super_type_parameters, implements)
+                || has_heritage_comments;
+        let has_heritage_line_comments = positions
+            .first_heritage_start
+            .is_some_and(|hs| self.has_line_comments_between(positions.pre_heritage_end, hs))
+            || extends_to_implements.is_some_and(|(a, b)| self.has_line_comments_between(a, b));
+        ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments)
+    }
+
+    /// Emit a class head's `<T>` type-parameter list, preceded by the gap before it.
+    ///
+    /// `name_end` is the class name's end, or `None` for an anonymous class. **The two
+    /// arms are not symmetric**, and the asymmetry is the point of having one emitter:
+    /// after a name the gap is the name→`<T>` gap and its comments are emitted here
+    /// (`class A /* c */ <T>`), while an anonymous class's preceding gap belongs to the
+    /// `class` keyword — a gap **no emitter reads**, so a comment authored there is
+    /// dropped (`const H = class // c⏎<T> {}`). That hole is open, and it is one hole
+    /// rather than the two it was before both class printers routed through here.
+    ///
+    /// The list itself always uses the wrapping builder, so it breaks on width
+    /// independently of the heritage group.
+    pub(in crate::printer) fn push_class_type_params(
+        &self,
+        parts: &mut DocBuf,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        name_end: Option<u32>,
+    ) {
+        let Some(type_params) = type_parameters else {
+            return;
+        };
+        if let Some(name_end) = name_end {
+            // A line comment takes a hardline here, so it can't absorb the `<T>` as
+            // comment text.
+            self.push_name_to_type_params_comments(
+                parts,
+                name_end,
+                type_params.span.start,
+                CommentSpacing::Trailing,
+            );
+        }
+        parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
     }
 
     /// Whether a class should use heritage "group mode" for structural

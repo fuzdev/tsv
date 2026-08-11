@@ -367,20 +367,23 @@ impl<'a> Printer<'a> {
     /// declaration is already `import type` / `export type`), the `left` identifier,
     /// and — when it's a rename — the ` as ` join with any comments in the `as` gap
     /// split around the keyword (before-`as` inline, after-`as` with trailing space).
+    ///
+    /// `specifier_start` is the specifier's own span start, which is the `type`
+    /// keyword when the specifier carries one — the gap between that keyword and the
+    /// name it modifies (`{ type //c⏎A }`) routes through the same header-gap
+    /// continuation helper as the `as` gaps beside it.
     fn build_renamed_specifier_doc(
         &self,
         declaration_is_type_only: bool,
         specifier_is_type: bool,
+        specifier_start: u32,
         left: &internal::ModuleExportName<'_>,
         right: &internal::ModuleExportName<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
-        if !declaration_is_type_only && specifier_is_type {
-            parts.push(d.text("type "));
-        }
-        parts.push(self.build_module_export_name_doc(left));
         let (left_span, right_span) = (left.span(), right.span());
+        let mut parts = DocBuf::new();
+        parts.push(self.build_module_export_name_doc(left));
         // Compare spans, not values: `{a}` has one span, `{a as a}` has two.
         if left_span != right_span {
             // A rename (`{a as b}`): the `as`-binding continuation is shared with the
@@ -399,7 +402,26 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_as_binding_continuation(left_span.end, right));
             }
         }
-        d.concat(&parts)
+        let named = d.concat(&parts);
+        if declaration_is_type_only || !specifier_is_type {
+            return named;
+        }
+        // The per-specifier `type`→name gap. The whole name (and any `as` rename after
+        // it) is the continuation, so a *line* comment there keeps its authored place
+        // and drops the tail one indent level rather than swallowing the name; a
+        // same-line block trails inline (`type /* c */ A`, matching prettier, which
+        // relocates the line-comment case to lead the specifier). The `type ` token
+        // below supplies the separating space the helper leaves out. A comment-free
+        // specifier skips both the scan and the helper.
+        let tail = if self.has_comments_to_emit_between(specifier_start, left_span.start) {
+            let type_end = self
+                .find_keyword_in_range(specifier_start, left_span.start, "type")
+                .map_or(specifier_start, |p| p + "type".len() as u32);
+            self.gap_comment_continuation_tail(type_end, left_span.start, named)
+        } else {
+            named
+        };
+        d.concat(&[d.text("type "), tail])
     }
 
     /// Build a doc for a `ModuleExportName`: a bare identifier emits its symbol;
@@ -427,6 +449,7 @@ impl<'a> Printer<'a> {
         self.build_renamed_specifier_doc(
             is_type_import,
             named_spec.import_kind == internal::ImportKind::Type,
+            named_spec.span.start,
             &named_spec.imported,
             &local,
         )
@@ -441,6 +464,7 @@ impl<'a> Printer<'a> {
         self.build_renamed_specifier_doc(
             is_type_export,
             spec.export_kind == internal::ExportKind::Type,
+            spec.span.start,
             &spec.local,
             &spec.exported,
         )
