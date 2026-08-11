@@ -197,6 +197,63 @@ A comma-separated list asks about one gap twice — the previous element's **tra
 
 That first-argument emitter carries a second obligation, because the `(` gap is the one place a comment can land on a line the builder does not own. Its same-line run splits by KIND: a block-only run goes inline ahead of the first argument (so a call that fits stays on one line), but a run containing a line comment stays whole on the `(` line — tsv's sanctioned divergence — and is handed back to the caller to inject via `wrap_call_with_hard_breaks_paren_line`. Splitting a mixed run would reverse it, and letting a `//` ride the argument's line would swallow the argument.
 
+## The statement-gap seam: the claim stops where the next statement's line begins
+
+A statement list asks about one gap twice as well — the previous statement's same-line
+trailing run and the next statement's leading run — and the split is one predicate:
+**a comment whose glued run reaches the next printed statement's line LEADS it**
+(`Printer::comment_leads_next_item`, prettier's remaining-comment placement — code on
+both sides of the run binds it forward), and everything before that comment trails.
+The reach is a CHAIN, not one `is_same_line`: prettier's `isEndOfLineComment` extends
+the comment's end through every comment glued after it before testing for the newline,
+so only a newline **outside comment bytes** breaks the chain — a glued pair whose tail
+is a multi-line block still leads whole (`a(); /* c */ /* x⏎y */ b();`), while a run
+whose closing comment ends its line trails whole (`a(); /* c1 */ /* c2 */⏎b();`). The
+scan is the **in-source** axis (an owned comment's bytes glue the chain like any
+other's — the multi-line tail in that example is typically owned by `b` and rides
+inside its doc, invisible to the to-emit iteration that must still glue the head).
+The claim is a prefix by construction (a later comment's chain is a suffix of an
+earlier one's), and `Printer::trailing_claim_end` states it as a POSITION, the
+element-comma seam's rule: the trailing emitter takes it as its upper bound, the
+cursor clamps to it (`find_end_with_trailing_comments(..).min(claim_end)`), and the
+leading filter's `leads_target` escape (`Printer::comment_already_trailed`) admits
+exactly the handed-over comments — so the two sides cannot claim past each other, and
+a re-spelled half is a drop or a double-print. One rule across the family: the program
+body, block and `namespace` bodies, switch consequents and the case-list gap (the
+comment then leads the next `case`/`default` label via the between-case run), class
+bodies, interface bodies, and both type-literal member walks — where the width-aware
+layout emits the handed-over run in the next member's segment, byte-identical when
+flat so only the broken layout moves. (Enum members sit on the element-comma seam,
+whose own machinery already chains glued runs.) The interface member walk stated the
+same rule inline first; both its sides now route through the shared predicate.
+
+Three slot rules bound the scan, because the gap can hold erased structure:
+
+- **A dropped `EmptyStatement` closes its slot** (`statement_gap_floor`): a comment
+  before the `;` trails the content before it however the lines fall
+  (`a(); /* c */ ; b();`), while one after it leads (`a(); ; /* c */ b();`) — prettier
+  binds both the same way, and the orphan arm's scan stops at the split so it neither
+  swallows nor re-prints the handed-over run.
+- **A type member's source separator is its slot floor** (`type_member_gap_floor`): a
+  comment before the `;`/`,` trails its member (`a: A /* c */; b: B`), so the
+  leads-next test opens past the separator.
+- **A class body's stray `;` closes its slot too** (`class_member_gap_floor`), and it
+  has no node to key on — the parser drops it without an `EmptyStatement` — so the
+  floor reads the source, past the LAST stray `;` in the gap
+  (`a = 1; /* c */ ; b = 2;` trails, `a = 1; ; /* c */ b = 2;` leads, both matching
+  prettier).
+
+The split decides only the one-line authoring, where the forced statement-per-line
+break must put the comment somewhere; both two-line authorings are dual-stable and
+untouched — a comment that ends its line trails (`a(); /* c */⏎let b = 1;`), one on
+the next statement's line leads. A `//` can never satisfy the leads test (its line
+ends the chain before anything follows it), so the deferred-terminator machinery is
+orthogonal to this seam. Pinned by the `*_gap_no_newline_comment` fixtures
+(statement list, class body, switch consequent and case gap, type literal, and
+interface body — the chain and modifier-start cases folded in alongside) plus the
+slot-rule fixtures (`statement_gap_empty_statement_comment`,
+`member_gap_stray_semi_comment`).
+
 ## The delimiter-line question: one rule, read at two points
 
 "Does a comment sharing the opening delimiter's line stay on it, or lead the first element?" is asked by two families, and the answer is the same rule both times: **pull onto the delimiter's line only when the container is breaking anyway; otherwise leave the block to hug the first element**, so a container that would have fit still fits.

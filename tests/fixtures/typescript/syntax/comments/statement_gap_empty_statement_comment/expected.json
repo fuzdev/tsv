@@ -1,0 +1,549 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 336,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment before a dropped empty statement binds inside its own slot and trails.",
+			"start": 10,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 101,
+			"end": 109,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 7
+				},
+				"end": {
+					"line": 3,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment after the dropped empty statement leads the next statement.",
+			"start": 125,
+			"end": 197,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 206,
+			"end": 214,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " One on each side: the dropped statement splits the gap.",
+			"start": 229,
+			"end": 287,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 295,
+			"end": 303,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 7
+				},
+				"end": {
+					"line": 11,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 305,
+			"end": 313,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 335,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 326,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 95,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 95,
+						"end": 99,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 95,
+							"end": 97,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "a1"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment before a dropped empty statement binds inside its own slot and trails.",
+							"start": 10,
+							"end": 93
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c1 ",
+							"start": 101,
+							"end": 109
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 111,
+					"end": 122,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 12
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 115,
+							"end": 121,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 5
+								},
+								"end": {
+									"line": 4,
+									"column": 11
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 115,
+								"end": 117,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 5
+									},
+									"end": {
+										"line": 4,
+										"column": 7
+									}
+								},
+								"name": "b1"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 120,
+								"end": 121,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 10
+									},
+									"end": {
+										"line": 4,
+										"column": 11
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 199,
+					"end": 204,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 199,
+						"end": 203,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 199,
+							"end": 201,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"name": "a2"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment after the dropped empty statement leads the next statement.",
+							"start": 125,
+							"end": 197
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 215,
+					"end": 226,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 10
+						},
+						"end": {
+							"line": 8,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 219,
+							"end": 225,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 14
+								},
+								"end": {
+									"line": 8,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 219,
+								"end": 221,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 14
+									},
+									"end": {
+										"line": 8,
+										"column": 16
+									}
+								},
+								"name": "b2"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 224,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 19
+									},
+									"end": {
+										"line": 8,
+										"column": 20
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 206,
+							"end": 214
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 289,
+					"end": 294,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 289,
+						"end": 293,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 289,
+							"end": 291,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"name": "a3"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " One on each side: the dropped statement splits the gap.",
+							"start": 229,
+							"end": 287
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c3 ",
+							"start": 295,
+							"end": 303
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 314,
+					"end": 325,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 10
+						},
+						"end": {
+							"line": 12,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 318,
+							"end": 324,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 14
+								},
+								"end": {
+									"line": 12,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 318,
+								"end": 320,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 14
+									},
+									"end": {
+										"line": 12,
+										"column": 16
+									}
+								},
+								"name": "b3"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 323,
+								"end": 324,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 19
+									},
+									"end": {
+										"line": 12,
+										"column": 20
+									}
+								},
+								"value": 3,
+								"raw": "3"
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c4 ",
+							"start": 305,
+							"end": 313
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

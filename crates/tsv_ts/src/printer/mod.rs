@@ -51,8 +51,8 @@ pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, container_may_have_multiline_content,
     has_multiline_content, is_brace_block_multiline, is_effectively_empty_body,
     is_module_path_fluid_call, is_multiline_string_literal, is_multiline_template_expression,
-    is_pure_property_chain, is_string_literal, next_printed_stmt_start,
-    object_pattern_should_expand, template_literal_has_newlines,
+    is_pure_property_chain, is_string_literal, next_printed_stmt, next_printed_stmt_start,
+    object_pattern_should_expand, statement_gap_floor, template_literal_has_newlines,
 };
 pub(crate) use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
@@ -900,6 +900,24 @@ impl<'a> Printer<'a> {
     pub(crate) fn comment_hangs_binary_operand(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| {
             !c.is_block || self.has_newline_between(c.span.end, next)
+        })
+    }
+
+    /// Whether the gap's comment run is **glued through to the value**: no comment in
+    /// `(start, end)` has a newline after it (toward the next comment, or `end` for
+    /// the last). Line breaks *inside* a preserved multiline block don't count — the
+    /// run still delivers the value on its closing line, so a `will_break` on the
+    /// run's doc is the comment's interior, not an own-line separator. The to-emit
+    /// counterpart of `OwnedCommentEffect::Pins`, feeding `RhsCommentInfo::pinned`:
+    /// prettier keeps such a run on the operator's line
+    /// (`= /* c */ /* x⏎y */ v`, `hasLeadingOwnLineComment` false — it keys on this
+    /// same trailing newline), where a bare `will_break` reading hangs the value.
+    ///
+    /// **on page**: an owned member of the run (`/* x⏎y */` glued to the value) is
+    /// part of the glue geometry even though the gap emits nothing for it.
+    pub(crate) fn comment_run_glued_through(&self, start: u32, end: u32) -> bool {
+        !self.any_comment_on_page_with_next(start, end, |c, next| {
+            self.has_newline_between(c.span.end, next)
         })
     }
 
