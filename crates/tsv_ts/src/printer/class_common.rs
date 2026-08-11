@@ -66,8 +66,8 @@ impl ClassHeaderLayout {
     }
 }
 
-/// Non-content inputs to `build_class_header_doc` — the body's shape/position,
-/// the heritage layout, and whether to emit header→body comments here.
+/// Non-content inputs to `build_class_header_doc` — the body's shape/position and the
+/// heritage layout.
 pub(in crate::printer) struct ClassHeaderOptions {
     /// The class body is `{}` — keep ` {}` on the heritage line (never `line()`).
     pub body_is_empty: bool,
@@ -75,9 +75,6 @@ pub(in crate::printer) struct ClassHeaderOptions {
     pub body_start: u32,
     /// How the heritage clauses lay out (group / independent / forced break).
     pub layout: ClassHeaderLayout,
-    /// Emit header→body comments here (false when the caller already emitted the
-    /// bare name→body / anonymous→body comments).
-    pub emit_pre_body_comments: bool,
     /// An own-line directive in the header→`{` gap freezes the body, so the gap's comment
     /// run keeps its own line rather than being spaced onto the header's. Resolved once per
     /// class by the caller (which also emits the frozen body) — see
@@ -280,47 +277,52 @@ impl<'a> Printer<'a> {
         ))
     }
 
-    /// Spacing (and any comment) between a class header and its body brace:
-    /// `extends B /* c */ {}`, `class A<T> /* c */ {}`. Line comments force a
-    /// hardline (they'd absorb the brace); block comments keep a space.
+    /// The header→body `{` gap resolved once: the gap's comment run (`None` when it holds
+    /// none) and whether the gap forces the brace onto its own line.
     ///
-    /// `emit_comments` gates the comment scan: the class-expression printer's
-    /// bare name→body / anonymous→body paths emit their own comments, so it
-    /// passes `false` when there is no heritage or type params.
-    /// Emit the comments between a class/interface header (after the last
-    /// heritage item or type params) and the body `{`, plus the pre-`{` spacing.
-    /// Shared by the class-declaration non-group path and the interface printer.
-    /// Comments are preserved each on their own line via `build_pre_body_comments_doc`
-    /// (line comments don't absorb following comments); a line comment forces the
-    /// brace onto the next line, otherwise it hugs with a single space. Returns a
-    /// bare `" "` when there are no comments (or `emit_comments` is false).
-    /// Whether the header→`{` gap forces the brace onto its own line: a `//` in the gap would
-    /// otherwise swallow it, and a FROZEN body's directive must keep the own line that makes it
-    /// honored (a header-trailing placement is inert, so the relocated form would lose the
-    /// freeze on the second pass). Both header layouts ask it, so it is spelled once.
-    fn pre_body_gap_breaks(&self, header_end: u32, body_start: u32, body_frozen: bool) -> bool {
-        body_frozen || self.has_line_comments_between(header_end, body_start)
+    /// The brace leaves the line when a `//` is in the gap (it would otherwise swallow the
+    /// brace), when a **multiline** block the author broke after keeps that break, or when
+    /// the body is FROZEN — a directive must keep the own line that makes it honored, since
+    /// a header-trailing placement is inert and would lose the freeze on the second pass.
+    ///
+    /// ⚠️ The comment half is [`Printer::comments_force_own_line_between`] — the shared
+    /// gate, not a line-vs-block reading of its own. Asking `has_line_comments_between` here
+    /// made this gap the one place a broke-after multiline block collapsed, against the rule
+    /// every pre-separator and value gap applies; the run
+    /// ([`Printer::build_pre_body_comments_doc`]) asks the same per-comment predicate, so
+    /// gate and emitter cannot answer differently.
+    ///
+    /// Returned as a pair rather than a finished doc because the two header layouts want
+    /// **different separators** for the same verdict: a plain header hugs with `" "`, while
+    /// the class header's group uses a collapsible `line()` (and `" "` for an empty body).
+    /// That difference is the only thing they may vary — deriving the run or the verdict
+    /// separately is what let the class header drift.
+    fn pre_body_gap(
+        &self,
+        header_end: u32,
+        body_start: u32,
+        body_frozen: bool,
+    ) -> (Option<DocId>, bool) {
+        let comments = self.build_pre_body_comments_doc(header_end, body_start, body_frozen);
+        let breaks = body_frozen || self.comments_force_own_line_between(header_end, body_start);
+        (comments, breaks)
     }
 
+    /// The header→body `{` gap as a finished doc, for the header layouts that hug the brace
+    /// with a plain space: `interface B /* c */ {`, `function a() // c⏎{`. A bare `" "` when
+    /// the gap holds no comments. The class header takes [`Self::pre_body_gap`] directly,
+    /// because its separator is group-relative.
     pub(in crate::printer) fn build_header_pre_body_doc(
         &self,
-        emit_comments: bool,
         header_end: u32,
         body_start: u32,
         body_frozen: bool,
     ) -> DocId {
         let d = self.d();
-        if emit_comments
-            && let Some(comments) =
-                self.build_pre_body_comments_doc(header_end, body_start, body_frozen)
-        {
-            if self.pre_body_gap_breaks(header_end, body_start, body_frozen) {
-                d.concat(&[comments, d.hardline()])
-            } else {
-                d.concat(&[comments, d.text(" ")])
-            }
-        } else {
-            d.text(" ")
+        match self.pre_body_gap(header_end, body_start, body_frozen) {
+            (Some(comments), true) => d.concat(&[comments, d.hardline()]),
+            (Some(comments), false) => d.concat(&[comments, d.text(" ")]),
+            (None, _) => d.text(" "),
         }
     }
 
@@ -333,8 +335,10 @@ impl<'a> Printer<'a> {
     /// second pass — and the body needs the span to emit verbatim. Resolving it twice is
     /// two sources of truth for one question.
     ///
-    /// `interface`, `enum` and `namespace`/`module` take this. The **class** resolves the
-    /// same pair by hand, because its header is assembled inside a group
+    /// `interface`, `enum`, `namespace`/`module` and every value-level function definition
+    /// (declaration and expression, class method, getter/setter, constructor, object method
+    /// — via [`Printer::append_body_with_sig_comments`]) take this. The **class** resolves
+    /// the same pair by hand, because its header is assembled inside a group
     /// ([`Printer::build_class_header_doc`]) and the verdict has to travel there as
     /// `ClassHeaderOptions::body_frozen`.
     ///
@@ -347,8 +351,7 @@ impl<'a> Printer<'a> {
         body: Span,
     ) -> (DocId, Option<Span>) {
         let frozen = self.gap_frozen_span(header_end, body);
-        let pre_body =
-            self.build_header_pre_body_doc(true, header_end, body.start, frozen.is_some());
+        let pre_body = self.build_header_pre_body_doc(header_end, body.start, frozen.is_some());
         (pre_body, frozen)
     }
 
@@ -359,10 +362,13 @@ impl<'a> Printer<'a> {
     /// group-wrapped header. The body is appended by the caller OUTSIDE this
     /// group so the body's hardlines don't pollute the header's fit check.
     ///
-    /// `emit_pre_body_comments` gates the header→body comment scan: the
-    /// class-expression printer's bare name→body / anonymous→body paths emit
-    /// their own comments, so it passes `false` when there is no heritage or
-    /// type params (the declaration always passes `true`).
+    /// The header→body `{` gap is resolved here for **every** class shape, declaration and
+    /// expression alike — bare name, anonymous, heritage, type params. It used to be gated
+    /// by an `emit_pre_body_comments` flag the class-expression printer set false for its
+    /// bare-name / anonymous forms, which emitted the gap themselves; those two routes then
+    /// answered it differently from their own siblings (collapsing a broke-after multiline
+    /// block, and emitting a stray space before the brace). A flag meaning "another emitter
+    /// already claimed this range" is the `docs/comments.md` §3 hazard, not a knob.
     pub(in crate::printer) fn build_class_header_doc(
         &self,
         mut parts: DocBuf,
@@ -386,7 +392,6 @@ impl<'a> Printer<'a> {
                 parts.push(impl_doc);
             }
             parts.push(self.build_header_pre_body_doc(
-                options.emit_pre_body_comments,
                 header_end,
                 options.body_start,
                 options.body_frozen,
@@ -431,22 +436,17 @@ impl<'a> Printer<'a> {
             parts.push(d.indent(d.concat(&heritage_parts)));
         }
 
-        // Comments between header and body, plus the pre-brace spacing.
-        // Line comments force a hardline (they'd absorb the brace). For a
-        // non-empty body, `line()` puts the brace on its own line when the
-        // group breaks; an empty body always keeps ` {}` on the heritage line.
-        let has_line_comment = options.emit_pre_body_comments
-            && self.pre_body_gap_breaks(header_end, options.body_start, options.body_frozen);
-        if options.emit_pre_body_comments
-            && let Some(comments) = self.build_pre_body_comments_doc(
-                header_end,
-                options.body_start,
-                options.body_frozen,
-            )
-        {
+        // Comments between header and body, plus the pre-brace spacing — the same gap
+        // resolution every other braced-body declaration takes, differing only in the
+        // separator this group wants: for a non-empty body `line()` puts the brace on its
+        // own line when the group breaks, while an empty body always keeps ` {}` on the
+        // heritage line.
+        let (gap_comments, gap_breaks) =
+            self.pre_body_gap(header_end, options.body_start, options.body_frozen);
+        if let Some(comments) = gap_comments {
             parts.push(comments);
         }
-        if has_line_comment {
+        if gap_breaks {
             parts.push(d.hardline());
         } else if options.body_is_empty {
             parts.push(d.text(" "));

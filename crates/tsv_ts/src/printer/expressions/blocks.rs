@@ -440,34 +440,4 @@ impl<'a> Printer<'a> {
         crate::printer::buffer_stats::record_leading_comments(collected.len());
         collected
     }
-
-    /// Build a Doc for a block statement with outer comments moved inside
-    ///
-    /// The outer_comments are comments from between the signature and opening brace
-    /// that should appear at the start of the block body.
-    pub(in crate::printer) fn build_block_statement_with_outer_comments_doc(
-        &self,
-        block: &internal::BlockStatement<'_>,
-        outer_comments: DocBuf,
-    ) -> DocId {
-        if outer_comments.is_empty() {
-            return self.build_block_statement_doc(block);
-        }
-
-        let d = self.d();
-        // Build outer comments as leading content
-        let mut leading_content = DocBuf::new();
-        for (i, comment_doc) in outer_comments.into_iter().enumerate() {
-            if i > 0 {
-                leading_content.push(d.hardline());
-            }
-            leading_content.push(comment_doc);
-        }
-
-        // Use unified body builder with leading content
-        // Note: expand_empty=false because outer comments will expand the block anyway.
-        // This helper is never used for a static block, so the body is always
-        // directive-prologue eligible.
-        self.build_block_body_doc(block, false, leading_content, true)
-    }
 }

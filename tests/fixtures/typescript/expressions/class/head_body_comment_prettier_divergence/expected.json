@@ -1,0 +1,1540 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 651,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multiline block the author broke after keeps the break - named and anonymous",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " alike, as the heritage and type-param forms already did.",
+			"start": 103,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 182,
+			"end": 191,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 19
+				},
+				"end": {
+					"line": 5,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 226,
+			"end": 235,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 17
+				},
+				"end": {
+					"line": 11,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 282,
+			"end": 291,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 29
+				},
+				"end": {
+					"line": 17,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 331,
+			"end": 340,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 22
+				},
+				"end": {
+					"line": 23,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A line comment keeps its place, with `{` flush below.",
+			"start": 359,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 435,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 19
+				},
+				"end": {
+					"line": 29,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 474,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 17
+				},
+				"end": {
+					"line": 34,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A single-line block collapses from any authored position.",
+			"start": 497,
+			"end": 557,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 577,
+			"end": 584,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 19
+				},
+				"end": {
+					"line": 40,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 618,
+			"end": 625,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 17
+				},
+				"end": {
+					"line": 44,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 650,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 641,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 47,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 164,
+					"end": 207,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 170,
+							"end": 206,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 170,
+								"end": 171,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 174,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 2
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 180,
+									"end": 181,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 17
+										},
+										"end": {
+											"line": 4,
+											"column": 18
+										}
+									},
+									"name": "A",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x\ny ",
+											"start": 182,
+											"end": 191
+										}
+									]
+								},
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 193,
+									"end": 206,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 1
+										},
+										"end": {
+											"line": 8,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 197,
+											"end": 203,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 7,
+													"column": 8
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 197,
+												"end": 198,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 2
+													},
+													"end": {
+														"line": 7,
+														"column": 3
+													}
+												},
+												"name": "p"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 201,
+												"end": 202,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 6
+													},
+													"end": {
+														"line": 7,
+														"column": 7
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multiline block the author broke after keeps the break - named and anonymous",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " alike, as the heritage and type-param forms already did.",
+							"start": 103,
+							"end": 162
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 210,
+					"end": 251,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 216,
+							"end": 250,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 216,
+								"end": 217,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 220,
+								"end": 250,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 14,
+										"column": 2
+									}
+								},
+								"id": null,
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 237,
+									"end": 250,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 1
+										},
+										"end": {
+											"line": 14,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 241,
+											"end": 247,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 2
+												},
+												"end": {
+													"line": 13,
+													"column": 8
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 241,
+												"end": 242,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 2
+													},
+													"end": {
+														"line": 13,
+														"column": 3
+													}
+												},
+												"name": "p"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 245,
+												"end": 246,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 6
+													},
+													"end": {
+														"line": 13,
+														"column": 7
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " x\ny ",
+											"start": 226,
+											"end": 235
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 254,
+					"end": 307,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 260,
+							"end": 306,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 260,
+								"end": 261,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 264,
+								"end": 306,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 2
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 270,
+									"end": 271,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 17
+										},
+										"end": {
+											"line": 16,
+											"column": 18
+										}
+									},
+									"name": "A"
+								},
+								"superClass": {
+									"type": "Identifier",
+									"start": 280,
+									"end": 281,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 27
+										},
+										"end": {
+											"line": 16,
+											"column": 28
+										}
+									},
+									"name": "B",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x\ny ",
+											"start": 282,
+											"end": 291
+										}
+									]
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 293,
+									"end": 306,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 1
+										},
+										"end": {
+											"line": 20,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 297,
+											"end": 303,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 2
+												},
+												"end": {
+													"line": 19,
+													"column": 8
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 297,
+												"end": 298,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 2
+													},
+													"end": {
+														"line": 19,
+														"column": 3
+													}
+												},
+												"name": "p"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 301,
+												"end": 302,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 6
+													},
+													"end": {
+														"line": 19,
+														"column": 7
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 310,
+					"end": 356,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 316,
+							"end": 355,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 316,
+								"end": 317,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 320,
+								"end": 355,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 11
+									},
+									"end": {
+										"line": 26,
+										"column": 2
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 326,
+									"end": 327,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 17
+										},
+										"end": {
+											"line": 22,
+											"column": 18
+										}
+									},
+									"name": "A"
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 327,
+									"end": 330,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 18
+										},
+										"end": {
+											"line": 22,
+											"column": 21
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 328,
+											"end": 329,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 19
+												},
+												"end": {
+													"line": 22,
+													"column": 20
+												}
+											},
+											"name": "T"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x\ny ",
+											"start": 331,
+											"end": 340
+										}
+									]
+								},
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 342,
+									"end": 355,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 1
+										},
+										"end": {
+											"line": 26,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 346,
+											"end": 352,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 2
+												},
+												"end": {
+													"line": 25,
+													"column": 8
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 346,
+												"end": 347,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 2
+													},
+													"end": {
+														"line": 25,
+														"column": 3
+													}
+												},
+												"name": "p"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 350,
+												"end": 351,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 6
+													},
+													"end": {
+														"line": 25,
+														"column": 7
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 417,
+					"end": 455,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 423,
+							"end": 454,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 423,
+								"end": 424,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 427,
+								"end": 454,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 11
+									},
+									"end": {
+										"line": 32,
+										"column": 2
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 433,
+									"end": 434,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 17
+										},
+										"end": {
+											"line": 29,
+											"column": 18
+										}
+									},
+									"name": "A",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 435,
+											"end": 439
+										}
+									]
+								},
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 441,
+									"end": 454,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 1
+										},
+										"end": {
+											"line": 32,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 445,
+											"end": 451,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 2
+												},
+												"end": {
+													"line": 31,
+													"column": 8
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 445,
+												"end": 446,
+												"loc": {
+													"start": {
+														"line": 31,
+														"column": 2
+													},
+													"end": {
+														"line": 31,
+														"column": 3
+													}
+												},
+												"name": "p"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 449,
+												"end": 450,
+												"loc": {
+													"start": {
+														"line": 31,
+														"column": 6
+													},
+													"end": {
+														"line": 31,
+														"column": 7
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment keeps its place, with `{` flush below.",
+							"start": 359,
+							"end": 415
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 458,
+					"end": 494,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 464,
+							"end": 493,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 7
+								},
+								"end": {
+									"line": 37,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 464,
+								"end": 465,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 7
+									},
+									"end": {
+										"line": 34,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 468,
+								"end": 493,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 11
+									},
+									"end": {
+										"line": 37,
+										"column": 2
+									}
+								},
+								"id": null,
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 480,
+									"end": 493,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 1
+										},
+										"end": {
+											"line": 37,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 484,
+											"end": 490,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 2
+												},
+												"end": {
+													"line": 36,
+													"column": 8
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 484,
+												"end": 485,
+												"loc": {
+													"start": {
+														"line": 36,
+														"column": 2
+													},
+													"end": {
+														"line": 36,
+														"column": 3
+													}
+												},
+												"name": "p"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 488,
+												"end": 489,
+												"loc": {
+													"start": {
+														"line": 36,
+														"column": 6
+													},
+													"end": {
+														"line": 36,
+														"column": 7
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 474,
+											"end": 478
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 559,
+					"end": 599,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 565,
+							"end": 598,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 7
+								},
+								"end": {
+									"line": 42,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 565,
+								"end": 566,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 7
+									},
+									"end": {
+										"line": 40,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 569,
+								"end": 598,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 11
+									},
+									"end": {
+										"line": 42,
+										"column": 2
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 575,
+									"end": 576,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 17
+										},
+										"end": {
+											"line": 40,
+											"column": 18
+										}
+									},
+									"name": "A",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 577,
+											"end": 584
+										}
+									]
+								},
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 585,
+									"end": 598,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 27
+										},
+										"end": {
+											"line": 42,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 589,
+											"end": 595,
+											"loc": {
+												"start": {
+													"line": 41,
+													"column": 2
+												},
+												"end": {
+													"line": 41,
+													"column": 8
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 589,
+												"end": 590,
+												"loc": {
+													"start": {
+														"line": 41,
+														"column": 2
+													},
+													"end": {
+														"line": 41,
+														"column": 3
+													}
+												},
+												"name": "p"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 593,
+												"end": 594,
+												"loc": {
+													"start": {
+														"line": 41,
+														"column": 6
+													},
+													"end": {
+														"line": 41,
+														"column": 7
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A single-line block collapses from any authored position.",
+							"start": 497,
+							"end": 557
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 602,
+					"end": 640,
+					"loc": {
+						"start": {
+							"line": 44,
+							"column": 1
+						},
+						"end": {
+							"line": 46,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 608,
+							"end": 639,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 7
+								},
+								"end": {
+									"line": 46,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 608,
+								"end": 609,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 7
+									},
+									"end": {
+										"line": 44,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 612,
+								"end": 639,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 11
+									},
+									"end": {
+										"line": 46,
+										"column": 2
+									}
+								},
+								"id": null,
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 626,
+									"end": 639,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 25
+										},
+										"end": {
+											"line": 46,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 630,
+											"end": 636,
+											"loc": {
+												"start": {
+													"line": 45,
+													"column": 2
+												},
+												"end": {
+													"line": 45,
+													"column": 8
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 630,
+												"end": 631,
+												"loc": {
+													"start": {
+														"line": 45,
+														"column": 2
+													},
+													"end": {
+														"line": 45,
+														"column": 3
+													}
+												},
+												"name": "p"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 634,
+												"end": 635,
+												"loc": {
+													"start": {
+														"line": 45,
+														"column": 6
+													},
+													"end": {
+														"line": 45,
+														"column": 7
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 618,
+											"end": 625
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
