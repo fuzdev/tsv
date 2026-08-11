@@ -1,0 +1,1081 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 571,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multiline block the author broke after keeps the break: the body `{` drops",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " to its own line, flush with the head.",
+			"start": 101,
+			"end": 141,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 156,
+			"end": 165,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 14
+				},
+				"end": {
+					"line": 5,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Class method - prettier relocates this one before the parameter list.",
+			"start": 182,
+			"end": 254,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 272,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 6
+				},
+				"end": {
+					"line": 13,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Class body brace.",
+			"start": 304,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 334,
+			"end": 343,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 9
+				},
+				"end": {
+					"line": 21,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Interface body brace.",
+			"start": 361,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 399,
+			"end": 408,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 13
+				},
+				"end": {
+					"line": 28,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Enum body brace.",
+			"start": 430,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 458,
+			"end": 467,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 8
+				},
+				"end": {
+					"line": 35,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Namespace body brace.",
+			"start": 485,
+			"end": 509,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 523,
+			"end": 532,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 13
+				},
+				"end": {
+					"line": 43,
+					"column": 4
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 570,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 561,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 47,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 143,
+					"end": 179,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 152,
+						"end": 153,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 4,
+								"column": 11
+							}
+						},
+						"name": "a"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 167,
+						"end": 179,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 171,
+								"end": 176,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 171,
+									"end": 175,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 171,
+										"end": 173,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 156,
+								"end": 165
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multiline block the author broke after keeps the break: the body `{` drops",
+							"start": 20,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " to its own line, flush with the head.",
+							"start": 101,
+							"end": 141
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 256,
+					"end": 301,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 262,
+						"end": 263,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 7
+							},
+							"end": {
+								"line": 11,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 264,
+						"end": 301,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 9
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 268,
+								"end": 298,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 268,
+									"end": 269,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 269,
+									"end": 298,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 3
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 284,
+										"end": 298,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 289,
+												"end": 294,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 3
+													},
+													"end": {
+														"line": 15,
+														"column": 8
+													}
+												},
+												"expression": {
+													"type": "CallExpression",
+													"start": 289,
+													"end": 293,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 3
+														},
+														"end": {
+															"line": 15,
+															"column": 7
+														}
+													},
+													"callee": {
+														"type": "Identifier",
+														"start": 289,
+														"end": 291,
+														"loc": {
+															"start": {
+																"line": 15,
+																"column": 3
+															},
+															"end": {
+																"line": 15,
+																"column": 5
+															}
+														},
+														"name": "fn"
+													},
+													"arguments": [],
+													"optional": false
+												}
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " x\ny ",
+												"start": 272,
+												"end": 281
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class method - prettier relocates this one before the parameter list.",
+							"start": 182,
+							"end": 254
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 326,
+					"end": 358,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 332,
+						"end": 333,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 7
+							},
+							"end": {
+								"line": 20,
+								"column": 8
+							}
+						},
+						"name": "B",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 334,
+								"end": 343
+							}
+						]
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 345,
+						"end": 358,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 1
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 349,
+								"end": 355,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 349,
+									"end": 350,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"name": "x"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 353,
+									"end": 354,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 6
+										},
+										"end": {
+											"line": 23,
+											"column": 7
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class body brace.",
+							"start": 304,
+							"end": 324
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 387,
+					"end": 427,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 397,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 11
+							},
+							"end": {
+								"line": 27,
+								"column": 12
+							}
+						},
+						"name": "C",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 399,
+								"end": 408
+							}
+						]
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 410,
+						"end": 427,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 1
+							},
+							"end": {
+								"line": 31,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 414,
+								"end": 424,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 12
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 414,
+									"end": 415,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 2
+										},
+										"end": {
+											"line": 30,
+											"column": 3
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 415,
+									"end": 423,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 3
+										},
+										"end": {
+											"line": 30,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 417,
+										"end": 423,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 5
+											},
+											"end": {
+												"line": 30,
+												"column": 11
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Interface body brace.",
+							"start": 361,
+							"end": 385
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 451,
+					"end": 482,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 456,
+						"end": 457,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 6
+							},
+							"end": {
+								"line": 34,
+								"column": 7
+							}
+						},
+						"name": "D",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 458,
+								"end": 467
+							}
+						]
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 473,
+							"end": 474,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 2
+								},
+								"end": {
+									"line": 37,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 473,
+								"end": 474,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 3
+									}
+								},
+								"name": "A"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 478,
+							"end": 479,
+							"loc": {
+								"start": {
+									"line": 38,
+									"column": 2
+								},
+								"end": {
+									"line": 38,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 478,
+								"end": 479,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 3
+									}
+								},
+								"name": "B"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Enum body brace.",
+							"start": 430,
+							"end": 449
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 511,
+					"end": 560,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 46,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 521,
+						"end": 522,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 11
+							},
+							"end": {
+								"line": 42,
+								"column": 12
+							}
+						},
+						"name": "E",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 523,
+								"end": 532
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 534,
+						"end": 560,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 1
+							},
+							"end": {
+								"line": 46,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExportNamedDeclaration",
+								"start": 538,
+								"end": 557,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 2
+									},
+									"end": {
+										"line": 45,
+										"column": 21
+									}
+								},
+								"exportKind": "value",
+								"declaration": {
+									"type": "VariableDeclaration",
+									"start": 545,
+									"end": 557,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 9
+										},
+										"end": {
+											"line": 45,
+											"column": 21
+										}
+									},
+									"declarations": [
+										{
+											"type": "VariableDeclarator",
+											"start": 551,
+											"end": 556,
+											"loc": {
+												"start": {
+													"line": 45,
+													"column": 15
+												},
+												"end": {
+													"line": 45,
+													"column": 20
+												}
+											},
+											"id": {
+												"type": "Identifier",
+												"start": 551,
+												"end": 552,
+												"loc": {
+													"start": {
+														"line": 45,
+														"column": 15
+													},
+													"end": {
+														"line": 45,
+														"column": 16
+													}
+												},
+												"name": "x"
+											},
+											"init": {
+												"type": "Literal",
+												"start": 555,
+												"end": 556,
+												"loc": {
+													"start": {
+														"line": 45,
+														"column": 19
+													},
+													"end": {
+														"line": 45,
+														"column": 20
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									],
+									"kind": "const"
+								},
+								"specifiers": [],
+								"source": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Namespace body brace.",
+							"start": 485,
+							"end": 509
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

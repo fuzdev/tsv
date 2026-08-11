@@ -384,7 +384,19 @@ value. The two shapes outside this rule are outside it there too: a **line** com
 the continuation indent, and a **multiline** block the author **broke after** keeps its
 break — the separator + tail drop to the continuation line (the Pre-separator
 multiline-block entry in [§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)) — so the broke-after
-distinction survives on both sides of the separator. A **list** gap
+distinction survives on both sides of the separator.
+
+A declaration's **head→body `{`** gap is the trailing-position corollary read where the
+tail is a body brace, and takes all three answers unchanged: a single-line block collapses
+onto the head line with `{` hugging it, and a line comment or a broke-after multiline block
+drops `{` to its own line. The one adaptation is the indent — the brace lands **flush** with
+the head rather than continuation-indented, because it owns the indent level beneath it and
+must stay aligned with its `}`. It is one answer across every braced-body declaration
+(function declaration and expression, class method, getter/setter, constructor, object
+method, class, interface, `enum`, `namespace`/`module`), reached through the shared gate
+rather than re-derived per emitter — the three
+[declaration head→body entries](./conformance_prettier_ts_comments.md#comment-relocation)
+catalog what prettier does instead. A **list** gap
 is governed by ordinary blank-line preservation instead — a blank between two list items is
 authoring tsv keeps, so an array element's leading comment preserves it
 ([arrays/end_of_line_block_comment](../tests/fixtures/typescript/expressions/arrays/end_of_line_block_comment_prettier_divergence/)).

@@ -13,7 +13,7 @@ use crate::printer::class_common::{ClassHeaderLayout, ClassHeaderOptions};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;
-use crate::printer::{CommentFilter, CommentSpacing, LeadingGlue};
+use crate::printer::{CommentSpacing, LeadingGlue};
 use crate::printer::{
     CommentVec, ParenContext, Printer, is_multiline_template_expression, unwrap_parenthesized,
 };
@@ -1919,45 +1919,13 @@ impl<'a> Printer<'a> {
                     type_params.span.start,
                     CommentSpacing::Trailing,
                 );
-            } else if positions.first_heritage_start.is_none() {
-                // No type params, no heritage: comments between name and body `class A /* c */ {}`
-                // Heritage path handles name→heritage comments when heritage exists
-                self.push_name_to_type_params_comments(
-                    &mut parts,
-                    id.span.end,
-                    class_expr.body.span.start,
-                    CommentSpacing::Leading,
-                );
-            }
-        } else if class_expr.type_parameters.is_none()
-            && class_expr.super_class.is_none()
-            && class_expr.implements.is_empty()
-        {
-            // Anonymous class without heritage: extract comments between `class` and body
-            // `class /* c */ {}` — heritage comment handling covers the heritage case
-            if self.has_line_comments_between(class_keyword_start, class_expr.body.span.start) {
-                // Line comment: hardline after, body on new line without extra space
-                // `class // c\n{}` — no heritage/type params, so return early
-                parts.push(self.build_name_to_type_params_comments(
-                    class_keyword_start,
-                    class_expr.body.span.start,
-                    CommentSpacing::Leading,
-                ));
-                parts.push(self.build_class_body_doc(
-                    &class_expr.body,
-                    self.gap_frozen_span(class_keyword_start, class_expr.body.span),
-                ));
-                return d.concat(&parts);
-            }
-            if let Some(comment_doc) = self.build_comments_between_filtered_opt(
-                class_keyword_start,
-                class_expr.body.span.start,
-                CommentSpacing::Leading,
-                CommentFilter::All,
-            ) {
-                parts.push(comment_doc);
             }
         }
+        // The name→body and `class`→body gaps are NOT emitted here: `header_end` already
+        // falls back to the name's end (or the `class` keyword's) when there is no heritage
+        // and no type params, so `build_class_header_doc` resolves every class shape's
+        // header→`{` gap through the one seam. Emitting them here instead is what made the
+        // bare-name and anonymous forms answer that gap differently from their siblings.
 
         // Type parameters (TypeScript generics): class<T>
         // Use _wrapping version for width-based line breaking
@@ -1977,11 +1945,6 @@ impl<'a> Printer<'a> {
             positions.implements_keyword_start,
         );
 
-        // The bare name→body / anonymous→body comments are emitted above, so only
-        // scan for header→body comments here when heritage or type params exist.
-        let emit_pre_body_comments =
-            positions.first_heritage_start.is_some() || class_expr.type_parameters.is_some();
-
         // Assemble the header (group-wrapped); the body is appended outside the
         // group so its hardlines don't affect the header's fit check.
         // Resolved once for the header placement and the body emission, as in the
@@ -1997,7 +1960,7 @@ impl<'a> Printer<'a> {
                 body_is_empty: class_expr.body.body.is_empty(),
                 body_start: class_expr.body.span.start,
                 layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
-                emit_pre_body_comments,
+
                 body_frozen: frozen_body.is_some(),
             },
         );
