@@ -526,7 +526,7 @@ impl<'a> Printer<'a> {
         // An alone-on-line format-ignore directive in the `<`→type gap freezes a
         // non-composite cast type verbatim (`single_child_frozen`; a composite
         // declines and freezes via its own leading-run walk). The broken-cast path
-        // below already keeps the directive own-line (`build_list_leading_comments`),
+        // below already keeps the directive own-line (`build_leading_comments_multiline`),
         // so the freeze slots in as the type doc.
         let type_doc = if self.single_child_frozen(angle_end, type_assert.type_annotation) {
             self.build_frozen_single_child_doc(type_assert.type_annotation)
@@ -664,7 +664,7 @@ impl<'a> Printer<'a> {
         let angle_end = open_pos + 1; // after `<`
         let (angle_prefix, angle_pull_pos) =
             self.delimiter_line_comment_prefix(open_pos, type_start);
-        let leading = self.build_list_leading_comments(angle_end, type_start, angle_pull_pos);
+        let leading = self.build_leading_comments_multiline(angle_end, type_start, angle_pull_pos);
         let trailing = self.build_trailing_gap_comments(type_end, close_angle);
         // `group_break`, not a bare concat: this is the already-broken form, and saying
         // so contains the leading run's soft `line` (prettier's `printLeadingComment`)

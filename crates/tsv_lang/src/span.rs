@@ -26,6 +26,20 @@ impl Span {
         &source[self.start as usize..self.end as usize]
     }
 
+    /// Whether `inner` lies wholly within this span (inclusive on both ends, so a
+    /// span contains itself).
+    ///
+    /// The question every "does this comment belong to that node rather than to the
+    /// gap around it?" test asks — the list-expansion gates' inside-an-item filters,
+    /// the compiler's dropped-region and module-script checks, and the ignore-range
+    /// hoist cut. Spelled once here because the inclusive/exclusive choice at each end
+    /// is the whole content of the predicate, and five hand-written copies is five
+    /// chances to pick differently.
+    #[inline]
+    pub fn contains(&self, inner: Span) -> bool {
+        inner.start >= self.start && inner.end <= self.end
+    }
+
     /// Convert to `std::ops::Range<usize>` for indexing
     #[inline]
     pub fn range(&self) -> std::ops::Range<usize> {

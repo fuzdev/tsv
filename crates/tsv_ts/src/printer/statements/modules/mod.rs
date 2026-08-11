@@ -595,6 +595,36 @@ impl<'a> Printer<'a> {
         self.finish_with_pre_semi(parts, content_end, decl.span.end, false)
     }
 
+    /// Emit an import declaration's leading header keyword — an import-phase keyword
+    /// (`source` / `defer`) or `type` — preserving any comment the author wrote in the
+    /// `import`→keyword gap.
+    ///
+    /// The two are mutually exclusive and ask one question, so they share one emitter.
+    /// Scanning that gap is what makes the comment *reachable*: emitting the keyword as a
+    /// bare fixed text scans none of it, so a comment there reaches no emitter at all and
+    /// is DROPPED. Prettier relocates such a comment past the keyword (for `type`, to a
+    /// target that varies by form — after `from` for empty, into the braces for named
+    /// specifiers, to the binding side for default/namespace); tsv preserves it —
+    /// `phase_keyword_comment_svelte_prettier_divergence`.
+    ///
+    /// A line comment in the gap indents the keyword's continuation one level (statement
+    /// continuation); the leading space comes from the `import ` token the caller has
+    /// already pushed, and the trailing one from here.
+    fn push_import_header_keyword(
+        &self,
+        parts: &mut DocBuf,
+        decl: &internal::ImportDeclaration<'_>,
+        keyword: &'static str,
+    ) {
+        let d = self.d();
+        let kw_end = decl.span.start + MODULE_KW_LEN;
+        let keyword_start = self
+            .find_keyword_in_range(kw_end, decl.source.span.start, keyword)
+            .unwrap_or(kw_end);
+        parts.push(self.gap_comment_continuation_tail(kw_end, keyword_start, d.text(keyword)));
+        parts.push(d.text(" "));
+    }
+
     /// Build a Doc for an import declaration
     ///
     /// Uses d.group() for width-based wrapping of named specifiers.
@@ -644,39 +674,16 @@ impl<'a> Printer<'a> {
         // Build the full import statement
         let mut parts = smallvec![d.text("import ")];
 
-        // Phase keyword for the import-phase proposals: `import source …` (binding)
-        // / `import defer …` (namespace). Mutually exclusive with `type`. The
-        // keyword spelling is `ImportPhase::as_str`'s — the single source of truth.
-        //
-        // The `import`→phase-keyword gap is scanned for exactly the same reason the
-        // `type` branch below scans its own: it is a position an author can comment in,
-        // and emitting the keyword as a bare fixed text scans none of it, so the comment
-        // reaches no emitter and is DROPPED. Prettier relocates a comment here past the
-        // keyword; tsv preserves it, matching what `type` already does in this same
-        // header slot — `phase_keyword_comment_svelte_prettier_divergence`.
-        if let Some(kw) = decl.phase.as_str() {
-            let kw_end = decl.span.start + MODULE_KW_LEN;
-            let phase_start = self
-                .find_keyword_in_range(kw_end, decl.source.span.start, kw)
-                .unwrap_or(kw_end);
-            parts.push(self.gap_comment_continuation_tail(kw_end, phase_start, d.text(kw)));
-            parts.push(d.text(" "));
+        // The leading header keyword, if any — the import-phase proposals'
+        // `import source …` (binding) / `import defer …` (namespace), whose spelling is
+        // `ImportPhase::as_str`'s, or `type`. Mutually exclusive, and one emitter: see
+        // `push_import_header_keyword` for why the gap before it must be scanned. The
+        // `type`/phase→binding/`{` gap is handled beside each form below.
+        if let Some(keyword) = decl.phase.as_str() {
+            self.push_import_header_keyword(&mut parts, decl, keyword);
         }
-
-        // Add 'type' keyword for type-only imports
         if is_type_import {
-            // Type-only import: preserve a comment between `import` and the `type`
-            // keyword in place — prettier relocates it (after `from` for empty, into
-            // the braces for named specifiers, to the binding side of `type` for
-            // default/namespace). A line comment indents the `type …` continuation
-            // one level (statement continuation); the leading space comes from the
-            // `import ` token above. The `type`→binding/`{` gap is handled beside
-            // each form.
-            let kw_end = decl.span.start + MODULE_KW_LEN;
-            let type_start = self
-                .find_keyword_in_range(kw_end, decl.source.span.start, "type")
-                .unwrap_or(kw_end);
-            parts.push(self.gap_comment_continuation_tail(kw_end, type_start, d.text("type ")));
+            self.push_import_header_keyword(&mut parts, decl, "type");
         }
 
         // Position just past the leading keyword(s), used to bound the scan for

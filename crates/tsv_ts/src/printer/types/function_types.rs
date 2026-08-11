@@ -736,7 +736,7 @@ impl<'a> Printer<'a> {
         // function/constructor-type twin below does: the previous param's claimed trailing
         // run ([`Printer::push_item_trailing_run`]) stays before the comma, and whatever
         // the run leaves behind leads the next param after it
-        // ([`Printer::build_list_leading_comments`]).
+        // ([`Printer::build_leading_comments_multiline`]).
         //
         // ⚠️ **Emitting the whole gap as the previous param's trailing run — the shape this
         // loop had — moves an after-comma comment BACKWARD across the comma**
@@ -774,7 +774,7 @@ impl<'a> Printer<'a> {
             // author gave its own line takes the soft `line` that breaks with this list
             // instead of a space that glues it to the param.
             if comments_present {
-                param_parts.extend(self.build_list_leading_comments(
+                param_parts.extend(self.build_leading_comments_multiline(
                     leading_start,
                     param.span().start,
                     None,
@@ -833,14 +833,15 @@ impl<'a> Printer<'a> {
     /// in the delimited list, and an own-line block after the last param. Each of these
     /// would otherwise be swallowed or collapsed by an inline layout.
     ///
-    /// ⚠️ **The `(`→first-param gap does not get a SECOND, wider question.** It used to:
-    /// a `has_own_line_block_comment_after` predicate anchored on the `(`'s line, so a block
-    /// merely written below the `(` forced the list open even when it hugged its param
-    /// (`(⏎/* c */ a: string)`, which prettier collapses) — and it re-answered a gap the
-    /// leading-comment walk already covers with the shared classification. The
-    /// delimiter-line question that predicate exists for is about a comment *on* the
-    /// delimiter's line, which is a `delimiter_line_comment_prefix` concern, not a
-    /// force-multiline one.
+    /// ⚠️ **The `(`→first-param gap does not get a SECOND, wider question.** A predicate
+    /// anchored on the `(`'s LINE — "is this block below the `(`?" — is the one-sided
+    /// reading, so a block merely written below the `(` forced the list open even when it
+    /// hugged its param (`(⏎/* c */ a: string)`, which prettier collapses); the walk above
+    /// already covers that gap with the shared two-sided classification
+    /// ([`Printer::block_comment_owns_its_line`]), which sees the param on the comment's
+    /// line and collapses. The delimiter-line question a `(`-anchored reading belongs to is
+    /// about a comment *on* the delimiter's line, which is a
+    /// [`Printer::delimiter_line_comment_prefix`] concern, not a force-multiline one.
     ///
     /// `comments_present` is the caller's window gate (its window is a superset of every
     /// range asked here), so a comment-free list pays one blank-line scan and nothing else.
@@ -1093,7 +1094,7 @@ impl<'a> Printer<'a> {
                     // `printLeadingComment` — in particular the soft `line` a run the author
                     // gave its own line takes, which breaks with this list rather than
                     // gluing the pair to a param the broken list puts below it.
-                    param_parts.extend(self.build_list_leading_comments(
+                    param_parts.extend(self.build_leading_comments_multiline(
                         leading_start,
                         p.span().start,
                         None,
@@ -1170,7 +1171,11 @@ impl<'a> Printer<'a> {
             // Leading comments (after previous comma or `(`); for the first param,
             // exclude comments already pulled onto the `(` line.
             let skip_delim = if i == 0 { paren_pull_pos } else { None };
-            inner_parts.extend(self.build_list_leading_comments(prev_end, param_start, skip_delim));
+            inner_parts.extend(self.build_leading_comments_multiline(
+                prev_end,
+                param_start,
+                skip_delim,
+            ));
 
             inner_parts.push(self.build_function_type_param_item_doc(paren_pos, params, i));
 

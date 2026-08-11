@@ -12,6 +12,16 @@ prettier relocates both to before `with`, tsv keeps them where they were written
 This is the empty-`with` analog of the `with_keyword_comment` and
 `source_trailing_comment` import divergences.
 
+**Keeping the comment inside is a claim about position, never a licence to lose
+it.** A lone block comment that fits stays inline and delimiter-tight (c3,
+`{/* c3 */}`), but a **line** comment cannot be inlined — the `}` and the `;`
+would land inside it — so it breaks the braces open (c5), and a **run** takes one
+line per comment in source order (c6/c7), including two blocks (c8/c9), since the
+dangling separator is unconditional. That is the empty tuple type's rule
+(`type A = [/* c */]` vs `[⏎ // c⏎]`), reached through the same shared emitter, so
+the two empty containers answer one question one way. Prettier relocates every one
+of these out past the `;` instead.
+
 Per Comment Position Philosophy, tsv keeps each comment where the author wrote it
 rather than relocating it to a canonical position.
 

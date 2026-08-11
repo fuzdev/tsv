@@ -43,7 +43,8 @@ pub(crate) enum BlankRule {
 /// union-vs-intersection split [`Printer::is_own_line_comment`] carries.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum StandaloneGlue {
-    /// The SOURCE reading ([`Printer::comment_hugs_next`]): anything after the `*/` on
+    /// The SOURCE reading (the glue half is [`Printer::comment_hugs_next`], reached through
+    /// the shared [`Printer::block_comment_owns_its_line`]): anything after the `*/` on
     /// that line glues the comment, the container's own comma included.
     /// The **object literal** and **object pattern**, whose separator is re-emitted
     /// structure outside every property span — so `{ a: 1⏎/* c */,⏎b: 2 }` collapses
@@ -103,25 +104,21 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build the leading-comment run over `[start, end)` for one item of a list — the
-    /// bracketed families (tuples, type params/args, function-type params, unions, the
-    /// bracket-break shell, the broken cast), on both their layouts: the all-hardline
-    /// builder a line comment forces, and the width-decided one beside it.
+    /// Build the leading-comment run over `[start, end)` for a list whose comments have
+    /// forced it multiline (tuples, type params/args, function-type params, unions, the
+    /// bracket-break shell, the broken cast).
     ///
     /// A thin adapter over the shared leading-comment emitter
     /// ([`Printer::push_leading_comment_run`]), so the separator after each comment
     /// follows prettier's `printLeadingComment` (space / soft `line` / hardline, keyed on
-    /// the source around *that* comment, never on where `end` is). The soft `line` is why
-    /// the width-decided layout must route here too: it is the separator that renders
-    /// differently in the two layouts, so a hardcoded space there gives the same document
-    /// a second fixed point (`docs/comments.md` §Own-line-ness is a SOURCE question).
+    /// the source around *that* comment, never on where `end` is).
     ///
     /// `skip_delim` drops the comments sharing `pos`'s source line: they were already
     /// emitted as a trailing prefix on the opening delimiter's line (see
     /// [`Self::delimiter_line_comment_prefix`]), so emitting them here too would
     /// **duplicate** them. Pass the `Option<u32>` that helper returns — gated to the list's
     /// first element, `None` for the rest, and `None` where no delimiter is involved.
-    pub(in crate::printer) fn build_list_leading_comments(
+    pub(in crate::printer) fn build_leading_comments_multiline(
         &self,
         start: u32,
         end: u32,
@@ -174,7 +171,7 @@ impl<'a> Printer<'a> {
     /// Builds the run here so the separator policy every array-family element shares
     /// (`LeadingGlue::Adjacent`, no continuation indent) is stated once rather than at each
     /// call. The range-holding sibling is
-    /// [`Self::build_list_leading_comments`].
+    /// [`Self::build_leading_comments_multiline`].
     pub(crate) fn build_list_element_group_from_comments<'c>(
         &self,
         comments: impl Iterator<Item = &'c internal::Comment>,
@@ -762,7 +759,8 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let (line_prefix, pull_pos) = self.delimiter_line_comment_prefix(bracket_char, body_start);
-        let mut inner = self.build_list_leading_comments(bracket_char + 1, body_start, pull_pos);
+        let mut inner =
+            self.build_leading_comments_multiline(bracket_char + 1, body_start, pull_pos);
         inner.push(body);
         d.group_break(d.concat(&[
             d.text(open),
@@ -1031,7 +1029,11 @@ impl<'a> Printer<'a> {
     /// Containers that always break with a dangling comment (class, interface,
     /// and namespace bodies) reach the same emitter through
     /// [`Self::build_empty_body_with_comments_doc`], with `sep` a `hardline`.
-    fn build_empty_inline_with_comments_doc(
+    ///
+    /// The empty import-attribute clause (`with {}`) calls it directly, from
+    /// `statements/modules/import_attributes.rs` — hence `pub(in crate::printer)`
+    /// rather than module-private.
+    pub(in crate::printer) fn build_empty_inline_with_comments_doc(
         &self,
         span_start: u32,
         span_end: u32,

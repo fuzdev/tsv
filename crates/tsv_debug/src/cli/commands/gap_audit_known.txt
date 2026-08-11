@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 374
+# shapes: 366
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -216,8 +216,6 @@ DROPPED	␣⟨⟩{}	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{})	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩}	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	'}⟨⟩/*	line
-DOUBLE-PRINTED	'}⟨⟩;	line
 DOUBLE-PRINTED	(@⟨⟩/*	line
 DOUBLE-PRINTED	(@⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	(@⟨⟩␣	line
@@ -226,9 +224,7 @@ DOUBLE-PRINTED	(⟨⟩NUM	line
 DOUBLE-PRINTED	).⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	)⟨⟩.	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	)⟨⟩␣	line
-DOUBLE-PRINTED	*/}⟨⟩;	line
 DOUBLE-PRINTED	*/⟨⟩),	line
-DOUBLE-PRINTED	*/⟨⟩;	line
 DOUBLE-PRINTED	*/⟨⟩␣	line
 DOUBLE-PRINTED	...⟨⟩IDENT	line
 DOUBLE-PRINTED	<⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
@@ -246,11 +242,8 @@ DOUBLE-PRINTED	IDENT⟨⟩}{:	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	IDENT⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	NUM⟨⟩)	line
 DOUBLE-PRINTED	}{⟨⟩IDENT	line
-DOUBLE-PRINTED	}⟨⟩;	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	}⟨⟩␣	line
 DOUBLE-PRINTED	␣⟨⟩/*	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩//	annotation,block,jsdoc_cast,multiline
-DOUBLE-PRINTED	␣⟨⟩;	line
 DOUBLE-PRINTED	␣⟨⟩@	line
 DOUBLE-PRINTED	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩[	line
@@ -360,7 +353,6 @@ SWALLOW	void⟨⟩;//	line
 SWALLOW	{*⟨⟩/*	line
 SWALLOW	{}*⟨⟩#	line
 SWALLOW	{}*⟨⟩IDENT	line
-SWALLOW	{⟨⟩/*	line
 SWALLOW	}⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	}⟨⟩);	line
 SWALLOW	}⟨⟩␣	line

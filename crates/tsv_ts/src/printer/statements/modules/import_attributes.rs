@@ -5,6 +5,7 @@
 use super::Printer;
 use crate::ast::internal;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -24,6 +25,11 @@ impl<'a> Printer<'a> {
     /// string literal — where the `with` keyword search begins; `stmt_end` is
     /// the declaration's span end (the `;`). PR #17329 (prettier 3.7): break
     /// attributes across lines when long.
+    ///
+    /// ⚠️ `stmt_end` bounds the token SEARCHES only (the `with` keyword, the braces) —
+    /// never a comment claim. Every comment window this clause opens closes at the `}`,
+    /// because the `}`→`;` gap belongs to the caller's post-`;` run; see the partition
+    /// note at the expansion gate below.
     pub(super) fn push_import_attributes_clause(
         &self,
         parts: &mut DocBuf,
@@ -52,6 +58,13 @@ impl<'a> Printer<'a> {
         let close_search_start = attributes.last().map_or(brace_start, |a| a.span.end);
         let brace_close = self.close_brace_offset(close_search_start, stmt_end);
 
+        // The clause's `{…}` span, and the one carrier of where it ENDS. Every window this
+        // function opens, the single-type gate, and the content end returned to the caller
+        // all take that bound from here rather than respelling `brace_close + 1` — the
+        // partition against the caller's post-`;` run is exactly what drifted when they did
+        // (see the expansion gate below).
+        let brace_span = Span::new(brace_start, brace_close + 1);
+
         // Build the `{…}` clause doc (kept as a local so the comment-forced-break
         // handling below can wrap it in `indent`).
         let brace_doc = if attributes.is_empty() {
@@ -59,32 +72,42 @@ impl<'a> Printer<'a> {
             // the braces is kept in place (`with {/* c */}`); prettier instead
             // relocates it before `with` — a comment-position divergence, like the
             // `with`→`{` gap. See attributes_empty_comment_prettier_divergence.
-            let mut inner: DocBuf = smallvec![d.text("{")];
-            let mut last_was_line = false;
-            let mut any_comment = false;
-            for comment in comments_to_emit_in_range(self.comments, brace_start + 1, brace_close) {
-                if any_comment {
-                    inner.push(d.text(" "));
-                }
-                inner.push(self.build_comment_doc(comment));
-                last_was_line = !comment.is_block;
-                any_comment = true;
-            }
-            // A trailing line comment would swallow the `}`; push it to a new line.
-            if last_was_line {
-                inner.push(d.hardline());
-            }
-            inner.push(d.text("}"));
-            d.concat(&inner)
+            //
+            // The run goes through the shared empty-container emitter, not a loop of its
+            // own: a hand-rolled one separated the comments with a plain `" "`, which
+            // WELDED the run (`/* c1 */ /* c2 */` reparsing as one) and, behind a `//`,
+            // swallowed the `}` and the `;` with it — output that does not reparse from
+            // input canonical Svelte accepts. Only a `//` that landed LAST was pushed
+            // clear, which is exactly the kind test `docs/comments.md` §Trailing and
+            // dangling runs names as the trap. The shared emitter breaks the braces open
+            // whenever the run holds a line comment and keeps a lone fitting block inline
+            // (`{/* c */}`, delimiter-tight via the `softline` separator) — the empty
+            // tuple type's rule, reached through the same call.
+            self.build_empty_inline_with_comments_doc(
+                brace_span.start,
+                brace_span.end,
+                "{}",
+                d.softline(),
+            )
         } else {
-            // Expanding comments force the multiline path — line comments anywhere in the
-            // list, and block comments the author isolated on their own line between the
-            // braces (collapsing `with {⏎ /* c */⏎ type: 'json' }` inline would move the
-            // comment). The attribute brace formerly asked only about line comments.
-            let has_expanding_comments =
-                self.has_line_comments_in_delimited_list(attributes, |a| a.span, stmt_end)
-                    || self.has_line_comments_between(brace_start + 1, attributes[0].span.start)
-                    || self.has_own_line_attribute_comments(attributes, brace_start, brace_close);
+            // Expanding comments force the multiline path — the two shared line-comment
+            // clauses, plus block comments the author isolated on their own line between
+            // the braces (collapsing `with {⏎ /* c */⏎ type: 'json' }` inline would move
+            // the comment). The own-line-block clause is the attribute clause's own
+            // (`has_own_line_attribute_comments`) rather than the bracketed-list
+            // spelling, which is why this can't call
+            // `has_expanding_comments_in_bracket_list` wholesale.
+            //
+            // ⚠️ Every window closes at the `}`, never at the `;`: the `}`→`;` gap belongs
+            // to the caller's post-`;` run (`finish_with_pre_semi`), and the two must
+            // PARTITION the statement (docs/comments.md §The element-comma seam). Taking
+            // the bound from `brace_span` is what keeps that true — restating it here once
+            // reached `stmt_end`, giving the gap a second emitter and DOUBLE-PRINTING every
+            // comment in it.
+            let attr_span = |a: &internal::ImportAttribute<'_>| a.span;
+            let has_expanding_comments = self
+                .has_expanding_line_comments_in_bracket_list(brace_span, attributes, attr_span)
+                || self.has_own_line_attribute_comments(attributes, brace_start, brace_close);
             if has_expanding_comments {
                 // A same-line comment trailing the `with {` brace stays on the
                 // brace line, like the import/export specifier brace
@@ -94,9 +117,9 @@ impl<'a> Printer<'a> {
                 self.build_braced_hardline_comma_list(
                     attributes,
                     brace_start,
-                    stmt_end,
+                    brace_close,
                     attributes[0].span.start,
-                    |a| a.span,
+                    attr_span,
                     |a| self.build_import_attribute_doc(a),
                 )
             } else {
@@ -104,10 +127,10 @@ impl<'a> Printer<'a> {
                     attributes,
                     brace_start,
                     brace_close,
-                    |a| a.span,
+                    attr_span,
                     |a| self.build_import_attribute_doc(a),
                 );
-                if self.is_single_type_attribute(attributes, brace_start, brace_close) {
+                if self.is_single_type_attribute(attributes, brace_span) {
                     // Ordered FIRST because prettier applies `removeLines` *after*
                     // `printObject`: the never-break rule outranks the authored break
                     // below, so `with {⏎ type: 'json'⏎}` still collapses.
@@ -142,7 +165,7 @@ impl<'a> Printer<'a> {
             self.gap_comment_indented_continuation(with_end, brace_start, brace_doc),
         ]);
         parts.push(self.gap_comment_indented_continuation(source_end, with_start, with_clause));
-        brace_close + 1
+        brace_span.end
     }
 
     /// Prettier's `isSingleTypeImportAttributes` (its `printImportAttributes`): a lone
@@ -158,13 +181,13 @@ impl<'a> Printer<'a> {
     /// Comments: prettier asks `hasComment` of the attribute, its key and its value —
     /// between the braces, and nowhere else. The `with`→`{` gap is deliberately not
     /// included (prettier relocates such a comment before `with` and still flattens),
-    /// nor is the `}`→`;` gap. The question is ON-PAGE, so a glued block comment owned
-    /// by the value counts, exactly as prettier's `hasComment(value)` does.
+    /// nor is the `}`→`;` gap — `brace_span` is the whole window, and taking it from the
+    /// caller is what keeps that exclusion true. The question is ON-PAGE, so a glued block
+    /// comment owned by the value counts, exactly as prettier's `hasComment(value)` does.
     fn is_single_type_attribute(
         &self,
         attributes: &[internal::ImportAttribute<'_>],
-        brace_start: u32,
-        brace_close: u32,
+        brace_span: Span,
     ) -> bool {
         let [attribute] = attributes else {
             return false;
@@ -172,7 +195,7 @@ impl<'a> Printer<'a> {
         if !matches!(attribute.value.value, internal::LiteralValue::String(_)) {
             return false;
         }
-        if self.has_comments_on_page_between(brace_start, brace_close + 1) {
+        if self.has_comments_on_page_between(brace_span.start, brace_span.end) {
             return false;
         }
         match &attribute.key {
@@ -234,9 +257,7 @@ impl<'a> Printer<'a> {
         brace_close: u32,
     ) -> bool {
         tsv_lang::comments_in_source_range(self.comments, brace_start + 1, brace_close).any(|c| {
-            let inside_attribute = attributes
-                .iter()
-                .any(|a| c.span.start >= a.span.start && c.span.end <= a.span.end);
+            let inside_attribute = attributes.iter().any(|a| a.span.contains(c.span));
             if inside_attribute {
                 return false;
             }

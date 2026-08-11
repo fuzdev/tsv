@@ -1091,10 +1091,9 @@ impl<'a> Printer<'a> {
             }
 
             // Skip comments that are inside an element (they belong to that element, not this list)
-            let inside_element = items.iter().any(|e| {
-                let s = get_printed_span(e);
-                comment.span.start >= s.start && comment.span.end <= s.end
-            });
+            let inside_element = items
+                .iter()
+                .any(|e| get_printed_span(e).contains(comment.span));
             if inside_element {
                 continue;
             }
@@ -1149,15 +1148,49 @@ impl<'a> Printer<'a> {
     where
         F: Fn(&T) -> Span,
     {
-        let Some(first) = items.first() else {
+        // An empty list short-circuits BEFORE the own-line-block clause, which reads
+        // `element_follows: false` with no items and would call a lone own-line block in
+        // an empty `<>` an expansion trigger.
+        if items.is_empty() {
             return false;
-        };
+        }
         if !self.has_comments_on_page_between(span.start, span.end) {
             return false;
         }
+        self.has_expanding_line_comments_in_bracket_list(span, items, &get_span)
+            || self.has_own_line_block_comments_in_bracket_list(span, items, &get_span)
+    }
+
+    /// The two LINE-comment clauses of [`Self::has_expanding_comments_in_bracket_list`] —
+    /// a `//` in the opener→first-item gap, and one anywhere between or after the items.
+    ///
+    /// Split out for the caller whose own-line-BLOCK clause differs: the `with { … }`
+    /// import-attribute clause, which must ask
+    /// [`Printer::has_own_line_attribute_comments`] instead (a glued attribute makes the
+    /// bracketed-list spelling non-idempotent — see that function). It is the only
+    /// legitimate reason to bypass the three-clause predicate above; a caller with an
+    /// *extra* question `||`s it onto that one rather than restating any clause here.
+    ///
+    /// ⚠️ **Both clauses take their bounds from `span`, and that is the point.** Restating
+    /// them per site means restating the closing-delimiter offset, and the attribute clause
+    /// got it wrong — it reached to the statement's `;` instead of the `}`, handing the
+    /// `}`→`;` gap a second emitter on top of the caller's post-`;` run and DOUBLE-PRINTING
+    /// every comment there (`docs/comments.md` §The element-comma seam). Deriving
+    /// `span.end - 1` in one place makes that slip unspellable.
+    pub(crate) fn has_expanding_line_comments_in_bracket_list<T, F>(
+        &self,
+        span: Span,
+        items: &[T],
+        get_span: F,
+    ) -> bool
+    where
+        F: Fn(&T) -> Span,
+    {
+        let Some(first) = items.first() else {
+            return false;
+        };
         self.has_line_comments_between(span.start + 1, get_span(first).start)
             || self.has_line_comments_in_delimited_list(items, &get_span, span.end - 1)
-            || self.has_own_line_block_comments_in_bracket_list(span, items, &get_span)
     }
 
     /// Find the closing `)` between a start position and end boundary.
