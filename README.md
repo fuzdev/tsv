@@ -19,7 +19,7 @@ bridging to JS or WASM plugins is an open question (leaning against).
 Compared to [rsvelte](https://github.com/baseballyama/rsvelte),
 tsv has its own TS/JS/CSS parsers instead of using Oxc,
 and rsvelte additionally has a compiler and linter/typechecker integration
-(tsv has some in-progress work here, scope unknown).
+(tsv has some in-progress work here, scope unknown, may never ship).
 
 tsv prioritizes, in order:
 
@@ -74,14 +74,14 @@ Future features (unknown order):
   but the lift to support it is small)
 - JS parsing diagnostics (test262 negative cases)
 - CSS error recovery (recover past invalid CSS per the spec)
-- maybe later:
-  - Svelte compiler (experimental partial implementation)
-  - TypeScript 7 integration (the Go impl), unlocking:
+- maybe later or never:
+  - Svelte compiler (experimental partial implementation, may never ship)
+  - likely TypeScript 7 integration (the Go impl), unlocking:
+    - linter - type aware, initially focused on serializable data-only plugins for extensibility
     - svelte-check replacement
     - LSP
-    - linter - type aware, initially focused on serializable data-only plugins for extensibility
     - includes an experimental first-party typechecker `tsv_check` (which may never ship)
-  - bundling is probably out of scope 
+  - bundling is out of scope 
   - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
 
 ## Install
