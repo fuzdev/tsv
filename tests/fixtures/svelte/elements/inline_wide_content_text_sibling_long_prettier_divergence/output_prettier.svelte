@@ -12,9 +12,16 @@
 	it re-breaks the hug and keeps the own-line form stable.
 -->
 <p>
-	<a href="#">alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar</a> mid <b>x</b>
+	<a href="#">
+		alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar
+	</a>
+	mid <b>x</b>
 </p>
 
 <p>
-	<span>a</span> <b>alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar</b> mid <i>z</i>
+	<span>a</span>
+	<b>
+		alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar
+	</b>
+	mid <i>z</i>
 </p>
