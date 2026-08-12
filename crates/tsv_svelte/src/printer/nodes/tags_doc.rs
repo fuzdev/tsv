@@ -354,12 +354,13 @@ impl<'a> Printer<'a> {
             let id_start = id.span().start;
             if i > 0 {
                 // Locate the separator comma at bracket depth 0 in the gap between
-                // the previous identifier and this one (each identifier is a plain
-                // `Identifier`, so the gap holds only trivia and the one comma). A
-                // comment before the comma trails the previous identifier; one after
-                // it leads this one. Scanning trivia-aware — the same scan
-                // `parse_const_tag` uses — keeps a `,` inside a comment from
-                // mis-anchoring the split.
+                // the previous identifier and this one (an identifier is a plain
+                // `Identifier` or a JSDoc cast of one, whose span starts at its `(`
+                // and whose comment is gap trivia here, so the gap holds only
+                // trivia and the one comma). A comment before the comma trails the
+                // previous identifier; one after it leads this one. Scanning
+                // trivia-aware — the same scan `parse_const_tag` uses — keeps a `,`
+                // inside a comment from mis-anchoring the split.
                 let comma = crate::parser::find_top_level_delim(
                     self.source.as_bytes(),
                     last_end as usize,
@@ -383,7 +384,12 @@ impl<'a> Printer<'a> {
                 comments_in_source_range(self.comments, last_end, id_start)
                     .map(|c| self.build_leading_js_comment_doc(c)),
             );
-            parts.push(d.source_span(id.span(), self.source));
+            // Not a bare `d.source_span`: a JSDoc-cast entry's span (`(a)`) can
+            // hold an interior comment (`(a /* c */)`) that rides out inside the
+            // slice and reaches no comment emitter — the ledger is told the
+            // range is covered. Still ordinary source-slice semantics (an
+            // interior newline breaks the enclosing group).
+            parts.push(self.source_span_covering_comments_doc(id.span()));
             last_end = id.span().end;
         }
 
