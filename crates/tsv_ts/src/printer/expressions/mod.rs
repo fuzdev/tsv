@@ -120,9 +120,19 @@ impl<'a> Printer<'a> {
     /// (`{@const}`'s init, inheriting the host document's mode) stays Grouped: its
     /// assignment layout owns the indent, and ContinuationIndent would stack on top.
     ///
+    /// Also where the embed's other build-time field lands: a host that cannot hang a
+    /// leading cast (`EmbedContext::jsdoc_cast_cannot_hang` — a Svelte braced head) has
+    /// the root's left-spine cast marked here, before any doc is built, so its
+    /// comment→`(` break reflows in every authoring (`build_jsdoc_cast_doc`). Both root
+    /// entries — this doc builder and `print_expression`'s string path — pass through
+    /// here, so the flag cannot behave differently per entry.
+    ///
     /// Only the Embedded-root *question* lives here; the answer is
     /// `build_continuation_indent_expression_doc`, shared with the cast operand.
     pub(crate) fn build_root_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+        if self.embed.jsdoc_cast_cannot_hang {
+            self.mark_jsdoc_cast_cannot_hang_gap(expr);
+        }
         if self.embed.is_embedded() {
             return self.build_continuation_indent_expression_doc(expr);
         }
@@ -333,6 +343,9 @@ impl<'a> Printer<'a> {
         // overwrites it — so an answer taken after the recursion below is the innermost
         // gap's, not this cast's, and every cast wrapping such a value lost its reflow.
         let in_value_gap = self.jsdoc_cast_in_value_gap(cast);
+        // The cannot-hang mark is entry-set and never overwritten, but read it up here
+        // beside its sibling so the two categories are decided at one time.
+        let in_cannot_hang_gap = self.jsdoc_cast_in_cannot_hang_gap(cast);
         // Rule A inside the cast's own parens: a directive alone on its line in the
         // `(`→inner gap freezes the INNER verbatim, with the cast's comment and parens
         // printing around the frozen slice. Freezing the paren-stripped inner rather than
@@ -374,8 +387,19 @@ impl<'a> Printer<'a> {
         // reflows to the space and both authorings reach the one fixed point every wide
         // cast already takes. Deciding it by width instead broke the gap without hanging
         // the value, landing the `(` at the statement's own indent.
+        //
+        // ⚠️ A **cannot-hang** gap (a Svelte braced head,
+        // [`Printer::jsdoc_cast_cannot_hang_target`]) outranks even the hardline arm: the
+        // host has no operator line to end, so the hardline the own-line authoring earns
+        // everywhere else would strand the `(` at the head's own column — pass 1 forces
+        // the head open, pass 2 reads the comment as mid-line and collapses it, no fixed
+        // point. The reflow lands both authorings on the one-line form the glued authoring
+        // already reaches. See docs/conformance_prettier_svelte.md §Svelte: Own-line JSDoc
+        // cast at a braced head.
         let comment_doc = self.build_comment_doc(&cast.comment);
-        let comment_gap = if jsdoc_cast_comment_is_own_line(cast, self.source) {
+        let comment_gap = if in_cannot_hang_gap {
+            d.text(" ")
+        } else if jsdoc_cast_comment_is_own_line(cast, self.source) {
             d.hardline()
         } else if self.comment_hugs_next(&cast.comment) || in_value_gap {
             d.text(" ")

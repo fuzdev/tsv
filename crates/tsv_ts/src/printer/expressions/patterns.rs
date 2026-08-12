@@ -771,7 +771,12 @@ impl<'a> Printer<'a> {
                     // For regular keys, use property_key_doc to normalize string keys to identifiers
                     let key_region_end;
                     let key_doc = if p.computed {
-                        let inner = self.build_expression_doc(&p.key);
+                        // Cannot-hang gap: a leading cast in the `[`→key gap reflows
+                        // (`Printer::with_jsdoc_cast_cannot_hang_gap`), as at the
+                        // object-literal/class spelling (`build_computed_key_expr_doc`).
+                        let inner = self.with_jsdoc_cast_cannot_hang_gap(&p.key, || {
+                            self.build_expression_doc(&p.key)
+                        });
                         let (doc, end) =
                             self.build_computed_key_bracket_doc(p.span.start, &p.key, inner);
                         key_region_end = end;
