@@ -38,6 +38,39 @@ impl DirectiveValue {
     }
 }
 
+/// Which host an **unprefixed** `{…}` value is built for — the two per-host verdicts
+/// [`Printer::build_expression_content_with_comments`] needs, as one axis instead of the
+/// bool pair (`always_block` + `cast_cannot_hang`) whose fourth state no caller could
+/// mean.
+#[derive(Clone, Copy)]
+enum UnprefixedHost {
+    /// The expression tag — and everything routed through it: attribute values (event
+    /// handlers included), the `style:` directive value, and the special elements'
+    /// `this={…}`. Hugs its braces, so a leading JSDoc cast cannot hang its break and
+    /// reflows (`EmbedContext::jsdoc_cast_cannot_hang`).
+    Tag,
+    /// An expression-valued directive choosing hug-vs-block by expression kind
+    /// ([`Printer::build_expression_doc_parts_with_span`]): its block form gives a
+    /// leading cast's own-line comment a real indented line, so the authoring survives —
+    /// no reflow.
+    Directive,
+    /// `bind:`'s always-block path: block structure whatever the freeze verdict says,
+    /// with `Directive`'s no-reflow answer.
+    DirectiveBlock,
+}
+
+impl UnprefixedHost {
+    /// The caller wraps the content in block structure whatever the freeze verdict says.
+    const fn always_block(self) -> bool {
+        matches!(self, Self::DirectiveBlock)
+    }
+
+    /// A leading JSDoc cast cannot hang in this host, so its break reflows.
+    const fn cast_cannot_hang(self) -> bool {
+        matches!(self, Self::Tag)
+    }
+}
+
 // Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`
 // emits the prefix and derives the expression offset from its `.len()`, so these are the
 // single source for both the emitted text and the comment-scan anchor.
@@ -524,9 +557,10 @@ impl<'a> Printer<'a> {
         let frozen = self.honored_directive_in_gap(comment_start, expr.span().start);
 
         // Expression doc with any nested comments, under the host's own embed (this head
-        // is measured where it sits, unlike an unprefixed `{…}` value), plus the clarity
-        // parens an assignment owes (`{...(a = b)}`, `{@attach (a = b)}`).
-        let value_doc = self.build_head_value_doc(expr, frozen, &self.embed);
+        // is measured where it sits, unlike an unprefixed `{…}` value) plus the
+        // leading-cast reflow every hugging braced head owes, and the clarity parens an
+        // assignment owes (`{...(a = b)}`, `{@attach (a = b)}`).
+        let value_doc = self.build_head_value_doc(expr, frozen, &self.cannot_hang_embed());
         let value_doc = self.wrap_value_clarity_parens(expr, value_doc);
 
         // The head's CONTENT only — the prefix and the `}` are the assembler's
@@ -716,11 +750,24 @@ impl<'a> Printer<'a> {
     /// — such a value is measured from its own `{`, not from the enclosing embedding. That is
     /// the one thing separating it from the prefixed heads' value stage.
     ///
+    /// `host` carries the leading-JSDoc-cast verdict ([`UnprefixedHost`]): the expression
+    /// tag hugs its braces, so it cannot hang the cast's own-line hardline and the break
+    /// reflows; a directive value can take the block form, which gives the comment a
+    /// properly indented line of its own, so the authoring survives. See
+    /// [`Printer::build_head_value_doc`] and
+    /// docs/conformance_prettier_svelte.md §Svelte: Own-line JSDoc cast at a braced head.
+    ///
     /// Assignment expressions get the printer's clarity parens: `prop={(a = b)}`, on the
     /// frozen arm too — see [`Printer::wrap_value_clarity_parens`].
-    fn build_unprefixed_value_doc(&self, expr: &Expression<'_>, frozen: bool) -> DocId {
+    fn build_unprefixed_value_doc(
+        &self,
+        expr: &Expression<'_>,
+        frozen: bool,
+        host: UnprefixedHost,
+    ) -> DocId {
         let embed = tsv_lang::EmbedContext {
             mode: tsv_lang::LayoutMode::Embedded,
+            jsdoc_cast_cannot_hang: host.cast_cannot_hang(),
             ..tsv_lang::EmbedContext::default()
         };
         let value_doc = self.build_head_value_doc(expr, frozen, &embed);
@@ -744,7 +791,8 @@ impl<'a> Printer<'a> {
         // The verdict comes back OUT of the content builder rather than going in — it
         // selects the value's doc AND its layout (block vs hug) below, and the two must
         // never disagree. See [`HeadExpr`]; one resolution, so there is no second to drift.
-        let head = self.build_expression_content_with_comments(expr, tag_span, false);
+        let head =
+            self.build_expression_content_with_comments(expr, tag_span, UnprefixedHost::Directive);
 
         // For expressions with internal group structure, keep them hugged with the braces.
         // Prettier lets their internal structure handle wrapping.
@@ -820,11 +868,12 @@ impl<'a> Printer<'a> {
     /// A `tag_span` of `None` is a value with no braces: no gap to hold a directive, and no
     /// gap to hold a comment either, so the whole freeze-and-comment stage is the braced case.
     ///
-    /// `always_block` — the caller wraps the content in block structure whatever the freeze
-    /// verdict says (only `bind:`'s block-structure path does). A frozen value is
-    /// block-wrapped anyway, so the two together are the
-    /// [`Printer::trailing_comment_docs`] `closer_owns_break` question: an indented content's
-    /// break cannot serve a closer sitting outside that indent.
+    /// `host` — which unprefixed `{…}` host is building ([`UnprefixedHost`]), carrying the
+    /// two per-host verdicts. Its `always_block` half (only `bind:`'s block-structure path)
+    /// joins the freeze verdict as the [`Printer::trailing_comment_docs`]
+    /// `closer_owns_break` question: an indented content's break cannot serve a closer
+    /// sitting outside that indent. Its `cast_cannot_hang` half is forwarded to
+    /// [`Self::build_unprefixed_value_doc`], whose doc carries that rule.
     ///
     /// A leading line comment hangs the value the same way
     /// ([`Printer::leading_line_comment_hangs_value`]) and so answers that question too — but
@@ -836,11 +885,11 @@ impl<'a> Printer<'a> {
         &self,
         expr: &Expression<'_>,
         tag_span: Option<Span>,
-        always_block: bool,
+        host: UnprefixedHost,
     ) -> HeadExpr {
         let Some(span) = tag_span else {
             return HeadExpr {
-                doc: self.build_unprefixed_value_doc(expr, false),
+                doc: self.build_unprefixed_value_doc(expr, false, host),
                 frozen: false,
                 ends_with_line_comment: false,
                 owes_continuation_indent: false,
@@ -852,7 +901,7 @@ impl<'a> Printer<'a> {
         let frozen = self.honored_directive_in_gap(gap_start, value_start);
 
         let leading_comments = self.leading_comment_docs(gap_start, value_start);
-        let expr_doc = self.build_unprefixed_value_doc(expr, frozen);
+        let expr_doc = self.build_unprefixed_value_doc(expr, frozen, host);
         // Every arm the caller can pick indents the content when this is true — the
         // block-wrapping ones by their own structure, the hugging ones by paying
         // `owes_continuation_indent` — so the closer's answer is the same either way, and it
@@ -861,7 +910,7 @@ impl<'a> Printer<'a> {
         let (trailing_comments, ends_with_line_comment) = self.trailing_comment_docs(
             expr.span().end,
             span.end - 1,
-            frozen || always_block || hangs,
+            frozen || host.always_block() || hangs,
         );
 
         HeadExpr {
@@ -872,7 +921,7 @@ impl<'a> Printer<'a> {
             ),
             frozen,
             ends_with_line_comment,
-            owes_continuation_indent: hangs && !always_block,
+            owes_continuation_indent: hangs && !host.always_block(),
         }
     }
 
@@ -1148,8 +1197,13 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         tag_span: Option<Span>,
     ) -> DocBuf {
-        // Always the block form, so the freeze verdict changes nothing about the layout here.
-        let head = self.build_expression_content_with_comments(expr, tag_span, true);
+        // Always the block form, so the freeze verdict changes nothing about the layout
+        // here — and a leading cast's own-line comment keeps its line inside it.
+        let head = self.build_expression_content_with_comments(
+            expr,
+            tag_span,
+            UnprefixedHost::DirectiveBlock,
+        );
         smallvec![
             self.d().text("="),
             self.wrap_in_block_structure(head.doc, head.ends_with_line_comment)
@@ -1169,9 +1223,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // The same value-head content every unprefixed `{…}` builds — the tag always has its
         // braces, so the span is never absent. Only the assembly below is the tag's own: it
-        // hugs its braces where an attribute value chooses between hug and block.
-        let head =
-            self.build_expression_content_with_comments(&tag.expression, Some(tag.span), false);
+        // hugs its braces where an attribute value chooses between hug and block — which is
+        // why a leading cast cannot hang here (`UnprefixedHost::Tag`, the reflow).
+        let head = self.build_expression_content_with_comments(
+            &tag.expression,
+            Some(tag.span),
+            UnprefixedHost::Tag,
+        );
 
         if head.frozen {
             // A frozen value takes the broken block form, which supplies its own braces — so
