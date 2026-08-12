@@ -133,6 +133,26 @@ fn is_one_line_separator(t: &internal::Text, source: &str) -> bool {
     !data.is_empty() && data.chars().all(is_collapsible_ws_char)
 }
 
+/// Whether every node here is a `Text` — content whose newlines are word separators, so width
+/// alone decides its layout. The two readers ask it of different slices but it is ONE question:
+/// `compute_multiline_cause` skips both authoring-derived triggers for such content (the
+/// `only_text_content` gate), and [`Printer::tail_boundary_regenerates_static_break`] mirrors
+/// that gate to answer what a width-broken element's output re-parses as — sharing the spelling
+/// is what keeps the mirror from drifting.
+fn content_is_text_only(nodes: &[FragmentNode<'_>]) -> bool {
+    nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)))
+}
+
+/// The content run between a fragment's first and last non-whitespace nodes — the slice every
+/// content-shape question is asked of ([`Printer::has_source_breaks_in_content`],
+/// [`Printer::tail_boundary_regenerates_static_break`]), so the boundary-trim scan has one
+/// definition. `None` when there is no content at all.
+fn trimmed_content_run<'n, 'x>(nodes: &'n [FragmentNode<'x>]) -> Option<&'n [FragmentNode<'x>]> {
+    let first = nodes.iter().position(|n| !n.is_whitespace_only_text())?;
+    let last = nodes.iter().rposition(|n| !n.is_whitespace_only_text())?;
+    Some(&nodes[first..=last])
+}
+
 impl<'a> Printer<'a> {
     /// Check if an expression has internal break points (ternary, &&, ||, +, etc.)
     ///
@@ -280,7 +300,7 @@ impl<'a> Printer<'a> {
     /// document reached two layouts — `elements/inline_content_flow_collapse_prettier_divergence`
     /// carries the case.
     ///
-    /// Takes the already-trimmed content run (the [`ContentBreaks`] producer owns that trim), so
+    /// Takes the already-trimmed content run (callers share [`trimmed_content_run`]'s trim), so
     /// the boundary-trim scan is not repeated per reader.
     fn content_is_reflowable_fill(&self, run: &[FragmentNode<'_>]) -> bool {
         let source = self.source;
@@ -365,6 +385,10 @@ impl<'a> Printer<'a> {
     /// Returns [`ContentBreaks`]: the answer, plus the [`Self::content_is_reflowable_fill`] answer
     /// this had to compute anyway, so the caller's third reader shares it rather than re-deriving
     /// it — see that predicate's warning for why one shared answer is load-bearing.
+    ///
+    /// ⚠️ [`Self::tail_boundary_regenerates_static_break`] mirrors the two boundary-newline arms
+    /// (component `boundary.both()`, inline `boundary.both() && !is_fill`) to ask what a
+    /// width-broken element's OUTPUT re-parses as — a change to either arm moves both.
     fn has_source_breaks_in_content(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -386,11 +410,7 @@ impl<'a> Printer<'a> {
 
         let source = self.source;
 
-        // Find first and last non-whitespace content indices
-        let first_content_idx = nodes.iter().position(|n| !n.is_whitespace_only_text());
-        let last_content_idx = nodes.iter().rposition(|n| !n.is_whitespace_only_text());
-
-        let (Some(first), Some(last)) = (first_content_idx, last_content_idx) else {
+        let Some(run) = trimmed_content_run(nodes) else {
             return ContentBreaks {
                 multiline: false,
                 is_fill: false,
@@ -417,8 +437,7 @@ impl<'a> Printer<'a> {
         // alone made them settle on two, which is also what prettier's own run-based
         // `startsWithLinebreak`/`endsWithLinebreak` (`^([\t\f\r ]*\n)` / `(\n[\t\f\r ]*)$`)
         // rules out. Pinned by `elements/boundary_newline_padded`.
-        let run = &nodes[first..=last];
-        // The one fill answer, computed on the trim this function already owns.
+        // The one fill answer, computed on the shared trim.
         let is_fill = self.content_is_reflowable_fill(run);
 
         // The run is known to hold a non-text child, so the old `has_nontext_content` conjunct
@@ -432,7 +451,7 @@ impl<'a> Printer<'a> {
             };
         }
 
-        if first >= last {
+        if run.len() <= 1 {
             return ContentBreaks {
                 multiline: false,
                 is_fill,
@@ -489,6 +508,40 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether this inline sibling's **width-broken output re-parses as statically multiline** —
+    /// the block-style form it renders emits boundary newlines that
+    /// [`Self::has_source_breaks_in_content`]'s Tier-2 rule then honors: unconditionally for a
+    /// **component** (`boundary.both()`), and for an inline **element** whenever its content is
+    /// not a reflowable fill.
+    ///
+    /// The reader is the tail boundary AFTER such an element (`handle_text_child`'s non-last
+    /// arm): where regeneration holds, that boundary must take the same per-width fill decision
+    /// the statically-broken case takes, or the two renderings of one document disagree across
+    /// passes — pass 1 width-breaks the element and hard-breaks the tail, pass 2 re-reads the
+    /// emitted newlines as the static trigger and hugs it, a period-2 the `authoring:audit`
+    /// mutants catch.
+    ///
+    /// A `SpecialElement` conservatively answers `false` (keeps the joint-group join): its kinds
+    /// are rare in inline runs and the join is the older, better-pinned behavior.
+    pub(super) fn tail_boundary_regenerates_static_break(&self, node: &FragmentNode<'_>) -> bool {
+        let FragmentNode::Element(el) = node else {
+            return false;
+        };
+        if el.facts.is_component_name() {
+            return true;
+        }
+        let Some(run) = trimmed_content_run(el.fragment.nodes) else {
+            return false;
+        };
+        // Text-only content never regenerates: `compute_multiline_cause` skips both
+        // authoring-derived triggers for it (the `only_text_content` gate), so there is no
+        // static trigger for the emitted newlines to re-read as.
+        if content_is_text_only(run) {
+            return false;
+        }
+        !self.content_is_reflowable_fill(run)
+    }
+
     /// Analyze an element to compute all formatting-relevant properties.
     ///
     /// Shared by regular and `svelte:*` elements — both project onto [`ElementParts`].
@@ -534,8 +587,7 @@ impl<'a> Printer<'a> {
         let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
 
         // Check if all content children are text nodes (no elements, expressions, blocks)
-        let only_text_content =
-            !is_empty && nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)));
+        let only_text_content = !is_empty && content_is_text_only(nodes);
 
         // The multiline decision. A whitespace-collapsing container (`<table>`, `<select>`, …)
         // with content always lays out block-style: its inter-sibling whitespace is render-free

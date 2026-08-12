@@ -53,9 +53,12 @@ Two deliberate choices:
 
    The rule has two edges, and each is pinned here or next door. An authored **blank line** is a
    Tier-2 signal *independent* of render, so it is not collapsed (`variant_blank_line_tail`; both
-   formatters agree, so it is not a divergence). And the scope is *terminal* text — a
-   **non-terminal** run, one followed by another flowing element, keeps its own line regardless of
-   authoring, because hugging it shifts where that element lands and the result does not converge
-   (`inline_wide_content_text_sibling_long`).
+   formatters agree, so it is not a divergence). And this fixture's scope is *terminal* text — a
+   **non-terminal** run, one followed by another flowing element, takes the same per-width answer
+   through a different mechanism, the fill's own boundary line rather than the fold
+   (`inline_wide_content_text_sibling_long` for prose content,
+   `inline_wide_element_content_tail_long` for element-child content); only an element still
+   inside its leading inline-sibling wrap keeps the joint measurement
+   (`inline_sibling_drop_tail_flow_long`).
 
 See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
