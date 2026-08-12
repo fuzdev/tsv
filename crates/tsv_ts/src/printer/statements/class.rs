@@ -3,6 +3,7 @@
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::class_common::ClassHeaderOptions;
+use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::{
     ClassMemberModifiers, CommentSpacing, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
@@ -172,7 +173,7 @@ impl<'a> Printer<'a> {
             self.push_class_type_params(
                 &mut header_parts,
                 decl.type_parameters.as_ref(),
-                Some(id.span.end),
+                ClassTypeParamsGap::Name(id.span.end),
             );
             let header_doc = self.build_class_header_doc(
                 header_parts,
@@ -195,8 +196,14 @@ impl<'a> Printer<'a> {
         }
 
         // Anonymous class declaration (`export default class {}`): the keyword→body
-        // / →heritage gap is handled by the header builder, unchanged.
-        self.push_class_type_params(&mut parts, decl.type_parameters.as_ref(), None);
+        // / →heritage gap is handled by the header builder, unchanged. The keyword→`<T>`
+        // gap is this printer's own — `cursor` is the `class` keyword, found rather than
+        // measured off the span.
+        self.push_class_type_params(
+            &mut parts,
+            decl.type_parameters.as_ref(),
+            ClassTypeParamsGap::Keyword(cursor),
+        );
         let header_doc = self.build_class_header_doc(
             parts,
             &positions,

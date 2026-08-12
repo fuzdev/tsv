@@ -12,9 +12,9 @@ use super::arg_comments::{
     last_arg_has_comments, push_empty_args,
 };
 use super::arg_predicates::{
-    arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments, is_block_function,
-    is_concise_numeric_array, is_curried_arrow, is_function_composition_args,
-    is_ternary_arrow_body, last_arg_is_array_or_object,
+    arrow_body_is_call_through_non_null, is_block_function, is_concise_numeric_array,
+    is_curried_arrow, is_function_composition_args, is_ternary_arrow_body,
+    last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
     ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
@@ -466,6 +466,9 @@ fn build_chain_args_force_expand(
         let arg = &call.arguments[0];
         if let Expression::ArrowFunctionExpression(arrow) = arg
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+            // …unless a break forced inside the signature invalidates the hug — see
+            // `arrow_signature_has_breaking_comments`.
+            && !arrow_signature_has_breaking_comments(printer, arrow)
         {
             let body_doc = printer.build_expression_doc(body_expr);
             let body_doc =
@@ -679,6 +682,9 @@ fn build_chain_args_single(
         // `has_any_comment_text`: refusing the hug is a LAYOUT decision, so it must see a
         // comment the argument owns and prints itself (see `build_chain_args_multi`).
         && !last_arg_commented
+        // …and a break forced INSIDE the signature refuses it too, the shared rule the
+        // object/array arm below and the general gate already ask.
+        && !(has_any_comment_text && arrow_signature_has_breaking_comments(printer, arrow))
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -738,6 +744,7 @@ fn build_chain_args_single(
         && is_ternary_arrow_body(body_expr)
         // `has_any_comment_text`: see above — a layout gate counts an owned comment.
         && !last_arg_commented
+        && !(has_any_comment_text && arrow_signature_has_breaking_comments(printer, arrow))
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -876,17 +883,11 @@ fn build_chain_args_single(
 
     // Check if it's a block arrow with trailing param comments
     // These need soft-break wrapping to expand the call
-    let block_arrow_has_trailing_param_comments = if let Expression::ArrowFunctionExpression(arrow) =
-        arg
-        && !arrow.body.is_expression()
-    {
-        let arrow_token = arrow.arrow_token;
-        arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
-            printer.has_comments_to_emit_between(start, end)
-        })
-    } else {
-        false
-    };
+    let block_arrow_has_trailing_param_comments = matches!(
+        arg,
+        Expression::ArrowFunctionExpression(arrow)
+            if !arrow.body.is_expression() && printer.arrow_has_trailing_param_comments(arrow)
+    );
 
     if block_arrow_has_trailing_param_comments {
         // Block arrow with trailing param comments - force expansion
@@ -1068,6 +1069,9 @@ fn build_chain_args_multi(
             &**body_expr,
             Expression::CallExpression(_) | Expression::ConditionalExpression(_)
         )
+        // A break forced inside the signature invalidates the hug here exactly as it does
+        // in the single-argument arms above — see `arrow_signature_has_breaking_comments`.
+        && !arrow_signature_has_breaking_comments(printer, arrow)
     {
         // Expand-last arrow with a call body: build the body ONCE and inject it so the
         // whole-arrow arg doc reuses it (the break-body state below reuses it too) —
@@ -1138,6 +1142,7 @@ fn build_chain_args_multi(
             &**body_expr,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         )
+        && !arrow_signature_has_breaking_comments(printer, arrow)
     {
         // Expand-last arrow with an object/array body: build the body ONCE and inject it so
         // the whole-arrow arg doc reuses it (the hug state below reuses it too) — building it

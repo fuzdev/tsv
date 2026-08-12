@@ -12,9 +12,9 @@ use super::arg_comments::{
     last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
-    arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
-    is_array_or_object_unwrapped, is_concise_numeric_array, is_curried_arrow,
-    is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
+    arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_concise_numeric_array,
+    is_curried_arrow, is_function_composition_args, is_ternary_arrow_body,
+    last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
     ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_split_last,
@@ -30,7 +30,9 @@ use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_modul
 use super::test_patterns::{build_test_callee_flat_doc, test_call_flat_layout_applies};
 use crate::ast::internal;
 use crate::printer::CommentVec;
-use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
+use crate::printer::expressions::functions::{
+    arrow_signature_has_breaking_comments, arrow_token_end,
+};
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -752,7 +754,11 @@ fn try_single_arg_hug(
                 // Prettier's couldExpandArg keys on the body type and looks
                 // through the return-type annotation, so typed-return arrows
                 // (`(x): T => …`) are eligible too.
-                if is_ternary_arrow_body(body_expr) {
+                // Same signature-break refusal as the two arms above — a hug this
+                // conditional-group cannot honor (`arrow_signature_has_breaking_comments`).
+                if is_ternary_arrow_body(body_expr)
+                    && !arrow_signature_has_breaking_comments(printer, arrow)
+                {
                     return Some(build_ternary_arrow_hug_states(
                         printer, callee, arrow, body_expr,
                     ));
@@ -773,7 +779,12 @@ fn try_single_arg_hug(
             // per prettier's `stripChainElementWrappers`). couldExpandArg keys on
             // the body type and ignores the return-type annotation, so typed-return
             // arrows (`(x): T => call()`) hug too.
-            if arrow_body_is_call_through_non_null(body_expr) {
+            if arrow_body_is_call_through_non_null(body_expr)
+                // A break forced inside the signature invalidates this hug exactly as it
+                // does the object/array one above — see
+                // `arrow_signature_has_breaking_comments`.
+                && !arrow_signature_has_breaking_comments(printer, arrow)
+            {
                 // Build the body ONCE and compose both hug/wrap states from it; building
                 // the whole arrow separately for the flat state re-built this same body
                 // and recursed into itself → O(2^depth) for `a(x => b(y => …))`.
@@ -819,12 +830,7 @@ fn build_block_arrow_hug_states(
 
     // If the arrow has trailing param comments, the params will be multiline,
     // so we should force the wrapped state (prettier behavior)
-    let arrow_token = arrow.arrow_token;
-    let has_trailing_param_comments =
-        arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
-            printer.has_comments_to_emit_between(start, end)
-        });
-    if has_trailing_param_comments {
+    if printer.arrow_has_trailing_param_comments(arrow) {
         // Force wrapped state when arrow has trailing param comments
         return d.concat(&[
             callee,
@@ -852,8 +858,7 @@ fn build_block_arrow_hug_states(
         // 'none'). Matches Prettier's expandLastArg behavior where the arrow
         // is reprinted with a softline appended.
         let body_start = body_expr.span().start;
-        let arrow_token = arrow.arrow_token;
-        if printer.has_own_line_post_arrow_comment(arrow_token, body_start) {
+        if printer.has_own_line_post_arrow_comment(arrow_token_end(arrow), body_start) {
             // group_break forces the arrow to break. The softline after it
             // causes `\n)` when the group breaks.
             let inner = d.concat(&[
@@ -1048,6 +1053,9 @@ fn try_expand_last_function_arg(
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && (arrow_body_is_call_through_non_null(body_expr)
                 || matches!(&**body_expr, internal::Expression::ConditionalExpression(_)))
+            // A break forced inside the signature invalidates the hug at every one of these
+            // states, single- or multi-argument — see `arrow_signature_has_breaking_comments`.
+            && !arrow_signature_has_breaking_comments(printer, arrow)
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
             // Reuse the pre-built call body (see above); conditional bodies build fresh.
@@ -1086,6 +1094,7 @@ fn try_expand_last_function_arg(
                 internal::Expression::ObjectExpression(_)
                     | internal::Expression::ArrayExpression(_)
             )
+            && !arrow_signature_has_breaking_comments(printer, arrow)
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
             // Reuse the pre-built object/array body (see above).

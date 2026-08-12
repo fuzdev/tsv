@@ -1,0 +1,586 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 281,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Anonymous class expression - block comment between keyword and type params",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 114,
+			"end": 122,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 16
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With heritage",
+			"start": 133,
+			"end": 149,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 166,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 16
+				},
+				"end": {
+					"line": 6,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Default-exported anonymous class",
+			"start": 198,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 255,
+			"end": 263,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 21
+				},
+				"end": {
+					"line": 9,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 280,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 99,
+					"end": 130,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 105,
+							"end": 129,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 105,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 109,
+								"end": 129,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 31
+									}
+								},
+								"id": null,
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 123,
+									"end": 126,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 25
+										},
+										"end": {
+											"line": 3,
+											"column": 28
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 124,
+											"end": 125,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 26
+												},
+												"end": {
+													"line": 3,
+													"column": 27
+												}
+											},
+											"name": "T"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 114,
+											"end": 122
+										}
+									]
+								},
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 127,
+									"end": 129,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 29
+										},
+										"end": {
+											"line": 3,
+											"column": 31
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Anonymous class expression - block comment between keyword and type params",
+							"start": 20,
+							"end": 97
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 151,
+					"end": 195,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 45
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 157,
+							"end": 194,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 44
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 157,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 161,
+								"end": 194,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 44
+									}
+								},
+								"id": null,
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 175,
+									"end": 178,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 25
+										},
+										"end": {
+											"line": 6,
+											"column": 28
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 176,
+											"end": 177,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 26
+												},
+												"end": {
+													"line": 6,
+													"column": 27
+												}
+											},
+											"name": "T"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 166,
+											"end": 174
+										}
+									]
+								},
+								"superClass": {
+									"type": "Identifier",
+									"start": 187,
+									"end": 188,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 37
+										},
+										"end": {
+											"line": 6,
+											"column": 38
+										}
+									},
+									"name": "A"
+								},
+								"superTypeParameters": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 188,
+									"end": 191,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 38
+										},
+										"end": {
+											"line": 6,
+											"column": 41
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 189,
+											"end": 190,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 39
+												},
+												"end": {
+													"line": 6,
+													"column": 40
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 189,
+												"end": 190,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 39
+													},
+													"end": {
+														"line": 6,
+														"column": 40
+													}
+												},
+												"name": "T"
+											}
+										}
+									]
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 192,
+									"end": 194,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 42
+										},
+										"end": {
+											"line": 6,
+											"column": 44
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With heritage",
+							"start": 133,
+							"end": 149
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 235,
+					"end": 270,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 36
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 250,
+						"end": 270,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 16
+							},
+							"end": {
+								"line": 9,
+								"column": 36
+							}
+						},
+						"id": null,
+						"typeParameters": {
+							"type": "TSTypeParameterDeclaration",
+							"start": 264,
+							"end": 267,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 30
+								},
+								"end": {
+									"line": 9,
+									"column": 33
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeParameter",
+									"start": 265,
+									"end": 266,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 31
+										},
+										"end": {
+											"line": 9,
+											"column": 32
+										}
+									},
+									"name": "T"
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c3 ",
+									"start": 255,
+									"end": 263
+								}
+							]
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 268,
+							"end": 270,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 34
+								},
+								"end": {
+									"line": 9,
+									"column": 36
+								}
+							},
+							"body": []
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Default-exported anonymous class",
+							"start": 198,
+							"end": 233
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

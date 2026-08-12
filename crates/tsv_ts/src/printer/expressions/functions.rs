@@ -8,8 +8,8 @@
 
 use crate::ast::internal;
 use crate::printer::ArrowChainContext;
-use crate::printer::calls::arg_predicates::arrow_has_trailing_param_comments;
 use crate::printer::class_common::ClassHeaderOptions;
+use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::statements::function::FunctionHeadModifier;
@@ -112,6 +112,16 @@ pub(in crate::printer) fn is_huggable_pattern(expr: &internal::Expression<'_>) -
         }
         _ => false,
     }
+}
+
+/// The offset just past an arrow's `=>` — where the gap before its body opens.
+///
+/// One spelling of that bound. Its readers had two: `arrow.arrow_token` raw at the
+/// expand-last-arg hug gate, `arrow_token + "=>".len()` everywhere else. The `=>` token's own
+/// bytes can hold no comment, so both ranges held the same comments and the drift stayed
+/// invisible — which is the argument for not carrying two of them, not for tolerating it.
+pub(in crate::printer) fn arrow_token_end(arrow: &internal::ArrowFunctionExpression<'_>) -> u32 {
+    arrow.arrow_token + "=>".len() as u32
 }
 
 /// Whether `arrow`'s signature — its params' `(` through its `=>` — holds a comment that
@@ -236,43 +246,15 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
 
-        // Calculate signature end position (after `)` or return type).
-        // This is where comments BEFORE `=>` start.
-        let sig_end = if let Some(rt) = &arrow.return_type {
-            rt.span.end
-        } else if let Some(params_start) = arrow.params_start {
-            // Find closing `)` to get accurate boundary
-            self.find_closing_paren(params_start, arrow.body.span().start)
-                .unwrap_or_else(|| arrow.body.span().start)
-        } else {
-            // No parens (single param arrow like `x => x`) - use param end
-            arrow
-                .params
-                .last()
-                .map_or(arrow.span.start, |p| p.span().end)
-        };
-
         // The `=>` token position (parser-recorded) distinguishes:
-        // - Comments between sig_end and `=>` → print BEFORE `=>`
+        // - Comments between the signature and `=>` → print BEFORE `=>`
         // - Comments between `=>` and body → print AFTER `=>`
-        let arrow_pos = arrow.arrow_token;
-        let arrow_end = arrow_pos + "=>".len() as u32;
+        let arrow_end = arrow_token_end(arrow);
 
         // Build the signature (async + type params + params + return type) via the
         // shared builder, then append any comment between the signature and `=>`
-        // (`(x) /* c */ =>`). The common (no-comment) path uses the signature doc
-        // directly — no extra Vec.
-        let sig_inner = self.build_arrow_signature_doc(arrow);
-        let sig_doc = if self.has_comments_to_emit_between(sig_end, arrow_pos) {
-            let mut sig_parts: DocBuf = smallvec![sig_inner];
-            for comment in comments_to_emit_in_range(self.comments, sig_end, arrow_pos) {
-                sig_parts.push(d.text(" "));
-                sig_parts.push(self.build_comment_doc(comment));
-            }
-            d.concat(&sig_parts)
-        } else {
-            sig_inner
-        };
+        // (`(x) /* c */ =>`) — the seam the call-argument states share.
+        let sig_doc = self.append_pre_arrow_comments(arrow, self.build_arrow_signature_doc(arrow));
 
         // Wrap entire signature in a group. In expand-last-arg context, render the
         // signature flat (remove_lines) so the params can't break — prettier's
@@ -372,15 +354,11 @@ impl<'a> Printer<'a> {
             && crate::printer::arrow_chain_has_return_type(arrow);
 
         // Check if body arrow has trailing param comments (forces break)
-        let body_arrow_has_trailing_param_comments =
-            if let internal::Expression::ArrowFunctionExpression(body_arrow) = expr {
-                let arrow_token = body_arrow.arrow_token;
-                arrow_has_trailing_param_comments(body_arrow, arrow_token, |start, end| {
-                    self.has_comments_to_emit_between(start, end)
-                })
-            } else {
-                false
-            };
+        let body_arrow_has_trailing_param_comments = matches!(
+            expr,
+            internal::Expression::ArrowFunctionExpression(body_arrow)
+                if self.arrow_has_trailing_param_comments(body_arrow)
+        );
 
         // Inline block comments don't prevent hugging — only own-line comments do.
         // `() => /* comment */ ({...})` hugs (inline block comment)
@@ -816,22 +794,14 @@ impl<'a> Printer<'a> {
         &self,
         arrow: &internal::ArrowFunctionExpression<'_>,
     ) -> DocId {
-        let params_start = arrow.params_start;
-
-        // Compute trailing comments boundary for params
-        // IMPORTANT: Stop at `)` not at return type or body start
-        // Comments between `)` and `=>` are handled separately by the arrow printer
-        let trailing_comments_end = if let Some(ps) = params_start {
-            // Find the closing `)` position
-            let body_start = arrow.body.span().start;
-            self.find_closing_paren(ps, body_start)
-        } else {
-            // No parens - use param end as boundary
-            arrow.params.last().map(|p| p.span().end)
-        };
-
-        // Delegate to shared implementation
-        self.build_params_doc_with_comments(arrow.params, params_start, trailing_comments_end)
+        // The trailing boundary stops at `)`, not at the return type or the body:
+        // comments between `)` and `=>` belong to the arrow printer
+        // ([`Self::append_pre_arrow_comments`]).
+        self.build_params_doc_with_comments(
+            arrow.params,
+            arrow.params_start,
+            self.arrow_params_end(arrow),
+        )
     }
 
     /// Emit an async arrow's `async` keyword and the gap between it and the head of
@@ -873,6 +843,117 @@ impl<'a> Printer<'a> {
             .or_else(|| arrow.params.first().map(|p| p.span().start))
             .unwrap_or_else(|| arrow.body.span().start);
         parts.push(self.build_keyword_to_name_comments(arrow.span.start, head_start));
+    }
+
+    /// Where an arrow's **parameter list** ends — just past its `)`, or, for a lone
+    /// unparenthesized parameter, at that parameter's own end.
+    ///
+    /// **The one spelling of that bound**, shared by the three readers that must agree on
+    /// it: the parameter-list emitter ([`Self::build_arrow_params_doc_ungrouped`]'s
+    /// `trailing_comments_end`, and through it the per-parameter
+    /// [`Self::param_trailing_end`]), the force-break gate over that emitter
+    /// ([`Self::arrow_has_trailing_param_comments`]), and the signature end
+    /// ([`Self::arrow_signature_end`]). A second derivation is how the gate and the emitter
+    /// come to disagree about which comments are in the list — the gate opening a list for
+    /// a comment no emitter there claims, or the pre-`=>` emitter reaching back over one
+    /// the list already printed.
+    ///
+    /// `None` only for a shape the grammar does not produce — a parenthesized list whose
+    /// `)` cannot be found, or no parens and no parameter — which is why the readers that
+    /// need a concrete offset supply their own floor rather than this returning one.
+    fn arrow_params_end(&self, arrow: &internal::ArrowFunctionExpression<'_>) -> Option<u32> {
+        match arrow.params_start {
+            // Find closing `)` to get accurate boundary
+            Some(params_start) => self.find_closing_paren(params_start, arrow.body.span().start),
+            // No parens (single param arrow like `x => x`) - use param end
+            None => arrow.params.last().map(|p| p.span().end),
+        }
+    }
+
+    /// Where an arrow's **signature** ends — after its return type when it has one,
+    /// otherwise after its parameter list. The start of the gap before `=>`.
+    fn arrow_signature_end(&self, arrow: &internal::ArrowFunctionExpression<'_>) -> u32 {
+        if let Some(rt) = &arrow.return_type {
+            return rt.span.end;
+        }
+        // The floor is reached only on the shape [`Self::arrow_params_end`] calls out, and
+        // it still lands past the parameter list either way — so the pre-`=>` emitter can
+        // never reach back over a parameter's own comment and print it a second time.
+        self.arrow_params_end(arrow).unwrap_or_else(|| {
+            arrow
+                .params_start
+                .map_or(arrow.span.start, |_| arrow.body.span().start)
+        })
+    }
+
+    /// Whether a comment sits in an arrow's parameter list after its last parameter:
+    ///
+    /// ```text
+    /// (a: string, // comment
+    /// ) => {}
+    /// ```
+    ///
+    /// The call printers read this as "the params will be multiline", and force their
+    /// wrapped state on it rather than hugging the callback.
+    ///
+    /// ⚠️ It is a question about the **parameter list**, so it stops at
+    /// [`Self::arrow_params_end`] — never at the `=>`. Reading on to the `=>` swept in two
+    /// regions that hold no parameter comment at all, the return type and the signature→`=>`
+    /// gap, and force-wrapped the whole call around a comment that leaves the list flat:
+    /// `fn((a) /* c */ => { … })`, `fn((a): T /* c */ => …)` and `fn((a): /* c */ T => …)` each
+    /// lost prettier's hug. The over-reach was invisible while
+    /// [`Self::append_pre_arrow_comments`]'s gap went unprinted — the layout was wrong about a
+    /// comment that wasn't in the output.
+    ///
+    /// A `Printer` method rather than one more predicate in `calls/arg_predicates.rs`: it needs
+    /// the comment table, and it owns its own bound, so no call site can hand it a different
+    /// one.
+    pub(in crate::printer) fn arrow_has_trailing_param_comments(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+    ) -> bool {
+        let Some(last_param) = arrow.params.last() else {
+            return false;
+        };
+        let Some(params_end) = self.arrow_params_end(arrow) else {
+            return false;
+        };
+        self.has_comments_to_emit_between(last_param.span().end, params_end)
+    }
+
+    /// Append the comments an author wrote between an arrow's signature and its `=>`
+    /// (`(x) /* c */ =>`), returning `sig` untouched when that gap is empty — the
+    /// overwhelmingly common case, which costs one span search and no doc node.
+    ///
+    /// ⚠️ **One gap, one emitter.** Every call-argument state reassembles an arrow as
+    /// signature + `" =>"` + body without routing it through
+    /// [`Self::build_arrow_doc`](Self::build_arrow_doc), so a gap those states don't ask
+    /// about is a gap **nobody** prints (`docs/comments.md` hazard 4). That dropped the
+    /// comment outright in `fn((x) /* c */ => call(x))`, `new Comp(…)` and the
+    /// return-type spelling alike — at every reassembly site — while the plain arrow and
+    /// the member chain printed it, which is what made the loss look context-dependent
+    /// rather than structural.
+    ///
+    /// Only block-shaped payloads can occur here: `=>` is preceded by
+    /// `[no LineTerminator here]`, so a `//` in this gap is a parse error, not a layout
+    /// question.
+    pub(in crate::printer) fn append_pre_arrow_comments(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+        sig: DocId,
+    ) -> DocId {
+        let sig_end = self.arrow_signature_end(arrow);
+        let arrow_pos = arrow.arrow_token;
+        if !self.has_comments_to_emit_between(sig_end, arrow_pos) {
+            return sig;
+        }
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![sig];
+        for comment in comments_to_emit_in_range(self.comments, sig_end, arrow_pos) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+        }
+        d.concat(&parts)
     }
 
     /// Build just the arrow function signature (async + type params + params + return type)
@@ -2005,7 +2086,12 @@ impl<'a> Printer<'a> {
         self.push_class_type_params(
             &mut parts,
             class_expr.type_parameters.as_ref(),
-            class_expr.id.as_ref().map(|id| id.span.end),
+            class_expr
+                .id
+                .as_ref()
+                .map_or(ClassTypeParamsGap::Keyword(class_keyword_start), |id| {
+                    ClassTypeParamsGap::Name(id.span.end)
+                }),
         );
 
         // Build heritage docs (shared with the class-declaration printer).

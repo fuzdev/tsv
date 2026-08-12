@@ -11,9 +11,8 @@ use super::arg_wrapping::{
 };
 use crate::ast::internal;
 use crate::printer::calls::arg_predicates::{
-    arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
-    is_array_or_object_unwrapped, is_concise_numeric_array, is_function_composition_args,
-    is_ternary_arrow_body,
+    arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_concise_numeric_array,
+    is_function_composition_args, is_ternary_arrow_body,
 };
 use crate::printer::calls::{
     ArgItem, ArgsJoin, PartitionedComments, build_args_joined_with_comments, build_args_split_last,
@@ -25,6 +24,7 @@ use crate::printer::calls::{
     prepend_arrow_body_comments, should_force_expansion_for_comments,
     wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
 };
+use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
 use crate::printer::{
     ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
 };
@@ -199,11 +199,8 @@ impl<'a> Printer<'a> {
 
                     // If the arrow has trailing param comments or leading comments,
                     // force wrapped state
-                    let arrow_token = arrow.arrow_token;
-                    let has_trailing_param_comments = new_has_comments
-                        && arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
-                            self.has_comments_to_emit_between(start, end)
-                        });
+                    let has_trailing_param_comments =
+                        new_has_comments && self.arrow_has_trailing_param_comments(arrow);
 
                     if has_trailing_param_comments || has_leading_comment {
                         return d.concat(&[
@@ -248,7 +245,11 @@ impl<'a> Printer<'a> {
                         // Break: `new Xy((x) =>\n  x ? y : z,\n)`
                         // couldExpandArg keys on the body type, looking through the
                         // return-type annotation, so typed-return arrows are eligible.
-                        if is_ternary_arrow_body(body_expr) {
+                        // A break forced inside the signature invalidates the hug —
+                        // the shared refusal, see `arrow_signature_has_breaking_comments`.
+                        let signature_forces_break =
+                            new_has_comments && arrow_signature_has_breaking_comments(self, arrow);
+                        if is_ternary_arrow_body(body_expr) && !signature_forces_break {
                             let sig_doc = build_arrow_sig_doc(self, arrow);
                             let body_doc = self.build_expression_doc(body_expr);
                             let body_doc = prepend_arrow_body_comments(
@@ -304,7 +305,8 @@ impl<'a> Printer<'a> {
                         // Simple call body: 2-state break at =>
                         // couldExpandArg keys on the body type, looking through the
                         // return-type annotation and a trailing non-null `!`.
-                        if arrow_body_is_call_through_non_null(body_expr) {
+                        if arrow_body_is_call_through_non_null(body_expr) && !signature_forces_break
+                        {
                             // Build the body ONCE (see `build_arrow_call_body_states`) — a
                             // separate whole-arrow doc re-built this body and recursed → O(2^depth).
                             let body_doc = self.build_expression_doc(body_expr);
@@ -646,6 +648,9 @@ impl<'a> Printer<'a> {
                                 &**body_expr,
                                 internal::Expression::ConditionalExpression(_)
                             ))
+                        // The multi-argument twin of the single-argument refusal above —
+                        // see `arrow_signature_has_breaking_comments`.
+                        && !(new_has_comments && arrow_signature_has_breaking_comments(self, arrow))
                     {
                         let sig_doc = build_arrow_sig_doc(self, arrow);
                         // Reuse the pre-built call body (see above); conditional bodies build fresh.
