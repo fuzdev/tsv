@@ -540,6 +540,35 @@ impl<'a> Printer<'a> {
     /// [`push_leading_comment_run`](Self::push_leading_comment_run) instead: reaching for
     /// this one there forces the group open around a run prettier keeps inline, which is
     /// exactly what the call family's leading emitter did before it was converged.
+    /// The separator after a comment in a **single-slot gap** — a keyword/operator and
+    /// the one token that follows it (`if /* c */ (`, `new /* c */ (`, a template
+    /// interpolation's `${ /* c */ expr`, a type-literal member's leading run): a block
+    /// glues with a space, a line comment takes a hardline because a `//` would
+    /// otherwise swallow that token.
+    ///
+    /// ⚠️ **Keyed on the comment's KIND, not on the source** — that is the whole
+    /// distinction from [`push_leading_run_separator`](Self::push_leading_run_separator),
+    /// which asks whether the *author* glued the pair. Both are correct where they sit:
+    /// a single-slot gap collapses a block comment to the inline form whenever it can do
+    /// so losslessly, so the authored break carries no signal to preserve
+    /// (`docs/conformance_prettier.md` §Comment Position Philosophy, the keyword→value
+    /// rule), while a leading run inside a list keeps the lines the author gave it. Pick
+    /// by which of those two a new site is, never by which is nearer.
+    ///
+    /// ⚠️ One caller deliberately does NOT route through here: the expression-statement
+    /// leading gap additionally forces the hardline for an **honored directive**
+    /// (`printer/expressions/mod.rs`), since a `prettier-ignore` must start its frozen
+    /// node on a fresh line. Whether the other single-slot gaps owe that carve-out is
+    /// open — none of them freezes a node, so no fixture reaches it today.
+    pub(crate) fn push_comment_kind_separator(&self, parts: &mut DocBuf, comment: &Comment) {
+        let d = self.d();
+        if comment.is_block {
+            parts.push(d.text(" "));
+        } else {
+            parts.push(d.hardline());
+        }
+    }
+
     pub(crate) fn push_leading_run_separator(
         &self,
         parts: &mut DocBuf,
@@ -1110,14 +1139,7 @@ impl<'a> Printer<'a> {
                 }
                 CommentSpacing::Trailing => {
                     parts.push(self.build_comment_doc(comment));
-                    // Separator after this comment (before the next comment / the
-                    // caller's token): a line comment forces the following content
-                    // onto a new line, a block comment keeps the inline trailing space.
-                    if comment.is_block {
-                        parts.push(d.text(" "));
-                    } else {
-                        parts.push(d.hardline());
-                    }
+                    self.push_comment_kind_separator(&mut parts, comment);
                 }
                 CommentSpacing::None => {
                     if !first {

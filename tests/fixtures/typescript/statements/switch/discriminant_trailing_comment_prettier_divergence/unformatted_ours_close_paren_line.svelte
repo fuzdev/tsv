@@ -8,10 +8,8 @@
 	}
 
 	// Block comment variant
-	switch (
-		y
-		/* trailing */
-	) {
+	switch (y
+	/* trailing */) {
 		case 1:
 			a();
 	}

@@ -49,8 +49,13 @@ impl<'a> Printer<'a> {
     /// - `own_line`: Comments on their own line (not same line as prev or next)
     /// - `inline_with_next`: Comments on the same line as `next_start`
     ///
-    /// This helper reduces repetitive comment classification code throughout
-    /// control flow statement printing.
+    /// ⚠️ **The primitive, not the API — emit through one of the two wrappers below.**
+    /// No gap emitter wants these three buckets *as three*: every one folds
+    /// `inline_with_next` into `own_line` ([`Self::partition_comments_trailing_vs_own_line`]),
+    /// and the header→body gaps then pull a body-glued block back out of it
+    /// ([`Self::partition_body_gap_comments`]). Destructuring the tuple here is how the
+    /// third bucket got bound to `_` and every comment in it silently dropped, so the
+    /// wrappers exist to make that fold unforgettable rather than conventional.
     fn partition_comments_by_line(
         &self,
         prev_end: u32,
@@ -74,6 +79,63 @@ impl<'a> Printer<'a> {
         }
 
         (inline_prev, own_line, inline_next)
+    }
+
+    /// The two buckets the **anchor-trailing vs own-line** rule needs: comments
+    /// sharing `prev_end`'s line trail the anchor, and *everything else takes its
+    /// own line*.
+    ///
+    /// This is [`Self::partition_comments_by_line`] with its third bucket folded
+    /// into the second, and it exists so that fold cannot be forgotten: a comment
+    /// sharing the FOLLOWING token's line is the bucket a two-way destructuring
+    /// silently drops (`if (a⏎/* c */) {` printed no comment at all, in every
+    /// construct whose head this builds — `if`, `while`, `do…while`, `switch`,
+    /// `catch`). Callers that must treat that bucket differently — the header→body
+    /// gaps, which let a block comment glued to the body lead it inline — take the
+    /// three-way form instead, deliberately.
+    fn partition_comments_trailing_vs_own_line(
+        &self,
+        prev_end: u32,
+        next_start: u32,
+    ) -> (CommentVec<'a>, CommentVec<'a>) {
+        let (trailing, mut own_line, inline_next) =
+            self.partition_comments_by_line(prev_end, next_start);
+        // Order survives the fold: every comment in the range ends before
+        // `next_start`, so one sharing its line is always last.
+        own_line.extend(inline_next);
+        (trailing, own_line)
+    }
+
+    /// The three buckets a **header→body** gap needs: comments trailing the anchor,
+    /// comments taking their own line, and the **body-glued** run that leads the body
+    /// inline (`) /* c */ {`).
+    ///
+    /// [`Self::partition_comments_trailing_vs_own_line`] plus the one carve-out that
+    /// bucket is separately good for — and the glue split must run **before** the fold,
+    /// not after: [`Printer::split_glued_comments`] takes a source-keyed *suffix*
+    /// (`comment_hugs_next` = a block with no newline after it), so over the folded run
+    /// it would also claim an own-line block that merely shares its line with the next
+    /// comment (`/* a */ /* b */⏎body`), gluing a comment the author left above the body.
+    fn partition_body_gap_comments(
+        &self,
+        gap_start: u32,
+        body_start: u32,
+    ) -> (CommentVec<'a>, CommentVec<'a>, CommentVec<'a>) {
+        let (anchor_line, mut own_line, inline_next) =
+            self.partition_comments_by_line(gap_start, body_start);
+        let (rest, glued) = self.split_glued_comments(inline_next);
+        own_line.extend(rest);
+        (anchor_line, own_line, glued)
+    }
+
+    /// Whether any comment between two positions falls in the `inline_prev` bucket of
+    /// [`Self::partition_comments_by_line`] — a comment trailing the anchor on its
+    /// own line. The existence-only twin of [`Self::has_isolated_comment_between`],
+    /// for a layout gate that would otherwise build three `SmallVec`s to read one
+    /// `is_empty`.
+    fn has_anchor_trailing_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
+        comments_to_emit_in_range(self.comments, prev_end, next_start)
+            .any(|comment| self.is_same_line(prev_end, comment.span.start))
     }
 
     /// Whether any comment between two positions falls in the `own_line` bucket of
@@ -139,11 +201,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_comment_doc(comment));
             // Block: glue with a trailing space so the `(` follows directly. Line: a
             // hardline drops the `(` to the next line so the `//` can't swallow it.
-            if comment.is_block {
-                parts.push(d.text(" "));
-            } else {
-                parts.push(d.hardline());
-            }
+            self.push_comment_kind_separator(&mut parts, comment);
         }
         Some(d.concat(&parts))
     }
@@ -206,14 +264,10 @@ impl<'a> Printer<'a> {
             return;
         }
 
-        let (inline_prev, own_line, inline_next) =
-            self.partition_comments_by_line(gap_start, keyword_start);
-
-        // Merge `inline_next` (comments sharing the keyword's line) into the own-line
-        // run so they're emitted before the keyword rather than dropped.
-        // e.g. `} \n /* b */ else {` → `}\n/* b */\nelse {`
-        let mut all_own_line = own_line;
-        all_own_line.extend(inline_next);
+        // A comment sharing the keyword's line takes its own line above it rather
+        // than being dropped: `} \n /* b */ else {` → `}\n/* b */\nelse {`.
+        let (inline_prev, all_own_line) =
+            self.partition_comments_trailing_vs_own_line(gap_start, keyword_start);
 
         self.build_comments_between_parts(parts, &inline_prev, &all_own_line, Some(gap_start));
 
@@ -260,14 +314,11 @@ impl<'a> Printer<'a> {
     /// no-comment fast path differs (`") "` vs a bare space), so it stays theirs.
     fn push_header_to_body_gap(&self, parts: &mut DocBuf, gap_start: u32, body_start: u32) {
         let d = self.d();
-        let (inline_prev, mut own_line, inline_next) =
-            self.partition_comments_by_line(gap_start, body_start);
-
         // A comment sharing the body's line is not trailing the anchor, so it does not
-        // stay up there — but a **block** one glued to the body leads it inline
-        // ([`Printer::split_glued_comments`]); the rest take their own line.
-        let (rest, glued) = self.split_glued_comments(inline_next);
-        own_line.extend(rest);
+        // stay up there — but a **block** one glued to the body leads it inline; the
+        // rest take their own line.
+        let (inline_prev, own_line, glued) =
+            self.partition_body_gap_comments(gap_start, body_start);
 
         self.build_comments_between_parts(parts, &inline_prev, &own_line, None);
 
@@ -318,12 +369,10 @@ impl<'a> Printer<'a> {
         body_doc: DocId,
     ) {
         let d = self.d();
-        let (anchor_line, mut own_line, inline_next) =
-            self.partition_comments_by_line(gap_start, body_start);
         // A block comment glued to the body leads it inline rather than taking a line of
-        // its own — see [`Printer::split_glued_comments`].
-        let (rest, glued) = self.split_glued_comments(inline_next);
-        own_line.extend(rest);
+        // its own.
+        let (anchor_line, own_line, glued) =
+            self.partition_body_gap_comments(gap_start, body_start);
 
         // Only a **block** comment can stay on the anchor's line. A line comment authored
         // trailing `)` normalizes to its own line — that is the position-agnostic half
@@ -811,11 +860,13 @@ impl<'a> Printer<'a> {
         // The condition itself
         inner_parts.push(test_doc);
 
-        // Trailing comments use partition_comments_by_line since the classification matches:
-        // inline = starts on same line as test_end (goes to inline_prev)
-        // own line = doesn't start on same line as test_end
-        let (trailing_inline, trailing_own_line, _) =
-            self.partition_comments_by_line(test_end, close_paren_pos);
+        // A comment sharing the condition's line trails it; everything else takes its
+        // own line before the `)` — including one sharing the `)`'s own line, which is
+        // the bucket this gap used to drop: `if (a\n/* c */) {` printed no comment at
+        // all. There is no body `{` here to glue a block to, so the two-bucket form is
+        // the whole rule.
+        let (trailing_inline, trailing_own_line) =
+            self.partition_comments_trailing_vs_own_line(test_end, close_paren_pos);
 
         // Trailing comments — the shared run builder, which owns the blank rule. An
         // authored blank survives both above the first own-line comment (`blank_seed` =
