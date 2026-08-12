@@ -43,6 +43,24 @@ pub(super) fn render_fill_iterative(
         embed,
         source,
     } = ctx;
+
+    // Every fit question this loop asks is the same one — "does `doc` fit FLAT in `budget`, given
+    // what follows?" — and only the doc, the look-ahead and the budget ever vary. The other four
+    // arguments are loop invariants, so binding them once keeps each measurement readable as the
+    // question it is. Captures only `Copy` context (never the mutable render state, which stays in
+    // registers per this function's contract).
+    let fits_flat = |doc: DocId, lookahead: &[ArenaCommand], budget: usize| {
+        arena_fits_with_lookahead(
+            arena,
+            doc,
+            Mode::Flat,
+            lookahead,
+            budget as isize,
+            has_line_suffix,
+            source,
+        )
+    };
+
     let mut offset = 0;
 
     while offset < parts.len() {
@@ -96,25 +114,9 @@ pub(super) fn render_fill_iterative(
             } else {
                 rest_commands
             };
-            arena_fits_with_lookahead(
-                arena,
-                content,
-                Mode::Flat,
-                lookahead,
-                remaining as isize,
-                has_line_suffix,
-                source,
-            )
+            fits_flat(content, lookahead, remaining)
         } else {
-            arena_fits_with_lookahead(
-                arena,
-                content,
-                Mode::Flat,
-                &[],
-                available as isize,
-                has_line_suffix,
-                source,
-            )
+            fits_flat(content, &[], available)
         };
 
         // A collapsible `line` in the CONTENT slot is 1 column flat, so measuring it ALONE is
@@ -141,11 +143,7 @@ pub(super) fn render_fill_iterative(
         // `rest_commands` measurement already asks the right question.
         let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
             let mut with_sep: SmallVec<[ArenaCommand; 8]> = if is_final_segment {
-                if context.break_before_wide_flow() {
-                    flow_lookahead(arena, rest_commands)
-                } else {
-                    SmallVec::from_slice(rest_commands)
-                }
+                boundary_lookahead(arena, context, rest_commands)
             } else {
                 SmallVec::new()
             };
@@ -159,15 +157,7 @@ pub(super) fn render_fill_iterative(
             } else {
                 available
             };
-            arena_fits_with_lookahead(
-                arena,
-                content,
-                Mode::Flat,
-                &with_sep,
-                budget as isize,
-                has_line_suffix,
-                source,
-            )
+            fits_flat(content, &with_sep, budget)
         } else {
             content_fits
         };
@@ -210,16 +200,24 @@ pub(super) fn render_fill_iterative(
                 break;
             }
             if !content_fits {
-                let line_start_pos = line_start_column(indent, render, embed);
-                if *pos != line_start_pos {
-                    trim_trailing_whitespace(output);
-                    output.push('\n');
-                    write_indentation(output, indent, render, embed);
-                    *pos = line_start_pos;
+                // The glued head may not drop ([`is_glued_head`]) — Case 3 has guarded it since the
+                // flag landed, and this case reaches `offset == 0` only for a ONE-item fill, which
+                // until `DocArena::as_fill` no builder produced with the flag on. So the arm was
+                // unreachable and the guard was never needed; it is now, because a lone glued word
+                // between two elements (`</code>.w<b>…`) is exactly that fill. The run renders in
+                // place instead, paying the overflow the way an unguarded head always has.
+                if !is_glued_head(context, offset) {
+                    let line_start_pos = line_start_column(indent, render, embed);
+                    if *pos != line_start_pos {
+                        trim_trailing_whitespace(output);
+                        output.push('\n');
+                        write_indentation(output, indent, render, embed);
+                        *pos = line_start_pos;
+                    }
                 }
-                // Unmeasured flat render (tsv shape: prettier uses Break mode
-                // here) — the nested groups must measure for themselves, so
-                // poison the fits-skip flag for this subtree.
+                // Unmeasured flat render (tsv shape: prettier uses Break mode here) — the nested
+                // groups must measure for themselves, so poison the fits-skip flag for this
+                // subtree. Unconditional: the render below is Flat on both sides of the guard.
                 *should_remeasure = true;
             }
             render_single_doc(
@@ -281,29 +279,17 @@ pub(super) fn render_fill_iterative(
                 // flow boundary still cloned a `Vec`).
                 //
                 // At a flow boundary (Svelte text→inline-element/component) the stack is the
-                // PAIRWISE one — last word, separator, element (see [`flow_lookahead`]). Scoped by
-                // the context flag to the in-flow (`!is_first`) text→element boundary; a
-                // first-child text leaves the element bare, which keeps hugging.
-                let mut rest_with_sep: SmallVec<[ArenaCommand; 8]> =
-                    if context.break_before_wide_flow() {
-                        flow_lookahead(arena, rest_commands)
-                    } else {
-                        SmallVec::from_slice(rest_commands)
-                    };
+                // PAIRWISE one — last word, separator, element (see [`boundary_lookahead`], which
+                // both fill parities share). Scoped by the context flag to the in-flow
+                // (`!is_first`) text→element boundary; a first-child text leaves the element bare,
+                // which keeps hugging.
+                let mut rest_with_sep = boundary_lookahead(arena, context, rest_commands);
                 rest_with_sep.push(ArenaCommand {
                     indent,
                     mode: Mode::Flat,
                     doc: separator,
                 });
-                arena_fits_with_lookahead(
-                    arena,
-                    content,
-                    Mode::Flat,
-                    &rest_with_sep,
-                    remaining as isize,
-                    has_line_suffix,
-                    source,
-                )
+                fits_flat(content, &rest_with_sep, remaining)
             } else {
                 content_fits
             };
@@ -332,41 +318,27 @@ pub(super) fn render_fill_iterative(
         );
 
         if both_fit {
-            render_single_doc(
+            render_pair(
                 ctx,
                 content,
-                output,
-                pos,
-                indent,
-                Mode::Flat,
-                should_remeasure,
-            );
-            render_single_doc(
-                ctx,
                 separator,
+                Mode::Flat,
+                Mode::Flat,
                 output,
                 pos,
                 indent,
-                Mode::Flat,
                 should_remeasure,
             );
         } else if content_fits {
-            render_single_doc(
+            render_pair(
                 ctx,
                 content,
-                output,
-                pos,
-                indent,
-                Mode::Flat,
-                should_remeasure,
-            );
-            render_single_doc(
-                ctx,
                 separator,
+                Mode::Flat,
+                Mode::Break,
                 output,
                 pos,
                 indent,
-                Mode::Break,
                 should_remeasure,
             );
         } else {
@@ -375,15 +347,7 @@ pub(super) fn render_fill_iterative(
 
             if !at_line_start {
                 let remaining_at_start = render.print_width.saturating_sub(line_start_pos);
-                let content_fits_at_start = arena_fits_with_lookahead(
-                    arena,
-                    content,
-                    Mode::Flat,
-                    &[],
-                    remaining_at_start as isize,
-                    has_line_suffix,
-                    source,
-                );
+                let content_fits_at_start = fits_flat(content, &[], remaining_at_start);
 
                 if context.after_element_fold() && !content_fits_at_start {
                     // The first fill item is a breakable inline element (the after-element fold's
@@ -396,22 +360,15 @@ pub(super) fn render_fill_iterative(
                     // the separator so the trailing text takes its own line. This keeps the child
                     // hugging the parent's `>`, the same shape the newline-authored boundary lands
                     // on, so both authorings converge.
-                    render_single_doc(
+                    render_pair(
                         ctx,
                         content,
-                        output,
-                        pos,
-                        indent,
-                        Mode::Break,
-                        should_remeasure,
-                    );
-                    render_single_doc(
-                        ctx,
                         separator,
+                        Mode::Break,
+                        Mode::Break,
                         output,
                         pos,
                         indent,
-                        Mode::Break,
                         should_remeasure,
                     );
                     offset += 2;
@@ -432,52 +389,37 @@ pub(super) fn render_fill_iterative(
                 // and every word a separator. Rendering the separator Flat is then just
                 // "write the word", the same thing every other arm does with it.
                 if arena.is_collapsible_line(content) {
-                    render_single_doc(
+                    render_pair(
                         ctx,
                         content,
-                        output,
-                        pos,
-                        indent,
-                        Mode::Break,
-                        should_remeasure,
-                    );
-                    render_single_doc(
-                        ctx,
                         separator,
+                        Mode::Break,
+                        Mode::Flat,
                         output,
                         pos,
                         indent,
-                        Mode::Flat,
                         should_remeasure,
                     );
                     offset += 2;
                     continue;
                 }
 
-                // `glued_lead`: the fill's FIRST item is byte-glued to what precedes it, so the
-                // boundary before it carries no whitespace and the fresh-line drop below would
-                // INJECT a rendered space (and, since the mangled form is itself a fixed point, F1
-                // could never see it). Render it in place — prettier's shape — and break the
+                // The glued head may not drop ([`is_glued_head`]) — the fresh-line drop below would
+                // INJECT a rendered space, and since the mangled form is itself a fixed point F1
+                // could never see it. Render it in place — prettier's shape — and break the
                 // separator, so the run splits at the first whitespace boundary INSIDE it instead,
                 // even when the glued head overruns printWidth. Head only: every later item is
                 // separated by real whitespace and keeps the ordinary drop.
-                if context.glued_lead() && offset == 0 {
-                    render_single_doc(
+                if is_glued_head(context, offset) {
+                    render_pair(
                         ctx,
                         content,
-                        output,
-                        pos,
-                        indent,
-                        Mode::Break,
-                        should_remeasure,
-                    );
-                    render_single_doc(
-                        ctx,
                         separator,
+                        Mode::Break,
+                        Mode::Break,
                         output,
                         pos,
                         indent,
-                        Mode::Break,
                         should_remeasure,
                     );
                     offset += 2;
@@ -518,22 +460,15 @@ pub(super) fn render_fill_iterative(
                         should_remeasure,
                     );
                 } else {
-                    render_single_doc(
+                    render_pair(
                         ctx,
                         content,
-                        output,
-                        pos,
-                        indent,
-                        Mode::Break,
-                        should_remeasure,
-                    );
-                    render_single_doc(
-                        ctx,
                         separator,
+                        Mode::Break,
+                        Mode::Break,
                         output,
                         pos,
                         indent,
-                        Mode::Break,
                         should_remeasure,
                     );
                 }
@@ -669,6 +604,88 @@ fn flow_lookahead(arena: &DocArena, rest_commands: &[ArenaCommand]) -> SmallVec<
         ..el_cmd
     });
     out
+}
+
+/// Render a fill item and the separator that follows it, each in the mode its arm chose.
+///
+/// Most of Case 3's arms end exactly this way and differ *only* in the two modes — which is the
+/// entire content of the decision, and what each arm's comment argues for. Naming the pair keeps
+/// that argument the readable part instead of burying it under repeated plumbing.
+///
+/// The two **hug** arms deliberately don't route through here: their separator mode is
+/// [`hug_terminal_sep_mode`] of the column the content just left, so the mode cannot exist until
+/// the content has rendered. That ordering is the rule, not an oversight, so those arms stay
+/// written out.
+#[inline]
+#[allow(clippy::too_many_arguments)]
+fn render_pair(
+    ctx: &RenderCtx<'_>,
+    content: DocId,
+    separator: DocId,
+    content_mode: Mode,
+    sep_mode: Mode,
+    output: &mut String,
+    pos: &mut usize,
+    indent: RenderIndent,
+    should_remeasure: &mut bool,
+) {
+    render_single_doc(
+        ctx,
+        content,
+        output,
+        pos,
+        indent,
+        content_mode,
+        should_remeasure,
+    );
+    render_single_doc(
+        ctx,
+        separator,
+        output,
+        pos,
+        indent,
+        sep_mode,
+        should_remeasure,
+    );
+}
+
+/// The boundary look-ahead stack, owned: [`flow_lookahead`]'s truncated pairwise unit at a flow
+/// boundary ([`DocContext::break_before_wide_flow`]), the raw remaining stack otherwise.
+///
+/// One question, one place. Case 2's `sep_fits` and the collapsible-line `content_fits` correction
+/// are the same boundary measurement reached through different fill parities, so they must grade
+/// the same unit — a rule change reaching only one of them would silently measure two different
+/// things at one boundary, which is not a shape any fixture would report as wrong.
+///
+/// Case 1's primary `content_fits` asks it too, but keeps a **borrow** of `rest_commands` on the
+/// non-flow path: that stack is the whole remaining render work-list, so copying it into a
+/// `SmallVec` there is not free the way it is here, where both callers already own one to push
+/// their next item onto. It shares the predicate rather than this constructor — deliberately the
+/// smaller granularity.
+#[inline]
+fn boundary_lookahead(
+    arena: &DocArena,
+    context: &DocContext,
+    rest_commands: &[ArenaCommand],
+) -> SmallVec<[ArenaCommand; 8]> {
+    if context.break_before_wide_flow() {
+        flow_lookahead(arena, rest_commands)
+    } else {
+        SmallVec::from_slice(rest_commands)
+    }
+}
+
+/// Whether `offset` is the fill's **glued head** — the item whose leading boundary carries no
+/// whitespace ([`DocContext::glued_lead`]), so no fresh-line drop may land in front of it: there is
+/// nothing there to spend, and breaking anyway INJECTS a rendered space.
+///
+/// One question, one predicate. Both drop arms ask it — Case 1's, reached only by a one-item fill,
+/// and Case 3's — and they must keep answering it identically: the flag is set per RUN, so a head
+/// that may not drop in one case may not drop in the other, and the run that reaches Case 1 (a lone
+/// glued word between two elements, `</code>.w<b>…`) is the same shape either way.
+#[inline]
+fn is_glued_head(context: &DocContext, offset: usize) -> bool {
+    context.glued_lead() && offset == 0
 }
 
 /// Terminal-tail separator mode for the Svelte after-element fold, shared by Case 3's two drop

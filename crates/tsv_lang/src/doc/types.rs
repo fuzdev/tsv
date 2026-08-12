@@ -277,6 +277,13 @@ impl DocContext {
     /// walk (entry classification) — so the flags never contend, but a builder that WRAPS a
     /// fill carrying them hides all three at once (the marker-burial hazard
     /// [`Self::joined_atom`] exists to defuse for the sibling join).
+    ///
+    /// ⚠️ The head's drop suppression is **two** render sites, not one: Case 3's arm and Case 1's,
+    /// the latter reached whenever the run is a fill of a single item (`is_glued_head` in
+    /// `arena_render_fill` is the shared predicate). Note the upstream walk reads this flag off a
+    /// non-`Fill` too — an element doc marked `glued_lead` + [`Self::glued_atom`] — which is why it
+    /// is exempt from the render-channel tripwire in
+    /// [`crate::doc::arena::DocArena::with_context`].
     #[inline]
     #[must_use]
     pub const fn glued_lead(&self) -> bool {
