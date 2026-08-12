@@ -25,4 +25,9 @@
 
 	const a4 = /** @type {A} */
 	((someParameter) => someObject.someProperty.someOther.andAnother.andYetMore.fin);
+
+	// A for-header init declarator is a value gap too — its cast reflows the same way,
+	// inside the broken header.
+	for (let a5 = /** @type {A} */
+	(someObjectName.somePropertyName.someOtherProperty.andAnotherOne.andYet); a5 < 9; a5++) {}
 </script>

@@ -32,6 +32,16 @@
 
 {#each items as {t =[/* c */1]}}<div>{t}</div>{/each}
 
+<!-- comment glued BEFORE an object/array default value -->
+{#each items as {u =/* c */{v:1}}}<div>{u}</div>{/each}
+
+{#each items as {w =/* c */[1]}}<div>{w}</div>{/each}
+
+<!-- glued before a nested object/array PATTERN: rename value and array element -->
+{#each items as {x:/* c */{y}}}<div>{y}</div>{/each}
+
+{#each items as [/* c */{z}]}<div>{z}</div>{/each}
+
 <!-- line comment: a // runs to end of line, so the pattern tail drops to the next line (no swallow) -->
 {#each items as {q =// c
 1}}<div>{q}</div>{/each}

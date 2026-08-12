@@ -4,7 +4,8 @@
 // for-in/for-of left/right printing.
 
 use crate::ast::internal::{self, Expression, Statement};
-use crate::printer::{CommentVec, LeadingGlue, ParenContext, Printer};
+use crate::printer::layout::hang_after_operator;
+use crate::printer::{CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer};
 use smallvec::smallvec;
 use tsv_lang::Comment;
 use tsv_lang::Span;
@@ -1764,27 +1765,79 @@ impl<'a> Printer<'a> {
                         let id_end = declarator.id.span().end;
                         let init_start = init.span().start;
                         let eq_pos = self.find_equals_position(id_end, init_start);
-                        // A comment after `=` that forces a break (line comment, or an
-                        // own-line / multiline block) breaks after the `=` and keeps the
-                        // comment on its own line — the same handling as a variable
-                        // declarator (gluing it up onto the `=` line would be
-                        // non-idempotent). A single-line block glued inline to `=` still
-                        // hugs the value across a source newline (`i = /* c */⏎0` →
-                        // `i = /* c */ 0`) and keeps the header flat.
-                        if let Some(rhs) =
-                            self.build_eq_comment_break_rhs(eq_pos, init_start, || {
-                                self.wrap_for_init_in(init, self.build_expression_doc(init))
+                        // An init declarator's `=` is a value gap, exactly as the
+                        // statement-level one is (`build_variable_declaration_doc`): an
+                        // own-line JSDoc cast hangs after the `=` rather than printing its
+                        // hardline mid-line, which had no fixed point (pass 1 stranded the
+                        // `(`, pass 2 read the comment as mid-line and collapsed the whole
+                        // header). Marked before any branch below builds the value; the
+                        // flag is span-keyed, so it is read wherever that build lands.
+                        self.mark_jsdoc_cast_value_gap(init);
+                        // The binding→`=` gap, answered exactly as the statement-level
+                        // declarator answers it (`build_variable_declaration_doc`): a
+                        // line comment — or a multiline block the author broke after —
+                        // keeps its place and drops `= value` to a continuation line
+                        // indented one level; anything else stays inline before the `=`
+                        // (`let a /* c */ = 0`). A gap this printer skips is a gap whose
+                        // comment is dropped outright, which is what this one used to do
+                        // for every comment kind in it.
+                        let before_eq = self.has_comments_to_emit_between(id_end, eq_pos);
+                        let continuation = before_eq
+                            .then(|| {
+                                self.build_initializer_line_continuation(id_end, eq_pos, || {
+                                    let value = self
+                                        .wrap_for_init_in(init, self.build_expression_doc(init));
+                                    self.prepend_rhs_comments(value, eq_pos + 1, init_start)
+                                })
                             })
-                        {
-                            one.push(rhs);
+                            .flatten();
+                        if let Some(cont) = continuation {
+                            one.push(cont);
                         } else {
-                            one.push(d.text(" = "));
-                            if let Some(comments) =
-                                self.build_rhs_comments_glued_opt(eq_pos + 1, init_start)
-                            {
-                                one.push(comments);
+                            if before_eq {
+                                one.push(self.build_inline_comments_between_doc(id_end, eq_pos));
                             }
-                            one.push(self.wrap_for_init_in(init, self.build_expression_doc(init)));
+                            // A comment after `=` that forces a break (line comment, or an
+                            // own-line / multiline block) breaks after the `=` and keeps the
+                            // comment on its own line — the same handling as a variable
+                            // declarator (gluing it up onto the `=` line would be
+                            // non-idempotent). A single-line block glued inline to `=` still
+                            // hugs the value across a source newline (`i = /* c */⏎0` →
+                            // `i = /* c */ 0`) and keeps the header flat.
+                            if let Some(rhs) =
+                                self.build_eq_comment_break_rhs(eq_pos, init_start, || {
+                                    self.wrap_for_init_in(init, self.build_expression_doc(init))
+                                })
+                            {
+                                one.push(rhs);
+                            } else if self.owned_leading_comment_effect(init)
+                                == Some(OwnedCommentEffect::Hangs)
+                            {
+                                // The owned half of the same question: a comment the value
+                                // OWNS (an own-line JSDoc cast) is glued to its first token
+                                // and travels inside its doc, so the gap probe above cannot
+                                // see it — docs/comments.md hazard 2. It still ends the `=`
+                                // line, so the value hangs, the layout the statement
+                                // declarator's break-after-operator branch gives it. Printed
+                                // flat, the cast's hardline landed mid-line and the authoring
+                                // had NO fixed point: pass 2 read the comment as mid-line and
+                                // collapsed the whole header.
+                                one.push(d.text(" ="));
+                                one.push(hang_after_operator(
+                                    d,
+                                    self.wrap_for_init_in(init, self.build_expression_doc(init)),
+                                ));
+                            } else {
+                                one.push(d.text(" = "));
+                                if let Some(comments) =
+                                    self.build_rhs_comments_glued_opt(eq_pos + 1, init_start)
+                                {
+                                    one.push(comments);
+                                }
+                                one.push(
+                                    self.wrap_for_init_in(init, self.build_expression_doc(init)),
+                                );
+                            }
                         }
                     }
                     decl_docs.push(d.concat(&one));

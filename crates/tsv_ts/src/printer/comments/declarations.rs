@@ -452,19 +452,39 @@ impl<'a> Printer<'a> {
     /// end-of-statement — which is **lossy when a second comment already trails the
     /// construct** (prettier merges them onto one line, the second `//` becoming text;
     /// tsv keeps both comments distinct). Shared by the initializer `=` sites: enum
-    /// members, class properties, variable declarators. See
-    /// conformance_prettier_ts_comments.md §Comment relocation.
+    /// members, class properties, variable declarators, and a for-header's init
+    /// declarators. See conformance_prettier_ts_comments.md §Comment relocation.
     pub(crate) fn build_initializer_line_continuation(
         &self,
         name_end: u32,
         eq_pos: u32,
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
+        self.build_operator_value_continuation(name_end, eq_pos, "=", build_value)
+    }
+
+    /// [`Self::build_initializer_line_continuation`] for a gap whose separator is not
+    /// a bare `=`: the assignment expression, whose operator is whatever the author
+    /// wrote (`=`, `+=`, `??=`, …). `op_text` is emitted verbatim ahead of the value,
+    /// so it must be the operator alone — the separating space before it is
+    /// [`Self::build_continuation_indent`]'s, and the one after it is added here.
+    ///
+    /// The two spellings share one seam because they are one rule: a comment the
+    /// author put *before* a separator stays there, and the separator's tail takes
+    /// the continuation line. Keeping the `=` sites on the named wrapper keeps their
+    /// call sites reading as the initializer rule they are.
+    pub(crate) fn build_operator_value_continuation(
+        &self,
+        head_end: u32,
+        op_pos: u32,
+        op_text: &'static str,
+        build_value: impl FnOnce() -> DocId,
+    ) -> Option<DocId> {
         let d = self.d();
-        self.comments_force_own_line_between(name_end, eq_pos)
+        self.comments_force_own_line_between(head_end, op_pos)
             .then(|| {
-                let tail = d.concat(&[d.text("= "), build_value()]);
-                self.build_continuation_indent(name_end, eq_pos, tail)
+                let tail = d.concat(&[d.text(op_text), d.text(" "), build_value()]);
+                self.build_continuation_indent(head_end, op_pos, tail)
             })
     }
 

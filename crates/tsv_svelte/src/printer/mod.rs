@@ -316,19 +316,36 @@ impl<'a> Printer<'a> {
     /// owes** — the Svelte twin of `tsv_ts`'s `build_frozen_node_doc`, and the emitter
     /// every value-head freeze in this printer goes through.
     ///
-    /// A block comment glued before the frozen node is *owned* by it: it rides inside the
-    /// doc the verbatim slice replaces, and every gap emitter skips it (the to-emit axis),
-    /// so unless the freeze prints it here nothing does — docs/comments.md hazard 1, the
-    /// ownership-is-about-who-PRINTS rule. It sits outside the slice's own span, so
-    /// widening the slice is not the fix; the claim is. Prettier keeps the comment right
-    /// where the author glued it, before the frozen value, and so does this.
+    /// A block comment glued before the frozen node is *owned* by it, so the slice owes
+    /// the claim ([`Self::claim_owned_leading_comment`]). It sits outside the slice's own
+    /// span, so widening the slice is not the fix; the claim is. Prettier keeps the
+    /// comment right where the author glued it, before the frozen value, and so does this.
     pub(in crate::printer) fn build_frozen_node_doc(&self, span: Span) -> DocId {
-        let doc = self.verbatim_source_doc(span);
+        self.claim_owned_leading_comment(self.verbatim_source_doc(span), span.start)
+    }
+
+    /// Prepend the block comment **owned** by the node beginning at `start`, when one
+    /// is glued there — the claim any builder owes that assembles a node's doc itself
+    /// instead of routing through `tsv_ts`'s comment-aware expression builder (which
+    /// makes the claim via `prepend_owned_leading_comment`).
+    ///
+    /// Two such builders exist in this printer: the freeze above, and the binding-pattern
+    /// printer's object/array delimiter builders (`build_object_braces` /
+    /// `build_array_brackets`, reached from [`Printer::build_pattern_doc`]). Both are
+    /// docs/comments.md hazard 1 — the comment rides *inside* the doc these replace, and
+    /// every gap emitter around it skips owned comments (the to-emit axis), so unless the
+    /// builder prints it nothing does.
+    ///
+    /// ⚠️ The claim belongs to the node whose doc is being **assembled here**, never to a
+    /// whole dispatch: two nested nodes can begin at the same offset (an
+    /// `AssignmentPattern` and its `left`, a paren-less arrow and its parameter), and a
+    /// claim made at both is a double print.
+    pub(in crate::printer) fn claim_owned_leading_comment(&self, doc: DocId, start: u32) -> DocId {
         if !self.has_owned_comments {
             return doc;
         }
-        let comment = tsv_lang::owned_leading_comment_at(self.source, self.comments, span.start);
-        let Some(comment) = comment else {
+        let Some(comment) = tsv_lang::owned_leading_comment_at(self.source, self.comments, start)
+        else {
             return doc;
         };
         let d = self.d();

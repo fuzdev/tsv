@@ -808,16 +808,23 @@ impl<'a> Printer<'a> {
     ///
     /// Returns the promoted comments doc (with leading space) and the new RHS comment start
     /// position, or None if no comments need promoting.
+    ///
+    /// **Block comments only** — the ones that can sit inline before the operator. A
+    /// comment that cannot (a `//`, or a multiline block the author broke after)
+    /// stays put and takes the operator's tail with it onto a continuation line;
+    /// that gap is answered by [`Printer::build_operator_value_continuation`], which
+    /// the caller consults first. Emitting such a comment here would swallow the
+    /// operator into it; leaving it to the RHS emitter relocated it *past* the
+    /// operator, which is what this gap used to do.
+    ///
+    /// `op_pos` is the operator's offset, found once by the caller
+    /// ([`Printer::find_operator_in_source`]) and shared with that gate.
     pub(crate) fn promote_comments_before_operator(
         &self,
         start: u32,
-        end: u32,
-        operator: &str,
+        op_pos: u32,
     ) -> Option<(DocId, u32)> {
         let d = self.d();
-        // Find the operator position by scanning forward, skipping whitespace and comments
-        let op_pos = self.find_operator_in_source(start, end, operator)?;
-
         // Collect block comments that appear before the operator
         let mut promoted_parts = DocBuf::new();
         let mut last_promoted_end = start;
@@ -838,7 +845,17 @@ impl<'a> Printer<'a> {
 
     /// Find the position of an operator string between two positions, skipping
     /// whitespace and comments in the source.
-    fn find_operator_in_source(&self, start: u32, end: u32, operator: &str) -> Option<u32> {
+    ///
+    /// The multi-byte sibling of [`Printer::find_equals_position`] (a bare `=`, with a
+    /// midpoint fallback rather than `None`); both step over comments through
+    /// [`tsv_lang::source_scan::skip_comment`], so a `//` or `/* */` in the gap can
+    /// never hide the operator behind its text.
+    pub(crate) fn find_operator_in_source(
+        &self,
+        start: u32,
+        end: u32,
+        operator: &str,
+    ) -> Option<u32> {
         let bytes = self.source.as_bytes();
         let op_bytes = operator.as_bytes();
         let op_len = op_bytes.len();
@@ -846,30 +863,9 @@ impl<'a> Printer<'a> {
         let mut i = start as usize;
 
         while i + op_len <= end_usize {
-            let b = bytes[i];
-            if b.is_ascii_whitespace() {
-                i += 1;
+            if let Some(past_comment) = tsv_lang::source_scan::skip_comment(bytes, i, end_usize) {
+                i = past_comment;
                 continue;
-            }
-            if b == b'/' && i + 1 < end_usize {
-                match bytes[i + 1] {
-                    b'*' => {
-                        i += 2;
-                        while i + 1 < end_usize && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                            i += 1;
-                        }
-                        i += 2;
-                        continue;
-                    }
-                    b'/' => {
-                        while i < end_usize && bytes[i] != b'\n' {
-                            i += 1;
-                        }
-                        i += 1;
-                        continue;
-                    }
-                    _ => {}
-                }
             }
             if &bytes[i..i + op_len] == op_bytes {
                 return Some(i as u32);

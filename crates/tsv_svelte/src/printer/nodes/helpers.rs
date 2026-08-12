@@ -416,6 +416,11 @@ impl<'a> Printer<'a> {
     /// comments thread through every gap (after `{`, around each `,`, before `}`) and a
     /// dangling comment in an empty pattern is preserved. Shared by the `ObjectPattern`
     /// (binding) and `ObjectExpression` (default-value) arms.
+    ///
+    /// Printing the opening `{` is what makes this the node's own emitter, so the
+    /// owned-comment claim ([`Printer::claim_owned_leading_comment`]) is made here rather
+    /// than by each arm — a comment glued before the brace is otherwise printed by
+    /// nobody.
     fn build_object_braces(
         &self,
         span_start: u32,
@@ -443,7 +448,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" "));
         }
         parts.push(d.text("}"));
-        d.concat(&parts)
+        self.claim_owned_leading_comment(d.concat(&parts), span_start)
     }
 
     /// Build comment-aware array brackets (`[ … ]`) — no bracket spacing in either
@@ -451,6 +456,7 @@ impl<'a> Printer<'a> {
     /// `]`); a hole (`[a, , b]`) has no element span to anchor against, so its separator
     /// stays a bare comma. Shared by the `ArrayPattern` (binding) and `ArrayExpression`
     /// (default-value) arms, which carry identical `Vec<Option<Expression>>` elements.
+    /// Claims the owned leading comment for the same reason its object twin does.
     fn build_array_brackets(
         &self,
         elements: &[Option<Expression<'_>>],
@@ -477,7 +483,7 @@ impl<'a> Printer<'a> {
         }
         parts.push(self.build_pattern_trailing_comments(prev_end, span_end - 1));
         parts.push(d.text("]"));
-        d.concat(&parts)
+        self.claim_owned_leading_comment(d.concat(&parts), span_start)
     }
 
     /// Build a doc for a pattern (destructuring context).
@@ -540,6 +546,13 @@ impl<'a> Printer<'a> {
             // **default values** (`{ a = { … } }` / `{ a = [ … ] }`), which prettier likewise
             // keeps inline (so they share the always-inline binding shape, not the breakable
             // expression printer); they just need the same comment-awareness.
+            //
+            // These four arms assemble their docs here rather than through the TS
+            // expression builder, so the owned-comment claim that builder would have made
+            // for a block glued right before them (`{ a = /* c */ { … } }`,
+            // `{ a: /* c */ { … } }`, `[/* c */ { … }]`) is the brace/bracket builders' —
+            // made where the opening delimiter is printed, so it lands inside any type
+            // annotation rather than between the pattern and its `: T`.
             Expression::ObjectPattern(obj) => {
                 let entries: SmallVec<[(u32, u32, DocId); 8]> = obj
                     .properties

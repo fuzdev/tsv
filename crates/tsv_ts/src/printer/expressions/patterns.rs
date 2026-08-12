@@ -136,17 +136,49 @@ impl<'a> Printer<'a> {
         let rhs_comment_start = assign.left.span().end;
         let rhs_comment_end = assign.right.span().start;
 
+        // One probe for the whole target→value gap gates every comment question in
+        // it, so the overwhelming common case (`a = b`) skips locating the operator —
+        // a byte-by-byte source scan — and both gap emitters. Sound because comments
+        // are start-sorted + disjoint and each sub-range lies within the gap, so an
+        // empty whole-gap window makes every sub-query provably empty. The same
+        // shape `build_variable_declaration_doc` uses for the declarator's gap.
+        let operator = assign.operator.as_str();
+        let op_pos = self
+            .has_comments_on_page_between(rhs_comment_start, rhs_comment_end)
+            .then(|| self.find_operator_in_source(rhs_comment_start, rhs_comment_end, operator))
+            .flatten();
+
+        // A comment in the target→operator gap that no inline position can hold — a
+        // `//` would swallow the operator, and a multiline block the author broke
+        // after would lose that break — keeps its place, and the operator and value
+        // take a continuation line indented one level, exactly as the declarator's
+        // name→`=` gap answers it (prettier instead relocates the comment past the
+        // value to end-of-statement, merging it with any comment already there).
+        // Asked BEFORE the promotion below, which would otherwise consume the very
+        // multiline block this gate reads. Bypasses the assignment-layout selection;
+        // the value is built lazily so the common path is unaffected.
+        if let Some(op_pos) = op_pos
+            && let Some(continuation) =
+                self.build_operator_value_continuation(rhs_comment_start, op_pos, operator, || {
+                    let value_doc = self
+                        .build_expression_doc_with_paren_comments(assign.right, assign.span.end);
+                    self.prepend_rhs_comments(
+                        value_doc,
+                        op_pos + operator.len() as u32,
+                        rhs_comment_end,
+                    )
+                })
+        {
+            return d.concat(&[left_doc, continuation]);
+        }
+
         // Promote comments that appear before the operator to the LHS.
         // e.g., `a /* comment */ = b` → comment stays before `=`, not after.
-        let (left_doc, effective_rhs_start) = if let Some((promoted, new_start)) = self
-            .promote_comments_before_operator(
-                rhs_comment_start,
-                rhs_comment_end,
-                assign.operator.as_str(),
-            ) {
-            (d.concat(&[left_doc, promoted]), new_start)
-        } else {
-            (left_doc, rhs_comment_start)
+        let (left_doc, effective_rhs_start) = match op_pos
+            .and_then(|op| self.promote_comments_before_operator(rhs_comment_start, op))
+        {
+            Some((promoted, new_start)) => (d.concat(&[left_doc, promoted]), new_start),
+            None => (left_doc, rhs_comment_start),
         };
 
         let rhs_has_line_comment =
