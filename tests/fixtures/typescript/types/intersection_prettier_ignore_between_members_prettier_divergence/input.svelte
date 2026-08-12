@@ -4,6 +4,6 @@
 	// & on pass 1) and its fixed point collapses the intersection inline, floating the
 	// directive to the statement end and LOSING the freeze
 	type I = { a: 1 } &
-	// prettier-ignore
-	{b:2} & { c: 3 };
+		// prettier-ignore
+		{b:2} & { c: 3 };
 </script>

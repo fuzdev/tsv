@@ -14,9 +14,8 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 259
+# shapes: 252
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
-DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	',⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	']⟨⟩/*	line
 DROPPED	'⟨⟩);	annotation,block,jsdoc_cast,multiline
@@ -112,7 +111,6 @@ DROPPED	}⟨⟩/*	line
 DROPPED	}⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩"	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩"\"	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩&	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩'	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩'\	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩'\'	annotation,block,jsdoc_cast,multiline
@@ -136,9 +134,6 @@ DROPPED	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩NUM	line
 DROPPED	␣⟨⟩[	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩as	annotation,block,jsdoc_cast
-DROPPED	␣⟨⟩{	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩{}	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩{})	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩}	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	).⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
@@ -157,7 +152,7 @@ DOUBLE-PRINTED	}{⟨⟩IDENT	line
 DOUBLE-PRINTED	␣⟨⟩/*	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩//	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	␣⟨⟩␣	line
-SWALLOW	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
+SWALLOW	&⟨⟩␣	line
 SWALLOW	((⟨⟩//	line
 SWALLOW	()⟨⟩;	line
 SWALLOW	()⟨⟩;;	line
@@ -217,7 +212,6 @@ SWALLOW	=>⟨⟩␣	line
 SWALLOW	>⟨⟩()	line
 SWALLOW	>⟨⟩():	line
 SWALLOW	?(⟨⟩//	line
-SWALLOW	IDENT⟨⟩&//	line
 SWALLOW	IDENT⟨⟩)	line
 SWALLOW	IDENT⟨⟩))	line
 SWALLOW	IDENT⟨⟩).	line
@@ -250,7 +244,6 @@ SWALLOW	{}*⟨⟩#	line
 SWALLOW	{}*⟨⟩IDENT	line
 SWALLOW	}⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	}⟨⟩);	line
-SWALLOW	}⟨⟩␣	line
 SWALLOW	␣⟨⟩&	line
 SWALLOW	␣⟨⟩(	line
 SWALLOW	␣⟨⟩((	line
@@ -266,7 +259,7 @@ SWALLOW	␣⟨⟩//	line
 SWALLOW	␣⟨⟩:	line
 SWALLOW	␣⟨⟩;	line
 SWALLOW	␣⟨⟩?	line
-SWALLOW	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
+SWALLOW	␣⟨⟩IDENT	line
 SWALLOW	␣⟨⟩[	line
 SWALLOW	␣⟨⟩in	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	␣⟨⟩new	line

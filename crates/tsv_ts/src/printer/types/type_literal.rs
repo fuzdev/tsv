@@ -9,6 +9,7 @@
 use super::super::CommentVec;
 use super::super::comments_to_emit_in_range;
 use super::helpers::{outermost_paren, unwrap_parenthesized};
+use super::union_intersection::union_member_parens;
 use super::{Printer, StandaloneGlue};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
@@ -353,12 +354,11 @@ impl<'a> Printer<'a> {
             // below (bare `("(", inner, ")")`, no inner indent) reproduces the array
             // path's single-indent layout, matching prettier. See
             // `intersection_paren_member_trailing_object_long`.
-            // Note: unwrap_parenthesized to handle cases like `(A & {...})` where
-            // the input is TSParenthesizedType wrapping TSIntersectionType
+            // `aligned_trailing_object_shell` is the whole question — including which
+            // comments the aligned opening can hold; a `//` in its member gaps declines
+            // it and falls through to the default arm below.
             if indent_default_paren
-                && let TSType::Intersection(intersection) = unwrap_parenthesized(ts_type)
-                && let Some(last) = intersection.types.last()
-                && let TSType::TypeLiteral(obj) = unwrap_parenthesized(last)
+                && let Some((intersection, obj)) = self.aligned_trailing_object_shell(ts_type)
             {
                 return self.build_parenthesized_intersection_trailing_object_doc(
                     intersection,
@@ -557,25 +557,51 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Build intersection types except the last one (the object)
+        // Build intersection types except the last one (the object), each member→member
+        // gap emitted around the `&` it belongs to. The opening is this builder's own
+        // text, so — like the shell gaps below — these gaps are invisible to every other
+        // emitter and a comment in one would be silently DROPPED. The two runs are the
+        // ordinary intersection printer's (`build_intersection_member_body_doc`), so the
+        // side of the `&` a comment keeps is decided in one place for both paths.
         //
-        // TODO: every `&` gap in this opening is fused text with no scan, so a comment
-        // in one is DROPPED — `(a & /* c */ { p: T })`, `(a /* c */ & b & { p: T })`,
-        // and the same with an empty object — where the bare (paren-free) intersection
-        // preserves it and prettier preserves every one. Hazard 4 in this builder's
-        // opening, the mirror of the shell gaps fixed below; the ordinary intersection
-        // printer's inter-member emitter is the landing. Pinned in the gap ratchet as
-        // `␣⟨⟩{` / `␣⟨⟩{}` / `␣⟨⟩{})`.
+        // Block comments only, and by construction rather than by filter: a `//` here
+        // declines this whole layout (`aligned_trailing_object_shell`), so what reaches
+        // this builder is always inline-able.
+        //
+        // ⚠️ Each member takes the intersection's **member-parens** rule, exactly as the
+        // ordinary path's members do. A bare `build_type_doc` here asked no paren question
+        // at all, so a member that needs parens as an operand of `&` lost them — silently
+        // RE-MEANING the type where `&` binds tighter (`(a & (b | c) & { x: X })` printing
+        // as `(a & b | c & { x: X })`, i.e. `(a & b) | (c & { x: X })`), and emitting
+        // output NEITHER parser accepts for a function or constructor member. Both survive
+        // every reparse-shaped audit — the meaning change is valid, idempotent and
+        // comment-clean — so only the prettier differential sees them.
+        let member_parens = union_member_parens(intersection.types.len());
         let types_before_object = &intersection.types[..intersection.types.len() - 1];
         for (i, t) in types_before_object.iter().enumerate() {
             if i > 0 {
-                opening_parts.push(d.text(" & "));
+                self.push_intersection_operator_gap_comments(
+                    &mut opening_parts,
+                    types_before_object[i - 1].span().end,
+                    t.span().start,
+                );
             }
-            opening_parts.push(self.build_type_doc(t));
+            opening_parts.push(self.build_intersection_member_type_doc(t, member_parens));
         }
 
-        // Add ` & {`
-        opening_parts.push(d.text(" & {"));
+        // Add ` & {`, with the last gap — the one before the trailing object — taking the
+        // same two runs. `build_aligned_object_literal_doc` receives the `{` fused onto
+        // this opening, so a comment after the `&` has to be emitted ahead of it here.
+        // `aligned_trailing_object_shell` admits only a 2+-member intersection, so this
+        // slice always has a last member and the `&` always has an operand on its left.
+        if let Some(prev) = types_before_object.last() {
+            self.push_intersection_operator_gap_comments(
+                &mut opening_parts,
+                prev.span().end,
+                trailing_obj.span.start,
+            );
+        }
+        opening_parts.push(d.text("{"));
 
         let mut parts: DocBuf = smallvec![
             self.build_aligned_object_literal_doc(trailing_obj, d.concat(&opening_parts))

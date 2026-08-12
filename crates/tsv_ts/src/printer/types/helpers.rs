@@ -241,10 +241,29 @@ pub fn intersection_has_expanding_first_type(intersection: &TSIntersectionType<'
 // Type parenthesization predicates
 //
 
+/// Peel a **single-member** union/intersection to its sole member, through parens and
+/// recursively (`(& { x: X })` → `{ x: X }`, the leading-operator authoring).
+///
+/// Such a node PRINTS as that member: prettier drops single-element union/intersection
+/// nodes in postprocess, and tsv reaches the same collapse via `union_member_parens`. So
+/// every "does the inner need parens here?" predicate must ask about what will be printed
+/// rather than about the wrapper — asking the wrapper says "an intersection, so parens" and
+/// keeps a pair that nothing needs (`(& { x: X })[]` → `({ x: X })[]`, where prettier emits
+/// `{ x: X }[]`). The peel keeps asking the same question of the member, so a member that
+/// genuinely needs parens (`(& (A | B))[]`) still gets them.
+pub(super) fn collapse_single_member_type<'t>(ts_type: &'t TSType<'t>) -> &'t TSType<'t> {
+    let inner = unwrap_parenthesized(ts_type);
+    match inner {
+        TSType::Union(u) if u.types.len() == 1 => collapse_single_member_type(&u.types[0]),
+        TSType::Intersection(i) if i.types.len() == 1 => collapse_single_member_type(&i.types[0]),
+        _ => inner,
+    }
+}
+
 /// Check if a type needs parentheses when used as the object in indexed access (`T[K]`).
 /// Without parens: `A | B[K]` parses as `A | (B[K])`, not `(A | B)[K]`
 pub(super) fn type_needs_parens_for_indexed_access_object(ts_type: &TSType<'_>) -> bool {
-    let inner = unwrap_parenthesized(ts_type);
+    let inner = collapse_single_member_type(ts_type);
     // TypeOperator included: `(keyof T)[K]` is valid and different from `keyof T[K]`
     matches!(
         inner,
@@ -262,7 +281,7 @@ pub(super) fn type_needs_parens_for_indexed_access_object(ts_type: &TSType<'_>) 
 /// Check if a type needs parentheses when used as the element type in an array (`T[]`).
 /// Without parens: `A | B[]` parses as `A | (B[])`, not `(A | B)[]`
 pub(super) fn type_needs_parens_for_array_element(ts_type: &TSType<'_>) -> bool {
-    let inner = unwrap_parenthesized(ts_type);
+    let inner = collapse_single_member_type(ts_type);
     // TypeOperator included: `(keyof T)[]` differs from `keyof T[]`, and
     // `(readonly string[])[]` differs from `readonly string[][]`.
     matches!(
@@ -284,7 +303,7 @@ pub(super) fn type_needs_parens_for_array_element(ts_type: &TSType<'_>) -> bool 
 /// parens the `?` rebinds: `[() => void?]` / `[A | B?]` are invalid or change
 /// meaning.
 pub(super) fn type_needs_parens_for_optional_element(ts_type: &TSType<'_>) -> bool {
-    let inner = unwrap_parenthesized(ts_type);
+    let inner = collapse_single_member_type(ts_type);
     matches!(
         inner,
         TSType::Union(_)
