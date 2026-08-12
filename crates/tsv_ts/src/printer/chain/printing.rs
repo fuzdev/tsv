@@ -4,7 +4,7 @@
 // - print_node: Basic node printing (with optional expansion flag)
 // - print_group: Group printing (with optional expansion and comment skipping)
 
-use super::types::{ChainGroup, ChainNode, is_numeric_index};
+use super::types::{ChainGroup, ChainNode, NonNullGap, is_numeric_index};
 use crate::ast::internal::{self, Expression};
 use crate::printer::{ParenContext, Printer, needs_parens};
 use tsv_lang::doc::{
@@ -92,49 +92,18 @@ pub(crate) fn print_node_inner<'a>(
                 };
                 // Preserve a comment from the stripped grouping parens inside them,
                 // before `)` (`(x + y /* c */)!.foo`) — prettier relocates it past
-                // `)`; tsv keeps it where the author wrote it.
-                if let Some(end) = *paren_comment_end {
-                    let start = expr.span().end;
-                    let classified = printer.classify_comments(start, end);
-                    if classified.has_line_comments() {
-                        // A line comment can't trail inline before `)` (the `//` would
-                        // swallow it), so force the multiline operand layout, keeping
-                        // the comment inside — the same shape as a unary line-comment
-                        // operand (`!(\n\tx + y // c\n)`).
-                        let leading_block =
-                            printer.build_chain_leading_comments_doc(&classified.leading_block);
-                        let leading_line =
-                            printer.build_chain_leading_comments_doc(&classified.leading_line);
-                        let trailing_block =
-                            printer.build_trailing_block_doc(&classified.trailing_block);
-                        // No boundary: the layout's own `hardline` before `)` flushes
-                        // the suffix, and a boundary would end the line first, landing
-                        // a blank between the comment and the closer.
-                        let trailing_line =
-                            printer.build_deferred_line_comments_doc(&classified.trailing_line);
-                        return d.concat(&[
-                            d.text("("),
-                            d.indent(d.concat(&[
-                                d.hardline(),
-                                leading_block,
-                                leading_line,
-                                inner,
-                                trailing_block,
-                                trailing_line,
-                            ])),
-                            d.hardline(),
-                            d.text(")"),
-                        ]);
-                    }
-                    if printer.has_comments_to_emit_between(start, end) {
-                        let trailing = printer.build_chain_block_comments_doc(
-                            start,
-                            end,
-                            crate::printer::CommentSpacing::Leading,
-                            false,
-                        );
-                        return d.concat(&[d.text("("), inner_group, trailing, d.text(")")]);
-                    }
+                // `)`; tsv keeps it where the author wrote it. The `!` itself is the
+                // next node, so this doc closes at the `)`.
+                if let Some(end) = *paren_comment_end
+                    && let Some(doc) = printer.build_non_null_paren_operand_doc(
+                        expr.span().end,
+                        end,
+                        inner_group,
+                        inner,
+                        ")",
+                    )
+                {
+                    return doc;
                 }
                 d.parens(inner_group)
             } else {
@@ -325,7 +294,30 @@ pub(crate) fn print_node_inner<'a>(
             d.concat(&[pre_bracket_block_doc, bracket_doc])
         }
 
-        ChainNode::NonNull => d.text("!"),
+        // A comment between the operand and the `!` (`aaa /* c */!.bbb`) is this node's
+        // to print — nothing else scans the region, and the chain builder can't take it
+        // the way it takes a member's gap, since a `!` may never start a line
+        // (`[no LineTerminator here]`). Prettier keeps it here too, in the same slot the
+        // non-chain arm of `build_ts_non_null_doc` already emits (`p?.q /* c */!`).
+        // Block-only, and a stripped shell is where that bound is wrong — see
+        // `NonNullGap::Bang`.
+        ChainNode::NonNull {
+            gap:
+                NonNullGap::Bang {
+                    operand_end,
+                    bang_end,
+                },
+        } if printer.chain_has_comments() => {
+            let comments = printer.build_chain_block_comments_doc(
+                *operand_end,
+                *bang_end,
+                crate::printer::CommentSpacing::Leading,
+                false,
+            );
+            d.concat(&[comments, d.text("!")])
+        }
+
+        ChainNode::NonNull { .. } => d.text("!"),
     }
 }
 
