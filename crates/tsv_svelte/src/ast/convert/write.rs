@@ -871,25 +871,54 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"identifiers\":");
+    // The internal entries keep what the author wrote — a JSDoc cast around the
+    // whole comma list (`{@debug /** @type {B} */ (b, c)}`) is ONE entry so the
+    // printer can reproduce the cast — but the wire is the canonical parse,
+    // where `remove_parens` uncovers the sequence and the reader flattens it:
+    // splice such an entry into the sequence's elements. The elements keep
+    // their own casts (emission unwraps a cast to its inner node), and their
+    // paren-inclusive spans are what give the discarded-wrapper bounds below
+    // canonical's own values. The cast-free common case borrows the parsed
+    // slice untouched.
+    let spliced = if tag.identifiers.iter().any(|entry| {
+        matches!(
+            entry.unwrap_jsdoc_casts(),
+            tsv_ts::Expression::SequenceExpression(_)
+        )
+    }) {
+        let mut flat = Vec::with_capacity(tag.identifiers.len() + 1);
+        for entry in tag.identifiers {
+            match entry.unwrap_jsdoc_casts() {
+                tsv_ts::Expression::SequenceExpression(seq) => {
+                    flat.extend(seq.expressions.iter().cloned());
+                }
+                _ => flat.push(entry.clone()),
+            }
+        }
+        Some(flat)
+    } else {
+        None
+    };
+    let identifiers = spliced.as_deref().unwrap_or(tag.identifiers);
     // `[first, .., last]` is the multi-identifier case AND the wrapper's own bounds: the
     // discarded `SequenceExpression` spans first identifier to last, and a single identifier
     // (which the pattern excludes) has no wrapper at all.
-    if let [first, .., last] = tag.identifiers
+    if let [first, .., last] = identifiers
         && ctx.any_comment_in(tag.span.start, tag.span.end)
     {
         let wc = build_expression_list_writer_comments(
-            tag.identifiers,
+            identifiers,
             ctx.attach(),
             tag.span.start,
             tag.span.end,
             Some(Span::new(first.span().start, last.span().end)),
         );
-        write_array(w, tag.identifiers, |w, id| {
+        write_array(w, identifiers, |w, id| {
             write_expression_embedded(w, id, ctx.embed(CommentMode::Emit(&wc)));
         });
         wc.debug_assert_consumed();
     } else {
-        write_array(w, tag.identifiers, |w, id| {
+        write_array(w, identifiers, |w, id| {
             write_braced_island(w, id, tag.span, ctx);
         });
     }

@@ -297,6 +297,21 @@ impl<'a> Printer<'a> {
         self.d().verbatim_source_span(span, self.source)
     }
 
+    /// A doc emitting `span` of the source as an ordinary [`DocId`] source slice —
+    /// content, not a format-ignore freeze (an interior newline still breaks the
+    /// enclosing group, unlike [`Self::verbatim_source_doc`]) — while telling the
+    /// ledger that any comment inside rides out in the slice. For the emitters
+    /// whose node spans can legitimately contain comment bytes nothing else
+    /// prints: the `{@debug}` identifier emitter, where a JSDoc-cast entry's span
+    /// (`(a)`) can hold an interior comment (`(a /* c */)`) that reaches no
+    /// comment emitter.
+    pub(crate) fn source_span_covering_comments_doc(&self, span: Span) -> DocId {
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+
+        self.d().source_span(span, self.source)
+    }
+
     /// The frozen slice for a node the freeze resolved, **plus the owned-comment claim it
     /// owes** — the Svelte twin of `tsv_ts`'s `build_frozen_node_doc`, and the emitter
     /// every value-head freeze in this printer goes through.
