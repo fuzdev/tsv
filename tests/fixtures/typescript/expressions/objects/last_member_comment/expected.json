@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 197,
+	"end": 313,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,56 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a multiline block comment trails the last property the same way",
+			"start": 189,
+			"end": 255,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 287,
+			"end": 298,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 7
+				},
+				"end": {
+					"line": 17,
+					"column": 5
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 196,
+		"end": 312,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 187,
+			"end": 303,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 12,
+					"line": 19,
 					"column": 9
 				}
 			},
@@ -412,6 +444,192 @@
 							"value": " single property",
 							"start": 127,
 							"end": 145
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 257,
+					"end": 302,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 263,
+							"end": 301,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 263,
+								"end": 267,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 11
+									}
+								},
+								"name": "obj3"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 270,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 14
+									},
+									"end": {
+										"line": 18,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 274,
+										"end": 278,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 274,
+											"end": 275,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 277,
+											"end": 278,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 5
+												},
+												"end": {
+													"line": 15,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 282,
+										"end": 286,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 282,
+											"end": 283,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 285,
+											"end": 286,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 5
+												},
+												"end": {
+													"line": 16,
+													"column": 6
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1\nc2 ",
+												"start": 287,
+												"end": 298
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multiline block comment trails the last property the same way",
+							"start": 189,
+							"end": 255
 						}
 					]
 				}
