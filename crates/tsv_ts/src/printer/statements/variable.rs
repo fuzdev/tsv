@@ -679,7 +679,19 @@ impl<'a> Printer<'a> {
                 let is_simple_rhs_with_breakable_lhs =
                     can_break_left && is_simple_self_expanding(init);
 
-                let needs_break_after_operator = !should_break
+                // `should_break` (a multi-declarator with initializers) withholds the
+                // width-decided break at `=` because the declarators are hardline-separated
+                // already — but an owned comment that HANGS is not width-decided. Its break
+                // is inside the value's doc whatever this layout picks, so withholding the
+                // hang only strands what follows the comment at the declarator list's own
+                // indent: for a cast, a form the next pass reads as mid-line and collapses,
+                // leaving that authoring no fixed point at all. The gap-emitted spelling of
+                // the same comment already hangs here (`build_eq_comment_break_rhs`, the
+                // first branch below, which `should_break` does not gate), so this is the
+                // owned half catching up to it
+                // (`multiple/value_own_line_comment_hang_prettier_divergence`).
+                let needs_break_after_operator = (!should_break
+                    || owned_comment_effect == Some(OwnedCommentEffect::Hangs))
                     && (is_break_after_op_rhs || is_simple_rhs_with_breakable_lhs)
                     && !d.will_break(id_doc)
                     && !has_complex_type_annotation

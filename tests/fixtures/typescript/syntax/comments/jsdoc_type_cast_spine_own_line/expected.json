@@ -1,0 +1,964 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 800,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line cast comment hangs the value — and the cast need only be the value's",
+			"start": 10,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " LEFTMOST LEAF, where its comment is still the first thing the value prints.",
+			"start": 95,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 187,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 227,
+			"end": 243,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 280,
+			"end": 296,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 3
+				},
+				"end": {
+					"line": 14,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The cast IS the value: the shape the leaf cases have to match.",
+			"start": 318,
+			"end": 383,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 397,
+			"end": 413,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control, same dimension: the same cast glued to its `(` keeps the value on the",
+			"start": 426,
+			"end": 507,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " operator's line, leaf or not.",
+			"start": 509,
+			"end": 541,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 553,
+			"end": 569,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 11
+				},
+				"end": {
+					"line": 25,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank line the author wrote before the comment survives: the element's printed",
+			"start": 585,
+			"end": 668,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " content begins at the comment, not at its own first token.",
+			"start": 670,
+			"end": 731,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 755,
+			"end": 771,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 799,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 790,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 35,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 175,
+					"end": 218,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 181,
+							"end": 217,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 181,
+								"end": 182,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 206,
+								"end": 217,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 13
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 207,
+									"end": 211,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 3
+										},
+										"end": {
+											"line": 6,
+											"column": 7
+										}
+									},
+									"name": "expr"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 213,
+									"end": 217,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 9
+										},
+										"end": {
+											"line": 6,
+											"column": 13
+										}
+									},
+									"name": "prop"
+								},
+								"computed": false,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 187,
+										"end": 203
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line cast comment hangs the value — and the cast need only be the value's",
+							"start": 10,
+							"end": 93
+						},
+						{
+							"type": "Line",
+							"value": " LEFTMOST LEAF, where its comment is still the first thing the value prints.",
+							"start": 95,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 221,
+					"end": 258,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 221,
+						"end": 257,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 13
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 221,
+							"end": 222,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"name": "b"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 246,
+							"end": 257,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 13
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 247,
+								"end": 251,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 3
+									},
+									"end": {
+										"line": 10,
+										"column": 7
+									}
+								},
+								"name": "expr"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 253,
+								"end": 257,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 9
+									},
+									"end": {
+										"line": 10,
+										"column": 13
+									}
+								},
+								"name": "prop"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @type {A} ",
+									"start": 227,
+									"end": 243
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 261,
+					"end": 315,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 267,
+						"end": 268,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 7
+							},
+							"end": {
+								"line": 12,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 269,
+						"end": 315,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 9
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 273,
+								"end": 312,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 15
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 273,
+									"end": 274,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "MemberExpression",
+									"start": 300,
+									"end": 311,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 15,
+											"column": 14
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 301,
+										"end": 305,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 4
+											},
+											"end": {
+												"line": 15,
+												"column": 8
+											}
+										},
+										"name": "expr"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 307,
+										"end": 311,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 10
+											},
+											"end": {
+												"line": 15,
+												"column": 14
+											}
+										},
+										"name": "prop"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* @type {A} ",
+											"start": 280,
+											"end": 296
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 385,
+					"end": 423,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 391,
+							"end": 422,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 391,
+								"end": 392,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 417,
+								"end": 421,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 3
+									},
+									"end": {
+										"line": 21,
+										"column": 7
+									}
+								},
+								"name": "expr",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 397,
+										"end": 413
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The cast IS the value: the shape the leaf cases have to match.",
+							"start": 318,
+							"end": 383
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 543,
+					"end": 582,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 40
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 549,
+							"end": 581,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 39
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 549,
+								"end": 550,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 570,
+								"end": 581,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 28
+									},
+									"end": {
+										"line": 25,
+										"column": 39
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 571,
+									"end": 575,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 29
+										},
+										"end": {
+											"line": 25,
+											"column": 33
+										}
+									},
+									"name": "expr"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 577,
+									"end": 581,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 35
+										},
+										"end": {
+											"line": 25,
+											"column": 39
+										}
+									},
+									"name": "prop"
+								},
+								"computed": false,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 553,
+										"end": 569
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control, same dimension: the same cast glued to its `(` keeps the value on the",
+							"start": 426,
+							"end": 507
+						},
+						{
+							"type": "Line",
+							"value": " operator's line, leaf or not.",
+							"start": 509,
+							"end": 541
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 733,
+					"end": 789,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 739,
+							"end": 788,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 739,
+								"end": 742,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 10
+									}
+								},
+								"name": "arr"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 745,
+								"end": 788,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 13
+									},
+									"end": {
+										"line": 34,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 749,
+										"end": 750,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 2
+											},
+											"end": {
+												"line": 30,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "MemberExpression",
+										"start": 774,
+										"end": 785,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 2
+											},
+											"end": {
+												"line": 33,
+												"column": 13
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 775,
+											"end": 779,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 3
+												},
+												"end": {
+													"line": 33,
+													"column": 7
+												}
+											},
+											"name": "expr"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 781,
+											"end": 785,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 9
+												},
+												"end": {
+													"line": 33,
+													"column": 13
+												}
+											},
+											"name": "prop"
+										},
+										"computed": false,
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "* @type {A} ",
+												"start": 755,
+												"end": 771
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line the author wrote before the comment survives: the element's printed",
+							"start": 585,
+							"end": 668
+						},
+						{
+							"type": "Line",
+							"value": " content begins at the comment, not at its own first token.",
+							"start": 670,
+							"end": 731
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
