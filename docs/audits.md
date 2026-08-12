@@ -779,7 +779,17 @@ is shared with [the corpus bundle](#the-corpus-bundle-auditcorpus) from
 # delta formatting can add under preserve_parens is a clarity-paren (roundtrip_audit
 # gates the rest), the skeleton is compared with ParenthesizedExpression STRIPPED —
 # the binding-paren signal rides a separate `anchor_is_paren` flag. So a clarity
-# paren deep inside is not a finding; a paren at the anchor is.
+# paren deep inside is not a finding; a GROUPING paren at the anchor is.
+#
+# ⚠️ Both `(` tests ask for a NODE, never for the byte. An arrow's parameter list
+# also opens with `(` and is the arrow's own syntax, so `/* c */ x => x` ->
+# `/* c */ (x) => x` (`arrowParens: always`) binds the same ArrowFunctionExpression
+# either way, and a cast-shaped comment on a bare parameter is not a cast. The byte
+# test called both re-bindings and reported HARD on ordinary JS
+# (`arr.map(/* index unused */ x => x.id)`). "No node begins at the `(`" is NOT the
+# cast test either: a real cast's parens are swallowed by whatever encloses it, so
+# `(root).head` has a MemberExpression starting right there. Only an arrow begins
+# at its own parameter `(`.
 #
 # HARD (a parser-owned glued comment re-binds) fails --gate — every glued block
 # comment is owned, so a cast, an annotation, and a plain glued comment alike; SOFT

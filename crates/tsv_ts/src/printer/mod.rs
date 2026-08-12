@@ -274,6 +274,29 @@ pub struct Printer<'a> {
     /// [`Self::jsdoc_cast_value_gap_target`], whose per-gap marks overwrite each other.
     /// Span-keyed like it: a cast nested off the spine keeps its width-decided layout.
     pub(crate) jsdoc_cast_cannot_hang_target: Cell<Option<Span>>,
+    /// Start of an owned leading comment an **enclosing** node already claims, so the node
+    /// beginning there must not claim it a second time
+    /// ([`Printer::prepend_owned_leading_comment`]).
+    ///
+    /// One shape needs it: a **paren-less** arrow, whose span starts at its own sole
+    /// parameter (`x => x`, `params_start: None`). Both nodes begin at the comment's token,
+    /// so the position-keyed lookup answers for both and the comment printed TWICE
+    /// (`/* c */ (/* c */ x) => x`). The claim stays on the ARROW, and the parameter declines
+    /// through this mark. Handing the claim DOWN — the `left_spine_child` repair every other
+    /// same-start pair takes, `[/* c */ a = 1]`'s `AssignmentPattern` among them — is not
+    /// available here: those parents print nothing before their left child, so the innermost
+    /// node still prints first, while this one emits a *synthesized* `(` that would land the
+    /// comment inside a paren the author never wrote.
+    ///
+    /// Set by [`Printer::build_arrow_params_doc_ungrouped`], the one spelling of an arrow's
+    /// parameter list, and save/restored around that build like
+    /// [`Printer::with_jsdoc_cast_cannot_hang_gap`]: nothing may leak into the body, where a
+    /// nested arrow's own comment sits. Every path that reaches it already claims at
+    /// `arrow.span.start` — `build_expression_doc`'s seam for a plain arrow and a chain
+    /// head, `prepend_owned_leading_comment_at` for the `build_arrow_sig_doc` reassembly and
+    /// a chain's inner arrows — which is what makes the suppression a de-duplication rather
+    /// than a DROP (`docs/comments.md` hazard 1).
+    pub(crate) claimed_owned_comment_start: Cell<Option<u32>>,
     /// The parent context for a curried arrow-chain value, set by the enclosing
     /// printer (assignment chokepoint, call-argument printer, binary-operand
     /// printer) just before the chain is built. The arrow printer reads and
@@ -381,6 +404,7 @@ impl<'a> Printer<'a> {
             ternary_hang_target: Cell::new(None),
             jsdoc_cast_value_gap_target: Cell::new(None),
             jsdoc_cast_cannot_hang_target: Cell::new(None),
+            claimed_owned_comment_start: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
             chain_arg_share_active: Cell::new(false),

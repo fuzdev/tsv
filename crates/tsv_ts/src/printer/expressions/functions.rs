@@ -124,6 +124,24 @@ pub(in crate::printer) fn arrow_token_end(arrow: &internal::ArrowFunctionExpress
     arrow.arrow_token + "=>".len() as u32
 }
 
+/// The start an arrow shares with its lone **unparenthesized** parameter — the one shape
+/// where a node and its child begin at the same byte while the parent still prints ahead of
+/// it (the `(` the printer synthesizes around that parameter).
+///
+/// `None` for every other arrow, the async paren-less one included (`async /* c */ x => x`):
+/// its span starts at `async`, so the two positions differ and the comment is never the
+/// arrow's to begin with — [`Printer::push_async_arrow_head`] prints it positionally.
+///
+/// Read only by [`Printer::build_arrow_params_doc_ungrouped`], to suppress the parameter's
+/// duplicate owned-comment claim; see the ⚠️ there.
+fn bare_param_sharing_arrow_start(arrow: &internal::ArrowFunctionExpression<'_>) -> Option<u32> {
+    if arrow.params_start.is_some() {
+        return None;
+    }
+    let start = arrow.params.first()?.span().start;
+    (start == arrow.span.start).then_some(start)
+}
+
 /// Whether `arrow`'s signature — its params' `(` through its `=>` — holds a comment that
 /// **forces** a break.
 ///
@@ -790,6 +808,15 @@ impl<'a> Printer<'a> {
     ///
     /// Structure matches prettier's function-parameters.js:
     /// `[typeParams, "(", indent([softline, ...params]), ifBreak(","), softline, ")"]`
+    ///
+    /// ⚠️ **A paren-less arrow's parameter starts where the ARROW does**, so the arrow's
+    /// owned leading comment answers the parameter's position-keyed lookup too and both
+    /// claimed it — `/* c */ x => x` printed as `/* c */ (/* c */ x) => x`, at every
+    /// position an arrow reaches. The claim belongs to the arrow: the `(` here is
+    /// *synthesized*, so pushing the claim down would move the comment inside a paren the
+    /// author never wrote (prettier keeps it outside too — `/* c */ (x) => x`). The
+    /// parameter declines through [`Self::with_owned_comment_claimed_above`], whose mark is
+    /// scoped to this list so a nested arrow in the body still claims its own.
     fn build_arrow_params_doc_ungrouped(
         &self,
         arrow: &internal::ArrowFunctionExpression<'_>,
@@ -797,11 +824,17 @@ impl<'a> Printer<'a> {
         // The trailing boundary stops at `)`, not at the return type or the body:
         // comments between `)` and `=>` belong to the arrow printer
         // ([`Self::append_pre_arrow_comments`]).
-        self.build_params_doc_with_comments(
-            arrow.params,
-            arrow.params_start,
-            self.arrow_params_end(arrow),
-        )
+        let build = || {
+            self.build_params_doc_with_comments(
+                arrow.params,
+                arrow.params_start,
+                self.arrow_params_end(arrow),
+            )
+        };
+        match bare_param_sharing_arrow_start(arrow) {
+            Some(start) => self.with_owned_comment_claimed_above(start, build),
+            None => build(),
+        }
     }
 
     /// Emit an async arrow's `async` keyword and the gap between it and the head of
