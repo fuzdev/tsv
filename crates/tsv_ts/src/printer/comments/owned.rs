@@ -55,6 +55,38 @@ fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> 
     })
 }
 
+/// The [`internal::JsdocCast`] whose comment is the FIRST thing `expr` prints — `expr`
+/// itself, or the leftmost leaf reached through [`left_spine_child`].
+///
+/// A cast is the one owned comment that has to be reached as a **node**: `JsdocCast::span`
+/// covers the `(`…`)` only, so the comment sits *outside* it and may be a newline above,
+/// where the glued lookup every other owned comment answers through finds nothing.
+///
+/// And reaching it means walking the spine, because a value's printed content begins at its
+/// leftmost leaf: `(x).prop`, `(x) + y`, `(x)(a)`, `(x) ? a : b` all print the cast's comment
+/// first. Matching `expr` alone left each of those without the hang the cast's own hardline
+/// requires — pass 1 stranded the `(` at the operator's own indent and pass 2 collapsed it, so
+/// the authoring had no fixed point at all (`jsdoc_type_cast_spine_own_line`).
+///
+/// The span-start guard is the one [`Printer::prepend_owned_leading_comment`] makes against
+/// this same walker: a child starting *later* than its parent (a `NewExpression` callee, a
+/// parenthesized inner) means the parent prints something ahead of it, so nothing below it
+/// leads the value.
+fn leading_jsdoc_cast<'x>(expr: &'x Expression<'x>) -> Option<&'x internal::JsdocCast<'x>> {
+    let start = expr.span().start;
+    let mut node = expr;
+    loop {
+        if let Expression::JsdocCast(cast) = node {
+            return Some(cast);
+        }
+        let child = left_spine_child(node)?;
+        if child.span().start != start {
+            return None;
+        }
+        node = child;
+    }
+}
+
 /// What the comment a value **owns** does to the operator's line (`=` / `:`) — the two
 /// exclusive halves of one question, so a caller reads them off one lookup instead of
 /// asking twice. See [`Printer::owned_leading_comment_effect`].
@@ -67,6 +99,18 @@ pub(crate) enum OwnedCommentEffect {
     /// the enclosing group must honor ([`Printer::block_comment_is_indentable`]) —
     /// prettier reaches the same place through `printIndentableBlockComment`'s
     /// `breakParent`.
+    ///
+    /// TODO: the hang is right, but the comment's hard break also propagates into the
+    /// VALUE's own group, so a value that would fit flat explodes with it
+    /// (`const a =⏎/** @type {A} */⏎(x) ? b : c` breaks the ternary; `= /**⏎ * c⏎ */ x + y +
+    /// z` breaks the binary chain). Prettier keeps them flat: its leading comment is printed
+    /// *outside* the value's group, while tsv's is inside it by construction — an owned
+    /// comment travels in its node's doc, which is the property that keeps a synthesized
+    /// paren from landing between the two. Fixing it means either hoisting the comment to the
+    /// OUTERMOST node starting at it (giving up that property) or a hard break that ends its
+    /// line without breaking the group around it; neither is a local change, and both need
+    /// their own fixture. Pre-dates the leftmost-leaf resolution above and is not specific to
+    /// a cast — the general indentable block does it too.
     Hangs,
     /// The comment **pins** the value to the operator's line (the never-break layout).
     ///
@@ -202,8 +246,10 @@ impl<'a> Printer<'a> {
         // describes, and a hang without that hardline strands the `(` (see that
         // function's doc — it is the single source of truth for both). The cast's comment
         // may also sit a *newline* away from the `(`, which the glued lookup below
-        // deliberately does not match — a bundler annotation binds only when glued.
-        let is_cast = if let Expression::JsdocCast(cast) = expr {
+        // deliberately does not match — a bundler annotation binds only when glued — and it
+        // may lead the value from the LEFTMOST LEAF rather than from `expr` itself, which
+        // is why the cast is resolved through [`leading_jsdoc_cast`] rather than matched.
+        let is_cast = if let Some(cast) = leading_jsdoc_cast(expr) {
             if jsdoc_cast_comment_is_own_line(cast, self.source) {
                 return Some(OwnedCommentEffect::Hangs);
             }
@@ -223,6 +269,32 @@ impl<'a> Printer<'a> {
         } else {
             None
         }
+    }
+
+    /// **on page**: whether the comment leading `value` is a JSDoc cast's that the author gave
+    /// a line of its own — the one owned-comment shape whose HANG the enclosing layout has to
+    /// supply itself.
+    ///
+    /// A value gap that builds its own layout (a binding default, an enum member) rather than
+    /// routing through [`Printer::build_assignment_layout`] must ask this, because the cast
+    /// prints a **hardline** between its comment and its `(` on exactly this shape
+    /// ([`jsdoc_cast_comment_is_own_line`], the source of truth for both halves) and a
+    /// hardline with no hang leaves that `(` at the binding's own indent — a form the next
+    /// pass collapses, so the authoring has no fixed point.
+    ///
+    /// ⚠️ **The NARROW twin of [`Self::owned_leading_comment_effect`], deliberately.** That
+    /// one also hangs an *indentable* owned block (`= /*⏎ * c⏎ */ 1`), and prettier hangs such
+    /// a block at a declarator while keeping it inline at a binding default and an enum member
+    /// — where tsv matches it (`member_init_multiline_block_comment`). Only the cast's own
+    /// hardline makes the hang structural rather than a layout preference, which is why those
+    /// two sites take this test and the declarator keeps the wide one. Both read the same cast
+    /// off [`leading_jsdoc_cast`], so the pair cannot disagree about WHICH cast leads a value.
+    pub(crate) fn is_own_line_jsdoc_cast(&self, value: &Expression<'_>) -> bool {
+        // Document-level short-circuit: a cast's comment is always owned, so no owned comment
+        // anywhere means no cast — and the spine walk below is skipped for ~every document.
+        self.has_owned_comments
+            && leading_jsdoc_cast(value)
+                .is_some_and(|cast| jsdoc_cast_comment_is_own_line(cast, self.source))
     }
 
     /// **on page**: where `expr`'s printed content begins in source — the start of the owned
@@ -250,7 +322,10 @@ impl<'a> Printer<'a> {
         // It must: `JsdocCast::span` covers the `(`…`)` only — the comment sits *outside* it —
         // and the cast's comment may be a newline away from the `(`, which the glue rule below
         // deliberately does not match. Asking the lookup would miss exactly the own-line cast.
-        if let Expression::JsdocCast(cast) = expr {
+        // Resolved down the left spine ([`leading_jsdoc_cast`]): the comment leads the value
+        // from its leftmost leaf too, and a bound taken past it drops an authored blank line
+        // (`[a,⏎⏎/** @type {A} */⏎(x).b]`) — the loss this function exists to prevent.
+        if let Some(cast) = leading_jsdoc_cast(expr) {
             return Some(cast.comment.span.start);
         }
         self.owned_leading_comment_at(expr.span().start)

@@ -1245,8 +1245,22 @@ impl<'a> Printer<'a> {
                     rhs_doc
                 };
 
-            tail.push(d.text(if pre_eq_hang.is_some() { "= " } else { " = " }));
-            tail.push(value_doc);
+            // A comment the value OWNS is glued to its first token and travels inside its
+            // doc, so neither probe above can see it (`docs/comments.md` hazard 2) — and an
+            // own-line cast's still decides this layout, which a default builds itself rather
+            // than routing through `build_assignment_layout`. The two halves must agree: the
+            // cast prints a hardline between its comment and its `(` on exactly that shape,
+            // and a hardline without the hang leaves the `(` at the binding's own indent — a
+            // form the next pass collapses, so the authoring had no fixed point at all
+            // (`jsdoc_type_cast_binding_default_own_line`). The NARROW test, deliberately:
+            // see [`Printer::is_own_line_jsdoc_cast`].
+            if self.is_own_line_jsdoc_cast(pattern.right) {
+                tail.push(d.text(if pre_eq_hang.is_some() { "=" } else { " =" }));
+                tail.push(hang_after_operator(d, value_doc));
+            } else {
+                tail.push(d.text(if pre_eq_hang.is_some() { "= " } else { " = " }));
+                tail.push(value_doc);
+            }
         }
         let tail_doc = d.concat(&tail);
         // A hanging pre-`=` comment left `= value` on its own line; the shared

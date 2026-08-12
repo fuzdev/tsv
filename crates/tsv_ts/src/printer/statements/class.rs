@@ -4,10 +4,12 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::expressions::assignment::RhsCommentInfo;
-use crate::printer::{ClassMemberModifiers, CommentSpacing, CommentVec, MemberGap};
+use crate::printer::{
+    ClassMemberModifiers, CommentSpacing, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
+    MemberSeam,
+};
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -219,7 +221,11 @@ impl<'a> Printer<'a> {
     /// statement lists get the same rule from their dropped `EmptyStatement` nodes
     /// ([`statement_gap_floor`](crate::printer::statement_gap_floor)); a class body
     /// has no node to key on, so the floor reads the source.
-    fn class_member_gap_floor(&self, member_end: u32, next_start: u32) -> u32 {
+    pub(in crate::printer) fn class_member_gap_floor(
+        &self,
+        member_end: u32,
+        next_start: u32,
+    ) -> u32 {
         let mut floor = member_end;
         while let Some(pos) = self.find_char_outside_comments(floor, next_start, b';') {
             floor = pos + 1;
@@ -259,134 +265,44 @@ impl<'a> Printer<'a> {
         let (brace_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(body.span.start, first_member_start);
 
-        // Build member docs with comments and blank line preservation
+        // Build member docs with comments and blank line preservation, via the shared
+        // member-body walk — the same one the interface body and both type-literal
+        // force-multiline walks take. A class body's own facts: its stray `;`s close
+        // their slots while producing no member node ([`Printer::class_member_gap_floor`]),
+        // its members print their own terminators, and a directive freezes the whole
+        // member span.
+        //
+        // Zero-comment fast gate: one binary search over the class-body span
+        // short-circuits every per-member comment sub-query (leading collect,
+        // format-ignore lookup, trailing-comment scan, trailing-end walk, and
+        // trailing-body comments). Sound because comments are disjoint + start-sorted
+        // and every sub-range lies within the body span, so when none sit inside the
+        // body all sub-queries are provably empty/false. Blank-line preservation is
+        // comment-independent and stays.
         let mut member_parts = d.pooled_docbuf();
-        let mut prev_end = body.span.start + 1; // Start after '{'
-
-        // Zero-comment fast gate: one binary search over the class-body
-        // span short-circuits every per-member comment sub-query (leading
-        // collect, format-ignore lookup, trailing-comment scan, trailing-end
-        // walk, and trailing-body comments). Sound because comments are disjoint
-        // + start-sorted and every sub-range lies within the body span, so when
-        // none sit inside the body all sub-queries are provably empty/false.
-        // Blank-line preservation is comment-independent and stays.
-        let body_has_comments = self.has_comments_on_page_between(body.span.start, body.span.end);
-        // Set when the member just emitted deferred a line comment past its own `;`, so
-        // its doc ends on a later line than the `;` and cannot carry that line's comments.
-        let mut prev_deferred_line_comment = false;
-
-        for (i, member) in body.body.iter().enumerate() {
-            let member_start = member.span().start;
-            let is_first = i == 0;
-
-            // Check for comments between previous position and this member
-            // Filter out trailing same-line comments from the previous member
-            let comments: CommentVec<'_> = if body_has_comments {
-                let all_comments: CommentVec<'_> =
-                    comments_to_emit_in_range(self.comments, prev_end, member_start).collect();
-                if is_first {
-                    // First member: drop comments pulled onto the `{` line (emitted as the
-                    // brace-line prefix below). A first member has no previous member, so
-                    // it can never be the deferring case.
-                    self.first_member_leading_comments(all_comments, delimiter_pull_pos)
-                } else {
-                    all_comments
-                        .iter()
-                        .filter(|c| {
-                            !self.comment_already_trailed(
-                                Some(prev_end),
-                                c,
-                                prev_deferred_line_comment,
-                                Some(member_start),
-                            )
-                        })
-                        .copied()
-                        .collect()
-                }
-            } else {
-                CommentVec::new()
-            };
-
-            // For non-first members, determine if we need blank line preservation
-            // We either add: hardline (no blank) or literalline + hardline (blank line)
-            if !is_first {
-                let check_pos = if comments.is_empty() {
-                    member_start
-                } else {
-                    comments[0].span.start
-                };
-                if self.has_blank_line_between(prev_end, check_pos) {
-                    // Blank line before first comment or member
-                    member_parts.push(d.literalline());
-                }
-                member_parts.push(d.hardline());
-            }
-
-            // Process comments before this member (with blank line preservation)
-            self.push_leading_comments_before(&mut member_parts, &comments, member_start);
-
-            // A preceding format-ignore directive keeps the member's source verbatim.
-            // The member span includes its trailing `;`.
-            let member_doc = if body_has_comments && self.member_gap_frozen(prev_end, member_start)
-            {
-                self.raw_source_doc(member.span())
-            } else {
-                self.build_class_member_doc(member)
-            };
-            member_parts.push(member_doc);
-
-            // Handle trailing inline comments on same line after member, and
-            // advance `prev_end` past them. With no comment in the body,
-            // `find_end_with_trailing_comments(end) == end`.
-            let member_end = member.span().end;
-            prev_deferred_line_comment =
-                body_has_comments && self.terminator_defers_line_comment(member_start, member_end);
-            if prev_deferred_line_comment {
-                // …unless this member's doc ends with a line comment its terminator gap
-                // deferred past the `;`. Nothing may share that line, so leaving `prev_end`
-                // at the `;` hands the comments to the next member's leading run; advancing
-                // it (what the trailing case does) would DROP them.
-                prev_end = member_end;
-            } else if body_has_comments {
-                // The shared trailing arm of the member-gap seam
-                // ([`Printer::member_trailing_run`]). The gap's slot floor is this
-                // family's own — a class body steps past the stray `;`s that print
-                // nothing, so a comment before one still trails its member.
-                let gap = match body.body.get(i + 1) {
-                    Some(next) => {
-                        let start = next.span().start;
-                        MemberGap::Next {
-                            floor: self.class_member_gap_floor(member_end, start),
-                            start,
-                        }
-                    }
-                    None => MemberGap::Last {
-                        list_end: body.span.end,
-                    },
-                };
-                let (trailing, cursor) = self.member_trailing_run(member_end, gap);
-                member_parts.extend(trailing);
-                prev_end = cursor;
-            } else {
-                prev_end = member_end;
-            }
-        }
-
-        // Handle trailing comments after the last member (before closing `}`)
-        if body_has_comments {
-            let body_end = body.span.end.saturating_sub(1); // Before '}'
-            member_parts.extend(self.build_trailing_body_comments_doc(
-                prev_end,
-                body_end,
-                prev_deferred_line_comment,
-            ));
-        }
+        self.build_member_list_docs_into(
+            &mut member_parts,
+            body.body,
+            MemberBody {
+                span: body.span,
+                has_comments: self.has_comments_on_page_between(body.span.start, body.span.end),
+                delimiter_pull_pos,
+                blank_scan: MemberBlankScan::FromCursor,
+                freeze: MemberFreeze::Span,
+                seam: MemberSeam::Whole {
+                    floor: MemberFloor::PastStraySemicolons,
+                },
+            },
+            internal::ClassMember::span,
+            |member| member.span().end,
+            |member, _deferred| self.build_class_member_doc(member),
+        );
 
         // Wrap body content in indent
         d.concat(&[
             d.text("{"),
             d.concat(&brace_line_prefix),
-            d.indent_hardline(d.concat(&member_parts)),
+            d.indent(d.concat(&member_parts)),
             d.hardline(),
             d.text("}"),
         ])
