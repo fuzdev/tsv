@@ -47,9 +47,10 @@ pub enum LayoutMode {
 /// tsv_svelte) constructs it when invoking an embedded language's printer.
 /// Defaults to a standalone, column-0, no-suffix, no-base-offset layout.
 ///
-/// ⚠️ **Read at render, not at doc-build.** The three width fields are consumed by the
-/// renderer, so they act only on the context handed to `arena_print_doc_*`. The context
-/// handed to a `build_*_doc` call reaches nothing but [`LayoutMode`]: that doc is rendered
+/// ⚠️ **The width fields are read at render, not at doc-build.** The three width fields are
+/// consumed by the renderer, so they act only on the context handed to `arena_print_doc_*`.
+/// The context handed to a `build_*_doc` call reaches nothing but [`LayoutMode`] and
+/// [`Self::jsdoc_cast_cannot_hang`] (the two build-time fields): that doc is rendered
 /// later, under whatever context its host passes — so a width set there is inert, and a
 /// layout choice that looks keyed to one is really keyed to `mode`. (Same reason a
 /// build-time `current_column()` is always 0: build-time width state is disconnected from
@@ -86,6 +87,21 @@ pub struct EmbedContext {
     pub suffix_width: usize,
     /// How the renderer should treat the outer doc — see [`LayoutMode`].
     pub mode: LayoutMode,
+    /// Whether a JSDoc cast **leading** this expression must REFLOW its comment→`(` break —
+    /// the value-gap category "answers the break by rule and CANNOT hang". The second
+    /// build-time field (with `mode`), read once at the TS expression entry
+    /// (`build_expression_doc_with_comments`), which resolves the expression's left-spine
+    /// cast and marks it; casts nested deeper keep their width-decided layout.
+    ///
+    /// Set by `tsv_svelte` for every braced head whose value **hugs** its delimiters (a
+    /// block head, a prefixed tag, a braced attribute head, the `{expr}` tag): such a
+    /// value starts right after the head's prefix, so there is no operator line to end and
+    /// the cast's own-line hardline has no matching hang — the stranded `(` lands at the
+    /// head's own column, an authoring with no fixed point. The heads that CAN place the
+    /// comment on a real line of its own — `{@const}`'s `=` hang, a directive value's
+    /// block form — leave this `false` and keep the authoring. See
+    /// `docs/conformance_prettier_svelte.md` §Svelte: Own-line JSDoc cast at a braced head.
+    pub jsdoc_cast_cannot_hang: bool,
 }
 
 impl Default for EmbedContext {
@@ -95,6 +111,7 @@ impl Default for EmbedContext {
             first_line_offset: 0,
             suffix_width: 0,
             mode: LayoutMode::Standalone,
+            jsdoc_cast_cannot_hang: false,
         }
     }
 }

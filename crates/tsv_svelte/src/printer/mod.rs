@@ -297,6 +297,21 @@ impl<'a> Printer<'a> {
         self.d().verbatim_source_span(span, self.source)
     }
 
+    /// A doc emitting `span` of the source as an ordinary [`DocId`] source slice —
+    /// content, not a format-ignore freeze (an interior newline still breaks the
+    /// enclosing group, unlike [`Self::verbatim_source_doc`]) — while telling the
+    /// ledger that any comment inside rides out in the slice. For the emitters
+    /// whose node spans can legitimately contain comment bytes nothing else
+    /// prints: the `{@debug}` identifier emitter, where a JSDoc-cast entry's span
+    /// (`(a)`) can hold an interior comment (`(a /* c */)`) that reaches no
+    /// comment emitter.
+    pub(crate) fn source_span_covering_comments_doc(&self, span: Span) -> DocId {
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+
+        self.d().source_span(span, self.source)
+    }
+
     /// The frozen slice for a node the freeze resolved, **plus the owned-comment claim it
     /// owes** — the Svelte twin of `tsv_ts`'s `build_frozen_node_doc`, and the emitter
     /// every value-head freeze in this printer goes through.
@@ -347,18 +362,25 @@ impl<'a> Printer<'a> {
     ///   heads alone; it is a property of the *comment*, not of the head, so it is now
     ///   [`Self::leading_line_comment_hangs_value`] and every braced head asks it.
     ///
-    /// TODO: a value whose leading comment is a JSDoc cast the author gave its own line is
-    /// NOT a fixed point at several of these heads. The cast prints a hardline between its
-    /// comment and its `(` on that shape, no braced head supplies the matching hang, so pass
-    /// 1 strands the `(` at the head's own column — and because the hardline also forces the
-    /// head open, pass 2 (where the comment now reads as mid-line) collapses the whole thing:
-    /// `{#if …}`, `{#each …}` (whose `as item` lands at column 0 meanwhile) and a plain
-    /// attribute value all move. `{@html …}` and a directive value happen to hold still.
-    /// The TS side answers this by marking a **value gap**
-    /// (`tsv_ts::Printer::mark_jsdoc_cast_value_gap`, whose reflow gives one fixed point),
-    /// but the answer is not uniform across these heads — an attribute wants the reflow while
-    /// the `{expr}` tag keeps the author's break, as prettier does — so the mark belongs at
-    /// the CALLERS, per head, with a fixture apiece. Not a value this shared seam can pick.
+    /// A value whose leading comment is a **JSDoc cast** rides one more per-head verdict:
+    /// `EmbedContext::jsdoc_cast_cannot_hang`, the "answers the break by rule and CANNOT
+    /// hang" value-gap category. A hugging braced head has no operator line to end — the
+    /// value starts right after `{#if ` — so the hardline an own-line cast comment earns
+    /// everywhere else would strand the `(` at the head's own column (no fixed point where
+    /// the head's group flattens, a column-0 value where it can't); the flag makes the cast
+    /// reflow to the glued one-line form instead (`{#if /** @type {A} */ (aa)}`). Every
+    /// hugging head sets it in its embed recipe ([`Self::head_embed`], the block-head inline
+    /// arm, the braced attribute heads, the expression tag); the two heads that CAN give the
+    /// comment a real line keep it unset — `{@const}` hangs off its `=`, a directive value
+    /// block-wraps. Prettier is no oracle here (it drops the cast comment outright at every
+    /// one of these heads); see
+    /// docs/conformance_prettier_svelte.md §Svelte: Own-line JSDoc cast at a braced head.
+    ///
+    /// ⚠️ **Hanging it instead is measured WRONG, not merely incomplete** — answering
+    /// [`Self::leading_line_comment_hangs_value`] `true` for the shape indents the value but
+    /// leaves the comment glued to `{#if ` (it is *owned*, riding inside the value's doc), so
+    /// the output still reads as mid-line and still collapses — and it drags the heads whose
+    /// group can't flatten into the same non-convergence. Measured on branch, reverted.
     pub(in crate::printer) fn build_head_value_doc(
         &self,
         expr: &Expression<'_>,
@@ -389,10 +411,15 @@ impl<'a> Printer<'a> {
     /// here. Perturbing it changes no byte of any fixture or of a 9k-file real corpus. It is
     /// computed anyway so the two hosts cannot read as deliberately different — which is the
     /// whole reason this recipe is one function rather than a copy each.
+    ///
+    /// `jsdoc_cast_cannot_hang` is the recipe's second load-bearing field: a braced head's
+    /// value hugs its prefix, so a leading cast's own-line hardline has no matching hang and
+    /// must reflow (see [`Self::build_head_value_doc`]).
     pub(in crate::printer) fn head_embed(&self, opening_offset: usize) -> EmbedContext {
         EmbedContext {
             first_line_offset: TAB_WIDTH + opening_offset,
             mode: LayoutMode::Embedded,
+            jsdoc_cast_cannot_hang: true,
             ..self.embed
         }
     }
@@ -695,6 +722,26 @@ impl<'a> Printer<'a> {
     /// tsv_ts functions directly.
     pub(crate) fn build_ts_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         self.build_head_value_doc(expr, false, &self.embed)
+    }
+
+    /// [`Self::build_ts_expression_doc`] for a **braced-head** value: the host's embed plus
+    /// the leading-cast reflow every hugging braced head owes (`jsdoc_cast_cannot_hang` —
+    /// see [`Self::build_head_value_doc`]). The `{#each}` key's fallback arm and the
+    /// pattern printer's computed key use it; the main key arm reaches the same flag
+    /// through [`Self::build_expression_doc_for_block`].
+    pub(crate) fn build_ts_expression_doc_cannot_hang(&self, expr: &Expression<'_>) -> DocId {
+        self.build_head_value_doc(expr, false, &self.cannot_hang_embed())
+    }
+
+    /// The host's embed plus `jsdoc_cast_cannot_hang` — the recipe for a hugging braced
+    /// head measured where it sits (the block-head inline arm, a prefixed attribute
+    /// head); the heads that re-base their measurement carry the flag in their own
+    /// recipes instead ([`Self::head_embed`], the unprefixed value's default-based embed).
+    pub(in crate::printer) fn cannot_hang_embed(&self) -> EmbedContext {
+        EmbedContext {
+            jsdoc_cast_cannot_hang: true,
+            ..self.embed
+        }
     }
 }
 

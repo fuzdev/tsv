@@ -1,0 +1,161 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 73,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RenderTag",
+				"start": 0,
+				"end": 34,
+				"expression": {
+					"type": "CallExpression",
+					"start": 27,
+					"end": 32,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 27
+						},
+						"end": {
+							"line": 1,
+							"column": 32
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 27,
+						"end": 30,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 27
+							},
+							"end": {
+								"line": 1,
+								"column": 30
+							}
+						},
+						"name": "fn1"
+					},
+					"arguments": [],
+					"optional": false,
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* @type {A} ",
+							"start": 9,
+							"end": 25
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 34,
+				"end": 36,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RenderTag",
+				"start": 36,
+				"end": 72,
+				"expression": {
+					"type": "ChainExpression",
+					"start": 63,
+					"end": 70,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 27
+						},
+						"end": {
+							"line": 3,
+							"column": 34
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 63,
+						"end": 70,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 27
+							},
+							"end": {
+								"line": 3,
+								"column": 34
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 63,
+							"end": 66,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 27
+								},
+								"end": {
+									"line": 3,
+									"column": 30
+								}
+							},
+							"name": "fn2"
+						},
+						"arguments": [],
+						"optional": true
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* @type {B} ",
+							"start": 45,
+							"end": 61
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 9,
+			"end": 25,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 9
+				},
+				"end": {
+					"line": 1,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {B} ",
+			"start": 45,
+			"end": 61,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 9
+				},
+				"end": {
+					"line": 3,
+					"column": 25
+				}
+			}
+		}
+	]
+}

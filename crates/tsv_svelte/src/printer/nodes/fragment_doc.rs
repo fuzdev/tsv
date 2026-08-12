@@ -750,6 +750,40 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// [`Self::sibling_newline_flows`] asked of a neighbour that may not exist — a fragment edge
+    /// answers `false`, since a boundary with no sibling on the other side is the parent's and has
+    /// already been trimmed.
+    ///
+    /// Every reader of the flow rule goes through here. It is one `is_some_and` and it earns its
+    /// name for that reason: the rule is consulted at four places across two files, and the whole
+    /// bug class in this vein is those readers quietly disagreeing about it.
+    #[inline]
+    pub(super) fn neighbour_newline_flows(&self, node: Option<&FragmentNode<'_>>) -> bool {
+        node.is_some_and(|n| self.sibling_newline_flows(n))
+    }
+
+    /// The flow rule asked of **one side** of a content text's boundary run — the leading and
+    /// trailing halves of [`Printer::handle_text_child`], which are exact mirrors.
+    ///
+    /// A SINGLE newline beside flowing inline content is a spelling difference only, so the run
+    /// reflows with the fill instead of pinning a hardline; a blank line (2+) still breaks, and a
+    /// separator-like node ([`Self::is_separator_like_text`]) never flows whatever sits beside it.
+    ///
+    /// One question, one predicate. The third site — the whitespace-only separator *between* two
+    /// siblings — asks the same rule of BOTH neighbours, plus its run's prose. Letting the sites
+    /// drift apart is what left a single run with two answers: the boundaries touching a text node
+    /// flowed while the one between two adjacent siblings did not
+    /// (`inline_adjacent_sibling_newline_flow_prettier_divergence`).
+    #[inline]
+    pub(super) fn boundary_newline_flows(
+        &self,
+        newlines: usize,
+        separator_like_text: bool,
+        neighbour: Option<&FragmentNode<'_>>,
+    ) -> bool {
+        newlines == 1 && !separator_like_text && self.neighbour_newline_flows(neighbour)
+    }
+
     /// Whether this text node is a **separator** wearing content's clothing: every character it
     /// holds is whitespace (an NBSP / narrow NBSP acting as the gap between two siblings). Such
     /// a node carries no word for the fill to pack, so treating its surrounding run as
