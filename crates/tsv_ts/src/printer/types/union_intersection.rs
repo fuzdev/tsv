@@ -13,7 +13,7 @@ use super::helpers::{
     unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer, TrailingBlock};
-use crate::ast::internal::{Comment, TSIntersectionType, TSType, TSUnionType};
+use crate::ast::internal::{Comment, TSIntersectionType, TSType, TSTypeLiteral, TSUnionType};
 use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
 use crate::printer::ignore::LeadingRunFreeze;
@@ -43,7 +43,7 @@ enum LeadingGap {
 /// in the union's own position and needs no precedence parens of its own — any required
 /// parens come from the union's parent context, applied one level up. 2+ members use the
 /// normal `|`/`&` precedence rule.
-fn union_member_parens(member_count: usize) -> fn(&TSType<'_>) -> bool {
+pub(super) fn union_member_parens(member_count: usize) -> fn(&TSType<'_>) -> bool {
     if member_count == 1 {
         |_| false
     } else {
@@ -62,22 +62,6 @@ fn union_member_parens(member_count: usize) -> fn(&TSType<'_>) -> bool {
 /// ride the closing `)` on the inner's last line (`) => void)`).
 fn is_paren_union_member(ts_type: &TSType<'_>) -> bool {
     matches!(unwrap_parenthesized(ts_type), TSType::Union(_))
-}
-
-/// Whether a parenthesized member is an object-trailing intersection
-/// (`(A & { … })`) — the shape `build_parenthesized_intersection_trailing_object_doc`
-/// builds via `build_aligned_object_literal_doc`, which supplies the member's
-/// `align(2)` offset itself (on its own closing `})`). Such a member must NOT be
-/// wrapped in the offset again, or its body and closing double-shift. Mirrors the
-/// detection in `build_type_doc_maybe_parens_impl`.
-fn is_object_trailing_intersection_member(ts_type: &TSType<'_>) -> bool {
-    if let TSType::Intersection(intersection) = unwrap_parenthesized(ts_type)
-        && let Some(last) = intersection.types.last()
-    {
-        matches!(unwrap_parenthesized(last), TSType::TypeLiteral(_))
-    } else {
-        false
-    }
 }
 
 impl<'a> Printer<'a> {
@@ -256,7 +240,7 @@ impl<'a> Printer<'a> {
             return self.build_union_member_object_literal_doc(obj);
         }
         if member_parens(t) && !is_paren_union_member(t) {
-            if is_object_trailing_intersection_member(t) {
+            if self.aligned_trailing_object_shell(t).is_some() {
                 // `(A & { … })` supplies its own `align(2)` inside
                 // `build_aligned_object_literal_doc` (its closing `})`), so it opts
                 // out of the wrapper here — wrapping again double-shifts it.
@@ -771,8 +755,23 @@ impl<'a> Printer<'a> {
                     // own-line path with the axes swapped: prettier's union and
                     // intersection printers preserve blanks in opposite member-gap
                     // positions.
+                    //
+                    // ⚠️ **The scan starts past every comment already in the gap, not at
+                    // the member.** `own_line` is collected from AFTER the pipe, so a
+                    // comment the author wrote BEFORE it (`A⏎// x⏎| // c⏎B`) sits inside
+                    // `[prev_type_end, first.span.start)` — and this printer emits it there
+                    // too. Measuring across it counted the newline that merely separates
+                    // the two comments as a second one and FABRICATED a blank the author
+                    // never wrote. `blank_scan_start` is the in-source reading of "where
+                    // does the whitespace before this comment actually begin"
+                    // ([comments.md](../../../../docs/comments.md) — a blank-line scan is
+                    // an in-source question). The fabricated blank was idempotent, so F1
+                    // held it stable and only the prettier differential disagreed.
                     if let Some(first) = own_line.first()
-                        && self.has_blank_line_between(prev_type_end, first.span.start)
+                        && self.has_blank_line_between(
+                            self.blank_scan_start(prev_type_end, first.span.start),
+                            first.span.start,
+                        )
                     {
                         parts.push(d.literalline());
                     }
@@ -1141,6 +1140,73 @@ impl<'a> Printer<'a> {
                     if matches!(p.type_annotation, TSType::Union(_))
                         && self.paren_has_leading_line_comment(p))
             })
+    }
+
+    /// Emit one intersection member→member gap — the comments before the `&`, the `&`
+    /// itself, and the comments after it leading the next member — for a caller that
+    /// prints the operator as its own text rather than through
+    /// [`Self::build_intersection_member_body_doc`] (the aligned trailing-object shell).
+    /// The two runs are that method's, so both paths answer "which side of the `&` does
+    /// this comment keep?" the same way.
+    pub(in crate::printer) fn push_intersection_operator_gap_comments(
+        &self,
+        parts: &mut DocBuf,
+        prev_member_end: u32,
+        next_member_start: u32,
+    ) {
+        self.push_pre_separator_block_comments(parts, prev_member_end, next_member_start, b'&');
+        parts.push(self.d().text(" & "));
+        if let Some(sep_pos) =
+            find_separator_position(self.source, prev_member_end, next_member_start, b'&')
+        {
+            // The run's own `breaks` flag is dropped, not ignored: a comment isolated on
+            // its line is exactly what `intersection_needs_line_comment_layout` routes
+            // away from this layout, so every comment reaching here is inline-able and
+            // the flag is always false.
+            let (run, _) = self.build_member_leading_block_comments(sep_pos + 1, next_member_start);
+            parts.push(run);
+        }
+    }
+
+    /// The object-trailing intersection shell (`(A & { … })`) when it takes the
+    /// **aligned** layout — [`Self::build_parenthesized_intersection_trailing_object_doc`],
+    /// which prints its own `(`…`)` and supplies the member's `align(2)` offset itself
+    /// (on its own closing `})`), so such a member must not be wrapped in that offset
+    /// again or its body and closing double-shift.
+    ///
+    /// One predicate for one question, asked by both readers — the builder selection in
+    /// `build_type_doc_maybe_parens_impl` and the offset opt-out in
+    /// [`Self::build_union_member_offset_doc`]. They were two spellings of the shape test
+    /// before, and the comment condition below is exactly the kind of clause that can only
+    /// be added to one of two spellings.
+    ///
+    /// A **line** comment in the opening's member gaps declines the layout: that opening is
+    /// fused text (`" & "`, `" & {"`) whose `{` cannot leave the `&`'s line, and a `//` runs
+    /// to end-of-line. Declining hands the shell to the general retained-paren path, which
+    /// already lays out exactly this — the same shape the no-trailing-object sibling
+    /// (`(a & // c⏎b)`) takes, matching prettier where prettier preserves. The gate is the
+    /// ordinary intersection printer's own ([`Self::intersection_needs_line_comment_layout`]),
+    /// so the two paths cannot disagree about which comments can be inline.
+    pub(in crate::printer) fn aligned_trailing_object_shell<'t>(
+        &self,
+        ts_type: &'t TSType<'t>,
+    ) -> Option<(&'t TSIntersectionType<'t>, &'t TSTypeLiteral<'t>)> {
+        let TSType::Intersection(intersection) = unwrap_parenthesized(ts_type) else {
+            return None;
+        };
+        // A **one-member** intersection (`& { x: X }`, the leading-`&` form) declines too:
+        // there is no `&` in the output — prettier drops a single-element intersection node
+        // in postprocess and so does the ordinary path, which reaches the same collapse in
+        // every other context. Taking it here instead printed the operator as pure text with
+        // nothing on its left (`[( & { x: X })?]`, reachable as an OPTIONAL tuple element)
+        // and dropped any comment after that `&`, since the arm had no member gap to scan.
+        if intersection.types.len() < 2 {
+            return None;
+        }
+        let TSType::TypeLiteral(obj) = unwrap_parenthesized(intersection.types.last()?) else {
+            return None;
+        };
+        (!self.intersection_needs_line_comment_layout(intersection)).then_some((intersection, obj))
     }
 
     //
@@ -1702,7 +1768,7 @@ impl<'a> Printer<'a> {
             // - object↔non-object transition → space-hug, indent (and latch) past index 1.
             let prev_obj = is_huggable_type(prev);
             let cur_obj = is_huggable_type(cur);
-            let (mut should_break, indent_member) = if prev_obj && cur_obj {
+            let (mut should_break, mut indent_member) = if prev_obj && cur_obj {
                 (false, was_indented)
             } else if (!prev_obj && !cur_obj) || !own_line_leading.is_empty() {
                 (true, true)
@@ -1716,12 +1782,21 @@ impl<'a> Printer<'a> {
             // Preserve: an isolated comment (any line comment, or an own-line block) in
             // the gap can't be inline, so its boundary breaks even where object-adjacency
             // would glue — the tsv/Prettier divergence this path exists for.
+            //
+            // ⚠️ The break carries the INDENT with it. The two are one decision in every
+            // arm above — a hug arm answers `false` to both — so forcing only the break
+            // here left the member at the enclosing indent, i.e. column 0 for a type-alias
+            // RHS (`type T = a & // c⏎{ x: X };`). It reads as an un-indented continuation
+            // only at the boundaries a hug arm chose (`i == 1`, or object-adjacency before
+            // `was_indented` latches); one member later the same shape indents, which is
+            // what made it look like an object-member quirk rather than this pairing.
             if !should_break
                 && self
                     .comments_on_page_between(prev_end, cur_start)
                     .any(|c| self.comment_isolated_on_its_line(c))
             {
                 should_break = true;
+                indent_member = true;
             }
 
             // The previous member's TRAILING RUN in the `prev_end`→`&` gap, claimed once
@@ -1783,9 +1858,12 @@ impl<'a> Printer<'a> {
                             unit.push(d.text(" "));
                             unit.push(self.build_comment_doc(comment));
                         }
-                        // Nothing in the run can be glued to: a block went before the `&`,
-                        // so it is not on this line at all, and a `//` runs to end of line.
-                        prev_comment = None;
+                        // A block in the run went before the `&` and is not on this line at
+                        // all, so nothing can be glued to it. A `//` IS on this line, and
+                        // the next comment must not land behind it — it is tracked for the
+                        // separator below, where `trailing_run_hugs_previous` answers "a
+                        // line comment never hugs" and gives that comment its own line.
+                        prev_comment = (!comment.is_block).then_some(comment);
                     } else {
                         if crossed_operator {
                             self.push_trailing_run_separator(
@@ -1803,11 +1881,33 @@ impl<'a> Printer<'a> {
                     }
                     scan_from = comment.span.end;
                 }
+                // The comments the author wrote on the `&`'s own line, trailing it inline.
+                //
+                // ⚠️ **The separator asks what this unit last emitted, not the operator.**
+                // A space is right only while the line still ends in the `&` — once
+                // anything above emitted a comment, appending with a space WELDS this one
+                // onto it, and where that predecessor is a `//` the weld is CONTENT LOSS:
+                // `A⏎// x⏎& // c⏎B` printed `// x // c`, one comment whose text contains
+                // the second. It reparses, it is idempotent, and the ledger still counts
+                // both as printed once, so F1, round-trip, the census and the fuzzer are
+                // all blind — only a prettier differential sees it. Routed through the
+                // shared run rule, which hugs only a block the author glued.
                 for comment in comments_to_emit_in_range(self.comments, amp_pos + 1, cur_start)
                     .filter(|c| self.is_same_line(amp_pos, c.span.start))
                 {
-                    unit.push(d.text(" "));
+                    if prev_comment.is_some() {
+                        self.push_trailing_run_separator(
+                            &mut unit,
+                            prev_comment,
+                            scan_from,
+                            comment.span.start,
+                        );
+                    } else {
+                        unit.push(d.text(" "));
+                    }
                     unit.push(self.build_comment_doc(comment));
+                    prev_comment = Some(comment);
+                    scan_from = comment.span.end;
                 }
             }
             if should_break {
