@@ -57,6 +57,42 @@ pub enum AssignmentLayout {
     Fluid,
 }
 
+impl<'a> Printer<'a> {
+    /// Record that `value` is about to be built as the direct value of a **value gap**, so
+    /// a JSDoc cast there reflows its comment→`(` break to a space
+    /// ([`Printer::jsdoc_cast_value_gap_target`]).
+    ///
+    /// Called by every value gap that can hold a cast: the declarator `=`, the shared
+    /// assignment layout (`build_assignment_layout` — assignment expressions,
+    /// class-property initializers, object-literal values), the object property's own
+    /// own-line-comment arm (which hangs the value itself rather than routing through that
+    /// builder), the binding-default `=` (object, array and parameter alike), the enum
+    /// member `=`, and the arrow body.
+    ///
+    /// A non-cast value clears the target rather than leaving a stale one, which is why
+    /// every call is unconditional: the flag names one node, and a gap that no longer has a
+    /// cast in it must not keep vouching for the last one that did. That clearing is also
+    /// why the answer is read at the TOP of `build_jsdoc_cast_doc` — a cast's own value gaps
+    /// mark themselves while its inner is built, overwriting the mark that was meant for it.
+    pub(in crate::printer) fn mark_jsdoc_cast_value_gap(&self, value: &Expression<'_>) {
+        self.jsdoc_cast_value_gap_target.set(match value {
+            Expression::JsdocCast(cast) => Some(cast.span),
+            _ => None,
+        });
+    }
+
+    /// Whether this cast is the one a value gap recorded — asked where the separator is
+    /// chosen ([`Printer::build_jsdoc_cast_doc`]).
+    ///
+    /// Span-keyed, so a cast nested deeper inside the value (a call argument, an operand)
+    /// answers `false` and keeps the width-decided soft `line`. That is the intent: the
+    /// reflow rule is about the break between the gap's head and its value, and a cast in
+    /// an argument list sits in a list that keeps lines.
+    pub(in crate::printer) fn jsdoc_cast_in_value_gap(&self, cast: &JsdocCast<'_>) -> bool {
+        self.jsdoc_cast_value_gap_target.get() == Some(cast.span)
+    }
+}
+
 /// Whether the author gave a JSDoc cast's comment a line of its own — a newline on
 /// **both** sides of it, as in `const a =⏎\t/** @type {A} */⏎\t(expr)`.
 ///
@@ -70,9 +106,27 @@ pub enum AssignmentLayout {
 ///
 /// The single source of truth for both consequences of that shape: the hang itself
 /// (`choose_layout` below, and the declarator's own predicates in
-/// `statements/variable.rs`) and the hardline the cast prints between the comment and
+/// `statements/variable.rs`) and the **hardline** the cast prints between the comment and
 /// its `(` (`build_jsdoc_cast_doc`). They must agree — a hang without the hardline
 /// leaves the `(` stranded, and a hardline without the hang un-indents it.
+///
+/// ⚠️ **This answers only the HANG, not "is there a separator".** The cast is the last
+/// comment of whatever leading run precedes it, so when this returns `false` the gap is
+/// still prettier's `printLeadingComment` question — a space when something follows the
+/// `*/` on its line, otherwise the soft `line` whose fate the enclosing group decides.
+/// Reading `false` as "space" collapsed a break the author left after the `*/`
+/// (`a();⏎/* c */ /** @type {A} */⏎(b);`) at statement position, where the list keeps
+/// lines and every *other* leading comment — a plain glued run, a bundler annotation —
+/// kept it. `build_jsdoc_cast_doc` owns that three-way split.
+///
+/// ⚠️ **The soft `line` arm is scoped to gaps that are not VALUE gaps**, because a value
+/// gap answers the break with a rule rather than with width: an unforced break there
+/// reflows (`docs/conformance_prettier.md` §Authored breaks in value position),
+/// so the separator is a space and the two authorings reach one fixed point. Letting the
+/// soft `line` decide it instead put the `(` at the statement's own indent whenever the
+/// enclosing group broke — a break with no hang, which is the second failure this doc
+/// names, reached from the other side. `Printer::jsdoc_cast_value_gap_target` is how the
+/// value gap says so.
 pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> bool {
     let bytes = source.as_bytes();
     // Only whitespace between the start of the line and the comment.
@@ -1096,6 +1150,9 @@ impl<'a> Printer<'a> {
         } else {
             ArrowChainContext::None
         };
+        // Every gap routed through this builder is a value gap
+        // (`mark_jsdoc_cast_value_gap`).
+        self.mark_jsdoc_cast_value_gap(right_expr);
         let right_doc = self.build_with_arrow_chain_context(chain_context, || {
             if let Some(boundary) = rhs_info.boundary {
                 self.build_expression_doc_with_paren_comments(right_expr, boundary)

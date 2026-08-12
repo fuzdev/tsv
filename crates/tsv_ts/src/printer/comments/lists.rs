@@ -35,6 +35,24 @@ pub(crate) enum BlankRule {
     AfterComma,
 }
 
+/// What follows a member in its body, for [`Printer::member_trailing_run`].
+///
+/// The `floor` is the gap's slot floor — where the leads-next test
+/// ([`Printer::comment_leads_next_item`]) opens — and it is a **per-family fact**, not a
+/// preference, so the caller states it rather than the shared walk guessing: a class body
+/// steps past the stray `;`s that print nothing (`class_member_gap_floor`), while an
+/// interface member's own span already covers its separator. Same shape and same reason as
+/// [`BlankRule`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum MemberGap {
+    /// A next member starts at `start`; the leads-next test opens at `floor`.
+    Next { floor: u32, start: u32 },
+    /// Nothing prints after this member in the body, so nothing can be led and the claim
+    /// runs to `list_end` — the body's end, which only this arm has any use for, hence its
+    /// place here rather than in the call's signature.
+    Last { list_end: u32 },
+}
+
 /// How a brace container decides a standalone block comment is **glued to what follows**
 /// ([`Printer::has_standalone_block_comment`]).
 ///
@@ -334,22 +352,32 @@ impl<'a> Printer<'a> {
     /// appended block is welded onto the line comment (`// c /* b */`) — the block becomes
     /// text of the comment and is lost.
     ///
-    /// Keyed on the `;`: only a terminator defers. A `}` / `,` / member end prints nothing
-    /// after itself, so its same-line run still trails. Keyed on a **line** comment because
-    /// only a `//` runs to end of line; a deferred block leaves the line open.
+    /// Keyed on a **terminator the construct's own doc re-prints**, which is what puts the
+    /// deferred comment behind it: the statement / class-member `;`, and a type member's
+    /// separator — `;` **or** `,`, since tsv normalizes either to the `;` the member doc
+    /// emits ([`Printer::build_comments_around_semicolon_doc`]). Reading only `;` here left
+    /// the comma authoring welding (`a: A // c1⏎, // c2` → `a: A; // c1 // c2`, the second
+    /// `//` becoming text of the first) at the interface and type-literal walks — the very
+    /// merge this predicate exists to prevent. A `}` / element-list `,` is NOT this: there
+    /// the separator is re-emitted by the CONTAINER's seam, outside the item's doc, so the
+    /// item ends where its source does and its same-line run still trails — and no such
+    /// caller asks this question anyway (every call site is a statement or member-body
+    /// walk). Keyed on a **line** comment because only a `//` runs to end of line; a
+    /// deferred block leaves the line open.
     pub(crate) fn terminator_defers_line_comment(&self, span_start: u32, span_end: u32) -> bool {
         let bytes = self.source.as_bytes();
-        if span_end == 0 || bytes.get(span_end as usize - 1) != Some(&b';') {
+        if span_end == 0 || !matches!(bytes.get(span_end as usize - 1), Some(b';' | b',')) {
             return false;
         }
-        let semi = span_end - 1;
-        let Some(last) = comments_to_emit_in_range(self.comments, span_start, semi).last() else {
+        let separator = span_end - 1;
+        let Some(last) = comments_to_emit_in_range(self.comments, span_start, separator).last()
+        else {
             return false;
         };
-        // Only whitespace may sit between the deferred comment and the `;` — anything else
-        // means the comment is interior to the construct, not in its terminator gap.
+        // Only whitespace may sit between the deferred comment and the separator — anything
+        // else means the comment is interior to the construct, not in its terminator gap.
         !last.is_block
-            && bytes[last.span.end as usize..semi as usize]
+            && bytes[last.span.end as usize..separator as usize]
                 .iter()
                 .all(u8::is_ascii_whitespace)
     }
@@ -449,6 +477,52 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The trailing arm of a gap seam, once: emit the item's same-line trailing run and
+    /// return it with the advanced cursor.
+    ///
+    /// The two families differ only in how they DERIVE `upper_bound` and `claim_end`
+    /// ([`Self::member_trailing_run`], [`Self::statement_trailing_run`]); what they do with
+    /// them is this, and it was spelled twice. Both ends matter and they are not the same
+    /// end: the emitted run stops at whichever of the two comes first, while the cursor is
+    /// clamped to the **claim split alone** — a handed-over comment must stay ahead of it
+    /// for the next item's leading run to find, and `upper_bound` (the next item's start)
+    /// would clamp it past nothing at all.
+    fn trailing_run(&self, item_end: u32, upper_bound: u32, claim_end: u32) -> (DocBuf, u32) {
+        let docs = self.build_trailing_same_line_comment_docs(item_end, upper_bound.min(claim_end));
+        let prev_end = self
+            .find_end_with_trailing_comments(item_end)
+            .min(claim_end);
+        (docs, prev_end)
+    }
+
+    /// The whole trailing arm of the **member**-gap seam, shared by the class-body and
+    /// interface-body walks — the member sibling of [`Self::statement_trailing_run`], and
+    /// for the same reason: the two walks held byte-identical copies of it, and the copy is
+    /// what let them drift (the interface's re-spelled `is_same_line` filter missed a
+    /// multi-line block's closing line, so a comment glued past that `*/` was torn onto its
+    /// own line and, on the last member, double-printed by the end-of-body run). An enum
+    /// body is NOT one of these: its members are comma-separated, so it takes the
+    /// element-comma seam (`collect_trailing_comments` / `push_element_comma_trailing`)
+    /// like every other comma list.
+    ///
+    /// Emits the member's same-line trailing run — bounded at the next member and stopped
+    /// at the claim split ([`Self::trailing_claim_end`]) so a comment whose glue chain
+    /// reaches that member leads it instead (`a: A; /* c */ b: B;`), emitted by its leading
+    /// run — and returns the docs plus the advanced cursor, clamped to the same split so a
+    /// handed-over comment stays ahead of it for that leading run to find.
+    ///
+    /// The caller states the gap's slot FLOOR, a per-family fact rather than a preference
+    /// ([`MemberGap`]) — the same role `statement_gap_floor` plays for a statement list.
+    pub(crate) fn member_trailing_run(&self, member_end: u32, gap: MemberGap) -> (DocBuf, u32) {
+        let (upper_bound, claim_end) = match gap {
+            MemberGap::Next { floor, start } => (start, self.trailing_claim_end(floor, start)),
+            // Nothing prints after this member, so nothing can be led and the claim runs
+            // to the body's end.
+            MemberGap::Last { list_end } => (list_end, u32::MAX),
+        };
+        self.trailing_run(member_end, upper_bound, claim_end)
+    }
+
     /// The whole trailing arm of the statement-gap seam for `body[index]`, shared by
     /// the program and block walks: emit the statement's same-line trailing run —
     /// bounded at the next *printed* statement, skipping dropped `;`s, so a comment
@@ -465,13 +539,8 @@ impl<'a> Printer<'a> {
         list_end: u32,
     ) -> (DocBuf, u32) {
         let stmt_end = body[index].span().end;
-        let claim_end = self.statement_claim_end(body, index, None);
-        let bound = next_printed_stmt_start(body, index, list_end).min(claim_end);
-        let docs = self.build_trailing_same_line_comment_docs(stmt_end, bound);
-        let prev_end = self
-            .find_end_with_trailing_comments(stmt_end)
-            .min(claim_end);
-        (docs, prev_end)
+        let bound = next_printed_stmt_start(body, index, list_end);
+        self.trailing_run(stmt_end, bound, self.statement_claim_end(body, index, None))
     }
 
     /// Whether `comment` was already emitted as the PREVIOUS item's trailing run — it
@@ -487,6 +556,21 @@ impl<'a> Printer<'a> {
     ///
     /// `anchor` is `None` when there is no previous item at all: nothing trailed, so
     /// nothing is claimed and the run keeps everything.
+    ///
+    /// ⚠️ **The two families spell `anchor` differently, and the two are EQUIVALENT — do
+    /// not "fix" one into the other.** The statement walks (program, block, switch) pass
+    /// the previous statement's **span end**; the member walks (class, interface, type
+    /// literal) pass the **cursor already advanced past the trailing run**
+    /// (`find_end_with_trailing_comments(..).min(claim_end)`). Those hold different values
+    /// whenever a multi-line block trailed the item — the cursor then sits on that block's
+    /// closing line, a line below the span end — yet the predicate cannot tell them apart,
+    /// because the cursor only ever advances to one of two places: **inside** the trailing
+    /// run, whose comments are behind it and never reach this filter, or to the **claim
+    /// split**, where every comment from there on leads the next item (the claim is a
+    /// prefix) and `leads_target` rescues it. A comment that does reach the filter
+    /// therefore sits on a later line than *both* anchors. Measured as well as argued: the
+    /// two spellings produce byte-identical output over 9196 real files and over the
+    /// targeted shapes that provably move the cursor off the item's line.
     ///
     /// `claims_trailing` forces `false`. The previous item deferred a line comment past its
     /// own `;` ([`Self::terminator_defers_line_comment`]) and therefore trailed **nothing**
@@ -511,6 +595,44 @@ impl<'a> Printer<'a> {
             && anchor.is_some_and(|a| self.is_same_line(a, comment.span.start))
     }
 
+    /// The comments that TRAIL a node ending at `after_pos` on its own output line — the
+    /// same-line run in `[after_pos, upper_bound)`.
+    ///
+    /// The run **follows a multi-line block comment to its closing `*/` line**, so a
+    /// comment the author glued past that `*/` trails the node too rather than being torn
+    /// onto a line of its own (`a; /* x⏎y */ /* c */`). That is the same `line_ref` walk
+    /// [`Self::find_end_with_trailing_comments`] makes, and the two are deliberately on
+    /// different axes and must stay that way: this one is **to emit** (an owned comment is
+    /// printed by its own node), while the cursor is **in source** (it steps over comment
+    /// bytes so a blank-line scan can't read a comment's own newlines as an author's
+    /// blank).
+    ///
+    /// The one statement of "what trails here", for the emitter that renders it
+    /// ([`Self::build_trailing_same_line_comment_docs`]) and for the caller that needs the
+    /// run as a LIST first — a type-literal member partitions it around its own `;`. A
+    /// re-spelled `is_same_line(after_pos, c.span.start)` filter answers the multi-line
+    /// case wrong, which is what put the interface and type-literal member walks at odds
+    /// with the class body and with prettier.
+    pub(crate) fn trailing_same_line_comments(
+        &self,
+        after_pos: u32,
+        upper_bound: u32,
+    ) -> CommentVec<'_> {
+        let mut line_ref = after_pos;
+        let mut run = CommentVec::new();
+        for comment in comments_to_emit_in_range(self.comments, after_pos, upper_bound) {
+            if !self.is_same_line(line_ref, comment.span.start) {
+                break; // Only same-line comments
+            }
+            // Follow multi-line block comments to their closing line
+            if comment.is_block && !self.is_same_line(comment.span.start, comment.span.end) {
+                line_ref = comment.span.end;
+            }
+            run.push(comment);
+        }
+        run
+    }
+
     /// Build docs for trailing same-line comments after a node
     ///
     /// Line comments are wrapped in `line_suffix` so they don't affect width
@@ -523,32 +645,9 @@ impl<'a> Printer<'a> {
         after_pos: u32,
         upper_bound: u32,
     ) -> DocBuf {
-        let d = self.d();
         let mut docs = DocBuf::new();
-        // Track line reference — follows multi-line block comments to their closing */
-        // line, the same walk [`Self::find_end_with_trailing_comments`] makes. The two are
-        // deliberately on different axes and must stay that way: this one is **to emit**
-        // (an owned comment is printed by its own node), while the cursor is **in source**
-        // (it steps over comment bytes so a blank-line scan can't read a comment's own
-        // newlines as an author's blank).
-        let mut line_ref = after_pos;
-        for comment in comments_to_emit_in_range(self.comments, after_pos, upper_bound) {
-            if self.is_same_line(line_ref, comment.span.start) {
-                if comment.is_block {
-                    // Block comments are inline, affect width
-                    docs.push(d.text(" "));
-                    docs.push(self.build_comment_doc(comment));
-                    // Follow multi-line block comments to their closing line
-                    if !self.is_same_line(comment.span.start, comment.span.end) {
-                        line_ref = comment.span.end;
-                    }
-                } else {
-                    // Line comments go in line_suffix, don't affect width
-                    docs.push(self.build_trailing_line_comment_doc(comment));
-                }
-            } else {
-                break; // Only same-line comments
-            }
+        for comment in self.trailing_same_line_comments(after_pos, upper_bound) {
+            docs.push(self.build_trailing_comment_doc(comment));
         }
         docs
     }
@@ -1299,14 +1398,30 @@ impl<'a> Printer<'a> {
         self.push_gap_comments(parts, start, sep_pos, false, true)
     }
 
-    /// Whether a separator-gap comment sits on the gap ANCHOR's line — the
-    /// classification [`Self::push_gap_comments`] partitions on, and the one every
-    /// caller that has to reason about the run it produced must re-ask.
+    /// Where a separator gap's ANCHOR-LINE run ENDS — the split
+    /// [`Self::push_gap_comments`] partitions on, and the one every caller that has to
+    /// reason about the run it produced must re-ask.
     ///
-    /// Named rather than open-coded because it is asked three times about one gap (the
-    /// partition itself, the deferred run's ends, and the blank-line scan's terminal), and
-    /// a spelling that drifts from this one hands a caller a run the emitter never
-    /// produced.
+    /// Stated as a POSITION rather than a per-comment predicate, the way the array
+    /// literal's element seam states its own ([`Printer::element_gap_split`]): the run is a
+    /// **prefix** of the gap by construction — positions increase, so once a comment opens a
+    /// later line every comment behind it does too — and one split shared by its three
+    /// readers (the partition itself, the deferred run's end, the blank-line scan's
+    /// terminal) cannot drift into handing a caller a run the emitter never produced.
+    ///
+    /// The run **follows a multi-line block to its closing `*/` line**, the same walk
+    /// [`Self::trailing_same_line_comments`] and the element seam make: a comment the author
+    /// glued past that `*/` trails the gap the block trails (`a: A /* x⏎y */ /* c */;`)
+    /// rather than reading as own-line and deferring past the separator. Asking a bare
+    /// `is_same_line(anchor, …)` instead put every gap that routes here — the type-member
+    /// and class-member terminators, a statement's own `;`, and the comma seam's parameter
+    /// lists — at odds with the array literal and with prettier, and the resulting form is
+    /// not even a fixed point (the reprint has the comment leading the next item, where its
+    /// own line reads as authored).
+    ///
+    /// The walk is the **in-source** axis: an owned comment's bytes sit on the page and
+    /// carry the line reference like any other's, exactly as
+    /// [`Self::comment_leads_next_item`]'s glue chain does.
     ///
     /// ⚠️ **Scoped to the region BEFORE the comma.** Past the comma the anchor is the
     /// comma itself ([`Printer::comment_on_comma_line`]) — the author may have pushed the
@@ -1317,8 +1432,20 @@ impl<'a> Printer<'a> {
     /// ([`Printer::comment_follows_content_on_its_line`]) the element→comma SEAM asks.
     /// This gap's anchor is the element's own end and the question is which side of the
     /// separator the comment renders on, not which element it binds to.
-    fn gap_comment_on_anchor_line(&self, anchor: u32, comment: &internal::Comment) -> bool {
-        self.is_same_line(anchor, comment.span.start)
+    pub(in crate::printer) fn gap_anchor_line_end(&self, anchor: u32, upper_bound: u32) -> u32 {
+        let mut line_ref = anchor;
+        let mut end = anchor;
+        for comment in comments_in_source_range(self.comments, anchor, upper_bound) {
+            if !self.is_same_line(line_ref, comment.span.start) {
+                break;
+            }
+            // Follow multi-line block comments to their closing line
+            if comment.is_block && !self.is_same_line(comment.span.start, comment.span.end) {
+                line_ref = comment.span.end;
+            }
+            end = comment.span.end;
+        }
+        end
     }
 
     /// Core of the gap-comment partition, with the two policy axes decoupled:
@@ -1338,8 +1465,19 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut deferred = DocBuf::new();
         let mut prev = start;
-        for comment in comments_to_emit_in_range(self.comments, start, sep_pos) {
-            if self.gap_comment_on_anchor_line(start, comment) {
+        let mut gap = comments_to_emit_in_range(self.comments, start, sep_pos).peekable();
+        // Zero-comment fast gate: the split is a search of its own, and every `;`-gap
+        // caller (a `const`'s terminator, a `for` head) asks on documents that mostly have
+        // no comment here at all. Safe to skip when the to-emit range is empty even though
+        // the split reads the IN-SOURCE axis: an all-owned gap classifies nothing, so the
+        // value would go unused.
+        let anchor_line_end = if gap.peek().is_some() {
+            self.gap_anchor_line_end(start, sep_pos)
+        } else {
+            start
+        };
+        for comment in gap {
+            if comment.span.start < anchor_line_end {
                 if block_after && comment.is_block {
                     deferred.push(self.build_trailing_comment_doc(comment));
                 } else {
@@ -1478,10 +1616,17 @@ impl<'a> Printer<'a> {
         let deferred_own_line =
             self.split_separator_gap_comments(parts, elem_end, comma_pos, false);
 
-        // The before-comma gap's final own-line comment — the one whose glue decides this
-        // emitter's separator, below.
+        // This gap's anchor-line split ([`Self::gap_anchor_line_end`]), resolved ONCE for
+        // the three readers below — the deferred run's last comment, and each of the two
+        // blank-scan arms. It is the same question the emitter above partitioned on, and a
+        // reader that re-asks it is a reader that can be given a different answer.
+        //
+        // The bound is the WIDER `next_start`: that is what the blank scan needs, and it
+        // costs the before-comma readers nothing, since the run is a prefix — over
+        // `[elem_end, comma_pos)` the two bounds classify identically.
+        let anchor_line_end = self.gap_anchor_line_end(elem_end, next_start);
         let last_deferred = comments_to_emit_in_range(self.comments, elem_end, comma_pos)
-            .filter(|c| !self.gap_comment_on_anchor_line(elem_end, c))
+            .filter(|c| c.span.start >= anchor_line_end)
             .last();
 
         // A deferred run LEADS the next element, so its last comment takes the
@@ -1507,7 +1652,13 @@ impl<'a> Printer<'a> {
             // emitted a blank in the TUPLE (`[aaaa⏎⏎/* c */, bbbb]`) that prettier
             // collapses — and the fabricated form is stable, so F1, the ledger and
             // `blanks:audit` are all blind to it.
-            if self.separator_gap_has_blank(blank_rule, elem_end, comma_pos + 1, next_start) {
+            if self.separator_gap_has_blank(
+                blank_rule,
+                elem_end,
+                comma_pos + 1,
+                next_start,
+                anchor_line_end,
+            ) {
                 parts.push(d.literalline());
             }
             parts.extend(deferred_own_line);
@@ -1562,7 +1713,13 @@ impl<'a> Printer<'a> {
         // Hardline to separate from next element, optionally preserving an author blank line
         // before the next own-line leading comment. WHICH blank counts is the caller's list
         // kind, not this emitter's business — see [`BlankRule`].
-        if self.separator_gap_has_blank(blank_rule, elem_end, after_comma_end, next_start) {
+        if self.separator_gap_has_blank(
+            blank_rule,
+            elem_end,
+            after_comma_end,
+            next_start,
+            anchor_line_end,
+        ) {
             parts.push(d.literalline());
         }
         parts.push(d.hardline());
@@ -1583,19 +1740,26 @@ impl<'a> Printer<'a> {
     /// **in source**: `next_lead` bounds a raw blank-line scan, which cannot tell a
     /// comment's own newlines from an author's blank line — so it must stop at every
     /// comment in the gap, not just the ones this caller emits.
+    ///
+    /// `anchor_line_end` is the gap's anchor-line split ([`Self::gap_anchor_line_end`]),
+    /// passed in rather than re-derived: the caller already resolved it for the deferred
+    /// run's separator, and the comment this scan stops at must be the first one that
+    /// emitter DEFERRED — a second derivation is a second chance to disagree about which
+    /// that is.
     fn separator_gap_has_blank(
         &self,
         blank_rule: BlankRule,
         elem_end: u32,
         from: u32,
         next_start: u32,
+        anchor_line_end: u32,
     ) -> bool {
         if blank_rule == BlankRule::None {
             return false;
         }
         let next_lead = self
             .comments_in_source_between(from, next_start)
-            .find(|c| !self.gap_comment_on_anchor_line(elem_end, c))
+            .find(|c| c.span.start >= anchor_line_end)
             .map_or(next_start, |c| c.span.start);
         match blank_rule {
             // Measured from the ELEMENT's end, so a blank the author put before the

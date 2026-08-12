@@ -465,6 +465,11 @@ impl<'a> Printer<'a> {
                     None
                 };
 
+                // A declarator `=` is a value gap (`mark_jsdoc_cast_value_gap`). Marked
+                // before any branch below builds the value; the flag is span-keyed, so it is
+                // read wherever that build lands.
+                self.mark_jsdoc_cast_value_gap(init);
+
                 // Helper: build the initializer's value — the same three arguments at every
                 // layout branch below, so they are spelled once.
                 let init_value_doc =

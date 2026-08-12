@@ -14,6 +14,29 @@
 		b: string;
 	}
 
+	// A block comment on the multiline block's closing line trails the member too
+	interface ClosingBlock {
+		a: number; /*
+		 * trailing multiline
+		 */ /* c1 */
+		b: string;
+	}
+
+	// A line comment on that closing line trails the member as well
+	interface ClosingLine {
+		a: number; /*
+		 * trailing multiline
+		 */ // c2
+		b: string;
+	}
+
+	// The same run on the last member stays trailing before the closing brace
+	interface ClosingLast {
+		a: number; /*
+		 * trailing multiline
+		 */ /* c3 */
+	}
+
 	// Own-line multiline block leads the next member (unchanged)
 	interface Leading {
 		a: number;
