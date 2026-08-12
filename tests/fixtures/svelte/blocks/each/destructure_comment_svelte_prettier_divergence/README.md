@@ -10,9 +10,12 @@ Covered positions (all block comments, pattern stays inline): an object default 
 (`{ a = /* c */ 1 }`), leading after `{` (`{ /* c */ b }`), trailing before `}`
 (`{ c /* c */ }`), the rename `key:` → value gap (`{ d: /* c */ e }`), an array element
 (`[f /* c */]`), a rest binding (`[.../* c */ rest]`), a nested object default
-(`[{ g = /* c */ 1 }]`), and a comment **inside a default value** that is itself an
+(`[{ g = /* c */ 1 }]`), a comment **inside a default value** that is itself an
 object/array expression (`{ r = { s: /* c */ 1 } }`, `{ t = [/* c */ 1] }` — kept inline,
-since prettier keeps default values inline even when wide). These are the same canonical
+since prettier keeps default values inline even when wide), and one glued **before** such
+a value or before a nested object/array **pattern** (`{ u = /* c */ { v: 1 } }`,
+`{ x: /* c */ { y } }`, `[/* c */ { z }]` — the positions where the comment is *owned* by
+the brace/bracket node, so the piece's own builder is the only thing that can print it). These are the same canonical
 positions tsv preserves for a regular TypeScript destructure (`const { a = /* c */ 1 } = x`).
 
 ## Svelte divergence (parser)

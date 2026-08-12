@@ -1,0 +1,285 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 255,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multiline block the author broke after keeps the break: the operator and",
+			"start": 10,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " value drop to a continuation line indented one level.",
+			"start": 89,
+			"end": 145,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 149,
+			"end": 158,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 3
+				},
+				"end": {
+					"line": 5,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " One whose operator shares its closing line stays glued.",
+			"start": 168,
+			"end": 226,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 230,
+			"end": 239,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 3
+				},
+				"end": {
+					"line": 10,
+					"column": 4
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 254,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 245,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 147,
+					"end": 165,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 147,
+						"end": 164,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 5
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 147,
+							"end": 148,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 2
+								}
+							},
+							"name": "d",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " x\ny ",
+									"start": 149,
+									"end": 158
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 163,
+							"end": 164,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 4
+								},
+								"end": {
+									"line": 6,
+									"column": 5
+								}
+							},
+							"value": 5,
+							"raw": "5"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multiline block the author broke after keeps the break: the operator and",
+							"start": 10,
+							"end": 87
+						},
+						{
+							"type": "Line",
+							"value": " value drop to a continuation line indented one level.",
+							"start": 89,
+							"end": 145
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 228,
+					"end": 244,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 9
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 228,
+						"end": 243,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 8
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 228,
+							"end": 229,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 1
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"name": "e",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " x\ny ",
+									"start": 230,
+									"end": 239
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 242,
+							"end": 243,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 8
+								}
+							},
+							"value": 6,
+							"raw": "6"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " One whose operator shares its closing line stays glued.",
+							"start": 168,
+							"end": 226
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
