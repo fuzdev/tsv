@@ -29,10 +29,12 @@ next door: glued content (`<a>{expr}text</a>`) is a single unbreakable unit with
 reflow, so there the boundary *is* the only signal and the authored lines stay — see
 [inline_multiline_nontext](../inline_multiline_nontext/), where prettier agrees.
 
-Together they leave exactly one form: the flowed content, boundaries hugged. Prettier converges
-neither axis, so it keeps a stable form for each authoring — the dangled form for the
-inter-sibling newline, and the block-style form for the boundary newline
-(`prettier_variant_boundary_newline`).
+Together they leave one form for the *inter-sibling* axis: the flowed content, boundaries hugged.
+Prettier does not converge it, so it keeps the dangled form for the inter-sibling newline. The
+**boundary** axis is not converged by either formatter — an authored boundary newline is the
+author's air and both keep it (`variant_boundary_newline`, dual-stable; see
+[inline_boundary_air](../inline_boundary_air/)), so the divergence here is the inter-sibling
+separator alone.
 
 What this fixture adds beyond those two is that the composition must settle in **one pass**. The
 flow and the collapse it enables are one decision; deciding the layout against the pre-flow
@@ -53,8 +55,8 @@ the converged
 inline form, with the inter-sibling-newline authoring as
 `unformatted_ours_newline.svelte` (tsv normalizes it to `input`; prettier instead dangles the tag
 delimiters around it, a form it keeps stable — pinned as `prettier_variant_dangle.svelte`) and the
-boundary-newline authoring as `prettier_variant_boundary_newline.svelte` (prettier keeps it
-stable; tsv normalizes it to `input`).
+boundary-newline authoring as `variant_boundary_newline.svelte` — **dual-stable**: it is the
+same document asking for air on the content boundaries, and both formatters preserve it.
 
 See
 [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
