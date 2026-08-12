@@ -39,6 +39,28 @@ pub(in crate::printer) struct ClassHeritagePositions {
     pub header_end: u32,
 }
 
+/// What sits to the left of a class head's `<T>` gap — the question that picks the gap's
+/// rule, asked once by [`Printer::push_class_type_params`].
+///
+/// The two are different gaps, not two spellings of one: after a name the comments belong
+/// to the name→`<T>` seam and stay flush (`class A /* c */ <T>`, pinned by
+/// `name_type_params_line_comment_prettier_divergence`); with no name the gap belongs to
+/// the `class` keyword, which makes it a declaration **header** gap and gives it the
+/// uniform forced-continuation indent (`const a = class // c⏎\t<T> {}`).
+pub(in crate::printer) enum ClassTypeParamsGap {
+    /// The class name's end (`class A /* c */ <T>`).
+    Name(u32),
+    /// **Any offset within the `class` keyword's own bytes** — its start or its end — for
+    /// an anonymous class (`class /* c */ <T>`). The keyword can hold no comment, so both
+    /// bound the gap identically, and each printer passes whichever it already has: the
+    /// expression printer its located keyword start, the declaration printer its
+    /// modifier-walk cursor (already past the keyword). Neither has to derive the other,
+    /// which is the point — a keyword's length is arithmetic, and arithmetic over a token
+    /// the source may have a comment beside it is what drops comments elsewhere in this
+    /// family.
+    Keyword(u32),
+}
+
 /// How `build_class_header_doc` lays out the class heritage.
 ///
 /// Encodes the real 3-state decision that `(group_mode, has_heritage_line_comments)`
@@ -182,13 +204,8 @@ impl<'a> Printer<'a> {
 
     /// Emit a class head's `<T>` type-parameter list, preceded by the gap before it.
     ///
-    /// `name_end` is the class name's end, or `None` for an anonymous class. **The two
-    /// arms are not symmetric**, and the asymmetry is the point of having one emitter:
-    /// after a name the gap is the name→`<T>` gap and its comments are emitted here
-    /// (`class A /* c */ <T>`), while an anonymous class's preceding gap belongs to the
-    /// `class` keyword — a gap **no emitter reads**, so a comment authored there is
-    /// dropped (`const H = class // c⏎<T> {}`). That hole is open, and it is one hole
-    /// rather than the two it was before both class printers routed through here.
+    /// Both arms emit the gap — [`ClassTypeParamsGap`] names which rule it takes, keyed on
+    /// what sits to its left, so neither arm can be the one nobody claims.
     ///
     /// The list itself always uses the wrapping builder, so it breaks on width
     /// independently of the heritage group.
@@ -196,22 +213,50 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-        name_end: Option<u32>,
+        gap: ClassTypeParamsGap,
     ) {
         let Some(type_params) = type_parameters else {
             return;
         };
-        if let Some(name_end) = name_end {
-            // A line comment takes a hardline here, so it can't absorb the `<T>` as
-            // comment text.
-            self.push_name_to_type_params_comments(
-                parts,
-                name_end,
-                type_params.span.start,
-                CommentSpacing::Trailing,
-            );
+        let list_start = type_params.span.start;
+        match gap {
+            ClassTypeParamsGap::Name(name_end) => {
+                // A line comment takes a hardline here, so it can't absorb the `<T>` as
+                // comment text.
+                self.push_name_to_type_params_comments(
+                    parts,
+                    name_end,
+                    list_start,
+                    CommentSpacing::Trailing,
+                );
+                parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
+            }
+            ClassTypeParamsGap::Keyword(keyword_start) => {
+                let list_doc = self.build_type_parameter_declaration_doc_wrapping(type_params);
+                if !self.has_comments_to_emit_between(keyword_start, list_start) {
+                    // The overwhelmingly common case: `class<T>` hugs the keyword, so the
+                    // gap contributes nothing — not even a separator.
+                    parts.push(list_doc);
+                    return;
+                }
+                let d = self.d();
+                let run = self.build_name_to_type_params_comments(
+                    keyword_start,
+                    list_start,
+                    CommentSpacing::Trailing,
+                );
+                let body = d.concat(&[run, list_doc]);
+                // A line comment ends the gap's line, so `<T>` starts a continuation line:
+                // indent it one level, the uniform declaration-header rule every other
+                // keyword gap takes. The indent must cover the run, whose hardline is the
+                // break being indented.
+                parts.push(if self.keyword_gap_breaks(keyword_start, list_start) {
+                    d.indent(body)
+                } else {
+                    body
+                });
+            }
         }
-        parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
     }
 
     /// Whether a class should use heritage "group mode" for structural

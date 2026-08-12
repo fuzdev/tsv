@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 81,
+	"end": 418,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,17 +12,129 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " comment",
-			"start": 46,
-			"end": 56,
+			"value": " Block body",
+			"start": 20,
+			"end": 33,
 			"loc": {
 				"start": {
-					"line": 4,
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 61,
+			"end": 66,
+			"loc": {
+				"start": {
+					"line": 5,
 					"column": 13
 				},
 				"end": {
-					"line": 4,
-					"column": 23
+					"line": 5,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Call body - the forced break in the signature expands the call too",
+			"start": 83,
+			"end": 152,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 180,
+			"end": 185,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 13
+				},
+				"end": {
+					"line": 12,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Ternary body - keeps its parens",
+			"start": 207,
+			"end": 241,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 269,
+			"end": 274,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 13
+				},
+				"end": {
+					"line": 19,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A preceding argument does not restore the hug",
+			"start": 299,
+			"end": 347,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 383,
+			"end": 388,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 13
+				},
+				"end": {
+					"line": 26,
+					"column": 18
 				}
 			}
 		}
@@ -30,76 +142,76 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 80,
+		"end": 417,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 71,
+			"end": 408,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 7,
+					"line": 29,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
-					"start": 20,
-					"end": 70,
+					"start": 35,
+					"end": 80,
 					"loc": {
 						"start": {
-							"line": 2,
+							"line": 3,
 							"column": 1
 						},
 						"end": {
-							"line": 6,
+							"line": 7,
 							"column": 3
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 20,
-						"end": 69,
+						"start": 35,
+						"end": 79,
 						"loc": {
 							"start": {
-								"line": 2,
+								"line": 3,
 								"column": 1
 							},
 							"end": {
-								"line": 6,
+								"line": 7,
 								"column": 2
 							}
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 20,
-							"end": 27,
+							"start": 35,
+							"end": 42,
 							"loc": {
 								"start": {
-									"line": 2,
+									"line": 3,
 									"column": 1
 								},
 								"end": {
-									"line": 2,
+									"line": 3,
 									"column": 8
 								}
 							},
 							"object": {
 								"type": "Identifier",
-								"start": 20,
-								"end": 23,
+								"start": 35,
+								"end": 38,
 								"loc": {
 									"start": {
-										"line": 2,
+										"line": 3,
 										"column": 1
 									},
 									"end": {
-										"line": 2,
+										"line": 3,
 										"column": 4
 									}
 								},
@@ -107,15 +219,15 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 24,
-								"end": 27,
+								"start": 39,
+								"end": 42,
 								"loc": {
 									"start": {
-										"line": 2,
+										"line": 3,
 										"column": 5
 									},
 									"end": {
-										"line": 2,
+										"line": 3,
 										"column": 8
 									}
 								},
@@ -127,15 +239,15 @@
 						"arguments": [
 							{
 								"type": "ArrowFunctionExpression",
-								"start": 31,
-								"end": 66,
+								"start": 46,
+								"end": 76,
 								"loc": {
 									"start": {
-										"line": 3,
+										"line": 4,
 										"column": 2
 									},
 									"end": {
-										"line": 5,
+										"line": 6,
 										"column": 9
 									}
 								},
@@ -146,44 +258,44 @@
 								"params": [
 									{
 										"type": "Identifier",
-										"start": 36,
-										"end": 45,
+										"start": 51,
+										"end": 60,
 										"loc": {
 											"start": {
-												"line": 4,
+												"line": 5,
 												"column": 3
 											},
 											"end": {
-												"line": 4,
+												"line": 5,
 												"column": 12
 											}
 										},
 										"name": "a",
 										"typeAnnotation": {
 											"type": "TSTypeAnnotation",
-											"start": 37,
-											"end": 45,
+											"start": 52,
+											"end": 60,
 											"loc": {
 												"start": {
-													"line": 4,
+													"line": 5,
 													"column": 4
 												},
 												"end": {
-													"line": 4,
+													"line": 5,
 													"column": 12
 												}
 											},
 											"typeAnnotation": {
 												"type": "TSStringKeyword",
-												"start": 39,
-												"end": 45,
+												"start": 54,
+												"end": 60,
 												"loc": {
 													"start": {
-														"line": 4,
+														"line": 5,
 														"column": 6
 													},
 													"end": {
-														"line": 4,
+														"line": 5,
 														"column": 12
 													}
 												}
@@ -192,24 +304,24 @@
 										"trailingComments": [
 											{
 												"type": "Line",
-												"value": " comment",
-												"start": 46,
-												"end": 56
+												"value": " c1",
+												"start": 61,
+												"end": 66
 											}
 										]
 									}
 								],
 								"body": {
 									"type": "BlockStatement",
-									"start": 64,
-									"end": 66,
+									"start": 74,
+									"end": 76,
 									"loc": {
 										"start": {
-											"line": 5,
+											"line": 6,
 											"column": 7
 										},
 										"end": {
-											"line": 5,
+											"line": 6,
 											"column": 9
 										}
 									},
@@ -218,7 +330,689 @@
 							}
 						],
 						"optional": false
-					}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block body",
+							"start": 20,
+							"end": 33
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 154,
+					"end": 204,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 154,
+						"end": 203,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 154,
+							"end": 161,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 8
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 154,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 1
+									},
+									"end": {
+										"line": 10,
+										"column": 4
+									}
+								},
+								"name": "arr"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 158,
+								"end": 161,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 5
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "map"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 165,
+								"end": 200,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 14
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 170,
+										"end": 179,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 3
+											},
+											"end": {
+												"line": 12,
+												"column": 12
+											}
+										},
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 171,
+											"end": 179,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 4
+												},
+												"end": {
+													"line": 12,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 173,
+												"end": 179,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 6
+													},
+													"end": {
+														"line": 12,
+														"column": 12
+													}
+												}
+											}
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 180,
+												"end": 185
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 193,
+									"end": 200,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 7
+										},
+										"end": {
+											"line": 13,
+											"column": 14
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 193,
+										"end": 197,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 7
+											},
+											"end": {
+												"line": 13,
+												"column": 11
+											}
+										},
+										"name": "call"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 198,
+											"end": 199,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 12
+												},
+												"end": {
+													"line": 13,
+													"column": 13
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Call body - the forced break in the signature expands the call too",
+							"start": 83,
+							"end": 152
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 243,
+					"end": 297,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 243,
+						"end": 296,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 243,
+							"end": 250,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 8
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 243,
+								"end": 246,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 1
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"name": "arr"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 247,
+								"end": 250,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 5
+									},
+									"end": {
+										"line": 17,
+										"column": 8
+									}
+								},
+								"name": "map"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 254,
+								"end": 293,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 18
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 259,
+										"end": 268,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 3
+											},
+											"end": {
+												"line": 19,
+												"column": 12
+											}
+										},
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 260,
+											"end": 268,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 4
+												},
+												"end": {
+													"line": 19,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 262,
+												"end": 268,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 6
+													},
+													"end": {
+														"line": 19,
+														"column": 12
+													}
+												}
+											}
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c3",
+												"start": 269,
+												"end": 274
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 283,
+									"end": 292,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 8
+										},
+										"end": {
+											"line": 20,
+											"column": 17
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 283,
+										"end": 284,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 8
+											},
+											"end": {
+												"line": 20,
+												"column": 9
+											}
+										},
+										"name": "a"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 287,
+										"end": 288,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 12
+											},
+											"end": {
+												"line": 20,
+												"column": 13
+											}
+										},
+										"name": "a"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 291,
+										"end": 292,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 16
+											},
+											"end": {
+												"line": 20,
+												"column": 17
+											}
+										},
+										"name": "a"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Ternary body - keeps its parens",
+							"start": 207,
+							"end": 241
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 349,
+					"end": 407,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 349,
+						"end": 406,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 349,
+							"end": 359,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 1
+								},
+								"end": {
+									"line": 23,
+									"column": 11
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 349,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 1
+									},
+									"end": {
+										"line": 23,
+										"column": 4
+									}
+								},
+								"name": "arr"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 353,
+								"end": 359,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 5
+									},
+									"end": {
+										"line": 23,
+										"column": 11
+									}
+								},
+								"name": "reduce"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 363,
+								"end": 364,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 3
+									}
+								},
+								"name": "x"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 368,
+								"end": 403,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 14
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 373,
+										"end": 382,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 3
+											},
+											"end": {
+												"line": 26,
+												"column": 12
+											}
+										},
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 374,
+											"end": 382,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 4
+												},
+												"end": {
+													"line": 26,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 376,
+												"end": 382,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 6
+													},
+													"end": {
+														"line": 26,
+														"column": 12
+													}
+												}
+											}
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c4",
+												"start": 383,
+												"end": 388
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 396,
+									"end": 403,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 7
+										},
+										"end": {
+											"line": 27,
+											"column": 14
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 396,
+										"end": 400,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 7
+											},
+											"end": {
+												"line": 27,
+												"column": 11
+											}
+										},
+										"name": "call"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 401,
+											"end": 402,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 12
+												},
+												"end": {
+													"line": 27,
+													"column": 13
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A preceding argument does not restore the hug",
+							"start": 299,
+							"end": 347
+						}
+					]
 				}
 			],
 			"sourceType": "module"

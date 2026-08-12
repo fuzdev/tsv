@@ -1057,12 +1057,19 @@ impl<'a> Printer<'a> {
     fn build_import_type_call_doc(&self, i: &TSImportType<'_>, paren_close: u32) -> DocId {
         let d = self.d();
         let open = d.text("import(");
-        let open_paren_end = i.span.start + "import(".len() as u32;
+        // The gap runs from the end of the `import` KEYWORD, not from a computed `(`:
+        // `import("` is a fixed string in the OUTPUT, never in the source, so measuring the
+        // paren off the span start (`+ "import(".len()`) lands inside a comment written
+        // before it and every scan below then starts past that comment — dropping it
+        // outright (`import/* c */('a')`, all payloads, and the first comment of a run).
+        // A keyword's own bytes can hold no comment, so its end bounds the region exactly
+        // and claims both sides of the `(` for the one emitter that prints this slot.
+        let paren_gap_start = i.span.start + "import".len() as u32;
         let arg_end = i.argument.span.end;
 
-        // Leading comments between `import(` and the specifier.
+        // Leading comments between `import` and the specifier.
         let (arg_doc, leading_forces_break) = self.build_paren_leading_value_doc(
-            open_paren_end,
+            paren_gap_start,
             i.argument.span.start,
             self.build_literal_doc(&i.argument),
         );

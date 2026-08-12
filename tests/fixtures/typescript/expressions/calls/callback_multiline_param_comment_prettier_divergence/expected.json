@@ -1,0 +1,1447 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 655,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Call body - the call expands, matching prettier",
+			"start": 20,
+			"end": 70,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " multi\n\tline ",
+			"start": 85,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 5
+				},
+				"end": {
+					"line": 6,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A member chain's call-body argument too",
+			"start": 130,
+			"end": 172,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " multi\n\tline ",
+			"start": 192,
+			"end": 209,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 5
+				},
+				"end": {
+					"line": 15,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Object body - the signature breaks, the call keeps hugging it",
+			"start": 237,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " multi\n\tline ",
+			"start": 312,
+			"end": 329,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 4
+				},
+				"end": {
+					"line": 23,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block body - same",
+			"start": 356,
+			"end": 376,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " multi\n\tline ",
+			"start": 387,
+			"end": 404,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 4
+				},
+				"end": {
+					"line": 30,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A member chain's block-body argument too",
+			"start": 436,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " multi\n\tline ",
+			"start": 495,
+			"end": 512,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 4
+				},
+				"end": {
+					"line": 39,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A function expression argument too",
+			"start": 544,
+			"end": 581,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 1
+				},
+				"end": {
+					"line": 45,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " multi\n\tline ",
+			"start": 601,
+			"end": 618,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 4
+				},
+				"end": {
+					"line": 48,
+					"column": 8
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 654,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 645,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 53,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 72,
+					"end": 127,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 72,
+						"end": 126,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 72,
+							"end": 74,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 78,
+								"end": 123,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 14
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 83,
+										"end": 84,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 3
+											},
+											"end": {
+												"line": 5,
+												"column": 4
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " multi\n\tline ",
+												"start": 85,
+												"end": 102
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 107,
+										"end": 108,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 3
+											},
+											"end": {
+												"line": 7,
+												"column": 4
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 116,
+									"end": 123,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 7
+										},
+										"end": {
+											"line": 8,
+											"column": 14
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 116,
+										"end": 120,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 7
+											},
+											"end": {
+												"line": 8,
+												"column": 11
+											}
+										},
+										"name": "call"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 121,
+											"end": 122,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 12
+												},
+												"end": {
+													"line": 8,
+													"column": 13
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Call body - the call expands, matching prettier",
+							"start": 20,
+							"end": 70
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 174,
+					"end": 234,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 174,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 174,
+							"end": 181,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 8
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 174,
+								"end": 177,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 1
+									},
+									"end": {
+										"line": 12,
+										"column": 4
+									}
+								},
+								"name": "arr"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 178,
+								"end": 181,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 5
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "map"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 185,
+								"end": 230,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 14
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 190,
+										"end": 191,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 4
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " multi\n\tline ",
+												"start": 192,
+												"end": 209
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 214,
+										"end": 215,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 3
+											},
+											"end": {
+												"line": 16,
+												"column": 4
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 223,
+									"end": 230,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 7
+										},
+										"end": {
+											"line": 17,
+											"column": 14
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 223,
+										"end": 227,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 7
+											},
+											"end": {
+												"line": 17,
+												"column": 11
+											}
+										},
+										"name": "call"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 228,
+											"end": 229,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 12
+												},
+												"end": {
+													"line": 17,
+													"column": 13
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A member chain's call-body argument too",
+							"start": 130,
+							"end": 172
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 303,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 18
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 303,
+						"end": 352,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 25,
+								"column": 17
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 303,
+							"end": 305,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 306,
+								"end": 351,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 4
+									},
+									"end": {
+										"line": 25,
+										"column": 16
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 310,
+										"end": 311,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 3
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " multi\n\tline ",
+												"start": 312,
+												"end": 329
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 333,
+										"end": 334,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 3
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 342,
+									"end": 350,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 7
+										},
+										"end": {
+											"line": 25,
+											"column": 15
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 344,
+											"end": 348,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 9
+												},
+												"end": {
+													"line": 25,
+													"column": 13
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 344,
+												"end": 345,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 9
+													},
+													"end": {
+														"line": 25,
+														"column": 10
+													}
+												},
+												"name": "x"
+											},
+											"value": {
+												"type": "Identifier",
+												"start": 347,
+												"end": 348,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 12
+													},
+													"end": {
+														"line": 25,
+														"column": 13
+													}
+												},
+												"name": "a"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Object body - the signature breaks, the call keeps hugging it",
+							"start": 237,
+							"end": 301
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 378,
+					"end": 433,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 378,
+						"end": 432,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 34,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 378,
+							"end": 380,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 1
+								},
+								"end": {
+									"line": 28,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 381,
+								"end": 431,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 4
+									},
+									"end": {
+										"line": 34,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 385,
+										"end": 386,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 3
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " multi\n\tline ",
+												"start": 387,
+												"end": 404
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 408,
+										"end": 409,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 3
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 416,
+									"end": 431,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 6
+										},
+										"end": {
+											"line": 34,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 420,
+											"end": 428,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 2
+												},
+												"end": {
+													"line": 33,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 420,
+												"end": 427,
+												"loc": {
+													"start": {
+														"line": 33,
+														"column": 2
+													},
+													"end": {
+														"line": 33,
+														"column": 9
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 420,
+													"end": 424,
+													"loc": {
+														"start": {
+															"line": 33,
+															"column": 2
+														},
+														"end": {
+															"line": 33,
+															"column": 6
+														}
+													},
+													"name": "call"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 425,
+														"end": 426,
+														"loc": {
+															"start": {
+																"line": 33,
+																"column": 7
+															},
+															"end": {
+																"line": 33,
+																"column": 8
+															}
+														},
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block body - same",
+							"start": 356,
+							"end": 376
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 481,
+					"end": 541,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 481,
+						"end": 540,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 1
+							},
+							"end": {
+								"line": 43,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 481,
+							"end": 488,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 1
+								},
+								"end": {
+									"line": 37,
+									"column": 8
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 481,
+								"end": 484,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 1
+									},
+									"end": {
+										"line": 37,
+										"column": 4
+									}
+								},
+								"name": "arr"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 485,
+								"end": 488,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 5
+									},
+									"end": {
+										"line": 37,
+										"column": 8
+									}
+								},
+								"name": "map"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 489,
+								"end": 539,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 9
+									},
+									"end": {
+										"line": 43,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 493,
+										"end": 494,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 3
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " multi\n\tline ",
+												"start": 495,
+												"end": 512
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 516,
+										"end": 517,
+										"loc": {
+											"start": {
+												"line": 40,
+												"column": 2
+											},
+											"end": {
+												"line": 40,
+												"column": 3
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 524,
+									"end": 539,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 6
+										},
+										"end": {
+											"line": 43,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 528,
+											"end": 536,
+											"loc": {
+												"start": {
+													"line": 42,
+													"column": 2
+												},
+												"end": {
+													"line": 42,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 528,
+												"end": 535,
+												"loc": {
+													"start": {
+														"line": 42,
+														"column": 2
+													},
+													"end": {
+														"line": 42,
+														"column": 9
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 528,
+													"end": 532,
+													"loc": {
+														"start": {
+															"line": 42,
+															"column": 2
+														},
+														"end": {
+															"line": 42,
+															"column": 6
+														}
+													},
+													"name": "call"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 533,
+														"end": 534,
+														"loc": {
+															"start": {
+																"line": 42,
+																"column": 7
+															},
+															"end": {
+																"line": 42,
+																"column": 8
+															}
+														},
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A member chain's block-body argument too",
+							"start": 436,
+							"end": 479
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 583,
+					"end": 644,
+					"loc": {
+						"start": {
+							"line": 46,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 583,
+						"end": 643,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 1
+							},
+							"end": {
+								"line": 52,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 583,
+							"end": 585,
+							"loc": {
+								"start": {
+									"line": 46,
+									"column": 1
+								},
+								"end": {
+									"line": 46,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "FunctionExpression",
+								"start": 586,
+								"end": 642,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 4
+									},
+									"end": {
+										"line": 52,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 599,
+										"end": 600,
+										"loc": {
+											"start": {
+												"line": 47,
+												"column": 2
+											},
+											"end": {
+												"line": 47,
+												"column": 3
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " multi\n\tline ",
+												"start": 601,
+												"end": 618
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 622,
+										"end": 623,
+										"loc": {
+											"start": {
+												"line": 49,
+												"column": 2
+											},
+											"end": {
+												"line": 49,
+												"column": 3
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 627,
+									"end": 642,
+									"loc": {
+										"start": {
+											"line": 50,
+											"column": 3
+										},
+										"end": {
+											"line": 52,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 631,
+											"end": 639,
+											"loc": {
+												"start": {
+													"line": 51,
+													"column": 2
+												},
+												"end": {
+													"line": 51,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 631,
+												"end": 638,
+												"loc": {
+													"start": {
+														"line": 51,
+														"column": 2
+													},
+													"end": {
+														"line": 51,
+														"column": 9
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 631,
+													"end": 635,
+													"loc": {
+														"start": {
+															"line": 51,
+															"column": 2
+														},
+														"end": {
+															"line": 51,
+															"column": 6
+														}
+													},
+													"name": "call"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 636,
+														"end": 637,
+														"loc": {
+															"start": {
+																"line": 51,
+																"column": 7
+															},
+															"end": {
+																"line": 51,
+																"column": 8
+															}
+														},
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A function expression argument too",
+							"start": 544,
+							"end": 581
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
