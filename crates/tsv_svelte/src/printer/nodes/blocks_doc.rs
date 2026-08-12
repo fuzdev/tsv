@@ -782,8 +782,9 @@ impl<'a> Printer<'a> {
         let key_doc = block.key.as_ref().map(|key| {
             // The key expression is inside parens, so the offset accounts for that.
             let Some(key_span) = block.key_span else {
-                // No key_span: build doc directly
-                return self.build_ts_expression_doc(key);
+                // No key_span: build doc directly (still a braced head — the key parens
+                // hug, so a leading cast reflows)
+                return self.build_ts_expression_doc_cannot_hang(key);
             };
             let key_head = self.build_expression_doc_for_block(
                 key,

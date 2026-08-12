@@ -108,7 +108,11 @@ impl<'a> Printer<'a> {
 /// (`choose_layout` below, and the declarator's own predicates in
 /// `statements/variable.rs`) and the **hardline** the cast prints between the comment and
 /// its `(` (`build_jsdoc_cast_doc`). They must agree — a hang without the hardline
-/// leaves the `(` stranded, and a hardline without the hang un-indents it.
+/// leaves the `(` stranded, and a hardline without the hang un-indents it. A gap that
+/// CANNOT hang at all (a Svelte braced head, a computed key —
+/// [`Printer::jsdoc_cast_cannot_hang_target`]) opts out of both halves together: the
+/// cast reflows to a space there without consulting this predicate, which is the only
+/// way the two can still agree where no operator line exists to end.
 ///
 /// ⚠️ **This answers only the HANG, not "is there a separator".** The cast is the last
 /// comment of whatever leading run precedes it, so when this returns `false` the gap is

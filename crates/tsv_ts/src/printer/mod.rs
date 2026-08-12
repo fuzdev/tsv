@@ -261,6 +261,19 @@ pub struct Printer<'a> {
     /// value's break is the one `docs/conformance_prettier.md` §Authored breaks in value
     /// position reflows.
     pub(crate) jsdoc_cast_value_gap_target: Cell<Option<Span>>,
+    /// Span of the JSDoc cast **leading** an embedded value whose gap CANNOT hang — the
+    /// braced-head category (`EmbedContext::jsdoc_cast_cannot_hang`): the comment→`(`
+    /// separator reflows to a space in **every** authoring, the own-line hardline arm
+    /// included, because the host has no operator line to end and the hardline would
+    /// strand the `(` at the head's own column ([`Printer::build_jsdoc_cast_doc`]).
+    ///
+    /// Set once per expression entry (`build_expression_doc_with_comments` →
+    /// [`Printer::mark_jsdoc_cast_cannot_hang_gap`]) on the value's **left-spine** cast —
+    /// the one whose comment leads the value, the same `leading_jsdoc_cast` walk the TS
+    /// hang predicates use — and never touched during the walk, unlike
+    /// [`Self::jsdoc_cast_value_gap_target`], whose per-gap marks overwrite each other.
+    /// Span-keyed like it: a cast nested off the spine keeps its width-decided layout.
+    pub(crate) jsdoc_cast_cannot_hang_target: Cell<Option<Span>>,
     /// The parent context for a curried arrow-chain value, set by the enclosing
     /// printer (assignment chokepoint, call-argument printer, binary-operand
     /// printer) just before the chain is built. The arrow printer reads and
@@ -367,6 +380,7 @@ impl<'a> Printer<'a> {
             expr_stmt_paren_target: Cell::new(None),
             ternary_hang_target: Cell::new(None),
             jsdoc_cast_value_gap_target: Cell::new(None),
+            jsdoc_cast_cannot_hang_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
             chain_arg_share_active: Cell::new(false),

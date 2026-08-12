@@ -575,7 +575,7 @@ impl<'a> Printer<'a> {
                 )
                 .doc
             } else {
-                self.build_ts_expression_doc(key)
+                self.build_ts_expression_doc_cannot_hang(key)
             };
             opening.push(d.text(" ("));
             opening.push(key_doc);

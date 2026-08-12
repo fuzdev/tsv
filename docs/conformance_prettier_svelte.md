@@ -215,6 +215,55 @@ See [Comment Position Philosophy](./conformance_prettier.md#comment-position-phi
 
 **Static attribute value containing both quote kinds** (◆prettier_bug / content_corruption) — the position where the rule above runs out of delimiters. A top-level `<script>`/`<style>` head reads its attributes with Svelte's `read_static_attribute`, whose value alternative is `[^>\s]+` — the one reader that admits a raw value holding a literal `"` *and* a literal `'` (`<script a=x'y"z>`). Neither quote can delimit it, so tsv emits it **unquoted**, which is both the authored form and the only lossless one: having come from that alternative the value holds no whitespace and no `>`, so the unquoted form always round-trips. Prettier wraps it in `"` like any other value, and the interior `"` closes it early — broken markup that does not re-parse. The one-kind cases at the same position keep the single/double rule unchanged. See [script/static_attribute_value_both_quotes](../tests/fixtures/svelte/script/static_attribute_value_both_quotes_prettier_divergence/), and [conformance_svelte.md §Static Attribute Reader Corrections](./conformance_svelte.md#static-attribute-reader-corrections) for the reader itself.
 
+## Svelte: Own-line JSDoc cast at a braced head
+
+**◆content_preservation ◆design_choice.** A JSDoc cast whose comment the author gave a
+line of its own (`{#if⏎\t/** @type {A} */⏎\t(aa)}`), at a braced head whose value **hugs
+its delimiters**: the block heads (`{#if}` / `{:else if}` / `{#each}` + its key /
+`{#await}` bare and `then` shorthand / `{#key}`), the prefixed tags (`{@html}` /
+`{@render}`), the braced attribute heads (`{...spread}` / `{@attach}`), the `{expr}` tag,
+attribute values (event handlers included), the `style:` directive value (Svelte models
+it as an expression tag), and `<svelte:element this={…}>`. No such head can hang the
+value — it starts right after the head's prefix, so there is no operator line to end,
+unlike every TS value gap — so tsv **reflows** the authored break: the comment joins the
+head's line and the cast glues to it (`{#if /** @type {A} */ (aa)}`), the fixed point the
+glued authoring already reaches. This is
+[§Comment Position Philosophy](./conformance_prettier.md#comment-position-philosophy)'s
+corollary applied to a flattening container — own-line-ness is authoring signal only
+where the container keeps lines at all, and a braced head's group flattens when it fits.
+The mid-line authoring with the `(` on the next line (`{#if /** @type {A} */⏎(aa)}`)
+reflows to the same fixed point, per
+[§Authored breaks in value position](./conformance_prettier.md#authored-breaks-in-value-position).
+
+Prettier is no oracle for the shape: at every one of these heads it **drops the cast
+comment and its parens outright** (`{#if aa}` — comment loss plus a semantic change,
+since the type assertion stops existing; the same template strip
+[§JSDoc / paren semantics](./conformance_prettier_ts_comments.md#jsdoc--paren-semantics)
+catalogs for the glued authoring). Where that strip misses the cast because its paren is
+not the expression's root, prettier keeps the comment and largely agrees with tsv: at a
+**left-spine** cast (`{#if /** @type {A} */ (aa) && bb}`, a member base alike) it reflows
+the authored break to tsv's same glued form — a plain match, pinned by
+[blocks/if/head_jsdoc_cast_left_spine](../tests/fixtures/svelte/blocks/if/head_jsdoc_cast_left_spine/)
+— and at the `{@render}` callee (`{@render /** @type {A} */ (fn)()}`) it shares tsv's
+glued fixed point while also holding the mid-line broken form stable, a second fixed
+point tsv normalizes (pinned as that fixture's `prettier_variant_break`).
+
+The two heads that **can** give the comment a properly indented line of its own are
+deliberately excluded and keep the authoring: `{@const}` hangs the value off its `=`
+exactly like a TS declarator — both formatters agree, pinned by
+[tags/const_jsdoc_cast_own_line](../tests/fixtures/svelte/tags/const_jsdoc_cast_own_line_svelte_divergence/)
+(a `_svelte_divergence` only for the cast comment's attachment) — and an expression-value
+directive (`on:` / `bind:` / `class:` / `use:` / `transition:` / `animate:`) takes its
+block form with the comment on its own indented line, pinned by
+[directives/on/jsdoc_cast_own_line](../tests/fixtures/svelte/directives/on/jsdoc_cast_own_line_svelte_prettier_divergence/)
+(still a ◆content_preservation divergence — prettier drops the comment there too).
+
+- blocks — [head_jsdoc_cast_own_line](../tests/fixtures/svelte/blocks/head_jsdoc_cast_own_line_svelte_prettier_divergence/), [head_jsdoc_cast_multiline_comment](../tests/fixtures/svelte/blocks/head_jsdoc_cast_multiline_comment_svelte_prettier_divergence/) (the multiline-comment arm — the reflowed comment's own verbatim newlines keep the head open in the comment-broken block shape of [§Svelte: Blocks](#svelte-blocks))
+- tags — [html_jsdoc_cast_own_line](../tests/fixtures/svelte/tags/html_jsdoc_cast_own_line_svelte_prettier_divergence/), [render_jsdoc_cast_own_line](../tests/fixtures/svelte/tags/render_jsdoc_cast_own_line_prettier_divergence/)
+- attributes — [jsdoc_cast_own_line](../tests/fixtures/svelte/attributes/jsdoc_cast_own_line_svelte_prettier_divergence/)
+- expression tag — [jsdoc_cast_own_line](../tests/fixtures/svelte/expression_tag/jsdoc_cast_own_line_svelte_prettier_divergence/)
+- directives (exclusion pin) — [on/jsdoc_cast_own_line](../tests/fixtures/svelte/directives/on/jsdoc_cast_own_line_svelte_prettier_divergence/)
+
 ## Svelte: Blocks
 
 Standalone head wrap + dangle + body-expand:
@@ -287,6 +336,7 @@ Same layout inside an inline element (head wraps + body expands, element hugs th
 **◆content_preservation.** A comment placed **inside** a destructuring binding pattern of `{#each … as}`, `{#await … then}`, `{:then}`, or `{:catch}` is preserved where the author wrote it; prettier-plugin-svelte prints these patterns from a comment-blind path and silently drops it. tsv routes the pattern through a comment-aware printer (the same canonical positions it preserves for a regular TypeScript destructure, e.g. `const { a = /* c */ 1 } = x`), so a destructuring comment reads the same wherever it appears. Covered (block comments, pattern stays inline): object default value (`{ a = /* c */ 1 }`), leading after `{` (`{ /* c */ a }`), trailing before `}` (`{ a /* c */ }`), rename `key:`→value gap (`{ a: /* c */ b }`), array element (`[a /* c */]`), rest binding (`[.../* c */ rest]`), and nested patterns. Per [Comment Position Philosophy](./conformance_prettier.md#comment-position-philosophy), user intent is preserved when prettier moves or drops comments. (In the `{#await … then}` *shorthand* pattern, the awaited expression's trailing-comment range stops at the pattern, so an interior comment is not pulled out to trail the expression.) These are `_svelte_prettier_divergence` fixtures: acorn attaches the comment to the pattern node (`leadingComments`/`trailingComments`) where tsv's detached model does not — see [conformance_svelte.md §Comment Attachment Differences](./conformance_svelte.md#comment-attachment-differences).
 
 - `{#each as { … }}` object/array/rest/nested positions — [destructure_comment](../tests/fixtures/svelte/blocks/each/destructure_comment_svelte_prettier_divergence/)
+- `{#each as { [cast]: v }}` computed-key JSDoc cast — the cannot-hang reflow of [conformance_prettier_ts_comments.md §Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s computed-key entry, at the binding-pattern spelling; prettier-plugin-svelte drops the cast comment and parens outright — [destructure_computed_key_jsdoc_cast](../tests/fixtures/svelte/blocks/each/destructure_computed_key_jsdoc_cast_prettier_divergence/)
 - `{#await then}` / `{:then}` / `{:catch}` — [destructure_comment](../tests/fixtures/svelte/blocks/await/destructure_comment_svelte_prettier_divergence/)
 - The binding's **type annotation** (`as x: /* c */ T`, `as { a }: /* c */ T`, and the indexed `as b: /* c */ T, i`) takes the same verdict one token later: preserved by tsv, dropped by prettier-plugin-svelte — [context_annotation_comment](../tests/fixtures/svelte/blocks/each/context_annotation_comment_svelte_prettier_divergence/)
 

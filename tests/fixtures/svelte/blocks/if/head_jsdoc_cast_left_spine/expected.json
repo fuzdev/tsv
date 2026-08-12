@@ -1,0 +1,205 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 92,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 0,
+				"end": 46,
+				"test": {
+					"type": "LogicalExpression",
+					"start": 22,
+					"end": 32,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 22
+						},
+						"end": {
+							"line": 1,
+							"column": 32
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 23,
+						"end": 25,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 23
+							},
+							"end": {
+								"line": 1,
+								"column": 25
+							}
+						},
+						"name": "aa"
+					},
+					"operator": "&&",
+					"right": {
+						"type": "Identifier",
+						"start": 30,
+						"end": 32,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 30
+							},
+							"end": {
+								"line": 1,
+								"column": 32
+							}
+						},
+						"name": "bb"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* @type {A} ",
+							"start": 5,
+							"end": 21
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 33,
+							"end": 41,
+							"raw": "\n\ttext1\n",
+							"data": "\n\ttext1\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 46,
+				"end": 48,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 48,
+				"end": 91,
+				"test": {
+					"type": "MemberExpression",
+					"start": 70,
+					"end": 77,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 22
+						},
+						"end": {
+							"line": 5,
+							"column": 29
+						}
+					},
+					"object": {
+						"type": "Identifier",
+						"start": 71,
+						"end": 73,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 23
+							},
+							"end": {
+								"line": 5,
+								"column": 25
+							}
+						},
+						"name": "cc"
+					},
+					"property": {
+						"type": "Identifier",
+						"start": 75,
+						"end": 77,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 27
+							},
+							"end": {
+								"line": 5,
+								"column": 29
+							}
+						},
+						"name": "dd"
+					},
+					"computed": false,
+					"optional": false,
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* @type {B} ",
+							"start": 53,
+							"end": 69
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 78,
+							"end": 86,
+							"raw": "\n\ttext2\n",
+							"data": "\n\ttext2\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 5,
+			"end": 21,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 5
+				},
+				"end": {
+					"line": 1,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {B} ",
+			"start": 53,
+			"end": 69,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 5
+				},
+				"end": {
+					"line": 5,
+					"column": 21
+				}
+			}
+		}
+	]
+}
