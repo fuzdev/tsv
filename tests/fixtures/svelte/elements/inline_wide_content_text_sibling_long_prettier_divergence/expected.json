@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 688,
+	"end": 1202,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 548,
-				"data": "\n\tA wide inline element whose content overflows, followed by text and then ANOTHER inline\n\telement. tsv wraps the content within print width (the printWidth-hard-limit divergence);\n\tthe text between (`mid`) takes its OWN line after the dangled `>`. Unlike the terminal case\n\t(inline_wide_content_trailing_long, which hugs a space-authored tail), non-terminal text\n\tstays on its own line — hugging it is non-convergent (it shifts the following element's fit).\n\tprettier agrees on the `mid` line, so the divergence is purely the content wrap.\n"
+				"end": 917,
+				"data": "\n\tA wide inline element whose PROSE content overflows, followed by text and then ANOTHER\n\tinline element. tsv wraps the content within print width (the printWidth-hard-limit\n\tdivergence) and the non-terminal text between (`mid`) hugs the intact closing tag: the\n\ttail boundary is a per-width fill decision however the element came to be multiline\n\t(contrast inline_wide_element_content_tail_long, the element-content twin at the exact\n\t100/101 boundary). The second case swaps the preceding text for an inline ELEMENT\n\tsibling, so the wide element sits in its inline-sibling wrap — the wrap's other side\n\tflows, so the tail takes the same per-width hug; only a NON-flowing other side (a\n\tcomment or a control-flow block) keeps the outside-in joint measurement, see\n\tinline_sibling_drop_tail_flow_long. prettier groups the boundary WITH the element, so\n\tit re-breaks the hug and keeps the own-line form stable.\n"
 			},
 			{
 				"type": "Text",
-				"start": 548,
-				"end": 549,
+				"start": 917,
+				"end": 918,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 549,
-				"end": 687,
+				"start": 918,
+				"end": 1055,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 9,
+						"line": 14,
 						"column": 1,
-						"character": 550
+						"character": 919
 					},
 					"end": {
-						"line": 9,
+						"line": 14,
 						"column": 2,
-						"character": 551
+						"character": 920
 					}
 				},
 				"attributes": [],
@@ -43,50 +43,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 552,
-							"end": 554,
+							"start": 921,
+							"end": 923,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 554,
-							"end": 668,
+							"start": 923,
+							"end": 1037,
 							"name": "a",
 							"name_loc": {
 								"start": {
-									"line": 10,
+									"line": 15,
 									"column": 2,
-									"character": 555
+									"character": 924
 								},
 								"end": {
-									"line": 10,
+									"line": 15,
 									"column": 3,
-									"character": 556
+									"character": 925
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 557,
-									"end": 565,
+									"start": 926,
+									"end": 934,
 									"name": "href",
 									"name_loc": {
 										"start": {
-											"line": 10,
+											"line": 15,
 											"column": 4,
-											"character": 557
+											"character": 926
 										},
 										"end": {
-											"line": 10,
+											"line": 15,
 											"column": 8,
-											"character": 561
+											"character": 930
 										}
 									},
 									"value": [
 										{
-											"start": 563,
-											"end": 564,
+											"start": 932,
+											"end": 933,
 											"type": "Text",
 											"raw": "#",
 											"data": "#"
@@ -99,8 +99,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 566,
-										"end": 664,
+										"start": 935,
+										"end": 1033,
 										"raw": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t",
 										"data": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t"
 									}
@@ -109,26 +109,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 668,
-							"end": 674,
-							"raw": "\n\tmid ",
-							"data": "\n\tmid "
+							"start": 1037,
+							"end": 1042,
+							"raw": " mid ",
+							"data": " mid "
 						},
 						{
 							"type": "RegularElement",
-							"start": 674,
-							"end": 682,
+							"start": 1042,
+							"end": 1050,
 							"name": "b",
 							"name_loc": {
 								"start": {
-									"line": 13,
-									"column": 6,
-									"character": 675
+									"line": 17,
+									"column": 11,
+									"character": 1043
 								},
 								"end": {
-									"line": 13,
-									"column": 7,
-									"character": 676
+									"line": 17,
+									"column": 12,
+									"character": 1044
 								}
 							},
 							"attributes": [],
@@ -137,8 +137,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 677,
-										"end": 678,
+										"start": 1045,
+										"end": 1046,
 										"raw": "x",
 										"data": "x"
 									}
@@ -147,8 +147,160 @@
 						},
 						{
 							"type": "Text",
-							"start": 682,
-							"end": 683,
+							"start": 1050,
+							"end": 1051,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1055,
+				"end": 1057,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1057,
+				"end": 1201,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 1058
+					},
+					"end": {
+						"line": 20,
+						"column": 2,
+						"character": 1059
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1060,
+							"end": 1062,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1062,
+							"end": 1076,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 21,
+									"column": 2,
+									"character": 1063
+								},
+								"end": {
+									"line": 21,
+									"column": 6,
+									"character": 1067
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1068,
+										"end": 1069,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1076,
+							"end": 1078,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1078,
+							"end": 1183,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 22,
+									"column": 2,
+									"character": 1079
+								},
+								"end": {
+									"line": 22,
+									"column": 3,
+									"character": 1080
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1081,
+										"end": 1179,
+										"raw": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t",
+										"data": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1183,
+							"end": 1188,
+							"raw": " mid ",
+							"data": " mid "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1188,
+							"end": 1196,
+							"name": "i",
+							"name_loc": {
+								"start": {
+									"line": 24,
+									"column": 11,
+									"character": 1189
+								},
+								"end": {
+									"line": 24,
+									"column": 12,
+									"character": 1190
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1191,
+										"end": 1192,
+										"raw": "z",
+										"data": "z"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1196,
+							"end": 1197,
 							"raw": "\n",
 							"data": "\n"
 						}
