@@ -261,7 +261,24 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// broader detector matched the file and it graded `partial`. tsv cannot borrow prettier's
 	// fix — a parse-time merge would break the acorn AST contract — so nestling is a printer
 	// question at every comment run, tracked separately rather than pinned as a detector here.
-	typescript: 109,
+	//
+	// 109 → 110: `js/comments-closure-typecast/styled-components.js` arrives from `known`,
+	// and it too arrives by getting BETTER. The file is an own-line JSDoc cast on a
+	// styled-components tagged template; the own-line-cast hang (break after `=`, comment and
+	// cast indented one level) made tsv's head lines match prettier byte-for-byte where tsv
+	// used to trail the cast comment on the `=` line with `(styled.div)` stranded at column 0
+	// — the shape `comment_position` was claiming. What is left is two COMPOSED sanctioned
+	// divergences in one file: the cast parens tsv preserves (`(styled.div)`; prettier strips
+	// them) and the tagged-template body tsv keeps verbatim (prettier's
+	// `embeddedLanguageFormatting` recognizes styled-components tags and reformats the
+	// embedded CSS). Neither detector reaches the residue: `jsdoc_type_cast_parens` keys on
+	// the same-line `*/ (` spelling, not the own-line-comment form, and
+	// `template_embedded_verbatim` recognizes only the explicit language tags
+	// (html/css/graphql/gql), not prettier's styled-components heuristic (`styled.div`,
+	// `styled(Component)`, `keyframes`, `createGlobalStyle`). Both halves are cataloged
+	// behavior, so the arrival is pinned; widening the detectors is a follow-up with its own
+	// overmatch questions, not a precondition for the pin.
+	typescript: 110,
 	css: 23
 };
 

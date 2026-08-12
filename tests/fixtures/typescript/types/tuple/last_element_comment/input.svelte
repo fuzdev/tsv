@@ -4,4 +4,11 @@
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb /* comment */
 	];
+
+	// a multiline block comment forces the tuple open and trails the last element
+	type U = [
+		A,
+		B /* c1
+c2 */
+	];
 </script>
