@@ -190,6 +190,32 @@ pub(crate) enum OwnedCommentEffect {
 }
 
 impl<'a> Printer<'a> {
+    /// Build `build()`'s doc with the owned comment at `start` marked as **already claimed
+    /// by an enclosing node**, so nothing beginning there claims it again
+    /// ([`Printer::claimed_owned_comment_start`]) — then restore the previous mark.
+    ///
+    /// The one caller is a paren-less arrow's parameter list
+    /// ([`Printer::build_arrow_params_doc_ungrouped`]): the arrow's span starts at its sole
+    /// parameter, so both nodes answer the position-keyed lookup, and the arrow is the one
+    /// that must keep the claim — it prints the synthesized `(` between the comment and the
+    /// parameter. A new caller owes the same argument the reassembly seam does, in mirror
+    /// image: that some enclosing node provably DOES claim the comment, or the suppression
+    /// is a DROP rather than a de-duplication.
+    ///
+    /// Save/restore rather than set/clear, so an enclosing mark survives — and so nothing
+    /// leaks past the parameter into the arrow's body, where a nested arrow's own owned
+    /// comment lives ([`Printer::with_jsdoc_cast_cannot_hang_gap`] is the same shape).
+    pub(in crate::printer) fn with_owned_comment_claimed_above(
+        &self,
+        start: u32,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let saved = self.claimed_owned_comment_start.replace(Some(start));
+        let doc = build();
+        self.claimed_owned_comment_start.set(saved);
+        doc
+    }
+
     /// Prepend the comment `expr` owns, glued to its own first token.
     ///
     /// The single seam, called from `build_expression_doc` — so the comment is part of
@@ -226,6 +252,13 @@ impl<'a> Printer<'a> {
         // A node whose left-spine child starts here is not the innermost — that child is
         // (or something below it). Let the recursion reach it.
         if left_spine_child(expr).is_some_and(|c| c.span().start == start) {
+            return doc;
+        }
+        // An ENCLOSING node already claims this comment and prints text ahead of us — the
+        // synthesized `(` of a paren-less arrow, whose span starts at this very parameter
+        // (`Printer::claimed_owned_comment_start`). Innermost-wins is the rule everywhere
+        // else precisely because the innermost node prints first; here it does not.
+        if self.claimed_owned_comment_start.get() == Some(start) {
             return doc;
         }
         self.prepend_owned_leading_comment_at(start, doc)

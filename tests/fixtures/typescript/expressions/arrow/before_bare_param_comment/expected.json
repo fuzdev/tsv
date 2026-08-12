@@ -1,0 +1,1212 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 630,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A bare parameter gains parens, and the comment leading it stays ahead of",
+			"start": 10,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " them — printed once, never repeated inside the parens.",
+			"start": 87,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 156,
+			"end": 163,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 11
+				},
+				"end": {
+					"line": 4,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same arrow reached as a call argument and as an array element",
+			"start": 180,
+			"end": 248,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 253,
+			"end": 260,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 4
+				},
+				"end": {
+					"line": 7,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 288,
+			"end": 295,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 12
+				},
+				"end": {
+					"line": 8,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A curried chain: every head keeps its own comment",
+			"start": 313,
+			"end": 365,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 377,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 11
+				},
+				"end": {
+					"line": 11,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 393,
+			"end": 401,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 27
+				},
+				"end": {
+					"line": 11,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A preserved multi-line block keeps the value on the `=` line",
+			"start": 418,
+			"end": 481,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 493,
+			"end": 504,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 11
+				},
+				"end": {
+					"line": 15,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An indentable one hangs the value onto its own line",
+			"start": 521,
+			"end": 575,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 589,
+			"end": 605,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 5
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 629,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 620,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 146,
+					"end": 177,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 152,
+							"end": 176,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 152,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 164,
+								"end": 176,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 19
+									},
+									"end": {
+										"line": 4,
+										"column": 31
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 165,
+										"end": 166,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 20
+											},
+											"end": {
+												"line": 4,
+												"column": 21
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 171,
+									"end": 176,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 26
+										},
+										"end": {
+											"line": 4,
+											"column": 31
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 171,
+										"end": 172,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 26
+											},
+											"end": {
+												"line": 4,
+												"column": 27
+											}
+										},
+										"name": "x"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 175,
+										"end": 176,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 30
+											},
+											"end": {
+												"line": 4,
+												"column": 31
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 156,
+										"end": 163
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A bare parameter gains parens, and the comment leading it stays ahead of",
+							"start": 10,
+							"end": 85
+						},
+						{
+							"type": "Line",
+							"value": " them — printed once, never repeated inside the parens.",
+							"start": 87,
+							"end": 144
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 250,
+					"end": 275,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 26
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 250,
+						"end": 274,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 25
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 250,
+							"end": 252,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 261,
+								"end": 273,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 12
+									},
+									"end": {
+										"line": 7,
+										"column": 24
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 262,
+										"end": 263,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 13
+											},
+											"end": {
+												"line": 7,
+												"column": 14
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 268,
+									"end": 273,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 19
+										},
+										"end": {
+											"line": 7,
+											"column": 24
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 268,
+										"end": 269,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 19
+											},
+											"end": {
+												"line": 7,
+												"column": 20
+											}
+										},
+										"name": "x"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 272,
+										"end": 273,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 23
+											},
+											"end": {
+												"line": 7,
+												"column": 24
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 253,
+										"end": 260
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same arrow reached as a call argument and as an array element",
+							"start": 180,
+							"end": 248
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 277,
+					"end": 310,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 34
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 283,
+							"end": 309,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 33
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 283,
+								"end": 284,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 287,
+								"end": 309,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 33
+									}
+								},
+								"elements": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 296,
+										"end": 308,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 20
+											},
+											"end": {
+												"line": 8,
+												"column": 32
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 297,
+												"end": 298,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 21
+													},
+													"end": {
+														"line": 8,
+														"column": 22
+													}
+												},
+												"name": "x"
+											}
+										],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 303,
+											"end": 308,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 27
+												},
+												"end": {
+													"line": 8,
+													"column": 32
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 303,
+												"end": 304,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 27
+													},
+													"end": {
+														"line": 8,
+														"column": 28
+													}
+												},
+												"name": "x"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Literal",
+												"start": 307,
+												"end": 308,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 31
+													},
+													"end": {
+														"line": 8,
+														"column": 32
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 288,
+												"end": 295
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 367,
+					"end": 415,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 49
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 373,
+							"end": 414,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 48
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 373,
+								"end": 374,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 386,
+								"end": 414,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 20
+									},
+									"end": {
+										"line": 11,
+										"column": 48
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 387,
+										"end": 388,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 21
+											},
+											"end": {
+												"line": 11,
+												"column": 22
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ArrowFunctionExpression",
+									"start": 402,
+									"end": 414,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 36
+										},
+										"end": {
+											"line": 11,
+											"column": 48
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 403,
+											"end": 404,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 37
+												},
+												"end": {
+													"line": 11,
+													"column": 38
+												}
+											},
+											"name": "y"
+										}
+									],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 409,
+										"end": 414,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 43
+											},
+											"end": {
+												"line": 11,
+												"column": 48
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 409,
+											"end": 410,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 43
+												},
+												"end": {
+													"line": 11,
+													"column": 44
+												}
+											},
+											"name": "x"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 413,
+											"end": 414,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 47
+												},
+												"end": {
+													"line": 11,
+													"column": 48
+												}
+											},
+											"name": "y"
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 393,
+											"end": 401
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 377,
+										"end": 385
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A curried chain: every head keeps its own comment",
+							"start": 313,
+							"end": 365
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 483,
+					"end": 518,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 489,
+							"end": 517,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 489,
+								"end": 490,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 505,
+								"end": 517,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 6
+									},
+									"end": {
+										"line": 15,
+										"column": 18
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 506,
+										"end": 507,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 7
+											},
+											"end": {
+												"line": 15,
+												"column": 8
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 512,
+									"end": 517,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 13
+										},
+										"end": {
+											"line": 15,
+											"column": 18
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 512,
+										"end": 513,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 13
+											},
+											"end": {
+												"line": 15,
+												"column": 14
+											}
+										},
+										"name": "x"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 516,
+										"end": 517,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 17
+											},
+											"end": {
+												"line": 15,
+												"column": 18
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1\nc2 ",
+										"start": 493,
+										"end": 504
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A preserved multi-line block keeps the value on the `=` line",
+							"start": 418,
+							"end": 481
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 577,
+					"end": 619,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 583,
+							"end": 618,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 583,
+								"end": 584,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 606,
+								"end": 618,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 6
+									},
+									"end": {
+										"line": 21,
+										"column": 18
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 607,
+										"end": 608,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 7
+											},
+											"end": {
+												"line": 21,
+												"column": 8
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 613,
+									"end": 618,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 13
+										},
+										"end": {
+											"line": 21,
+											"column": 18
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 613,
+										"end": 614,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 13
+											},
+											"end": {
+												"line": 21,
+												"column": 14
+											}
+										},
+										"name": "x"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 617,
+										"end": 618,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 17
+											},
+											"end": {
+												"line": 21,
+												"column": 18
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "*\n * c\n ",
+										"start": 589,
+										"end": 605
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An indentable one hangs the value onto its own line",
+							"start": 521,
+							"end": 575
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

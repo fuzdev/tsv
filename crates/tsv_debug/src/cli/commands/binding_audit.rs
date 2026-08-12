@@ -35,6 +35,12 @@
 //!   paren-free normal-parse skeleton, which formatting preserves), and the
 //!   binding-paren signal is carried separately by `anchor_is_paren` — a paren
 //!   appearing at the anchor is the re-binding, a clarity paren deep inside is not.
+//!   ⚠️ That flag asks for a **`ParenthesizedExpression` node**, never for the byte
+//!   `(`: an arrow's *parameter list* also starts at a `(` and is the arrow's own
+//!   syntax, so `/* c */ x => x` → `/* c */ (x) => x` binds the same
+//!   `ArrowFunctionExpression` either way. The cast test above asks the mirror
+//!   question of the same `(` — is it an arrow's, rather than this cast's — so both
+//!   go through one node lookup ([`node_of_type_at`]) rather than the byte.
 //!
 //! ## Buckets
 //!
@@ -419,12 +425,26 @@ fn comment_binding(
     let skeleton_at =
         |pos: usize| outermost_at(wire, map, pos).map(|n| structural_skeleton(&strip_parens(n)));
 
-    if tsv_ts::is_jsdoc_type_cast_comment(content) {
-        // A cast's parens are expected: it must be followed by `(`, and it binds
-        // the subtree *inside* — so anchor past the `(` and its trivia.
-        if bytes[anchor] != b'(' {
-            return None;
-        }
+    // A cast's parens are expected: it must be followed by `(`, and it binds the subtree
+    // *inside* — so anchor past the `(` and its trivia.
+    //
+    // ⚠️ That `(` must not be an ARROW's parameter list — the same false premise the
+    // `anchor_is_paren` flag below carried, in the same function, so the two are fixed
+    // together rather than left to drift. `/** @type {T} */ x => x` formats to
+    // `/** @type {T} */ (x) => x` under `arrowParens: always`, which every real parser
+    // still reads as an arrow (tsv's own, acorn's, and TypeScript's, whose JSDoc cast
+    // wants a parenthesized *expression*) — read as a cast it was a HARD
+    // `<unbound> → cast(Identifier)` finding. Such a comment falls through to the glued
+    // arm below, which is what it is: a block comment leading the arrow, before and after.
+    //
+    // "No node begins at the `(`" is NOT the test, though it reads like one: a real cast's
+    // parens are swallowed by whatever encloses it, so `(root).head` has a
+    // `MemberExpression` starting right there. Only an arrow *begins* at its own
+    // parameter `(`.
+    if tsv_ts::is_jsdoc_type_cast_comment(content)
+        && bytes[anchor] == b'('
+        && !node_of_type_at(wire, map, anchor, "ArrowFunctionExpression")
+    {
         let inner = skip_trivia_run(bytes, anchor + 1);
         return Some(Binding::Cast(skeleton_at(inner)?));
     }
@@ -436,12 +456,23 @@ fn comment_binding(
     }
     Some(Binding::Glued {
         skeleton: skeleton_at(anchor)?,
-        anchor_is_paren: bytes[anchor] == b'(',
+        // A **grouping** paren, not merely the byte `(` — the byte test is a cheap
+        // pre-filter, the node test is the meaning. `preserve_parens` exists precisely so
+        // a grouping paren is a `ParenthesizedExpression` node, and only such a paren can
+        // re-bind the comment. The one other `(` that can START a node is an arrow's
+        // **parameter list**, which is the arrow's own syntax: `/* c */ x => x` formats to
+        // `/* c */ (x) => x` under `arrowParens: always`, the bound node is the same
+        // `ArrowFunctionExpression` before and after, and nothing was re-bound — but the
+        // byte test called it one, reporting a HARD finding on ordinary JS
+        // (`arr.map(/* index unused */ x => x.id)`). A call's or `new`'s argument `(`
+        // starts no node at all, so it already resolved to `None` above.
+        anchor_is_paren: bytes[anchor] == b'('
+            && node_of_type_at(wire, map, anchor, "ParenthesizedExpression"),
     })
 }
 
-/// The outermost wire node whose byte-start equals `target_byte` (pre-order DFS —
-/// the first hit is the shallowest, i.e. widest, node beginning there).
+/// The first wire node beginning at `target_byte` whose `type` satisfies `want` (pre-order
+/// DFS, so the first hit is the shallowest — the widest node beginning there).
 ///
 /// Wire `start`/`end` are **UTF-16** code-unit offsets (acorn/JS semantics), while
 /// `target_byte` and every source scan here are byte-space. A node's `start` is
@@ -450,19 +481,49 @@ fn comment_binding(
 /// is narrowed out by a missing `end` translation). The two spaces coincide on ASCII
 /// and diverge past any multibyte char — see
 /// `glued_binding_resolves_through_a_multibyte_offset`.
-fn outermost_at<'a>(v: &'a Value, map: &Utf16ToByte, target_byte: usize) -> Option<&'a Value> {
+///
+/// The predicate is what lets the type-specific questions share this walk instead of
+/// copying it: they cannot be answered from [`outermost_at`]'s result, because the node
+/// they ask about may sit *under* a wider one beginning at the same byte (`(x.y).z` — the
+/// `MemberExpression` is outermost there, the `ParenthesizedExpression` below it), so the
+/// question is "does ANY node here have that type".
+fn node_at<'a>(
+    v: &'a Value,
+    map: &Utf16ToByte,
+    target_byte: usize,
+    want: &impl Fn(&str) -> bool,
+) -> Option<&'a Value> {
     if let Value::Object(m) = v
-        && m.contains_key("type")
+        && m.get("type").and_then(Value::as_str).is_some_and(want)
         && let Some(start) = m.get("start").and_then(Value::as_u64)
         && map.byte(start as usize) == Some(target_byte)
     {
         return Some(v);
     }
     match v {
-        Value::Object(m) => m.values().find_map(|c| outermost_at(c, map, target_byte)),
-        Value::Array(a) => a.iter().find_map(|c| outermost_at(c, map, target_byte)),
+        Value::Object(m) => m.values().find_map(|c| node_at(c, map, target_byte, want)),
+        Value::Array(a) => a.iter().find_map(|c| node_at(c, map, target_byte, want)),
         _ => None,
     }
+}
+
+/// The outermost wire node beginning at `target_byte`, of any kind — [`node_at`] with no
+/// type filter, the anchor resolution every binding is built from.
+fn outermost_at<'a>(v: &'a Value, map: &Utf16ToByte, target_byte: usize) -> Option<&'a Value> {
+    node_at(v, map, target_byte, &|_| true)
+}
+
+/// Whether a node of `ty` begins at `target_byte` — the two questions this audit asks about
+/// a `(` that follows a comment:
+///
+/// - `ParenthesizedExpression` — a **grouping** paren, the shape `preserve_parens` turns a
+///   grouping `(` into, and the only paren that can re-bind a comment
+///   (`anchor_is_paren`).
+/// - `ArrowFunctionExpression` — the `(` opens that arrow's **parameter list**, so it is
+///   the arrow's own syntax and no cast's. An arrow never begins at a grouping paren
+///   (`((x) => x)` starts the arrow at the *inner* `(`), which is what makes this exact.
+fn node_of_type_at(v: &Value, map: &Utf16ToByte, target_byte: usize, ty: &str) -> bool {
+    node_at(v, map, target_byte, &|t| t == ty).is_some()
 }
 
 /// Recursively unwrap `ParenthesizedExpression` nodes. Under `preserve_parens`
@@ -615,6 +676,66 @@ mod tests {
         let without = "const b = /* grouping */ expr;\n";
         let with_paren = "const b = /* grouping */ (expr);\n";
         assert!(!rebinds(without, with_paren).is_empty());
+    }
+
+    #[test]
+    fn a_cast_shaped_comment_on_a_bare_parameter_is_not_a_cast() {
+        // The parens `arrowParens: always` gives a bare parameter are the arrow's own
+        // parameter LIST, not a cast's — every real parser still reads an arrow — so the
+        // comment leads the same arrow before and after and nothing re-binds. Read as a
+        // cast, this was a HARD `<unbound> → cast(Identifier)` finding.
+        let bare = "const a = /** @type {any} */ x => x;\n";
+        let parenthesized = "const a = /** @type {any} */ (x) => x;\n";
+        assert!(rebinds(bare, parenthesized).is_empty());
+        for src in [bare, parenthesized] {
+            let b = extract_bindings(src).expect("parses");
+            let cast = b
+                .iter()
+                .find(|b| b.content.contains("@type"))
+                .expect("present");
+            assert!(
+                matches!(cast.binding, Some(Binding::Glued { .. })),
+                "a bare parameter's leading comment is glued, not a cast: {}",
+                describe(cast.binding.as_ref())
+            );
+        }
+        // The falsifier: a REAL cast — its `(` opens no node — still resolves as one.
+        let real = extract_bindings("const t = /** @type {T} */ (root).head;\n").expect("parses");
+        let cast = real
+            .iter()
+            .find(|b| b.content.contains("@type"))
+            .expect("present");
+        assert!(
+            matches!(cast.binding, Some(Binding::Cast(_))),
+            "real cast still a cast"
+        );
+    }
+
+    #[test]
+    fn ignores_arrow_parameter_parens() {
+        // An arrow's PARAMETER LIST `(` is the arrow's own syntax, not a grouping paren:
+        // `arrowParens: always` parenthesizes a bare parameter, and the comment binds the
+        // same `ArrowFunctionExpression` before and after. A byte-level `bytes[anchor] ==
+        // b'('` test called that a re-binding and reported HARD on ordinary JS. The
+        // falsifier below it must keep firing, or the flag has simply been disabled.
+        let bare = "const ids = arr.map(/* index unused */ x => x.id);\n";
+        let parenthesized = "const ids = arr.map(/* index unused */ (x) => x.id);\n";
+        assert!(rebinds(bare, parenthesized).is_empty());
+        assert!(
+            rebinds(
+                "const a = /* c */ x => x;\n",
+                "const a = /* c */ (x) => x;\n"
+            )
+            .is_empty()
+        );
+        // …while a real grouping paren around that same arrow still re-binds it.
+        assert!(
+            !rebinds(
+                bare,
+                "const ids = arr.map(/* index unused */ ((x) => x.id));\n"
+            )
+            .is_empty()
+        );
     }
 
     #[test]
