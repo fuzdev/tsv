@@ -8,7 +8,8 @@ use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
 use crate::printer::{
-    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, MemberGap,
+    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, MemberBlankScan,
+    MemberBody, MemberFloor, MemberFreeze, MemberSeam,
 };
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
@@ -922,128 +923,36 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
-        let mut prev_end = body_start + 1; // after opening brace
 
-        // Zero-comment fast gate: one binary search over the whole
-        // body span short-circuits every per-member comment sub-query (leading
-        // collect, format-ignore lookup, trailing-comment scan, trailing-body
-        // comments). Sound because comments are disjoint + start-sorted and every
-        // sub-range lies within `[body_start, body_end)`. Blank-line preservation
-        // is comment-independent and stays outside the gate.
-        let body_has_comments = self.has_comments_on_page_between(body_start, body_end);
-        // Set when the member just emitted deferred a line comment past its own `;`, so
-        // its doc ends on a later line than the `;` and cannot carry that line's comments.
-        let mut prev_deferred_line_comment = false;
-
-        for (i, member) in members.iter().enumerate() {
-            let member_start = member.span().start;
-            let is_first = i == 0;
-
-            // Find comments between previous element and this one
-            // Filter out trailing same-line comments from the previous member
-            let leading_comments: CommentVec<'_> = if !body_has_comments {
-                CommentVec::new()
-            } else {
-                let all_comments: CommentVec<'_> =
-                    comments_to_emit_in_range(self.comments, prev_end, member_start).collect();
-                if !is_first {
-                    all_comments
-                        .iter()
-                        .filter(|c| {
-                            // Not claimed by the previous member's trailing run, so it
-                            // leads this one — including a comment that hugs this member
-                            // on its line (`a: 1, /* c */ b`, the predicate's
-                            // `leads_target` escape), which leads it even from the
-                            // previous member's line, matching prettier and the
-                            // type-literal/class/statement printers.
-                            !self.comment_already_trailed(
-                                Some(prev_end),
-                                c,
-                                prev_deferred_line_comment,
-                                Some(member_start),
-                            )
-                        })
-                        .copied()
-                        .collect()
-                } else {
-                    // First member: drop comments pulled onto the `{` line (emitted
-                    // as the brace-line prefix by the caller).
-                    self.first_member_leading_comments(all_comments, delimiter_pull_pos)
-                }
-            };
-
-            // Add separator before this member
-            // For first member: just hardline
-            // For other members: literalline + hardline if blank line in source, just hardline otherwise
-            if i > 0 {
-                let check_pos = if leading_comments.is_empty() {
-                    member_start
-                } else {
-                    leading_comments[0].span.start
-                };
-                // Step the scan past the previous member's trailing comment(s) so a
-                // multi-line block's interior newlines aren't read as an authored blank
-                // line (`a: 1; /*⏎…⏎*/⏎b` has no blank line between the members).
-                let blank_start = self.blank_scan_start(prev_end, check_pos);
-                if self.has_blank_line_between(blank_start, check_pos) {
-                    parts.push(d.literalline());
-                }
-            }
-            // Always add hardline before member (or its leading comments)
-            parts.push(d.hardline());
-
-            // Print leading comments with blank line preservation
-            self.push_leading_comments_before(&mut parts, &leading_comments, member_start);
-
-            // A preceding format-ignore directive keeps the member's source verbatim.
-            // The member span includes its trailing `;`.
-            let member_doc = if body_has_comments && self.member_gap_frozen(prev_end, member_start)
-            {
-                self.raw_source_doc(member.span())
-            } else {
-                self.build_type_element_doc(member)
-            };
-            parts.push(member_doc);
-
-            // Trailing same-line comments after the member, and the cursor advanced past
-            // them — the shared member-gap trailing arm ([`Printer::member_trailing_run`],
-            // the same call the class body makes). The member span includes its separator,
-            // so the span end IS this family's gap floor.
-            let member_end = member.span().end;
-            prev_deferred_line_comment =
-                body_has_comments && self.terminator_defers_line_comment(member_start, member_end);
-            if prev_deferred_line_comment {
-                // …unless this member's doc ends with a line comment its member→`;` gap
-                // deferred past the `;`. Nothing may share that line, so leaving `prev_end`
-                // at the `;` hands the comments to the next member's leading run; appending
-                // them here instead lands them in the same `line_suffix` flush, where a
-                // second `//` WELDS onto the first (the pair reparsing as one comment) and
-                // a block comes out REORDERED ahead of it.
-                prev_end = member_end;
-            } else if body_has_comments {
-                let gap = match members.get(i + 1) {
-                    Some(next) => MemberGap::Next {
-                        floor: member_end,
-                        start: next.span().start,
-                    },
-                    None => MemberGap::Last { list_end: body_end },
-                };
-                let (trailing, cursor) = self.member_trailing_run(member_end, gap);
-                parts.extend(trailing);
-                prev_end = cursor;
-            } else {
-                prev_end = member_end;
-            }
-        }
-
-        // Handle trailing comments after the last member (before closing `}`)
-        if body_has_comments {
-            parts.extend(self.build_trailing_body_comments_doc(
-                prev_end,
-                body_end.saturating_sub(1),
-                prev_deferred_line_comment,
-            ));
-        }
+        // The shared member-body walk — the same one the class body and both
+        // type-literal force-multiline walks take. An interface body's own facts: a
+        // member's span already covers its separator (so the span end IS this family's
+        // gap floor), the member doc prints its own `;`, and a directive freezes the
+        // whole member span.
+        //
+        // Zero-comment fast gate: one binary search over the whole body span
+        // short-circuits every per-member comment sub-query (leading collect,
+        // format-ignore lookup, trailing-comment scan, trailing-body comments). Sound
+        // because comments are disjoint + start-sorted and every sub-range lies within
+        // `[body_start, body_end)`. Blank-line preservation is comment-independent and
+        // stays outside the gate.
+        self.build_member_list_docs_into(
+            &mut parts,
+            members,
+            MemberBody {
+                span: Span::new(body_start, body_end),
+                has_comments: self.has_comments_on_page_between(body_start, body_end),
+                delimiter_pull_pos,
+                blank_scan: MemberBlankScan::PastComments,
+                freeze: MemberFreeze::Span,
+                seam: MemberSeam::Whole {
+                    floor: MemberFloor::MemberEnd,
+                },
+            },
+            internal::TSTypeElement::span,
+            |member| member.span().end,
+            |member, _deferred| self.build_type_element_doc(member),
+        );
 
         d.concat(&parts)
     }
@@ -1314,6 +1223,17 @@ impl<'a> Printer<'a> {
                     self.build_eq_comment_break_rhs(eq_pos, init_start, || init_with_indent)
                 {
                     d.concat(&[id_doc, rhs])
+                } else if self.is_own_line_jsdoc_cast(init) {
+                    // The helper above reads the `=`→value gap, which an OWNED comment never
+                    // reaches — it is glued to the value's first token and rides inside its
+                    // doc (`docs/comments.md` hazard 2). An own-line cast's comment still
+                    // decides this layout: the cast prints a hardline between it and its `(`,
+                    // so without the matching hang the `(` lands at the member's own indent
+                    // and the next pass collapses it — an authoring with no fixed point. Same
+                    // narrow test, same reason, as the binding defaults; the wider
+                    // `owned_leading_comment_effect` would also hang an indentable block this
+                    // member keeps inline (`member_init_multiline_block_comment`).
+                    d.concat(&[id_doc, d.text(" ="), hang_after_operator(d, value_doc)])
                 } else {
                     // Only a glued single-line block (or no comment) reaches here — the
                     // helper claimed every authoring that hangs. The value gets its own

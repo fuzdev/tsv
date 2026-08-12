@@ -22,6 +22,9 @@
 //   heritage / keyword→name comment emitters.
 // - **lists.rs**: List- and body-level comment emitters (leading/trailing body
 //   comments, delimiter-line prefixes, empty-container comments, comma emission).
+// - **member_body.rs**: The `{ … }` member-body walk shared by the class body, the
+//   interface body and both type-literal force-multiline walks — the member analog
+//   of `build_statement_list_docs_into`.
 // - **element_comma.rs**: The single source of the `trailingComma: 'none'`
 //   comment-position contract for inline element lists (block-before / comma /
 //   block-after-on-last / line-suffix), shared by the object/array pattern and
@@ -30,6 +33,7 @@
 mod declarations;
 mod element_comma;
 mod lists;
+mod member_body;
 mod owned;
 mod paren;
 mod render;
@@ -38,6 +42,7 @@ mod scan;
 pub(crate) use declarations::{ClassMemberModifiers, HeritageKeyword};
 pub(super) use element_comma::{block_is_before_comma, run_defers_line};
 pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
+pub(crate) use member_body::{MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam};
 pub(crate) use owned::OwnedCommentEffect;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.

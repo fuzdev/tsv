@@ -56,7 +56,8 @@ pub(crate) use analysis::{
 };
 pub(crate) use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
-    MemberGap, OwnedCommentEffect, StandaloneGlue,
+    MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberGap, MemberSeam,
+    OwnedCommentEffect, StandaloneGlue,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{

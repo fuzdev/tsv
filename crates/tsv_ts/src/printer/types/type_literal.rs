@@ -13,7 +13,9 @@ use super::{Printer, StandaloneGlue};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
+use crate::printer::{MemberBlankScan, MemberBody, MemberFreeze, MemberSeam};
 use smallvec::{SmallVec, smallvec};
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -30,73 +32,31 @@ impl<'a> Printer<'a> {
     // Comment partitioning helpers
     //
 
-    /// Build docs for leading comments with blank line preservation in multiline format.
+    /// The per-family facts of a type-literal member body, for the shared member-body
+    /// walk ([`Printer::build_member_list_docs_into`]): a type member's `;` is the
+    /// WALK's, so its trailing run partitions around that separator
+    /// ([`MemberSeam::AroundSeparator`]) and a format-ignore freeze stops at the
+    /// member's content end rather than carrying a second terminator out with it.
     ///
-    /// Returns docs for: `[literalline if blank && !is_first] hardline [leading comments]`
-    ///
-    /// For non-first members, filters out same-line comments (they belong to the previous member).
-    fn build_multiline_member_prefix_doc(
+    /// `delimiter_pull_pos` is `None` for the alignment caller, which keeps the
+    /// delimiter-line comment relocating in that path; `freeze` is
+    /// [`MemberFreeze::Never`] there too — a union-member / parenthesized-intersection
+    /// object type has never honored a directive in a member gap.
+    fn type_literal_member_body(
         &self,
-        prev_end: u32,
-        member_start: u32,
-        is_first: bool,
-        delimiter_pull_pos: Option<u32>,
+        t: &TSTypeLiteral<'_>,
         comments_present: bool,
-        claims_trailing: bool,
-    ) -> DocBuf {
-        let d = self.d();
-        // `comments_present` is the caller's whole-construct existence gate:
-        // when false, `[prev_end, member_start]` is provably empty,
-        // so skip the collect/filter machinery.
-        let all_comments: CommentVec<'_> = if comments_present {
-            comments_to_emit_in_range(self.comments, prev_end, member_start).collect()
-        } else {
-            CommentVec::new()
-        };
-        let leading_comments: CommentVec<'_> = if !is_first {
-            all_comments
-                .iter()
-                .filter(|c| {
-                    // A comment hugging this member's start leads it even from the
-                    // previous member's line (`a: A; /* c */ b: B;` — the predicate's
-                    // `leads_target` escape); the trailing claim stopped there too.
-                    // `claims_trailing`: the previous member deferred a line comment past
-                    // its own `;` and so trailed NOTHING on that line, leaving this run
-                    // its only emitter.
-                    !self.comment_already_trailed(
-                        Some(prev_end),
-                        c,
-                        claims_trailing,
-                        Some(member_start),
-                    )
-                })
-                .copied()
-                .collect()
-        } else {
-            // First member: drop comments pulled onto the `{` line (emitted as
-            // the brace-line prefix by the caller). No-op when `delimiter_pull_pos`
-            // is `None` (the alignment caller).
-            self.first_member_leading_comments(all_comments, delimiter_pull_pos)
-        };
-
-        // Step the scan past the previous member's trailing comment(s) so a multi-line
-        // block's interior newlines aren't read as an authored blank line
-        // (`a: 1; /*⏎…⏎*/⏎b` has no blank line between the members).
-        let check_pos = if !leading_comments.is_empty() {
-            leading_comments[0].span.start
-        } else {
-            member_start
-        };
-        let has_blank =
-            self.has_blank_line_between(self.blank_scan_start(prev_end, check_pos), check_pos);
-
-        let mut docs = DocBuf::with_capacity(3);
-        if has_blank && !is_first {
-            docs.push(d.literalline());
+        delimiter_pull_pos: Option<u32>,
+        freeze: MemberFreeze,
+    ) -> MemberBody {
+        MemberBody {
+            span: t.span,
+            has_comments: comments_present,
+            delimiter_pull_pos,
+            blank_scan: MemberBlankScan::PastComments,
+            freeze,
+            seam: MemberSeam::AroundSeparator,
         }
-        docs.push(d.hardline());
-        self.push_leading_comments_before(&mut docs, &leading_comments, member_start);
-        docs
     }
 
     /// Build docs for block comments between the opening brace and the first
@@ -187,58 +147,50 @@ impl<'a> Printer<'a> {
         docs
     }
 
-    /// [`Printer::trailing_claim_end`] for the gap after member `i`, from its
-    /// separator floor ([`Self::type_member_gap_floor`]) toward the next member —
-    /// unbounded (`u32::MAX`) after the last member, toward whose `}` nothing leads.
-    /// The one spelling for every reader of a member gap (both force-multiline
-    /// walks' trailing collects, the width-aware trailing collect, and the
-    /// width-aware handed-over run), so the two sides cannot disagree.
-    fn type_member_claim_end(
+    /// [`Printer::trailing_claim_end`] for the gap after a member ending at
+    /// `member_content_end`, from its separator floor ([`Self::type_member_gap_floor`])
+    /// toward the next member — unbounded (`u32::MAX`) after the last member, toward
+    /// whose `}` nothing leads. The one spelling for every reader of a member gap (the
+    /// shared force-multiline walk's trailing collect, the width-aware trailing collect,
+    /// and the width-aware handed-over run), so the two sides cannot disagree.
+    pub(in crate::printer) fn type_member_claim_end(
         &self,
-        t: &TSTypeLiteral<'_>,
-        i: usize,
         member_content_end: u32,
+        next_start: Option<u32>,
     ) -> u32 {
-        match t.members.get(i + 1) {
-            Some(next) => self.trailing_claim_end(
-                self.type_member_gap_floor(member_content_end, next.span().start),
-                next.span().start,
-            ),
+        match next_start {
+            Some(start) => self
+                .trailing_claim_end(self.type_member_gap_floor(member_content_end, start), start),
             None => u32::MAX,
         }
     }
 
-    /// Collect the comments a member's trailing run claims in a force-multiline
+    /// Collect the comments a member's trailing run claims in the force-multiline
     /// walk — the same-line run after its content end
     /// ([`Printer::trailing_same_line_comments`], which follows a multi-line block to its
     /// closing `*/` line), stopped at the claim split
     /// ([`Self::type_member_claim_end`]): a comment hugging the next member's start
-    /// leads it instead (`a: A; /* c */ b: B;`), emitted by that member's prefix run
-    /// ([`Printer::build_multiline_member_prefix_doc`]'s `leads_target` escape).
-    /// Shared by both force-multiline member walks so the two cannot drift.
+    /// leads it instead (`a: A; /* c */ b: B;`), emitted by that member's leading run
+    /// (the shared walk's `leads_target` escape).
     ///
     /// `deferred_line_comment` empties the run: the member's own doc ends with a line
     /// comment its member→`;` gap deferred past the `;`, so nothing may share that output
     /// line. Claiming here anyway lands the run in the same `line_suffix` flush, where a
     /// second `//` WELDS onto the first (the pair reparsing as ONE comment) and a block
-    /// comes out REORDERED ahead of it. The comments go to the next member's prefix run
+    /// comes out REORDERED ahead of it. The comments go to the next member's leading run
     /// instead, via its `claims_trailing`.
     fn collect_member_trailing_comments(
         &self,
-        t: &TSTypeLiteral<'_>,
-        i: usize,
         member_content_end: u32,
+        upper_bound: u32,
+        next_start: Option<u32>,
         comments_present: bool,
         deferred_line_comment: bool,
     ) -> CommentVec<'_> {
         if !comments_present || deferred_line_comment {
             return CommentVec::new();
         }
-        let upper_bound = t
-            .members
-            .get(i + 1)
-            .map_or(t.span.end, |next| next.span().start);
-        let claim_end = self.type_member_claim_end(t, i, member_content_end);
+        let claim_end = self.type_member_claim_end(member_content_end, next_start);
         self.trailing_same_line_comments(member_content_end, upper_bound.min(claim_end))
     }
 
@@ -261,41 +213,37 @@ impl<'a> Printer<'a> {
             .max(span_end)
     }
 
-    /// The whole trailing arm of the type-literal member seam — the type-member sibling of
-    /// [`Printer::member_trailing_run`], which the class and interface bodies share.
+    /// The whole trailing arm of the type-literal member seam — the type-member arm of
+    /// the shared member-body walk ([`MemberSeam::AroundSeparator`]), where the class and
+    /// interface bodies take [`Printer::member_trailing_run`].
     ///
     /// It cannot BE that call: those two emit a run and advance a cursor, while a type
     /// member must partition its run around its own `;` and slot the member→`;` gap's
     /// deferred comments between the two halves
-    /// ([`Self::build_comments_around_semicolon_doc`]). What it shares with them is the
-    /// reason for existing — both force-multiline walks held byte-identical copies of these
-    /// twenty lines, and the copy is what lets a walk drift.
+    /// ([`Self::build_comments_around_semicolon_doc`]). Keeping that difference
+    /// expressible is why the walk names its seam rather than assuming one.
     ///
-    /// Returns the caller's new `(prev_end, prev_deferred_line_comment)`. The order of the
+    /// Returns the walk's new `(prev_end, prev_deferred_line_comment)`. The order of the
     /// two is load-bearing: the deferred flag is read by the run collector (an emptied run
     /// is how a deferred `//` keeps its output line to itself) and again by the NEXT
-    /// member's prefix run and the body's end-of-run emitter, as their `claims_trailing`.
-    fn push_type_member_trailing_seam(
+    /// member's leading run and the body's end-of-run emitter, as their `claims_trailing`.
+    pub(in crate::printer) fn push_type_member_trailing_seam(
         &self,
         member_parts: &mut DocBuf,
-        t: &TSTypeLiteral<'_>,
-        i: usize,
+        body: MemberBody,
+        member_span: Span,
         member_content_end: u32,
-        comments_present: bool,
+        next_start: Option<u32>,
         deferred: DocBuf,
     ) -> (u32, bool) {
-        let m = &t.members[i];
-        let upper_bound = t
-            .members
-            .get(i + 1)
-            .map_or(t.span.end, |next| next.span().start);
-        let deferred_line_comment =
-            comments_present && self.terminator_defers_line_comment(m.span().start, m.span().end);
+        let upper_bound = next_start.unwrap_or(body.span.end);
+        let deferred_line_comment = body.has_comments
+            && self.terminator_defers_line_comment(member_span.start, member_span.end);
         let trailing = self.collect_member_trailing_comments(
-            t,
-            i,
             member_content_end,
-            comments_present,
+            upper_bound,
+            next_start,
+            body.has_comments,
             deferred_line_comment,
         );
         member_parts.extend(self.build_comments_around_semicolon_doc(
@@ -305,7 +253,7 @@ impl<'a> Printer<'a> {
             deferred,
         ));
         (
-            self.member_cursor_past_trailing(m.span().end, &trailing),
+            self.member_cursor_past_trailing(member_span.end, &trailing),
             deferred_line_comment,
         )
     }
@@ -691,66 +639,31 @@ impl<'a> Printer<'a> {
         }
 
         let mut member_parts = d.pooled_docbuf();
-        let mut prev_end = t.span.start + 1; // after opening brace
-        // Set when the member just emitted deferred a line comment past its own `;`, so
-        // its doc ends on a later line than the `;` and cannot carry that line's comments.
-        let mut prev_deferred_line_comment = false;
 
-        // Width-aware: the opening bracketSpacing boundary leads (a space when flat
-        // `{ a }`, a newline when broken), THEN the first member's leading block
-        // comments, so the padding sits before the comment (`{ /* c */ a }`).
-        // The force_multiline branch handles leading comments per-member via
-        // `build_multiline_member_prefix_doc`; the width-aware branch does not —
-        // without this a union-member object's interior leading comment is dropped
-        // (`{ /* c */ a: 1 } | B`). Mirrors the width-aware branch of
-        // `build_type_literal_doc_inner`.
-        if !force_multiline {
+        if force_multiline {
+            // Forced multiline: the shared member-body walk, hardline-separated. This
+            // path has no freeze arm — a directive in a member gap has never been
+            // honored for a union-member / parenthesized-intersection object type.
+            self.build_member_list_docs_into(
+                &mut member_parts,
+                t.members,
+                self.type_literal_member_body(t, comments_present, None, MemberFreeze::Never),
+                TSTypeElement::span,
+                |m| m.content_end(self.source),
+                |m, deferred| self.build_type_member_doc_inner(m, deferred),
+            );
+        } else {
+            // Width-aware: the opening bracketSpacing boundary leads (a space when flat
+            // `{ a }`, a newline when broken), THEN the first member's leading block
+            // comments, so the padding sits before the comment (`{ /* c */ a }`).
+            // The force_multiline branch handles leading comments per-member through the
+            // shared walk; the width-aware branch does not — without this a union-member
+            // object's interior leading comment is dropped (`{ /* c */ a: 1 } | B`).
+            // Mirrors the width-aware branch of `build_type_literal_doc_inner`.
             self.push_width_aware_type_literal_opener(&mut member_parts, t, comments_present);
-        }
-
-        for (i, m) in t.members.iter().enumerate() {
-            let is_first = i == 0;
-            // Use content_end for comment detection (before trailing separator)
-            let member_content_end = m.content_end(self.source);
-
-            if force_multiline {
-                // Forced multiline: build with hardlines. `None` keeps the
-                // delimiter-line comment relocating in this alignment path
-                // (union-member / intersection-trailing object literals).
-                member_parts.extend(self.build_multiline_member_prefix_doc(
-                    prev_end,
-                    m.span().start,
-                    is_first,
-                    None,
-                    comments_present,
-                    prev_deferred_line_comment,
-                ));
-                let mut deferred = DocBuf::new();
-                member_parts.push(self.build_type_member_doc_inner(m, &mut deferred));
-
-                // Handle trailing comments - preserve position relative to semicolon
-                (prev_end, prev_deferred_line_comment) = self.push_type_member_trailing_seam(
-                    &mut member_parts,
-                    t,
-                    i,
-                    member_content_end,
-                    comments_present,
-                    deferred,
-                );
-            } else {
+            for (i, m) in t.members.iter().enumerate() {
                 self.push_width_aware_type_member(&mut member_parts, t, i, m, comments_present);
-                prev_end = m.span().end;
             }
-        }
-
-        if force_multiline && comments_present {
-            // Trailing comments after last member
-            let body_end = t.span.end.saturating_sub(1);
-            member_parts.extend(self.build_trailing_body_comments_doc(
-                prev_end,
-                body_end,
-                prev_deferred_line_comment,
-            ));
         }
 
         d.concat(&member_parts)
@@ -822,7 +735,7 @@ impl<'a> Printer<'a> {
             // byte-identical to the trailing form, so only the broken layout moves.
             if comments_present {
                 let prev_content_end = t.members[i - 1].content_end(self.source);
-                let claim_end = self.type_member_claim_end(t, i - 1, prev_content_end);
+                let claim_end = self.type_member_claim_end(prev_content_end, Some(m.span().start));
                 for comment in comments_to_emit_in_range(self.comments, claim_end, m.span().start) {
                     member_parts.push(self.build_comment_doc(comment));
                     member_parts.push(d.text(" "));
@@ -841,7 +754,10 @@ impl<'a> Printer<'a> {
             .get(i + 1)
             .map_or(t.span.end, |next| next.span().start);
         let trailing: CommentVec<'_> = if comments_present {
-            let claim_end = self.type_member_claim_end(t, i, member_content_end);
+            let claim_end = self.type_member_claim_end(
+                member_content_end,
+                t.members.get(i + 1).map(|n| n.span().start),
+            );
             comments_to_emit_in_range(self.comments, member_content_end, upper_bound)
                 .filter(|c| c.span.start < claim_end)
                 .collect()
@@ -1044,58 +960,24 @@ impl<'a> Printer<'a> {
             };
             parts.push(d.concat(&brace_line_prefix));
 
-            // Multi-line format (same for both modes)
+            // Multi-line format (same for both modes) — the shared member-body walk. A
+            // preceding format-ignore directive keeps the member's source verbatim, up to
+            // the member's CONTENT end (no trailing `;`), because the walk's own seam
+            // re-adds the separator ([`MemberFreeze::Content`]).
             let mut member_parts = d.pooled_docbuf();
-            let mut prev_end = t.span.start + 1; // after opening brace
-            // Set when the member just emitted deferred a line comment past its own `;`,
-            // so its doc ends on a later line than the `;` and cannot carry that line's
-            // comments.
-            let mut prev_deferred_line_comment = false;
-            for (i, m) in t.members.iter().enumerate() {
-                let is_first = i == 0;
-                // Use content_end for comment detection (before trailing separator)
-                let member_content_end = m.content_end(self.source);
-
-                member_parts.extend(self.build_multiline_member_prefix_doc(
-                    prev_end,
-                    m.span().start,
-                    is_first,
-                    delimiter_pull_pos,
-                    comments_present,
-                    prev_deferred_line_comment,
-                ));
-                // A preceding format-ignore directive keeps the member's source
-                // verbatim. Use the content span (no trailing
-                // `;`); the loop's semicolon handling below re-adds the `;`.
-                // (A directive is itself a comment, so the gate is exact.)
-                let mut deferred = DocBuf::new();
-                let member_doc =
-                    if comments_present && self.member_gap_frozen(prev_end, m.span().start) {
-                        self.raw_source_range(m.span().start, member_content_end)
-                    } else {
-                        self.build_type_member_doc_inner(m, &mut deferred)
-                    };
-                member_parts.push(member_doc);
-
-                // Handle trailing comments - preserve position relative to semicolon
-                (prev_end, prev_deferred_line_comment) = self.push_type_member_trailing_seam(
-                    &mut member_parts,
+            self.build_member_list_docs_into(
+                &mut member_parts,
+                t.members,
+                self.type_literal_member_body(
                     t,
-                    i,
-                    member_content_end,
                     comments_present,
-                    deferred,
-                );
-            }
-
-            let body_end = t.span.end.saturating_sub(1);
-            if comments_present {
-                member_parts.extend(self.build_trailing_body_comments_doc(
-                    prev_end,
-                    body_end,
-                    prev_deferred_line_comment,
-                ));
-            }
+                    delimiter_pull_pos,
+                    MemberFreeze::Content,
+                ),
+                TSTypeElement::span,
+                |m| m.content_end(self.source),
+                |m, deferred| self.build_type_member_doc_inner(m, deferred),
+            );
 
             parts.push(d.indent(d.concat(&member_parts)));
             parts.push(d.hardline());

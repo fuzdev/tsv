@@ -346,6 +346,19 @@ impl<'a> Printer<'a> {
     ///   leading-line-comment continuation indent used to sit in this list, on the block
     ///   heads alone; it is a property of the *comment*, not of the head, so it is now
     ///   [`Self::leading_line_comment_hangs_value`] and every braced head asks it.
+    ///
+    /// TODO: a value whose leading comment is a JSDoc cast the author gave its own line is
+    /// NOT a fixed point at several of these heads. The cast prints a hardline between its
+    /// comment and its `(` on that shape, no braced head supplies the matching hang, so pass
+    /// 1 strands the `(` at the head's own column — and because the hardline also forces the
+    /// head open, pass 2 (where the comment now reads as mid-line) collapses the whole thing:
+    /// `{#if …}`, `{#each …}` (whose `as item` lands at column 0 meanwhile) and a plain
+    /// attribute value all move. `{@html …}` and a directive value happen to hold still.
+    /// The TS side answers this by marking a **value gap**
+    /// (`tsv_ts::Printer::mark_jsdoc_cast_value_gap`, whose reflow gives one fixed point),
+    /// but the answer is not uniform across these heads — an attribute wants the reflow while
+    /// the `{expr}` tag keeps the author's break, as prettier does — so the mark belongs at
+    /// the CALLERS, per head, with a fixture apiece. Not a value this shared seam can pick.
     pub(in crate::printer) fn build_head_value_doc(
         &self,
         expr: &Expression<'_>,
