@@ -328,7 +328,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Mirrors Svelte's `1-parse/state/tag.js`: the whole content after `debug`
     /// is parsed as one expression (`read_expression`), a top-level comma
     /// `SequenceExpression` is flattened into the identifier list, and every
-    /// element must be a plain `Identifier` (`debug_tag_invalid_arguments`).
+    /// element must be a plain `Identifier` (`debug_tag_invalid_arguments`) —
+    /// through any JSDoc cast, which Svelte's post-`remove_parens` check never
+    /// sees (a cast element stays a cast in the stored list; a cast around the
+    /// whole list stays ONE entry, its sequence flattened only on the wire).
     /// `{@debug}` — only whitespace before `}` — is "debug all" (an empty list).
     ///
     /// Unlike Prettier (which strips comments), we preserve TS comments in debug
@@ -378,7 +381,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     }
                 }
                 _ => {
-                    self.require_debug_identifier(&expr)?;
+                    // A JSDoc cast around the whole comma list validates per
+                    // element — Svelte's check runs after `remove_parens`, which
+                    // sees only parens + a comment here, so the sequence it
+                    // uncovers flattens exactly as the bare one above. The STORED
+                    // entry keeps the wrapper as one element for the whole cast:
+                    // the printer emits identifiers by source span, so flattening
+                    // through the cast would drop its parens from the output
+                    // (breaking idempotency and the cast's binding).
+                    if let Expression::SequenceExpression(seq) = expr.unwrap_jsdoc_casts() {
+                        for element in seq.expressions {
+                            self.require_debug_identifier(element)?;
+                        }
+                    } else {
+                        self.require_debug_identifier(&expr)?;
+                    }
                     identifiers.push(expr);
                 }
             }
@@ -398,9 +415,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// argument list as a full TS expression, so reject the non-identifier forms
     /// (regex/member/call/binary/`this`/literal) here to match Svelte — and, for
     /// a regex literal, to avoid re-emitting a `/…*/` source span glued to `}` as
-    /// unreparseable output.
+    /// unreparseable output. The check looks through JSDoc casts
+    /// (`unwrap_jsdoc_casts`): Svelte validates after `remove_parens`, to which a
+    /// cast is nothing but parens + a comment, so `{@debug /** @type {A} */ (a)}`
+    /// is an identifier to both parsers.
     fn require_debug_identifier(&self, expr: &Expression<'arena>) -> Result<(), ParseError> {
-        if matches!(expr, Expression::Identifier(_)) {
+        if matches!(expr.unwrap_jsdoc_casts(), Expression::Identifier(_)) {
             Ok(())
         } else {
             Err(self.error_msg_at(
@@ -421,10 +441,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// and Svelte's two-branch check collapses to one: the expression must be a
     /// `CallExpression`. A non-call form (`{@render foo}`, `{@render a?.b}`) is
     /// rejected, mirroring `require_debug_identifier`.
+    ///
+    /// The check looks through JSDoc casts (`unwrap_jsdoc_casts`): Svelte
+    /// validates after `remove_parens`, to which a cast is nothing but parens +
+    /// a comment, so `{@render /** @type {A} */ (fn())}` is a call to both
+    /// parsers. The stored expression keeps the wrapper — the printer reproduces
+    /// the authored cast from it.
     fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         let (expression, span) = self.parse_keyword_expression_tag(start, "render")?;
 
-        if !matches!(expression, Expression::CallExpression(_)) {
+        if !matches!(
+            expression.unwrap_jsdoc_casts(),
+            Expression::CallExpression(_)
+        ) {
             return Err(self.error_msg_at(
                 "{@render ...} tags can only contain call expressions",
                 expression.span().start as usize,

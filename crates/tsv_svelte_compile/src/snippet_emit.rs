@@ -150,6 +150,12 @@ pub(crate) fn build_snippet_function<'arena>(
 /// (`{@render (s as T)(x)}`) leaves a call and compiles. One definition, shared by
 /// the emitter (its shape gate and callee/argument extraction, on the raw node
 /// then again on the erased one) and the `needs_context` render walk.
+///
+/// A `JsdocCast` around the call (`{@render /** @type {A} */ (fn())}`) is NOT that
+/// rule: the oracle sees only parens + a comment there and compiles it. tsv's
+/// parser accepts the shape too, but this helper returns `None` for it, so the
+/// emitter refuses — a safe over-refusal, subsumed by the standing
+/// template-expression-comment refusal (a cast is never comment-free).
 pub(crate) fn render_call_expression<'a, 'arena>(
     expr: &'a Expression<'arena>,
 ) -> Option<&'a CallExpression<'arena>> {

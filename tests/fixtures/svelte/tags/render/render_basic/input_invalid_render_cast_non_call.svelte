@@ -1,0 +1,1 @@
+{@render /** @type {A} */ (fn)}
