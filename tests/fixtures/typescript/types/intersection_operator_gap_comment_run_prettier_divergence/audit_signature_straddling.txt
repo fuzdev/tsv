@@ -1,0 +1,72 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// an own-line comment before the `&` and one trailing the `&` both follow the operator,
+	// each on its own line, in the order the author wrote them
+	type A1 = A & // c
+		// x
+		B;
+
+	// the same with two own-line comments ahead of the operator
+	type A2 = A & // c
+		// x1
+		// x2
+		B;
+
+	// and as an index signature value
+	type A3 = {
+		[k: string]: A & // c
+			// x
+			B;
+	};
+
+	// a `//` trailing the previous member and one trailing the `&`: each keeps its own line
+	type A4 = A & // t
+	// c
+		B;
+
+	// an own-line block ahead of the operator and a `//` trailing it stay on separate lines
+	type A5 = A & // c
+		/* b */
+		B;
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// an own-line comment before the `&` and one trailing the `&` both follow the operator,
+	// each on its own line, in the order the author wrote them
+	type A1 = A & // c
+		// x
+		B;
+
+	// the same with two own-line comments ahead of the operator
+	type A2 = A & // c
+		// x1
+		// x2
+		B;
+
+	// and as an index signature value
+	type A3 = {
+		[k: string]: A & // c
+			// x
+			B;
+	};
+
+	// a `//` trailing the previous member and one trailing the `&`: each keeps its own line
+	type A4 = A & // t
+		// c
+		B;
+
+	// an own-line block ahead of the operator and a `//` trailing it stay on separate lines
+	type A5 = A & // c
+		/* b */
+		B;
+</script>
