@@ -804,11 +804,21 @@ doctrine, hazards, and the leading-comment emitter rules — lives in ./docs/com
 
 **Owned comments** (`owned_by_node`, set by the parser): **every glued block comment is
 owned** — bound to the token after it and printed by that node's doc rather than by the
-enclosing gap, so a synthesized paren can never land between them. A bundler annotation
+enclosing gap, so a paren synthesized around an ENCLOSING expression can never land
+between them. A bundler annotation
 (`/* @__PURE__ */`), a JSDoc cast (`/** @type {T} */ (x)` — handed to the `JsdocCast`
 node), and a plain glued comment bind identically; `owned ⇒ is_block`, so no line comment
 is ever owned. **Ownership is a fact about who PRINTS a comment, never about whether it
 EXISTS** — every bug in this class has been a violation of that sentence.
+
+⚠️ **"The innermost node its token begins" holds only because that node prints FIRST**, and
+a **paren-less arrow** breaks it: its span starts at its own sole parameter, so both nodes
+answer the position-keyed lookup while the arrow still prints a synthesized `(` ahead of the
+parameter. The arrow keeps the claim and the parameter is suppressed
+(`Printer::with_owned_comment_claimed_above`) — pushing the claim down would move the comment
+inside a paren the author never wrote, and declining the bind would give up
+`OwnedCommentEffect` for the shape. A suppression is only a de-duplication where some
+enclosing node provably claims; otherwise it is hazard 1 spelled backwards.
 
 A comment can be asked about along exactly **three** axes, and the lookup API
 (`tsv_lang::comment`) makes the caller name which:
