@@ -1379,6 +1379,30 @@ impl DocArena {
         self.group(self.concat(&[self.line(), x]))
     }
 
+    /// `id` as a `Fill`, wrapping it in a one-part fill when it is not already one.
+    ///
+    /// A [`DocContext`] carrying a **render-side** flag ([`DocContext::break_before_wide_flow`],
+    /// [`DocContext::glued_lead`]) is only ever read off a `Fill`: `WithContext`'s render arm
+    /// dispatches to the fill loop and otherwise descends, dropping the context on the floor. So a
+    /// builder attaching one to a non-`Fill` doc silently loses it — and the loss is invisible,
+    /// since the flag's whole job is to *change* a boundary decision that still produces valid,
+    /// idempotent output without it.
+    ///
+    /// That is not hypothetical: a text run of a single word is a bare `Text` (a glued-prefixed one
+    /// a `Concat`), the same shape-vs-flag trap [`Self::welded_entry`] warns about on the walk side.
+    /// A one-word run glued to a following element is exactly where the flow boundary matters most,
+    /// and its flag reached no reader at all.
+    ///
+    /// A one-part fill is the faithful spelling rather than a workaround: the run *is* a fill of one
+    /// item, and the fill loop's last-item case (Case 1) is what asks the boundary question.
+    #[inline]
+    pub fn as_fill(&self, id: DocId) -> DocId {
+        if matches!(self.nodes.borrow()[id.index()], DocNode::Fill(_)) {
+            return id;
+        }
+        self.fill(&[id])
+    }
+
     /// If `id` is exactly the inline-sibling wrap [`Self::inline_sibling_line_group`] builds — a
     /// non-breaking `Group(Concat([Line(Normal|Soft), X]))` with no conditional-group states —
     /// return the inner `X` (the bare element doc), dropping the leading boundary `Line`. `None` for
@@ -1769,7 +1793,24 @@ impl DocArena {
     }
 
     /// Wrap a doc with rendering context.
+    ///
+    /// ⚠️ A `DocContext` reaches the RENDERER only through a `Fill`: `WithContext`'s render arm
+    /// dispatches to the fill loop and otherwise just descends, dropping the context. The debug
+    /// tripwire below holds the two flags that are purely render-side to that channel — see
+    /// [`Self::as_fill`], which is how a builder satisfies it for a run that isn't already a fill.
+    ///
+    /// The other flags are deliberately exempt, because they are read at BUILD time off whatever
+    /// shape they mark: [`DocContext::glued_lead`] and [`DocContext::glued_atom`] mark an element
+    /// doc for the welded walk ([`Self::welded_entry`]), and [`DocContext::trailing_reserve`] marks
+    /// a bare `empty()` in the CSS printer. Asserting on those would fire on correct code.
     pub fn with_context(&self, doc: DocId, context: DocContext) -> DocId {
+        #[cfg(debug_assertions)]
+        debug_assert!(
+            !(context.break_before_wide_flow() || context.after_element_fold())
+                || matches!(self.nodes.borrow()[doc.index()], DocNode::Fill(_)),
+            "render-side DocContext flag on a non-Fill doc — the renderer will drop it silently \
+             (wrap with DocArena::as_fill)"
+        );
         self.alloc(DocNode::WithContext { doc, context })
     }
 
@@ -3103,11 +3144,10 @@ mod welded_sibling_join_tests {
         // Ordinary content, arbitrarily wrapped.
         let plain = a.group(a.concat(&[a.indent(a.text("x")), a.line()]));
         a.debug_check_buried_welded_marker(plain);
-        // A WithContext without the marker flag descends without firing.
-        let flagged = a.with_context(
-            a.text("y"),
-            DocContext::default().with_after_element_fold(true),
-        );
+        // A WithContext without the marker flag descends without firing. The flag has to be a
+        // BUILD-side one — the CSS printer's `trailing_reserve` marker is the real instance — since
+        // `with_context`'s own tripwire holds the render-side flags to a `Fill`.
+        let flagged = a.with_context(a.text("y"), DocContext::reserving(4));
         a.debug_check_buried_welded_marker(a.group(a.concat(&[flagged, a.line()])));
     }
 }

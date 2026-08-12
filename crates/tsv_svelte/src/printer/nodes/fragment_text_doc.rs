@@ -304,22 +304,35 @@ impl<'a> Printer<'a> {
             // emits one of them, flip-flops). So the flow test is spelling-independent and the
             // newline arm below simply re-spells itself as the space.
             //
-            // The enclosing element's [`MultilineCause`] is the rule's other boundary — the same
-            // claim read one level up. Landing both spellings on one doc converges them only if
-            // the *arm* they land in is itself spelling-independent, and it is not when the
-            // element went multiline BECAUSE of these newlines (`MultilineCause::SourceBreaks`).
-            // There, collapsing the separator deletes the very break that chose the multiline arm,
-            // so the next pass takes the inline arm, whose `next_is_tag` case emits a bare `line`
-            // (all-or-nothing with the already-broken parent group) and splits the run apart
-            // again — the two spellings become each other's output, a period-2 cycle rather than a
-            // fixed point. So the rule stands down exactly there: inside such an element the
-            // newline is not pure spelling, it is the sanctioned Tier-2 element-expansion signal.
-            // It holds wherever the multiline layout is structural — the root fragment, block
-            // bodies, and any element forced multiline by block children, an expanding block, or a
-            // whitespace-collapsing container. Pinned by
-            // `elements/inline_content_spaced_tags_tail_long`.
+            // The enclosing element need only be multiline AT ALL — `run_has_prose` is this site's
+            // whole boundary, and the cause is not a second one.
+            //
+            // ⚠️ This conjunct read `cause == MultilineCause::Structural` and that was too narrow,
+            // in a way only a whole run could show. The flow rule has three call sites and the
+            // OTHER two — a content text's leading and trailing runs — carry no cause gate at all,
+            // so a `SourceBreaks` container half-applied it: within one run the boundaries touching
+            // a text node flowed while the one between two adjacent siblings did not, and
+            // `text1 <span>a</span>⏎<span>b</span> text2` came out broken in a line that fits —
+            // a form neither formatter produces. A rule keyed on the CONTAINER cannot be right at
+            // one of its boundaries and wrong at the next.
+            //
+            // The narrow gate was written against a period-2 cycle: collapsing the separator was
+            // held to delete the very break that chose the multiline arm, so the next pass would
+            // take the inline arm, whose `next_is_tag` case emits a bare `line` (all-or-nothing
+            // with the already-broken parent group) and splits the run apart again. That does not
+            // occur, and the reason is structural rather than lucky — this separator is *interior*
+            // to the content, so collapsing it cannot touch the element's own boundary newlines,
+            // which are what the multiline decision reads. Both spellings converge, for element
+            // and tag siblings alike, and `authoring:audit` is the standing guard.
+            // `elements/inline_content_spaced_tags_tail_long` is unaffected: its content is a
+            // reflowable fill, so the source-breaks signal is suppressed before it reaches here
+            // ([`Self::content_is_reflowable_fill`]) and the gate never opens for it.
+            //
+            // Widening it makes tsv converge a tag pair onto one line where prettier splits it —
+            // a deliberate divergence in the same family as the rest of this rule, pinned by
+            // `elements/inline_adjacent_sibling_newline_flow_prettier_divergence`.
             let separator_flows = run_has_prose
-                && cause == MultilineCause::Structural
+                && cause.is_multiline()
                 && prev_node.is_some_and(|n| self.sibling_newline_flows(n))
                 && next_node.is_some_and(|n| self.sibling_newline_flows(n));
             let ws_flows = newline_count == 1 && separator_flows;
@@ -817,9 +830,16 @@ impl<'a> Printer<'a> {
                 // first non-glued entry.
                 next_is_flow_or_tag
             };
+            // Both flags are read only off a `Fill` at render, and a run of a SINGLE word is a bare
+            // `Text` (`build_text_fill_doc_trimmed`'s early return) — so the run has to be spelled
+            // as the one-item fill it is, or the flag reaches no reader (`DocArena::as_fill`). The
+            // glued half lands there by construction: it requires `!has_trailing_ws`, which is
+            // exactly the arm that returns bare text. A lone `(` heading a run glued to a following
+            // element then never got its boundary measured, and the run stood and paid the overflow
+            // out of the element's own tag.
             let fill_doc = if break_before_wide_flow || glued_lead {
                 d.with_context(
-                    fill_doc,
+                    d.as_fill(fill_doc),
                     tsv_lang::doc::DocContext::default()
                         .with_break_before_wide_flow(break_before_wide_flow)
                         .with_glued_lead(glued_lead),
