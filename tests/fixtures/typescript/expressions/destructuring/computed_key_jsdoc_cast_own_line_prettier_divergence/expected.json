@@ -1,0 +1,353 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 117,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 19,
+			"end": 35,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 10
+				},
+				"end": {
+					"line": 2,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {B} ",
+			"start": 66,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 10
+				},
+				"end": {
+					"line": 3,
+					"column": 26
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 116,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 55,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 46
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 54,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 45
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 16,
+								"end": 47,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 38
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 18,
+										"end": 45,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 9
+											},
+											"end": {
+												"line": 2,
+												"column": 36
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": true,
+										"key": {
+											"type": "Identifier",
+											"start": 37,
+											"end": 39,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 28
+												},
+												"end": {
+													"line": 2,
+													"column": 30
+												}
+											},
+											"name": "k1",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": "* @type {A} ",
+													"start": 19,
+													"end": 35
+												}
+											]
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 43,
+											"end": 45,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 34
+												},
+												"end": {
+													"line": 2,
+													"column": 36
+												}
+											},
+											"name": "v1"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 50,
+								"end": 54,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 41
+									},
+									"end": {
+										"line": 2,
+										"column": 45
+									}
+								},
+								"name": "obj1"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 57,
+					"end": 106,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 50
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 63,
+							"end": 105,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 49
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 63,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 42
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 65,
+										"end": 96,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 9
+											},
+											"end": {
+												"line": 3,
+												"column": 40
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": true,
+										"key": {
+											"type": "Identifier",
+											"start": 84,
+											"end": 86,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 28
+												},
+												"end": {
+													"line": 3,
+													"column": 30
+												}
+											},
+											"name": "k2",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": "* @type {B} ",
+													"start": 66,
+													"end": 82
+												}
+											]
+										},
+										"value": {
+											"type": "AssignmentPattern",
+											"start": 90,
+											"end": 96,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 34
+												},
+												"end": {
+													"line": 3,
+													"column": 40
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 90,
+												"end": 92,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 34
+													},
+													"end": {
+														"line": 3,
+														"column": 36
+													}
+												},
+												"name": "v2"
+											},
+											"right": {
+												"type": "Literal",
+												"start": 95,
+												"end": 96,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 39
+													},
+													"end": {
+														"line": 3,
+														"column": 40
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 101,
+								"end": 105,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 45
+									},
+									"end": {
+										"line": 3,
+										"column": 49
+									}
+								},
+								"name": "obj2"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

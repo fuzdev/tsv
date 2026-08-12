@@ -87,6 +87,64 @@ fn leading_jsdoc_cast<'x>(expr: &'x Expression<'x>) -> Option<&'x internal::Jsdo
     }
 }
 
+impl<'a> Printer<'a> {
+    /// Record that `value` sits in a gap that answers a leading cast's break by rule and
+    /// **cannot hang** — a Svelte braced head (`EmbedContext::jsdoc_cast_cannot_hang`) —
+    /// so the cast it LEADS with reflows its comment→`(` break to a space in every
+    /// authoring, the own-line hardline arm included
+    /// ([`Printer::jsdoc_cast_cannot_hang_target`]).
+    ///
+    /// The mark lands on the value's [`leading_jsdoc_cast`] — the left-spine walk the TS
+    /// hang predicates use — because a braced head's bug is exactly the hang's absence:
+    /// wherever a TS value gap would answer the cast's hardline by ending the operator's
+    /// line, a braced head has no operator line, so the reflow must reach every cast the
+    /// hang would have.
+    ///
+    /// Called once per expression-root entry (`build_root_expression_doc`, which both the
+    /// doc and string entries pass through), before any doc is built; nothing overwrites
+    /// it during the walk. An **interior** cannot-hang gap (a computed key) must not use
+    /// this — it would clobber the entry mark for every sibling built after it, including
+    /// a left-spine cast rebuilt in a later `conditional_group` candidate; those wrap
+    /// their build in [`Printer::with_jsdoc_cast_cannot_hang_gap`] instead.
+    pub(in crate::printer) fn mark_jsdoc_cast_cannot_hang_gap(&self, value: &Expression<'_>) {
+        self.jsdoc_cast_cannot_hang_target
+            .set(leading_jsdoc_cast(value).map(|cast| cast.span));
+    }
+
+    /// Build `value`'s doc under a cannot-hang mark, restoring the previous mark after —
+    /// the interior-gap form of [`Printer::mark_jsdoc_cast_cannot_hang_gap`], for the
+    /// **computed-key** `[`→key gap (object/class members, both pattern spellings): a `[`
+    /// starts the key's line, so there is no operator line to end and a leading cast's
+    /// own-line hardline would strand the `(` — the same shape as a Svelte braced head,
+    /// answered the same way (reflow; a plain block comment in this gap already reflows).
+    /// The save/restore is what keeps an enclosing entry mark alive for subtrees built
+    /// after the key.
+    pub(in crate::printer) fn with_jsdoc_cast_cannot_hang_gap(
+        &self,
+        value: &Expression<'_>,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let saved = self.jsdoc_cast_cannot_hang_target.get();
+        self.jsdoc_cast_cannot_hang_target
+            .set(leading_jsdoc_cast(value).map(|cast| cast.span));
+        let doc = build();
+        self.jsdoc_cast_cannot_hang_target.set(saved);
+        doc
+    }
+
+    /// Whether this cast is the one a cannot-hang gap recorded — asked where the
+    /// separator is chosen ([`Printer::build_jsdoc_cast_doc`]), ahead of the own-line
+    /// arm. The complement of [`Printer::jsdoc_cast_in_value_gap`], which reflows only
+    /// the soft-`line` arm (its gaps CAN hang, so their own-line authoring keeps the
+    /// hardline and the enclosing gap supplies the hang).
+    pub(in crate::printer) fn jsdoc_cast_in_cannot_hang_gap(
+        &self,
+        cast: &internal::JsdocCast<'_>,
+    ) -> bool {
+        self.jsdoc_cast_cannot_hang_target.get() == Some(cast.span)
+    }
+}
+
 /// What the comment a value **owns** does to the operator's line (`=` / `:`) — the two
 /// exclusive halves of one question, so a caller reads them off one lookup instead of
 /// asking twice. See [`Printer::owned_leading_comment_effect`].

@@ -338,7 +338,11 @@ impl<'a> Printer<'a> {
             // therefore emit the same doc for that key (byte-identical over tests/fixtures and
             // a pattern-key shape matrix). Using the comment-aware one anyway keeps the two
             // arms the same shape, so neither can quietly become a comment sink.
-            let key_doc = self.build_ts_expression_doc(key);
+            //
+            // Cannot-hang, like the TS twin (`build_computed_key_expr_doc`): the `[`→key
+            // gap has no operator line to end, so a leading cast's break reflows and the
+            // pattern formats the same in both contexts.
+            let key_doc = self.build_ts_expression_doc_cannot_hang(key);
             let trail = self.build_pattern_trailing_comments(key_end, close);
             let doc = d.concat(&[d.text("["), lead, key_doc, trail, d.text("]")]);
             (doc, close + 1)
@@ -689,11 +693,12 @@ impl<'a> Printer<'a> {
         // In multiline contexts, set up embedded expression context so a ROOT binary
         // chain uses ContinuationIndent style ([`Printer::head_embed`]). An INLINE head
         // keeps the host's embed: `remove_lines` below holds it flat, so there is no
-        // continuation for the mode to style.
+        // continuation for the mode to style. The leading-cast reflow applies on both
+        // arms — an inline head is still a braced head with no hang to offer.
         let embed = if in_multiline_context {
             self.head_embed(opening_offset)
         } else {
-            self.embed
+            self.cannot_hang_embed()
         };
 
         // Build expression doc tree

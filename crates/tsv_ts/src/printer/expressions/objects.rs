@@ -904,11 +904,15 @@ impl<'a> Printer<'a> {
     /// member-*access* index applies the same rule inline in the chain printer,
     /// which threads `in_for_init` explicitly.)
     pub(in crate::printer) fn build_computed_key_expr_doc(&self, key: &Expression<'_>) -> DocId {
-        if self.needs_parens(key, super::ParenContext::ComputedPropertyKey) {
-            self.d().parens(self.build_expression_doc(key))
-        } else {
-            self.build_expression_doc(key)
-        }
+        // The `[`→key gap cannot hang a leading cast's break — no operator line to end —
+        // so the cast reflows onto the `[`'s line (`Printer::with_jsdoc_cast_cannot_hang_gap`).
+        self.with_jsdoc_cast_cannot_hang_gap(key, || {
+            if self.needs_parens(key, super::ParenContext::ComputedPropertyKey) {
+                self.d().parens(self.build_expression_doc(key))
+            } else {
+                self.build_expression_doc(key)
+            }
+        })
     }
 
     /// Build a `[key]` doc with comments preserved inside brackets.

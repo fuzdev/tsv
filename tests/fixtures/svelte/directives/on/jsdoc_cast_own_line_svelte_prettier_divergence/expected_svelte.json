@@ -1,0 +1,98 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 68,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 67,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 7,
+						"character": 7
+					}
+				},
+				"attributes": [
+					{
+						"start": 9,
+						"end": 48,
+						"type": "OnDirective",
+						"name": "click",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 1,
+								"character": 9
+							},
+							"end": {
+								"line": 2,
+								"column": 9,
+								"character": 17
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 42,
+							"end": 44,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 3
+								},
+								"end": {
+									"line": 4,
+									"column": 5
+								}
+							},
+							"name": "fn"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 50,
+							"end": 58,
+							"raw": "\n\ttext1\n",
+							"data": "\n\ttext1\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 22,
+			"end": 38,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 18
+				}
+			}
+		}
+	]
+}
