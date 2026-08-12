@@ -88,8 +88,36 @@ pub enum ChainNode<'a> {
         object_end: u32,
         bracket_end: u32,
     },
-    /// Non-null assertion: !
-    NonNull,
+    /// Non-null assertion: `!`
+    ///
+    /// `gap` names which rule the operand→`!` region takes — see [`NonNullGap`].
+    NonNull { gap: NonNullGap },
+}
+
+/// Which rule the operand→`!` region of a [`ChainNode::NonNull`] takes, keyed on
+/// what sits to its left.
+///
+/// The two arms are a partition of one region, so exactly one emitter prints its
+/// comments — deliberately not a "someone else claimed this" flag.
+#[derive(Debug, Clone, Copy)]
+pub enum NonNullGap {
+    /// The region belongs to the `!`, which prints its comments just before
+    /// itself: `aaa /* c */!.bbb`. `operand_end` is where the operand expression
+    /// ends; `bang_end` is just past the `!`.
+    ///
+    /// ⚠️ Where the operand is written bare, only a single-line block comment can
+    /// sit here — the `!` binds under `[no LineTerminator here]`, so a `//` (or a
+    /// block comment spanning lines) is a parse error. That premise fails the
+    /// moment a grouping shell is **stripped**: the region then spans the erased
+    /// `)`, and `(aaa // c⏎)!.bbb` puts a `//` in it, which this arm's block-only
+    /// emitter DROPS. Preserving it means retaining the shell (the multiline
+    /// operand layout `build_non_null_paren_operand_doc` gives the required-paren
+    /// case) — a divergence decision, still open.
+    Bang { operand_end: u32, bang_end: u32 },
+    /// A parenthesized operand keeps the region *inside* its own parens, where the
+    /// author wrote it (`(x + y /* c */)!.foo`), so the `!` prints nothing. Set by
+    /// the linearizer's `paren_comment_end` arm on the preceding [`ChainNode::Base`].
+    InsideOperandParens,
 }
 
 /// Whether a computed index is a numeric literal — Prettier's `isNumericLiteral` carve-out.
@@ -194,9 +222,24 @@ impl<'a> ChainNode<'a> {
         }
     }
 
-    /// Create a new non-null node
-    pub fn non_null() -> Self {
-        Self::NonNull
+    /// Create a new non-null node whose `!` owns the operand→`!` region
+    ///
+    /// The bounds are derived here rather than at the call sites, so the two
+    /// linearization entry points cannot hand the node different ones.
+    pub fn non_null(non_null: &internal::TSNonNullExpression<'_>) -> Self {
+        Self::NonNull {
+            gap: NonNullGap::Bang {
+                operand_end: non_null.expression.span().end,
+                bang_end: non_null.span.end,
+            },
+        }
+    }
+
+    /// Create a new non-null node whose region a parenthesized operand keeps
+    pub fn non_null_after_paren_operand() -> Self {
+        Self::NonNull {
+            gap: NonNullGap::InsideOperandParens,
+        }
     }
 
     /// Check if this is a call node
@@ -212,8 +255,14 @@ impl<'a> ChainNode<'a> {
         )
     }
 
-    /// Get the comment range for this node (object_end, property_start)
-    /// Returns None for nodes that don't have inter-element comment regions
+    /// Get the **chain-level** comment range for this node (object_end, property_start)
+    /// — the region whose comments the chain builder emits ahead of the line break it
+    /// puts in front of the node.
+    ///
+    /// Returns None for nodes that get no such break. A [`Self::NonNull`] has a region
+    /// of its own but is never one of them: the `!` binds under `[no LineTerminator
+    /// here]`, so a break before it is a syntax error and the node prints that region
+    /// itself (see [`NonNullGap`]).
     pub fn comment_range(&self) -> Option<(u32, u32)> {
         match self {
             Self::Member {
@@ -229,13 +278,13 @@ impl<'a> ChainNode<'a> {
             Self::ComputedMember {
                 object_end, expr, ..
             } => Some((*object_end, expr.span().start)),
-            Self::Base { .. } | Self::Call { .. } | Self::NonNull => None,
+            Self::Base { .. } | Self::Call { .. } | Self::NonNull { .. } => None,
         }
     }
 
     /// Check if this is a non-null node
     pub const fn is_non_null(&self) -> bool {
-        matches!(self, Self::NonNull)
+        matches!(self, Self::NonNull { .. })
     }
 
     /// Check if this is a numeric computed accessor like `[0]`, `[1]`
