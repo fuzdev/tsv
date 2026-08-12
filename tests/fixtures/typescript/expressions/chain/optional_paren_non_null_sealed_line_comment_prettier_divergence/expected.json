@@ -1,0 +1,452 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 243,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment before the `!` of a sealed parenthesized optional chain forces",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the multiline paren layout, keeping the comment inside the parens.",
+			"start": 102,
+			"end": 171,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 186,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 7
+				},
+				"end": {
+					"line": 5,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 218,
+			"end": 222,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 7
+				},
+				"end": {
+					"line": 8,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 242,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 173,
+					"end": 197,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 173,
+						"end": 196,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "TSNonNullExpression",
+							"start": 177,
+							"end": 194,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 5
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "ChainExpression",
+								"start": 181,
+								"end": 185,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 181,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 181,
+										"end": 182,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 184,
+										"end": 185,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 5
+											},
+											"end": {
+												"line": 5,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 186,
+										"end": 190
+									}
+								]
+							}
+						},
+						"arguments": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment before the `!` of a sealed parenthesized optional chain forces",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " the multiline paren layout, keeping the comment inside the parens.",
+							"start": 102,
+							"end": 171
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 199,
+					"end": 232,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 205,
+							"end": 231,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 205,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "t"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 209,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"tag": {
+									"type": "TSNonNullExpression",
+									"start": 209,
+									"end": 226,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 11
+										},
+										"end": {
+											"line": 9,
+											"column": 3
+										}
+									},
+									"expression": {
+										"type": "ChainExpression",
+										"start": 213,
+										"end": 217,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 6
+											}
+										},
+										"expression": {
+											"type": "MemberExpression",
+											"start": 213,
+											"end": 217,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 6
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 213,
+												"end": 214,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 2
+													},
+													"end": {
+														"line": 8,
+														"column": 3
+													}
+												},
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 216,
+												"end": 217,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 5
+													},
+													"end": {
+														"line": 8,
+														"column": 6
+													}
+												},
+												"name": "b"
+											},
+											"computed": false,
+											"optional": true
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 218,
+												"end": 222
+											}
+										]
+									}
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 226,
+									"end": 231,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 9,
+											"column": 8
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 227,
+											"end": 230,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 4
+												},
+												"end": {
+													"line": 9,
+													"column": 7
+												}
+											},
+											"value": {
+												"raw": "tpl",
+												"cooked": "tpl"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

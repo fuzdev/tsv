@@ -1050,7 +1050,18 @@ impl<'a> Printer<'a> {
         non_null_expr: &crate::ast::internal::TSNonNullExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        let needs_parens = self.needs_parens(non_null_expr.expression, ParenContext::NonNull);
+        // A `//` in the operand→`!` gap RETAINS the shell, even where the parens are
+        // otherwise redundant. Deferring it instead carries it out of its own statement
+        // (`(x + y // c1⏎)!; // c2` → `(x + y)!; // c1 // c2`), where it MERGES with
+        // whatever already trails that line and the second comment stops existing — the
+        // information-losing relocation §Comment Position Philosophy names as its
+        // deciding test, and one the comment census measures directly. A block comment
+        // needs no shell: it trails inline without ending the line.
+        let needs_parens = self.needs_parens(non_null_expr.expression, ParenContext::NonNull)
+            || self.has_line_comments_between(
+                non_null_expr.expression.span().end,
+                non_null_expr.span.end,
+            );
 
         // A leading comment from the stripped grouping parens, before the operand
         // (`(/* b */ x + y)!`), is emitted before the operand/`(`, matching prettier
@@ -1079,20 +1090,19 @@ impl<'a> Printer<'a> {
             // author wrote them — leading before the operand (`(/* b */ x + y)!`),
             // trailing before the `)` (`(x + y /* c */)!`). Prettier relocates them
             // outside (before `(` / between `)` and `!`); tsv preserves the position.
-            let mut parts: DocBuf = smallvec![d.text("(")];
-            if let Some(lead) = leading {
-                parts.push(lead);
-            }
-            parts.push(inner_doc);
-            if self.has_comments_to_emit_between(argument_end, non_null_expr.span.end) {
-                self.append_trailing_paren_comments(
-                    &mut parts,
-                    argument_end,
-                    non_null_expr.span.end,
-                );
-            }
-            parts.push(d.text(")!"));
-            d.concat(&parts)
+            let body = match leading {
+                Some(lead) => d.concat(&[lead, inner_doc]),
+                None => inner_doc,
+            };
+            // The operand has one rendering here, so both layouts take the same body.
+            self.build_non_null_paren_operand_doc(
+                argument_end,
+                non_null_expr.span.end,
+                body,
+                body,
+                ")!",
+            )
+            .unwrap_or_else(|| d.concat(&[d.text("("), body, d.text(")!")]))
         } else if self.has_comments_to_emit_between(
             non_null_expr.expression.span().end,
             non_null_expr.span.end,
@@ -1101,9 +1111,17 @@ impl<'a> Printer<'a> {
             // grouping parens `(x /* c */)!`) trails the operand — preserve it rather
             // than dropping it. The redundant grouping parens are stripped per tsv's
             // non-null seal canonicalization (`(p?.q)!` → `p?.q!`); prettier keeps them
-            // when the source had them. Comments can't be threaded through the
-            // linearized chain, so this path renders the operand directly for chain and
-            // non-chain operands alike.
+            // when the source had them.
+            //
+            // ⚠️ This branch stays ahead of the chain one for the **line** spelling only.
+            // `ChainNode::NonNull` prints the same gap now, so a block comment would come
+            // out identically there — but its emitter is block-only, because an
+            // unparenthesized operand can hold nothing else (`[no LineTerminator here]`
+            // before the `!`). A *stripped* shell breaks that premise: the gap spans the
+            // erased `)`, so `(x // c⏎)!` puts a `//` in it, and routing that to the chain
+            // DROPS it. Preserving it there means retaining the shell (the multiline
+            // operand layout the required-paren case uses) — a divergence decision, not a
+            // refactor, so the two paths stay split until it is taken.
             let argument_end = non_null_expr.expression.span().end;
             let inner_doc = self.build_expression_doc(non_null_expr.expression);
             let mut parts: DocBuf = smallvec![inner_doc];
@@ -1149,7 +1167,21 @@ impl<'a> Printer<'a> {
         if non_null.seals_optional_chain() {
             let d = self.d();
             let inner_doc = self.build_expression_doc_with_indent_on_break(non_null.expression);
-            Some(d.concat(&[d.text("("), inner_doc, d.text(")!")]))
+            // These positions never enter a chain, so nothing else scans the
+            // operand→`!` gap — the comment the author wrote inside the parens
+            // (`new (a?.b /* c */)!()`) is this doc's to print, on the same seam the
+            // chain's parenthesized base uses.
+            let inner_start = non_null.expression.span().end;
+            Some(
+                self.build_non_null_paren_operand_doc(
+                    inner_start,
+                    non_null.span.end,
+                    inner_doc,
+                    inner_doc,
+                    ")!",
+                )
+                .unwrap_or_else(|| d.concat(&[d.text("("), inner_doc, d.text(")!")])),
+            )
         } else {
             None
         }

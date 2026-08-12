@@ -69,7 +69,7 @@ pub fn linearize_chain_from_non_null<'a>(
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(non_null.expression, &mut nodes, &mut paren_gaps);
-    nodes.push(ChainNode::non_null());
+    nodes.push(ChainNode::non_null(non_null));
     finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
@@ -218,6 +218,7 @@ fn linearize_recursive<'a>(
             let inner = &non_null.expression;
             if non_null.seals_optional_chain() {
                 nodes.push(ChainNode::base_with_paren_comment(inner, non_null.span.end));
+                nodes.push(ChainNode::non_null_after_paren_operand());
             } else {
                 linearize_recursive(inner, nodes, paren_gaps);
                 // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
@@ -233,9 +234,11 @@ fn linearize_recursive<'a>(
                 {
                     *paren_comment_end = Some(non_null.span.end);
                     *followed_by_non_null = true;
+                    nodes.push(ChainNode::non_null_after_paren_operand());
+                } else {
+                    nodes.push(ChainNode::non_null(non_null));
                 }
             }
-            nodes.push(ChainNode::non_null());
         }
 
         // TSInstantiationExpression as a call callee (`expr<T>(args)`): transparent.
