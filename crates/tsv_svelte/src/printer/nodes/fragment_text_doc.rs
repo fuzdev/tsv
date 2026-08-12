@@ -333,8 +333,8 @@ impl<'a> Printer<'a> {
             // `elements/inline_adjacent_sibling_newline_flow_prettier_divergence`.
             let separator_flows = run_has_prose
                 && cause.is_multiline()
-                && prev_node.is_some_and(|n| self.sibling_newline_flows(n))
-                && next_node.is_some_and(|n| self.sibling_newline_flows(n));
+                && self.neighbour_newline_flows(prev_node)
+                && self.neighbour_newline_flows(next_node);
             let ws_flows = newline_count == 1 && separator_flows;
             // The rule's own claim, applied literally: a flowing single newline IS the space
             // separator, differently spelled. So it takes the space arm verbatim rather than a
@@ -427,9 +427,11 @@ impl<'a> Printer<'a> {
         // it emitted itself (the NBSP F1 break).
         let separator_like_text = Self::is_separator_like_text(&text.data(self.source));
         let leading_run = &raw[..raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()];
-        let leading_newline_flows = leading_run.matches('\n').count() == 1
-            && !separator_like_text
-            && prev_node.is_some_and(|n| self.sibling_newline_flows(n));
+        let leading_newline_flows = self.boundary_newline_flows(
+            leading_run.matches('\n').count(),
+            separator_like_text,
+            prev_node,
+        );
         if multiline && prev_owns_line {
             // After a declaration tag's own line: trim the render-free run rather than printing a
             // boundary — the tag's own break_after is the line. Checked ahead of the
@@ -629,9 +631,8 @@ impl<'a> Printer<'a> {
         // spelling difference only, so it falls through to the space arms below and reflows with
         // the fill. Blank lines, comments and block elements keep the structural hardline. See
         // [`Self::sibling_newline_flows`].
-        let trailing_newline_flows = trailing_ws_newlines == 1
-            && !separator_like_text
-            && next_node.is_some_and(|n| self.sibling_newline_flows(n));
+        let trailing_newline_flows =
+            self.boundary_newline_flows(trailing_ws_newlines, separator_like_text, next_node);
         if multiline && next_owns_line {
             // Mirror of the leading arm: the tag below supplies the line, so this run is trimmed
             // rather than printed. Reached at a fragment edge too, where `is_last` already trims —
