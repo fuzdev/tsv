@@ -1191,7 +1191,14 @@ impl<'a> Printer<'a> {
             return d.text(keyword);
         };
 
-        let keyword_end = yield_expr.span.start + keyword.len() as u32;
+        // The gap starts at the end of the bare `yield`, never past a computed `*`:
+        // `yield*` is one fixed string in the OUTPUT, but in the source the `*` follows
+        // whatever the author wrote between the two (`yield/* c */* x`), so measuring the
+        // gap as `+ "yield*".len()` lands inside that comment and both scans below start
+        // past it — dropping it. A keyword's own bytes can hold no comment, so its end
+        // bounds the region exactly; the `*` then sits inside the gap, which is harmless
+        // because both readers look for comments (and `(`) rather than slicing text.
+        let keyword_end = yield_expr.span.start + "yield".len() as u32;
         // `yield` argument — an `ancestorNameMap` value position.
         self.mark_ternary_extra_indent(arg);
         let argument_start = arg.span().start;

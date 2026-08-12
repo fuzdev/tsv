@@ -168,35 +168,6 @@ pub(in crate::printer) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
     matches!(body, Expression::ConditionalExpression(_))
 }
 
-/// Check if an arrow function has trailing comments after its last parameter.
-///
-/// Returns true if there are comments between the last param and the `=>` token, e.g.:
-/// ```text
-/// (a: string, // comment
-/// ) => {}
-/// ```
-///
-/// Does NOT include comments between `=>` and the body — those are body comments,
-/// not trailing param comments.
-///
-/// `arrow_token_pos` is the byte offset of `=>` in the source — the parser-recorded
-/// `arrow.arrow_token`.
-pub(crate) fn arrow_has_trailing_param_comments<F>(
-    arrow: &internal::ArrowFunctionExpression<'_>,
-    arrow_token_pos: u32,
-    has_comments_to_emit_between: F,
-) -> bool
-where
-    F: Fn(u32, u32) -> bool,
-{
-    let Some(last_param) = arrow.params.last() else {
-        return false;
-    };
-    let param_end = last_param.span().end;
-
-    has_comments_to_emit_between(param_end, arrow_token_pos)
-}
-
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
 #[inline]
 pub(in crate::printer) fn last_arg_is_array_or_object(arguments: &[Expression<'_>]) -> bool {

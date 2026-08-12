@@ -986,7 +986,14 @@ impl<'a> Printer<'a> {
         ext_ref: &internal::TSExternalModuleReference<'_>,
     ) -> DocId {
         let d = self.d();
-        let require_open_end = ext_ref.span.start + "require(".len() as u32;
+        // From the end of the `require` KEYWORD, not from a computed `(`: `require(` is a
+        // fixed string in the OUTPUT, never in the source, so measuring the paren off the
+        // span start (`+ "require(".len()`) lands inside a comment written before it and
+        // the three scans below then start past that comment — dropping it outright
+        // (`require/* c */('m')`, every payload, and the first comment of a run). A
+        // keyword's own bytes can hold no comment, so its end bounds the region exactly and
+        // claims both sides of the `(` for the one emitter that prints this slot.
+        let require_open_end = ext_ref.span.start + "require".len() as u32;
         let literal_start = ext_ref.expression.span.start;
         let close_paren = ext_ref.span.end.saturating_sub(1);
 

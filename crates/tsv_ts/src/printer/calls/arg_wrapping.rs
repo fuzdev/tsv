@@ -17,60 +17,46 @@ use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_short_second_arg_for_expand_first,
 };
 use crate::ast::internal;
-use crate::printer::expressions::functions::has_leftmost_object_expression;
+use crate::printer::expressions::functions::{arrow_token_end, has_leftmost_object_expression};
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::has_newline_before_position;
 
-/// Build an inline arrow function signature without break points.
+/// Build an arrow function signature doc for a call-argument state.
 ///
-/// Used when we want the signature to stay on one line (e.g., `(x) =>`).
-/// Does NOT include the ` =>` - caller adds that.
-/// Handles arrows with no type parameters and no return type; param-level type
-/// annotations are fine (emitted via `build_function_parameter_doc`).
-pub(crate) fn build_arrow_inline_signature(
-    printer: &Printer<'_>,
-    arrow: &internal::ArrowFunctionExpression<'_>,
-) -> DocId {
-    let d = printer.d();
-    let mut sig_parts = DocBuf::new();
-    printer.push_async_arrow_head(&mut sig_parts, arrow);
-    if arrow.params.is_empty() {
-        sig_parts.push(
-            printer
-                .build_empty_params_with_comments_doc(arrow.params_start, arrow.body.span().start),
-        );
-    } else {
-        sig_parts.push(d.text("("));
-        sig_parts.push(
-            d.join(
-                arrow
-                    .params
-                    .iter()
-                    .map(|p| printer.build_function_parameter_doc(p)),
-                ", ",
-            ),
-        );
-        sig_parts.push(d.text(")"));
-    }
-    d.concat(&sig_parts)
-}
-
-/// Build an arrow function signature doc, choosing inline or full based on type annotations.
+/// Does NOT include the ` =>` — the caller adds that, which is why the signature→`=>` gap
+/// is claimed here (see [`Printer::append_pre_arrow_comments`]).
 ///
-/// Untyped arrows use the inline signature (no break points).
-/// Typed arrows use the full signature wrapped in a group (can break internally).
-/// Does NOT include the ` =>` - caller adds that.
+/// One builder for both shapes. An untyped arrow keeps its "no break points" property from
+/// `remove_lines` rather than from a second builder: the hand-rolled twin that used to
+/// serve it joined its parameters with a bare `", "` and asked no gap anything, so **every**
+/// comment in the list was dropped (`fn((a /* c */, b) => …)`, and the leading / later /
+/// last positions alike) while the plain arrow and the member chain printed them — the
+/// `docs/comments.md` hazard-4 shape, down to its empty arm being comment-aware and its
+/// non-empty arm not. Flattening loses nothing the twin kept: a `//` here is a parse error
+/// (`[no LineTerminator here]` precedes `=>`), and a multiline block renders inline either
+/// way — it merely stays flatter than prettier, which expands the whole call around it,
+/// a layout divergence this shape already had while the comment was being dropped.
 pub(crate) fn build_arrow_sig_doc(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
 ) -> DocId {
+    let d = printer.d();
+    // The signature→`=>` gap rides inside the group, exactly as the plain arrow path
+    // composes it. Without it this reassembly drops every comment there — the states
+    // below emit `" =>"` themselves, so no other emitter can reach the gap.
+    let sig = printer.append_pre_arrow_comments(arrow, printer.build_arrow_signature_doc(arrow));
+    // ⚠️ The two arms are NOT interchangeable, and a green fixture suite does not say they
+    // are: `remove_lines` and `group` differ inside an outer FLAT `fits` walk, which no
+    // fixture here reaches (the TODO records two such "equivalent" deletions that had to be
+    // reversed). This keeps each arm's historical layout exactly — the fix above is the gap
+    // claim, not the break policy.
     let sig = if arrow_has_return_or_type_params(arrow) {
-        printer.d().group(printer.build_arrow_signature_doc(arrow))
+        d.group(sig)
     } else {
-        build_arrow_inline_signature(printer, arrow)
+        d.remove_lines(sig)
     };
     // Every call-argument state that reassembles an arrow from signature + body starts
     // here, and none of them route the arrow through `build_expression_doc` — so this is
@@ -92,7 +78,7 @@ pub(crate) fn prepend_arrow_body_comments(
     body_start: u32,
     body_doc: DocId,
 ) -> DocId {
-    let arrow_end = arrow.arrow_token + "=>".len() as u32;
+    let arrow_end = arrow_token_end(arrow);
 
     // Prepend inline comments between `=>` and body. Glued: a single-line block
     // hugged to `=>` stays with the body across a source newline, matching the main
@@ -275,11 +261,10 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind
 
 /// Check if an arrow function has a return type or type parameters.
 ///
-/// These are the parts `build_arrow_inline_signature` can't render, so an arrow
-/// carrying either needs the full grouped signature. A param-level type annotation
-/// does NOT need it — the inline signature emits param types too (via
-/// `build_function_parameter_doc`), so a params-only-typed arrow renders identically
-/// either way.
+/// These are the parts that need real break points, so an arrow carrying either takes the
+/// grouped signature in a call-argument state while the rest take the flattened one
+/// ([`build_arrow_sig_doc`]). A param-level type annotation does NOT count: it introduces
+/// no break point of its own, so a params-only-typed arrow renders identically either way.
 pub(crate) fn arrow_has_return_or_type_params(
     arrow: &internal::ArrowFunctionExpression<'_>,
 ) -> bool {
