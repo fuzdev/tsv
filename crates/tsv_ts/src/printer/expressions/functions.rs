@@ -991,6 +991,8 @@ impl<'a> Printer<'a> {
             return doc;
         }
         let d = self.d();
+        // An arrow body is a value gap (`mark_jsdoc_cast_value_gap`).
+        self.mark_jsdoc_cast_value_gap(expr);
         // Object at leftmost position in arrow body needs parens to avoid block ambiguity.
         // Examples: `() => ({}) as T`, `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`.
         // The span target tells build_expression_doc to wrap exactly that ObjectExpression
@@ -1573,9 +1575,21 @@ impl<'a> Printer<'a> {
                 // comma as well as the param (`param_trailing_line_comment`), so a shared
                 // "same-line run" would read as answering for them too while quietly using
                 // the narrower anchor.
+                //
+                // "Same line" is the gap's anchor-line run ([`Printer::gap_anchor_line_end`]),
+                // which FOLLOWS a multi-line block to its closing `*/` line — a bare
+                // `is_same_line(param_end, …)` reads a comment glued past that `*/`
+                // (`aaaa /* x⏎y */ /* c */,`) as own-line and hands it to the next param's
+                // leading run. `leading_param_comments` reads the same split, so the two
+                // still partition the gap.
+                let anchor_line_end = if comments_present {
+                    self.gap_anchor_line_end(param_end, search_end)
+                } else {
+                    param_end
+                };
                 let same_line_blocks: CommentVec<'_> = if comments_present {
                     comments_to_emit_in_range(self.comments, param_end, search_end)
-                        .filter(|c| c.is_block && self.is_same_line(param_end, c.span.start))
+                        .filter(|c| c.is_block && c.span.start < anchor_line_end)
                         .collect()
                 } else {
                     CommentVec::new()
@@ -1614,7 +1628,14 @@ impl<'a> Printer<'a> {
                 // set, so the two partition the gap.
                 if comments_present {
                     for comment in comments_to_emit_in_range(self.comments, param_end, search_end)
-                        .filter(|c| self.param_trailing_line_comment(c, param_end, comma_pos))
+                        .filter(|c| {
+                            self.param_trailing_line_comment(
+                                c,
+                                param_end,
+                                anchor_line_end,
+                                comma_pos,
+                            )
+                        })
                     {
                         inner_parts.push(self.build_trailing_line_comment_doc(comment));
                     }
@@ -1742,6 +1763,10 @@ impl<'a> Printer<'a> {
         prev_comma_pos: Option<u32>,
         skip_delim: Option<u32>,
     ) -> CommentVec<'_> {
+        // The previous param's anchor-line run, the same split its trailing arm claims
+        // ([`Printer::gap_anchor_line_end`] — it follows a multi-line block to its closing
+        // `*/` line, so a comment glued past that `*/` still trails the previous param).
+        let anchor_line_end = self.gap_anchor_line_end(start, param_render_start);
         comments_to_emit_in_range(self.comments, start, param_render_start)
             .filter(|c| {
                 // A comment already pulled onto the opening `(` line (first param)
@@ -1767,14 +1792,14 @@ impl<'a> Printer<'a> {
                 // trailing-line arm, so it never leads this one. The comma reading is
                 // what the item reading cannot give: an author who pushed the comma onto
                 // its own line (`a⏎, // c⏎ b`) wrote the comment against the comma.
-                if self.param_trailing_line_comment(c, start, Some(comma)) {
+                if self.param_trailing_line_comment(c, start, anchor_line_end, Some(comma)) {
                     return false;
                 }
-                // Different line from prev param - definitely a leading comment
-                if !self.is_same_line(start, c.span.start) {
+                // Past the prev param's anchor-line run - definitely a leading comment
+                if c.span.start >= anchor_line_end {
                     return true;
                 }
-                // Same line as prev param: only keep block comments after the comma
+                // On the prev param's line: only keep block comments after the comma
                 // (block comments before the comma are trailing)
                 c.is_block && c.span.start >= comma
             })
@@ -1782,10 +1807,18 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether a line comment in a param's `[param_end, next_start)` gap **trails that
-    /// param** — it sits on the param's own line, or on the line of the comma that closes
-    /// it. The one statement of that claim, asked by the trailing-line emitter and by
+    /// param** — it sits inside the gap's anchor-line run, or on the line of the comma that
+    /// closes it. The one statement of that claim, asked by the trailing-line emitter and by
     /// `leading_param_comments`'s exclusion: the two must PARTITION the gap, so a spelling
     /// that drifts either drops the comment or prints it twice.
+    ///
+    /// `anchor_line_end` is that run's end ([`Printer::gap_anchor_line_end`]), passed in so
+    /// both callers hand it the same split the *block* arms partition on. It is not
+    /// `is_same_line(param_end, …)`: the run follows a multi-line block to its closing `*/`
+    /// line, and a `//` written after that `*/` (`aaaa /* x⏎y */ /* c */ // d⏎,`) is on the
+    /// param's rendered line even though it is two source lines below the param's end.
+    /// Answering with the bare anchor left it claimed by NEITHER arm — the block arm skips
+    /// it for its kind, the leading arm for its line — which is a DROP.
     ///
     /// The **comma** half is what an item-anchored reading cannot give. The comma is
     /// re-emitted structure — the printer pulls it back onto the param's line whatever the
@@ -1813,12 +1846,13 @@ impl<'a> Printer<'a> {
         &self,
         comment: &internal::Comment,
         param_end: u32,
+        anchor_line_end: u32,
         comma_pos: Option<u32>,
     ) -> bool {
         if comment.is_block {
             return false;
         }
-        let anchored = self.is_same_line(param_end, comment.span.start)
+        let anchored = comment.span.start < anchor_line_end
             || comma_pos.is_some_and(|comma| {
                 comment.span.start >= comma && self.comment_on_comma_line(comma, comment)
             });

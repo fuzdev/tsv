@@ -4,7 +4,7 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::expressions::assignment::RhsCommentInfo;
-use crate::printer::{ClassMemberModifiers, CommentSpacing, CommentVec};
+use crate::printer::{ClassMemberModifiers, CommentSpacing, CommentVec, MemberGap};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -348,30 +348,25 @@ impl<'a> Printer<'a> {
                 // it (what the trailing case does) would DROP them.
                 prev_end = member_end;
             } else if body_has_comments {
-                // The claim stops at the split: a comment hugging the next member's
-                // start leads it instead (`a = 1; /* c */ b = 2;`), emitted by its
-                // leading run above, and the cursor clamps to the same split so it
-                // stays ahead of it. With no next member nothing leads and the claim
-                // runs to the body's end as before.
-                let (upper_bound, claim_end) = match body.body.get(i + 1) {
+                // The shared trailing arm of the member-gap seam
+                // ([`Printer::member_trailing_run`]). The gap's slot floor is this
+                // family's own — a class body steps past the stray `;`s that print
+                // nothing, so a comment before one still trails its member.
+                let gap = match body.body.get(i + 1) {
                     Some(next) => {
-                        let next_start = next.span().start;
-                        let floor = self.class_member_gap_floor(member_end, next_start);
-                        (next_start, self.trailing_claim_end(floor, next_start))
+                        let start = next.span().start;
+                        MemberGap::Next {
+                            floor: self.class_member_gap_floor(member_end, start),
+                            start,
+                        }
                     }
-                    None => (body.span.end, u32::MAX),
+                    None => MemberGap::Last {
+                        list_end: body.span.end,
+                    },
                 };
-                member_parts.extend(
-                    self.build_trailing_same_line_comment_docs(
-                        member_end,
-                        upper_bound.min(claim_end),
-                    ),
-                );
-                // Update prev_end past trailing comments (including comments on the
-                // closing */ line of multi-line block comments)
-                prev_end = self
-                    .find_end_with_trailing_comments(member_end)
-                    .min(claim_end);
+                let (trailing, cursor) = self.member_trailing_run(member_end, gap);
+                member_parts.extend(trailing);
+                prev_end = cursor;
             } else {
                 prev_end = member_end;
             }

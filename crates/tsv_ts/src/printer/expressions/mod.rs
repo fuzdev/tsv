@@ -328,6 +328,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let open = cast.span.start; // the `(`
         let inner_start = cast.inner.span().start;
+        // Read BEFORE the inner is built. The mark names one node, and the inner may hold
+        // value gaps of its own (an object property, an arrow body) whose own mark
+        // overwrites it — so an answer taken after the recursion below is the innermost
+        // gap's, not this cast's, and every cast wrapping such a value lost its reflow.
+        let in_value_gap = self.jsdoc_cast_in_value_gap(cast);
         // Rule A inside the cast's own parens: a directive alone on its line in the
         // `(`→inner gap freezes the INNER verbatim, with the cast's comment and parens
         // printing around the frozen slice. Freezing the paren-stripped inner rather than
@@ -344,15 +349,38 @@ impl<'a> Printer<'a> {
             |frozen| self.build_frozen_expression_doc(cast.inner, frozen),
         );
 
-        // The owned comment, glued to the `(`. A comment the author gave a line of its
-        // own keeps it (the same predicate drives the enclosing assignment to hang, so
-        // the `(` lands indented under it); any other authored newline between the two
-        // collapses to a space, matching prettier.
+        // The owned comment, glued to the `(` — the cast is the last comment of whatever
+        // leading run precedes it, so its separator is prettier's `printLeadingComment`,
+        // the same three-way rule [`Printer::push_leading_comment_run`] applies to every
+        // other leading comment:
+        //
+        // - **hardline** when the author isolated the comment on a line of its own
+        //   (`jsdoc_cast_comment_is_own_line`). That predicate also drives the enclosing
+        //   assignment to hang, so the `(` lands indented under it — the two must agree.
+        // - **space** when something follows the `*/` on its line
+        //   ([`Printer::comment_hugs_next`]) — the `(` itself, or a comment before it.
+        // - **soft `line`** otherwise: the author broke after the `*/`, and whether that
+        //   break survives is the enclosing group's to decide. A call argument that fits
+        //   pulls the `(` back up (matching prettier); a STATEMENT, whose list keeps lines,
+        //   keeps the break.
+        //
+        // That last arm is what a bare space could not express, and it is why a plain
+        // glued run (`/* c1 */ /* c2 */⏎b;`) and a bundler annotation both kept the
+        // author's break at statement position while a cast — alone among owned comments —
+        // collapsed it.
+        //
+        // ⚠️ A **value gap** is not one of the soft `line`'s gaps: there the break is
+        // answered by rule, not by width ([`Printer::jsdoc_cast_value_gap_target`]), so it
+        // reflows to the space and both authorings reach the one fixed point every wide
+        // cast already takes. Deciding it by width instead broke the gap without hanging
+        // the value, landing the `(` at the statement's own indent.
         let comment_doc = self.build_comment_doc(&cast.comment);
         let comment_gap = if jsdoc_cast_comment_is_own_line(cast, self.source) {
             d.hardline()
-        } else {
+        } else if self.comment_hugs_next(&cast.comment) || in_value_gap {
             d.text(" ")
+        } else {
+            d.line()
         };
         let lead = d.concat(&[comment_doc, comment_gap]);
         let with_lead = |paren_doc: DocId| d.concat(&[lead, paren_doc]);
