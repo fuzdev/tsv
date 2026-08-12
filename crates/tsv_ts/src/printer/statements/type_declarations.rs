@@ -7,7 +7,9 @@ use crate::printer::ignore::is_freeze_target;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
-use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
+use crate::printer::{
+    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, MemberGap,
+};
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
@@ -927,10 +929,11 @@ impl<'a> Printer<'a> {
         // collect, format-ignore lookup, trailing-comment scan, trailing-body
         // comments). Sound because comments are disjoint + start-sorted and every
         // sub-range lies within `[body_start, body_end)`. Blank-line preservation
-        // is comment-independent and stays outside the gate; `prev_end` here is
-        // `member.span().end` (no comma / trailing-comment walk), so it needs no
-        // gating either.
+        // is comment-independent and stays outside the gate.
         let body_has_comments = self.has_comments_on_page_between(body_start, body_end);
+        // Set when the member just emitted deferred a line comment past its own `;`, so
+        // its doc ends on a later line than the `;` and cannot carry that line's comments.
+        let mut prev_deferred_line_comment = false;
 
         for (i, member) in members.iter().enumerate() {
             let member_start = member.span().start;
@@ -956,7 +959,7 @@ impl<'a> Printer<'a> {
                             !self.comment_already_trailed(
                                 Some(prev_end),
                                 c,
-                                false,
+                                prev_deferred_line_comment,
                                 Some(member_start),
                             )
                         })
@@ -1002,31 +1005,35 @@ impl<'a> Printer<'a> {
             };
             parts.push(member_doc);
 
-            // Handle trailing inline comments on the same line after the member —
-            // single- or multi-line block, matching prettier and the type-literal /
-            // class member printers (a multi-line block trailing the last member was
-            // previously skipped here and then dropped entirely). The claim stops at
-            // the split ([`Printer::trailing_claim_end`] — the member span includes
-            // its separator, so the span end is the gap's slot floor): a comment whose
-            // glue chain reaches the next member's start leads it (`a: A; /* c */ b`),
-            // emitted by the leading filter above, so trailing it here too would
-            // duplicate it.
-            if body_has_comments {
-                let member_end = member.span().end;
-                let claim_end = match members.get(i + 1) {
-                    Some(next) => self.trailing_claim_end(member_end, next.span().start),
-                    None => body_end,
+            // Trailing same-line comments after the member, and the cursor advanced past
+            // them — the shared member-gap trailing arm ([`Printer::member_trailing_run`],
+            // the same call the class body makes). The member span includes its separator,
+            // so the span end IS this family's gap floor.
+            let member_end = member.span().end;
+            prev_deferred_line_comment =
+                body_has_comments && self.terminator_defers_line_comment(member_start, member_end);
+            if prev_deferred_line_comment {
+                // …unless this member's doc ends with a line comment its member→`;` gap
+                // deferred past the `;`. Nothing may share that line, so leaving `prev_end`
+                // at the `;` hands the comments to the next member's leading run; appending
+                // them here instead lands them in the same `line_suffix` flush, where a
+                // second `//` WELDS onto the first (the pair reparsing as one comment) and
+                // a block comes out REORDERED ahead of it.
+                prev_end = member_end;
+            } else if body_has_comments {
+                let gap = match members.get(i + 1) {
+                    Some(next) => MemberGap::Next {
+                        floor: member_end,
+                        start: next.span().start,
+                    },
+                    None => MemberGap::Last { list_end: body_end },
                 };
-                for comment in comments_to_emit_in_range(self.comments, member_end, claim_end) {
-                    if self.is_same_line(member_end, comment.span.start) {
-                        parts.push(self.build_trailing_comment_doc(comment));
-                    } else {
-                        break; // Only same-line comments
-                    }
-                }
+                let (trailing, cursor) = self.member_trailing_run(member_end, gap);
+                parts.extend(trailing);
+                prev_end = cursor;
+            } else {
+                prev_end = member_end;
             }
-
-            prev_end = member.span().end;
         }
 
         // Handle trailing comments after the last member (before closing `}`)
@@ -1034,7 +1041,7 @@ impl<'a> Printer<'a> {
             parts.extend(self.build_trailing_body_comments_doc(
                 prev_end,
                 body_end.saturating_sub(1),
-                false,
+                prev_deferred_line_comment,
             ));
         }
 
@@ -1250,6 +1257,8 @@ impl<'a> Printer<'a> {
 
         // Initializer: ` = value`
         if let Some(init) = &member.initializer {
+            // An enum member's `=` is a value gap (`mark_jsdoc_cast_value_gap`).
+            self.mark_jsdoc_cast_value_gap(init);
             let init_doc = self.build_expression_doc(init);
 
             // Extract comments between `=` and initializer value

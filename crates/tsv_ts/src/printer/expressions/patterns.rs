@@ -1211,6 +1211,9 @@ impl<'a> Printer<'a> {
         //
         // Rides the zero-comment gate above: a directive is a comment, so a comment-free
         // gap provably holds none — and `eq_pos` is a real `=` position only there.
+        // A binding default's `=` is a value gap, and object, array and parameter defaults
+        // all land here (`mark_jsdoc_cast_value_gap`).
+        self.mark_jsdoc_cast_value_gap(pattern.right);
         let frozen = gap_has_comments
             .then(|| self.value_head_frozen_span(eq_pos + 1, pattern.right.span()))
             .flatten();

@@ -20,7 +20,11 @@ use tsv_lang::doc::arena::DocId;
 /// What [`Printer::build_statement_list_docs_into`] leaves for its caller's end-of-body
 /// comment emitter.
 pub(in crate::printer) struct StatementListTail {
-    /// Source cursor past everything the walk emitted.
+    /// Source cursor past everything the walk emitted — and therefore the position the
+    /// caller's end-of-body run must open at. It is not `last_stmt_end` advanced past that
+    /// statement's trailing comments: a body ending in dropped `;`s leaves the cursor past
+    /// them, which is what keeps a blank the author left before a `;` from reading as a
+    /// blank before the trailing run.
     pub prev_end: u32,
     /// End of the last statement actually printed; `None` when the walk printed none.
     pub last_stmt_end: Option<u32>,
@@ -194,18 +198,18 @@ impl<'a> Printer<'a> {
         // Preserve blank lines between last statement and trailing comments, and between
         // comments — the shared end-of-body run, same emitter the class/interface/enum/
         // type-literal/namespace bodies use.
-        if let Some(last_stmt_end) = tail.last_stmt_end {
-            // A last statement that deferred a line comment past its own `;` trailed
-            // nothing on that line, and there is no further statement to lead — so this
-            // run claims them, and its anchor must stay at the `;` rather than advancing
-            // past the very comments it has to print (`terminator_defers_line_comment`).
-            let trailing_start = if tail.claims_trailing {
-                tail.prev_end
-            } else {
-                self.find_end_with_trailing_comments(last_stmt_end)
-            };
+        if tail.last_stmt_end.is_some() {
+            // The walk's own cursor, never a recomputed `find_end_with_trailing_comments`
+            // over the last PRINTED statement: the two agree everywhere except a body
+            // ending in dropped `;`s, where the recompute rewinds behind them and reads a
+            // blank the author left *before* a `;` as a blank before this run
+            // (`{ a();⏎⏎;⏎/* c */ }` gained a blank line prettier drops — and the program
+            // walk, which already used the cursor, did not). It also carries the deferred
+            // case for free: a last statement that deferred a line comment past its own
+            // `;` left the cursor AT that `;`, which is where this run's anchor has to
+            // stand — advancing past the very comments it must print would drop them.
             body_parts.extend(self.build_trailing_body_comments_doc(
-                trailing_start,
+                tail.prev_end,
                 block_end,
                 tail.claims_trailing,
             ));
@@ -301,8 +305,22 @@ impl<'a> Printer<'a> {
                     stmt_end
                 };
 
+                // `prev_deferred_line_comment` reaches the ORPHAN run too, the way it does
+                // the printing run below: the previous statement deferred a line comment
+                // past its own `;` and so trailed NOTHING on that line, which leaves this
+                // run its only emitter. Answering `false` here made the filter call the
+                // gap's comments already-trailed and skip them — a DROP, since the dropped
+                // `;` puts no leading run after them either
+                // (`a = 1 // c1⏎; /* c2 */ ;⏎b = 2;`). The switch consequent's own orphan
+                // arm has always passed it; this copy is the one that drifted.
                 let mut leading_comments = if body_has_comments {
-                    self.collect_leading_comments(prev_end, search_end, prev_stmt_end, false, None)
+                    self.collect_leading_comments(
+                        prev_end,
+                        search_end,
+                        prev_stmt_end,
+                        prev_deferred_line_comment,
+                        None,
+                    )
                 } else {
                     CommentVec::new()
                 };

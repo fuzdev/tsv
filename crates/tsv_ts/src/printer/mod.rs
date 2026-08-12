@@ -56,7 +56,7 @@ pub(crate) use analysis::{
 };
 pub(crate) use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
-    OwnedCommentEffect, StandaloneGlue,
+    MemberGap, OwnedCommentEffect, StandaloneGlue,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
@@ -245,6 +245,21 @@ pub struct Printer<'a> {
     /// operand, a non-null assertion's operand). Keyed by span and not consumed, like
     /// the two targets above.
     pub(crate) ternary_hang_target: Cell<Option<Span>>,
+    /// Span of a JSDoc cast sitting directly in a **value gap**, whose comment→`(`
+    /// separator therefore reflows to a space instead of taking the soft `line`
+    /// ([`Printer::build_jsdoc_cast_doc`]).
+    ///
+    /// The gap the cast's comment sits in is a value gap or it isn't, and only the
+    /// enclosing printer knows which — the byte before the comment cannot tell an object
+    /// value's `key:` from a `label:`. So the value gaps record their cast here
+    /// ([`Printer::mark_jsdoc_cast_value_gap`]) and the cast reads it, exactly as the three
+    /// targets above route a parent's fact into a child. Keyed by span and not consumed,
+    /// like them: a cast rebuilt across conditional-group variants must answer the same way
+    /// every time, and a cast nested deeper (a call argument inside the value) has a
+    /// different span and so is left alone — which is the point, since only the direct
+    /// value's break is the one `docs/conformance_prettier.md` §Authored breaks in value
+    /// position reflows.
+    pub(crate) jsdoc_cast_value_gap_target: Cell<Option<Span>>,
     /// The parent context for a curried arrow-chain value, set by the enclosing
     /// printer (assignment chokepoint, call-argument printer, binary-operand
     /// printer) just before the chain is built. The arrow printer reads and
@@ -350,6 +365,7 @@ impl<'a> Printer<'a> {
             arrow_body_object_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
             ternary_hang_target: Cell::new(None),
+            jsdoc_cast_value_gap_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
             chain_arg_share_active: Cell::new(false),

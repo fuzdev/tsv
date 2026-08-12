@@ -37,7 +37,7 @@ mod scan;
 
 pub(crate) use declarations::{ClassMemberModifiers, HeritageKeyword};
 pub(super) use element_comma::{block_is_before_comma, run_defers_line};
-pub(crate) use lists::{BlankRule, StandaloneGlue};
+pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
 pub(crate) use owned::OwnedCommentEffect;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.

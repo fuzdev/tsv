@@ -1,0 +1,943 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 563,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " At the start of the body, where the run has no previous statement to break from.",
+			"start": 10,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x0\ny0 ",
+			"start": 95,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A multi-line block glued to the next statement adds no blank line above the run.",
+			"start": 116,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 208,
+			"end": 213,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x1\ny1 ",
+			"start": 215,
+			"end": 227,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same after an own-line block comment.",
+			"start": 236,
+			"end": 280,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 289,
+			"end": 297,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x2\ny2 ",
+			"start": 299,
+			"end": 311,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank line the author wrote above the run is still preserved.",
+			"start": 320,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 395,
+			"end": 400,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x3\ny3 ",
+			"start": 403,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same rules inside a block body.",
+			"start": 424,
+			"end": 462,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 483,
+			"end": 488,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x4\ny4 ",
+			"start": 491,
+			"end": 504,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 29,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 522,
+			"end": 527,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x5\ny5 ",
+			"start": 530,
+			"end": 543,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 2
+				},
+				"end": {
+					"line": 34,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 562,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 553,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 36,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 108,
+					"end": 113,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 7
+						},
+						"end": {
+							"line": 4,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 108,
+						"end": 112,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 7
+							},
+							"end": {
+								"line": 4,
+								"column": 11
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 108,
+							"end": 110,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 9
+								}
+							},
+							"name": "a0"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At the start of the body, where the run has no previous statement to break from.",
+							"start": 10,
+							"end": 93
+						},
+						{
+							"type": "Block",
+							"value": " x0\ny0 ",
+							"start": 95,
+							"end": 107
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 201,
+					"end": 206,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 201,
+						"end": 205,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 201,
+							"end": 203,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"name": "a1"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block glued to the next statement adds no blank line above the run.",
+							"start": 116,
+							"end": 199
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 228,
+					"end": 233,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 7
+						},
+						"end": {
+							"line": 10,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 228,
+						"end": 232,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 7
+							},
+							"end": {
+								"line": 10,
+								"column": 11
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 228,
+							"end": 230,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 9
+								}
+							},
+							"name": "b1"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 208,
+							"end": 213
+						},
+						{
+							"type": "Block",
+							"value": " x1\ny1 ",
+							"start": 215,
+							"end": 227
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 282,
+					"end": 287,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 282,
+						"end": 286,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 282,
+							"end": 284,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 13,
+									"column": 3
+								}
+							},
+							"name": "a2"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same after an own-line block comment.",
+							"start": 236,
+							"end": 280
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 312,
+					"end": 317,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 7
+						},
+						"end": {
+							"line": 16,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 312,
+						"end": 316,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 7
+							},
+							"end": {
+								"line": 16,
+								"column": 11
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 312,
+							"end": 314,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 9
+								}
+							},
+							"name": "b2"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 289,
+							"end": 297
+						},
+						{
+							"type": "Block",
+							"value": " x2\ny2 ",
+							"start": 299,
+							"end": 311
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 388,
+					"end": 393,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 388,
+						"end": 392,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 1
+							},
+							"end": {
+								"line": 19,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 388,
+							"end": 390,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 1
+								},
+								"end": {
+									"line": 19,
+									"column": 3
+								}
+							},
+							"name": "a3"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line the author wrote above the run is still preserved.",
+							"start": 320,
+							"end": 386
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 416,
+					"end": 421,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 7
+						},
+						"end": {
+							"line": 23,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 416,
+						"end": 420,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 7
+							},
+							"end": {
+								"line": 23,
+								"column": 11
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 416,
+							"end": 418,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 9
+								}
+							},
+							"name": "b3"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 395,
+							"end": 400
+						},
+						{
+							"type": "Block",
+							"value": " x3\ny3 ",
+							"start": 403,
+							"end": 415
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 464,
+					"end": 552,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 473,
+						"end": 476,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 10
+							},
+							"end": {
+								"line": 26,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 479,
+						"end": 552,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 16
+							},
+							"end": {
+								"line": 35,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 505,
+								"end": 510,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 8
+									},
+									"end": {
+										"line": 29,
+										"column": 13
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 505,
+									"end": 509,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 8
+										},
+										"end": {
+											"line": 29,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 505,
+										"end": 507,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 8
+											},
+											"end": {
+												"line": 29,
+												"column": 10
+											}
+										},
+										"name": "a4"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 483,
+										"end": 488
+									},
+									{
+										"type": "Block",
+										"value": " x4\ny4 ",
+										"start": 491,
+										"end": 504
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 514,
+								"end": 519,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 514,
+									"end": 518,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 514,
+										"end": 516,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 4
+											}
+										},
+										"name": "b4"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 544,
+								"end": 549,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 8
+									},
+									"end": {
+										"line": 34,
+										"column": 13
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 544,
+									"end": 548,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 8
+										},
+										"end": {
+											"line": 34,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 544,
+										"end": 546,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 8
+											},
+											"end": {
+												"line": 34,
+												"column": 10
+											}
+										},
+										"name": "c4"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c5",
+										"start": 522,
+										"end": 527
+									},
+									{
+										"type": "Block",
+										"value": " x5\ny5 ",
+										"start": 530,
+										"end": 543
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same rules inside a block body.",
+							"start": 424,
+							"end": 462
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

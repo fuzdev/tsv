@@ -659,6 +659,14 @@ impl<'a> Printer<'a> {
                     let lhs_doc = d.concat(&lhs_parts);
 
                     // Build RHS: comments (with proper separators) + value
+                    //
+                    // This arm hangs the value itself instead of routing through
+                    // `build_assignment_layout`, so it owes that builder's value-gap mark:
+                    // a `:`→value gap is a value gap whichever arm prints it, and a JSDoc
+                    // cast here reflows its comment→`(` break like any other value's.
+                    // Without the mark the cast took the width-decided soft `line` and this
+                    // arm's own hang then split the comment from its `(`.
+                    self.mark_jsdoc_cast_value_gap(&prop.value);
                     let comments_doc = self
                         .build_value_gap_comments_opt(colon_pos + 1, value_start)
                         .unwrap_or_else(|| d.empty());
