@@ -241,7 +241,7 @@ impl<'a> Printer<'a> {
         // a later rescan blind to the prose *before* it in the same run.
         let (mut run_end, mut run_has_prose) = (0usize, false);
         for (i, node) in trimmed_nodes.iter().enumerate() {
-            if multiline && i >= run_end {
+            if i >= run_end {
                 (run_end, run_has_prose) = self.scan_inline_run(trimmed_nodes, i);
             }
             if i > 0 && is_inline_content(&trimmed_nodes[i - 1]) {

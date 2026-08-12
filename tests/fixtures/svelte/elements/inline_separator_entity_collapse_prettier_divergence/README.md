@@ -36,11 +36,11 @@ consequence and must not be restated as one.
 The three non-text sibling kinds — an expression-tag pair, an element pair and a component pair —
 each in the converged inline form, plus the two other authorings of that same document:
 
-- `prettier_variant_boundary_newline_entity.svelte` — the content boundaries newline-authored.
-  tsv normalizes it to `input`; prettier keeps it as its own stable form. That authoring is the
-  whole divergence: the entity separator only decided the layout when the boundary was
-  newline-authored, because that is the only case in which the boundary had a layout left to
-  select.
+- `variant_boundary_newline_entity.svelte` — the content boundaries newline-authored.
+  **Dual-stable**: the authored air is the author's and both formatters preserve it (see
+  [inline_boundary_air](../inline_boundary_air/)). What it pins here is that the entity
+  separator does not pick a layout inside that preserved air either — the separator's spelling
+  is inert on both sides of the boundary question.
 - `prettier_variant_boundary_space_entity.svelte` — the boundaries space-authored, the third
   point of the hug ↔ space ↔ newline triangle. tsv normalizes it to `input` too (a render-free
   boundary run is trimmed whole); prettier holds a stable form per authoring, so one document

@@ -425,9 +425,12 @@ impl<'a> Printer<'a> {
         // `<a>\n  text<span>text</span></a>` collapses (no trailing break).
         // `<span>  \n  {expr}</span>` collapses — but because it has no TRAILING break, not
         // because of the leading spaces: both boundaries route through the same run predicate.
-        // A fill ([`Self::content_is_reflowable_fill`]) stays inline even with both breaks —
-        // `{a} {b}`, and equally `<Comp /> text1 <Comp />` or `text1 <code>a</code>`, since what
-        // makes the boundary inert is the fill, not the separator's shape.
+        // A fill ([`Self::content_is_reflowable_fill`]) no longer changes that answer: the
+        // boundary is the author's air whatever the content is made of, so `{a} {b}` and
+        // `<Comp /> text1 <Comp />` preserve it exactly as glued content does. The fill answer
+        // still governs the two INTERIOR arms below — a newline the fill itself wrapped in must
+        // not be re-read as authoring — which is the distinction the old boundary conjunct
+        // conflated.
         //
         // Both edges come from `nodes_boundary_newline` — the single boundary-authoring
         // question. It is a RUN predicate (does the edge whitespace run contain a newline?),
@@ -444,7 +447,19 @@ impl<'a> Printer<'a> {
         // here was dead: `compute_multiline_cause` reaches this function only past its `is_empty`
         // return and only when `!only_text_content`, i.e. only when some node is not a `Text` —
         // and the trim above drops whitespace-only *text* alone, so that node is inside `run`.
-        if boundary.both() && !is_fill {
+        // Both boundaries authored — the air is the author's, whatever the content is made of.
+        // This is the SAME question the component arm above answers with `boundary.both()` and
+        // the block arm with `boundary.leading`, so asking it identically here is what makes one
+        // rule out of three: an inline element used to fold air a component in the identical
+        // shape kept, a split keyed on the container's classification rather than on anything the
+        // rule is about (`<span>` / `<a>` / `<td>` / `<label>` vs `<Comp>` / `<p>`).
+        //
+        // The conjunct removed here was `!is_fill`, on the reasoning that a run with a whitespace
+        // seam has a fill to reflow into and therefore does not need its boundary preserved. That
+        // is true of the run's INTERIOR — which is why `is_fill` still suppresses the two
+        // interior-newline arms below — but not of the element's own boundary, where a newline is
+        // the only air the author can express and prettier preserves it in every shape probed.
+        if boundary.both() {
             return ContentBreaks {
                 multiline: true,
                 is_fill,

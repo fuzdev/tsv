@@ -45,18 +45,18 @@ each in the converged inline form, with two authorings:
 - `unformatted_tab.svelte` — the tab spelling with the boundaries already hugged. **Both**
   formatters normalize this to `input`, so it is the control that isolates the defect: the tab
   alone was never the problem.
-- `unformatted_ours_boundary_newline_tab.svelte` — the tab spelling with the content boundaries
-  newline-authored. Only tsv normalizes it to `input`; prettier settles on its own stable form,
-  pinned as `divergent_variant_boundary_newline_tab.svelte`.
+- `variant_boundary_newline_tab.svelte` — the same document with the content boundaries
+  newline-authored. **Dual-stable**: the authored air is preserved by both formatters (see
+  [inline_boundary_air](../inline_boundary_air/), where the tab spelling of that form is pinned
+  as an `unformatted_*`), and its separators are spelled as spaces, which is the tab rule this
+  fixture is about applied inside the preserved air.
 
-`divergent_variant_*` rather than `prettier_variant_*` is the load-bearing part of that pin, and it
-is what the divergence actually looks like: prettier's form spells the tag-pair and component-pair
-separators as **newlines** — and tsv does not normalize those back to `input`, since a pure-sibling
-run authored across lines keeps its lines (the asymmetry above) — while the element pair's separator
-prettier had already joined onto one line. So tsv rewrites prettier's form to a *third* stable form,
-collapsing only that element pair. Reading that pin
-next to `input` shows the frontier directly: tsv converges the tab with the space and holds the
-newline apart, on all three sibling kinds.
+`variant_*` rather than `prettier_variant_*` is the load-bearing part of that pin: the form is
+stable under **both** formatters, so the boundary axis carries no divergence at all. Its
+separators are spelled as spaces on every sibling kind, and a pure-sibling run authored across
+lines keeps its lines (the asymmetry above), so reading it next to `input` shows the frontier
+directly: tsv converges the tab with the space and holds the newline apart, on all three sibling
+kinds, whether or not the content boundaries carry air.
 
 Together they locate the rule-1 violation precisely: the spelling only decided the layout when the
 boundary was newline-authored, because that is the only case in which the boundary had a layout to

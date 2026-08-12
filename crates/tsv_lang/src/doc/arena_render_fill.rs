@@ -141,26 +141,38 @@ pub(super) fn render_fill_iterative(
         // Case 1 is deliberately excluded (`offset + 1 < parts.len()`): there the `line` is the
         // fill's last item, a boundary separator to whatever FOLLOWS the fill, and its existing
         // `rest_commands` measurement already asks the right question.
-        let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
-            let mut with_sep: SmallVec<[ArenaCommand; 8]> = if is_final_segment {
-                boundary_lookahead(arena, context, rest_commands)
+        //
+        // ⚠️ `flow_forced_break` is excluded too, and for a reason the parity shift makes easy to
+        // miss: this branch OVERWRITES `content_fits`, so folding the separator in here also
+        // discards the forced-break short-circuit computed above. A following node that is already
+        // multiline can never "fit" — measuring it flat short-circuits at its own hardline and
+        // reports a fit — so the welded unit would weld onto the line and open the follower's tag
+        // mid-line. The parity shift is exactly the leading-`line` case, so the loss was invisible
+        // to every run whose fill starts with a word: `text1 var(<Comp…>` travelled while
+        // `{expr1} var(<Comp…>` did not, one rule with two answers keyed on the PREDECESSOR
+        // (`inline_welded_run_travel_after_boundary`).
+        let content_fits =
+            if !flow_forced_break && offset + 1 < parts.len() && arena.is_collapsible_line(content)
+            {
+                let mut with_sep: SmallVec<[ArenaCommand; 8]> = if is_final_segment {
+                    boundary_lookahead(arena, context, rest_commands)
+                } else {
+                    SmallVec::new()
+                };
+                with_sep.push(ArenaCommand {
+                    indent,
+                    mode: Mode::Flat,
+                    doc: parts[offset + 1],
+                });
+                let budget = if final_with_rest {
+                    remaining
+                } else {
+                    available
+                };
+                fits_flat(content, &with_sep, budget)
             } else {
-                SmallVec::new()
+                content_fits
             };
-            with_sep.push(ArenaCommand {
-                indent,
-                mode: Mode::Flat,
-                doc: parts[offset + 1],
-            });
-            let budget = if final_with_rest {
-                remaining
-            } else {
-                available
-            };
-            fits_flat(content, &with_sep, budget)
-        } else {
-            content_fits
-        };
 
         // A short inline element (its own content fits flat) that dropped to its own line — whether
         // pushed there by a preceding break (already at line start) or dropped mid-fill below — no

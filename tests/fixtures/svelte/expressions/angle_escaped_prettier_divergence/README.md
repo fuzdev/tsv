@@ -51,7 +51,7 @@ element whose content went multiline *because of* these same newlines, collapsin
 delete the break that chose the multiline layout, and the next pass would split the run back
 apart — so the rule stands down there and the tags keep their authored lines. That boundary is
 pinned by
-[inline_content_spaced_tags_tail_long](../../elements/inline_content_spaced_tags_tail_long/).
+[inline_content_spaced_tags_tail_long](../../elements/inline_content_spaced_tags_tail_long_prettier_divergence/).
 
 See
 [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

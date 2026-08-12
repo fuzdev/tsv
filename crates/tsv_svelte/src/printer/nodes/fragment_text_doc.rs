@@ -253,7 +253,23 @@ impl<'a> Printer<'a> {
                 // settle on a stable (if authoring-dependent) form there — the sanctioned
                 // Tier-2 element-expansion class, not this bug. A tag has no such structure
                 // to protect, so the bare break is strictly better.
-                if next_is_tag {
+                //
+                // ⚠️ A FLOWING run is the exception, and it is the same question the multiline
+                // arm's `next_is_tag && separator_flows` case asks — asked here so one run's
+                // interior does not depend on WHY its element went multiline. A width-broken
+                // element and a newline-authored one lay the same prose run out identically:
+                // both defer to the next sibling's per-width `group([line, tag])`, so the run
+                // packs. Without this the two modes hold contradictory interior policies — the
+                // bare `line` resolves all-or-nothing with the parent group, which is already
+                // broken whenever the element overflowed, so every separator in the run breaks
+                // while the newline-authored twin packs. That difference is invisible while the
+                // reflowable-fill suppression keeps the authored form out of the multiline arm,
+                // and becomes a two-pass cycle the moment it doesn't
+                // (`inline_content_spaced_tags_tail_long`).
+                let flows = run_has_prose
+                    && self.neighbour_newline_flows(prev_node)
+                    && self.neighbour_newline_flows(next_node);
+                if next_is_tag && !flows {
                     child_docs.push(d.line());
                 } else {
                     // Signal the next inline element to lead with a line.
@@ -324,9 +340,9 @@ impl<'a> Printer<'a> {
             // to the content, so collapsing it cannot touch the element's own boundary newlines,
             // which are what the multiline decision reads. Both spellings converge, for element
             // and tag siblings alike, and `authoring:audit` is the standing guard.
-            // `elements/inline_content_spaced_tags_tail_long` is unaffected: its content is a
-            // reflowable fill, so the source-breaks signal is suppressed before it reaches here
-            // ([`Self::content_is_reflowable_fill`]) and the gate never opens for it.
+            // `elements/inline_content_spaced_tags_tail_long` reaches the SAME interior through
+            // the non-multiline arm above (a width-broken element), which is what keeps one prose
+            // run from having two layouts depending on why its element expanded.
             //
             // Widening it makes tsv converge a tag pair onto one line where prettier splits it —
             // a deliberate divergence in the same family as the rest of this rule, pinned by
