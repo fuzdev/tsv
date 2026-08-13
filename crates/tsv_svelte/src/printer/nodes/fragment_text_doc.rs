@@ -8,7 +8,7 @@
 
 use super::element_doc::MultilineCause;
 use super::fragment_doc::text_starts_with_linebreak;
-use super::helpers::is_inline_content;
+use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{FragmentNode, is_collapsible_ws_char, split_collapsible_ws};
 use crate::printer::Printer;
 use smallvec::SmallVec;
@@ -187,6 +187,10 @@ impl<'a> Printer<'a> {
             .is_some();
         let next_is_inline = next_node.is_some_and(is_inline_content) || comment_glued_next_flow;
         let next_is_tag = next_node.is_some_and(Self::is_tag_node);
+        // Whether the next sibling is a control-flow block — consulted ONLY by the spaced half
+        // of `break_before_wide_flow` below (never folded into `next_is_flow_or_tag`, whose
+        // other readers key the leading-side arms and the inline-sibling wrap on the flow set).
+        let next_is_rendering_block = next_node.is_some_and(is_control_flow_block);
         // Whether the next sibling is an HTML *inline* element vs a *block* element —
         // the two kinds prettier-plugin-svelte trims boundary whitespace *into* (the
         // trimmed text emits nothing; the element's own group([line, …]) /
@@ -418,6 +422,10 @@ impl<'a> Printer<'a> {
         // incorrectly separating the closing tag from trailing text.
         let prev_will_break = child_docs.last().is_some_and(|&doc| d.will_break(doc));
         let mut leading_line = false;
+        // The authored-newline hold (set only by the flow-probe arm below): the fill's
+        // leading line renders as a forced break iff the probed predecessor rendered
+        // multiline. Carried to the fill wrapper beside `break_before_wide_flow`.
+        let mut hold_boundary = false;
         // The mirror of the whitespace-only rule above, on a content text's *leading* run: a
         // SINGLE leading newline after flowing inline content is a spelling difference only, so
         // it falls through to the space arms below and reflows with the fill instead of pinning a
@@ -482,14 +490,13 @@ impl<'a> Printer<'a> {
             // strand a leading space — `space_after_block_prettier_divergence`).
             trim_left = true;
         } else if has_leading_ws && !is_first && position.prev_is_inline() {
-            // The **terminal fold** is the one shape that does not take the run's own fill
-            // `line` — a last text after a predecessor carrying no forced break. Everything else
-            // falls through to `leading_line` below, so the exception is the condition and there
-            // is one body rather than two identical ones.
-            //
-            // Pop the last doc (the inline element) and fold the trailing words into ONE fill so a
-            // wide element wraps its own content within printWidth and the words pack after it —
-            // see `build_after_element_fold`.
+            // Two shapes here do not take the run's own bare fill `line`: an AUTHORED-NEWLINE
+            // boundary (the probe arm — the fill still leads with its `line`, carrying the
+            // layout-keyed hold), and the **terminal fold** (a last text after a predecessor
+            // carrying no forced break, folded into one fill so a wide element wraps its own
+            // content within printWidth and the words pack after it —
+            // `build_after_element_fold`). Everything else falls through to `leading_line`
+            // below.
             //
             // The fold's head is the popped unit, so its leading boundary is the one in front of
             // `prev_sibling_head` — the same question `glued_lead` asks of a text run, asked here
@@ -497,13 +504,67 @@ impl<'a> Printer<'a> {
             // at that boundary, so the drop would INJECT a rendered space (`</code>/` `<code>`),
             // and the mangled form is its own fixed point, so F1 cannot see it.
             trim_left = true;
-            if is_last && !prev_is_tag && !prev_will_break {
+            // Whether the author spelled this boundary as a SINGLE newline. In a multiline
+            // container only the flow rule lets a newline reach this arm (it re-spells one as
+            // the space); in an inline container (`multiline` false) the hardline arms above
+            // are skipped, so a blank-line run can arrive too — the exact count keeps a blank
+            // out of the layout-keyed rule, which is defined over the single-newline spelling.
+            let authored_newline = leading_run.matches('\n').count() == 1;
+            let glued_head =
+                self.leading_boundary_glued(trimmed_nodes, prev_sibling_head, content_bounds.0);
+            if authored_newline && !prev_is_tag && !separator_like_text && !glued_head {
+                // AN AUTHORED NEWLINE AFTER AN ELEMENT/COMPONENT FOLLOWS THE UNIT'S RENDERED
+                // LAYOUT. The boundary builds exactly like the space spelling — the run's own
+                // fill `leading_line` — plus two flags: the popped predecessor carries
+                // `flow_break_probe` (the renderer records whether its subtree actually
+                // emitted a newline), and the fill carries `hold_line_after_broken_flow` (its
+                // leading line renders as a forced break when the probe answered yes). So
+                // `</a>⏎text` beside an element that RENDERS multiline keeps the text's own
+                // line, while the same authoring beside one that renders inline reflows with
+                // the fill and converges with the space spelling — layout-keyed at render,
+                // with no build-side prediction (a width-broken text-only element is
+                // statically collapsible on every pass, so `will_break` could never see it)
+                // and NO measurement change: an outer fits walk sees an ordinary fill whose
+                // leading line is an ordinary break opportunity. A `group([element, line])`
+                // join here is NOT equivalent — it gets measured through by the preceding
+                // boundary's fit walk (the tail's leading break point vanishes from the
+                // measurement space between element and tail), re-breaking that boundary on
+                // the re-parse: a 2-cycle only the width sweep can see. Cataloged in
+                // conformance_prettier_svelte.md §Svelte:
+                // Inline content block-style ("An authored newline after the closing tag");
+                // `elements/tail_newline_after_multiline_prettier_divergence`.
+                //
+                // Excluded, each falling through to the arms below unchanged:
+                // - a TAG predecessor (`{expr}⏎text`) keeps the unconditional flow — a tag's
+                //   break lands inside its own expression, leaving its adjacencies untouched,
+                //   so the "tag pile" reading this rule preserves does not arise;
+                // - a separator-like text (NBSP-only), which never flows anywhere;
+                // - a GLUED-headed popped unit (`text1<a>…</a>⏎text2`): its doc carries the
+                //   welded-run marker, and wrapping it in a fresh probe context would bury
+                //   that marker from the welded walk (`debug_check_buried_welded_marker`).
+                //   That shape keeps the per-width `leading_line`.
+                //
+                // A predecessor inside its inline-sibling wrap participates: the probe flag
+                // goes on the element INSIDE the wrap (strip → flag → re-wrap through the
+                // named producer, so the wrap's shape contract holds), and the lead boundary
+                // stays an independent decision — the probe changes no measurement, so the
+                // wrap's own fit walk is untouched and the comment-hug fixed point stands
+                // (`inline_sibling_drop_tail_flow_long`).
                 if let Some(last_doc) = child_docs.pop() {
-                    let glued_head = self.leading_boundary_glued(
-                        trimmed_nodes,
-                        prev_sibling_head,
-                        content_bounds.0,
-                    );
+                    let flagged = self.rejoin_inside_leading_wrap(last_doc, |el| {
+                        d.with_context(
+                            el,
+                            tsv_lang::doc::DocContext::default().with_flow_break_probe(true),
+                        )
+                    });
+                    child_docs.push(flagged);
+                    hold_boundary = true;
+                }
+                leading_line = true;
+            } else if is_last && !prev_is_tag && !prev_will_break {
+                // The **terminal fold** — see the arm comment above. Space-spelled boundaries
+                // only; the newline spelling takes the probe arm above.
+                if let Some(last_doc) = child_docs.pop() {
                     let folded = self.rejoin_inside_leading_wrap(last_doc, |el| {
                         self.build_after_element_fold(el, raw, glued_head)
                     });
@@ -561,7 +622,9 @@ impl<'a> Printer<'a> {
                 // ([`tsv_lang::doc::DocContext::break_before_wide_flow`]), so a unit that does not
                 // fit travels there and nothing is stranded flat past printWidth.
                 //
-                // **Every** non-terminal tail lands here, wrapped or not. An element still inside
+                // **Every** non-terminal SPACE-spelled tail lands here, wrapped or not (a
+                // newline-spelled one after an unwrapped element/component took the
+                // authored-newline join above). An element still inside
                 // its inline-sibling wrap (`group([line, el])` — a spaced comment or a
                 // control-flow block put it there) used to keep a JOINT `group([el, line])`
                 // instead, so the two boundaries meeting on the element resolved outside-in:
@@ -845,7 +908,19 @@ impl<'a> Printer<'a> {
                 // source-keyed follower set here was a two-pass hazard: a glued BLOCK follower
                 // detaches by its own layout, so its weld survives only in the source, and
                 // pass 2 re-classified the boundary pass 1 had measured.
-                trailing_line && next_is_flow_or_tag
+                //
+                // A CONTROL-FLOW BLOCK follower joins the spaced half too: the same pairwise
+                // measurement (`sep_fits` over the block flat) packs an inline-rendering block
+                // per width, and `flow_forced_break` puts a block that renders multiline on a
+                // fresh line — a multiline unit's head never ends a content line, the posture
+                // every other unit kind already has (conformance_prettier_svelte.md §Svelte:
+                // Blocks, `blocks/multiline_head_after_text_prettier_divergence`). A
+                // `{#snippet}` never reaches this arm (`next_owns_line` claimed its boundary —
+                // it is a declaration), so the disjunct is inert for it. The GLUED half below
+                // deliberately still excludes blocks: a glued block detaches by its own layout,
+                // so its weld survives only in the source (the two-pass hazard above), and the
+                // whole-unit travel for that shape is a separate, tracked admission.
+                trailing_line && (next_is_flow_or_tag || next_is_rendering_block)
             } else {
                 // GLUED half: no separator — the boundary in front of the last word is the
                 // break point, and ANY tag joins: the welded word+tag pair is the smallest
@@ -862,12 +937,13 @@ impl<'a> Printer<'a> {
             // exactly the arm that returns bare text. A lone `(` heading a run glued to a following
             // element then never got its boundary measured, and the run stood and paid the overflow
             // out of the element's own tag.
-            let fill_doc = if break_before_wide_flow || glued_lead {
+            let fill_doc = if break_before_wide_flow || glued_lead || hold_boundary {
                 d.with_context(
                     d.as_fill(fill_doc),
                     tsv_lang::doc::DocContext::default()
                         .with_break_before_wide_flow(break_before_wide_flow)
-                        .with_glued_lead(glued_lead),
+                        .with_glued_lead(glued_lead)
+                        .with_hold_line_after_broken_flow(hold_boundary),
                 )
             } else {
                 fill_doc
@@ -896,12 +972,14 @@ impl<'a> Printer<'a> {
     /// its own leading line flat, stranding a leading space
     /// (`inline_break_before_prev_inline_long`).
     ///
-    /// Only the **terminal** tail reaches here now. A non-terminal one used to take a joint
-    /// `group([el, line])` for the wrapped shapes, fusing the two boundaries so they resolved
-    /// outside-in; that fusion was retired because it was conditioned on the wrap, which its own
-    /// leading break destroys — see `handle_text_child`'s `leading_line` arm and
-    /// `inline_sibling_drop_tail_wide_long`. Every non-terminal tail boundary is now the text
-    /// fill's own `leading_line`, decided per width from the element's actual end column.
+    /// Two callers reach here: the **terminal fold**, and the authored-newline **probe arm**
+    /// (whose `build_tail` merely wraps the element in its `flow_break_probe` context — no
+    /// layout is added, so the two boundaries stay independent). A non-terminal tail used to
+    /// take a joint `group([el, line])` through here for the wrapped shapes, fusing the two
+    /// boundaries so they resolved outside-in; that fusion is retired — it was conditioned on
+    /// the wrap, which its own leading break destroys (`inline_sibling_drop_tail_wide_long`) —
+    /// and a SPACE-spelled tail boundary is now the text fill's own `leading_line`, decided per
+    /// width from the element's actual end column.
     fn rejoin_inside_leading_wrap(
         &self,
         last_doc: DocId,

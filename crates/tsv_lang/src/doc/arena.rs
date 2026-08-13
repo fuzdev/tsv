@@ -207,6 +207,14 @@ pub enum DocNode {
     /// group with no line after the suffix stays flat. Invisible to
     /// `will_break` (it forces no particular group) and a no-op at render.
     FlushBreak,
+
+    /// Flow-probe completion sentinel. Never built by a printer: the renderer pushes it
+    /// behind the subtree of a node whose context carries
+    /// [`DocContext::flow_break_probe`], and when it pops the arena records whether that
+    /// subtree's output contained a newline — the answer
+    /// [`DocContext::hold_line_after_broken_flow`] reads at the immediately following
+    /// fill. Zero-width and skipped by every measurement walk; invisible to `will_break`.
+    FlowProbeEnd,
 }
 
 // `DocNode` must stay free of drop glue: dynamically-built text lives in the
@@ -732,6 +740,24 @@ pub struct DocArena {
     /// (generation, id) — stateless like `Line`, same dedicated-cell
     /// interning. Valid iff the generation matches `format_gen`.
     flush_break_node: Cell<(u32, DocId)>,
+    /// The interned [`DocNode::FlowProbeEnd`] node for the current document
+    /// (generation, id) — stateless like `Line`, same dedicated-cell
+    /// interning. Valid iff the generation matches `format_gen`.
+    flow_probe_end_node: Cell<(u32, DocId)>,
+    /// Flow-probe render state: the output-length snapshots of the probes currently open
+    /// (a stack — probed subtrees nest), plus the most recently completed probe's answer.
+    /// Written only by the render loop (probe begin at a flagged node, finish at its
+    /// [`DocNode::FlowProbeEnd`] sentinel), read by
+    /// [`DocContext::hold_line_after_broken_flow`]'s fill hook. Positional freshness: the
+    /// sentinel completes immediately before the paired fill's command, so the answer the
+    /// fill reads is always its own predecessor's. Measurement walks never touch it —
+    /// `arena_fits` skips the sentinel — so a nested measure render cannot corrupt an open
+    /// probe (a measure render that *contains* a probed node balances its own begin/finish
+    /// before the enclosing render continues).
+    flow_probe: RefCell<FlowProbeState>,
+    /// The most recently completed flow probe's answer — split out of `flow_probe` so the
+    /// per-fill read is a `Cell` load, not a `RefCell` borrow.
+    flow_probe_broke: Cell<bool>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -749,6 +775,15 @@ pub struct DocArena {
     /// [`crate::comment_ledger`]. Compiled in only under the `comment_check` feature.
     #[cfg(feature = "comment_check")]
     comment_docs: RefCell<Vec<(u32, Span, DocumentKey)>>,
+}
+
+/// Flow-probe render state — see the `flow_probe` field's doc on [`DocArena`].
+/// The answer bit lives beside it as a plain `Cell` ([`DocArena::flow_probe_broke`]'s read
+/// takes no `RefCell` borrow).
+#[derive(Default)]
+struct FlowProbeState {
+    /// Output-length snapshots of the probes currently open, innermost last.
+    starts: SmallVec<[usize; 4]>,
 }
 
 /// One `static_cache` slot: a static string's identity (`ptr`+`len`)
@@ -836,6 +871,9 @@ impl DocArena {
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
             flush_break_node: Cell::new((0, DocId(0))),
+            flow_probe_end_node: Cell::new((0, DocId(0))),
+            flow_probe: RefCell::new(FlowProbeState::default()),
+            flow_probe_broke: Cell::new(false),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -891,6 +929,9 @@ impl DocArena {
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
             flush_break_node: Cell::new((0, DocId(0))),
+            flow_probe_end_node: Cell::new((0, DocId(0))),
+            flow_probe: RefCell::new(FlowProbeState::default()),
+            flow_probe_broke: Cell::new(false),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -945,6 +986,7 @@ impl DocArena {
             self.line_suffix_boundary_node.set((0, DocId(0)));
             self.break_parent_node.set((0, DocId(0)));
             self.flush_break_node.set((0, DocId(0)));
+            self.flow_probe_end_node.set((0, DocId(0)));
             self.format_gen.set(1);
         } else {
             self.format_gen.set(next);
@@ -1800,6 +1842,32 @@ impl DocArena {
         self.interned_singleton(&self.flush_break_node, || DocNode::FlushBreak)
     }
 
+    /// The interned [`DocNode::FlowProbeEnd`] sentinel — pushed only by the render loop
+    /// behind a [`DocContext::flow_break_probe`]-flagged subtree, never by a printer.
+    pub(super) fn flow_probe_end_node(&self) -> DocId {
+        self.interned_singleton(&self.flow_probe_end_node, || DocNode::FlowProbeEnd)
+    }
+
+    /// Open a flow probe: snapshot the output length at the probed subtree's start.
+    pub(super) fn flow_probe_begin(&self, output_len: usize) {
+        self.flow_probe.borrow_mut().starts.push(output_len);
+    }
+
+    /// Close the innermost flow probe, recording whether its subtree emitted a newline.
+    pub(super) fn flow_probe_finish(&self, output: &str) {
+        if let Some(start) = self.flow_probe.borrow_mut().starts.pop() {
+            self.flow_probe_broke
+                .set(output.as_bytes()[start.min(output.len())..].contains(&b'\n'));
+        }
+    }
+
+    /// The most recently completed flow probe's answer — read by the
+    /// [`DocContext::hold_line_after_broken_flow`] fill hook, whose command immediately
+    /// follows its probe's sentinel.
+    pub(super) fn flow_probe_broke(&self) -> bool {
+        self.flow_probe_broke.get()
+    }
+
     //
     // Convenience builders
     //
@@ -1984,6 +2052,7 @@ impl DocArena {
             // fits walk's pending-flush state, not by this subtree query, so a
             // containing group is NOT unconditionally broken.
             DocNode::FlushBreak => false,
+            DocNode::FlowProbeEnd => false,
         };
         cache[id.index()] = Some(result);
         result
@@ -2010,6 +2079,7 @@ impl DocArena {
     pub(super) fn can_break_inner(id: DocId, nodes: &[DocNode], children: &[DocId]) -> bool {
         match &nodes[id.index()] {
             DocNode::Line(_) => true,
+            DocNode::FlowProbeEnd => false,
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 Self::can_break_inner(*inner, nodes, children)
             }
@@ -2158,7 +2228,9 @@ impl DocArena {
         let info = {
             let nodes = self.nodes.borrow();
             match &nodes[id.index()] {
-                DocNode::Text(_) | DocNode::LineSuffixBoundary => Info::Keep,
+                DocNode::Text(_) | DocNode::LineSuffixBoundary | DocNode::FlowProbeEnd => {
+                    Info::Keep
+                }
                 // `MultilineText`'s `\n`s are hard lines pre-joined into one body, so it
                 // follows `mode` for the same reason a `Line(Hard)` does — see the fn docs.
                 DocNode::MultilineText { span, .. } => match mode {
