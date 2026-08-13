@@ -2,40 +2,41 @@
 
 Air on **one** boundary. Where both content boundaries carry a newline every container kind
 preserves the air alike ([inline_boundary_air](../inline_boundary_air/)); asked of a single
-boundary the kinds answer differently, and that arity is the whole rule:
+boundary each kind answers by its boundary rule alone:
 
 | container | one-boundary answer | rule |
 | --- | --- | --- |
 | inline element (`<span>`) | collapses | both-or-neither |
-| block (`<p>`) | expands | the leading boundary alone is the signal |
-| component (`<Comp>`), content starts with **text** | expands | any newline inside a content *text* counts |
-| component (`<Comp>`), content starts with an **element** | collapses | the same boundary, in a different node |
+| component (`<Comp>`) | collapses | both-or-neither |
+| block (`<p>`), leading | expands | the leading boundary alone is the signal |
+| block (`<p>`), trailing | collapses | the trailing boundary alone is not |
 
-The last two are one case split by where the newline **lands**, and they are the reason this
-fixture exists. A component is both-or-neither like an inline element, but it also treats a
-newline anywhere inside a content text node as a break — and a leading boundary in front of text
-*is* inside that text node, while a leading boundary in front of an element sits in a
-whitespace-only node the content trim drops. So the pair is not an exception to the arity, it is
-the arity meeting a different node shape. Written as a single "components need both boundaries"
-claim the behavior reads as a bug; written as the pair, it is the rule.
+Where the newline **lands** is not part of the question. A leading boundary in front of text
+sits inside that text node's edge run, while the same boundary in front of an element is a
+whitespace-only node — one boundary, two node shapes, one answer. The component pair pins that
+(cases 5 and 6), and the block pair pins the arity from both sides (leading expands, trailing
+collapses — cases 3 and 4).
 
-`unformatted_ours_one_sided.svelte` carries all five one-boundary authorings and tsv normalizes
-them to `input` in one pass — which is what makes the collapse and the expansion each a single
-fixed point rather than an authoring-dependent pair.
+`unformatted_ours_one_sided.svelte` carries all seven one-boundary authorings and tsv
+normalizes them to `input` in one pass — which is what makes the collapse and the expansion
+each a single fixed point rather than an authoring-dependent pair.
 
 ## Prettier's forms
 
-Prettier agrees with `input` itself — the arity is not the divergence. What differs is the
-**normalization**: from the one-sided authoring prettier keeps its own stable form
-(`prettier_variant_one_sided.svelte`), in two shapes this section already catalogs elsewhere:
+Prettier agrees with `input` itself — the per-kind arity is not the divergence, and on the
+block-trailing and component-trailing authorings prettier normalizes to `input` too. What
+differs is the **normalization** of the remaining one-sided authorings: prettier keeps its own
+stable form (`prettier_variant_one_sided.svelte`), in two shapes this section already catalogs
+elsewhere:
 
-- it converts a collapsed boundary newline into a **rendered-free space** it keeps
+- it converts a collapsed boundary newline into a render-free **space** it keeps
   (`<span> text1 …`, `… text2 </span>`) where tsv trims the boundary;
-- it **dangles the closing delimiter** (`</Comp⏎>`) where tsv keeps both tags intact.
+- it keeps the leading newline and **dangles the closing delimiter** (`</Comp⏎>`) where tsv
+  collapses the content inline.
 
-So both formatters hold `input` stable and only tsv converges the one-sided authoring onto it.
-Every boundary tsv trims is render-free under Svelte 5, so the output renders identically to the
-input.
+So both formatters hold `input` stable and only tsv converges every one-sided authoring onto
+it. Every boundary tsv trims is render-free under Svelte 5, so the output renders identically
+to the input.
 
 ## Reason
 
