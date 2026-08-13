@@ -526,11 +526,10 @@ impl<'a> Printer<'a> {
                 // statically collapsible on every pass, so `will_break` could never see it)
                 // and NO measurement change: an outer fits walk sees an ordinary fill whose
                 // leading line is an ordinary break opportunity. A `group([element, line])`
-                // join here is NOT equivalent — it gets measured through by the preceding
-                // boundary's fit walk (the tail's leading break point vanishes from the
-                // measurement space between element and tail), re-breaking that boundary on
-                // the re-parse: a 2-cycle only the width sweep can see. Cataloged in
-                // conformance_prettier_svelte.md §Svelte:
+                // join here is NOT equivalent (measured through by the preceding boundary's
+                // fit walk — a razor-caught 2-cycle; the full story lives on
+                // `tsv_lang::doc::DocContext::flow_break_probe` and in the catalog entry).
+                // Cataloged in conformance_prettier_svelte.md §Svelte:
                 // Inline content block-style ("An authored newline after the closing tag");
                 // `elements/tail_newline_after_multiline_prettier_divergence`.
                 //
@@ -543,6 +542,10 @@ impl<'a> Printer<'a> {
                 //   welded-run marker, and wrapping it in a fresh probe context would bury
                 //   that marker from the welded walk (`debug_check_buried_welded_marker`).
                 //   That shape keeps the per-width `leading_line`.
+                //
+                // Deliberately NO `prev_will_break` exclusion (contrast the fold below): a
+                // forced-break predecessor is exactly the case the probe answers yes to — the
+                // rule covers statically-broken and width-broken units with one mechanism.
                 //
                 // A predecessor inside its inline-sibling wrap participates: the probe flag
                 // goes on the element INSIDE the wrap (strip → flag → re-wrap through the
@@ -561,9 +564,19 @@ impl<'a> Printer<'a> {
                     hold_boundary = true;
                 }
                 leading_line = true;
-            } else if is_last && !prev_is_tag && !prev_will_break {
+            } else if is_last && !prev_is_tag && !prev_will_break && !next_owns_line {
                 // The **terminal fold** — see the arm comment above. Space-spelled boundaries
                 // only; the newline spelling takes the probe arm above.
+                //
+                // `!next_owns_line`: a text before a printing hoisted DECLARATION is `is_last`
+                // only by `content_bounds`' hoist skip — terminal for boundary TRIM, not for
+                // the fold. The fold's early return skips the whole trailing chain, and its
+                // `trim_right` would eat an authored blank line as if it were a fragment edge
+                // (the declaration still prints after it, so the blank is real — Tier-2, kept
+                // by prettier and by the first-position path). Routed to `leading_line` below,
+                // the trailing chain's `next_owns_line` arm emits the blank's hardline and the
+                // declaration's own `break_before` supplies the line, exactly as when this
+                // text is the first child (`tags/declaration_blank_line`).
                 if let Some(last_doc) = child_docs.pop() {
                     let folded = self.rejoin_inside_leading_wrap(last_doc, |el| {
                         self.build_after_element_fold(el, raw, glued_head)
@@ -624,7 +637,10 @@ impl<'a> Printer<'a> {
                 //
                 // **Every** non-terminal SPACE-spelled tail lands here, wrapped or not (a
                 // newline-spelled one after an unwrapped element/component took the
-                // authored-newline join above). An element still inside
+                // authored-newline join above), and so does a text before a printing hoisted
+                // declaration (terminal only by `content_bounds`' hoist skip — the fold's
+                // `!next_owns_line` guard routes it here so the trailing chain can carry an
+                // authored blank). An element still inside
                 // its inline-sibling wrap (`group([line, el])` — a spaced comment or a
                 // control-flow block put it there) used to keep a JOINT `group([el, line])`
                 // instead, so the two boundaries meeting on the element resolved outside-in:

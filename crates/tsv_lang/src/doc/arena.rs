@@ -758,6 +758,15 @@ pub struct DocArena {
     /// The most recently completed flow probe's answer — split out of `flow_probe` so the
     /// per-fill read is a `Cell` load, not a `RefCell` borrow.
     flow_probe_broke: Cell<bool>,
+    /// Debug-only tripwire on the flow probe's POSITIONAL-PAIRING invariant: set by
+    /// [`Self::flow_probe_finish`], cleared by [`Self::flow_probe_consume`]. A hold-flagged
+    /// fill must render immediately after its paired probe's sentinel; a consume finding no
+    /// fresh answer means a builder flagged a fill without pairing it (or its probe was
+    /// skipped), and the hook would otherwise act silently on a stale answer. One-directional
+    /// by design — a probe whose paired fill never consumes leaves a stale-true flag the next
+    /// legitimate pair overwrites, so only the hold-without-probe miswire is caught.
+    #[cfg(debug_assertions)]
+    flow_probe_fresh: Cell<bool>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -874,6 +883,8 @@ impl DocArena {
             flow_probe_end_node: Cell::new((0, DocId(0))),
             flow_probe: RefCell::new(FlowProbeState::default()),
             flow_probe_broke: Cell::new(false),
+            #[cfg(debug_assertions)]
+            flow_probe_fresh: Cell::new(false),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -932,6 +943,8 @@ impl DocArena {
             flow_probe_end_node: Cell::new((0, DocId(0))),
             flow_probe: RefCell::new(FlowProbeState::default()),
             flow_probe_broke: Cell::new(false),
+            #[cfg(debug_assertions)]
+            flow_probe_fresh: Cell::new(false),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -1858,13 +1871,26 @@ impl DocArena {
         if let Some(start) = self.flow_probe.borrow_mut().starts.pop() {
             self.flow_probe_broke
                 .set(output.as_bytes()[start.min(output.len())..].contains(&b'\n'));
+            #[cfg(debug_assertions)]
+            self.flow_probe_fresh.set(true);
         }
     }
 
-    /// The most recently completed flow probe's answer — read by the
-    /// [`DocContext::hold_line_after_broken_flow`] fill hook, whose command immediately
-    /// follows its probe's sentinel.
-    pub(super) fn flow_probe_broke(&self) -> bool {
+    /// The most recently completed flow probe's answer, consumed by the paired
+    /// [`DocContext::hold_line_after_broken_flow`] fill — whose command immediately follows
+    /// its probe's sentinel, which is what keeps the answer fresh by construction. Debug
+    /// builds assert exactly that: a read with no fresh answer (see
+    /// [`Self::flow_probe_fresh`]) is a hold flag some builder set without pairing it.
+    pub(super) fn flow_probe_consume(&self) -> bool {
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(
+                self.flow_probe_fresh.get(),
+                "hold_line_after_broken_flow read with no fresh flow-probe answer — \
+                 the fill is not positionally paired with a flow_break_probe predecessor"
+            );
+            self.flow_probe_fresh.set(false);
+        }
         self.flow_probe_broke.get()
     }
 

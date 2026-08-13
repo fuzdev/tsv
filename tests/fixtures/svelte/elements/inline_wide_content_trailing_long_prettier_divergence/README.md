@@ -41,18 +41,19 @@ Two deliberate choices:
 1. **Block-style content** — tsv keeps printWidth a hard limit and lays the element out block-style
    (both tags intact, content on its own indented line) rather than emitting prettier's single
    over-width dangled line.
-2. **Terminal trailing text hugs, whatever the authored boundary** — the whitespace between a
-   closing tag and a *terminal* text sibling is **render-free** under Svelte 5: space and newline
-   collapse alike, so it carries no authoring signal to preserve. tsv therefore converges both
-   authorings onto the hug rather than reproducing the distinction — one fixed point per document,
-   which is what `authoring:audit` grades. This is exactly how a *short* inline element already
-   behaves; wide and short elements treat the boundary the same way.
+2. **The terminal tail is layout-keyed** — the whitespace between a closing tag and a *terminal*
+   text sibling is **render-free** under Svelte 5: space and newline collapse alike. Beside this
+   element, which renders multiline, both spellings are therefore clean and the authored one is
+   kept: a space hugs the intact closing tag, an authored newline keeps the tail's own line
+   (dual-stable — `variant_newline_tail`). Beside a *fitting* element the newline reflows with
+   the fill and converges with the space spelling — which is exactly how a *short* inline
+   element behaves.
 
    The rule has two edges, and each is pinned here or next door. An authored **blank line** is a
    Tier-2 signal *independent* of render, so it is not collapsed (`variant_blank_line_tail`; both
    formatters agree, so it is not a divergence). And this fixture's scope is *terminal* text — a
    **non-terminal** run, one followed by another flowing element, takes the same per-width answer
-   through a different mechanism, the fill's own boundary line rather than the fold
+   for its space spelling through a different mechanism, the fill's own boundary line rather than the fold
    (`inline_wide_content_text_sibling_long` for prose content,
    `inline_wide_element_content_tail_long` for element-child content) — including an element
    inside a leading inline-sibling wrap, whose joint measurement was retired at the width it

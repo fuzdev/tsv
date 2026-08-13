@@ -12,9 +12,10 @@ multiline element, as `output_prettier`'s dual-stability records):
 - **101 chars** — the element lays out block-style (both tags intact), and the tail **hugs the
   intact closing tag**: `</span> text2 <span>text3</span>, text4`.
 
-Both reach one fixed point from every authoring: `unformatted_ours_compact` (everything on one
-line) converges in **one pass** — the 100 case folds and drops its tail, the 101 case goes
-block-style and hugs it.
+Both reach one fixed point from every space-spelled authoring: `unformatted_ours_compact`
+(everything on one line) converges in **one pass** — the 100 case folds and drops its tail, the
+101 case goes block-style and hugs it. (The newline-spelled tail holds its own fixed point —
+`output_prettier.svelte`'s dual-stability below.)
 
 The prose twin next door is `inline_wide_content_text_sibling_long` — the same per-width tail
 answer for a wide element whose content is **prose**. What separates the two is what forces the
@@ -50,8 +51,9 @@ fixture's one-pass claim now pins.
 ## Reason
 
 Design choice: the tail boundary after a multiline inline element is render-free inter-node
-whitespace, so tsv converges its spellings onto the per-width answer — hug when it fits, break
-when it does not — where prettier's element-grouped boundary always breaks and so holds a
-distinct stable form per authoring. For this fixture's element-content shape the per-width answer
+whitespace, so tsv converges its **space** spelling onto the per-width answer — hug when it
+fits, break when it does not — while an authored newline is layout-keyed (preserved beside the
+multiline element); prettier's element-grouped boundary always breaks and so holds a distinct
+stable form per authoring. For this fixture's element-content shape the per-width answer
 is additionally forced by idempotence — see the regeneration argument above.
 See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

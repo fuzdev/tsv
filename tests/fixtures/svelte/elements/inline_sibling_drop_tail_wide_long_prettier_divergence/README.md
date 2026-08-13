@@ -26,8 +26,8 @@ existing gate could see it: the strayed pass is only reachable at widths no fixt
 at, which is why it took the width sweep (`deno task razor:audit`) to surface.
 
 The per-width answer is the only convergeable one here, and it is what every neighbouring shape
-already gave: the tail boundary after a multiline inline element is a fill decision measured from
-the closing tag's own column, however the element came to be multiline
+already gave: the tail boundary's **space** spelling after a multiline inline element is a fill
+decision measured from the closing tag's own column, however the element came to be multiline
 ([inline_wide_content_text_sibling_long](../inline_wide_content_text_sibling_long_prettier_divergence/)
 for the unwrapped prose-content case). Three of the five sibling kinds — an element, a tag, a block
 element — always took it; only the two non-flowing ones (a comment, a control-flow block) were held

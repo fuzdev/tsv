@@ -21,7 +21,9 @@ therefore changes no render, and the layout question is free —
 declarations and what keeps a declaration visually distinct from the content beside it. A
 render-free run must not select a layout, the rule this whole section rests on
 ([§Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)),
-so the glued, spaced and newline authorings are one document and reach one form.
+so the glued, spaced and newline authorings are one document and reach one form. (An
+authored **blank line** beside the tag is a separate Tier-2 signal and survives, in every
+position — `tags/declaration_blank_line` pins it, with prettier agreeing.)
 
 ⚠️ **The one exception is a snippet GLUED to content on both sides**, where the break is *not*
 render-free: `<div>a{#snippet fn5()}x{/snippet}b</div>` compiles to `ab`, while the own-line form
