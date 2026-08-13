@@ -130,6 +130,32 @@
 				"end": 384
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 3-char format ",
+				"start": 17,
+				"end": 36
+			},
+			{
+				"type": "CSSComment",
+				"value": " 4-char format with alpha ",
+				"start": 119,
+				"end": 149
+			},
+			{
+				"type": "CSSComment",
+				"value": " 6-char format ",
+				"start": 189,
+				"end": 208
+			},
+			{
+				"type": "CSSComment",
+				"value": " 8-char format with alpha ",
+				"start": 306,
+				"end": 336
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 385,

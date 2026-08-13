@@ -130,6 +130,32 @@
 				"end": 549
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comma syntax ",
+				"start": 17,
+				"end": 35
+			},
+			{
+				"type": "CSSComment",
+				"value": " space syntax ",
+				"start": 138,
+				"end": 156
+			},
+			{
+				"type": "CSSComment",
+				"value": " comma syntax with alpha ",
+				"start": 253,
+				"end": 282
+			},
+			{
+				"type": "CSSComment",
+				"value": " space syntax with / alpha ",
+				"start": 403,
+				"end": 434
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 550,

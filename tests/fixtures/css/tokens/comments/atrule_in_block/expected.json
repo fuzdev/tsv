@@ -67,6 +67,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 27,
+				"end": 40
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 71,

@@ -74,5 +74,19 @@
 				"is_global_block": false
 			}
 		}
+	],
+	"comments": [
+		{
+			"type": "CSSComment",
+			"value": " Empty custom-property value carrying !important normalizes to a single space ",
+			"start": 9,
+			"end": 91
+		},
+		{
+			"type": "CSSComment",
+			"value": " Non-empty custom-property value with !important is unaffected ",
+			"start": 111,
+			"end": 178
+		}
 	]
 }

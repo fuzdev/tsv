@@ -179,6 +179,14 @@
 				"end": 136
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Test universal selector ",
+				"start": 9,
+				"end": 38
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 137,

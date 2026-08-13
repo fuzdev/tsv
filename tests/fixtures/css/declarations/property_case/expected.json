@@ -74,6 +74,14 @@
 				"end": 313
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " property names are case-insensitive keywords; prettier (and tsv)\n\t\t   lowercase them, including vendor prefixes. Values, custom-property\n\t\t   names, and SCSS `$` variables are case-sensitive and preserved. ",
+				"start": 15,
+				"end": 226
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 314,

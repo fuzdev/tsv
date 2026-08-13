@@ -67,6 +67,26 @@
 				"end": 281
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Two directly-adjacent quoted strings — one opaque run, kept verbatim. ",
+				"start": 16,
+				"end": 91
+			},
+			{
+				"type": "CSSComment",
+				"value": " String, ident, string glued into one run — kept verbatim. ",
+				"start": 113,
+				"end": 176
+			},
+			{
+				"type": "CSSComment",
+				"value": " Double-quoted run — not re-quoted to a single string. ",
+				"start": 199,
+				"end": 258
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 282,

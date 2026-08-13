@@ -53,6 +53,14 @@
 				"end": 88
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment line1\n\t   comment line2\n\t   comment line3 ",
+				"start": 9,
+				"end": 64
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 89,

@@ -372,6 +372,107 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Multiple comment positions - we normalize spacing, Prettier preserves input ",
+				"start": 9,
+				"end": 90
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 99,
+				"end": 106,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 114,
+				"end": 121,
+				"position": 7
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 126,
+				"end": 133,
+				"position": 12
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comment with or keyword ",
+				"start": 187,
+				"end": 216
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 241,
+				"end": 248,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " e ",
+				"start": 252,
+				"end": 259,
+				"position": 20
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comment inside condition value ",
+				"start": 312,
+				"end": 348
+			},
+			{
+				"type": "CSSComment",
+				"value": " size ",
+				"start": 369,
+				"end": 379,
+				"position": 12
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comment with not keyword ",
+				"start": 423,
+				"end": 453
+			},
+			{
+				"type": "CSSComment",
+				"value": " f ",
+				"start": 466,
+				"end": 473,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comment with only keyword ",
+				"start": 518,
+				"end": 549
+			},
+			{
+				"type": "CSSComment",
+				"value": " g ",
+				"start": 563,
+				"end": 570,
+				"position": 5
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comment before comma in list ",
+				"start": 615,
+				"end": 649
+			},
+			{
+				"type": "CSSComment",
+				"value": " h ",
+				"start": 665,
+				"end": 672,
+				"position": 7
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 715,

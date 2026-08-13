@@ -67,6 +67,14 @@
 				"end": 107
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before declaration ",
+				"start": 43,
+				"end": 75
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 108,

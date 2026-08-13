@@ -440,6 +440,50 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Basic container query ",
+				"start": 9,
+				"end": 36
+			},
+			{
+				"type": "CSSComment",
+				"value": " Named container ",
+				"start": 109,
+				"end": 130
+			},
+			{
+				"type": "CSSComment",
+				"value": " Boolean operators - and ",
+				"start": 215,
+				"end": 244
+			},
+			{
+				"type": "CSSComment",
+				"value": " Boolean operators - or ",
+				"start": 338,
+				"end": 366
+			},
+			{
+				"type": "CSSComment",
+				"value": " Boolean operators - not ",
+				"start": 466,
+				"end": 495
+			},
+			{
+				"type": "CSSComment",
+				"value": " Style queries ",
+				"start": 573,
+				"end": 592
+			},
+			{
+				"type": "CSSComment",
+				"value": " Named container with style query ",
+				"start": 688,
+				"end": 726
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 805,

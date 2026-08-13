@@ -74,6 +74,32 @@
 				"end": 772
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - single token fits inline at the boundary ",
+				"start": 17,
+				"end": 75
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - single token wraps onto its own line ",
+				"start": 177,
+				"end": 231
+			},
+			{
+				"type": "CSSComment",
+				"value": " nested 100: outer wraps, inner at boundary stays flat on its own line ",
+				"start": 341,
+				"end": 416
+			},
+			{
+				"type": "CSSComment",
+				"value": " nested 101: outer wraps, inner over boundary also breaks (cascade) ",
+				"start": 537,
+				"end": 609
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 773,

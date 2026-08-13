@@ -189,6 +189,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " and/or/not are case-insensitive CSS grammar keywords; tsv preserves the\n\t   author's case (matching prettier) — it parses the uppercase forms but\n\t   never rewrites them. ",
+				"start": 9,
+				"end": 185
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 393,

@@ -286,6 +286,14 @@
 				"end": 326
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Test multiple compound selectors chained together ",
+				"start": 9,
+				"end": 64
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 327,

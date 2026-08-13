@@ -185,6 +185,32 @@
 				"end": 227
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comments at multiple nesting levels ",
+				"start": 9,
+				"end": 50
+			},
+			{
+				"type": "CSSComment",
+				"value": " level 1 comment ",
+				"start": 64,
+				"end": 85
+			},
+			{
+				"type": "CSSComment",
+				"value": " level 2 comment ",
+				"start": 118,
+				"end": 139
+			},
+			{
+				"type": "CSSComment",
+				"value": " level 3 comment ",
+				"start": 176,
+				"end": 197
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 228,

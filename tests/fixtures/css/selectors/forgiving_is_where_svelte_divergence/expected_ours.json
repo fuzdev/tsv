@@ -989,6 +989,68 @@
 				"end": 1850
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :is() with syntax error - invalid selector skipped ",
+				"start": 9,
+				"end": 65
+			},
+			{
+				"type": "CSSComment",
+				"value": " :where() with syntax error - invalid selector skipped ",
+				"start": 106,
+				"end": 165
+			},
+			{
+				"type": "CSSComment",
+				"value": " :is() with pseudo-element - kept in AST (valid syntax) ",
+				"start": 221,
+				"end": 281
+			},
+			{
+				"type": "CSSComment",
+				"value": " :where() with pseudo-elements only - all kept (valid syntax) ",
+				"start": 339,
+				"end": 405
+			},
+			{
+				"type": "CSSComment",
+				"value": " :is() with mixed valid/invalid/pseudo-element - syntax errors skipped, rest kept ",
+				"start": 458,
+				"end": 544
+			},
+			{
+				"type": "CSSComment",
+				"value": " :where() with unknown pseudo-class - kept (syntactically valid) ",
+				"start": 622,
+				"end": 691
+			},
+			{
+				"type": "CSSComment",
+				"value": " :is() with An+B in an invalid context - `of` is valid only in :nth-*(), so the\n\t   whole arg is a contextually-invalid selector and the forgiving list is empty ",
+				"start": 783,
+				"end": 948
+			},
+			{
+				"type": "CSSComment",
+				"value": " :where() with a contextually-invalid An+B among valid classes - only the An+B is\n\t   skipped; the valid siblings are kept (the text is preserved verbatim on format) ",
+				"start": 990,
+				"end": 1160
+			},
+			{
+				"type": "CSSComment",
+				"value": " a dropped forgiving item is kept verbatim except for a whitespace COLLAPSE, which\n\t   must not reach inside an escape: `\\<TAB>` is a valid escape whose escaped code\n\t   point IS that tab (css-syntax-3 §4.3.4/§4.3.7), so the class is named `b<TAB>c`.\n\t   Collapsing it to a space silently renames the class ",
+				"start": 1225,
+				"end": 1536
+			},
+			{
+				"type": "CSSComment",
+				"value": " the item's OUTER trim is escape-aware too: `.b\\ ` ends in an escape whose payload\n\t   is that space, and trimming it strands the backslash onto the `)` that closes the\n\t   pseudo — output tsv's own parser would then reject ",
+				"start": 1579,
+				"end": 1807
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1851,

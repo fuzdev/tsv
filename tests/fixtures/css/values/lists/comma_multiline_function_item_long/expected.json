@@ -67,6 +67,26 @@
 				"end": 635
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Function comma-item at 100 - stays inline within the multiline list ",
+				"start": 17,
+				"end": 90
+			},
+			{
+				"type": "CSSComment",
+				"value": " Function comma-item at 101 - wraps to stay within 100 ",
+				"start": 218,
+				"end": 277
+			},
+			{
+				"type": "CSSComment",
+				"value": " Final function item at 101 - trailing ; reserved, also wraps ",
+				"start": 423,
+				"end": 489
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 636,

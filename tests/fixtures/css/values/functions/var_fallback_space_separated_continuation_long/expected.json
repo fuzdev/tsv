@@ -53,6 +53,21 @@
 				"end": 298
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Long comment that forces separate line aaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+				"start": 16,
+				"end": 88
+			},
+			{
+				"type": "CSSComment",
+				"value": " Long comment that forces separate line aaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+				"start": 113,
+				"end": 185,
+				"position": 16
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 299,

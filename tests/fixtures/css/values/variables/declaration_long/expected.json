@@ -74,6 +74,32 @@
 				"end": 668
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comma-separated at exactly 100 - no wrapping ",
+				"start": 17,
+				"end": 67
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comma-separated at 101 - width-based wrapping ",
+				"start": 170,
+				"end": 221
+			},
+			{
+				"type": "CSSComment",
+				"value": " Space-separated with functions at exactly 100 - no wrapping ",
+				"start": 328,
+				"end": 393
+			},
+			{
+				"type": "CSSComment",
+				"value": " Space-separated with functions at 101 - width-based wrapping ",
+				"start": 496,
+				"end": 562
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 669,

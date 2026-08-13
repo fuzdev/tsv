@@ -330,6 +330,20 @@
 				"end": 231
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Text direction ",
+				"start": 9,
+				"end": 29
+			},
+			{
+				"type": "CSSComment",
+				"value": " Language matching with subtags ",
+				"start": 108,
+				"end": 144
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 232,

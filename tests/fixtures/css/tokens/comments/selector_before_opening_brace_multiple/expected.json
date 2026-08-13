@@ -147,6 +147,44 @@
 				"end": 144
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 17,
+				"end": 24
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 54,
+				"end": 61
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 62,
+				"end": 69
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 100,
+				"end": 107
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 108,
+				"end": 115
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 116,
+				"end": 123
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 145,

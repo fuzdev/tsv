@@ -278,6 +278,38 @@
 				"end": 435
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Details content styling ",
+				"start": 9,
+				"end": 38
+			},
+			{
+				"type": "CSSComment",
+				"value": " Column pseudo-element ",
+				"start": 89,
+				"end": 116
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined with type selector ",
+				"start": 172,
+				"end": 205
+			},
+			{
+				"type": "CSSComment",
+				"value": " With pseudo-class ",
+				"start": 257,
+				"end": 280
+			},
+			{
+				"type": "CSSComment",
+				"value": " Column with class selector ",
+				"start": 349,
+				"end": 381
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 436,

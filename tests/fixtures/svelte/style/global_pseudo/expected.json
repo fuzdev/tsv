@@ -461,6 +461,38 @@
 				"end": 449
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :global() followed by pseudo-class ",
+				"start": 9,
+				"end": 49
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() with :has() ",
+				"start": 89,
+				"end": 116
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() with pseudo-element ",
+				"start": 171,
+				"end": 206
+			},
+			{
+				"type": "CSSComment",
+				"value": " Local class adjacent to :global() with pseudo ",
+				"start": 249,
+				"end": 300
+			},
+			{
+				"type": "CSSComment",
+				"value": " Compound with multiple pseudo-classes ",
+				"start": 355,
+				"end": 398
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 450,

@@ -777,6 +777,50 @@
 				"end": 853
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A bare number after an implicit descendant combinator inside :is() is an\n\t   Nth node (parseCss: descendant Combinator + Nth), not a parse error ",
+				"start": 9,
+				"end": 159
+			},
+			{
+				"type": "CSSComment",
+				"value": " An An+B in descendant position structures the same way ",
+				"start": 194,
+				"end": 254
+			},
+			{
+				"type": "CSSComment",
+				"value": " :not() and :where() complex-selector lists behave identically ",
+				"start": 293,
+				"end": 360
+			},
+			{
+				"type": "CSSComment",
+				"value": " :has() relative-selector list: same descendant-Nth support ",
+				"start": 435,
+				"end": 499
+			},
+			{
+				"type": "CSSComment",
+				"value": " Unknown functional pseudo-class reaches the same combinator path ",
+				"start": 538,
+				"end": 608
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple descendant hops before the terminal Nth ",
+				"start": 651,
+				"end": 705
+			},
+			{
+				"type": "CSSComment",
+				"value": " Explicit child combinator already structured (regression guard) ",
+				"start": 749,
+				"end": 818
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 854,

@@ -297,6 +297,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " @scope body is a relative-selector-list scoped to :scope (CSS Cascade 6\n\t   §\"Scoped Style Rules\"): a bare declaration applies to :scope, a plain\n\t   selector is implicitly :scope-relative, and a leading combinator is allowed. ",
+				"start": 9,
+				"end": 241
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 425,

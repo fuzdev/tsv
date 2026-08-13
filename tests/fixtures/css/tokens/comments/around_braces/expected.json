@@ -241,6 +241,38 @@
 				"end": 234
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 17,
+				"end": 30
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 64,
+				"end": 77
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 126,
+				"end": 139
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 175,
+				"end": 188
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 218,
+				"end": 231
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 235,

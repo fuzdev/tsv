@@ -128,6 +128,34 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " single condition ",
+				"start": 9,
+				"end": 31
+			},
+			{
+				"type": "CSSComment",
+				"value": " trailing ",
+				"start": 59,
+				"end": 73,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " multi-condition ",
+				"start": 108,
+				"end": 129
+			},
+			{
+				"type": "CSSComment",
+				"value": " trailing ",
+				"start": 171,
+				"end": 185,
+				"position": 30
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 219,

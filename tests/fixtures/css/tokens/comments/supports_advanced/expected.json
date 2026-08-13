@@ -189,6 +189,54 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " or connector ",
+				"start": 9,
+				"end": 27
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 58,
+				"end": 71,
+				"position": 19
+			},
+			{
+				"type": "CSSComment",
+				"value": " not keyword ",
+				"start": 116,
+				"end": 133
+			},
+			{
+				"type": "CSSComment",
+				"value": " before not ",
+				"start": 145,
+				"end": 161,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " multiple consecutive ",
+				"start": 217,
+				"end": 243
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 271,
+				"end": 279,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 280,
+				"end": 288,
+				"position": 17
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 337,

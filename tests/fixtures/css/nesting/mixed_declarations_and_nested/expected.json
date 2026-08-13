@@ -199,6 +199,14 @@
 				"end": 200
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Declarations before, between, and after nested rules ",
+				"start": 9,
+				"end": 67
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 201,

@@ -133,6 +133,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Nested rules inside @media blocks ",
+				"start": 9,
+				"end": 48
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 150,

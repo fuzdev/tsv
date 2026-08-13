@@ -461,6 +461,20 @@
 				"end": 344
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :nth-child(An+B of S) where S is a bare An+B/number term (2n, 123) ",
+				"start": 9,
+				"end": 81
+			},
+			{
+				"type": "CSSComment",
+				"value": " S is a complex selector ending in a descendant Nth (.a <descendant> 123) ",
+				"start": 219,
+				"end": 297
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 345,

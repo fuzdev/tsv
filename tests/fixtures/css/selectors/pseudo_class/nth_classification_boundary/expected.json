@@ -381,6 +381,38 @@
 				"end": 488
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an ident that merely starts with n is a type selector, not an Nth 2n ",
+				"start": 9,
+				"end": 83
+			},
+			{
+				"type": "CSSComment",
+				"value": " An+B is case-sensitive (lowercase): N is a type selector, not a bare n ",
+				"start": 116,
+				"end": 192
+			},
+			{
+				"type": "CSSComment",
+				"value": " EVEN is a type selector, not the even keyword ",
+				"start": 223,
+				"end": 274
+			},
+			{
+				"type": "CSSComment",
+				"value": " a hyphenated ident starting with n stays a type selector ",
+				"start": 310,
+				"end": 372
+			},
+			{
+				"type": "CSSComment",
+				"value": " nom does not match the n An+B production ",
+				"start": 409,
+				"end": 455
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 489,

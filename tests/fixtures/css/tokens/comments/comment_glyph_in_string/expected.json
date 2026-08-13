@@ -107,6 +107,14 @@
 				"end": 165
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment glyphs inside a string are content, not comments - later lines keep indent ",
+				"start": 9,
+				"end": 97
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 166,

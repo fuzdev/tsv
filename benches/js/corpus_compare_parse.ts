@@ -214,6 +214,29 @@ function subtree_has_nth_of(node: unknown): boolean {
 	return false;
 }
 
+/** True if `property` carries a tell of Svelte's `read_declaration` tokenization garbage. */
+const is_garbage_property = (property: unknown): boolean =>
+	typeof property === 'string' && (property.startsWith(';') || property.includes('/*'));
+
+/**
+ * True if `node`'s subtree contains a canonical `Declaration` whose `property`
+ * shows that garbage — the document-level precondition for the comment-array
+ * consequence below.
+ */
+function subtree_has_garbage_declaration(node: unknown): boolean {
+	if (node == null || typeof node !== 'object') return false;
+	const n = node as Record<string, unknown>;
+	if (n.type === 'Declaration' && is_garbage_property(n.property)) return true;
+	for (const v of Object.values(n)) {
+		if (Array.isArray(v)) {
+			if (v.some(subtree_has_garbage_declaration)) return true;
+		} else if (v && typeof v === 'object' && subtree_has_garbage_declaration(v)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 interface DocumentedMatcher {
 	name: string;
 	/** docs/conformance_svelte.md section the divergence is cataloged under */
@@ -458,16 +481,32 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		// `color/* c */:` yields property "color/*" with the comment tail leaking into
 		// the value (read_until stops at the first whitespace, which sits INSIDE the
 		// comment). tsv parses per spec (skips empty declarations, tokenizes comments).
+		//
+		// Two shapes, because the same garbage lands in two places. (1) The
+		// declaration's own `property`/`value`, gated on the canonical PARENT being
+		// the garbage declaration. (2) The stylesheet's flat `comments` array: a
+		// comment Svelte swallowed into a property token is never captured, so tsv
+		// emits it plus every later comment at a shifted index, with `value` and
+		// `position` following the shift. One insertion renumbers the whole tail, so
+		// that arm cannot be scoped per index — it is scoped to the root `comments`
+		// array of a document that actually contains the garbage. It is scoped by
+		// DIRECTION too (the `comment_dedup` discipline, mirrored): the divergence
+		// is an INSERTION, so the array is longer on OUR side and the extra entries
+		// are `missing_canonical`. A comment tsv *loses* — the failure that matters
+		// — is the opposite direction and still surfaces undocumented, as does any
+		// comment-array divergence in a file with no garbage declaration.
 		name: 'css_declaration_tokenization',
 		conformance_section:
 			'CSS Parser Corrections (corpus-enforced) — Declaration tokenization garbage',
-		matches: (_entry, canonical_parent) => {
+		matches: (entry, canonical_parent, ctx) => {
 			const parent = canonical_parent as { type?: unknown; property?: unknown } | null | undefined;
-			return (
-				parent?.type === 'Declaration' &&
-				typeof parent.property === 'string' &&
-				(parent.property.startsWith(';') || parent.property.includes('/*'))
-			);
+			if (parent?.type === 'Declaration' && is_garbage_property(parent.property)) return true;
+			if (!/^(css\.)?comments(\[\d+\])?(\.|$)/.test(entry.path)) return false;
+			if (entry.kind === 'length_mismatch' && Number(entry.ours) <= Number(entry.canonical)) {
+				return false;
+			}
+			if (entry.kind === 'missing_ours') return false;
+			return subtree_has_garbage_declaration(ctx.canonical_root);
 		}
 	},
 	{

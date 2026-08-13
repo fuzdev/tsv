@@ -67,6 +67,14 @@
 				"end": 158
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a malformed consecutive double-dot is left verbatim (like ..5, 1.5.5, 1.px); prettier normalizes it ",
+				"start": 15,
+				"end": 120
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 159,

@@ -311,6 +311,44 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " @supports wraps at 101 chars (we wrap at >100, Prettier waits until >102) ",
+				"start": 9,
+				"end": 88
+			},
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline (both agree) ",
+				"start": 91,
+				"end": 134
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - we wrap, Prettier stays inline ",
+				"start": 266,
+				"end": 314
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 chars - we wrap, Prettier stays inline ",
+				"start": 450,
+				"end": 498
+			},
+			{
+				"type": "CSSComment",
+				"value": " 103 chars - wraps (both agree) ",
+				"start": 636,
+				"end": 672
+			},
+			{
+				"type": "CSSComment",
+				"value": " very long - the continuation re-wraps greedily across multiple lines (both agree) ",
+				"start": 812,
+				"end": 899
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1127,

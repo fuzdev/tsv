@@ -731,6 +731,68 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Basic scoping ",
+				"start": 9,
+				"end": 28
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scope with limit ",
+				"start": 88,
+				"end": 110
+			},
+			{
+				"type": "CSSComment",
+				"value": " Named scope root ",
+				"start": 175,
+				"end": 197
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scope with multiple selectors ",
+				"start": 251,
+				"end": 286
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scope with complex limit ",
+				"start": 359,
+				"end": 389
+			},
+			{
+				"type": "CSSComment",
+				"value": " Nested scopes ",
+				"start": 478,
+				"end": 497
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scope with descendant selectors ",
+				"start": 626,
+				"end": 663
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scope with pseudo-class ",
+				"start": 723,
+				"end": 752
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scope with limit and nested rules ",
+				"start": 819,
+				"end": 858
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scope with attribute selector ",
+				"start": 978,
+				"end": 1013
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1108,

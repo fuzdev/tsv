@@ -140,6 +140,44 @@
 				"end": 492
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Default namespace declaration ",
+				"start": 9,
+				"end": 44
+			},
+			{
+				"type": "CSSComment",
+				"value": " Named namespace for SVG ",
+				"start": 91,
+				"end": 120
+			},
+			{
+				"type": "CSSComment",
+				"value": " Named namespace for MathML ",
+				"start": 169,
+				"end": 201
+			},
+			{
+				"type": "CSSComment",
+				"value": " Empty namespace ",
+				"start": 259,
+				"end": 280
+			},
+			{
+				"type": "CSSComment",
+				"value": " Namespace with URL function ",
+				"start": 305,
+				"end": 338
+			},
+			{
+				"type": "CSSComment",
+				"value": " Example usage with namespace prefix ",
+				"start": 396,
+				"end": 437
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 493,

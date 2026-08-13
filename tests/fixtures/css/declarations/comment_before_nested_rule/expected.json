@@ -362,6 +362,56 @@
 				"end": 550
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " No blank line before comment preceding nested rule ",
+				"start": 9,
+				"end": 65
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 89,
+				"end": 102
+			},
+			{
+				"type": "CSSComment",
+				"value": " No blank line before comment preceding nested at-rule ",
+				"start": 135,
+				"end": 194
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 215,
+				"end": 228
+			},
+			{
+				"type": "CSSComment",
+				"value": " Blank line before comment preceding nested rule preserved ",
+				"start": 285,
+				"end": 348
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 371,
+				"end": 384
+			},
+			{
+				"type": "CSSComment",
+				"value": " Blank line after comment before nested rule preserved ",
+				"start": 417,
+				"end": 476
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 499,
+				"end": 512
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 551,

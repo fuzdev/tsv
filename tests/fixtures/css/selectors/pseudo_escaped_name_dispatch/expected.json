@@ -156,6 +156,20 @@
 				"end": 518
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " An escaped pseudo-class name dispatches to its argument grammar by the DECODED\n\t   name, not the raw source: \\69s decodes to `is`, so the argument is a forgiving\n\t   selector list. The escape is preserved in the printed name (recovered from source). ",
+				"start": 9,
+				"end": 264
+			},
+			{
+				"type": "CSSComment",
+				"value": " \\6e\\74\\68-child decodes to `nth-child`, so the argument parses as an An+B `Nth`\n\t   (not a selector list) — the observable proof that dispatch reads the decoded name. ",
+				"start": 300,
+				"end": 472
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 519,

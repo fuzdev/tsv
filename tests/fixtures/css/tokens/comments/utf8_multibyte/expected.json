@@ -59,6 +59,20 @@
 				"end": 128
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Multi-byte UTF-8: ⟳ (3 bytes), 你好 (6 bytes), 👨‍👩‍👧 (family, ZWJ sequence) ",
+				"start": 9,
+				"end": 91
+			},
+			{
+				"type": "CSSComment",
+				"value": " Family emoji with ZWJ: 👨‍👩‍👧‍👦 ",
+				"start": 130,
+				"end": 170
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 171,

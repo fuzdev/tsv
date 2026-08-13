@@ -472,6 +472,14 @@
 				"end": 388
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Nested :where(:is()) exceeds 100 chars and wraps; the :is() args indent one\n\t   level (uniform), not the extra level prettier adds for a >2-node compound ",
+				"start": 9,
+				"end": 168
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 389,

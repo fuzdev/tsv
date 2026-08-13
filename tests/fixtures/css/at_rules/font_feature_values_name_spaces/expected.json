@@ -76,6 +76,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " multi-ident family name: internal whitespace preserved verbatim, not collapsed ",
+				"start": 9,
+				"end": 93
+			},
+			{
+				"type": "CSSComment",
+				"value": " single-space sibling — already canonical ",
+				"start": 164,
+				"end": 210
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 277,

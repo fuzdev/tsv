@@ -25,7 +25,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 53,
-											"end": 62
+											"end": 76,
+											"args": {
+												"type": "SelectorList",
+												"start": 72,
+												"end": 75,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 72,
+														"end": 75,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "div",
+																		"start": 72,
+																		"end": 75
+																	}
+																],
+																"start": 72,
+																"end": 75
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 53,
@@ -72,7 +100,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 141,
-											"end": 150
+											"end": 164,
+											"args": {
+												"type": "SelectorList",
+												"start": 151,
+												"end": 154,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 151,
+														"end": 154,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "div",
+																		"start": 151,
+																		"end": 154
+																	}
+																],
+																"start": 151,
+																"end": 154
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 141,
@@ -98,6 +154,32 @@
 				},
 				"start": 141,
 				"end": 184
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before the compound selector ",
+				"start": 9,
+				"end": 51
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 63,
+				"end": 71
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after the compound selector ",
+				"start": 98,
+				"end": 139
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 155,
+				"end": 163
 			}
 		],
 		"content": {

@@ -271,6 +271,26 @@
 				"end": 452
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " pseudo-class and pseudo-element names are case-insensitive keywords, so\n\t   prettier lowercases them (the args are left alone — class names are\n\t   case-sensitive) ",
+				"start": 9,
+				"end": 178
+			},
+			{
+				"type": "CSSComment",
+				"value": " vendor-prefixed names lowercase too ",
+				"start": 268,
+				"end": 309
+			},
+			{
+				"type": "CSSComment",
+				"value": " custom `:--name` pseudo-classes are preserved, not lowercased ",
+				"start": 352,
+				"end": 419
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 453,

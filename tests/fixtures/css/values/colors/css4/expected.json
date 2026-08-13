@@ -144,6 +144,56 @@
 				"end": 767
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " RGB with percentages ",
+				"start": 17,
+				"end": 43
+			},
+			{
+				"type": "CSSComment",
+				"value": " RGB with none keyword ",
+				"start": 103,
+				"end": 130
+			},
+			{
+				"type": "CSSComment",
+				"value": " RGB with percentage alpha ",
+				"start": 192,
+				"end": 223
+			},
+			{
+				"type": "CSSComment",
+				"value": " HSL with angle units ",
+				"start": 291,
+				"end": 317
+			},
+			{
+				"type": "CSSComment",
+				"value": " HSL with none keyword ",
+				"start": 387,
+				"end": 414
+			},
+			{
+				"type": "CSSComment",
+				"value": " HSL with percentage alpha ",
+				"start": 478,
+				"end": 509
+			},
+			{
+				"type": "CSSComment",
+				"value": " Mixed: RGB percentages + none + percentage alpha ",
+				"start": 585,
+				"end": 639
+			},
+			{
+				"type": "CSSComment",
+				"value": " Mixed: HSL with deg + none + percentage alpha ",
+				"start": 676,
+				"end": 727
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 768,

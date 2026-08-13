@@ -136,6 +136,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " and/or media-query connectors are case-insensitive; tsv preserves the\n\t   author's case (matching prettier), incl. @import preludes and comma lists. ",
+				"start": 9,
+				"end": 163
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 374,

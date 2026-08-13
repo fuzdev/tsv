@@ -156,6 +156,32 @@
 				"end": 190
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before the argument selector ",
+				"start": 9,
+				"end": 51
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 62,
+				"end": 70
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after the argument selector ",
+				"start": 101,
+				"end": 142
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 161,
+				"end": 169
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 191,

@@ -74,6 +74,32 @@
 				"end": 884
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " multiply with parens - 100 chars exactly - stays inline ",
+				"start": 17,
+				"end": 78
+			},
+			{
+				"type": "CSSComment",
+				"value": " multiply with parens - 101 chars - breaks after * ",
+				"start": 222,
+				"end": 277
+			},
+			{
+				"type": "CSSComment",
+				"value": " inner line 100 chars after * break - stays inline in parens ",
+				"start": 427,
+				"end": 492
+			},
+			{
+				"type": "CSSComment",
+				"value": " inner line 101 chars after * break - inner parens also break ",
+				"start": 645,
+				"end": 711
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 885,

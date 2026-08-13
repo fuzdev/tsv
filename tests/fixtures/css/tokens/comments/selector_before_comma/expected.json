@@ -318,6 +318,44 @@
 				"end": 229
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 17,
+				"end": 24
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 63,
+				"end": 70
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 71,
+				"end": 78
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 118,
+				"end": 125
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 127,
+				"end": 134
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 186,
+				"end": 193
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 230,

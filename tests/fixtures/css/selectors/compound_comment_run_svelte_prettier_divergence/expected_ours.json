@@ -118,6 +118,44 @@
 				"end": 205
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " two adjacent glued comments keep the compound (not a descendant) ",
+				"start": 9,
+				"end": 79
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 83,
+				"end": 91
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 91,
+				"end": 99
+			},
+			{
+				"type": "CSSComment",
+				"value": " a glued comment run mid-compound ",
+				"start": 123,
+				"end": 161
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 167,
+				"end": 175
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 175,
+				"end": 183
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 206,

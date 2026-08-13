@@ -306,6 +306,32 @@
 				"end": 341
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " leading + on a coefficient: tsv keeps it glued to the An+B term ",
+				"start": 9,
+				"end": 78
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading + on a plain integer B ",
+				"start": 115,
+				"end": 151
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading + on a bare n ",
+				"start": 183,
+				"end": 210
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading + via the dedicated :nth-child An+B path ",
+				"start": 244,
+				"end": 298
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 342,

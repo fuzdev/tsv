@@ -142,6 +142,26 @@
 				"end": 561
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " U+00A0 (no-break space) is not CSS whitespace: it stays inside the value\n\t\t   token, while a real ASCII space still splits the list ",
+				"start": 15,
+				"end": 152
+			},
+			{
+				"type": "CSSComment",
+				"value": " …and at the END of a value or a function argument, where a Unicode trim\n\t\t   would silently eat it and rewrite the token ",
+				"start": 200,
+				"end": 326
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same in a selector: a trailing NBSP is part of the class name, so eating it\n\t   would silently rename the class (and here, glue it to the list comma) ",
+				"start": 373,
+				"end": 532
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 562,

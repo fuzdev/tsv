@@ -555,6 +555,32 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Single comparison operators (MQ Level 4) ",
+				"start": 9,
+				"end": 55
+			},
+			{
+				"type": "CSSComment",
+				"value": " Range feature names ",
+				"start": 326,
+				"end": 351
+			},
+			{
+				"type": "CSSComment",
+				"value": " Double comparison (range syntax) ",
+				"start": 506,
+				"end": 544
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined with boolean operators ",
+				"start": 620,
+				"end": 657
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 859,

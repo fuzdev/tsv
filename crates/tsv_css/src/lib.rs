@@ -183,7 +183,7 @@ pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_j
 /// consumers skip the O(output) validation a `String` requires.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_stylesheet_file_bytes(stylesheet.nodes, source)
+    ast::convert::write_stylesheet_file_bytes(stylesheet, source)
 }
 
 /// The `no-locations` variant, for parity with the TS/Svelte writers and the

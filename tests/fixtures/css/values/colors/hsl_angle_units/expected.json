@@ -74,6 +74,20 @@
 				"end": 293
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " hsl() hue as an angle with explicit units (rad/turn/grad), space + comma syntax ",
+				"start": 17,
+				"end": 102
+			},
+			{
+				"type": "CSSComment",
+				"value": " deg is the common contrast case ",
+				"start": 215,
+				"end": 252
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 294,

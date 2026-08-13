@@ -161,6 +161,20 @@
 				"end": 403
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " format-ignore ",
+				"start": 239,
+				"end": 258
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 312,
+				"end": 333
+			}
+		],
 		"content": {
 			"start": 237,
 			"end": 404,

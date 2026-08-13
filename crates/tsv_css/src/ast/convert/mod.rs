@@ -18,18 +18,21 @@
 //
 // The writer (`write.rs`) emits the wire JSON directly from the internal AST
 // in one walk and **reuses the raw-source reconstruction helpers below**
-// (`strip_css_comments`, `split_declaration_svelte_compat`,
+// (`strip_css_comments_collecting`, `split_declaration_svelte_compat`,
 // `raw_selector_name`, …), so the Svelte scan semantics live in one place. It
 // is the sole emission path; `convert_ast_json_bytes` calls it and
-// `convert_ast_json` parses its bytes back into a `Value`.
+// `convert_ast_json` parses its bytes back into a `Value`. That one walk also
+// GATHERS the wire's flat `CSSComment[]`: a declaration's comments exist only
+// in the strip its `value` comes from, so collecting them there rather than in
+// a second pass is what keeps their offsets indexing the string they describe.
 
 use super::internal;
 use std::borrow::Cow;
 use tsv_lang::Span;
 
 mod write;
-pub use write::write_css_node;
 pub(crate) use write::write_stylesheet_file_bytes;
+pub use write::{CssComments, write_css_children, write_css_comments};
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.
 ///
@@ -85,25 +88,69 @@ pub(super) fn split_declaration_svelte_compat(decl_source: &str, colon_pos: usiz
 /// String- and url()-aware: `/*` sequences inside `"..."`, `'...'`, or `url(...)` are
 /// treated as content, not comments. Unterminated comments are left intact (parse
 /// error caught elsewhere).
-pub(super) fn strip_css_comments(input: &str) -> Cow<'_, str> {
+fn strip_css_comments(input: &str) -> Cow<'_, str> {
+    strip_css_comments_inner(input, 0, None)
+}
+
+/// `strip_css_comments`, additionally recording every comment it strips as a wire
+/// `CSSComment` on `sink` — the shape Svelte's `read_value` produces for a
+/// declaration value or an at-rule prelude, where a captured comment carries both
+/// its source span and a `position` offset into the emitted string.
+///
+/// `base` is `input`'s start offset in the document, so the recorded spans are in
+/// document coordinates. Comments arrive in source order.
+pub(super) fn strip_css_comments_collecting<'a>(
+    input: &'a str,
+    base: u32,
+    sink: &mut Vec<WireComment>,
+) -> Cow<'a, str> {
+    strip_css_comments_inner(input, base, Some(sink))
+}
+
+/// One emitted `CSSComment`. `position` is `Some` only for a comment lifted out of
+/// a declaration `value` / at-rule `prelude` string — Svelte sets the field there
+/// and nowhere else, so a structural comment (between rules, in a block, in a
+/// selector gap) carries the span alone.
+#[derive(Clone, Copy)]
+pub(super) struct WireComment {
+    pub(super) span: Span,
+    pub(super) position: Option<u32>,
+}
+
+fn strip_css_comments_inner<'a>(
+    input: &'a str,
+    base: u32,
+    sink: Option<&mut Vec<WireComment>>,
+) -> Cow<'a, str> {
     // Fast path: no block-comment delimiter anywhere means nothing is stripped, so
-    // the result is just the trimmed input — a borrowed sub-slice, no allocation.
-    // (Conservative: a `/*` inside a string/url is preserved either way, so those
-    // rare inputs fall to the owned path; correctness is unaffected.)
+    // the result is just the trimmed input — a borrowed sub-slice, no allocation,
+    // and nothing to record. (Conservative: a `/*` inside a string/url is preserved
+    // either way, so those rare inputs fall to the owned path; correctness is
+    // unaffected — the owned path records only what it actually strips.)
     if !input.contains("/*") {
         return Cow::Borrowed(input.trim());
     }
     let mut out = String::with_capacity(input.len());
+    // `(byte offset in `out`, source span)` per stripped comment. The offset is the
+    // UNTRIMMED accumulated length, matching Svelte's `value.length` read at the
+    // moment it consumes the comment; it becomes a `position` once the leading
+    // whitespace is known (below).
+    let mut stripped: Vec<(usize, Span)> = Vec::new();
     let mut rest = input;
     while let Some(ch) = rest.chars().next() {
         // Block comment — strip
         if crate::comments::is_comment_start(rest.as_bytes(), 0) {
             // `comment_end_checked`, not `comment_end`: an unterminated comment is kept
-            // verbatim here rather than swallowed to end-of-input.
+            // verbatim here rather than swallowed to end-of-input. Svelte's `read_comment`
+            // errors on one instead of capturing it, so it goes unrecorded either way.
             let Some(end) = crate::comments::comment_end_checked(rest.as_bytes(), 0) else {
                 out.push_str(rest);
                 break;
             };
+            if sink.is_some() {
+                let start = base as usize + (input.len() - rest.len());
+                stripped.push((out.len(), Span::new(start as u32, (start + end) as u32)));
+            }
             rest = &rest[end..];
             continue;
         }
@@ -125,9 +172,33 @@ pub(super) fn strip_css_comments(input: &str) -> Cow<'_, str> {
     // Trim in place — truncate trailing whitespace, then drain leading — instead of
     // `out.trim().to_string()`, which copied the whole (already-owned) buffer again.
     let end = out.trim_end().len();
+    let leading = out.len() - out.trim_start().len();
+    if let Some(sink) = sink {
+        // Svelte re-bases each captured position on the trimmed value by subtracting
+        // the leading whitespace (clamped at zero, since a comment can sit ahead of
+        // it), and never re-bases on the TRAILING trim — so a comment after the last
+        // value token keeps a position past the end of the value it is attached to.
+        // Positions are JS string indices, i.e. UTF-16 code units of that value.
+        //
+        // The offsets are recorded in source order, so the conversion walks `out`
+        // once with a cursor rather than re-measuring each prefix from `leading`.
+        sink.reserve(stripped.len());
+        let (mut cursor, mut position) = (leading, 0usize);
+        for (offset, span) in stripped {
+            let offset = offset.max(leading);
+            position += out[cursor..offset]
+                .chars()
+                .map(char::len_utf16)
+                .sum::<usize>();
+            cursor = offset;
+            sink.push(WireComment {
+                span,
+                position: Some(position as u32),
+            });
+        }
+    }
     out.truncate(end);
-    let start = out.len() - out.trim_start().len();
-    out.drain(..start);
+    out.drain(..leading.min(end));
     Cow::Owned(out)
 }
 
@@ -185,6 +256,13 @@ fn starts_with_url_open(s: &str) -> bool {
 /// comments after the value (and after `!important`) sit inside the declaration extent.
 /// Only whitespace, comments, and the `!important` tail can occur between the parsed
 /// value's end and the terminator, so a flat byte walk is safe (no string/url content).
+///
+/// ⚠️ **That safety argument is the whole contract — do not point this at a region
+/// that can hold content.** It is blind to strings and `url()`, unlike Svelte's own
+/// `read_value`, so over an at-rule PRELUDE it stops at the first `;`/`}` inside one
+/// (`@import url("a;b.css") /* c */;`) and silently truncates. The prelude's ends come
+/// from the parser instead (`write.rs`'s `collect_prelude_comments`); the one caller
+/// here is the declaration's post-value tail this function is written for.
 pub(super) fn scan_to_terminator(source: &str, from: usize) -> usize {
     let bytes = source.as_bytes();
     let mut i = from;
@@ -308,8 +386,8 @@ pub(super) fn raw_selector_name(source: &str, span: Span, prefix_len: usize) -> 
 ///
 /// A pseudo's `span` covers the whole `:name(args)` / `::name(args)`, so when it has
 /// arguments the name runs only up to the first `(`; without arguments the whole span is
-/// the name. Used to bound the `raw_selector_name` slice (and, for pseudo-elements, the
-/// public `end`) to just the name — the decoded internal name is never re-serialized.
+/// the name. Used to bound the `raw_selector_name` slice to just the name — the decoded
+/// internal name is never re-serialized. The public `end` is the whole span, args and all.
 pub(super) fn pseudo_name_end(source: &str, span: Span, has_args: bool) -> u32 {
     if has_args {
         let raw = &source[span.start as usize..span.end as usize];
@@ -376,6 +454,72 @@ mod tests {
         assert_eq!(
             strip("\"a\\\" /* in str */ b\" /* real */ c"),
             "\"a\\\" /* in str */ b\"  c",
+        );
+    }
+
+    /// One recorded comment, flattened: `(span start, span end, position)`.
+    type Recorded = (u32, u32, Option<u32>);
+
+    /// The emitted value plus what a collecting strip recorded alongside it.
+    fn collect(input: &str, base: u32) -> (String, Vec<Recorded>) {
+        let mut sink = Vec::new();
+        let value = strip_css_comments_collecting(input, base, &mut sink).into_owned();
+        let recorded = sink
+            .iter()
+            .map(|c| (c.span.start, c.span.end, c.position))
+            .collect();
+        (value, recorded)
+    }
+
+    /// A `position` is an index into the *emitted* value, so it can only be
+    /// graded beside the value it indexes — which is why these assert the pair.
+    #[test]
+    fn strip_css_comments_collecting_records_spans_and_positions() {
+        // Spans are document-absolute (`base`-shifted); positions are not.
+        assert_eq!(
+            collect(" red /* c */ blue", 100),
+            ("red  blue".to_owned(), vec![(105, 112, Some(4))]),
+        );
+        // Every comment, in source order, each measured on the value so far.
+        assert_eq!(
+            collect("a /* c1 */ b /* c2 */ c", 0),
+            (
+                "a  b  c".to_owned(),
+                vec![(2, 10, Some(2)), (13, 21, Some(5))],
+            ),
+        );
+    }
+
+    /// The three edges of Svelte's own rebasing, which is what the offsets mean.
+    #[test]
+    fn strip_css_comments_collecting_position_edges() {
+        // Clamped at zero: a comment AHEAD of the leading whitespace it is
+        // rebased by (`max(0, …)` in `read_value`).
+        assert_eq!(
+            collect("/* c */ red", 0),
+            ("red".to_owned(), vec![(0, 7, Some(0))])
+        );
+        // Never rebased on the TRAILING trim, so a comment after the last token
+        // keeps a position one past the end of the value it is attached to.
+        assert_eq!(
+            collect("red /* c */", 0),
+            ("red".to_owned(), vec![(4, 11, Some(4))])
+        );
+        // UTF-16 code units, not bytes or chars — a JS string index. The span
+        // stays in BYTES (7 of them precede the comment; the value is 5 units).
+        assert_eq!(
+            collect("'😀' /* c */", 0),
+            ("'😀'".to_owned(), vec![(7, 14, Some(5))]),
+        );
+    }
+
+    /// An unterminated comment is kept verbatim rather than swallowed, and goes
+    /// unrecorded — Svelte's `read_comment` errors on one instead of capturing it.
+    #[test]
+    fn strip_css_comments_collecting_skips_unterminated() {
+        assert_eq!(
+            collect("red /* oops", 0),
+            ("red /* oops".to_owned(), vec![])
         );
     }
 }

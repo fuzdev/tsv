@@ -46,6 +46,26 @@
 				"block": null
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an empty query between two others keeps both commas ",
+				"start": 9,
+				"end": 66
+			},
+			{
+				"type": "CSSComment",
+				"value": " empty first query, then an empty interior one ",
+				"start": 153,
+				"end": 204
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comma closing the list is a separator with no entry after it, so it is dropped ",
+				"start": 301,
+				"end": 387
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 420,

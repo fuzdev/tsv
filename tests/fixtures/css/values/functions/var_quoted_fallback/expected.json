@@ -67,6 +67,26 @@
 				"end": 264
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Quoted fallback with comma ",
+				"start": 17,
+				"end": 49
+			},
+			{
+				"type": "CSSComment",
+				"value": " Quoted fallback with space ",
+				"start": 95,
+				"end": 127
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple quoted fallbacks ",
+				"start": 172,
+				"end": 203
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 265,

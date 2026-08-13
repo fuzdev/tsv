@@ -519,6 +519,38 @@
 				"end": 615
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Unknown functional pseudo-class: an An+B argument structures as an Nth\n\t   node - the name is 'foo', not swallowed into 'foo(2n + 1)' ",
+				"start": 9,
+				"end": 148
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comma-separated numbers become multiple Nth nodes ",
+				"start": 184,
+				"end": 239
+			},
+			{
+				"type": "CSSComment",
+				"value": " The odd/even keywords and a bare n are Nth nodes too ",
+				"start": 277,
+				"end": 335
+			},
+			{
+				"type": "CSSComment",
+				"value": " A negative An+B (leading minus, required +B tail) is an Nth node ",
+				"start": 400,
+				"end": 470
+			},
+			{
+				"type": "CSSComment",
+				"value": " A normal selector argument already structures (regression guard) ",
+				"start": 509,
+				"end": 579
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 616,

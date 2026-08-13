@@ -462,6 +462,20 @@
 				"end": 495
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " fits at 100 — stays inline; the trailing escape's terminator drops before `)` ",
+				"start": 9,
+				"end": 92
+			},
+			{
+				"type": "CSSComment",
+				"value": " exceeds 100 — wraps one-per-line; the last arg's escape absorbs the line\n\t   break as its terminator, which must drop before the closing `)` ",
+				"start": 211,
+				"end": 357
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 496,

@@ -60,6 +60,34 @@
 				"end": 280
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - no wrap ",
+				"start": 17,
+				"end": 42
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 60,
+				"end": 73,
+				"position": 9
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - wraps ",
+				"start": 144,
+				"end": 167
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 192,
+				"end": 205,
+				"position": 16
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 281,

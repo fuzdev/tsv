@@ -189,7 +189,7 @@ map the fused writer consults at each node's close, so `leadingComments` /
 `trailingComments` serialize in place. `<script>` content, block patterns,
 `{@const}`/`{const}`/`{let}` declarations, and `<svelte:options>` fuse the
 same way, and embedded `<style>` children fuse via `tsv_css`'s
-`write_css_node`.
+`write_css_children`.
 
 There is **no central `Language` trait, no plugin registry, no
 language-set enum**. Each language crate (`tsv_ts`, `tsv_css`,

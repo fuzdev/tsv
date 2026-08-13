@@ -509,6 +509,14 @@
 				"end": 515
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Non-An+B :nth-child arguments parse as ordinary selectors (drop-in parity\n\t   with parseCss), not as a single raw Nth value. These are semantically invalid\n\t   CSS, but a drop-in parser must still produce parseCss's structured AST. ",
+				"start": 9,
+				"end": 246
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 516,

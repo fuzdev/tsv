@@ -30,6 +30,32 @@
 				"block": null
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " @import wraps at 101 chars (we wrap at >100, Prettier waits until >102) ",
+				"start": 9,
+				"end": 86
+			},
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline (both agree) ",
+				"start": 89,
+				"end": 132
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - we wrap, Prettier stays inline ",
+				"start": 235,
+				"end": 283
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 chars - both wrap ",
+				"start": 389,
+				"end": 416
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 521,

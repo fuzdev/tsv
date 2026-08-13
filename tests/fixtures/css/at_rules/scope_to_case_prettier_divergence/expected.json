@@ -67,6 +67,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the `to` scope-limit keyword is a case-insensitive grammar keyword; tsv\n\t   canonicalizes it to lowercase, prettier preserves the author's case. ",
+				"start": 9,
+				"end": 159
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 219,

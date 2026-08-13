@@ -60,6 +60,14 @@
 				"end": 133
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Scroll-driven animations ",
+				"start": 22,
+				"end": 52
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 134,

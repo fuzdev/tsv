@@ -30,6 +30,20 @@
 				"block": null
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Unquoted url() — opaque content preserved verbatim (the `://` colon is not a property\n\tcolon); lowercase url() also has its inner whitespace trimmed. ",
+				"start": 9,
+				"end": 164
+			},
+			{
+				"type": "CSSComment",
+				"value": " Uppercase URL() is NOT a url-token (lowercase only), so its inner whitespace is\n\tpreserved verbatim rather than trimmed. ",
+				"start": 263,
+				"end": 389
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 442,

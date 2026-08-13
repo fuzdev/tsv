@@ -215,6 +215,57 @@
 				"end": 394
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comma gap - the comment joins the selector line, interior verbatim ",
+				"start": 9,
+				"end": 81
+			},
+			{
+				"type": "CSSComment",
+				"value": " x1\ny1\nz1 ",
+				"start": 92,
+				"end": 106
+			},
+			{
+				"type": "CSSComment",
+				"value": " before opening brace ",
+				"start": 136,
+				"end": 162
+			},
+			{
+				"type": "CSSComment",
+				"value": " x2\ny2 ",
+				"start": 172,
+				"end": 183
+			},
+			{
+				"type": "CSSComment",
+				"value": " declaration value ",
+				"start": 206,
+				"end": 229
+			},
+			{
+				"type": "CSSComment",
+				"value": " x3\ny3 ",
+				"start": 246,
+				"end": 257,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " between rules - a continuation line may itself start with a comment opener ",
+				"start": 268,
+				"end": 348
+			},
+			{
+				"type": "CSSComment",
+				"value": " x4\n/* y4\nz4 ",
+				"start": 350,
+				"end": 367
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 395,

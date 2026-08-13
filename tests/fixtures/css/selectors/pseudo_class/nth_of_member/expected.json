@@ -370,6 +370,32 @@
 				"end": 523
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " An+B of S in a non-nth pseudo folds `of ` into the Nth value; S stays a sibling\n\t   selector (tsv matches Svelte here — only the dedicated :nth-*() path nests S) ",
+				"start": 9,
+				"end": 176
+			},
+			{
+				"type": "CSSComment",
+				"value": " :has relative-list arg ",
+				"start": 213,
+				"end": 241
+			},
+			{
+				"type": "CSSComment",
+				"value": " the comma splits at the pseudo-arg level, not inside the of clause ",
+				"start": 280,
+				"end": 352
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading-minus An+B, an of descendant compound, in an unknown functional pseudo ",
+				"start": 396,
+				"end": 480
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 524,

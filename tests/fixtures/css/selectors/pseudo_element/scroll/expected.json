@@ -119,7 +119,35 @@
 											"type": "PseudoElementSelector",
 											"name": "scroll-button",
 											"start": 190,
-											"end": 205
+											"end": 209,
+											"args": {
+												"type": "SelectorList",
+												"start": 206,
+												"end": 208,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 206,
+														"end": 208,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "up",
+																		"start": 206,
+																		"end": 208
+																	}
+																],
+																"start": 206,
+																"end": 208
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 190,
@@ -166,7 +194,35 @@
 											"type": "PseudoElementSelector",
 											"name": "scroll-button",
 											"start": 239,
-											"end": 254
+											"end": 260,
+											"args": {
+												"type": "SelectorList",
+												"start": 255,
+												"end": 259,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 255,
+														"end": 259,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "down",
+																		"start": 255,
+																		"end": 259
+																	}
+																],
+																"start": 255,
+																"end": 259
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 239,
@@ -213,7 +269,35 @@
 											"type": "PseudoElementSelector",
 											"name": "scroll-button",
 											"start": 290,
-											"end": 305
+											"end": 311,
+											"args": {
+												"type": "SelectorList",
+												"start": 306,
+												"end": 310,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 306,
+														"end": 310,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "left",
+																		"start": 306,
+																		"end": 310
+																	}
+																],
+																"start": 306,
+																"end": 310
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 290,
@@ -260,7 +344,35 @@
 											"type": "PseudoElementSelector",
 											"name": "scroll-button",
 											"start": 341,
-											"end": 356
+											"end": 363,
+											"args": {
+												"type": "SelectorList",
+												"start": 357,
+												"end": 362,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 357,
+														"end": 362,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "right",
+																		"start": 357,
+																		"end": 362
+																	}
+																],
+																"start": 357,
+																"end": 362
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 341,
@@ -399,6 +511,38 @@
 				},
 				"start": 493,
 				"end": 548
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Scroll marker styling ",
+				"start": 9,
+				"end": 36
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scroll marker group ",
+				"start": 81,
+				"end": 106
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scroll button with direction ",
+				"start": 154,
+				"end": 188
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined with selectors ",
+				"start": 393,
+				"end": 422
+			},
+			{
+				"type": "CSSComment",
+				"value": " With pseudo-class ",
+				"start": 468,
+				"end": 491
 			}
 		],
 		"content": {

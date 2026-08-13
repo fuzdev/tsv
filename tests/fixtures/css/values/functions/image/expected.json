@@ -67,6 +67,26 @@
 				"end": 244
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Resolution selection ",
+				"start": 17,
+				"end": 43
+			},
+			{
+				"type": "CSSComment",
+				"value": " Image blending ",
+				"start": 106,
+				"end": 126
+			},
+			{
+				"type": "CSSComment",
+				"value": " Element as image ",
+				"start": 184,
+				"end": 206
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 245,
