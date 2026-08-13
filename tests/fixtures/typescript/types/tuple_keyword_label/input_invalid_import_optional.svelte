@@ -1,3 +1,3 @@
 <script lang="ts">
-	class C<in const T> {}
+	type A = [import?];
 </script>

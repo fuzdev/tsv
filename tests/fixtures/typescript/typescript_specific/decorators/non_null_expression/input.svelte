@@ -7,4 +7,8 @@
 
 	@(x!.y)
 	class C {}
+
+	// The `!` composes with type arguments, which need no trailing call.
+	@(x!<number>)
+	class D {}
 </script>

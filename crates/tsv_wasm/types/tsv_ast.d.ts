@@ -656,6 +656,10 @@ export interface AssignmentExpression {
 	end: number;
 	loc: SourceLocation;
 	operator: string;
+	/**
+	 * A TypeScript assertion wrapping the target survives here — `(x as T) = 1` is a
+	 * `TSAsExpression`, not the bare `Identifier`.
+	 */
 	left: Expression;
 	right: Expression;
 }
@@ -1404,11 +1408,16 @@ export interface TSTypeParameter {
 	start: number;
 	end: number;
 	loc: SourceLocation;
-	/** Omitted from JSON when false. */
+	/**
+	 * Omitted from JSON when false. The three modifier keys are emitted in the order
+	 * the SOURCE spells them, so `<in const T>` and `<const in T>` differ by key order
+	 * alone (both parse; the ordering rule is a tsc grammar-checker error, and both
+	 * formatters normalize the printed form to `const in out`).
+	 */
 	const?: boolean;
-	/** Omitted from JSON when false. */
+	/** Omitted from JSON when false. See `const` for the key-order rule. */
 	in?: boolean;
-	/** Omitted from JSON when false. */
+	/** Omitted from JSON when false. See `const` for the key-order rule. */
 	out?: boolean;
 	name: string;
 	constraint?: TSType;
@@ -1584,14 +1593,17 @@ export interface TSOptionalType {
 	typeAnnotation: TSType;
 }
 
-/** `label: T` or `label?: T` in tuple types. */
+/**
+ * `label: T` or `label?: T` in tuple types. The label is an `IdentifierName`, so a
+ * reserved or contextual keyword spells one too (`[function: string]`).
+ */
 export interface TSNamedTupleMember {
 	type: 'TSNamedTupleMember';
 	start: number;
 	end: number;
 	loc: SourceLocation;
-	optional: boolean;
 	label: Identifier;
+	optional: boolean;
 	elementType: TSType;
 }
 

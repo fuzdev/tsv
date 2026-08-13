@@ -286,7 +286,6 @@
 										"column": 3
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 194,
@@ -303,6 +302,7 @@
 									},
 									"name": "x"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSTypeReference",
 									"start": 204,
@@ -405,7 +405,6 @@
 										"column": 3
 									}
 								},
-								"optional": true,
 								"label": {
 									"type": "Identifier",
 									"start": 224,
@@ -422,6 +421,7 @@
 									},
 									"name": "x"
 								},
+								"optional": true,
 								"elementType": {
 									"type": "TSTypeReference",
 									"start": 235,

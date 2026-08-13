@@ -466,6 +466,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
+    /// The current token read as a type predicate's SUBJECT — an identifier or
+    /// contextual keyword name, or `this` (`x is T`, `this is T`, `asserts x`).
+    /// Asked twice per return type, once to decide whether an ordinary predicate
+    /// outranks a leading `asserts` and once to take the name, so the set they agree on
+    /// is spelled here rather than at each.
+    fn try_type_predicate_subject(&self) -> Option<IdentName<'arena>> {
+        self.try_ident_or_contextual_name()
+            .or_else(|| self.this_as_name())
+    }
+
     /// Parse a `: ReturnType` annotation when the next token is a `:`, else
     /// `None` — the optional-guard for function/method/signature return types
     /// (type predicates included via `parse_return_type_annotation`).
@@ -500,19 +510,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // The predicate itself starts at the first token after `:`, not at `:`
         let predicate_start = self.current_pos().0 as u32;
 
+        // An ORDINARY type predicate outranks the `asserts` modifier: a parameter may
+        // itself be named `asserts` (`(asserts: unknown): asserts is string`), and only
+        // the token after the name tells `asserts x` from `<name> is T`. Read that first,
+        // so the modifier is never eaten out from under a predicate subject of the same
+        // spelling.
+        let plain_predicate =
+            self.peek_predicate_is_ahead() && self.try_type_predicate_subject().is_some();
+
         // Check for a leading `asserts` assertion-predicate keyword. Eaten only
         // when an identifier or keyword follows (see `eat_type_predicate_asserts`);
         // a bare `asserts`, or one heading a regular type (`asserts[]`,
         // `asserts<T>`, `asserts.Foo`), stays unconsumed and is parsed below as an
         // ordinary type reference.
-        let asserts = self.eat_type_predicate_asserts();
+        let asserts = !plain_predicate && self.eat_type_predicate_asserts();
 
         // The predicate subject is an identifier/keyword name or `this`
         // (`x is T`, `this is T`, `asserts x`, `asserts this`).
-        let param_name = self
-            .try_ident_or_contextual_name()
-            .or_else(|| self.this_as_name());
-        if let Some(param_name) = param_name {
+        if let Some(param_name) = self.try_type_predicate_subject() {
             // Type predicate: `identifier is Type` or `asserts identifier is Type`.
             // The `is` must not be preceded by a line terminator
             // (`parameterName [no LineTerminator here] is Type`); see

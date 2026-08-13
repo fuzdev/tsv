@@ -122,7 +122,6 @@
 										"column": 16
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 104,
@@ -139,6 +138,7 @@
 									},
 									"name": "label"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSUnionType",
 									"start": 136,
@@ -306,7 +306,6 @@
 										"column": 10
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 153,
@@ -323,6 +322,7 @@
 									},
 									"name": "other"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSTypeReference",
 									"start": 160,

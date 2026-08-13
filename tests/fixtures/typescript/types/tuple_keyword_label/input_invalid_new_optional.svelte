@@ -1,3 +1,3 @@
 <script lang="ts">
-	function f<in const T>() {}
+	type A = [new?];
 </script>

@@ -182,7 +182,6 @@
 											"column": 46
 										}
 									},
-									"optional": false,
 									"label": {
 										"type": "Identifier",
 										"start": 56,
@@ -199,6 +198,7 @@
 										},
 										"name": "a"
 									},
+									"optional": false,
 									"elementType": {
 										"type": "TSNumberKeyword",
 										"start": 59,
@@ -246,7 +246,6 @@
 											"column": 60
 										}
 									},
-									"optional": false,
 									"label": {
 										"type": "Identifier",
 										"start": 70,
@@ -263,6 +262,7 @@
 										},
 										"name": "b"
 									},
+									"optional": false,
 									"elementType": {
 										"type": "TSStringKeyword",
 										"start": 73,
@@ -436,7 +436,6 @@
 											"column": 68
 										}
 									},
-									"optional": false,
 									"label": {
 										"type": "Identifier",
 										"start": 130,
@@ -453,6 +452,7 @@
 										},
 										"name": "component"
 									},
+									"optional": false,
 									"elementType": {
 										"type": "TSConditionalType",
 										"start": 141,
@@ -655,7 +655,6 @@
 											"column": 40
 										}
 									},
-									"optional": false,
 									"label": {
 										"type": "Identifier",
 										"start": 200,
@@ -672,6 +671,7 @@
 										},
 										"name": "options"
 									},
+									"optional": false,
 									"elementType": {
 										"type": "TSTypeLiteral",
 										"start": 209,
@@ -877,7 +877,6 @@
 											"column": 20
 										}
 									},
-									"optional": false,
 									"label": {
 										"type": "Identifier",
 										"start": 247,
@@ -894,6 +893,7 @@
 										},
 										"name": "component"
 									},
+									"optional": false,
 									"elementType": {
 										"type": "TSTypeReference",
 										"start": 258,
@@ -940,7 +940,6 @@
 											"column": 58
 										}
 									},
-									"optional": false,
 									"label": {
 										"type": "Identifier",
 										"start": 264,
@@ -957,6 +956,7 @@
 										},
 										"name": "options"
 									},
+									"optional": false,
 									"elementType": {
 										"type": "TSTypeLiteral",
 										"start": 273,

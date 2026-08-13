@@ -151,10 +151,11 @@ impl<'arena> Expression<'arena> {
 
     /// Peel type-assertion wrappers (`as` / `satisfies` / non-null `!` / `<T>`),
     /// returning the innermost wrapped expression (e.g. the `x` in `(x as T)!`).
-    /// The single source of truth for "what counts as a type assertion" used by
-    /// the assignment-target validation (parser) and the simple-`=` left unwrap
-    /// (convert). `TSInstantiationExpression` (`f<T>`) is deliberately **not**
-    /// peeled — it is not an assertion.
+    /// The single source of truth for "what counts as a type assertion", used by the
+    /// assignment-target validation (does the assertion wrap a *simple* target?).
+    /// `TSInstantiationExpression` (`f<T>`) is deliberately **not** peeled — it is not
+    /// an assertion. Peeling is a QUESTION here, never an emission: the wire keeps the
+    /// assertion node, and only convert's `unwrap_jsdoc_casts` drops anything.
     pub fn skip_type_assertions(&self) -> &Expression<'arena> {
         match self {
             Expression::TSAsExpression(e) => e.expression.skip_type_assertions(),

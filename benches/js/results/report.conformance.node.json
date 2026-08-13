@@ -1,9 +1,9 @@
 {
-	"version": 8,
+	"version": 9,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-08-08T00:35:51.772Z",
-	"git_commit": "621541e8",
+	"timestamp": "2026-08-13T18:27:11.216Z",
+	"git_commit": "76ee44f3",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -12,7 +12,7 @@
 	},
 	"corpus": {
 		"svelte": 4551,
-		"typescript": 52353,
+		"typescript": 52321,
 		"css": 22641
 	},
 	"corpus_sources": [
@@ -138,10 +138,10 @@
 		},
 		{
 			"path": "benches/js/.cache/ts_repo_files.json",
-			"files": 8129,
+			"files": 8097,
 			"by_language": {
 				"svelte": 0,
-				"typescript": 8129,
+				"typescript": 8097,
 				"css": 0
 			}
 		}
@@ -176,6 +176,14 @@
 				"tsv_wasm-internal": {
 					"processed": 318,
 					"total": 318
+				},
+				"rsvelte-parse": {
+					"processed": 318,
+					"total": 318
+				},
+				"rsvelte-parse-skip-expr-loc": {
+					"processed": 318,
+					"total": 318
 				}
 			},
 			"../prettier/tests/format/html": {
@@ -204,6 +212,14 @@
 					"total": 84
 				},
 				"tsv_wasm-internal": {
+					"processed": 84,
+					"total": 84
+				},
+				"rsvelte-parse": {
+					"processed": 84,
+					"total": 84
+				},
+				"rsvelte-parse-skip-expr-loc": {
 					"processed": 84,
 					"total": 84
 				}
@@ -236,37 +252,45 @@
 				"tsv_wasm-internal": {
 					"processed": 4149,
 					"total": 4149
+				},
+				"rsvelte-parse": {
+					"processed": 4148,
+					"total": 4149
+				},
+				"rsvelte-parse-skip-expr-loc": {
+					"processed": 4148,
+					"total": 4149
 				}
 			}
 		},
 		"parse/typescript": {
 			"../prettier/tests/format/typescript": {
 				"acorn-typescript": {
-					"processed": 712,
+					"processed": 714,
 					"total": 793
 				},
 				"tsv-json": {
-					"processed": 775,
+					"processed": 779,
 					"total": 793
 				},
 				"tsv_wasm-json": {
-					"processed": 775,
+					"processed": 779,
 					"total": 793
 				},
 				"tsv-json-no-locations": {
-					"processed": 775,
+					"processed": 779,
 					"total": 793
 				},
 				"tsv_wasm-json-no-locations": {
-					"processed": 775,
+					"processed": 779,
 					"total": 793
 				},
 				"tsv-internal": {
-					"processed": 775,
+					"processed": 779,
 					"total": 793
 				},
 				"tsv_wasm-internal": {
-					"processed": 775,
+					"processed": 779,
 					"total": 793
 				},
 				"oxc-parser": {
@@ -284,6 +308,10 @@
 				"yuku-parser-wasm": {
 					"processed": 780,
 					"total": 793
+				},
+				"swc": {
+					"processed": 756,
+					"total": 793
 				}
 			},
 			"../prettier/tests/format/js": {
@@ -292,27 +320,27 @@
 					"total": 1103
 				},
 				"tsv-json": {
-					"processed": 920,
+					"processed": 922,
 					"total": 1103
 				},
 				"tsv_wasm-json": {
-					"processed": 920,
+					"processed": 922,
 					"total": 1103
 				},
 				"tsv-json-no-locations": {
-					"processed": 920,
+					"processed": 922,
 					"total": 1103
 				},
 				"tsv_wasm-json-no-locations": {
-					"processed": 920,
+					"processed": 922,
 					"total": 1103
 				},
 				"tsv-internal": {
-					"processed": 920,
+					"processed": 922,
 					"total": 1103
 				},
 				"tsv_wasm-internal": {
-					"processed": 920,
+					"processed": 922,
 					"total": 1103
 				},
 				"oxc-parser": {
@@ -329,6 +357,10 @@
 				},
 				"yuku-parser-wasm": {
 					"processed": 935,
+					"total": 1103
+				},
+				"swc": {
+					"processed": 906,
 					"total": 1103
 				}
 			},
@@ -376,6 +408,10 @@
 				"yuku-parser-wasm": {
 					"processed": 78,
 					"total": 78
+				},
+				"swc": {
+					"processed": 78,
+					"total": 78
 				}
 			},
 			"../svelte/packages/svelte/tests": {
@@ -420,6 +456,10 @@
 					"total": 137
 				},
 				"yuku-parser-wasm": {
+					"processed": 137,
+					"total": 137
+				},
+				"swc": {
 					"processed": 137,
 					"total": 137
 				}
@@ -468,52 +508,60 @@
 				"yuku-parser-wasm": {
 					"processed": 42089,
 					"total": 42113
+				},
+				"swc": {
+					"processed": 41953,
+					"total": 42113
 				}
 			},
 			"benches/js/.cache/ts_repo_files.json": {
 				"acorn-typescript": {
-					"processed": 7799,
-					"total": 8129
+					"processed": 7772,
+					"total": 8097
 				},
 				"tsv-json": {
-					"processed": 8016,
-					"total": 8129
+					"processed": 8017,
+					"total": 8097
 				},
 				"tsv_wasm-json": {
-					"processed": 8016,
-					"total": 8129
+					"processed": 8017,
+					"total": 8097
 				},
 				"tsv-json-no-locations": {
-					"processed": 8016,
-					"total": 8129
+					"processed": 8017,
+					"total": 8097
 				},
 				"tsv_wasm-json-no-locations": {
-					"processed": 8016,
-					"total": 8129
+					"processed": 8017,
+					"total": 8097
 				},
 				"tsv-internal": {
-					"processed": 8016,
-					"total": 8129
+					"processed": 8017,
+					"total": 8097
 				},
 				"tsv_wasm-internal": {
-					"processed": 8016,
-					"total": 8129
+					"processed": 8017,
+					"total": 8097
 				},
 				"oxc-parser": {
-					"processed": 8032,
-					"total": 8129
+					"processed": 8000,
+					"total": 8097
 				},
 				"oxc-parser-wasm": {
-					"processed": 8032,
-					"total": 8129
+					"processed": 8000,
+					"total": 8097
 				},
 				"tsc": {
-					"processed": 8129,
-					"total": 8129
+					"processed": 8097,
+					"total": 8097
 				},
 				"yuku-parser-wasm": {
-					"processed": 8022,
-					"total": 8129
+					"processed": 7991,
+					"total": 8097
+				},
+				"swc": {
+					"processed": 7932,
+					"total": 8097
 				}
 			}
 		},
@@ -538,6 +586,10 @@
 				"tsv_wasm-internal": {
 					"processed": 123,
 					"total": 150
+				},
+				"postcss": {
+					"processed": 142,
+					"total": 150
 				}
 			},
 			"../svelte/packages/svelte/tests": {
@@ -558,6 +610,10 @@
 					"total": 181
 				},
 				"tsv_wasm-internal": {
+					"processed": 181,
+					"total": 181
+				},
+				"postcss": {
 					"processed": 181,
 					"total": 181
 				}
@@ -582,6 +638,10 @@
 				"tsv_wasm-internal": {
 					"processed": 22153,
 					"total": 22310
+				},
+				"postcss": {
+					"processed": 22210,
+					"total": 22310
 				}
 			}
 		}
@@ -590,7 +650,7 @@
 		"tsv": "0.2.0",
 		"svelte": "5.56.8",
 		"acorn": "8.16.0",
-		"acorn_ts": "1.0.12",
+		"acorn_ts": "1.0.13",
 		"prettier": "3.9.6",
 		"prettier_svelte": "4.1.1",
 		"oxc_parser": "0.140.0",
@@ -599,7 +659,12 @@
 		"yuku_parser_wasm": "0.8.1",
 		"biome": "2.5.4",
 		"dprint": "0.96.1",
-		"rsvelte_fmt": "0.7.4"
+		"malva": "0.16.0",
+		"postcss": "8.5.26",
+		"rsvelte_fmt": "0.7.4",
+		"rsvelte_parse": "0.3.4",
+		"rsvelte_parse_svelte_target": "5.56.8",
+		"swc": "1.15.47"
 	},
 	"binary_sizes": [
 		{
@@ -610,9 +675,9 @@
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3493072,
+			"bytes": 3724192,
 			"kind": "native",
-			"gzip_bytes": 1496484
+			"gzip_bytes": 1596556
 		},
 		{
 			"label": "tsv_wasm",
@@ -667,6 +732,24 @@
 			"bytes": 7890648,
 			"kind": "native",
 			"gzip_bytes": 3155906
+		},
+		{
+			"label": "malva (wasm)",
+			"bytes": 1465125,
+			"kind": "wasm",
+			"gzip_bytes": 414019
+		},
+		{
+			"label": "rsvelte compiler (napi)",
+			"bytes": 14246656,
+			"kind": "native",
+			"gzip_bytes": 5910800
+		},
+		{
+			"label": "swc (napi)",
+			"bytes": 31601920,
+			"kind": "native",
+			"gzip_bytes": 11851540
 		}
 	],
 	"entries": [
@@ -687,7 +770,7 @@
 			"sample_size": null,
 			"files_processed": 4551,
 			"files_total": 4551,
-			"files_iterated": 4551,
+			"files_iterated": 4550,
 			"runtime": "node"
 		},
 		{
@@ -707,7 +790,7 @@
 			"sample_size": null,
 			"files_processed": 4551,
 			"files_total": 4551,
-			"files_iterated": 4551,
+			"files_iterated": 4550,
 			"runtime": "node"
 		},
 		{
@@ -727,7 +810,7 @@
 			"sample_size": null,
 			"files_processed": 4551,
 			"files_total": 4551,
-			"files_iterated": 4551,
+			"files_iterated": 4550,
 			"runtime": "node"
 		},
 		{
@@ -747,7 +830,7 @@
 			"sample_size": null,
 			"files_processed": 4551,
 			"files_total": 4551,
-			"files_iterated": 4551,
+			"files_iterated": 4550,
 			"runtime": "node"
 		},
 		{
@@ -767,7 +850,7 @@
 			"sample_size": null,
 			"files_processed": 4551,
 			"files_total": 4551,
-			"files_iterated": 4551,
+			"files_iterated": 4550,
 			"runtime": "node"
 		},
 		{
@@ -787,7 +870,7 @@
 			"sample_size": null,
 			"files_processed": 4551,
 			"files_total": 4551,
-			"files_iterated": 4551,
+			"files_iterated": 4550,
 			"runtime": "node"
 		},
 		{
@@ -807,7 +890,47 @@
 			"sample_size": null,
 			"files_processed": 4551,
 			"files_total": 4551,
-			"files_iterated": 4551,
+			"files_iterated": 4550,
+			"runtime": "node"
+		},
+		{
+			"name": "rsvelte-parse",
+			"group": "parse/svelte",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 4550,
+			"files_total": 4551,
+			"files_iterated": 4550,
+			"runtime": "node"
+		},
+		{
+			"name": "rsvelte-parse-skip-expr-loc",
+			"group": "parse/svelte",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 4550,
+			"files_total": 4551,
+			"files_iterated": 4550,
 			"runtime": "node"
 		},
 		{
@@ -825,9 +948,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 51450,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 51425,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -845,9 +968,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52039,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52046,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -865,9 +988,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52039,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52046,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -885,9 +1008,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52039,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52046,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -905,9 +1028,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52039,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52046,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -925,9 +1048,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52039,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52046,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -945,9 +1068,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52039,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52046,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -965,9 +1088,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52046,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52014,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -985,9 +1108,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52046,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52014,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -1005,9 +1128,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52139,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52107,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -1025,9 +1148,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 52041,
-			"files_total": 52353,
-			"files_iterated": 51286,
+			"files_processed": 52010,
+			"files_total": 52321,
+			"files_iterated": 51101,
+			"runtime": "node"
+		},
+		{
+			"name": "swc",
+			"group": "parse/typescript",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 51762,
+			"files_total": 52321,
+			"files_iterated": 51101,
 			"runtime": "node"
 		},
 		{
@@ -1047,7 +1190,7 @@
 			"sample_size": null,
 			"files_processed": 22402,
 			"files_total": 22641,
-			"files_iterated": 22388,
+			"files_iterated": 22386,
 			"runtime": "node"
 		},
 		{
@@ -1067,7 +1210,7 @@
 			"sample_size": null,
 			"files_processed": 22457,
 			"files_total": 22641,
-			"files_iterated": 22388,
+			"files_iterated": 22386,
 			"runtime": "node"
 		},
 		{
@@ -1087,7 +1230,7 @@
 			"sample_size": null,
 			"files_processed": 22457,
 			"files_total": 22641,
-			"files_iterated": 22388,
+			"files_iterated": 22386,
 			"runtime": "node"
 		},
 		{
@@ -1107,7 +1250,7 @@
 			"sample_size": null,
 			"files_processed": 22457,
 			"files_total": 22641,
-			"files_iterated": 22388,
+			"files_iterated": 22386,
 			"runtime": "node"
 		},
 		{
@@ -1127,7 +1270,27 @@
 			"sample_size": null,
 			"files_processed": 22457,
 			"files_total": 22641,
-			"files_iterated": 22388,
+			"files_iterated": 22386,
+			"runtime": "node"
+		},
+		{
+			"name": "postcss",
+			"group": "parse/css",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 22533,
+			"files_total": 22641,
+			"files_iterated": 22386,
 			"runtime": "node"
 		}
 	],

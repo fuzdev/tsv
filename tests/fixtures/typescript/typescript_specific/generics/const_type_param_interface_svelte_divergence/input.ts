@@ -10,3 +10,7 @@ interface Multiple<const T, const U> {
 interface WithVariance<const in T> {
 	consume(value: T): void;
 }
+
+interface VarianceFirst<const in T> {
+	consume(value: T): void;
+}

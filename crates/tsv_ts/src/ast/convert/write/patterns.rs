@@ -180,12 +180,12 @@ pub(super) fn write_assignment_pattern(
 ) {
     node_header(w, "AssignmentPattern", span, ctx);
     w.raw(",\"left\":");
-    // acorn's `=` conversion (`toAssignable`, return value used) peels a
-    // type-assertion/paren wrapper off a default's target, so the wire `left`
-    // is the bare target (`{ a: (b as T) = 1 }` → `Identifier` `b`); the cast
-    // stays in the internal AST for the formatter — same unwrap as the simple
-    // `=` left in `write_expression`'s `AssignmentExpression` arm.
-    write_expression(w, pattern.left.skip_type_assertions(), ctx);
+    // A default's target keeps its type-assertion wrapper (`{ a: (b as T) = 1 }` →
+    // `TSAsExpression`): acorn-typescript's `toAssignable` validates through the
+    // assertion but preserves the node — same as the simple `=` left in
+    // `write_expression`'s `AssignmentExpression` arm. The internal-only JSDoc cast is
+    // still peeled, by `write_expression` itself.
+    write_expression(w, pattern.left, ctx);
     w.raw(",\"right\":");
     write_expression(w, pattern.right, ctx);
     write_decorators_field(w, pattern.decorators, ctx);

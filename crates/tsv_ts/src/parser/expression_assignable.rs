@@ -52,9 +52,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`(x as T) = …`, `/** @type {T} */ (x) = …`); `ForHead` (a no-declaration
     /// for-in/of head) rejects type assertions but accepts a JSDoc cast over a simple
     /// target; `Binding` (function params, destructuring bindings) rejects both —
-    /// matching acorn-typescript's `isBinding` split. The assertion/cast node is kept
-    /// here; the public AST unwraps it at the convert boundary (acorn drops the
-    /// cast/assertion from a simple `=` left and from an `AssignmentPattern` left).
+    /// matching acorn-typescript's `isBinding` split. The assertion node is kept, and the
+    /// public AST keeps it too (acorn preserves it on a simple `=` left and on an
+    /// `AssignmentPattern` left); only the internal-only JSDoc cast unwraps at convert.
     pub(super) fn to_assignable(
         &self,
         expr: Expression<'arena>,
@@ -172,13 +172,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // AssignmentExpression in pattern context becomes AssignmentPattern
             // This handles default values like `{a = 1}` which was parsed as shorthand.
             // The left converts as non-nested: it is an `=` left in its own right, so a
-            // parenthesized cast is a valid target there (acorn's inner-`=` conversion
-            // unwraps it; the convert layer mirrors that unwrap at emission). That
-            // inner-`=` conversion runs at expression-parse time in acorn — before the
-            // enclosing construct is known — so it applies in a for-head too
-            // (`for ([(a as T) = 1] of x)` is accepted); ForHead therefore converts the
-            // left under Assignment rules. Binding stays Binding: params reject the
-            // cast ("unexpected type cast in parameter position").
+            // parenthesized cast is a valid target there. That inner-`=` conversion runs
+            // at expression-parse time — before the enclosing construct is known — so it
+            // applies in a for-head too; ForHead therefore converts the left under
+            // Assignment rules. tsc accepts `for ([(a as T) = 1] of x)` and prettier
+            // formats it; acorn-typescript rejects it, because preserving the assertion
+            // node leaves it in the way of the for-head's second, binding-mode pass —
+            // cataloged as `cast_target_destructure_default_for_head_svelte_divergence`.
+            // Binding stays Binding: params reject the cast ("unexpected type cast in
+            // parameter position").
             Expression::AssignmentExpression(assign) => {
                 let left_context = match context {
                     AssignableContext::ForHead => AssignableContext::Assignment,
@@ -235,9 +237,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // (`for ((x as T) of …)`) / binding position (acorn's `isBinding` split).
             // Nested (a bare pattern child), the cast must additionally be
             // *unparenthesized* — `({ a: b as T } = x)` is kept, but
-            // `({ a: (b as T) } = x)` is acorn's "Assigning to rvalue". The node is
-            // kept (the formatter reproduces prettier's `(x as T) = …`); convert
-            // unwraps it for a simple `=` left.
+            // `({ a: (b as T) } = x)` is acorn's "Assigning to rvalue". The node is kept
+            // (the formatter reproduces prettier's `(x as T) = …`), and convert emits it.
             Expression::TSAsExpression(_)
             | Expression::TSSatisfiesExpression(_)
             | Expression::TSNonNullExpression(_)

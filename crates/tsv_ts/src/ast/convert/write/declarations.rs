@@ -539,22 +539,25 @@ pub(super) fn write_type_parameter_declaration(
     close_node(w, "TSTypeParameterDeclaration", params.span, ctx);
 }
 
-/// Emits a `TSTypeParameter` node. Field order: `const`/`in`/`out` (each
-/// only when true), `name`, `constraint?`, `default?`.
+/// Emits a `TSTypeParameter` node. Field order: the modifiers present, **in the
+/// order the source spells them**, then `name`, `constraint?`, `default?`.
+///
+/// acorn-typescript's `tsParseModifiers` stamps each flag as it consumes the
+/// keyword, so `<in const T>` and `<const in T>` differ on the wire by key order
+/// alone. Both parse (the ordering rule is a tsc *grammar-checker* error, not a
+/// parse one), and both formatters normalize the printed form to `const in out` —
+/// so this order is reachable only from source neither tool would emit, which is
+/// exactly why nothing else guards it.
 pub(super) fn write_type_parameter(
     w: &mut JsonWriter,
     param: &internal::TSTypeParameter<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSTypeParameter", param.span, ctx);
-    if param.is_const {
-        w.raw(",\"const\":true");
-    }
-    if param.is_in {
-        w.raw(",\"in\":true");
-    }
-    if param.is_out {
-        w.raw(",\"out\":true");
+    for modifier in param.modifiers.iter() {
+        w.raw(",\"");
+        w.raw(modifier.as_str());
+        w.raw("\":true");
     }
     w.raw(",\"name\":");
     write_name(w, param.name.ident_name(), param.name.span.start, ctx);

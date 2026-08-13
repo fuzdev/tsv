@@ -393,6 +393,74 @@ pub struct TSTypeParameterDeclaration<'arena> {
     pub span: Span,
 }
 
+/// A type parameter's modifier keyword — `const` (TS 5.0) and the `in`/`out`
+/// variance pair (TS 4.7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TSTypeParameterModifier {
+    Const,
+    In,
+    Out,
+}
+
+impl TSTypeParameterModifier {
+    /// The wire's key for this modifier — also its source spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TSTypeParameterModifier::Const => "const",
+            TSTypeParameterModifier::In => "in",
+            TSTypeParameterModifier::Out => "out",
+        }
+    }
+}
+
+/// The modifiers a type parameter carries, **in source order**.
+///
+/// ⚠️ The order is observable OUTPUT, not bookkeeping, and the two readers ask
+/// opposite questions of it. acorn-typescript stamps each flag as it consumes the
+/// keyword, so `<in const T>` emits `in` before `const` on the wire while
+/// `<const in T>` emits it after — the WRITER must walk [`Self::iter`]. The PRINTER
+/// is the reverse: it emits the canonical `const in out` however the source spells
+/// it (as prettier does), so it asks [`Self::contains`] three times and never sees
+/// the order. Storing a set plus a separate order field would give those two
+/// answers room to disagree; one ordered value cannot.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TSTypeParameterModifiers {
+    /// At most one of each of the three keywords, so three slots always suffice.
+    order: [Option<TSTypeParameterModifier>; 3],
+}
+
+impl TSTypeParameterModifiers {
+    /// Append `modifier`, or return `false` if it is already present — a repeat
+    /// (`<const const T>`) is a syntax error the caller reports.
+    pub fn push(&mut self, modifier: TSTypeParameterModifier) -> bool {
+        if self.contains(modifier) {
+            return false;
+        }
+        for slot in &mut self.order {
+            if slot.is_none() {
+                *slot = Some(modifier);
+                return true;
+            }
+        }
+        // Unreachable: there are three distinct modifiers and three slots, and the
+        // duplicate check above already returned, so at most two slots are filled.
+        // Reporting "already present" is the harmless reading if it ever were reached:
+        // the caller rejects on a `false`, which is what a fourth modifier keyword
+        // would deserve anyway.
+        false
+    }
+
+    /// Whether `modifier` is present, order-blind — the printer's question.
+    pub fn contains(self, modifier: TSTypeParameterModifier) -> bool {
+        self.order.iter().flatten().any(|&m| m == modifier)
+    }
+
+    /// The modifiers in the order the author wrote them — the wire's question.
+    pub fn iter(self) -> impl Iterator<Item = TSTypeParameterModifier> {
+        self.order.into_iter().flatten()
+    }
+}
+
 /// Single type parameter: `T`, `T extends U`, or `T extends U = V`
 /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
 #[derive(Debug, Clone)]
@@ -400,12 +468,8 @@ pub struct TSTypeParameter<'arena> {
     pub name: Identifier<'arena>,
     pub constraint: Option<&'arena TSType<'arena>>,
     pub default: Option<&'arena TSType<'arena>>,
-    /// `const` modifier (TS 5.0): `<const T>`
-    pub is_const: bool,
-    /// `in` variance modifier (TS 4.7): `<in T>`
-    pub is_in: bool,
-    /// `out` variance modifier (TS 4.7): `<out T>`
-    pub is_out: bool,
+    /// `const` / `in` / `out`, in source order — see [`TSTypeParameterModifiers`].
+    pub modifiers: TSTypeParameterModifiers,
     pub span: Span,
 }
 

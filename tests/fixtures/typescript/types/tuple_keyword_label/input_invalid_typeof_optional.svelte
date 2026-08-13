@@ -1,3 +1,3 @@
 <script lang="ts">
-	interface L<in const T> {}
+	type A = [typeof?];
 </script>
