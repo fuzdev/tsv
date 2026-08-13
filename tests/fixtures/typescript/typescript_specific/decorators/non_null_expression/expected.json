@@ -2,30 +2,47 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 92,
+	"end": 191,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
 		"nodes": []
 	},
 	"options": null,
-	"comments": [],
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The `!` composes with type arguments, which need no trailing call.",
+			"start": 84,
+			"end": 153,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 70
+				}
+			}
+		}
+	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 91,
+		"end": 190,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 82,
+			"end": 181,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 10,
+					"line": 14,
 					"column": 9
 				}
 			},
@@ -383,6 +400,157 @@
 						},
 						"body": []
 					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 155,
+					"end": 180,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 11
+						}
+					},
+					"decorators": [
+						{
+							"type": "Decorator",
+							"start": 155,
+							"end": 168,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 14
+								}
+							},
+							"expression": {
+								"type": "TSInstantiationExpression",
+								"start": 157,
+								"end": 167,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 3
+									},
+									"end": {
+										"line": 12,
+										"column": 13
+									}
+								},
+								"expression": {
+									"type": "TSNonNullExpression",
+									"start": 157,
+									"end": 159,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 3
+										},
+										"end": {
+											"line": 12,
+											"column": 5
+										}
+									},
+									"expression": {
+										"type": "Identifier",
+										"start": 157,
+										"end": 158,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 3
+											},
+											"end": {
+												"line": 12,
+												"column": 4
+											}
+										},
+										"name": "x"
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 159,
+									"end": 167,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 5
+										},
+										"end": {
+											"line": 12,
+											"column": 13
+										}
+									},
+									"params": [
+										{
+											"type": "TSNumberKeyword",
+											"start": 160,
+											"end": 166,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 6
+												},
+												"end": {
+													"line": 12,
+													"column": 12
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"id": {
+						"type": "Identifier",
+						"start": 176,
+						"end": 177,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 7
+							},
+							"end": {
+								"line": 13,
+								"column": 8
+							}
+						},
+						"name": "D"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 178,
+						"end": 180,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 9
+							},
+							"end": {
+								"line": 13,
+								"column": 11
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `!` composes with type arguments, which need no trailing call.",
+							"start": 84,
+							"end": 153
+						}
+					]
 				}
 			],
 			"sourceType": "module"

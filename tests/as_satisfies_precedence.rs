@@ -203,12 +203,13 @@ fn union_rhs_and_chained_casts() {
     }
 }
 
-/// A parenthesized cast is the one accepted cast assignment target; the `as T` is
-/// stripped to the bare identifier during the assignment-target conversion (both
-/// tsv and acorn), and `x = y as T` keeps the cast on the right. Unchanged.
+/// A parenthesized cast is the one accepted cast assignment target, and the `as T`
+/// SURVIVES the assignment-target conversion (both tsv and acorn — the conversion
+/// validates through the assertion rather than peeling it). `x = y as T` keeps the
+/// cast on the right as always.
 #[test]
 fn assignment_target_preserved() {
-    assert_eq!(expr_sig("(x as T) = v;"), "(x = v)");
+    assert_eq!(expr_sig("(x as T) = v;"), "((x as T) = v)");
     assert_eq!(expr_sig("x = y as T;"), "(x = (y as T))");
 }
 

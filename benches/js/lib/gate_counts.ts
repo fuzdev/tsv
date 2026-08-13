@@ -94,7 +94,7 @@ export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: strin
 		commit: '44a781373',
 		pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*'
 	},
-	'../acorn-typescript': { commit: '111d92a', pins: 'TS_FIXTURES_PINS' },
+	'../acorn-typescript': { commit: '923b213', pins: 'TS_FIXTURES_PINS' },
 	'../typescript': {
 		commit: '637d5746b',
 		pins: 'TS_REPO_PINS, TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN'
@@ -117,7 +117,7 @@ export interface GatePins {
 export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3387, both_accept: 3292 };
 
 /** conformance:ts-fixtures — provenance in `GATE_CHECKOUT_COMMITS` (../acorn-typescript, oracle @sveltejs/acorn-typescript). */
-export const TS_FIXTURES_PINS: GatePins = { scanned: 214, both_accept: 191 };
+export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202 };
 
 /**
  * conformance:ts-repo — `scanned` corpus files + `accept_parity` (tsv/tsc-baseline agreement);

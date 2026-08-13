@@ -293,17 +293,15 @@ pub(super) fn write_expression_inner(
             write_bare_node(w, "Super", s.span, ctx);
         }
         internal::Expression::AssignmentExpression(assign) => {
-            // acorn drops a type assertion from a *simple* `=` left.
-            let left = if matches!(assign.operator, internal::AssignmentOperator::Assign) {
-                assign.left.skip_type_assertions()
-            } else {
-                assign.left
-            };
+            // The `=` left keeps its type-assertion wrapper (`(x as T) = 1` →
+            // `TSAsExpression`): acorn-typescript's `toAssignable` validates through the
+            // assertion but preserves the node. A JSDoc cast is not an assertion node at
+            // all in the public AST, and `write_expression` already peels it.
             node_header(w, "AssignmentExpression", assign.span, ctx);
             w.raw(",\"operator\":\"");
             w.raw(assign.operator.as_str());
             w.raw("\",\"left\":");
-            write_expression(w, left, ctx);
+            write_expression(w, assign.left, ctx);
             w.raw(",\"right\":");
             write_expression(w, assign.right, ctx);
             close_node(w, "AssignmentExpression", assign.span, ctx);
@@ -361,7 +359,18 @@ pub(super) fn write_expression_inner(
         internal::Expression::TSInstantiationExpression(inst_expr) => {
             node_header(w, "TSInstantiationExpression", inst_expr.span, ctx);
             w.raw(",\"expression\":");
-            write_expression(w, inst_expr.expression, ctx);
+            write_expression_inner(
+                w,
+                inst_expr.expression,
+                ctx,
+                ExprFlags {
+                    chain: ChainState::Unresolved,
+                    force_optional: false,
+                    // A call-less decorator (`@a.b<T>`) wraps its member spine in one
+                    // of these, so the strip walks through it too.
+                    strip_optional: flags.strip_optional,
+                },
+            );
             w.raw(",\"typeArguments\":");
             write_type_parameter_instantiation(w, &inst_expr.type_arguments, ctx);
             close_node(w, "TSInstantiationExpression", inst_expr.span, ctx);

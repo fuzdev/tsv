@@ -154,7 +154,6 @@
 										"column": 28
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 111,
@@ -171,6 +170,7 @@
 									},
 									"name": "label"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSUnionType",
 									"start": 118,
@@ -321,7 +321,6 @@
 										"column": 48
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 220,
@@ -338,6 +337,7 @@
 									},
 									"name": "label"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSUnionType",
 									"start": 230,
@@ -519,7 +519,6 @@
 										"column": 28
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 461,
@@ -536,6 +535,7 @@
 									},
 									"name": "label"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSIntersectionType",
 									"start": 468,
@@ -686,7 +686,6 @@
 										"column": 46
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 576,
@@ -703,6 +702,7 @@
 									},
 									"name": "label"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSIntersectionType",
 									"start": 583,

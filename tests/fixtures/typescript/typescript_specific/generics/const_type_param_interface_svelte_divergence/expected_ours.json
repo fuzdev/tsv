@@ -1,14 +1,14 @@
 {
 	"type": "Program",
 	"start": 0,
-	"end": 172,
+	"end": 239,
 	"loc": {
 		"start": {
 			"line": 1,
 			"column": 0
 		},
 		"end": {
-			"line": 13,
+			"line": 17,
 			"column": 0
 		}
 	},
@@ -628,6 +628,216 @@
 									},
 									"end": {
 										"line": 11,
+										"column": 24
+									}
+								}
+							}
+						},
+						"kind": "method"
+					}
+				]
+			}
+		},
+		{
+			"type": "TSInterfaceDeclaration",
+			"start": 173,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 1
+				}
+			},
+			"id": {
+				"type": "Identifier",
+				"start": 183,
+				"end": 196,
+				"loc": {
+					"start": {
+						"line": 14,
+						"column": 10
+					},
+					"end": {
+						"line": 14,
+						"column": 23
+					}
+				},
+				"name": "VarianceFirst"
+			},
+			"typeParameters": {
+				"type": "TSTypeParameterDeclaration",
+				"start": 196,
+				"end": 208,
+				"loc": {
+					"start": {
+						"line": 14,
+						"column": 23
+					},
+					"end": {
+						"line": 14,
+						"column": 35
+					}
+				},
+				"params": [
+					{
+						"type": "TSTypeParameter",
+						"start": 197,
+						"end": 207,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 24
+							},
+							"end": {
+								"line": 14,
+								"column": 34
+							}
+						},
+						"const": true,
+						"in": true,
+						"name": "T"
+					}
+				]
+			},
+			"body": {
+				"type": "TSInterfaceBody",
+				"start": 209,
+				"end": 238,
+				"loc": {
+					"start": {
+						"line": 14,
+						"column": 36
+					},
+					"end": {
+						"line": 16,
+						"column": 1
+					}
+				},
+				"body": [
+					{
+						"type": "TSMethodSignature",
+						"start": 212,
+						"end": 236,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 25
+							}
+						},
+						"computed": false,
+						"key": {
+							"type": "Identifier",
+							"start": 212,
+							"end": 219,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 1
+								},
+								"end": {
+									"line": 15,
+									"column": 8
+								}
+							},
+							"name": "consume"
+						},
+						"parameters": [
+							{
+								"type": "Identifier",
+								"start": 220,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 9
+									},
+									"end": {
+										"line": 15,
+										"column": 17
+									}
+								},
+								"name": "value",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 225,
+									"end": 228,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 14
+										},
+										"end": {
+											"line": 15,
+											"column": 17
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 227,
+										"end": 228,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 16
+											},
+											"end": {
+												"line": 15,
+												"column": 17
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 227,
+											"end": 228,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 16
+												},
+												"end": {
+													"line": 15,
+													"column": 17
+												}
+											},
+											"name": "T"
+										}
+									}
+								}
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 229,
+							"end": 235,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 18
+								},
+								"end": {
+									"line": 15,
+									"column": 24
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 231,
+								"end": 235,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 20
+									},
+									"end": {
+										"line": 15,
 										"column": 24
 									}
 								}

@@ -606,7 +606,6 @@
 										"column": 24
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 444,
@@ -623,6 +622,7 @@
 									},
 									"name": "first"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 451,
@@ -653,7 +653,6 @@
 										"column": 40
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 459,
@@ -670,6 +669,7 @@
 									},
 									"name": "second"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSNumberKeyword",
 									"start": 467,
@@ -700,7 +700,6 @@
 										"column": 56
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 475,
@@ -717,6 +716,7 @@
 									},
 									"name": "third"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSBooleanKeyword",
 									"start": 482,
@@ -747,7 +747,6 @@
 										"column": 72
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 491,
@@ -764,6 +763,7 @@
 									},
 									"name": "fourth"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSObjectKeyword",
 									"start": 499,
@@ -794,7 +794,6 @@
 										"column": 97
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 507,
@@ -811,6 +810,7 @@
 									},
 									"name": "fifth"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSTypeReference",
 									"start": 514,
@@ -919,7 +919,6 @@
 										"column": 15
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 594,
@@ -936,6 +935,7 @@
 									},
 									"name": "first"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 601,
@@ -966,7 +966,6 @@
 										"column": 16
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 611,
@@ -983,6 +982,7 @@
 									},
 									"name": "second"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSNumberKeyword",
 									"start": 619,
@@ -1013,7 +1013,6 @@
 										"column": 16
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 629,
@@ -1030,6 +1029,7 @@
 									},
 									"name": "third"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSBooleanKeyword",
 									"start": 636,
@@ -1060,7 +1060,6 @@
 										"column": 16
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 647,
@@ -1077,6 +1076,7 @@
 									},
 									"name": "fourth"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSObjectKeyword",
 									"start": 655,
@@ -1107,7 +1107,6 @@
 										"column": 26
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 665,
@@ -1124,6 +1123,7 @@
 									},
 									"name": "fifth"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSTypeReference",
 									"start": 672,

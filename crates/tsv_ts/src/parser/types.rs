@@ -398,7 +398,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Any remaining reserved keyword is a type-reference NAME: TS's type
             // space is a separate `IdentifierName` namespace, so reserved statement
             // keywords (`break`, `default`, `function`, `case`, …) are valid type
-            // names (tsc + prettier accept; acorn-typescript is over-strict here).
+            // names — tsc, prettier and acorn-typescript all accept.
             // The primitive keywords, `this`/`const`/`import`/`typeof`/`new`, and
             // the contextual type operators (which lex as `Identifier`) all match
             // above, so only the reserved keywords reach this arm — the entity-name
@@ -497,9 +497,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 name,
                 constraint,
                 default: None,
-                is_const: false,
-                is_in: false,
-                is_out: false,
+                // `infer T` takes no modifiers.
+                modifiers: TSTypeParameterModifiers::default(),
                 span: Span::new(name_start, end),
             },
             span: Span::new(start as u32, end),
@@ -1489,19 +1488,75 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )
     }
 
+    /// The current token read as a tuple element's LABEL, with the keyword it was
+    /// spelled as (`None` for a plain identifier) — the head of `label: T` / `label?: T`.
+    ///
+    /// A label is an `IdentifierName`, so a reserved or contextual keyword spells one
+    /// too (`[function: string]`, `[string?: number]`) — tsc, prettier and
+    /// acorn-typescript all read it that way. A keyword token is never `\u`-escaped (the
+    /// lexer re-classifies an escaped one as an `Identifier`), so its name reads raw.
+    /// The caller keeps the keyword because the head may turn out to be a standalone
+    /// type instead — see [`Parser::tuple_label_head_as_type`].
+    fn tuple_label_head(&self) -> Option<(IdentName<'arena>, Option<KeywordKind>)> {
+        match self.current_kind() {
+            TokenKind::Identifier => Some((self.current_ident_name(), None)),
+            TokenKind::Keyword(kw) => Some((self.current_raw_ident_name(), Some(*kw))),
+            _ => None,
+        }
+    }
+
+    /// The already-consumed label-position head of a tuple element, re-read as the
+    /// standalone type it turned out to be (`[T?]`, `[this?]`, `[void?]`).
+    ///
+    /// `[T?]` and `[T?: U]` are told apart only by the token *after* the `?`, and this
+    /// parser has one token of lookahead — so the head is consumed as a label first and
+    /// rebuilt here when the `:` never arrives. Every head that reaches this point spells
+    /// a **leaf** type, so nothing needs re-lexing: the primitive keywords
+    /// (`void`/`null`/`true`/`string`/…) are their own node, `this` is the `this` type,
+    /// and every other keyword is an ordinary type-reference name (TS's type space is a
+    /// separate `IdentifierName` namespace).
+    ///
+    /// The exception is the three keywords that must be *followed* by more type syntax —
+    /// `typeof T`, `new () => T`, `import('m')` — where the `?` we consumed already made
+    /// this a syntax error (`[typeof?]` rejects in tsc and acorn-typescript alike). The
+    /// caret points at the keyword, which is the construct that lost its operand.
+    fn tuple_label_head_as_type(
+        &self,
+        keyword: Option<KeywordKind>,
+        name: IdentName<'arena>,
+        span: Span,
+    ) -> Result<TSType<'arena>, ParseError> {
+        if let Some(kw) = keyword {
+            if let Some(ts_kind) = TSKeywordKind::from_lexer_keyword(kw) {
+                return Ok(TSType::Keyword(TSKeywordType::new(ts_kind, span)));
+            }
+            match kw {
+                KeywordKind::This => return Ok(TSType::ThisType(TSThisType { span })),
+                KeywordKind::Typeof | KeywordKind::New | KeywordKind::Import => {
+                    return Err(self.error_msg_at("Expected a type name", span.start as usize));
+                }
+                _ => {}
+            }
+        }
+        Ok(TSType::TypeReference(TSTypeReference {
+            type_name: TSEntityName::Identifier(Identifier::simple(name, span)),
+            type_arguments: None,
+            span,
+        }))
+    }
+
     /// Parse a tuple element (without leading `...`): `T`, `T?`, `label: T`, `label?: T`
     fn parse_tuple_element_inner(&mut self) -> Result<TSType<'arena>, ParseError> {
         let elem_start = self.current_pos().0;
 
         // Check for named tuple member: `label: T` or `label?: T`
-        // An identifier followed by `:` indicates a named tuple member
-        // An identifier followed by `?:` indicates an optional named tuple member
-        if matches!(self.current_kind(), TokenKind::Identifier)
+        // A label head followed by `:` indicates a named tuple member
+        // A label head followed by `?:` indicates an optional named tuple member
+        if let Some((label_name, label_keyword)) = self.tuple_label_head()
             && matches!(self.peek_kind(), TokenKind::Colon | TokenKind::Question)
         {
             let (label_start, label_end) = self.current_pos();
-            let label_name = self.current_ident_name();
-            self.advance()?; // consume identifier
+            self.advance()?; // consume the label token
 
             // A `?` here is either the named-member marker (`label?: T`) or the postfix
             // optional one (`TypeRef?`), and only the token AFTER it tells them apart —
@@ -1520,18 +1575,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 } else if after_line_break {
                     return Err(self.error_optional_marker_after_line_break(marker_pos));
                 } else {
-                    // This was actually `TypeRef?` - we need to create the type reference
-                    // and wrap it in optional
-                    let type_ref = TSType::TypeReference(TSTypeReference {
-                        type_name: TSEntityName::Identifier(Identifier::simple(
-                            label_name,
-                            Span::new(label_start as u32, label_end as u32),
-                        )),
-                        type_arguments: None,
-                        span: Span::new(label_start as u32, label_end as u32),
-                    });
+                    // This was actually `T?` — the head is a standalone type after all,
+                    // and the `?` is the postfix optional marker.
+                    let head = self.tuple_label_head_as_type(
+                        label_keyword,
+                        label_name,
+                        Span::new(label_start as u32, label_end as u32),
+                    )?;
                     return Ok(TSType::Optional(TSOptionalType {
-                        type_annotation: self.alloc(type_ref),
+                        type_annotation: self.alloc(head),
                         span: Span::new(elem_start as u32, self.prev_token_end() as u32),
                     }));
                 }
@@ -1724,31 +1776,62 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_type_parameter(&mut self) -> Result<TSTypeParameter<'arena>, ParseError> {
         let start = self.current_pos().0 as u32;
 
-        // Parse optional modifiers: const, in, out
-        let mut is_const = false;
-        let mut is_in = false;
-        let mut is_out = false;
+        // Parse optional modifiers: `const` (TS 5.0) and the `in`/`out` variance pair
+        // (TS 4.7), in ANY order. tsc's parser collects them with an order-free modifier
+        // loop and leaves "'const' modifier must precede 'in'" to its grammar checker, so
+        // the ordering rule joins the static-semantic early-errors tsv defers — and
+        // prettier formats every ordering on a class, interface or type alias, which is
+        // the accept test.
+        //
+        // TODO: the variance *context* rule is a different matter and should be
+        // rejected, not deferred — prettier refuses `function f<in T>() {}` ("'in'
+        // modifier can only appear on a type parameter of a class, interface or type
+        // alias"), so tsv accepting it is an over-acceptance. Enforcing it needs the
+        // declaring construct threaded down to here, which no caller passes today.
+        let mut modifiers = TSTypeParameterModifiers::default();
 
-        // Check for `const` modifier (TS 5.0)
-        if self.check(&TokenKind::Keyword(KeywordKind::Const)) {
-            is_const = true;
-            self.advance()?;
-        }
-
-        // Check for `in` modifier (variance, TS 4.7)
-        if self.check(&TokenKind::Keyword(KeywordKind::In)) {
-            is_in = true;
-            self.advance()?;
-        }
-
-        // Check for `out` modifier (variance, TS 4.7)
-        // Note: `out` is a contextual keyword, check as identifier
-        if matches!(self.current_kind(), TokenKind::Identifier) {
-            let text = self.current_value();
-            if text == "out" {
-                is_out = true;
-                self.advance()?;
+        loop {
+            let modifier = match self.current_kind() {
+                TokenKind::Keyword(KeywordKind::Const) => TSTypeParameterModifier::Const,
+                TokenKind::Keyword(KeywordKind::In) => TSTypeParameterModifier::In,
+                // `out` is contextual, so it lexes as an identifier.
+                TokenKind::Identifier if self.current_value() == "out" => {
+                    TSTypeParameterModifier::Out
+                }
+                _ => break,
+            };
+            // A modifier keyword is only a MODIFIER when a name can still follow it
+            // (tsc's `nextTokenCanFollowModifier`) — otherwise it IS the name, since
+            // `out` is contextual and names a parameter as freely as `T` does
+            // (`<out>`, `<out, T>`, `<out = string>`, `<in out>`). The test is the
+            // token's *shape*, not its validity as a name: `extends` is a keyword, so
+            // `<out extends string>` keeps `out` a modifier and then fails for want of
+            // a name — which is what tsc, prettier and acorn all do. Reserved `in` /
+            // `const` reach the name read and reject there, as before.
+            if !self.peek_is_identifier_or_keyword() {
+                break;
             }
+            // A REPEAT is rejected HERE, at the offending keyword, rather than left to
+            // fail as a stray token further along: `<out out T>` is a duplicate modifier
+            // in every context, adjudicable from the construct alone — the
+            // unconditional-local bucket tsv rejects rather than defers (see
+            // `../../CLAUDE.md` §Strict Mode Only), and the same call tsv already makes
+            // one position over for a class member (`public public foo`). ⚠️ tsc's
+            // parser instead accepts and raises TS1030 `'out' modifier already seen`
+            // from its grammar checker, and prettier collapses the repeat — so this is
+            // a deliberate rejection of input prettier formats, not a gap. acorn agrees
+            // with tsv, message and all (`Duplicate modifier: 'out'`).
+            //
+            // The guard above runs FIRST, so a trailing repeat that is really the NAME
+            // never reaches this: `<out out>` is variance `out` on a parameter named
+            // `out`, which every oracle accepts.
+            if !modifiers.push(modifier) {
+                return Err(self.error_msg_at(
+                    &format!("Duplicate modifier: '{}'", modifier.as_str()),
+                    self.current_pos().0,
+                ));
+            }
+            self.advance()?;
         }
 
         let (id_start, id_end) = self.current_pos();
@@ -1788,9 +1871,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             name,
             constraint,
             default,
-            is_const,
-            is_in,
-            is_out,
+            modifiers,
             span: Span::new(start, end),
         })
     }

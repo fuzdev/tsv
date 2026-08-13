@@ -138,7 +138,6 @@
 										"column": 30
 									}
 								},
-								"optional": true,
 								"label": {
 									"type": "Identifier",
 									"start": 85,
@@ -163,6 +162,7 @@
 										}
 									]
 								},
+								"optional": true,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 98,
@@ -249,7 +249,6 @@
 										"column": 29
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 118,
@@ -274,6 +273,7 @@
 										}
 									]
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 130,

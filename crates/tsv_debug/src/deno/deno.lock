@@ -2,7 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@std/streams@1": "1.1.2",
-    "npm:@sveltejs/acorn-typescript@1.0.12": "1.0.12_acorn@8.16.0",
+    "npm:@sveltejs/acorn-typescript@1.0.13": "1.0.13_acorn@8.16.0",
     "npm:acorn@8.16.0": "8.16.0",
     "npm:prettier-plugin-svelte@4.1.1": "4.1.1_prettier@3.9.6_svelte@5.56.8",
     "npm:prettier@3.9.6": "3.9.6",
@@ -41,8 +41,8 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@sveltejs/acorn-typescript@1.0.12_acorn@8.16.0": {
-      "integrity": "sha512-J1jNYG23QWd67UfrQSFHtjhV37r9mVi0gdc12A3MWPldOjRK35Xk+um+qACPVjgw3AleiqoyEAhok8Wm3q46NA==",
+    "@sveltejs/acorn-typescript@1.0.13_acorn@8.16.0": {
+      "integrity": "sha512-wgKggnhZVL9Bfx1OaKKTrYY9BFRk6C8UAkQNUcIv1+llzYrIqy+RZm5HPKzn0NpEBvTVhTqB4kQyllZywsRBRQ==",
       "dependencies": [
         "acorn"
       ]

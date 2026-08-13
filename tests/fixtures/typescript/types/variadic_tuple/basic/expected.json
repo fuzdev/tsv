@@ -645,7 +645,6 @@
 										"column": 24
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 212,
@@ -662,6 +661,7 @@
 									},
 									"name": "first"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 219,
@@ -706,7 +706,6 @@
 											"column": 36
 										}
 									},
-									"optional": false,
 									"label": {
 										"type": "Identifier",
 										"start": 230,
@@ -723,6 +722,7 @@
 										},
 										"name": "rest"
 									},
+									"optional": false,
 									"elementType": {
 										"type": "TSTypeReference",
 										"start": 236,
