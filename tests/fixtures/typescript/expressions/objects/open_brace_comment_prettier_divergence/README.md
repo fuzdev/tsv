@@ -23,4 +23,19 @@ opening `(`
 ([open_paren_comment](../../calls/open_paren_comment_prettier_divergence/)),
 and first-element leading comments across lists.
 
+## Author blank after the pulled comment
+
+An author blank line between the pulled comment and the first property does not
+survive — tsv prints the property directly under the `{` line. That is a
+*consequence* of the position above, not a second choice: both formatters
+discard a blank in the **leading gap** (an opening delimiter's line → the first
+item) and both preserve one *between* items. Keeping the comment on the `{`
+line leaves the blank in the leading gap, so tsv's own leading-gap rule drops
+it; Prettier makes the comment the first body item, which moves the blank into
+an inter-item gap it then keeps. The derivation runs both ways — hand tsv
+Prettier's relocated form and tsv preserves the blank itself, which is why
+`variant_blank_after_comment.svelte` is dual-stable while
+`unformatted_ours_blank_after_comment.svelte` (the authored shape) normalizes
+back to `input.svelte`.
+
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

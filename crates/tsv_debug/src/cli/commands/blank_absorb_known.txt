@@ -27,7 +27,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 531
+# shapes: 530
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -170,7 +170,6 @@
 (ExportAllDeclaration, ^→exported)
 (ExportAllDeclaration, ^→source)
 (ExportAllDeclaration, attributes→$)
-(ExportAllDeclaration, attributes→attributes)
 (ExportAllDeclaration, exported→source)
 (ExportAllDeclaration, source→$)
 (ExportAllDeclaration, source→attributes)

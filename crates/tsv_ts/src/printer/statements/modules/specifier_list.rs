@@ -28,6 +28,40 @@ pub(super) struct SpecifierListSpans {
     pub(super) bound: u32,
 }
 
+/// The source geometry of a braced comma list: the `{`, the exclusive bound every scan
+/// inside it stops at, and where the first item starts (what the `{`-line comment pull
+/// scans toward). One value rather than three loose `u32`s, so the two hardline builders
+/// that share it cannot be handed them in a different order.
+#[derive(Clone, Copy)]
+pub(super) struct CommaListSpans {
+    pub(super) brace_start: u32,
+    pub(super) end_boundary: u32,
+    pub(super) first_item_start: u32,
+}
+
+/// How a braced comma list disposes of an author blank line.
+///
+/// The two consumers of these builders need **opposite** answers, because prettier prints
+/// them through different printers. `printModuleSpecifiers` joins specifiers with a bare
+/// `join([",", line], …)` — it never asks `isNextLineEmpty`, so no blank between specifiers
+/// survives — while `printImportAttributes` delegates the whole clause to `printObject`,
+/// which does. A single policy here is what keeps that fact stated once instead of being
+/// re-derived (differently) at each seam.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum CommaListBlanks {
+    /// `printModuleSpecifiers`. A blank **between specifiers never survives**. Comments at
+    /// the head of the list are the first specifier's LEADING run, so a blank *after* each
+    /// one does survive (prettier's `printLeadingComment`); an own-line comment following a
+    /// specifier is that specifier's TRAILING run, where a blank *before* each survives
+    /// (`printTrailingComment`'s `isPreviousLineEmpty`) but one after the last does not —
+    /// there is no comment left for it to attach to, and the join has no blank rule.
+    ModuleSpecifiers,
+    /// `printObject`, which `printImportAttributes` delegates to: a blank between items
+    /// survives (`isNextLineEmpty`) and forces the clause open, and every comment run is a
+    /// leading run.
+    Object,
+}
+
 impl<'a> Printer<'a> {
     /// Check if an import declaration has empty named braces `{}` in source.
     /// This distinguishes `import {} from 'x'` from `import 'x'`.
@@ -315,9 +349,12 @@ impl<'a> Printer<'a> {
             // specifier's leading comment).
             self.build_braced_hardline_comma_list(
                 specifiers,
-                brace_start,
-                brace_close,
-                first_start,
+                CommaListSpans {
+                    brace_start,
+                    end_boundary: brace_close,
+                    first_item_start: first_start,
+                },
+                CommaListBlanks::ModuleSpecifiers,
                 &get_span,
                 &build_item,
             )
@@ -335,6 +372,7 @@ impl<'a> Printer<'a> {
                 specifiers,
                 brace_start,
                 brace_close,
+                CommaListBlanks::ModuleSpecifiers,
                 &get_span,
                 &build_item,
             );
@@ -477,10 +515,19 @@ impl<'a> Printer<'a> {
         items: &[T],
         brace_start: u32,
         brace_close: u32,
+        blanks: CommaListBlanks,
         get_span: impl Fn(&T) -> Span,
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
+        // A soft `line` cannot carry a blank, so a list that preserves one has to decide
+        // before it picks the separator: under `Object` an author blank takes the
+        // blank-preserving hardline instead, which is also what forces the clause open
+        // (prettier's `printObject` emits a `hardline` there). `ModuleSpecifiers` never
+        // preserves one, so its separator stays the plain `line` in both loops below.
+        let item_gap_blank = |prev_end: u32, item_start: u32| {
+            blanks == CommaListBlanks::Object && self.item_gap_has_blank_line(prev_end, item_start)
+        };
 
         // Zero-comment fast gate (see `build_params_doc_with_comments`): every
         // comment sub-query below — the per-item leading/trailing lookups, the
@@ -494,7 +541,15 @@ impl<'a> Printer<'a> {
             for (i, item) in items.iter().enumerate() {
                 if i > 0 {
                     inner_parts.push(d.text(","));
-                    inner_parts.push(d.line());
+                    // The comment-free path still owns the blank question: with no comment
+                    // in the gap an author blank is the ONLY thing in it, so skipping the
+                    // check here is exactly how it went missing.
+                    if item_gap_blank(get_span(&items[i - 1]).end, get_span(item).start) {
+                        inner_parts.push(d.literalline());
+                        inner_parts.push(d.hardline());
+                    } else {
+                        inner_parts.push(d.line());
+                    }
                 }
                 inner_parts.push(build_item_doc(item));
             }
@@ -520,6 +575,10 @@ impl<'a> Printer<'a> {
             let is_last = i == items.len() - 1;
 
             let mut item_parts = DocBuf::new();
+            // This item's gap opens where the PREVIOUS item's trailing run ended, and
+            // `prev_end` is advanced past it below — so the separator emitted after the
+            // loop body has to read it from here, not from the already-moved cursor.
+            let gap_start = prev_end;
 
             // Leading block comments before this item (after prev comma or `{`)
             for comment in comments_to_emit_in_range(self.comments, prev_end, item_start) {
@@ -558,7 +617,12 @@ impl<'a> Printer<'a> {
             }
 
             if i > 0 {
-                inner_parts.push(d.line());
+                if item_gap_blank(gap_start, item_start) {
+                    inner_parts.push(d.literalline());
+                    inner_parts.push(d.hardline());
+                } else {
+                    inner_parts.push(d.line());
+                }
             }
             inner_parts.push(d.concat(&item_parts));
             if !is_last {
@@ -585,20 +649,19 @@ impl<'a> Printer<'a> {
     pub(super) fn build_braced_hardline_comma_list<T>(
         &self,
         items: &[T],
-        brace_start: u32,
-        end_boundary: u32,
-        first_item_start: u32,
+        spans: CommaListSpans,
+        blanks: CommaListBlanks,
         get_span: impl Fn(&T) -> Span,
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
         let (brace_line_prefix, delimiter_pull_pos) =
-            self.delimiter_line_comment_prefix(brace_start, first_item_start);
+            self.delimiter_line_comment_prefix(spans.brace_start, spans.first_item_start);
         let inner_doc = self.build_hardline_comma_list(
             items,
-            brace_start,
-            end_boundary,
+            spans,
             delimiter_pull_pos,
+            blanks,
             get_span,
             build_item_doc,
         );
@@ -616,13 +679,18 @@ impl<'a> Printer<'a> {
     fn build_hardline_comma_list<T>(
         &self,
         items: &[T],
-        brace_start: u32,
-        end_boundary: u32,
+        spans: CommaListSpans,
         delimiter_pull_pos: Option<u32>,
+        blanks: CommaListBlanks,
         get_span: impl Fn(&T) -> Span,
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
+        let CommaListSpans {
+            brace_start,
+            end_boundary,
+            ..
+        } = spans;
         let mut parts = DocBuf::new();
         // Where the first item's gap opens, per the delimited-list anchor convention.
         let list_start = brace_start + 1;
@@ -644,16 +712,31 @@ impl<'a> Printer<'a> {
                 is_first.then_some(delimiter_pull_pos).flatten(),
             );
 
-            if !is_first {
-                self.push_item_blank_separator(&mut parts, prev_end, item_start);
-            }
-
-            for comment in &comments {
-                parts.push(self.build_comment_doc(comment));
-                if self.comment_hugs_next(comment) {
-                    parts.push(d.text(" "));
-                } else {
-                    parts.push(d.hardline());
+            // The gap's blank rule, per `CommaListBlanks`. Both arms route the run through
+            // a shared emitter rather than re-spelling the separator inline — leading
+            // comments have one rule and one emitter (docs/comments.md), and the loop this
+            // replaced hand-rolled a bare `hardline` that could not ask the blank question
+            // at all.
+            match blanks {
+                CommaListBlanks::Object => {
+                    if !is_first {
+                        self.push_item_blank_separator(&mut parts, prev_end, item_start);
+                    }
+                    self.push_leading_comments_before(&mut parts, &comments, item_start);
+                }
+                // The head run leads the first specifier; everything after one is the
+                // PREVIOUS specifier's trailing run, so it takes its separator BEFORE each
+                // comment (the same emitter this function's end-of-list run uses) and the
+                // step to the item itself never carries a blank.
+                CommaListBlanks::ModuleSpecifiers if is_first => {
+                    self.push_leading_comments_before(&mut parts, &comments, item_start);
+                }
+                CommaListBlanks::ModuleSpecifiers => {
+                    self.push_trailing_comment_run(&mut parts, comments.iter().copied(), prev_end);
+                    match comments.last() {
+                        Some(last) if self.comment_hugs_next(last) => parts.push(d.text(" ")),
+                        _ => parts.push(d.hardline()),
+                    }
                 }
             }
 
@@ -685,21 +768,11 @@ impl<'a> Printer<'a> {
                 // ([`Printer::push_trailing_run_separator`]), so a pair the author GLUED
                 // onto one line keeps it and everything else takes the blank-preserving
                 // break, the same answer every other end-of-container run gives.
-                let mut prev_pos = trailing.end_pos;
-                let mut prev_comment: Option<&internal::Comment> = None;
-                for comment in
-                    comments_to_emit_in_range(self.comments, trailing.end_pos, end_boundary)
-                {
-                    self.push_trailing_run_separator(
-                        &mut parts,
-                        prev_comment,
-                        prev_pos,
-                        comment.span.start,
-                    );
-                    parts.push(self.build_comment_doc(comment));
-                    prev_pos = comment.span.end;
-                    prev_comment = Some(comment);
-                }
+                self.push_trailing_comment_run(
+                    &mut parts,
+                    comments_to_emit_in_range(self.comments, trailing.end_pos, end_boundary),
+                    trailing.end_pos,
+                );
             }
         }
 
