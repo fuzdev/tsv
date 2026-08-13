@@ -18,7 +18,7 @@ use crate::printer::{CommentSpacing, LeadingGlue};
 use crate::printer::{
     CommentVec, ParenContext, Printer, is_multiline_template_expression, unwrap_parenthesized,
 };
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -88,10 +88,11 @@ fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<Span> {
 
 /// Prepend an optional leading comment run to a doc, allocating nothing when there is none.
 ///
-/// One spelling, shared by [`Printer::build_arrow_body_doc_with_leading`] (which decides
-/// which side of the body's parens the run belongs on) and by the one arm that emits its
-/// paren tokens itself. The no-run case must stay node-free: this sits on the arrow-body
-/// hot path.
+/// One spelling for every consumer of an [`Printer::arrow_gap_leading_run`]-shaped
+/// `Option`: [`Printer::build_arrow_body_doc_with_leading`] (which decides which side of the
+/// body's parens the run belongs on), the arm that emits its paren tokens itself, the
+/// block-body own-line arm, and the chain's inter-head gap. The no-run case must stay
+/// node-free: this sits on the arrow-body hot path.
 #[inline]
 pub(in crate::printer) fn prepend_leading(
     d: &DocArena,
@@ -124,6 +125,34 @@ fn ternary_body_parens_group(d: &DocArena, body: DocId) -> DocId {
         d.indent(d.concat(&[d.softline(), body])),
         d.if_break(d.empty(), d.text(")")),
     ]))
+}
+
+/// Walk a curried arrow chain's heads from `head` inwards, calling `visit` with each head
+/// and the **previous** head's `=>` end (`None` at the chain's own head, whose leading gap
+/// belongs to the enclosing site), and returning the terminal non-arrow body.
+///
+/// One walk, two consumers: [`Printer::build_arrow_chain_doc`] builds a signature per head,
+/// and [`Printer::chain_comment_outside_emitted_regions`] collects the regions that builder
+/// prints. The predicate's region list is an **assertion about the builder**, so the two
+/// must visit the same heads and the same gaps — a copied traversal that stopped one head
+/// short would leave a region unclaimed by either, which is a DROPPED comment.
+fn walk_arrow_chain<'a, 'arena>(
+    head: &'a internal::ArrowFunctionExpression<'arena>,
+    mut visit: impl FnMut(&'a internal::ArrowFunctionExpression<'arena>, Option<u32>),
+) -> &'a internal::ArrowFunctionBody<'arena> {
+    let mut current = head;
+    let mut gap_start = None;
+    loop {
+        visit(current, gap_start);
+        gap_start = Some(arrow_token_end(current));
+        match &current.body {
+            internal::ArrowFunctionBody::Expression(b) => match b {
+                internal::Expression::ArrowFunctionExpression(inner) => current = inner,
+                _ => break &current.body,
+            },
+            internal::ArrowFunctionBody::BlockStatement(_) => break &current.body,
+        }
+    }
 }
 
 /// Whether an expression has an ObjectExpression at its leftmost position.
@@ -520,9 +549,12 @@ impl<'a> Printer<'a> {
         // `build_arrow_body_doc`, whose own ternary branch adds the parens) and never
         // reaches arm 6. The two routes must therefore agree about the `=>`→body gap —
         // arms 3/4/5/6 each reassemble the body and so must each hand the gap run to it,
-        // which is what `gap_run` above is for. `build_arrow_chain_doc` looks like an
-        // eighth route but is unreachable with comments: `should_use_arrow_chain_layout`
-        // declines whenever the chain holds one anywhere.
+        // which is what `gap_run` above is for. `build_arrow_chain_doc` is an eighth route
+        // for the gaps it emits — the inter-head ones, via `arrow_gap_leading_run` — but
+        // never for the TERMINAL `=>`→body gap: `chain_comment_outside_emitted_regions`
+        // leaves that region out of the chain's emitted set, so a comment there declines
+        // the chain layout and lands in the arms below. (It used to decline for a comment
+        // anywhere in the chain at all, which made the whole flattened layout dead code.)
         if has_own_line_comment {
             // Own-line or line comments — always break
             let body_with_comments =
@@ -673,16 +705,8 @@ impl<'a> Printer<'a> {
         // (non-idempotent, non-reparseable). Mirrors the expression-body path
         // (`build_arrow_body_with_comments_doc`).
         if has_post_arrow_comments && self.has_own_line_post_arrow_comment(arrow_end, body_start) {
-            let mut body_parts: DocBuf = DocBuf::new();
-            self.push_leading_comment_run(
-                &mut body_parts,
-                comments_to_emit_in_range(self.comments, arrow_end, body_start),
-                body_start,
-                LeadingGlue::Adjacent,
-                d.empty(),
-            );
-            body_parts.push(block_doc);
-            parts.push(hang_after_operator(d, d.concat(&body_parts)));
+            let run = self.arrow_gap_leading_run(arrow_end, body_start);
+            parts.push(hang_after_operator(d, prepend_leading(d, run, block_doc)));
             return;
         }
 
@@ -705,9 +729,10 @@ impl<'a> Printer<'a> {
     /// `printArrowFunctionSignatures`). Covers the untyped assignment-RHS and
     /// call-arg/binaryish contexts: the body must be another arrow, the chain
     /// must carry no return type / type params / non-identifier param (those
-    /// route through the existing break-after-operator path), and there must be
-    /// no comments in the heads region (which the existing path owns). A `None`
-    /// context (no enclosing chain site) or the call-arg expand-last-arg path
+    /// route through the existing break-after-operator path), and every comment
+    /// must sit in a region [`Printer::build_arrow_chain_doc`] emits
+    /// ([`Self::chain_comment_outside_emitted_regions`]). A `None` context (no
+    /// enclosing chain site) or the call-arg expand-last-arg path
     /// (`skip_arrow_chain`) routes to the default arrow layout.
     fn should_use_arrow_chain_layout(
         &self,
@@ -728,10 +753,92 @@ impl<'a> Printer<'a> {
         if crate::printer::arrow_chain_has_return_type(arrow) {
             return false;
         }
-        // Any comment anywhere in the chain (heads, between `=>`s, around the body,
-        // or trailing a stripped grouping paren) routes to the existing path, which
-        // owns the chain's comment handling.
-        !self.has_comments_to_emit_between(arrow.span.start, arrow.span.end)
+        !self.chain_comment_outside_emitted_regions(arrow)
+    }
+
+    /// Whether the chain holds a comment in a gap [`Printer::build_arrow_chain_doc`] has
+    /// no emitter for — the question that decides whether the flattened layout is legal
+    /// at all.
+    ///
+    /// The chain doc's byte range partitions into five region kinds, and it emits three
+    /// of them:
+    ///
+    /// - each head's **signature**, `[head.span.start, arrow_signature_end(head))`, printed
+    ///   by [`Self::build_arrow_signature_doc`] — the same region the default arrow layout
+    ///   delegates to that builder, [`Self::append_pre_arrow_comments`] owning the complement;
+    /// - each inner head's leading **`=>`→body gap**, via [`Self::arrow_gap_leading_run`];
+    /// - the **terminal body**'s own span, printed by `build_arrow_body_doc` /
+    ///   `build_block_statement_doc`.
+    ///
+    /// The other two are unemitted, so a comment in one is DROPPED — hazard 4 in
+    /// `docs/comments.md`, measured rather than assumed: each head's signature→`=>` gap
+    /// (`(x) /* c */ =>`), and the terminal body→chain-end region (a stripped grouping
+    /// paren's trailing comments, whose retained-paren form is a sanctioned divergence the
+    /// default layout owns). ⚠️ **Ownership masks both**: a glued block comment rides
+    /// inside its own node's doc, so only a line or own-line comment exposes the loss and a
+    /// block-comment repro reports the chain healthy. Those gaps route to the default arrow
+    /// layout, which owns them — and at both, that layout already converges with prettier.
+    ///
+    /// ⚠️ The question is **positional** — comment offsets against span regions — and must
+    /// stay that way. A kind or own-line test here would be conditioned on what this very
+    /// layout produces (breaking a parameter list is what puts a comment at a line start),
+    /// the rake spelled out at
+    /// [`Self::range_has_layout_stable_break_forcing_comment`].
+    fn chain_comment_outside_emitted_regions(
+        &self,
+        head: &internal::ArrowFunctionExpression<'_>,
+    ) -> bool {
+        if !self.has_comments_to_emit_between(head.span.start, head.span.end) {
+            return false;
+        }
+        let mut emitted: SmallVec<[(u32, u32); 8]> = SmallVec::new();
+        let terminal = walk_arrow_chain(head, |current, gap_start| {
+            emitted.push((current.span.start, self.arrow_signature_end(current)));
+            if let Some(gap_start) = gap_start {
+                emitted.push((gap_start, current.span.start));
+            }
+        });
+        let body = terminal.span();
+        emitted.push((body.start, body.end));
+
+        comments_to_emit_in_range(self.comments, head.span.start, head.span.end).any(|comment| {
+            !emitted
+                .iter()
+                .any(|&(start, end)| comment.span.start >= start && comment.span.end <= end)
+        })
+    }
+
+    /// The leading-comment run for an arrow-adjacent gap that is **already broken** — the
+    /// `=>`→body gap in its own-line arms, and a chain's head→head gap — or `None` when the
+    /// gap holds nothing to emit.
+    ///
+    /// One question, one builder, for the three sites that ask it: the block-body own-line
+    /// arm, the expression-body own-line arm ([`Self::build_arrow_body_with_comments_doc`],
+    /// which hands the run to the body so it lands on the right side of its parens), and the
+    /// chain's inter-head gap. All three take `LeadingGlue::Adjacent` — the mode whose extra
+    /// glued rule cannot fire, since every comment reaching them is own-line by their
+    /// callers' gates — so the difference between them is only what they do with the run,
+    /// which is [`prepend_leading`]'s job.
+    ///
+    /// ⚠️ At the chain's gap, what reaches here is only ever a run needing a line of its own:
+    /// a **glued block** there is owned and rides the inner arrow's own doc, claimed by
+    /// `prepend_owned_leading_comment_at` a step earlier. That is why the chain layout
+    /// printed glued blocks correctly while dropping every line and own-line comment beside
+    /// them — the ownership mask on hazard 4 (`docs/comments.md`).
+    fn arrow_gap_leading_run(&self, start: u32, end: u32) -> Option<DocId> {
+        if !self.has_comments_to_emit_between(start, end) {
+            return None;
+        }
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        self.push_leading_comment_run(
+            &mut parts,
+            comments_to_emit_in_range(self.comments, start, end),
+            end,
+            LeadingGlue::Adjacent,
+            d.empty(),
+        );
+        Some(d.concat(&parts))
     }
 
     /// Build a flattened curried arrow chain: the signature heads
@@ -758,12 +865,9 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
-        // Walk the chain, collecting each arrow's signature, until the terminal
-        // (non-arrow) body.
+        // Collect each head's signature, in the walk the legality predicate shares.
         let mut sig_docs: DocBuf = DocBuf::new();
-        let mut current = head;
-        let mut is_head = true;
-        let terminal: &internal::ArrowFunctionBody<'_> = loop {
+        let terminal = walk_arrow_chain(head, |current, gap_start| {
             // Each signature is its own group so its params break independently of
             // the chain (prettier wraps each `printArrowFunctionSignature` in a
             // group): when the heads break onto separate lines, the params stay
@@ -773,25 +877,22 @@ impl<'a> Printer<'a> {
             // `build_expression_doc`, so this is the only place its owned leading comment
             // can be claimed — otherwise it is dropped. The head is not: this whole chain
             // doc is what `build_expression_doc` wraps, and it claims the head's comment
-            // there, so claiming it again here would print it twice.
-            let sig = if is_head {
-                sig
-            } else {
-                self.prepend_owned_leading_comment_at(current.span.start, sig)
-            };
-            is_head = false;
-            sig_docs.push(sig);
-            match &current.body {
-                internal::ArrowFunctionBody::Expression(b) => {
-                    if let internal::Expression::ArrowFunctionExpression(inner) = b {
-                        current = inner;
-                    } else {
-                        break &current.body;
-                    }
+            // there, so claiming it again here would print it twice. The head's leading
+            // gap is the enclosing site's for the same reason, which is what `gap_start`
+            // being `None` there says.
+            let sig = match gap_start {
+                None => sig,
+                Some(gap_start) => {
+                    let sig = self.prepend_owned_leading_comment_at(current.span.start, sig);
+                    prepend_leading(
+                        d,
+                        self.arrow_gap_leading_run(gap_start, current.span.start),
+                        sig,
+                    )
                 }
-                internal::ArrowFunctionBody::BlockStatement(_) => break &current.body,
-            }
-        };
+            };
+            sig_docs.push(sig);
+        });
 
         // The heads group is keyed on `GroupId::ArrowChain`; its shape depends on
         // the parent context. Either way the terminal `=>` + body are emitted
@@ -1393,26 +1494,20 @@ impl<'a> Printer<'a> {
         sig_end: u32,
         body_start: u32,
     ) -> DocId {
-        let d = self.d();
-        let mut parts: DocBuf = DocBuf::new();
-
-        // Print leading comments: a block comment inline-adjacent to the next
-        // comment / the body hugs it with a space; a line comment or own-line
-        // block drops to its own line (a line comment must break so it can't
-        // absorb the body). Same shape as the RHS-of-`=` leading run.
-        self.push_leading_comment_run(
-            &mut parts,
-            comments_to_emit_in_range(self.comments, sig_end, body_start),
-            body_start,
-            LeadingGlue::Adjacent,
-            d.empty(),
-        );
-
+        // Leading comments: a block comment inline-adjacent to the next comment / the body
+        // hugs it with a space; a line comment or own-line block drops to its own line (a
+        // line comment must break so it can't absorb the body). Same shape as the
+        // RHS-of-`=` leading run, and the same builder the block-body and chain-gap arms
+        // take.
+        //
         // The run is handed to the body rather than concatenated ahead of it, so it
         // lands on the correct side of whatever parens the body takes — see
         // `build_arrow_body_doc_with_leading`. For every body but a ternary the two are
         // the same bytes; for a ternary the run belongs inside its layout parens.
-        self.build_arrow_body_doc_with_leading(expr, Some(d.concat(&parts)))
+        self.build_arrow_body_doc_with_leading(
+            expr,
+            self.arrow_gap_leading_run(sig_end, body_start),
+        )
     }
 
     /// Check if any comment between `=>` and body is on its own line.

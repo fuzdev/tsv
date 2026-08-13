@@ -2,9 +2,17 @@
 
 A line comment between a `:` annotation and its type (`X: // c\nType`), for the
 contexts where prettier keeps the type **flush**: variable declarations, class
-properties, function parameters, function return types (declaration and arrow),
-and **intersection** types in any position (variable and type-element, with one
-comment or several).
+properties, function parameters, function return types (declaration, arrow, class
+method and object method), and **intersection** types in any position (variable and
+type-element, with one comment or several).
+
+The return-type face is pinned in **every position its head can sit**, not just at
+a declaration: the continuation indents one level below whatever line the head
+landed on, so an arrow in **call-argument** position (`c12`, where the call's own
+break puts the head two levels in) reads the same as a top-level one. That
+position is worth its own case because it is where the layout question is easiest
+to mistake for a hug or call-argument question — it is neither; the indent is this
+rule and reproduces with no call in sight.
 
 tsv applies the **uniform forced-continuation indent**: the comment trails `:`
 where the author wrote it and the type drops to a continuation line indented one

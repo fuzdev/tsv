@@ -162,7 +162,10 @@ its tail:
   the shared `build_type_annotation_doc`, **uniformly for union, intersection, and
   simple types** and in **every** context: property signatures
   ([annotation_simple](../tests/fixtures/typescript/types/comments/annotation_simple_prettier_divergence/)),
-  variable declarations, class properties, function parameters/return types, and
+  variable declarations, class properties, function parameters, every spelling of a
+  **return type** (function declaration, arrow, class method, object method) at every
+  position its head can sit — a call argument included, where the indent is one level
+  below the head's own line and is this rule rather than a hug question — and
   intersection types
   ([annotation_continuation_indent](../tests/fixtures/typescript/types/comments/annotation_continuation_indent_prettier_divergence/)),
   plus an index signature's key-type
