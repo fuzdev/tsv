@@ -222,21 +222,6 @@ pub(in crate::printer) fn is_block_function(expr: &Expression<'_>) -> bool {
     ) || matches!(expr, Expression::FunctionExpression(_))
 }
 
-/// Check if an expression is a curried arrow (arrow whose body is another arrow).
-///
-/// Used to set `skip_arrow_chain` in call arg contexts, matching prettier's
-/// `!args.expandLastArg` in `shouldPrintAsChain` — curried arrows in call args
-/// should hug their body rather than chain-breaking.
-#[inline]
-pub(in crate::printer) fn is_curried_arrow(expr: &Expression<'_>) -> bool {
-    matches!(
-        expr,
-        Expression::ArrowFunctionExpression(a)
-            if matches!(a.body, internal::ArrowFunctionBody::Expression(e)
-                if matches!(e, Expression::ArrowFunctionExpression(_)))
-    )
-}
-
 /// Check if an expression is a "simple" call argument (Prettier's `isSimpleCallArgument`)
 ///
 /// Uses depth-limited recursion (typically depth=2) to prevent checking arbitrarily

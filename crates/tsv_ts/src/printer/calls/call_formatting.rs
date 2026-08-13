@@ -4,7 +4,8 @@
 // all the special cases for call expression formatting.
 
 use super::super::{
-    ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
+    ParenContext, Printer, arrow_chain_has_return_type, container_may_have_multiline_content,
+    has_multiline_content, is_curried_arrow_chain,
 };
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
@@ -13,15 +14,15 @@ use super::arg_comments::{
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_concise_numeric_array,
-    is_curried_arrow, is_function_composition_args, is_ternary_arrow_body,
-    last_arg_is_array_or_object,
+    is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
     ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    build_expand_all_args, build_inline_args, build_inline_or_expand_all,
+    build_printed_argument_doc, could_expand_arrow_chain, last_two_args_same_type,
+    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
     wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
@@ -453,21 +454,15 @@ pub(super) fn build_call_doc_with_wrapping(
     let use_arg_indent = !is_boolean_call(call, printer);
     let arg_parts = d.join_doc(
         call.arguments.iter().map(|arg| {
-            // For curried arrows (body is another arrow), skip chain detection so the
-            // outer arrow hugs its body — matches prettier's expandLastArg behavior.
-            let curried = is_curried_arrow(arg);
-            if curried {
-                printer.skip_arrow_chain.set(true);
-            }
-            let doc = if use_arg_indent {
-                printer.build_arg_expression_doc(arg)
-            } else {
-                printer.build_expression_doc(arg)
-            };
-            if curried {
-                printer.skip_arrow_chain.set(false);
-            }
-            doc
+            // This is prettier's `printedArguments` — printed with no `expandLastArg`, so a
+            // curried chain takes the progressive layout (`build_printed_argument_doc`).
+            build_printed_argument_doc(printer, arg, || {
+                if use_arg_indent {
+                    printer.build_arg_expression_doc(arg)
+                } else {
+                    printer.build_expression_doc(arg)
+                }
+            })
         }),
         d.comma_line(),
     );
@@ -573,7 +568,7 @@ fn try_single_arg_comment_paths(
         // (flush continuation), losing the indent prettier applies here.
         // An own-line directive in the gap freezes the argument verbatim (Rule A);
         // this branch already keeps such a comment on its own line.
-        inner.push(printer.build_arg_item_doc(paren_open, call.arguments, 0));
+        inner.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0));
 
         return Some(d.concat(&[
             callee,
@@ -604,7 +599,7 @@ fn try_single_arg_comment_paths(
         // line-comment branch above for the same reasoning. A directive alone on its
         // line freezes the argument (Rule A) — only the BLOCK spelling reaches here
         // (a line comment routes to the branch above).
-        let arg_doc = printer.build_arg_item_doc(paren_open, call.arguments, 0);
+        let arg_doc = ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0);
 
         // Build comment + arg, including any trailing comments after the arg
         // Note: build_rhs_comments_opt already adds trailing space after each comment
@@ -807,8 +802,12 @@ fn try_single_arg_hug(
             }
             // Other expression types: fall through to standard wrapping
         }
-        // Block arrow or non-call expression body: standard wrapping
-        let arg_doc = printer.build_expression_doc(&call.arguments[0]);
+        // Block arrow or non-call expression body: standard wrapping.
+        // Nothing here hugs, so this is prettier's `printedArguments` shape — a curried
+        // chain takes the progressive layout (`build_printed_argument_doc`).
+        let arg = &call.arguments[0];
+        let arg_doc =
+            build_printed_argument_doc(printer, arg, || printer.build_expression_doc(arg));
         return Some(wrap_call_with_soft_breaks(d, callee, arg_doc));
     }
 
@@ -826,17 +825,32 @@ fn build_block_arrow_hug_states(
 ) -> DocId {
     let d = printer.d();
 
-    // For curried arrows (body is another arrow), skip chain detection
-    // so the outer arrow hugs its body — prettier's shouldPrintAsChain
-    // is false when expandLastArg is true.
-    let curried = is_curried_arrow(arg);
-    if curried {
+    // ⚠️ Prettier prints the last argument TWICE — `printedArguments` with no
+    // `expandLastArg` (so `shouldPrintAsChain` holds and a curried chain takes the
+    // progressive layout), feeding `allArgsBrokenOut()`, and a separate `lastArg` with
+    // `expandLastArg: true`, feeding the hug states. tsv needs only ONE doc here, and which
+    // one is the whole question this builder used to get wrong:
+    //
+    // - **Untyped chain** — route it through the progressive layout
+    //   (`build_printed_argument_doc`). Its FLAT rendering is byte-identical to the hugged
+    //   one, so the hug state (measured flat) still selects identically; the layouts diverge
+    //   only once the argument is broken out, which is what the broken states want. Building
+    //   the hug's rendering separately would buy nothing and cost everything: a second build
+    //   of this argument recurses into any call nested in its body, so the doc-node count
+    //   goes 2^depth on `fn((a) => (b) => { return fn(…); })`.
+    // - **Typed chain** (a return type, type params, or a non-identifier param anywhere) —
+    //   the progressive layout is refused outright, so `skip_arrow_chain`'s *other* job is
+    //   what this position needs: it suppresses the nested-arrow break
+    //   (`chain_has_return_type` in `build_arrow_body`) so the body still hugs `=>`, which is
+    //   exactly the expand-last hug. `calls/curried_arrow_chain` pins it.
+    let arrow_doc = if is_curried_arrow_chain(arg) && arrow_chain_has_return_type(arrow) {
         printer.skip_arrow_chain.set(true);
-    }
-    let arrow_doc = printer.build_expression_doc(arg);
-    if curried {
+        let doc = printer.build_expression_doc(arg);
         printer.skip_arrow_chain.set(false);
-    }
+        doc
+    } else {
+        build_printed_argument_doc(printer, arg, || printer.build_expression_doc(arg))
+    };
 
     // If the arrow has trailing param comments, the params will be multiline,
     // so we should force the wrapped state (prettier behavior)
@@ -1430,7 +1444,7 @@ fn build_call_with_arg_comments(
         // no-comment path (the single-arg comment path does the same via
         // build_arg_expression_doc). An own-line format-ignore directive in this
         // argument's gap freezes it verbatim (Rule A).
-        arg_parts.push(printer.build_arg_item_doc(paren_open, call.arguments, i));
+        arg_parts.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, i));
 
         // Check for comments after this argument (before next arg or closing paren)
         if i < call.arguments.len() - 1 {

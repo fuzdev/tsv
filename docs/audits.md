@@ -389,10 +389,16 @@ it by hand — the anchor rule is `Printer::element_claim_anchor`.
 # builder that assembles `conditional_group` candidates by RE-INVOKING the recursive
 # builder on the same nodes — instead of building the subtree once and reusing the
 # DocId — grows the doc-node count exponentially in nesting depth (hang/OOM on a
-# deeply-nested but ordinary file). Builds synthetic nested inputs across six axes
-# (svelte elements / {#if} / {#each} / {#await} / sibling-`>` dangle, ts member
-# chains) at increasing depth and fails if the doc-node count grows faster than
-# ~depth^3. Deterministic, pure Rust, no Deno. Exits 1 on any super-linear case.
+# deeply-nested but ordinary file). Builds synthetic nested inputs across one axis per
+# candidate-building construct (svelte elements / {#if} / {#each} / {#await} /
+# sibling-`>` dangle / {#snippet} / {#key}; ts member chains, ternaries, conditional
+# types, nested calls, and the expand-last arrow family — plain, multi-arg, `new`,
+# chain, object-body, conditional-body, `function`, and curried, the last in untyped /
+# typed / `new` / chain spellings) at increasing depth, failing if the doc-node count
+# grows faster than ~depth^3. An axis earns its place by REACHING a builder no other
+# axis does; the curried four came from a real 2^depth regression that the family as it
+# then stood could not see. Deterministic, pure Rust, no Deno. Exits 1 on any
+# super-linear case.
 cargo run -p tsv_debug build_fanout_audit
 # Also: --json. Gated in `deno task check` via the `fanout:audit` task.
 ```

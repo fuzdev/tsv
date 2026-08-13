@@ -7,7 +7,7 @@
 
 use super::super::{
     ArrowChainContext, CommentSpacing, Printer, is_curried_arrow_chain,
-    is_multiline_template_expression,
+    is_curried_arrow_with_return_type, is_multiline_template_expression,
 };
 use super::arg_comments::{
     emit_first_arg_leading_comments, emit_last_arg_trailing_comments, find_comma_pos,
@@ -23,6 +23,52 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::has_newline_before_position;
+
+/// Build one call-argument doc, routing a curried arrow chain through the progressive
+/// call-arg chain layout ([`Printer::build_arrow_chain_doc`], prettier's
+/// `printArrowFunctionSignatures`, reached via its `isCallLikeExpression(parent)`).
+///
+/// **This is the shape of prettier's `printedArguments`** — printed with no
+/// `expandLastArg`, so `shouldPrintAsChain` holds and the heads take their own lines.
+/// `allArgsBrokenOut()` and the default `contents` path both read that array, so every
+/// builder feeding either must build its arguments through here. A builder that instead
+/// reused a `skip_arrow_chain` doc (tsv's spelling of `expandLastArg`) for its broken-out
+/// state had no chain layout at all, which is the whole bug class this helper closes.
+///
+/// Prettier's other printing — the `expandLastArg` `lastArg` its hug states read — has
+/// exactly one caller left, [`Printer::skip_arrow_chain`]'s, and only for a typed chain:
+/// see `call_formatting.rs`'s `build_block_arrow_hug_states`, which states why an untyped
+/// chain needs no second build (and why paying for one would be 2^depth).
+///
+/// Only an **untyped** chain is routed: `should_use_arrow_chain_layout` refuses a chain
+/// carrying a return type, type params, or a non-identifier param anywhere, so the context
+/// is inert for those (nothing else reads it) — and saying so here keeps the helper's name
+/// honest, since a typed chain's call-argument layout is a separate, cataloged question.
+///
+/// `build` stays a closure because the callers disagree on which builder to run
+/// (`build_expression_doc` vs `build_arg_expression_doc`) — only the context is shared.
+/// ⚠️ It also **clears `skip_arrow_chain` for the duration of the build**, and that is a
+/// correctness fix rather than hygiene. Prettier's `expandLastArg` is an argument to one
+/// `print()` call — it describes the node being printed and nested prints never inherit it —
+/// whereas tsv spells it as ambient `Printer` state, so without a clear it survives the
+/// descent: a **typed** chain's hug (the one position that still sets the flag) suppressed
+/// the progressive layout of an entirely different, untyped chain nested in its body
+/// (`fn(({ a }) => ({ b }) => { return g((x, …) => (y) => z); })`). Every argument of every
+/// nested call routes through here, which is exactly the seam where the flag stops applying.
+pub(crate) fn build_printed_argument_doc(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+    build: impl FnOnce() -> DocId,
+) -> DocId {
+    let outer_skip = printer.skip_arrow_chain.replace(false);
+    let doc = if is_curried_arrow_chain(arg) && !is_curried_arrow_with_return_type(arg) {
+        printer.build_with_arrow_chain_context(ArrowChainContext::CallArgOrBinaryish, build)
+    } else {
+        build()
+    };
+    printer.skip_arrow_chain.set(outer_skip);
+    doc
+}
 
 /// Build an arrow function signature doc for a call-argument state.
 ///
@@ -458,29 +504,13 @@ pub(crate) fn build_args_split_last(
     // assignments, and the indented binary/conditional layouts).
     //
     // A curried arrow-chain argument (`fn(x, (a) => (b) => …)`) routes through the
-    // progressive call-arg chain layout: set the context so the outermost chain
-    // arrow flattens its heads (`should_use_arrow_chain_layout` still gates on untyped,
-    // and on every comment sitting in a region the chain doc emits, and
-    // `skip_arrow_chain` keeps the expand-last-arg hug states on the default path).
-    // Mirrors prettier's `isCallLikeExpression(parent)`
-    // reaching `printArrowFunctionSignatures`.
+    // progressive call-arg chain layout — see [`build_printed_argument_doc`], which owns
+    // that decision for every caller. (`should_use_arrow_chain_layout` still gates on
+    // untyped, and on every comment sitting in a region the chain doc emits.)
     let arg_docs: DocBuf = arguments
         .iter()
         .enumerate()
-        .map(|(i, arg)| {
-            // Rule A first: an own-line directive in this argument's gap freezes it
-            // verbatim, so no layout context applies to it.
-            if let Some(frozen) = printer.args_frozen_span(paren_open, arguments, i) {
-                printer.build_frozen_arg_doc(arg, frozen)
-            } else if is_curried_arrow_chain(arg) {
-                printer
-                    .build_with_arrow_chain_context(ArrowChainContext::CallArgOrBinaryish, || {
-                        printer.build_arg_expression_doc(arg)
-                    })
-            } else {
-                printer.build_arg_expression_doc(arg)
-            }
-        })
+        .map(|(i, _)| ArgItem::ArgContext.build(printer, paren_open, arguments, i))
         .collect();
 
     // Leading comments between `(` and the first argument (e.g., /** @type {T} */).
@@ -922,20 +952,27 @@ impl ArgItem {
     /// directive in its gap freezes it (Rule A), else this variant's ordinary builder.
     /// The frozen slice is the same whichever builder the variant names, so the dispatch
     /// lives here rather than at each layout arm.
-    fn build(
+    ///
+    /// Every layout that reaches here is a **broken-out** one — nothing in this family
+    /// hugs an argument onto the callee's line — so the build goes through
+    /// [`build_printed_argument_doc`]; a curried chain that skipped the progressive layout
+    /// here would keep its heads welded to the first one. Rule A still wins inside it:
+    /// a frozen argument is a verbatim source slice, which no layout context can reach,
+    /// so the wrapper is inert on that arm.
+    pub(crate) fn build(
         self,
         printer: &Printer<'_>,
         paren_open: u32,
         args: &[internal::Expression<'_>],
         i: usize,
     ) -> DocId {
-        match self {
+        build_printed_argument_doc(printer, &args[i], || match self {
             Self::ArgContext => printer.build_arg_item_doc(paren_open, args, i),
             Self::Plain => printer.args_frozen_span(paren_open, args, i).map_or_else(
                 || printer.build_expression_doc(&args[i]),
                 |frozen| printer.build_frozen_arg_doc(&args[i], frozen),
             ),
-        }
+        })
     }
 }
 
@@ -1127,9 +1164,10 @@ pub(super) fn build_call_args_with_blank_lines(
         // Argument-context builder so a binary/logical chain (or conditional) keeps
         // its continuation indent, and an assignment gets clarity parens — same as
         // the no-blank-line path; the blank-line forced expansion is just another
-        // reason the args break. An own-line directive in this argument's gap freezes
-        // it verbatim (Rule A).
-        arg_parts.push(printer.build_arg_item_doc(paren_open, args, i));
+        // reason the args break. Through [`ArgItem`] rather than `build_arg_item_doc`
+        // directly, so this layout gets the Rule A freeze AND the broken-out argument's
+        // chain routing from the one place that states both.
+        arg_parts.push(ArgItem::ArgContext.build(printer, paren_open, args, i));
 
         if i < args.len() - 1 {
             let arg_end = arg.span().end;
