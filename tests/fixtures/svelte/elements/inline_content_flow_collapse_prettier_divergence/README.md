@@ -13,12 +13,15 @@ and both are already sanctioned:
   space, so a newline and a space between two siblings render identically and the spelling carries
   no signal — see
   [inline_sibling_newline_flow](../inline_sibling_newline_flow_prettier_divergence/).
-- **The content boundary does not select the layout.** Boundary whitespace is render-free, so the
-  hugged, spaced and newline authorings of one document converge — see
+- **The content boundary's spelling does not select the tags' layout.** Boundary whitespace is
+  render-free, so the hugged, spaced and one-sided-newline authorings of one document converge;
+  a newline on **both** boundaries is the author's air and is preserved instead (the
+  boundary-axis paragraph below) — see
   [§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
-The last four cases pin the second rule's own predicate. What makes the boundary inert is that
-the content is a **fill to reflow into** — asked of the RUN, never of the separator's shape or
+The last four cases pin the interior side of the second rule's predicate. What lets those
+newlines reflow rather than expand the element is that the content is a **fill to reflow
+into** — asked of the RUN, never of the separator's shape or
 the sibling count. A separator carrying words (`text1`) is as much a fill as a space-only one,
 and a lone element beside prose is one too, so all of them must reach the same form the
 space-separated twin already reaches. Otherwise one document has two layouts depending on

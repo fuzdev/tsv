@@ -563,13 +563,15 @@ impl<'a> Printer<'a> {
                 // boundary against a column the converged output no longer contains, leaving the
                 // document a second stable fixed point. That shape keeps the joint join below.
                 //
-                // A REGENERATING previous element (a component, or an inline element with
-                // non-reflowable-fill content) takes this arm even when wrapped: its width-broken
+                // A REGENERATING previous element (a component, or an inline element with any
+                // non-text-only content) takes this arm even when wrapped: its width-broken
                 // form re-parses as a statically-broken one (the emitted boundary newlines re-read
                 // as the Tier-2 signal), and the static path's tail hugs per width — so the
                 // width-broken rendering must answer the same or the document converges only on
-                // pass 2 (`authoring:audit` catches the mutants). That invariant outranks the
-                // outside-in preference, which for these kinds has no stable joint answer to keep.
+                // pass 2 (`authoring:audit` catches the mutants; a fill-content element in a
+                // comment wrap was the escaped instance, `inline_comment_wrap_fill_tail_long`).
+                // That invariant outranks the outside-in preference, which for these kinds has
+                // no stable joint answer to keep.
                 trim_left = true;
                 add_leading_space = false;
                 leading_line = true;

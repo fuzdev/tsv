@@ -17,10 +17,12 @@ The **second case** swaps the preceding text for an inline **element** sibling (
 so the wide element sits in its inline-sibling wrap. What sibling kind precedes the wide element
 cannot change where its tail breaks: the wrap's other side *flows* (an element's separator
 spellings converge), so the tail takes the same per-width hug. The one shape that instead keeps
-the joint element+boundary measurement is a wrap whose other side does **not** flow — a spaced
-comment or a control-flow block, whose own-line spelling is a fixed point and therefore the only
-convergeable target — where two boundaries meet on one element and resolve outside-in; see
-`inline_sibling_drop_tail_flow_long`.
+the joint element+boundary measurement is a **text-only** element in a wrap whose other side
+does **not** flow — a spaced comment or a control-flow block, whose own-line spelling is a fixed
+point and therefore the only convergeable target — where two boundaries meet on one element and
+resolve outside-in; see `inline_sibling_drop_tail_flow_long`, and
+`inline_comment_wrap_fill_tail_long` for why any other content kind takes the per-width answer
+even there (its width-broken form regenerates the static trigger).
 
 The `unformatted_ours_*` variants pin idempotence: the single-line and one-line-content authorings
 both normalize to the hugged form in one pass.

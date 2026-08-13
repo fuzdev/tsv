@@ -21,6 +21,12 @@ is the non-terminal counterpart of the terminal fold, which already separates th
 boundaries before folding element and tail into one fill
 ([inline_element_wide_multiattr_long](../inline_element_wide_multiattr_long_prettier_divergence/)).
 
+The joint grouping is scoped to a **text-only** element like this one, the one content kind whose
+width-broken form regenerates no static trigger. Any other content re-parses its emitted boundary
+newlines as the authored-air signal, so its tail must answer per width even inside the wrap — see
+[inline_comment_wrap_fill_tail_long](../inline_comment_wrap_fill_tail_long_prettier_divergence/),
+the fill-content twin.
+
 ## Cases
 
 - **100 (control)** — the comment, the element and the first word fit exactly, so the element hugs
