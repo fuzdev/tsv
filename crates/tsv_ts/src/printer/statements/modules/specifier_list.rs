@@ -732,19 +732,7 @@ impl<'a> Printer<'a> {
                     self.push_leading_comments_before(&mut parts, &comments, item_start);
                 }
                 CommaListBlanks::ModuleSpecifiers => {
-                    let mut prev_pos = prev_end;
-                    let mut prev_comment: Option<&internal::Comment> = None;
-                    for comment in &comments {
-                        self.push_trailing_run_separator(
-                            &mut parts,
-                            prev_comment,
-                            prev_pos,
-                            comment.span.start,
-                        );
-                        parts.push(self.build_comment_doc(comment));
-                        prev_pos = comment.span.end;
-                        prev_comment = Some(comment);
-                    }
+                    self.push_trailing_comment_run(&mut parts, comments.iter().copied(), prev_end);
                     match comments.last() {
                         Some(last) if self.comment_hugs_next(last) => parts.push(d.text(" ")),
                         _ => parts.push(d.hardline()),
@@ -780,21 +768,11 @@ impl<'a> Printer<'a> {
                 // ([`Printer::push_trailing_run_separator`]), so a pair the author GLUED
                 // onto one line keeps it and everything else takes the blank-preserving
                 // break, the same answer every other end-of-container run gives.
-                let mut prev_pos = trailing.end_pos;
-                let mut prev_comment: Option<&internal::Comment> = None;
-                for comment in
-                    comments_to_emit_in_range(self.comments, trailing.end_pos, end_boundary)
-                {
-                    self.push_trailing_run_separator(
-                        &mut parts,
-                        prev_comment,
-                        prev_pos,
-                        comment.span.start,
-                    );
-                    parts.push(self.build_comment_doc(comment));
-                    prev_pos = comment.span.end;
-                    prev_comment = Some(comment);
-                }
+                self.push_trailing_comment_run(
+                    &mut parts,
+                    comments_to_emit_in_range(self.comments, trailing.end_pos, end_boundary),
+                    trailing.end_pos,
+                );
             }
         }
 
