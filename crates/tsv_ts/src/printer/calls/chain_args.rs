@@ -212,6 +212,15 @@ struct ChainArgsContext {
     /// this one — an owned annotation on the last argument must refuse the expand-last hug
     /// exactly as an ordinary leading comment does.
     has_any_comment_text: bool,
+    /// **on page**: a comment attaches to the last argument — leading it or trailing it
+    /// before the `)`. The one predicate every argument-hug arm in all three branch
+    /// builders asks, because prettier's `shouldExpandLastArg` returns false for a
+    /// commented argument and because the hug layouts reassemble the argument from its
+    /// signature and body docs, leaving its trailing gap with no emitter at all. Computed
+    /// here rather than per builder: it was three identical re-derivations, and an arm that
+    /// asked its own narrower question is exactly how the argument→`)` gap came to be
+    /// DROPPED under forced expansion.
+    last_arg_commented: bool,
     has_trailing_block_comments: bool,
     comments_force_expansion: bool,
     standard_expansion: bool,
@@ -287,6 +296,10 @@ fn build_call_args_doc_for_chain_impl(
         || has_trailing_comments
         || has_trailing_block_comments
         || has_spread_paren_comments;
+    // The argument-hug refusal, asked by every branch builder — see `ChainArgsContext`.
+    // Guarded by the same window search, so a comment-free call pays nothing for it.
+    let last_arg_commented = call_has_comments
+        && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open);
 
     // Build leading comment doc once for reuse in single-arg arrow paths
     // (e.g., /** @param {any} x */ before arrow function parameters)
@@ -346,6 +359,7 @@ fn build_call_args_doc_for_chain_impl(
         has_leading_comment_on_page,
         has_any_comments,
         has_any_comment_text: call_has_comments,
+        last_arg_commented,
         has_trailing_block_comments,
         comments_force_expansion,
         standard_expansion,
@@ -392,6 +406,7 @@ fn build_chain_args_force_expand(
         paren_open,
         prefix,
         has_leading_comments,
+        last_arg_commented,
         has_trailing_block_comments,
         comments_force_expansion,
         standard_expansion,
@@ -430,7 +445,9 @@ fn build_chain_args_force_expand(
     // Skip when comments_force_expansion — this layout has no line to put a comment that
     // must own one on, and the `(`-line channel `leading_comment_doc` cannot carry has no
     // home here either.
+    // Skip on a commented last argument — see `last_arg_commented` above.
     if call.arguments.len() == 1
+        && !last_arg_commented
         && !comments_force_expansion
         && let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
@@ -458,7 +475,11 @@ fn build_chain_args_force_expand(
     // Skip when standard_expansion is requested — short chains where the chain
     // doesn't break between groups need the standard `(\n  args,\n)` form to keep
     // the first line short enough for fits().
+    // Skip on a commented last argument, like the two arms above — the standard form below
+    // routes the argument→`)` gap through `emit_last_arg_trailing_comments`, which is also
+    // prettier's layout for a commented argument.
     if !standard_expansion
+        && !last_arg_commented
         && !comments_force_expansion
         && call.arguments.len() == 1
         && is_single_arrow_with_breakable_body(&call.arguments[0])
@@ -652,17 +673,10 @@ fn build_chain_args_single(
         has_leading_comment_on_page,
         has_any_comments,
         has_any_comment_text,
+        last_arg_commented,
         leading_comment_doc,
         ..
     } = ctx;
-
-    // Whether a comment on the page attaches to the last argument — the predicate that
-    // refuses every argument hug below. Computed once: it walks the arguments with a
-    // `find_comma_pos` source scan plus two binary searches, and three arms ask it with
-    // identical arguments. Guarded by the same `has_any_comment_text`, so a comment-free
-    // call still pays nothing beyond the one window-wide search that set that flag.
-    let last_arg_commented = has_any_comment_text
-        && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open);
 
     let arg = &call.arguments[0];
 
@@ -939,10 +953,12 @@ fn build_chain_args_single(
             d.hardline(),
             d.text(")"),
         ]);
-        if has_leading_comment_on_page {
-            // Leading comments prevent hugging — force expansion. An owned comment
-            // (on page but not in `has_leading_comments`) rides inside `arg_with_comments`
-            // via `arg_doc`, so it still defeats the hug.
+        if has_leading_comment_on_page || last_arg_commented {
+            // A comment anywhere on the argument prevents hugging — force expansion, the
+            // same `shouldExpandLastArg` rule the arms above ask, and prettier's layout for
+            // a trailing one too (`(\n  (x) => {…} /* c */\n)`). An owned comment (on page
+            // but not in `has_leading_comments`) rides inside `arg_with_comments` via
+            // `arg_doc`, so it still defeats the hug.
             parts.push(state_expand);
         } else {
             // No leading comments — try hug first, then expand
@@ -1006,17 +1022,10 @@ fn build_chain_args_multi(
         prefix,
         has_any_comments,
         has_any_comment_text,
+        last_arg_commented,
         comments_force_expansion,
         ..
     } = ctx;
-
-    // Whether a comment on the page attaches to the last argument — the predicate that
-    // refuses the expand-last hugs below. Computed once (see `build_chain_args_single`);
-    // four arms ask it, two through the narrower **to-emit** `has_any_comments`, which is
-    // a subset of the `has_any_comment_text` guarding this binding, so each arm keeps
-    // saying which axis it means.
-    let last_arg_commented = has_any_comment_text
-        && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open);
 
     // Multiple arguments with block-body callback:
     // Use conditional_group to try inline first, then expand-all.
