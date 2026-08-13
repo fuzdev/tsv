@@ -100,6 +100,28 @@ fn prepend_leading(d: &DocArena, leading: Option<DocId>, doc: DocId) -> DocId {
     }
 }
 
+/// Prettier's `shouldAddParensIfNotBreak` for a ternary arrow body: the parens exist only in
+/// the FLAT rendering and are dropped the moment the group breaks, the body hanging on its own
+/// line instead.
+///
+/// Both terminal-body printers build exactly this — the plain arrow body
+/// ([`Printer::build_arrow_expression_body`]) and the curried chain's
+/// ([`Printer::build_arrow_chain_doc`]). Only their `will_break` fallback differs
+/// (`hang_after_operator` vs `indent_line`), so that stays at each site; the leading `" "` is
+/// each caller's too, since one pushes into a buffer and the other returns a concat.
+///
+/// ⚠️ The third ternary-paren site is **not** this shape and must not be folded in:
+/// [`Printer::build_arrow_body_doc_with_leading`] uses a bare `if_break(body, parens(body))`
+/// with no group, indent or softline, because its callers have already forced a break. It reads
+/// like the same rule and would change layout.
+fn ternary_body_parens_group(d: &DocArena, body: DocId) -> DocId {
+    d.group(d.concat(&[
+        d.if_break(d.empty(), d.text("(")),
+        d.indent(d.concat(&[d.softline(), body])),
+        d.if_break(d.empty(), d.text(")")),
+    ]))
+}
+
 /// Whether an expression has an ObjectExpression at its leftmost position.
 /// See [`leftmost_object_span`].
 pub(in crate::printer) fn has_leftmost_object_expression(expr: &internal::Expression<'_>) -> bool {
@@ -423,6 +445,27 @@ impl<'a> Printer<'a> {
                 .then(|| self.build_inline_post_arrow_comments_doc(arrow_end, body_start))
         };
 
+        // ⚠️ These arms are ORDERED and the order is LOAD-BEARING — each is reached only
+        // because every arm above it declined, so an arm's stated condition is never its
+        // full precondition. In precedence order:
+        //
+        //   1. own-line comment      — takes every own-line/line comment out of the gap, so
+        //                              arms 2-7 see nothing but inline blocks there.
+        //   2. hug                   — object / array / same-line template bodies stop here.
+        //   3. curried, typed        — a nested arrow under a return type, or inside a chain.
+        //   4. curried, param comment— a nested arrow whose params carry a trailing comment.
+        //   5. curried, innermost    — the terminal body of a curried chain, ANY body type.
+        //   6. ternary               — `shouldAddParensIfNotBreak`.
+        //   7. normal expression.
+        //
+        // The trap that has already cost a bug: **5 fires before 6**, so a ternary body
+        // inside a curried chain is printed by arm 5 (which delegates to
+        // `build_arrow_body_doc`, whose own ternary branch adds the parens) and never
+        // reaches arm 6. The two routes must therefore agree about the `=>`→body gap —
+        // arms 3/4/5/6 each reassemble the body and so must each hand the gap run to it,
+        // which is what `gap_run` above is for. `build_arrow_chain_doc` looks like an
+        // eighth route but is unreachable with comments: `should_use_arrow_chain_layout`
+        // declines whenever the chain holds one anywhere.
         if has_own_line_comment {
             // Own-line or line comments — always break
             let body_with_comments =
@@ -516,11 +559,7 @@ impl<'a> Printer<'a> {
                 parts.push(hang_after_operator(d, with_leading));
             } else {
                 parts.push(d.text(" "));
-                parts.push(d.group(d.concat(&[
-                    d.if_break(d.empty(), d.text("(")),
-                    d.indent(d.concat(&[d.softline(), with_leading])),
-                    d.if_break(d.empty(), d.text(")")),
-                ])));
+                parts.push(ternary_body_parens_group(d, with_leading));
             }
         } else {
             // Normal expression: can break after => with indentation
@@ -770,14 +809,7 @@ impl<'a> Printer<'a> {
                         // chain group below (prettier's `indent([line, bodyDoc])`).
                         d.indent_line(body_doc)
                     } else {
-                        d.concat(&[
-                            d.text(" "),
-                            d.group(d.concat(&[
-                                d.if_break(d.empty(), d.text("(")),
-                                d.indent(d.concat(&[d.softline(), body_doc])),
-                                d.if_break(d.empty(), d.text(")")),
-                            ])),
-                        ])
+                        d.concat(&[d.text(" "), ternary_body_parens_group(d, body_doc)])
                     }
                 } else {
                     // Other expression body: hang on the next line when the chain
