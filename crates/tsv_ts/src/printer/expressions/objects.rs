@@ -69,7 +69,14 @@ impl<'a> Printer<'a> {
             return self.build_empty_braces_inline_with_comments_doc(obj.span);
         }
 
-        // Check if source has newline after opening brace
+        // Check if source has newline after opening brace.
+        //
+        // ⚠️ This rule is the object LITERAL's alone — the object PATTERN deliberately has
+        // no counterpart, and the asymmetry is prettier's: it guards the whole preserve on
+        // `node.type !== "ObjectPattern"` (`print/object.js`). A pattern that opened on an
+        // authored newline would also be its own second fixed point, since the expanded
+        // form reprints one newline and never the author's blank
+        // (`patterns.rs::collection_formatting_hints`). Don't mirror this line over there.
         let first_prop_start = obj.properties[0].span().start;
         let has_source_newline = self.has_newline_between(obj.span.start + 1, first_prop_start);
 

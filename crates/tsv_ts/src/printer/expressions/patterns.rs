@@ -344,10 +344,13 @@ impl<'a> Printer<'a> {
         if obj.properties.is_empty() {
             self.build_empty_object_pattern_doc(obj)
         } else {
-            // Expand if: nested patterns, line comments, blank lines, or own-line
-            // block comments between/around properties. One whole-span comment
-            // pre-check gates both comment-scanning hints (blank lines are
-            // comment-independent, so `formatting_hints` still runs to detect them).
+            // Expand if: nested patterns, line comments, blank lines BETWEEN
+            // properties, or own-line block comments between/around properties.
+            // One whole-span comment pre-check gates both comment-scanning hints
+            // (blank lines are comment-independent, so `formatting_hints` still runs
+            // to detect them). The blank half is deliberately inter-property only —
+            // a blank after the `{` is not a reason to expand, and acting on one made
+            // the expanded output its own second fixed point (`collection_formatting_hints`).
             let should_expand = object_pattern_should_expand(obj, context);
             let boundary = obj.body_end();
             let has_comments = self.has_comments_on_page_between(obj.span.start, boundary);
@@ -530,6 +533,10 @@ impl<'a> Printer<'a> {
     /// `has_comments` is the caller's whole-span comment pre-check: when false,
     /// the per-element comment scans are skipped (no comment can be in any gap),
     /// leaving only the comment-independent blank-line detection.
+    ///
+    /// The blank-line half is an **inter-element** question only: the leading gap
+    /// between the opening delimiter and the first element never counts (see the
+    /// loop's note). The comment half spans every gap, leading one included.
     fn collection_formatting_hints<T>(
         &self,
         collection_start: u32,
@@ -544,7 +551,7 @@ impl<'a> Printer<'a> {
         let mut prev_end = collection_start + 1; // After opening bracket/brace
         let mut prev_span_end = prev_end;
 
-        for elem in elements {
+        for (i, elem) in elements.iter().enumerate() {
             let span = get_span(elem);
             let elem_start = span.start;
 
@@ -558,12 +565,22 @@ impl<'a> Printer<'a> {
             } else {
                 elem_start
             };
+            // ⚠️ The LEADING gap — the opening `{`/`[` to the first element — is skipped:
+            // it is an INTER-element rule, and a blank there is not an authorship signal
+            // a pattern can act on. Prettier guards its whole newline-after-`{` preserve
+            // on `node.type !== "ObjectPattern"` (`print/object.js`), so a pattern never
+            // opens on one; and the expanded form prints no leading blank, so measuring
+            // it made tsv's own output a SECOND fixed point — `const {⏎⏎a} = o` expanded
+            // on pass 1 and collapsed on pass 2, in every pattern position alike
+            // (declarator, parameter, catch binding, assignment pattern, nested).
+            // A blank-line rule cannot be conditioned on a trigger its own output erases.
+            //
             // ⚠️ The blank scan keeps the SPAN end while the comment scan takes the printed
             // one: they are opposite questions about the same stripped-paren shell
             // (`docs/comments.md` §The element-comma seam). Measuring the distance from
             // inside the shell reads its own line breaks as an author blank and expands a
             // pattern prettier keeps inline (`{a = (1⏎⏎), b}`).
-            if self.has_blank_line_between(prev_span_end, check_pos) {
+            if i > 0 && self.has_blank_line_between(prev_span_end, check_pos) {
                 has_blank_lines = true;
             }
 
