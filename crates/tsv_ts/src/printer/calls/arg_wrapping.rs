@@ -1176,9 +1176,7 @@ pub(super) fn build_call_args_with_blank_lines(
             if printer.inter_arg_gap_has_comments(arg, next_start) {
                 let gap = printer.open_inter_arg_gap(&mut arg_parts, arg, next_start);
 
-                let next_has_blank = gap
-                    .comments
-                    .has_blank_line_in_gap(printer.source, printer.layout_line_breaks);
+                let next_has_blank = gap.comments.has_blank_line_in_gap(printer);
                 if next_has_blank {
                     arg_parts.push(d.literalline());
                 }

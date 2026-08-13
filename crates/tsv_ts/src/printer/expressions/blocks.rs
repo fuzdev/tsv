@@ -17,6 +17,69 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// A statement list's **blank** cursor, which is not its comment cursor.
+///
+/// The two part over one thing and one thing only: a dropped `EmptyStatement`. The comment
+/// cursor advances past its `;` (the statement-gap seam's slot floor — a dropped `;` closes
+/// its slot, `docs/comments.md`), while prettier's `printStatementSequence` skips an
+/// `EmptyStatement` outright and asks `isNextLineEmpty` of the previous **printed**
+/// statement, so the `;` may neither move the anchor nor be scanned past. Measuring from the
+/// shared cursor was wrong in both directions at once — `a();⏎⏎;⏎b();` lost the author's
+/// blank (it sits above the `;`, behind the cursor) and `a();⏎;⏎⏎b();` gained one prettier
+/// drops (it sits below).
+///
+/// One type rather than a pair of locals per loop because the rule has three moving parts
+/// and **two** copies of the walk (the program/block/namespace list and the switch
+/// consequent's own): a hand-rolled second copy is how the two would drift, which is the
+/// bug class this whole area is about.
+pub(in crate::printer) struct StatementBlankScan {
+    /// End of the last thing this list actually PRINTED.
+    anchor: u32,
+    /// The first dropped `;` since the anchor last moved; `u32::MAX` when none is in the way,
+    /// so an ordinary gap keeps whatever bound its own comment scan picks.
+    bound: u32,
+}
+
+impl StatementBlankScan {
+    pub(in crate::printer) fn new(start: u32) -> Self {
+        Self {
+            anchor: start,
+            bound: u32::MAX,
+        }
+    }
+
+    /// Where the blank question measures FROM.
+    pub(in crate::printer) fn anchor(&self) -> u32 {
+        self.anchor
+    }
+
+    /// The caller's own upper bound, capped at a dropped `;` in the way.
+    pub(in crate::printer) fn bound(&self, check_end: u32) -> u32 {
+        check_end.min(self.bound)
+    }
+
+    /// Content reached the output (a statement, or a dropped `;`'s orphan comment run), so
+    /// the two cursors rejoin and nothing is in the way any more.
+    pub(in crate::printer) fn printed(&mut self, end: u32) {
+        self.anchor = end;
+        self.bound = u32::MAX;
+    }
+
+    /// A dropped `;` that printed nothing: it leaves the anchor alone and becomes the bound.
+    ///
+    /// Two guards, each of which a fixture found. It must **start a line** — one the author
+    /// left on the previous statement's own line (`a();; // c`) is trivia prettier walks
+    /// straight over, its `skipToLineEnd` being `skip(",; \t")`, and bounding there would
+    /// drop the blank BELOW that line, which is the previous statement's own. And it must lie
+    /// **ahead** of the anchor — a `;` the previous statement's trailing run already consumed
+    /// sits behind it, where bounding inverts the range and every later blank reads as absent.
+    pub(in crate::printer) fn skipped_semi(&mut self, printer: &Printer<'_>, semi_start: u32) {
+        if semi_start >= self.anchor && !printer.is_same_line(self.anchor, semi_start) {
+            self.bound = self.bound.min(semi_start);
+        }
+    }
+}
+
 /// What [`Printer::build_statement_list_docs_into`] leaves for its caller's end-of-body
 /// comment emitter.
 pub(in crate::printer) struct StatementListTail {
@@ -266,6 +329,8 @@ impl<'a> Printer<'a> {
         } = body_span;
         let d = self.d();
         let mut prev_end = body_start;
+        // The BLANK cursor, which `prev_end` above cannot serve — see [`StatementBlankScan`].
+        let mut blanks = StatementBlankScan::new(body_start);
         let mut prev_stmt_end: Option<u32> = None;
         // Set when the statement just emitted deferred a line comment past its own `;`, so
         // its doc ends on a later line than the `;` and cannot carry that line's comments.
@@ -343,6 +408,13 @@ impl<'a> Printer<'a> {
                 }
 
                 prev_end = search_end;
+                // The orphan run is content and moves the blank anchor exactly as a
+                // statement does; a `;` that printed nothing becomes the bound instead.
+                if leading_comments.is_empty() {
+                    blanks.skipped_semi(self, stmt.span().start);
+                } else {
+                    blanks.printed(search_end);
+                }
                 continue;
             }
 
@@ -386,11 +458,21 @@ impl<'a> Printer<'a> {
                 // *in-source* one, which is sound because only the *to-emit* axis skips
                 // an owned comment — on-page and in-source have the same membership.
                 let blank_line_check_end = if body_has_comments {
-                    self.blank_scan_end(prev_end, stmt_start)
+                    self.blank_scan_end(blanks.anchor(), stmt_start)
                 } else {
                     stmt_start
                 };
-                if self.has_blank_line_between(prev_end, blank_line_check_end) {
+                // ⚠️ A dropped `;` CAPS the scan as well as failing to move its start —
+                // the two halves of one question ([`StatementBlankScan`]): what did the
+                // author write between the last printed statement and the next thing in
+                // the gap? The `;` is such a thing, exactly as a comment is
+                // (`blank_scan_end`'s own rule). Capping the table-based count rather than
+                // switching to prettier's byte-scanning `isNextLineEmpty` keeps the
+                // line-break TABLE as the oracle, which is what sees U+2028 / U+2029 as
+                // line terminators — the byte scan does not, and
+                // `syntax/whitespace/line_terminators` is the fixture that says so.
+                if self.has_blank_line_between(blanks.anchor(), blanks.bound(blank_line_check_end))
+                {
                     body_parts.push(d.literalline());
                 }
                 body_parts.push(d.hardline());
@@ -436,6 +518,7 @@ impl<'a> Printer<'a> {
             } else {
                 prev_end = stmt_end;
             }
+            blanks.printed(prev_end);
             prev_stmt_end = Some(stmt_end);
         }
 
