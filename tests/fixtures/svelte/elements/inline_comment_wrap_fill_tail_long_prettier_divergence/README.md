@@ -4,9 +4,9 @@ The fill-content twin of
 [inline_sibling_drop_tail_flow_long](../inline_sibling_drop_tail_flow_long_prettier_divergence/):
 the wrap's other side is a comment, whose own-line spelling is pinned — but the element's
 content holds prose and a child, so its width-broken block-style form re-parses as the
-authored-air document. The width-broken and newline-authored spellings are ONE document, and
-the non-terminal tail after the element must answer identically in both: per width, from the
-closing tag's own column — the same rule
+authored-air document. The width-broken and newline-authored *content* spellings are ONE document, and
+the non-terminal tail's **space** spelling after the element must answer identically in both: per
+width, from the closing tag's own column — the same rule
 [inline_wide_content_text_sibling_long](../inline_wide_content_text_sibling_long_prettier_divergence/)
 pins without the wrap. The joint element+boundary measurement the text-only twin used to keep has
 no stable answer here: width-breaking the element *creates* the newline-authored document, whose
@@ -24,13 +24,15 @@ so every non-terminal tail now answers per width.
 - **101** — the same document one character wider: the trailing element wraps to its own line
   and the prose keeps the hug.
 
-`unformatted_ours_same_line` authors both cases on one line; tsv normalizes every authoring to
-`input` in one pass. Prettier instead drops the tail to its own line once the element is
-multiline and holds a stable form per authoring, so the authorings never converge there:
-`output_prettier.svelte` is its form from `input` (tail dropped, the authored block layouts
-kept), `prettier_variant_dropped_tail` its form from the dropped-tail authoring (which is its
-own fixed point), and `prettier_variant_dangle` its form from the one-line authoring (the tag
-delimiters dangled, the tail dropped) — tsv normalizes both variants to `input`.
+`unformatted_ours_same_line` authors both cases on one line; tsv normalizes it to `input` in one
+pass. Prettier instead drops the tail to its own line once the element is multiline and holds a
+stable form per authoring: `output_prettier.svelte` is its form from `input` (tail dropped, the
+authored block layouts kept), `variant_dropped_tail` its form from the dropped-tail authoring —
+now **dual-stable**, since a tail's authored newline after a multiline-rendering unwrapped
+element is preserved (the layout-keyed rule; in these geometries the comment has its own line, so
+the element carries no wrap) — and `divergent_variant_dangle` its form from the one-line
+authoring (the tag delimiters dangled, the tail dropped), which tsv rewrites to the dropped-tail
+form rather than to `input`.
 
 ## Reason
 

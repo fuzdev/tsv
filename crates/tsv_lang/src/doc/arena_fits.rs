@@ -131,6 +131,8 @@ fn flat_width_fill(
         // Carries the pending-flush state the walk needs (like the suffix pair
         // above); a memoized width would hide it. `None` = "walk it".
         DocNode::FlushBreak => None,
+        // Render-only sentinel; zero columns, no layout effect.
+        DocNode::FlowProbeEnd => Some(0),
     };
     cache[id.index()] = match result {
         Some(w) => w,
@@ -374,6 +376,9 @@ pub(super) fn arena_fits_with_lookahead(
                 // unconditional "doesn't fit" — a group with no line
                 // opportunity after this point is deliberately left flat.
                 DocNode::FlushBreak => pending_flush = true,
+                // Render-only sentinel: zero columns, no layout effect — the probe it
+                // completes exists only on the real render's command stack.
+                DocNode::FlowProbeEnd => {}
             }
         }
 

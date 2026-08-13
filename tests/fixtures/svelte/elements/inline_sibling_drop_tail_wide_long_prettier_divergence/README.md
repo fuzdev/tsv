@@ -3,7 +3,10 @@
 tsv: when the element inside an inline-sibling wrap is wide enough to lay its **own content** out
 block-style, the non-terminal text run after it takes the ordinary per-width boundary — it hugs the
 intact `</a>` when it fits there. Prettier: drops the tail to its own line once the element is
-multiline.
+multiline. (Prettier's own-line form is now *also* a tsv fixed point: in that geometry the comment
+sits on its own line, the element is unwrapped, and the tail's authored newline after a
+multiline-rendering element is preserved — the layout-keyed rule. So `output_prettier` holds under
+both formatters, and the divergence is which form each *reaches* from the wrap authorings.)
 
 ## Reason
 
@@ -39,8 +42,9 @@ back by the fusion.
 
 `unformatted_ours_same_line` authors both documents with the comment, the element and the tail all
 on one line — the authoring the wrap comes from — and normalizes to `input` in one pass.
-`prettier_variant_dangle` is prettier's own fixed point for that authoring, where it dangles the
-closing `>` rather than laying the content out block-style.
+`divergent_variant_dangle` is prettier's own fixed point for that authoring, where it dangles the
+closing `>` rather than laying the content out block-style; tsv rewrites it to `output_prettier`'s
+form (block-style content, the authored newline tail preserved).
 
 See
 [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

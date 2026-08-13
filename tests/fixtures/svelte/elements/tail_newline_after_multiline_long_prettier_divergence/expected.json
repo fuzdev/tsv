@@ -1,0 +1,241 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 625,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 171,
+				"data": " 100: the component renders inline (its line is exactly 100), so the authored\n\tnewline after it is a spelling the fill reflows — text3 takes its own line by width. "
+			},
+			{
+				"type": "Text",
+				"start": 171,
+				"end": 172,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 172,
+				"end": 294,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 173
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 174
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 175,
+							"end": 184,
+							"raw": "\n\ttext1\n\t",
+							"data": "\n\ttext1\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 184,
+							"end": 282,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 185
+								},
+								"end": {
+									"line": 5,
+									"column": 6,
+									"character": 189
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 190,
+									"end": 269,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 7,
+											"character": 190
+										},
+										"end": {
+											"line": 5,
+											"column": 11,
+											"character": 194
+										}
+									},
+									"value": [
+										{
+											"start": 196,
+											"end": 268,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 270,
+										"end": 275,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 282,
+							"end": 290,
+							"raw": "\n\ttext3\n",
+							"data": "\n\ttext3\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 294,
+				"end": 296,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 296,
+				"end": 495,
+				"data": " 101: one character wider, the component renders multiline (block-style), and the\n\tauthored newline after it is PRESERVED — text6 keeps its own line where a space\n\twould hug (variant_welded). "
+			},
+			{
+				"type": "Text",
+				"start": 495,
+				"end": 496,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 496,
+				"end": 624,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 497
+					},
+					"end": {
+						"line": 12,
+						"column": 2,
+						"character": 498
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 499,
+							"end": 508,
+							"raw": "\n\ttext4\n\t",
+							"data": "\n\ttext4\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 508,
+							"end": 612,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 2,
+									"character": 509
+								},
+								"end": {
+									"line": 14,
+									"column": 6,
+									"character": 513
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 514,
+									"end": 594,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 14,
+											"column": 7,
+											"character": 514
+										},
+										"end": {
+											"line": 14,
+											"column": 11,
+											"character": 518
+										}
+									},
+									"value": [
+										{
+											"start": 520,
+											"end": 593,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 595,
+										"end": 605,
+										"raw": "\n\t\ttext5\n\t",
+										"data": "\n\t\ttext5\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 612,
+							"end": 620,
+							"raw": "\n\ttext6\n",
+							"data": "\n\ttext6\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

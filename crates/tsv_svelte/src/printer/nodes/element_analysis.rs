@@ -285,9 +285,11 @@ impl<'a> Printer<'a> {
     ///
     /// This used to be mirrored by a second predicate asking what a width-broken element's
     /// OUTPUT re-parses as, so the tail boundary after such an element could answer in advance
-    /// what the next pass would. The mirror is gone — every non-terminal tail boundary is now
-    /// decided per width from the closing tag's own column, so no caller has to predict the
-    /// re-parse and there is no second copy of these rules to keep in step.
+    /// what the next pass would. The mirror is gone — a tail boundary's space spelling is
+    /// decided per width from the closing tag's own column, and its newline spelling rides the
+    /// joint `group([element, line])`, which breaks with the element's own layout — so no
+    /// caller has to predict the re-parse and there is no second copy of these rules to keep
+    /// in step.
     fn has_source_breaks_in_content(
         &self,
         nodes: &[FragmentNode<'_>],

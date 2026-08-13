@@ -5,16 +5,16 @@ trailing text, inside a block (`<p>`). Covers a `<strong>` (no attributes) and a
 `href`) — the divergence is the same for both.
 
 tsv lays the content out **block-style**: both tags stay intact and the over-wide content wraps on
-its own indented line(s) so every line stays ≤100. The trailing text **hugs the intact closing tag**
-(`</tag> tail`), whichever way its boundary was authored.
-
-Prettier keeps the content on a **single over-width line** and **dangles** the tag delimiters
-(`>…content…</tag`) rather than laying out block-style, letting the content exceed printWidth. It
-also *distinguishes* the two boundaries, hugging a space and breaking a newline.
+its own indented line(s) so every line stays ≤100. The trailing text's boundary is
+**layout-keyed**: a **space** hugs the intact closing tag (`</tag> tail`), and an authored
+**newline** keeps the tail's own line — the element renders multiline, so both spellings are clean
+and the authored one is kept (dual-stable; the layout-keyed rule). Prettier splits the boundary the
+same way, so the divergence here is the **content**: prettier keeps it on a **single over-width
+line** and **dangles** the tag delimiters (`>…content…</tag`) rather than laying out block-style.
 
 ```
-tsv:       content lays out block-style (≤100), tail hugs `</tag> tail` on either boundary
-Prettier:  content on one over-width line,       tail hugs a space, breaks a newline
+tsv:       content lays out block-style (≤100); tail hugs a space, keeps an authored newline
+Prettier:  content on one over-width line;      tail hugs a space, keeps an authored newline
 ```
 
 ## What each file pins
@@ -27,15 +27,12 @@ the stable form prettier lands on:
 | `unformatted_ours_compact` | everything on one line, space tail | tsv → `input`; prettier → `prettier_variant_compact` |
 | `prettier_variant_compact` | prettier's dangled form, `> tail` hugged | prettier keeps it; tsv → `input` |
 | `unformatted_ours_multiline` | content on one line, **space** tail | tsv → `input`; prettier does not |
-| `unformatted_ours_widecontent` | content on one line, **newline** tail | tsv → `input`; prettier → `prettier_variant_widecontent` |
-| `prettier_variant_widecontent` | prettier's dangled form, tail on its own line | prettier keeps it; tsv → `input` |
-| `prettier_variant_newline_tail` | `input` exactly, tail on its own line | prettier keeps it; tsv → `input` |
+| `divergent_variant_widecontent` | prettier's dangled form, tail on its own line | prettier keeps it; tsv rewrites it to `variant_newline_tail`'s form (content block-styled, the newline tail kept) |
+| `variant_newline_tail` | `input` exactly, tail on its own line | **dual-stable** — both formatters keep it (the layout-keyed preserve) |
 | `variant_blank_line_tail` | `input` with a **blank line** before the tail | **dual-stable** — both formatters keep it |
 
-`unformatted_ours_multiline` and `unformatted_ours_widecontent` are a minimal pair: identical but for
-the tail boundary, and both land on `input`. `prettier_variant_newline_tail` isolates that boundary
-further still — it differs from `input` in nothing but the newline, so it pins the convergence with
-no content reflow confounding it.
+`variant_newline_tail` isolates the tail boundary with no content reflow confounding it — it
+differs from `input` in nothing but the newline, and both formatters hold each form.
 
 ## Reason
 
