@@ -338,15 +338,28 @@ pub(super) struct ElementContext {
 }
 
 impl<'a> Printer<'a> {
-    /// `<name>` — a start tag with no attributes (HTML spec "start tag").
+    /// `<name>` — a whole start tag with no attributes (HTML spec "start tag").
     /// `name` is a pre-built name doc (span-identity `source_span`).
+    ///
+    /// The counterpart to [`Printer::end_tag`], and it marks the same distinction from the
+    /// other side: an attribute-bearing tag goes through [`Printer::build_opening_tag`],
+    /// which stops *before* the `>` so its caller can place that character — hug it to the
+    /// last attribute, dedent it to its own line, or hand it to a sibling. Only where there
+    /// is nothing to decide is the `>` part of the tag itself, and that is what this spells.
     #[inline]
     pub(super) fn start_tag(&self, name: DocId) -> DocId {
         let d = self.d();
         d.concat(&[d.text("<"), name, d.text(">")])
     }
 
-    /// `</name>` — an end tag (HTML spec "end tag").
+    /// `</name>` — a whole end tag (HTML spec "end tag").
+    ///
+    /// ⚠️ **Every site that emits a complete end tag calls this**, so a remaining bare
+    /// `d.text("</")` in this crate marks the other thing: an end tag whose `>` is placed
+    /// *elsewhere* — dangled onto its own line, deferred to an enclosing group's break
+    /// decision, or handed to a following sibling (the axis-3 `>` dangle). That distinction is
+    /// load-bearing in this printer and invisible when both spellings are three anonymous
+    /// `text` nodes, which is the whole reason this helper is worth calling for three tokens.
     #[inline]
     pub(super) fn end_tag(&self, name: DocId) -> DocId {
         let d = self.d();
@@ -775,9 +788,7 @@ impl<'a> Printer<'a> {
             d.text(">"),
             indent_inner,
             d.hardline(),
-            d.text("</"),
-            parts.name,
-            d.text(">"),
+            self.end_tag(parts.name),
         ])
     }
 
@@ -969,17 +980,15 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let name_doc = d.source_span_ident(element.name_span);
-        // Build opening tag
-        let opening_tag = if attr_docs.is_empty() {
-            self.start_tag(name_doc)
-        } else {
-            let sl = d.softline();
-            let dedented = d.dedent(sl);
-            let attr_concat = d.concat(&attr_docs);
-            let inner = d.group(d.concat(&[attr_concat, dedented]));
-            let indented = d.indent(inner);
-            d.group(d.concat(&[d.text("<"), name_doc, indented, d.text(">")]))
-        };
+        // The attr-keyed opening tag every other element path takes — this used to carry a
+        // hand-rolled copy of it (same softline, same dedent, same indent), which is the
+        // two-copies-drift this crate's `ElementParts` doc warns about, one tag lower down.
+        // The group wraps `build_opening_tag`'s output plus the `>` the helper deliberately
+        // leaves to its caller (see [`Printer::end_tag`] for the same split at the other tag).
+        let opening_tag = d.group(d.concat(&[
+            self.build_opening_tag(name_doc, &attr_docs, false),
+            d.text(">"),
+        ]));
 
         // Get raw content from the single Text child
         let content = element.fragment.nodes.first().and_then(|node| match node {
@@ -989,7 +998,7 @@ impl<'a> Printer<'a> {
 
         // Empty element or whitespace-only content
         let Some(content) = content.filter(|c| !c.trim().is_empty()) else {
-            return d.concat(&[opening_tag, d.text("</"), name_doc, d.text(">")]);
+            return d.concat(&[opening_tag, self.end_tag(name_doc)]);
         };
 
         // Parse and format content based on tag type
@@ -1029,24 +1038,11 @@ impl<'a> Printer<'a> {
 
                 let content_concat = d.concat(&content_lines);
                 let indented = d.indent(content_concat);
-                d.concat(&[
-                    opening_tag,
-                    indented,
-                    d.hardline(),
-                    d.text("</"),
-                    name_doc,
-                    d.text(">"),
-                ])
+                d.concat(&[opening_tag, indented, d.hardline(), self.end_tag(name_doc)])
             }
             _ => {
                 // Fallback: preserve raw content if parsing fails
-                d.concat(&[
-                    opening_tag,
-                    d.text_pooled(&content),
-                    d.text("</"),
-                    name_doc,
-                    d.text(">"),
-                ])
+                d.concat(&[opening_tag, d.text_pooled(&content), self.end_tag(name_doc)])
             }
         }
     }

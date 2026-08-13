@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 165,
+	"end": 373,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -155,6 +155,240 @@
 					]
 				},
 				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 164,
+				"end": 166,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 166,
+				"end": 237,
+				"data": " with attributes: the `>` hugs the last attribute when they fit "
+			},
+			{
+				"type": "Text",
+				"start": 237,
+				"end": 238,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 238,
+				"end": 326,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 1,
+						"character": 239
+					},
+					"end": {
+						"line": 21,
+						"column": 4,
+						"character": 242
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 243,
+							"end": 245,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 245,
+							"end": 319,
+							"name": "style",
+							"name_loc": {
+								"start": {
+									"line": 22,
+									"column": 2,
+									"character": 246
+								},
+								"end": {
+									"line": 22,
+									"column": 7,
+									"character": 251
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 252,
+									"end": 262,
+									"name": "lang",
+									"name_loc": {
+										"start": {
+											"line": 22,
+											"column": 8,
+											"character": 252
+										},
+										"end": {
+											"line": 22,
+											"column": 12,
+											"character": 256
+										}
+									},
+									"value": [
+										{
+											"start": 258,
+											"end": 261,
+											"type": "Text",
+											"raw": "css",
+											"data": "css"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 263,
+									"end": 280,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 22,
+											"column": 19,
+											"character": 263
+										},
+										"end": {
+											"line": 22,
+											"column": 28,
+											"character": 272
+										}
+									},
+									"value": [
+										{
+											"start": 274,
+											"end": 279,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 281,
+										"end": 311,
+										"type": "Text",
+										"data": "\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t",
+										"raw": "\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 319,
+							"end": 320,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 326,
+				"end": 328,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 328,
+				"end": 372,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 29,
+						"column": 1,
+						"character": 329
+					},
+					"end": {
+						"line": 29,
+						"column": 4,
+						"character": 332
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 333,
+							"end": 366,
+							"name": "style",
+							"name_loc": {
+								"start": {
+									"line": 29,
+									"column": 6,
+									"character": 334
+								},
+								"end": {
+									"line": 29,
+									"column": 11,
+									"character": 339
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 340,
+									"end": 357,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 29,
+											"column": 12,
+											"character": 340
+										},
+										"end": {
+											"line": 29,
+											"column": 21,
+											"character": 349
+										}
+									},
+									"value": [
+										{
+											"start": 351,
+											"end": 356,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 358,
+										"end": 358,
+										"type": "Text",
+										"data": "",
+										"raw": ""
+									}
+								]
+							}
+						}
+					]
+				}
 			}
 		]
 	},

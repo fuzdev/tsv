@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 102,
+	"end": 296,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -128,6 +128,232 @@
 									{
 										"start": 86,
 										"end": 86,
+										"type": "Text",
+										"data": "",
+										"raw": ""
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 101,
+				"end": 103,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 103,
+				"end": 174,
+				"data": " with attributes: the `>` hugs the last attribute when they fit "
+			},
+			{
+				"type": "Text",
+				"start": 174,
+				"end": 175,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 175,
+				"end": 247,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 176
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 179
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 180,
+							"end": 182,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 182,
+							"end": 240,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 2,
+									"character": 183
+								},
+								"end": {
+									"line": 11,
+									"column": 8,
+									"character": 189
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 190,
+									"end": 195,
+									"name": "defer",
+									"name_loc": {
+										"start": {
+											"line": 11,
+											"column": 9,
+											"character": 190
+										},
+										"end": {
+											"line": 11,
+											"column": 14,
+											"character": 195
+										}
+									},
+									"value": true
+								},
+								{
+									"type": "Attribute",
+									"start": 196,
+									"end": 213,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 11,
+											"column": 15,
+											"character": 196
+										},
+										"end": {
+											"line": 11,
+											"column": 24,
+											"character": 205
+										}
+									},
+									"value": [
+										{
+											"start": 207,
+											"end": 212,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 214,
+										"end": 231,
+										"type": "Text",
+										"data": "\n\t\tconst a = 1;\n\t",
+										"raw": "\n\t\tconst a = 1;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 240,
+							"end": 241,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 247,
+				"end": 249,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 249,
+				"end": 295,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 250
+					},
+					"end": {
+						"line": 16,
+						"column": 4,
+						"character": 253
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 254,
+							"end": 289,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 6,
+									"character": 255
+								},
+								"end": {
+									"line": 16,
+									"column": 12,
+									"character": 261
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 262,
+									"end": 279,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 16,
+											"column": 13,
+											"character": 262
+										},
+										"end": {
+											"line": 16,
+											"column": 22,
+											"character": 271
+										}
+									},
+									"value": [
+										{
+											"start": 273,
+											"end": 278,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 280,
+										"end": 280,
 										"type": "Text",
 										"data": "",
 										"raw": ""

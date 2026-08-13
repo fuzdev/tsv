@@ -53,7 +53,10 @@ and the edge trim but not *which nodes the edge is measured against*. The behavi
 - **leading edge** — `{@debug cond} text`: the mirror.
 - **`<title>`** — `<svelte:head><title>text2</title> text3</svelte:head>`: the other participating
   hoisted kind (a `TitleElement` — `<title>` *inside* `<svelte:head>`; a bare `<title>` elsewhere
-  is a RegularElement and not hoisted). Its trailing edge run trims the same way. One case only —
+  is a RegularElement and not hoisted). Its trailing edge run trims the same way. ⚠️ That is the
+  run *outside* the element, and it is the only one: a `TitleElement`'s own content never reaches
+  `clean_nodes` at all, so its interior runs are rendered bytes and are preserved — see
+  [special_elements/title_content_verbatim](../../special_elements/title_content_verbatim_prettier_divergence/). One case only —
   a component allows a single `<svelte:head>` — and the interior rule is the same mechanism the
   `{@debug}` control below pins.
 - **interior control** — `a {@debug cond} b`. With content on **both** sides the hoist does not

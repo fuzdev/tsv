@@ -60,6 +60,19 @@ impl<'a> Printer<'a> {
         };
         let ctx = self.analyze_element(&parts, &attr_docs);
 
+        // `<title>` as a head child is whitespace-SENSITIVE, so it leaves the shared pipeline
+        // here — the same place `build_element_doc` dispatches `<pre>`/`<textarea>` out of it,
+        // and for the same reason. `compute_element_layout` is the only stage skipped: it is
+        // what trims the content boundaries, which for this one kind deletes rendered bytes.
+        if element.kind.preserves_content_whitespace() && !element.fragment.nodes.is_empty() {
+            return self.build_title_content_doc(
+                tag_name,
+                element.fragment.nodes,
+                &attr_docs,
+                &ctx,
+            );
+        }
+
         match self.compute_element_layout(&parts, &ctx) {
             // Identical shape to a regular element's `<tag … />` — `is_declaration: false`
             // (`<!DOCTYPE>` is not a `svelte:*` tag).
@@ -73,6 +86,51 @@ impl<'a> Printer<'a> {
                 self.build_content_element_doc(&parts, &ctx, &attr_docs, boundary)
             }
         }
+    }
+
+    /// Build `<title>…</title>` for a **head** `<title>`, whose content prints verbatim.
+    ///
+    /// `<pre>`/`<textarea>` are not the whole of the compiler's whitespace exemption. A
+    /// `<title>` that is a (transparent) child of `<svelte:head>` parses as a `TitleElement`,
+    /// and both of Svelte's `TitleElement` visitors walk `node.fragment.nodes` **directly** —
+    /// the server one wraps them in `$$renderer.title(…)`, the client one concatenates them
+    /// into a `document.title` assignment — so **`clean_nodes` never runs over them**. The
+    /// content boundaries, the runs around an `{expr}` tag, and a whitespace-only body all
+    /// reach the served page as authored, which puts this kind in the whitespace-sensitive
+    /// class rather than the trimming one.
+    ///
+    /// The bytes are observable, so this is content preservation and not layout taste: only
+    /// `document.title`'s **getter** strips and collapses them (HTML `Document.title`); its
+    /// setter does not, `HTMLTitleElement.text` returns the child text content unchanged, and
+    /// `<title>` is deliberately outside the `pre`/`listing`/`textarea` set whose leading
+    /// newline the parser drops.
+    ///
+    /// Two neighbouring facts are untouched. The **hoist** still holds — `clean_nodes` lifts a
+    /// `TitleElement` out of its parent fragment, so the run between it and a *sibling* is a
+    /// fragment edge and is deleted; that happens in the fragment walk, not here. And an
+    /// **empty** title has no content bytes to preserve, so it keeps the shared pipeline's
+    /// self-closing / empty layouts (the caller gates on that).
+    ///
+    /// Pinned by
+    /// [`title_content_verbatim`](../../../../../tests/fixtures/svelte/special_elements/title_content_verbatim_prettier_divergence/);
+    /// see [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).
+    fn build_title_content_doc(
+        &self,
+        tag_name: &'static str,
+        nodes: &[internal::FragmentNode<'_>],
+        attr_docs: &[DocId],
+        ctx: &ElementContext,
+    ) -> DocId {
+        let d = self.d();
+        let name_doc = d.text(tag_name);
+        // Attributes are a compile error on a `<title>`, so this list is empty in anything
+        // Svelte accepts — but the formatter still has to print what it was handed, and
+        // `build_opening_tag` is the one emitter that keeps a `//`-terminated list off the
+        // `>`'s line. Its trailing break sits inside the attr group, so the `>` appended here
+        // hugs a flat list and takes its own line when the list wraps.
+        let opening = self.build_opening_tag(name_doc, attr_docs, ctx.has_multiline_attr);
+        let content = self.build_whitespace_sensitive_content_doc(nodes);
+        d.concat(&[opening, d.text(">"), content, self.end_tag(name_doc)])
     }
 
     /// Build `<tag></tag>` for a special element with no content, wrapping the attributes in the

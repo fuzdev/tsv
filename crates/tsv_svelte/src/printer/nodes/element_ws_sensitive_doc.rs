@@ -384,13 +384,7 @@ impl<'a> Printer<'a> {
         // Build content preserving text whitespace but formatting expressions/blocks
         let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
 
-        d.concat(&[
-            opening_tag,
-            content_doc,
-            d.text("</"),
-            name_doc,
-            d.text(">"),
-        ])
+        d.concat(&[opening_tag, content_doc, self.end_tag(name_doc)])
     }
 
     /// Build content for whitespace-sensitive elements (pre, textarea).
@@ -398,7 +392,10 @@ impl<'a> Printer<'a> {
     /// Text nodes preserve their exact whitespace (significant for pre/textarea).
     /// Expressions, blocks, and other dynamic content are formatted normally
     /// (their internal whitespace is not significant).
-    fn build_whitespace_sensitive_content_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
+    pub(super) fn build_whitespace_sensitive_content_doc(
+        &self,
+        nodes: &[FragmentNode<'_>],
+    ) -> DocId {
         // Whitespace is significant here (`<pre>`/`<textarea>`): a block must not
         // dangle its `}` or expand its body — that would inject rendered whitespace.
         // The dedicated ws-sensitive if/each builders already hug; this also gates

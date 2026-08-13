@@ -665,6 +665,29 @@ impl<'arena> SpecialElementKind<'arena> {
         )
     }
 
+    /// Whether this kind's **content** prints verbatim — the whitespace-sensitive class, which
+    /// for regular elements is `tsv_html::preserves_whitespace` (`<pre>` / `<textarea>`).
+    ///
+    /// Exactly one special kind joins it. A `TitleElement` — `<title>` as a (transparent) child
+    /// of `<svelte:head>` — is compiled by visitors that walk `fragment.nodes` **directly**
+    /// (`$$renderer.title(…)` on the server, a `document.title` assignment on the client), so
+    /// `clean_nodes` never runs over its children and every byte between the tags reaches the
+    /// page. The two predicates together are the whole verbatim set, and every reader of "does
+    /// the printer own this whitespace?" must consult both — the printer's dispatch and the
+    /// audits that mirror it alike, since an audit excluding a different set than the printer
+    /// emits either accuses the author's bytes or blinds itself to the printer's.
+    ///
+    /// ⚠️ This is about the element's **interior**. The `clean_nodes` **hoist** is a separate
+    /// fact that still applies to a `TitleElement`: it is lifted out of its parent fragment, so
+    /// the run between it and a *sibling* is a fragment edge and is deleted.
+    ///
+    /// Readers walking the public wire AST ask the same question of a node's `"TitleElement"`
+    /// type string, there being no kind enum on that side.
+    #[inline]
+    pub const fn preserves_content_whitespace(&self) -> bool {
+        matches!(self, Self::TitleElement)
+    }
+
     /// Returns the tag name as it appears in source code
     #[inline]
     pub const fn tag_name(&self) -> &'static str {

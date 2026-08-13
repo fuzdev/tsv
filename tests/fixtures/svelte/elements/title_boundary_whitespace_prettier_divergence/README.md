@@ -13,11 +13,14 @@ whitespace model), so the spaced authoring is a prettier-stable form tsv normali
   cases to the glued `input.svelte`.
 
 The contrast is the **TitleElement** form — `<title>` as a direct/transparent child of
-`<svelte:head>` — where prettier trims the boundary spaces too, so only the regular form
-diverges. That agreement is pinned by
-[`special_elements/title_in_head`](../../special_elements/title_in_head/)'s
-`unformatted_spaces.svelte` (its RegularElement case is deliberately left unpadded there,
-because this fixture owns the divergence).
+`<svelte:head>` — and there the two formatters swap sides: `clean_nodes` never runs on a
+`TitleElement`'s children, so its boundary runs are rendered bytes, tsv preserves them and
+**prettier** is the one that trims. Pinned by
+[`special_elements/title_content_verbatim`](../../special_elements/title_content_verbatim_prettier_divergence/);
+the positional classification itself by
+[`special_elements/title_in_head`](../../special_elements/title_in_head/). So the tag name
+decides nothing here and the position decides everything — which is why this fixture's own
+cases are the bare-root and inside-a-regular-element ones.
 
 ## Reason
 

@@ -1022,11 +1022,25 @@ fn test_command_name_is_independent_of_argv0() {
     let renamed = dir.join(format!("tsv_renamed{}", std::env::consts::EXE_SUFFIX));
     fs::copy(built_tsv(), &renamed).expect("Failed to copy the tsv binary");
 
+    // ⚠️ Retry on ETXTBSY. `fs::copy` above closes its destination handle before
+    // returning, but this harness runs tests on parallel threads and most of them
+    // spawn a child process: between another thread's fork and its exec the child
+    // holds a *copy* of every open descriptor, so a fork that straddles the copy
+    // leaves the new inode write-open in that child until it execs. The kernel's
+    // check is on the inode's writecount, so exec'ing the fresh binary in that
+    // window fails with `ExecutableFileBusy` — a race in the harness, never in
+    // the binary. The window closes with the other child's exec, so a bounded
+    // retry is the fix; the copy itself cannot avoid it.
     let run = |args: &[&str]| {
-        Command::new(&renamed)
-            .args(args)
-            .output()
-            .expect("Failed to execute the renamed tsv binary")
+        for _ in 0..50 {
+            match Command::new(&renamed).args(args).output() {
+                Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+                result => return result.expect("Failed to execute the renamed tsv binary"),
+            }
+        }
+        panic!("the renamed tsv binary stayed ExecutableFileBusy for a second");
     };
 
     let help = run(&["help", "format"]);
