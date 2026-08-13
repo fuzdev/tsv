@@ -1,5 +1,6 @@
 //! The wire-tree **node-edge** walker: the enclosing AST node and child-role
-//! span-containment lookup behind `gap_audit --by-node`'s coarse emitter rollup.
+//! span-containment lookup behind `gap_audit --by-node`'s coarse emitter rollup and the
+//! key of `blank_audit`'s absorb pin (`blank_absorb_known.txt`).
 //!
 //! Walks a parsed wire tree (see
 //! [`tsv_parse_to_value`](crate::audit::properties::tsv_parse_to_value)) to find the
@@ -29,7 +30,11 @@ use crate::audit::properties::Utf16ToByte;
 /// `(VariableDeclarator, id→init)` the `=`-gap, `(ImportDeclaration, ^→specifiers)` the
 /// `import⟨⟩{` gap.
 ///
-/// Report-only: nothing here feeds the ratchet key or the snapshot.
+/// Two consumers, split by role: in `gap_audit` the key is REPORT-ONLY (the `--by-node`
+/// rollup — never the ratchet key), while `blank_audit`'s absorb pin SNAPSHOTS it
+/// (`blank_absorb_known.txt`): there ~80% of injections hit, so the fine token shape would
+/// pin the corpus's whole token-adjacency vocabulary and churn on every fixture PR — the
+/// coarse emitter grain is exactly what keeps that pin stable.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub(crate) struct NodeEdgeKey {
     pub(crate) node_type: String,
