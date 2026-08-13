@@ -1,0 +1,688 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 164,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 30,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 5,
+							"end": 24,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 6,
+								"end": 23,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 6
+									},
+									"end": {
+										"line": 1,
+										"column": 23
+									}
+								},
+								"left": {
+									"type": "UpdateExpression",
+									"start": 6,
+									"end": 10,
+									"loc": {
+										"start": {
+											"line": 1,
+											"column": 6
+										},
+										"end": {
+											"line": 1,
+											"column": 10
+										}
+									},
+									"operator": "++",
+									"prefix": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 6,
+										"end": 8,
+										"loc": {
+											"start": {
+												"line": 1,
+												"column": 6
+											},
+											"end": {
+												"line": 1,
+												"column": 8
+											}
+										},
+										"name": "aa"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 11,
+											"end": 18
+										}
+									]
+								},
+								"operator": "/",
+								"right": {
+									"type": "Identifier",
+									"start": 21,
+									"end": 23,
+									"loc": {
+										"start": {
+											"line": 1,
+											"column": 21
+										},
+										"end": {
+											"line": 1,
+											"column": 23
+										}
+									},
+									"name": "bb"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 30,
+				"end": 31,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 31,
+				"end": 61,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 32
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 35
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 36,
+							"end": 55,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 37,
+								"end": 54,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 6
+									},
+									"end": {
+										"line": 2,
+										"column": 23
+									}
+								},
+								"left": {
+									"type": "CallExpression",
+									"start": 37,
+									"end": 41,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 6
+										},
+										"end": {
+											"line": 2,
+											"column": 10
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 37,
+										"end": 39,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 6
+											},
+											"end": {
+												"line": 2,
+												"column": 8
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 42,
+											"end": 49
+										}
+									]
+								},
+								"operator": "/",
+								"right": {
+									"type": "Identifier",
+									"start": 52,
+									"end": 54,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 21
+										},
+										"end": {
+											"line": 2,
+											"column": 23
+										}
+									},
+									"name": "bb"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 61,
+				"end": 62,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 62,
+				"end": 94,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 63
+					},
+					"end": {
+						"line": 3,
+						"column": 4,
+						"character": 66
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 67,
+							"end": 88,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 68,
+								"end": 87,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 6
+									},
+									"end": {
+										"line": 3,
+										"column": 25
+									}
+								},
+								"left": {
+									"type": "MemberExpression",
+									"start": 68,
+									"end": 74,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 6
+										},
+										"end": {
+											"line": 3,
+											"column": 12
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 68,
+										"end": 71,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 6
+											},
+											"end": {
+												"line": 3,
+												"column": 9
+											}
+										},
+										"name": "arr"
+									},
+									"property": {
+										"type": "Literal",
+										"start": 72,
+										"end": 73,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 10
+											},
+											"end": {
+												"line": 3,
+												"column": 11
+											}
+										},
+										"value": 0,
+										"raw": "0"
+									},
+									"computed": true,
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 75,
+											"end": 82
+										}
+									]
+								},
+								"operator": "/",
+								"right": {
+									"type": "Identifier",
+									"start": 85,
+									"end": 87,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 23
+										},
+										"end": {
+											"line": 3,
+											"column": 25
+										}
+									},
+									"name": "bb"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 94,
+				"end": 95,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 95,
+				"end": 123,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 96
+					},
+					"end": {
+						"line": 4,
+						"column": 4,
+						"character": 99
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 100,
+							"end": 117,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 101,
+								"end": 116,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 6
+									},
+									"end": {
+										"line": 4,
+										"column": 21
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 101,
+									"end": 103,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 6
+										},
+										"end": {
+											"line": 4,
+											"column": 8
+										}
+									},
+									"name": "aa",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 104,
+											"end": 111
+										}
+									]
+								},
+								"operator": "/",
+								"right": {
+									"type": "Identifier",
+									"start": 114,
+									"end": 116,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 19
+										},
+										"end": {
+											"line": 4,
+											"column": 21
+										}
+									},
+									"name": "bb"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 123,
+				"end": 124,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 124,
+				"end": 163,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 125
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 128
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 129,
+							"end": 157,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 130,
+								"end": 156,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 6
+									},
+									"end": {
+										"line": 5,
+										"column": 32
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 130,
+									"end": 132,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 6
+										},
+										"end": {
+											"line": 5,
+											"column": 8
+										}
+									},
+									"name": "aa"
+								},
+								"operator": "+",
+								"right": {
+									"type": "CallExpression",
+									"start": 143,
+									"end": 156,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 19
+										},
+										"end": {
+											"line": 5,
+											"column": 32
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 143,
+										"end": 152,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 19
+											},
+											"end": {
+												"line": 5,
+												"column": 28
+											}
+										},
+										"object": {
+											"type": "Literal",
+											"start": 143,
+											"end": 147,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 19
+												},
+												"end": {
+													"line": 5,
+													"column": 23
+												}
+											},
+											"value": {},
+											"raw": "/re/",
+											"regex": {
+												"pattern": "re",
+												"flags": ""
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 148,
+											"end": 152,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 24
+												},
+												"end": {
+													"line": 5,
+													"column": 28
+												}
+											},
+											"name": "test"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 153,
+											"end": 155,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 29
+												},
+												"end": {
+													"line": 5,
+													"column": 31
+												}
+											},
+											"name": "bb"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 135,
+											"end": 142
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 11,
+			"end": 18,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 11
+				},
+				"end": {
+					"line": 1,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 42,
+			"end": 49,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 11
+				},
+				"end": {
+					"line": 2,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 75,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 13
+				},
+				"end": {
+					"line": 3,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 104,
+			"end": 111,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 9
+				},
+				"end": {
+					"line": 4,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 135,
+			"end": 142,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 11
+				},
+				"end": {
+					"line": 5,
+					"column": 18
+				}
+			}
+		}
+	]
+}

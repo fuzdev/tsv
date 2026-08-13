@@ -110,10 +110,9 @@ impl<'a> Printer<'a> {
         let alt_start = alternate.span().start;
         let flush_with_else = match alternate {
             Statement::BlockStatement(_) => true,
-            Statement::IfStatement(_) => !self
-                .partition_comments_by_line(else_end, alt_start)
-                .0
-                .is_empty(),
+            Statement::IfStatement(_) => {
+                self.has_anchor_trailing_comment_between(else_end, alt_start)
+            }
             _ => false,
         };
         parts.push(d.text(if leading_space { " else" } else { "else" }));

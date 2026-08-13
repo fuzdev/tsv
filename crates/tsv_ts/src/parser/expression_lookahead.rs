@@ -12,7 +12,10 @@ use super::scan::{
     is_identifier_start, is_word_at, skip_identifier, skip_numeric_literal,
     skip_whitespace_and_comments,
 };
-use tsv_lang::source_scan::{TriviaProfile, is_regex_start, skip_regex_literal, skip_trivia};
+use tsv_lang::source_scan::{
+    TriviaProfile, is_regex_start_after, operand_end_after, skip_regex_literal, skip_trivia,
+    trivia_ends_operand,
+};
 
 /// `<` at `pos` is `<=` comparison operator, not an angle bracket open
 #[inline]
@@ -57,19 +60,25 @@ pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
     let end = bytes.len();
     let mut pos = start;
     let mut depth = 0;
+    // Just past the last significant byte — the anchor `is_regex_start_after` reads.
+    let mut operand_end = start;
     while pos < end {
         // Strings, templates, and comments are opaque — a `(`/`)` inside one is
         // not a real delimiter. The shared cursor skips all three in one place
         // (including backtick templates, which this scan historically missed).
         if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            if trivia_ends_operand(bytes, pos) {
+                operand_end = past;
+            }
             pos = past;
             continue;
         }
         // Regex literals are the one trivia kind the cursor leaves significant
-        // (it needs backward token lookback). Skip a real regex so a `)`/`(`
+        // (it needs previous-token context). Skip a real regex so a `)`/`(`
         // inside its pattern isn't counted — e.g. a param default `(a = /\)/)`.
-        if bytes[pos] == b'/' && is_regex_start(bytes, pos, start) {
+        if bytes[pos] == b'/' && is_regex_start_after(bytes, operand_end, start) {
             pos = skip_regex_literal(bytes, pos, end);
+            operand_end = pos;
             continue;
         }
         match bytes[pos] {
@@ -82,6 +91,7 @@ pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
             }
             _ => {}
         }
+        operand_end = operand_end_after(bytes, pos, operand_end);
         pos += 1;
     }
     false
@@ -115,13 +125,20 @@ pub(super) fn paren_pattern_then_type_operator(bytes: &[u8], start: usize) -> bo
     };
     let close = if open == b'{' { b'}' } else { b']' };
     let mut depth = 0usize;
+    // Just past the last significant byte — the anchor `is_regex_start_after` reads.
+    // The `(` at `start` is significant, and the scan begins past it.
+    let mut operand_end = start + 1;
     while pos < end {
         if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            if trivia_ends_operand(bytes, pos) {
+                operand_end = past;
+            }
             pos = past;
             continue;
         }
-        if bytes[pos] == b'/' && is_regex_start(bytes, pos, start) {
+        if bytes[pos] == b'/' && is_regex_start_after(bytes, operand_end, start) {
             pos = skip_regex_literal(bytes, pos, end);
+            operand_end = pos;
             continue;
         }
         let b = bytes[pos];
@@ -134,6 +151,7 @@ pub(super) fn paren_pattern_then_type_operator(bytes: &[u8], start: usize) -> bo
                 return matches!(bytes.get(next), Some(b'|' | b'&'));
             }
         }
+        operand_end = operand_end_after(bytes, pos, operand_end);
         pos += 1;
     }
     false

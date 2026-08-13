@@ -178,8 +178,8 @@ impl<'a> Printer<'a> {
             return;
         }
 
-        let (inline_prev, own_line, inline_next) =
-            self.partition_comments_by_line(paren_end, body_start);
+        let (inline_prev, own_line) =
+            self.partition_comments_trailing_vs_own_line(paren_end, body_start);
 
         parts.push(d.text(")"));
 
@@ -190,7 +190,7 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_comment_doc(comment));
             }
 
-            // Remaining comments (own_line + inline_next) go indented before body.
+            // Everything not trailing the `)` goes indented before the body.
             //
             // Separator-BEFORE form: the separator ahead of each comment is keyed on the
             // PREVIOUS comment, and the one before the body on the last — identical to
@@ -211,7 +211,7 @@ impl<'a> Printer<'a> {
             };
             let mut inner = DocBuf::new();
             let mut prev: Option<&Comment> = None;
-            for comment in own_line.into_iter().chain(inline_next) {
+            for comment in own_line {
                 match prev {
                     None => inner.push(d.hardline()),
                     Some(p) => {

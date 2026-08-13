@@ -21,13 +21,14 @@
 /// is off, which keeps a JS-shaped cursor from mis-reading CSS.
 ///
 /// Regex literals are deliberately **not** a profile option here: a `/…/` needs
-/// previous-token lookback to tell it from division, which a stateless forward
+/// previous-token context to tell it from division, which a stateless forward
 /// `skip_trivia` can't carry as a flag. The disambiguation lives in the separate
-/// [`is_regex_start`] / [`skip_regex_literal`] helpers below, which the
-/// depth-tracking scanners that *do* sit at a regex boundary (the Svelte brace
-/// matcher, the TS arrow-vs-paren lookahead) call alongside `skip_trivia`. A
-/// plain inter-node delimiter scan never sits at a regex boundary in practice,
-/// matching the historical `skip_string_or_comment`.
+/// [`is_regex_start_after`] / [`skip_regex_literal`] helpers below, which the
+/// depth-tracking scanners that *do* sit at a regex boundary (the printer's paren
+/// scan, the Svelte brace matcher, the TS arrow-vs-paren lookahead) call alongside
+/// `skip_trivia`, threading the operand-end anchor themselves. A plain inter-node
+/// delimiter scan never sits at a regex boundary in practice, matching the
+/// historical `skip_string_or_comment`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TriviaProfile {
     /// `//` to end of line (the newline is consumed as part of the span).
@@ -378,49 +379,93 @@ pub fn rfind_keyword(
     found
 }
 
-/// Whether the `/` at `slash_pos` starts a regex literal (rather than a division
-/// operator). Decided by the previous significant byte, walking back to
-/// `lower_bound`: a `/` after something that *ends* an expression (identifier
-/// char, `)`, `]`, or a string/template closing quote `'` `"` `` ` ``) is
-/// division; after anything else (or at the start) it is a regex. Callers run
-/// [`skip_trivia`] first, which consumes complete strings/templates, so a quote
-/// immediately before a significant `/` is always a *closing* quote.
+/// Whether a trivia span opening at `i` **ends an operand** — a string or
+/// template literal does (`'ab' / 2` divides), a comment does not (it is
+/// transparent, and the operand before it still governs).
+///
+/// The discriminator is the opener byte, because [`skip_trivia`] returns the
+/// same `Some(past)` for both kinds. Depth-tracking scanners call this to
+/// maintain the `operand_end` anchor [`is_regex_start_after`] reads; stating the
+/// rule once here is what keeps a scanner from silently treating a skipped
+/// string as if it were a comment.
+#[inline]
+pub fn trivia_ends_operand(bytes: &[u8], i: usize) -> bool {
+    matches!(bytes[i], b'"' | b'\'' | b'`')
+}
+
+/// The operand-end anchor after a scan consumes the significant byte at `i` —
+/// unchanged when that byte is whitespace, which ends no operand.
+///
+/// The whitespace case is the whole reason this is a named helper rather than a
+/// bare `operand_end = i + 1`: an anchor advanced over the space *after* a
+/// comment sits above the comment's own bytes, which is precisely the position a
+/// backward reader must never be handed.
+#[inline]
+#[must_use]
+pub fn operand_end_after(bytes: &[u8], i: usize, operand_end: usize) -> usize {
+    if bytes[i].is_ascii_whitespace() {
+        operand_end
+    } else {
+        i + 1
+    }
+}
+
+/// Whether a `/` starts a regex literal (rather than a division operator), given
+/// `operand_end` — the caller's scan position just past the last **non-trivia**
+/// byte it consumed before reaching the `/`.
+///
+/// Decided by the last non-whitespace byte at or below `operand_end`: a `/`
+/// after something that *ends* an expression (identifier char, `)`, `]`, a
+/// postfix `++`/`--`, or a string/template closing quote `'` `"` `` ` ``) is
+/// division; after anything else — or with nothing significant before it — it is
+/// a regex. `lower_bound` bounds both walks.
+///
+/// The anchor is read directly — there is no backward walk, which is the point:
+/// `bytes[operand_end - 1]` is a byte the caller's scan already classified as
+/// significant, so no reader here can wander into a comment. Callers maintain it
+/// with [`operand_end_after`] and [`trivia_ends_operand`].
 ///
 /// This is the one piece of `/`-disambiguation the trivia cursor deliberately
-/// leaves out of [`skip_trivia`]/[`TriviaProfile`]: it needs a *backward*
-/// raw-byte walk, which a stateless forward scan can't honor as a flag. So it
-/// lives here as a standalone helper that the depth-tracking scanners
-/// (Svelte's brace matcher, the TS arrow-vs-paren lookahead) call alongside
-/// `skip_trivia`, lower-bounding the walk at their own scan start.
+/// leaves out of [`skip_trivia`]/[`TriviaProfile`]: it needs previous-**token**
+/// context, which a stateless forward scan can't carry as a flag. So the
+/// depth-tracking scanners that sit at a regex boundary (the printer's paren
+/// scan, Svelte's brace matcher, the TS arrow-vs-paren lookahead) thread the
+/// anchor themselves — updating it past every significant byte, past a skipped
+/// regex or template, and past a skipped string but **not** a comment
+/// ([`trivia_ends_operand`]).
+///
+/// ⚠️ It takes the anchor rather than the `/`'s own position because deriving
+/// one by walking *backward* cannot see trivia: a block comment before the
+/// slash (`fn() /* c */ / bb`) puts the `/` of its `*/` in the lookback slot,
+/// which ends no operand, so the division read as a regex and the scan ran on
+/// to some unrelated delimiter — losing the `)` a paren scan was looking for,
+/// and rejecting a Svelte `{…}` tag outright.
 #[inline]
-pub fn is_regex_start(bytes: &[u8], slash_pos: usize, lower_bound: usize) -> bool {
-    let mut j = slash_pos;
-    while j > lower_bound {
-        j -= 1;
-        let b = bytes[j];
-        if !b.is_ascii_whitespace() {
-            // An identifier byte usually ends an operand (`a / 2` divides), but a
-            // whole RESERVED word ending here is an operator, and a `/` after an
-            // operator opens a regex (`typeof /re/`, `void /re/`, `'a' in /re/`).
-            if is_identifier_byte(b) {
-                return word_before_regex(bytes, j + 1, lower_bound);
-            }
-            // A postfix `++`/`--` ends an operand, so the `/` after it DIVIDES
-            // (`aa++ / bb`). A lone `+`/`-` is a binary or unary operator, after
-            // which a regex may start (`aa + /re/.test(b)`), so the doubling is
-            // the whole discriminator.
-            if matches!(b, b'+' | b'-') && j > lower_bound && bytes[j - 1] == b {
-                return false;
-            }
-            // Bytes that END an expression — a `/` after these is DIVISION. The
-            // string/template closing quotes (`'` `"` `` ` ``) belong here: after a
-            // literal like `'ab' / 2`, the `/` divides (skip_trivia already ate the
-            // whole string, so this quote can only be its close).
-            return !(b == b')' || b == b']' || b == b'\'' || b == b'"' || b == b'`');
-        }
-    }
+pub fn is_regex_start_after(bytes: &[u8], operand_end: usize, lower_bound: usize) -> bool {
     // Nothing significant before it (start of the scanned region) → regex.
-    true
+    if operand_end <= lower_bound {
+        return true;
+    }
+    let j = operand_end - 1;
+    let b = bytes[j];
+    // An identifier byte usually ends an operand (`a / 2` divides), but a
+    // whole RESERVED word ending here is an operator, and a `/` after an
+    // operator opens a regex (`typeof /re/`, `void /re/`, `'a' in /re/`).
+    if is_identifier_byte(b) {
+        return word_before_regex(bytes, operand_end, lower_bound);
+    }
+    // A postfix `++`/`--` ends an operand, so the `/` after it DIVIDES
+    // (`aa++ / bb`). A lone `+`/`-` is a binary or unary operator, after
+    // which a regex may start (`aa + /re/.test(b)`), so the doubling is
+    // the whole discriminator.
+    if matches!(b, b'+' | b'-') && j > lower_bound && bytes[j - 1] == b {
+        return false;
+    }
+    // Bytes that END an expression — a `/` after these is DIVISION. The
+    // string/template closing quotes (`'` `"` `` ` ``) belong here: after a
+    // literal like `'ab' / 2`, the `/` divides (the anchor sits past the whole
+    // string, so this quote can only be its close).
+    !(b == b')' || b == b']' || b == b'\'' || b == b'"' || b == b'`')
 }
 
 /// Whether the identifier ending at `word_end` (exclusive) is a reserved word an
@@ -467,14 +512,48 @@ fn word_before_regex(bytes: &[u8], word_end: usize, lower_bound: usize) -> bool 
         return false;
     }
     // `.name` / `?.name` — a member access, so the word is an operand.
+    //
+    // This is the one lookback the caller's forward anchor can't supply: it asks
+    // about the token *before* the word, not the one the anchor marks. So it
+    // walks back, and must step over a block comment written in that gap
+    // (`a./* c */in / bb`) — landing on the `/` of a `*/` would read as "no dot"
+    // and turn the member access into an operator, i.e. the division into a
+    // regex. A line comment can't sit here: it would swallow the word.
     let mut j = start;
     while j > lower_bound {
         j -= 1;
+        if let Some(open) = block_comment_start_before(bytes, j, lower_bound) {
+            j = open;
+            continue;
+        }
         if !bytes[j].is_ascii_whitespace() {
             return bytes[j] != b'.';
         }
     }
     true
+}
+
+/// If `bytes[j]` is the `/` closing a block comment, the index of that comment's
+/// opening `/` — so a backward walk can step over it. `None` when `j` isn't a
+/// comment close, or no opener is found above `lower_bound`.
+///
+/// Backward matching is only sound because JS block comments don't nest; a `/*`
+/// inside a comment *body* can still be found first, which leaves the walk
+/// inside the comment rather than past it — no worse than not stepping at all,
+/// and the reason forward anchoring ([`is_regex_start_after`]) is preferred
+/// wherever the caller can supply one.
+fn block_comment_start_before(bytes: &[u8], j: usize, lower_bound: usize) -> Option<usize> {
+    if bytes[j] != b'/' || j < lower_bound + 2 || bytes[j - 1] != b'*' {
+        return None;
+    }
+    let mut k = j - 1;
+    while k > lower_bound {
+        k -= 1;
+        if bytes[k] == b'*' && k > lower_bound && bytes[k - 1] == b'/' {
+            return Some(k - 1);
+        }
+    }
+    None
 }
 
 /// Skip past a regex literal whose opening `/` is at `start`, returning the
@@ -483,7 +562,7 @@ fn word_before_regex(bytes: &[u8], word_end: usize, lower_bound: usize) -> bool 
 /// character class is a literal, not the terminator. An unterminated literal
 /// returns `end`.
 ///
-/// Pairs with [`is_regex_start`] — the caller confirms the `/` is a regex
+/// Pairs with [`is_regex_start_after`] — the caller confirms the `/` is a regex
 /// before skipping. Caller must ensure `start < end <= bytes.len()`.
 #[inline]
 pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
@@ -524,7 +603,7 @@ pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
 /// if the braces don't balance before `end`.
 ///
 /// Expression-context aware: strings and line/block comments are skipped via
-/// [`skip_trivia`] (JS), regex literals via [`is_regex_start`] / [`skip_regex_literal`],
+/// [`skip_trivia`] (JS), regex literals via [`is_regex_start_after`] / [`skip_regex_literal`],
 /// and template literals — interpolation and all — via [`skip_template_literal`], so
 /// a `}` inside any of them is inert. The shared core behind Svelte's `{…}`-tag
 /// matcher (`tsv_svelte`'s `scan_to_matching_brace`) and the `${…}` interpolation
@@ -534,17 +613,25 @@ pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
 pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Option<usize> {
     let mut depth: u32 = 1;
     let mut i = scan_start;
+    // Just past the last significant byte — the anchor `is_regex_start_after`
+    // reads. A template literal ends an operand, as does a skipped regex.
+    let mut operand_end = scan_start;
     while i < end {
         if bytes[i] == b'`' {
             i = skip_template_literal(bytes, i, end);
+            operand_end = i;
             continue;
         }
         if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+            if trivia_ends_operand(bytes, i) {
+                operand_end = past;
+            }
             i = past;
             continue;
         }
-        if bytes[i] == b'/' && i + 1 < end && is_regex_start(bytes, i, scan_start) {
+        if bytes[i] == b'/' && i + 1 < end && is_regex_start_after(bytes, operand_end, scan_start) {
             i = skip_regex_literal(bytes, i, end);
+            operand_end = i;
             continue;
         }
         match bytes[i] {
@@ -557,6 +644,7 @@ pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Op
             }
             _ => {}
         }
+        operand_end = operand_end_after(bytes, i, operand_end);
         i += 1;
     }
     None
@@ -736,11 +824,36 @@ mod tests {
         assert_eq!(s("`${abc"), 6); // unterminated interpolation
     }
 
+    /// What a depth-tracking scanner does, in miniature: walk forward to the `/`
+    /// at `slash_pos`, maintaining the `operand_end` anchor, then ask. The tests
+    /// grade this composition rather than a hand-computed anchor, because the
+    /// bug class lives in the hand-off — a scanner that lets a skipped *comment*
+    /// advance the anchor (or fails to advance it past a skipped *string*) gets
+    /// the right answer from a wrong premise.
+    fn regex_at(src: &str, slash_pos: usize, lower_bound: usize) -> bool {
+        let bytes = src.as_bytes();
+        let end = bytes.len();
+        let mut i = lower_bound;
+        let mut operand_end = lower_bound;
+        while i < slash_pos {
+            if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+                if trivia_ends_operand(bytes, i) {
+                    operand_end = past;
+                }
+                i = past;
+                continue;
+            }
+            operand_end = operand_end_after(bytes, i, operand_end);
+            i += 1;
+        }
+        is_regex_start_after(bytes, operand_end, lower_bound)
+    }
+
     #[test]
     fn is_regex_start_division_after_string_close() {
         // A `/` after a string/template closing quote is DIVISION, not a regex.
         // `lower_bound` = 0; the `/` position is the last byte.
-        let div = |src: &str| !is_regex_start(src.as_bytes(), src.len() - 1, 0);
+        let div = |src: &str| !regex_at(src, src.len() - 1, 0);
         assert!(div("'ab' /")); // single-quote close
         assert!(div("\"ab\" /")); // double-quote close
         assert!(div("`ab` /")); // template close
@@ -953,17 +1066,58 @@ mod tests {
     #[test]
     fn is_regex_start_uses_previous_significant_byte() {
         // `= /re/` — `/` after `=` (and whitespace) is a regex.
-        assert!(is_regex_start(b"a = /re/", 4, 0));
+        assert!(regex_at("a = /re/", 4, 0));
         // `a / b` — `/` after identifier `a` is division.
-        assert!(!is_regex_start(b"a / b", 2, 0));
+        assert!(!regex_at("a / b", 2, 0));
         // `) / b` — `/` after `)` is division; `] / b` likewise.
-        assert!(!is_regex_start(b") / b", 2, 0));
-        assert!(!is_regex_start(b"] / b", 2, 0));
+        assert!(!regex_at(") / b", 2, 0));
+        assert!(!regex_at("] / b", 2, 0));
         // At the lower bound (nothing significant before) → regex.
-        assert!(is_regex_start(b"/re/", 0, 0));
-        // The lower bound is honored: even though `(` precedes, a walk bounded
+        assert!(regex_at("/re/", 0, 0));
+        // The lower bound is honored: even though `(` precedes, a scan bounded
         // at the `/` itself sees nothing before it → regex.
-        assert!(is_regex_start(b"(/re/", 1, 1));
+        assert!(regex_at("(/re/", 1, 1));
+    }
+
+    #[test]
+    fn is_regex_start_sees_through_a_comment_to_the_operand() {
+        // A comment is transparent: the operand BEFORE it still decides, so each
+        // of these `/`s divides. Walking backward from the slash instead lands on
+        // the `/` of the `*/`, which ends no operand — and read the division as a
+        // regex, running the enclosing scan on to some unrelated delimiter.
+        for src in [
+            "aa++ /* c */ /",
+            "aa-- /* c */ /",
+            "fn() /* c */ /",
+            "arr[0] /* c */ /",
+            "aa /* c */ /",
+            "'ab' /* c */ /",
+            "`ab` /* c */ /",
+            "aa /* c1 */ /* c2 */ /",
+            "aa // c\n/",
+        ] {
+            assert!(
+                !regex_at(src, src.len() - 1, 0),
+                "expected division: {src:?}"
+            );
+        }
+
+        // ...and the operator cases stay regexes through a comment.
+        for src in [
+            "= /* c */ /",
+            "aa + /* c */ /",
+            "typeof /* c */ /",
+            "( /* c */ /",
+        ] {
+            assert!(regex_at(src, src.len() - 1, 0), "expected regex: {src:?}");
+        }
+
+        // A reserved word used as a PROPERTY NAME is an operand even with the
+        // comment between the `.` and the name — the one lookback the forward
+        // anchor can't supply, so it steps back over the comment itself.
+        assert!(!regex_at("a./* c */in /", 12, 0));
+        // ...while a comment before a genuine operator keyword leaves it one.
+        assert!(regex_at("/* c */ typeof /", 15, 0));
     }
 
     #[test]
@@ -972,7 +1126,7 @@ mod tests {
         // position — no scan needed to locate it.
         let at_slash = |prefix: &str, rest: &str| {
             let src = format!("{prefix}{rest}");
-            is_regex_start(src.as_bytes(), prefix.len(), 0)
+            regex_at(&src, prefix.len(), 0)
         };
 
         // A reserved word is an operator, so the `/` after it opens a regex.
