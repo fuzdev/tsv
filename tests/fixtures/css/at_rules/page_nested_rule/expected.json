@@ -156,6 +156,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " @page block is agnostic: a nested style rule parses alongside declarations ",
+				"start": 9,
+				"end": 89
+			},
+			{
+				"type": "CSSComment",
+				"value": " declarations, margin at-rules, and nested rules coexist in one @page block ",
+				"start": 137,
+				"end": 217
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 309,

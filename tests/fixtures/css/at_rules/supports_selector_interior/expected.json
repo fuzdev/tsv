@@ -494,6 +494,44 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A `:` inside selector() opens a pseudo-class, not a declaration value ",
+				"start": 9,
+				"end": 84
+			},
+			{
+				"type": "CSSComment",
+				"value": " A space before the pseudo-class is a descendant combinator ",
+				"start": 150,
+				"end": 214
+			},
+			{
+				"type": "CSSComment",
+				"value": " A functional pseudo-class keeps its name glued to the colon ",
+				"start": 281,
+				"end": 346
+			},
+			{
+				"type": "CSSComment",
+				"value": " `and` names a class here, so it is an identifier, not a boolean operator ",
+				"start": 418,
+				"end": 496
+			},
+			{
+				"type": "CSSComment",
+				"value": " The argument is a selector, normalized like one anywhere else ",
+				"start": 557,
+				"end": 624
+			},
+			{
+				"type": "CSSComment",
+				"value": " An argument that is not a selector at all stays as authored ",
+				"start": 847,
+				"end": 912
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 968,

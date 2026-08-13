@@ -81,6 +81,15 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " nested ",
+				"start": 53,
+				"end": 65,
+				"position": 16
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 119,

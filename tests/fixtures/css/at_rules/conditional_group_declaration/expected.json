@@ -137,6 +137,26 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Bare declarations parse directly in a conditional-group at-rule: CSS block\n\t   parsing is agnostic (CSS Syntax 3 §consume-a-block), so a declaration is\n\t   parsed here — parseCss keeps it. ",
+				"start": 9,
+				"end": 203
+			},
+			{
+				"type": "CSSComment",
+				"value": " A declaration in a conditional nested inside another conditional — the shape\n\t   @function/@mixin bodies use. ",
+				"start": 253,
+				"end": 368
+			},
+			{
+				"type": "CSSComment",
+				"value": " A conditional block mixing a declaration and a nested rule. ",
+				"start": 450,
+				"end": 515
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 587,

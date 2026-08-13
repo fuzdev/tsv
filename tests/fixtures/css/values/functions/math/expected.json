@@ -186,6 +186,38 @@
 				"end": 741
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comparison functions (CSS Values 4) ",
+				"start": 17,
+				"end": 58
+			},
+			{
+				"type": "CSSComment",
+				"value": " Stepped value functions (CSS Values 4) ",
+				"start": 158,
+				"end": 202
+			},
+			{
+				"type": "CSSComment",
+				"value": " Sign-related functions (CSS Values 4) ",
+				"start": 291,
+				"end": 334
+			},
+			{
+				"type": "CSSComment",
+				"value": " Trigonometric functions (CSS Values 4) ",
+				"start": 378,
+				"end": 422
+			},
+			{
+				"type": "CSSComment",
+				"value": " Exponential functions (CSS Values 5) ",
+				"start": 591,
+				"end": 633
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 742,

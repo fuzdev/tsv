@@ -372,6 +372,93 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A comment glued to a value takes a space on each side ",
+				"start": 9,
+				"end": 68
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 95,
+				"end": 102,
+				"position": 15
+			},
+			{
+				"type": "CSSComment",
+				"value": " The space after `:` is decided by the property name, past the comment ",
+				"start": 138,
+				"end": 213
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 230,
+				"end": 237,
+				"position": 5
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment trailing a nested condition ",
+				"start": 278,
+				"end": 321
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 354,
+				"end": 361,
+				"position": 21
+			},
+			{
+				"type": "CSSComment",
+				"value": " One space before a nested connector, not two ",
+				"start": 397,
+				"end": 447
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 476,
+				"end": 483,
+				"position": 17
+			},
+			{
+				"type": "CSSComment",
+				"value": " Two comments in the run stay one space apart ",
+				"start": 534,
+				"end": 584
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 613,
+				"end": 620,
+				"position": 17
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 621,
+				"end": 628,
+				"position": 18
+			},
+			{
+				"type": "CSSComment",
+				"value": " The same rule inside a function argument ",
+				"start": 679,
+				"end": 725
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 744,
+				"end": 751,
+				"position": 7
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 788,

@@ -30,6 +30,26 @@
 				"block": null
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline (both agree) ",
+				"start": 9,
+				"end": 52
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - we break the condition, Prettier stays inline ",
+				"start": 155,
+				"end": 218
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 chars - both break, at different points ",
+				"start": 327,
+				"end": 376
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 484,

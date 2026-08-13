@@ -106,6 +106,26 @@
 				"end": 556
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Attribute-selector names preserve escapes verbatim in the FORMATTED output (the\n\t   formatter must not decode them), and the AST `name` is half-decoded like Svelte's\n\t   read_identifier: hex escapes decode, identity escapes keep the `\\`. Mirrors\n\t   class/id/type (escaped_names) and pseudos (pseudo_escaped_identity). ",
+				"start": 9,
+				"end": 333
+			},
+			{
+				"type": "CSSComment",
+				"value": " hex escape: AST name decodes to \"Ab\"; formatter keeps the raw source ",
+				"start": 336,
+				"end": 410
+			},
+			{
+				"type": "CSSComment",
+				"value": " identity escape: AST name keeps the backslash (\"f\\oo\"); formatter keeps raw ",
+				"start": 441,
+				"end": 522
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 557,

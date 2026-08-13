@@ -1735,19 +1735,41 @@ export interface StyleSheet {
 	end: number;
 	attributes: unknown[];
 	children: unknown[];
+	comments: CSSComment[];
 	content: StyleContent;
 }
 
 /**
  * Standalone CSS file parse — what `parse_css` returns when CSS is not
  * embedded in a Svelte component. Matches Svelte's `parseCss(...)` output
- * shape: only `children` (no `attributes`/`content`).
+ * shape: `children` and `comments` (no `attributes`/`content`).
  */
 export interface StyleSheetFile {
 	type: 'StyleSheetFile';
 	start: number;
 	end: number;
 	children: unknown[];
+	comments: CSSComment[];
+}
+
+/**
+ * A CSS block comment, in source order on the stylesheet root — CSS comments
+ * are detached from the nodes around them rather than carried as children.
+ *
+ * `value` is the interior text, delimiters excluded.
+ */
+export interface CSSComment {
+	type: 'CSSComment';
+	value: string;
+	start: number;
+	end: number;
+	/**
+	 * Index into the containing declaration `value` or at-rule `prelude`
+	 * string — an ordinary JS string index (UTF-16 code units). Present only
+	 * for a comment lifted out of one, and measured before that string's
+	 * trailing trim, so it can point one past the end.
+	 */
+	position?: number;
 }
 
 /** Raw CSS text inside a `<style>` block. */

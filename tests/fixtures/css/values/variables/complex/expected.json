@@ -130,6 +130,38 @@
 				"end": 827
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " var() in calc() ",
+				"start": 21,
+				"end": 42
+			},
+			{
+				"type": "CSSComment",
+				"value": " var() in color functions ",
+				"start": 197,
+				"end": 227
+			},
+			{
+				"type": "CSSComment",
+				"value": " var() in functions with fallbacks in calc() ",
+				"start": 385,
+				"end": 434
+			},
+			{
+				"type": "CSSComment",
+				"value": " Complex composition ",
+				"start": 534,
+				"end": 559
+			},
+			{
+				"type": "CSSComment",
+				"value": " var() in gradients ",
+				"start": 727,
+				"end": 751
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 828,

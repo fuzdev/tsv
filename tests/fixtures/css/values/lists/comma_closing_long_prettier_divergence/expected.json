@@ -74,6 +74,46 @@
 				"end": 862
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comment routes the value to the source-extracting path; at 100 columns it stays inline ",
+				"start": 17,
+				"end": 111
+			},
+			{
+				"type": "CSSComment",
+				"value": " k ",
+				"start": 142,
+				"end": 149,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " one column more (101) breaks those arguments one per line, closing comma on the last ",
+				"start": 213,
+				"end": 303
+			},
+			{
+				"type": "CSSComment",
+				"value": " k ",
+				"start": 338,
+				"end": 345,
+				"position": 20
+			},
+			{
+				"type": "CSSComment",
+				"value": " a broken list reserves the `,;` its last element takes, so at 100 the element stays flat ",
+				"start": 428,
+				"end": 522
+			},
+			{
+				"type": "CSSComment",
+				"value": " one column more (101) and that element wraps at its space rather than overrunning ",
+				"start": 646,
+				"end": 733
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 863,

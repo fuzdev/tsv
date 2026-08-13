@@ -165,6 +165,74 @@
 				"end": 1466
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Font-family lists ",
+				"start": 17,
+				"end": 40
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple backgrounds ",
+				"start": 136,
+				"end": 162
+			},
+			{
+				"type": "CSSComment",
+				"value": " Transition properties ",
+				"start": 294,
+				"end": 321
+			},
+			{
+				"type": "CSSComment",
+				"value": " Animation properties ",
+				"start": 445,
+				"end": 471
+			},
+			{
+				"type": "CSSComment",
+				"value": " Text-shadow - multiple shadows ",
+				"start": 628,
+				"end": 664
+			},
+			{
+				"type": "CSSComment",
+				"value": " Box-shadow - space-separated values ",
+				"start": 763,
+				"end": 804
+			},
+			{
+				"type": "CSSComment",
+				"value": " Function with trailing values (triggers multiline) ",
+				"start": 894,
+				"end": 950
+			},
+			{
+				"type": "CSSComment",
+				"value": " One bad apple - mixed atomic and space-separated ",
+				"start": 1022,
+				"end": 1076
+			},
+			{
+				"type": "CSSComment",
+				"value": " Pure atomic values - stay inline ",
+				"start": 1117,
+				"end": 1155
+			},
+			{
+				"type": "CSSComment",
+				"value": " Custom properties - stay inline despite structure ",
+				"start": 1185,
+				"end": 1240
+			},
+			{
+				"type": "CSSComment",
+				"value": " Mixed values ",
+				"start": 1340,
+				"end": 1358
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1467,

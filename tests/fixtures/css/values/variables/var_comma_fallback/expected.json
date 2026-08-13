@@ -60,6 +60,20 @@
 				"end": 207
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the fallback is a comma token, not an empty fallback ",
+				"start": 16,
+				"end": 74
+			},
+			{
+				"type": "CSSComment",
+				"value": " an escaped comma is content, so this fallback is the single ident `x,` ",
+				"start": 99,
+				"end": 175
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 208,

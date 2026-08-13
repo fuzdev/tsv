@@ -156,6 +156,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " trailing1 ",
+				"start": 50,
+				"end": 65
+			},
+			{
+				"type": "CSSComment",
+				"value": " trailing2 ",
+				"start": 161,
+				"end": 176
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 198,

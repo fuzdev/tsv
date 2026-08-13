@@ -81,6 +81,38 @@
 				"end": 393
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Lone high surrogate (U+D800 - first in range) ",
+				"start": 17,
+				"end": 68
+			},
+			{
+				"type": "CSSComment",
+				"value": " Lone low surrogate (U+DFFF - last in range) ",
+				"start": 91,
+				"end": 140
+			},
+			{
+				"type": "CSSComment",
+				"value": " Surrogate pair sequence (two escapes, not combined) ",
+				"start": 163,
+				"end": 220
+			},
+			{
+				"type": "CSSComment",
+				"value": " Single codepoint form (proper way to write U+1F469) ",
+				"start": 248,
+				"end": 305
+			},
+			{
+				"type": "CSSComment",
+				"value": " Replacement character for reference ",
+				"start": 329,
+				"end": 370
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 394,

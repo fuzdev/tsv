@@ -67,6 +67,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " escaped @ in a supports condition value keeps its backslash ",
+				"start": 9,
+				"end": 74
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 130,

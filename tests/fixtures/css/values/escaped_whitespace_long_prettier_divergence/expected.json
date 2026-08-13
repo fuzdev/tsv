@@ -60,6 +60,20 @@
 				"end": 402
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars: fits exactly, stays inline (the escaped space is content, not a wrap point) ",
+				"start": 17,
+				"end": 109
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars: must break — but NOT on the escaped space, which is inside an ident ",
+				"start": 212,
+				"end": 296
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 403,

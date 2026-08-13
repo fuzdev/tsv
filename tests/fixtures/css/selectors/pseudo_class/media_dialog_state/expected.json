@@ -993,6 +993,56 @@
 				"end": 981
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Media playback states ",
+				"start": 9,
+				"end": 36
+			},
+			{
+				"type": "CSSComment",
+				"value": " Media loading states ",
+				"start": 158,
+				"end": 184
+			},
+			{
+				"type": "CSSComment",
+				"value": " Audio sound states ",
+				"start": 287,
+				"end": 311
+			},
+			{
+				"type": "CSSComment",
+				"value": " Display presentation states ",
+				"start": 406,
+				"end": 439
+			},
+			{
+				"type": "CSSComment",
+				"value": " Dialog/modal states ",
+				"start": 534,
+				"end": 559
+			},
+			{
+				"type": "CSSComment",
+				"value": " Web component states ",
+				"start": 653,
+				"end": 679
+			},
+			{
+				"type": "CSSComment",
+				"value": " Time-dimensional states (WebVTT) ",
+				"start": 725,
+				"end": 763
+			},
+			{
+				"type": "CSSComment",
+				"value": " Functional form ",
+				"start": 872,
+				"end": 893
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 982,

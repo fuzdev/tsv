@@ -252,6 +252,26 @@
 				"end": 286
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :is() forgiving list keeps a bare number as an Nth node (not dropped) ",
+				"start": 9,
+				"end": 84
+			},
+			{
+				"type": "CSSComment",
+				"value": " :not() list: a bare An+B is an Nth node ",
+				"start": 120,
+				"end": 165
+			},
+			{
+				"type": "CSSComment",
+				"value": " :has() relative list: a bare number is an Nth node ",
+				"start": 198,
+				"end": 254
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 287,

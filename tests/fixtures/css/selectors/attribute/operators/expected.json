@@ -406,6 +406,50 @@
 				"end": 511
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Exact match ",
+				"start": 9,
+				"end": 26
+			},
+			{
+				"type": "CSSComment",
+				"value": " Prefix match ",
+				"start": 64,
+				"end": 82
+			},
+			{
+				"type": "CSSComment",
+				"value": " Suffix match ",
+				"start": 122,
+				"end": 140
+			},
+			{
+				"type": "CSSComment",
+				"value": " Substring match ",
+				"start": 180,
+				"end": 201
+			},
+			{
+				"type": "CSSComment",
+				"value": " Whitespace list contains ",
+				"start": 246,
+				"end": 276
+			},
+			{
+				"type": "CSSComment",
+				"value": " Dash prefix match ",
+				"start": 320,
+				"end": 343
+			},
+			{
+				"type": "CSSComment",
+				"value": " Exact match, bare attribute selectors ",
+				"start": 382,
+				"end": 425
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 512,

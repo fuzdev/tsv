@@ -74,6 +74,32 @@
 				"end": 442
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a hex escape consumes one following whitespace as its terminator; that\n\t\t   space is part of the property-name token, so it's kept before the colon ",
+				"start": 17,
+				"end": 170
+			},
+			{
+				"type": "CSSComment",
+				"value": " no terminator whitespace — the colon ends the escape, so no space is added ",
+				"start": 186,
+				"end": 266
+			},
+			{
+				"type": "CSSComment",
+				"value": " terminator preserved when the escape ends a longer property name ",
+				"start": 283,
+				"end": 353
+			},
+			{
+				"type": "CSSComment",
+				"value": " custom property names keep the terminator too ",
+				"start": 372,
+				"end": 423
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 443,

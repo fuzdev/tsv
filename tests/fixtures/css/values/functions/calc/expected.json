@@ -158,6 +158,38 @@
 				"end": 656
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Basic calc() expressions ",
+				"start": 17,
+				"end": 47
+			},
+			{
+				"type": "CSSComment",
+				"value": " Nested calc() ",
+				"start": 159,
+				"end": 178
+			},
+			{
+				"type": "CSSComment",
+				"value": " Mixed units ",
+				"start": 262,
+				"end": 279
+			},
+			{
+				"type": "CSSComment",
+				"value": " Complex expressions ",
+				"start": 365,
+				"end": 390
+			},
+			{
+				"type": "CSSComment",
+				"value": " Zero and negative values ",
+				"start": 511,
+				"end": 541
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 657,

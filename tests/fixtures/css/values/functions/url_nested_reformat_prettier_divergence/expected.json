@@ -60,6 +60,20 @@
 				"end": 298
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " unquoted url() content is an opaque <url-token>; tsv keeps it verbatim, prettier adds a space after the comma inside the nested parens ",
+				"start": 15,
+				"end": 155
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier drops the whitespace inside the nested parens; tsv keeps it verbatim ",
+				"start": 185,
+				"end": 268
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 299,

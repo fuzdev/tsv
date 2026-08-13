@@ -1500,6 +1500,44 @@
 				"end": 1151
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :is() - 100 chars exactly - stays inline (at boundary) ",
+				"start": 9,
+				"end": 69
+			},
+			{
+				"type": "CSSComment",
+				"value": " :is() - 101 chars - wraps (exceeds print_width) ",
+				"start": 189,
+				"end": 242
+			},
+			{
+				"type": "CSSComment",
+				"value": " :not() - 100 chars exactly - stays inline (at boundary) ",
+				"start": 385,
+				"end": 446
+			},
+			{
+				"type": "CSSComment",
+				"value": " :not() - 101 chars - wraps (exceeds print_width) ",
+				"start": 568,
+				"end": 622
+			},
+			{
+				"type": "CSSComment",
+				"value": " :where() - 100 chars exactly - stays inline (at boundary) ",
+				"start": 767,
+				"end": 830
+			},
+			{
+				"type": "CSSComment",
+				"value": " :where() - 101 chars - wraps (exceeds print_width) ",
+				"start": 953,
+				"end": 1009
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1152,

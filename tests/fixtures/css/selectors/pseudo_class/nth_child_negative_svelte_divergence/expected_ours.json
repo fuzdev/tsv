@@ -330,6 +330,14 @@
 				"end": 358
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Spec-valid negative An+B forms (css-syntax-3 An+B microsyntax): a bare negative\n\t   <integer> B, a negative <n-dimension> A, a negative A with a negative offset,\n\t   and negative-zero. ",
+				"start": 9,
+				"end": 199
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 359,

@@ -165,6 +165,14 @@
 				"end": 165
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " relative list: bare first item (descendant), then combinator-leading tail items ",
+				"start": 9,
+				"end": 94
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 166,

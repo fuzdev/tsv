@@ -67,6 +67,26 @@
 				"end": 426
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " before boundary ",
+				"start": 17,
+				"end": 38
+			},
+			{
+				"type": "CSSComment",
+				"value": " after boundary ",
+				"start": 140,
+				"end": 160
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102+ chars - wraps to new line ",
+				"start": 266,
+				"end": 302
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 427,

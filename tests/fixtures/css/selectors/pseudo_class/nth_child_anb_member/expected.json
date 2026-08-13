@@ -499,6 +499,32 @@
 				"end": 678
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " An+B terms inside :nth-child() args are only recognized where terminated by\n\t   `)`/`,`/` of `; elsewhere the argument parses as an ordinary selector list, so\n\t   these structure like parseCss rather than one raw Nth value. ",
+				"start": 9,
+				"end": 238
+			},
+			{
+				"type": "CSSComment",
+				"value": " An+B in descendant position after a selector stays an Nth ",
+				"start": 240,
+				"end": 303
+			},
+			{
+				"type": "CSSComment",
+				"value": " an An+B keyword not terminated by `)`/`,`/` of ` reads as a type selector ",
+				"start": 393,
+				"end": 472
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comma makes the argument a selector list of An+B/selector terms ",
+				"start": 517,
+				"end": 588
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 679,

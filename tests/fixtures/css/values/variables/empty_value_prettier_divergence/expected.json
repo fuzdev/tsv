@@ -61,6 +61,26 @@
 				"end": 261
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Empty custom-property value: declaration-value whitespace is trimmed, ",
+				"start": 19,
+				"end": 94
+			},
+			{
+				"type": "CSSComment",
+				"value": " so the value is empty regardless of source spacing — normalized to a single space ",
+				"start": 97,
+				"end": 184
+			},
+			{
+				"type": "CSSComment",
+				"value": " Non-empty custom property is unaffected ",
+				"start": 196,
+				"end": 241
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 262,

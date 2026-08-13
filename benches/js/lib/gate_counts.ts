@@ -91,7 +91,7 @@ import type { Language } from './types.ts';
  */
 export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: string }> = {
 	'../svelte': {
-		commit: '44a781373',
+		commit: '20b341f10',
 		pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*'
 	},
 	'../acorn-typescript': { commit: '923b213', pins: 'TS_FIXTURES_PINS' },
@@ -114,7 +114,7 @@ export interface GatePins {
 }
 
 /** conformance:svelte-fixtures — `scanned` suite inputs + `both_accept`; provenance in `GATE_CHECKOUT_COMMITS`. */
-export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3387, both_accept: 3292 };
+export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3392, both_accept: 3297 };
 
 /** conformance:ts-fixtures — provenance in `GATE_CHECKOUT_COMMITS` (../acorn-typescript, oracle @sveltejs/acorn-typescript). */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202 };
@@ -351,7 +351,7 @@ export const TS_REPO_REJECTS_PIN = 519;
  * ../svelte at 8fb7ceeba, oracle svelte@5.56.4 (142 of 5648 conformance-view
  * Svelte files, re-verified after the ryanatkn.com + webdevladder.net + mdz
  * corpus additions — all their Svelte is valid); re-harvested unchanged at
- * ../svelte 44a781373, oracle svelte@5.56.8. Fewer = the svelte/compiler oracle stopped rejecting (broken
+ * ../svelte 20b341f10, oracle svelte@5.56.9. Fewer = the svelte/compiler oracle stopped rejecting (broken
  * import/config); more = it started rejecting wholesale — either way the cache
  * would corrupt the published coverage number.
  */

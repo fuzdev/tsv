@@ -45,6 +45,20 @@
 				"end": 67
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " only comments ",
+				"start": 21,
+				"end": 40
+			},
+			{
+				"type": "CSSComment",
+				"value": " no declarations ",
+				"start": 43,
+				"end": 64
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 68,

@@ -767,6 +767,164 @@
 				"end": 1037
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " descendant combinator gap ",
+				"start": 9,
+				"end": 40
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 46,
+				"end": 54
+			},
+			{
+				"type": "CSSComment",
+				"value": " child combinator, comment after ",
+				"start": 78,
+				"end": 115
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 121,
+				"end": 129
+			},
+			{
+				"type": "CSSComment",
+				"value": " child combinator, comment before ",
+				"start": 154,
+				"end": 192
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 196,
+				"end": 204
+			},
+			{
+				"type": "CSSComment",
+				"value": " next-sibling combinator ",
+				"start": 233,
+				"end": 262
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 269,
+				"end": 277
+			},
+			{
+				"type": "CSSComment",
+				"value": " subsequent-sibling combinator ",
+				"start": 302,
+				"end": 337
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 344,
+				"end": 352
+			},
+			{
+				"type": "CSSComment",
+				"value": " column combinator ",
+				"start": 377,
+				"end": 400
+			},
+			{
+				"type": "CSSComment",
+				"value": " c6 ",
+				"start": 409,
+				"end": 417
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment on both sides of the symbol ",
+				"start": 445,
+				"end": 486
+			},
+			{
+				"type": "CSSComment",
+				"value": " c7 ",
+				"start": 490,
+				"end": 498
+			},
+			{
+				"type": "CSSComment",
+				"value": " c8 ",
+				"start": 501,
+				"end": 509
+			},
+			{
+				"type": "CSSComment",
+				"value": " compound-internal glued (stays a compound) ",
+				"start": 535,
+				"end": 583
+			},
+			{
+				"type": "CSSComment",
+				"value": " c9 ",
+				"start": 587,
+				"end": 595
+			},
+			{
+				"type": "CSSComment",
+				"value": " glued compound, type + class (stays a compound) ",
+				"start": 622,
+				"end": 675
+			},
+			{
+				"type": "CSSComment",
+				"value": " c11 ",
+				"start": 680,
+				"end": 689
+			},
+			{
+				"type": "CSSComment",
+				"value": " glued compound, class + pseudo-class (stays a compound) ",
+				"start": 714,
+				"end": 775
+			},
+			{
+				"type": "CSSComment",
+				"value": " c12 ",
+				"start": 779,
+				"end": 788
+			},
+			{
+				"type": "CSSComment",
+				"value": " glued compound run across three members (each boundary stays glued) ",
+				"start": 817,
+				"end": 890
+			},
+			{
+				"type": "CSSComment",
+				"value": " c13 ",
+				"start": 894,
+				"end": 903
+			},
+			{
+				"type": "CSSComment",
+				"value": " c14 ",
+				"start": 905,
+				"end": 914
+			},
+			{
+				"type": "CSSComment",
+				"value": " relative-selector leading combinator in :has() ",
+				"start": 940,
+				"end": 992
+			},
+			{
+				"type": "CSSComment",
+				"value": " c10 ",
+				"start": 1001,
+				"end": 1010
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1038,

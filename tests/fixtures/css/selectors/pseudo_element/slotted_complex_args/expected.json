@@ -25,7 +25,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 69,
-											"end": 78
+											"end": 81,
+											"args": {
+												"type": "SelectorList",
+												"start": 79,
+												"end": 80,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 79,
+														"end": 80,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "0",
+																		"start": 79,
+																		"end": 80
+																	}
+																],
+																"start": 79,
+																"end": 80
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 69,
@@ -72,7 +100,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 103,
-											"end": 112
+											"end": 120,
+											"args": {
+												"type": "SelectorList",
+												"start": 113,
+												"end": 119,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 113,
+														"end": 119,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1",
+																		"start": 113,
+																		"end": 119
+																	}
+																],
+																"start": 113,
+																"end": 119
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 103,
@@ -119,7 +175,54 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 209,
-											"end": 218
+											"end": 235,
+											"args": {
+												"type": "SelectorList",
+												"start": 219,
+												"end": 234,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 219,
+														"end": 234,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class1",
+																		"start": 219,
+																		"end": 226
+																	}
+																],
+																"start": 219,
+																"end": 226
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 226,
+																	"end": 227
+																},
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class2",
+																		"start": 227,
+																		"end": 234
+																	}
+																],
+																"start": 226,
+																"end": 234
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 209,
@@ -166,7 +269,54 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 259,
-											"end": 268
+											"end": 287,
+											"args": {
+												"type": "SelectorList",
+												"start": 269,
+												"end": 286,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 269,
+														"end": 286,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class1",
+																		"start": 269,
+																		"end": 276
+																	}
+																],
+																"start": 269,
+																"end": 276
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": ">",
+																	"start": 277,
+																	"end": 278
+																},
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class2",
+																		"start": 279,
+																		"end": 286
+																	}
+																],
+																"start": 277,
+																"end": 286
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 259,
@@ -213,7 +363,54 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 347,
-											"end": 356
+											"end": 363,
+											"args": {
+												"type": "SelectorList",
+												"start": 357,
+												"end": 362,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 357,
+														"end": 362,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "*",
+																		"start": 357,
+																		"end": 358
+																	}
+																],
+																"start": 357,
+																"end": 358
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": ">",
+																	"start": 359,
+																	"end": 360
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "*",
+																		"start": 361,
+																		"end": 362
+																	}
+																],
+																"start": 359,
+																"end": 362
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 347,
@@ -260,7 +457,56 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 425,
-											"end": 434
+											"end": 452,
+											"args": {
+												"type": "SelectorList",
+												"start": 435,
+												"end": 451,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 435,
+														"end": 442,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class1",
+																		"start": 435,
+																		"end": 442
+																	}
+																],
+																"start": 435,
+																"end": 442
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 444,
+														"end": 451,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class2",
+																		"start": 444,
+																		"end": 451
+																	}
+																],
+																"start": 444,
+																"end": 451
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 425,
@@ -286,6 +532,32 @@
 				},
 				"start": 425,
 				"end": 474
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " bare number and An+B — the pseudo-arg Nth production ",
+				"start": 9,
+				"end": 67
+			},
+			{
+				"type": "CSSComment",
+				"value": " descendant and child combinators — a full complex selector ",
+				"start": 143,
+				"end": 207
+			},
+			{
+				"type": "CSSComment",
+				"value": " universal with a combinator ",
+				"start": 312,
+				"end": 345
+			},
+			{
+				"type": "CSSComment",
+				"value": " comma-separated selector list ",
+				"start": 388,
+				"end": 423
 			}
 		],
 		"content": {

@@ -165,6 +165,44 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Quoted URLs - single quotes ",
+				"start": 17,
+				"end": 50
+			},
+			{
+				"type": "CSSComment",
+				"value": " Quoted URLs - double quotes ",
+				"start": 130,
+				"end": 163
+			},
+			{
+				"type": "CSSComment",
+				"value": " Unquoted URLs ",
+				"start": 256,
+				"end": 275
+			},
+			{
+				"type": "CSSComment",
+				"value": " Data URIs - unquoted ",
+				"start": 389,
+				"end": 415
+			},
+			{
+				"type": "CSSComment",
+				"value": " Data URIs - quoted (commas inside quotes) ",
+				"start": 546,
+				"end": 593
+			},
+			{
+				"type": "CSSComment",
+				"value": " URLs with spaces (must be quoted) ",
+				"start": 701,
+				"end": 740
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 904,

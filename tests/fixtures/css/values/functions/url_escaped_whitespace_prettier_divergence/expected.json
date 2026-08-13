@@ -60,6 +60,20 @@
 				"end": 207
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escape INSIDE the url content: prettier keeps it ",
+				"start": 17,
+				"end": 74
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same escape at the END, where the payload abuts the closing paren ",
+				"start": 105,
+				"end": 180
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 208,

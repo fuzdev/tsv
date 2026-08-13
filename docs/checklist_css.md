@@ -76,6 +76,11 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
 - Comments in at-rules
 - Consecutive comments
 - Nested comment closing (spec-compliant)
+- Comments on the wire AST — `parseCss` hangs a flat, source-ordered `CSSComment[]` off both
+  stylesheet roots (`StyleSheet` / `StyleSheetFile`), carrying a `position` offset on any
+  comment it lifted out of a declaration `value` or an at-rule `prelude`. tsv emits the same
+  set; the internal AST keeps those comments in three separate places, so the writer rebuilds
+  the flat list (see [`crates/tsv_css/CLAUDE.md`](../crates/tsv_css/CLAUDE.md))
 - `format-ignore` / `prettier-ignore` directive (`/* format-ignore */` emits the next rule/declaration verbatim — see [directives.md](./directives.md))
 
 ### Escapes
@@ -701,4 +706,8 @@ Corrections](conformance_svelte.md#css-corrections); the classes are:
 - `;` inside a balanced construct — a function value, a simple block, a `var()`
   fallback, or an `@supports` `<general-enclosed>` — is content, not a terminator
 - Pseudo-element arguments (`::slotted()`, `::part()`) — internal parsing with
-  Svelte-compatible public output
+  Svelte-compatible public output. `parseCss` reads *every* pseudo-element argument as a
+  selector list and (since svelte 5.56.9) emits it as `PseudoElementSelector.args`; tsv
+  models `::part( <ident>+ )` per CSS Shadow Parts instead — an ident run, not selectors —
+  and projects it onto that selector-list shape at the wire boundary, so the public output
+  matches while the internal AST keeps the per-ident spans the printer needs

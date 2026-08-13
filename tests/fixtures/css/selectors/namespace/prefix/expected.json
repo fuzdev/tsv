@@ -301,6 +301,26 @@
 				"end": 343
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Type selectors with namespace ",
+				"start": 9,
+				"end": 44
+			},
+			{
+				"type": "CSSComment",
+				"value": " Universal namespace with type selector ",
+				"start": 146,
+				"end": 190
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined patterns ",
+				"start": 221,
+				"end": 244
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 344,

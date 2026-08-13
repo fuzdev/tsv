@@ -60,6 +60,34 @@
 				"end": 372
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - comment + value fit on same line ",
+				"start": 17,
+				"end": 67
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment that is quite long and extends past the print width limit ",
+				"start": 92,
+				"end": 163,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - value breaks to separate line ",
+				"start": 194,
+				"end": 241
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment that is quite long and extends past the print width limit ",
+				"start": 266,
+				"end": 337,
+				"position": 16
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 373,

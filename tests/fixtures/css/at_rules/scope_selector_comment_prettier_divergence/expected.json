@@ -48,6 +48,48 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment leading the root, trailing the limit ",
+				"start": 9,
+				"end": 59
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 69,
+				"end": 77,
+				"position": 1
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 99,
+				"end": 107,
+				"position": 23
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment trailing the root, leading the limit ",
+				"start": 130,
+				"end": 180
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 198,
+				"end": 206,
+				"position": 9
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 212,
+				"end": 220,
+				"position": 15
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 250,

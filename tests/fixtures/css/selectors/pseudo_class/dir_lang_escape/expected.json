@@ -411,6 +411,38 @@
 				"end": 531
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " concatenated hex escapes: \\6c\\74\\72 decodes to ltr ",
+				"start": 9,
+				"end": 65
+			},
+			{
+				"type": "CSSComment",
+				"value": " hex escape + space terminator + literal: \\65 n decodes to en ",
+				"start": 105,
+				"end": 171
+			},
+			{
+				"type": "CSSComment",
+				"value": " uppercase hex digits: \\65\\6E decodes to en ",
+				"start": 219,
+				"end": 267
+			},
+			{
+				"type": "CSSComment",
+				"value": " literal interleaved with an escape: l\\74r decodes to ltr ",
+				"start": 315,
+				"end": 377
+			},
+			{
+				"type": "CSSComment",
+				"value": " identity escape (non-hex) keeps the backslash: a\\.b stays a\\.b ",
+				"start": 419,
+				"end": 487
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 532,

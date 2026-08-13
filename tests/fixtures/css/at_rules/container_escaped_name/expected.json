@@ -128,6 +128,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " escaped @ in a container name keeps its backslash ",
+				"start": 9,
+				"end": 64
+			},
+			{
+				"type": "CSSComment",
+				"value": " escaped @ in a container condition value keeps its backslash ",
+				"start": 137,
+				"end": 203
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 261,

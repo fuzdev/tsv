@@ -67,6 +67,15 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " keep 2.50px ",
+				"start": 35,
+				"end": 52,
+				"position": 19
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 77,

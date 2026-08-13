@@ -67,6 +67,26 @@
 				"end": 470
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline (at boundary) ",
+				"start": 17,
+				"end": 61
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - wraps ",
+				"start": 164,
+				"end": 187
+			},
+			{
+				"type": "CSSComment",
+				"value": " url filter with long path - single-arg function, doesn't wrap ",
+				"start": 298,
+				"end": 365
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 471,

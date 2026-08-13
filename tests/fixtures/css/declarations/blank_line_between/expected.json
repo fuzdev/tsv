@@ -81,6 +81,14 @@
 				"end": 151
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Blank line between declaration groups preserved ",
+				"start": 9,
+				"end": 62
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 152,

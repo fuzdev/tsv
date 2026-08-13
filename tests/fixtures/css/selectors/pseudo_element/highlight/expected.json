@@ -25,7 +25,35 @@
 											"type": "PseudoElementSelector",
 											"name": "highlight",
 											"start": 62,
-											"end": 73
+											"end": 89,
+											"args": {
+												"type": "SelectorList",
+												"start": 74,
+												"end": 88,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 74,
+														"end": 88,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "search-results",
+																		"start": 74,
+																		"end": 88
+																	}
+																],
+																"start": 74,
+																"end": 88
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 62,
@@ -192,6 +220,20 @@
 				},
 				"start": 286,
 				"end": 326
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Highlight API - args truncated like ::slotted ",
+				"start": 9,
+				"end": 60
+			},
+			{
+				"type": "CSSComment",
+				"value": " Text highlighting pseudo-elements ",
+				"start": 119,
+				"end": 158
 			}
 		],
 		"content": {

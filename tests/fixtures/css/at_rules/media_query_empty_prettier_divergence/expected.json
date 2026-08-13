@@ -40,6 +40,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an all-empty list keeps its comma: without it the list is empty, which is true ",
+				"start": 9,
+				"end": 93
+			},
+			{
+				"type": "CSSComment",
+				"value": " an empty query in leading and interior position ",
+				"start": 122,
+				"end": 175
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 227,

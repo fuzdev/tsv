@@ -168,6 +168,14 @@
 				"end": 192
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the An+B `n` variable lowercases when it carries a numeric coefficient\n\t   (2N→2n), matching prettier. ",
+				"start": 9,
+				"end": 117
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 193,

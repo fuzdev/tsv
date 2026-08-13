@@ -504,6 +504,20 @@
 				"end": 366
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars exactly - stays inline (at boundary) ",
+				"start": 9,
+				"end": 61
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - wraps (exceeds print_width) ",
+				"start": 181,
+				"end": 226
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 367,

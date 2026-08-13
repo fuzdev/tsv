@@ -13,7 +13,8 @@
 //! Almost everything else fuses too:
 //!
 //! - **Root comments, `<svelte:options>`** (scalar props + `customElement`),
-//!   **`<style>`** (CSS `children` via `tsv_css`'s `write_css_node`, plus the
+//!   **`<style>`** (CSS `children` via `tsv_css`'s `write_css_children`, whose
+//!   return value is the sibling `comments` array, plus the
 //!   `StyleSheet`/`StyleContent` envelope and preceding comment),
 //!   **`<script>`/`<style>`/`<svelte:options>` tag attributes**, the
 //!   **`<svelte:element>` string `tag`**, and **bind/class shorthand** identifiers
@@ -60,7 +61,7 @@
 
 use crate::ast::internal;
 use crate::whitespace::is_svelte_ws;
-use tsv_css::ast::convert::write_css_node;
+use tsv_css::ast::convert::{write_css_children, write_css_comments};
 use tsv_lang::{
     Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
     write_array, write_or_null,
@@ -1375,9 +1376,10 @@ fn write_style_directive(w: &mut JsonWriter, d: &internal::StyleDirective<'_>, c
 // Scripts, style, and shared helpers
 //
 
-/// A `<style>` `StyleSheet`. `children` fuse via `tsv_css`'s `write_css_node`;
-/// `attributes` and the preceding comment fuse too (the `<style>` envelope is
-/// never visited by the template attach passes).
+/// A `<style>` `StyleSheet`. `children` fuse via `tsv_css`'s
+/// `write_css_children`, which hands back the sibling `comments` run its walk
+/// gathered; `attributes` and the preceding comment fuse too (the `<style>`
+/// envelope is never visited by the template attach passes).
 fn write_style_sheet(
     w: &mut JsonWriter,
     style: &internal::Style<'_>,
@@ -1391,9 +1393,9 @@ fn write_style_sheet(
     w.raw(",\"attributes\":");
     write_value_attributes(w, style.attributes, ctx);
     w.raw(",\"children\":");
-    write_array(w, style.css_stylesheet.nodes, |w, node| {
-        write_css_node(w, node, ctx.source, ctx.loc.map);
-    });
+    let css_comments = write_css_children(w, &style.css_stylesheet, ctx.source, ctx.loc.map);
+    w.raw(",\"comments\":");
+    write_css_comments(w, &css_comments, ctx.source, ctx.loc.map);
     w.raw(",\"content\":{\"start\":");
     w.u32(ctx.pos(style.content_span.start));
     w.raw(",\"end\":");

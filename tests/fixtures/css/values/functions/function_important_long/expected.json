@@ -60,6 +60,20 @@
 				"end": 419
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " !important counts toward width: with it this is exactly 100 cols, stays inline. ",
+				"start": 17,
+				"end": 102
+			},
+			{
+				"type": "CSSComment",
+				"value": " One col longer (101): the function wraps one arg per line, ') !important' trails. ",
+				"start": 204,
+				"end": 291
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 420,

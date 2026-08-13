@@ -53,6 +53,22 @@
 				"end": 51
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 26,
+				"end": 33,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 34,
+				"end": 41,
+				"position": 0
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 52,

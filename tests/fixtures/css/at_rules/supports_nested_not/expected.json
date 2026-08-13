@@ -128,6 +128,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a `not` directly inside a parenthesized condition keeps the paren tight ",
+				"start": 9,
+				"end": 86
+			},
+			{
+				"type": "CSSComment",
+				"value": " nested `not` inside an and-joined group ",
+				"start": 153,
+				"end": 198
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 281,

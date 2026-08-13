@@ -165,6 +165,38 @@
 				"end": 877
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Margin and padding shorthands ",
+				"start": 17,
+				"end": 52
+			},
+			{
+				"type": "CSSComment",
+				"value": " Border-radius with slash notation ",
+				"start": 134,
+				"end": 173
+			},
+			{
+				"type": "CSSComment",
+				"value": " Box-shadow - single and multiple ",
+				"start": 291,
+				"end": 329
+			},
+			{
+				"type": "CSSComment",
+				"value": " Transform functions ",
+				"start": 558,
+				"end": 583
+			},
+			{
+				"type": "CSSComment",
+				"value": " Mixed units in shorthands ",
+				"start": 753,
+				"end": 784
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 878,

@@ -90,6 +90,71 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 16,
+				"end": 23,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 32,
+				"end": 39,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 43,
+				"end": 50,
+				"position": 12
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 62,
+				"end": 69,
+				"position": 24
+			},
+			{
+				"type": "CSSComment",
+				"value": " e ",
+				"start": 98,
+				"end": 105,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " f ",
+				"start": 114,
+				"end": 121,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " g ",
+				"start": 151,
+				"end": 158,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " h ",
+				"start": 171,
+				"end": 178,
+				"position": 12
+			},
+			{
+				"type": "CSSComment",
+				"value": " i ",
+				"start": 209,
+				"end": 216,
+				"position": 0
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 237,

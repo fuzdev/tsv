@@ -126,6 +126,26 @@
 				"end": 209
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comments inside nested rule declaration block ",
+				"start": 9,
+				"end": 60
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment inside nested rule ",
+				"start": 104,
+				"end": 136
+			},
+			{
+				"type": "CSSComment",
+				"value": " between declarations ",
+				"start": 156,
+				"end": 182
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 210,

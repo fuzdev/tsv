@@ -54,6 +54,33 @@
 				"block": null
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " leading comma: the query list's first query is empty ",
+				"start": 9,
+				"end": 67
+			},
+			{
+				"type": "CSSComment",
+				"value": " the comma glues to whichever prelude component precedes it ",
+				"start": 131,
+				"end": 195
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment before the comma keeps the comma glued to it ",
+				"start": 339,
+				"end": 399
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 448,
+				"end": 455,
+				"position": 39
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 465,

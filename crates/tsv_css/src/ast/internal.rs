@@ -22,6 +22,10 @@ pub struct CssStyleSheet<'arena> {
     /// Does **not** include value comments (inside property values like
     /// `font-size: /* comment */ 12px;`): those are never lexed as `Comment`s — they're
     /// re-derived from source at print time — so they're out of scope by construction.
+    /// Nor the in-block ones, which ride `CssBlockChild::Comment`. **Three disjoint
+    /// places, one per printer need** — the wire's flat `CSSComment[]` is a fourth
+    /// reading that spans all of them, rebuilt by `ast/convert/write.rs`'s
+    /// `write_children` as it emits.
     ///
     /// Use `tsv_lang::comments_to_emit_in_range()` for efficient range lookups.
     pub comments: Vec<Comment>,
@@ -255,8 +259,7 @@ pub enum PseudoClassArgs<'arena> {
     /// Contains a full SelectorList that can include multiple complex selectors.
     /// Used for logical combinations, relational selectors, and `::slotted()` — whose
     /// spec grammar is `<compound-selector>` but which parseCss parses (and tsv
-    /// reproduces) as a lenient `<complex-selector-list>`, dropping it from the wire
-    /// AST at the pseudo-element convert boundary.
+    /// reproduces) as a lenient `<complex-selector-list>`.
     SelectorList {
         selectors: SelectorList<'arena>,
         span: Span,
@@ -278,6 +281,15 @@ pub enum PseudoClassArgs<'arena> {
     /// the last) and *between* names — and derive the whole-run span (first
     /// name's start .. last name's end). Always non-empty (the parser rejects an
     /// empty `::part()`).
+    ///
+    /// ⚠️ The **wire** reads `ident_spans` too. `parseCss` has no `::part` grammar
+    /// — it reads every pseudo-element argument as a selector list — so the writer
+    /// projects this run onto that shape (`ast/convert/write.rs`'s
+    /// `write_part_args`: one `ComplexSelector` of `TypeSelector`s joined by
+    /// descendant combinators, the gaps taken from these spans). A parser change
+    /// that admits a shape the projection can't express — a comma list, anything
+    /// but a plain ident run — must move the projection in the same breath, or the
+    /// wire goes wrong rather than merely different.
     Part {
         idents: &'arena [&'arena str], // Space-separated part names
         ident_spans: &'arena [Span],   // Per-ident spans, parallel to `idents`

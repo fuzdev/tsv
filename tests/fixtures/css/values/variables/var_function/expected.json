@@ -199,6 +199,38 @@
 				"end": 746
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Simple var() usage ",
+				"start": 108,
+				"end": 132
+			},
+			{
+				"type": "CSSComment",
+				"value": " var() with fallback ",
+				"start": 213,
+				"end": 238
+			},
+			{
+				"type": "CSSComment",
+				"value": " Nested fallbacks (2 levels) ",
+				"start": 339,
+				"end": 372
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple var() in one value ",
+				"start": 472,
+				"end": 505
+			},
+			{
+				"type": "CSSComment",
+				"value": " var() with complex fallbacks ",
+				"start": 628,
+				"end": 662
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 747,

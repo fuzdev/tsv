@@ -189,6 +189,47 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comment between conditions stays in place ",
+				"start": 9,
+				"end": 58
+			},
+			{
+				"type": "CSSComment",
+				"value": " note ",
+				"start": 86,
+				"end": 96,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment whose text contains the `and` connector word stays put ",
+				"start": 145,
+				"end": 215
+			},
+			{
+				"type": "CSSComment",
+				"value": " x and y ",
+				"start": 243,
+				"end": 256,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same when the comment contains the `or` connector word ",
+				"start": 306,
+				"end": 370
+			},
+			{
+				"type": "CSSComment",
+				"value": " p or q ",
+				"start": 398,
+				"end": 410,
+				"position": 16
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 458,

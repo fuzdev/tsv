@@ -119,6 +119,20 @@
 				"end": 147
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comment before nested selector ",
+				"start": 9,
+				"end": 45
+			},
+			{
+				"type": "CSSComment",
+				"value": " This styles the nested element ",
+				"start": 74,
+				"end": 110
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 148,

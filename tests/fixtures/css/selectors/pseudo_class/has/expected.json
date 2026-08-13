@@ -753,6 +753,38 @@
 				"end": 515
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Basic :has() with combinators ",
+				"start": 9,
+				"end": 44
+			},
+			{
+				"type": "CSSComment",
+				"value": " :has() with multiple selectors ",
+				"start": 127,
+				"end": 163
+			},
+			{
+				"type": "CSSComment",
+				"value": " :has() with negation ",
+				"start": 209,
+				"end": 235
+			},
+			{
+				"type": "CSSComment",
+				"value": " Chained :has() ",
+				"start": 292,
+				"end": 312
+			},
+			{
+				"type": "CSSComment",
+				"value": " :has() combined with :is() and :not() ",
+				"start": 373,
+				"end": 416
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 516,

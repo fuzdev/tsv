@@ -462,6 +462,38 @@
 				"end": 402
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :global() with :root ",
+				"start": 9,
+				"end": 35
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() with universal selector ",
+				"start": 75,
+				"end": 114
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() with html and body ",
+				"start": 160,
+				"end": 194
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() with attribute selector ",
+				"start": 246,
+				"end": 285
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() with :not() ",
+				"start": 333,
+				"end": 360
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 403,

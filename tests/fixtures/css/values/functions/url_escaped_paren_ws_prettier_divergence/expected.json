@@ -53,6 +53,14 @@
 				"end": 157
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " tsv trims the url-token's outer whitespace (§4.3.6); prettier keeps it when the content has an escaped paren ",
+				"start": 15,
+				"end": 129
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 158,

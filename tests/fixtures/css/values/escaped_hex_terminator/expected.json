@@ -60,6 +60,20 @@
 				"end": 350
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a hex escape takes up to 6 hex digits then ONE whitespace terminator, which\n\t\t   belongs to the escape — so this is a single ident `A2px`, not `\\41` + `2px`,\n\t\t   and a value scanner must not split on that space ",
+				"start": 17,
+				"end": 234
+			},
+			{
+				"type": "CSSComment",
+				"value": " the terminator is optional: a non-hex byte ends the escape on its own ",
+				"start": 255,
+				"end": 330
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 351,

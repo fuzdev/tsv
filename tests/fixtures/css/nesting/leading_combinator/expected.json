@@ -418,6 +418,38 @@
 				"end": 469
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " child combinator ",
+				"start": 39,
+				"end": 61
+			},
+			{
+				"type": "CSSComment",
+				"value": " next-sibling combinator ",
+				"start": 99,
+				"end": 128
+			},
+			{
+				"type": "CSSComment",
+				"value": " subsequent-sibling combinator ",
+				"start": 171,
+				"end": 206
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading combinator in selector list ",
+				"start": 244,
+				"end": 285
+			},
+			{
+				"type": "CSSComment",
+				"value": " combinator with multiple compound selectors ",
+				"start": 375,
+				"end": 424
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 470,

@@ -196,7 +196,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 310,
-											"end": 319
+											"end": 325,
+											"args": {
+												"type": "SelectorList",
+												"start": 320,
+												"end": 324,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 320,
+														"end": 324,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "A",
+																		"start": 320,
+																		"end": 324
+																	}
+																],
+																"start": 320,
+																"end": 324
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 310,
@@ -303,6 +331,26 @@
 				},
 				"start": 425,
 				"end": 459
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a hex escape's terminator whitespace inside pseudo args is dropped before\n\t   the closing `)` (and before `,`), like other selector separators ",
+				"start": 9,
+				"end": 157
+			},
+			{
+				"type": "CSSComment",
+				"value": " pseudo-element args (a separate code path) drop the terminator before `)` too ",
+				"start": 225,
+				"end": 308
+			},
+			{
+				"type": "CSSComment",
+				"value": " an internal terminator that doubles as a descendant combinator is kept ",
+				"start": 347,
+				"end": 423
 			}
 		],
 		"content": {

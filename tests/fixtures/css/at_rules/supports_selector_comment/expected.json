@@ -433,6 +433,99 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A comment at a combinator boundary ",
+				"start": 9,
+				"end": 49
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 74,
+				"end": 82,
+				"position": 13
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment inside a functional pseudo-class argument ",
+				"start": 125,
+				"end": 182
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 208,
+				"end": 216,
+				"position": 14
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment glued between two compound members stays glued — a space there\n\twould make the compound a descendant ",
+				"start": 260,
+				"end": 376
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 404,
+				"end": 412,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment in an argument that is not a selector ",
+				"start": 455,
+				"end": 508
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 531,
+				"end": 539,
+				"position": 11
+			},
+			{
+				"type": "CSSComment",
+				"value": " The same glue where the argument is not a selector: nothing is inserted ",
+				"start": 575,
+				"end": 652
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 689,
+				"end": 697,
+				"position": 25
+			},
+			{
+				"type": "CSSComment",
+				"value": " Each side keeps the separation it was authored with ",
+				"start": 739,
+				"end": 796
+			},
+			{
+				"type": "CSSComment",
+				"value": " c6 ",
+				"start": 834,
+				"end": 842,
+				"position": 26
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment opening the argument stays glued to the token after it ",
+				"start": 884,
+				"end": 954
+			},
+			{
+				"type": "CSSComment",
+				"value": " c7 ",
+				"start": 975,
+				"end": 983,
+				"position": 9
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1033,

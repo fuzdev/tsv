@@ -67,6 +67,26 @@
 				"end": 544
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline ",
+				"start": 17,
+				"end": 47
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 chars - wrap between values, keep color-mix inline ",
+				"start": 150,
+				"end": 210
+			},
+			{
+				"type": "CSSComment",
+				"value": " Corpus case: long property name with nested vars (149 chars total) ",
+				"start": 318,
+				"end": 390
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 545,

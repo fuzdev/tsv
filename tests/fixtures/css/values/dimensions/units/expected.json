@@ -347,6 +347,92 @@
 				"end": 1360
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Test dimension values with various units ",
+				"start": 9,
+				"end": 55
+			},
+			{
+				"type": "CSSComment",
+				"value": " Length units - absolute ",
+				"start": 65,
+				"end": 94
+			},
+			{
+				"type": "CSSComment",
+				"value": " Length units - font-relative ",
+				"start": 193,
+				"end": 227
+			},
+			{
+				"type": "CSSComment",
+				"value": " Length units - viewport-relative ",
+				"start": 335,
+				"end": 373
+			},
+			{
+				"type": "CSSComment",
+				"value": " Modern viewport units (small) ",
+				"start": 458,
+				"end": 493
+			},
+			{
+				"type": "CSSComment",
+				"value": " Modern viewport units (large) ",
+				"start": 576,
+				"end": 611
+			},
+			{
+				"type": "CSSComment",
+				"value": " Modern viewport units (dynamic) ",
+				"start": 649,
+				"end": 686
+			},
+			{
+				"type": "CSSComment",
+				"value": " Modern viewport units (logical) ",
+				"start": 724,
+				"end": 761
+			},
+			{
+				"type": "CSSComment",
+				"value": " Container query units ",
+				"start": 805,
+				"end": 832
+			},
+			{
+				"type": "CSSComment",
+				"value": " Typography units (Level 4) ",
+				"start": 916,
+				"end": 948
+			},
+			{
+				"type": "CSSComment",
+				"value": " Percentage ",
+				"start": 1025,
+				"end": 1041
+			},
+			{
+				"type": "CSSComment",
+				"value": " Angle units ",
+				"start": 1060,
+				"end": 1077
+			},
+			{
+				"type": "CSSComment",
+				"value": " Time units ",
+				"start": 1195,
+				"end": 1211
+			},
+			{
+				"type": "CSSComment",
+				"value": " Resolution units ",
+				"start": 1270,
+				"end": 1292
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1361,

@@ -77,7 +77,14 @@ the `DOCUMENTED_MATCHERS` named below.
   the first whitespace — which sits _inside_ the comment (tsv tokenizes the
   comment; the comment-between-property-and-colon _quirk_ with whitespace,
   `color /* c */ :`, is still replicated — see
-  `split_declaration_svelte_compat`).
+  `split_declaration_svelte_compat`). The second case also moves the
+  stylesheet's flat `comments` array: a comment swallowed into a property token
+  is never captured on the canonical side, so tsv emits it plus every later
+  comment at a shifted index, carrying its `value` and `position` along. That
+  is the same divergence read through the newer field, not a second one, so the
+  matcher absorbs the root `comments` array of any document holding a garbage
+  declaration — one insertion renumbers the whole tail, which no per-index
+  scope could follow.
 
 ### CSS Parser Scope & Error Model
 
@@ -799,8 +806,8 @@ Implementation oddities in Svelte's parser that tsv replicates for AST compatibi
 - Comment-before-colon in declaration value — `crates/tsv_css/src/ast/convert/mod.rs`
 - Block-comment stripping in declaration value — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
 - Block-comment stripping in at-rule prelude — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
-- ::slotted()/::part() span truncation — `crates/tsv_css/src/ast/convert/mod.rs`
 - :dir()/:lang()/::highlight() identifier wrapping — `crates/tsv_css/src/ast/convert/mod.rs`
+- ::part() ident run re-projected onto parseCss's selector-list arg shape — `write_part_args` in `crates/tsv_css/src/ast/convert/write.rs`
 - Selector-name half-decoding (class/id/type, pseudo-class/element, **and** attribute names) — `raw_selector_name` in `crates/tsv_css/src/ast/convert/mod.rs`
 - HTML comment (CDO/CDC) `<!-- ... -->` swallow at statement/selector-list boundaries — `skip_html_comment_markers` in `crates/tsv_css/src/parser/mod.rs`
 

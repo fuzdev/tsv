@@ -597,6 +597,68 @@
 				"end": 733
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before the An+B ",
+				"start": 9,
+				"end": 38
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 53,
+				"end": 61
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after the An+B (part of the expression text, kept verbatim) ",
+				"start": 87,
+				"end": 160
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment freezes the An+B text verbatim - no operator respacing inside it ",
+				"start": 210,
+				"end": 290
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment between the An+B and the of keyword (kept verbatim) ",
+				"start": 346,
+				"end": 411
+			},
+			{
+				"type": "CSSComment",
+				"value": " consecutive comments between the of keyword and the selector list ",
+				"start": 471,
+				"end": 542
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 562,
+				"end": 570
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 571,
+				"end": 579
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after the last selector of the of list ",
+				"start": 613,
+				"end": 665
+			},
+			{
+				"type": "CSSComment",
+				"value": " c6 ",
+				"start": 702,
+				"end": 710
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 734,

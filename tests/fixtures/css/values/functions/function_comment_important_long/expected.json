@@ -60,6 +60,34 @@
 				"end": 378
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " !important counts toward width; exactly 100 cols, stays inline. ",
+				"start": 17,
+				"end": 86
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 98,
+				"end": 105,
+				"position": 3
+			},
+			{
+				"type": "CSSComment",
+				"value": " One col longer (101): the function wraps, ') !important' trails the paren. ",
+				"start": 188,
+				"end": 268
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 284,
+				"end": 291,
+				"position": 7
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 379,

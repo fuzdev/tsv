@@ -360,6 +360,20 @@
 				"end": 376
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :has() with relative (leading-combinator) selectors — short, stays inline ",
+				"start": 9,
+				"end": 88
+			},
+			{
+				"type": "CSSComment",
+				"value": " :has() relative selectors wrap one-per-line; each broken arg keeps its leading combinator ",
+				"start": 136,
+				"end": 231
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 377,

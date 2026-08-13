@@ -544,6 +544,32 @@
 				"end": 378
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :global() inside CSS nesting ",
+				"start": 9,
+				"end": 43
+			},
+			{
+				"type": "CSSComment",
+				"value": " Nested with & combinator ",
+				"start": 95,
+				"end": 125
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() as ancestor with & ",
+				"start": 188,
+				"end": 222
+			},
+			{
+				"type": "CSSComment",
+				"value": " Deeply nested ",
+				"start": 287,
+				"end": 306
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 379,

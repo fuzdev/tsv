@@ -53,6 +53,14 @@
 				"end": 201
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Prettier's greedy fill allows 101 chars, we wrap at 100 ",
+				"start": 17,
+				"end": 78
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 202,

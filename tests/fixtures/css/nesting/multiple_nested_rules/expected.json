@@ -185,6 +185,14 @@
 				"end": 149
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Multiple nested rules at same level ",
+				"start": 9,
+				"end": 50
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 150,

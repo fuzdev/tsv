@@ -394,6 +394,44 @@
 				"end": 507
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " With other selectors ",
+				"start": 9,
+				"end": 35
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple attributes ",
+				"start": 85,
+				"end": 110
+			},
+			{
+				"type": "CSSComment",
+				"value": " In complex selectors ",
+				"start": 174,
+				"end": 200
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined with pseudo-classes ",
+				"start": 253,
+				"end": 287
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple operators on same element ",
+				"start": 338,
+				"end": 378
+			},
+			{
+				"type": "CSSComment",
+				"value": " With descendant combinator ",
+				"start": 431,
+				"end": 463
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 508,

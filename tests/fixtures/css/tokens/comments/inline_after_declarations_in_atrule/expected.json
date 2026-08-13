@@ -142,6 +142,38 @@
 				"end": 311
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " trailing comments after declarations directly inside an at-rule block stay on the line ",
+				"start": 17,
+				"end": 109
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment1 ",
+				"start": 143,
+				"end": 157
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment2 ",
+				"start": 179,
+				"end": 193
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment3 ",
+				"start": 214,
+				"end": 228
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment4 ",
+				"start": 290,
+				"end": 304
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 312,

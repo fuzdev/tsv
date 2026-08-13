@@ -25,7 +25,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 9,
-											"end": 18
+											"end": 21,
+											"args": {
+												"type": "SelectorList",
+												"start": 19,
+												"end": 20,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 19,
+														"end": 20,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "*",
+																		"start": 19,
+																		"end": 20
+																	}
+																],
+																"start": 19,
+																"end": 20
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 9,
@@ -72,7 +100,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 43,
-											"end": 52
+											"end": 57,
+											"args": {
+												"type": "SelectorList",
+												"start": 53,
+												"end": 56,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 53,
+														"end": 56,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "div",
+																		"start": 53,
+																		"end": 56
+																	}
+																],
+																"start": 53,
+																"end": 56
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 43,
@@ -119,7 +175,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 80,
-											"end": 89
+											"end": 98,
+											"args": {
+												"type": "SelectorList",
+												"start": 90,
+												"end": 97,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 90,
+														"end": 97,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class1",
+																		"start": 90,
+																		"end": 97
+																	}
+																],
+																"start": 90,
+																"end": 97
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 80,
@@ -166,7 +250,54 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 122,
-											"end": 131
+											"end": 153,
+											"args": {
+												"type": "SelectorList",
+												"start": 132,
+												"end": 152,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 132,
+														"end": 152,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "div",
+																		"start": 132,
+																		"end": 135
+																	},
+																	{
+																		"type": "ClassSelector",
+																		"name": "class1",
+																		"start": 135,
+																		"end": 142
+																	},
+																	{
+																		"type": "IdSelector",
+																		"name": "id1",
+																		"start": 142,
+																		"end": 146
+																	},
+																	{
+																		"type": "PseudoClassSelector",
+																		"name": "hover",
+																		"args": null,
+																		"start": 146,
+																		"end": 152
+																	}
+																],
+																"start": 132,
+																"end": 152
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 122,
@@ -213,7 +344,38 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 178,
-											"end": 187
+											"end": 195,
+											"args": {
+												"type": "SelectorList",
+												"start": 188,
+												"end": 194,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 188,
+														"end": 194,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "AttributeSelector",
+																		"start": 188,
+																		"end": 194,
+																		"name": "slot",
+																		"matcher": null,
+																		"value": null,
+																		"flags": null
+																	}
+																],
+																"start": 188,
+																"end": 194
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 178,
@@ -241,6 +403,7 @@
 				"end": 217
 			}
 		],
+		"comments": [],
 		"content": {
 			"start": 7,
 			"end": 218,

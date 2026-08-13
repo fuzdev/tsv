@@ -119,6 +119,20 @@
 				"end": 142
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comment after nested selector before opening brace ",
+				"start": 9,
+				"end": 65
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 104,
+				"end": 117
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 143,

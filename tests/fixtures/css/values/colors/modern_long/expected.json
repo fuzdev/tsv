@@ -60,6 +60,20 @@
 				"end": 361
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " color-mix() - 100 chars exactly - stays inline (at boundary) ",
+				"start": 17,
+				"end": 83
+			},
+			{
+				"type": "CSSComment",
+				"value": " color-mix() - 101 chars - wraps (exceeds print_width) ",
+				"start": 186,
+				"end": 245
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 362,

@@ -60,6 +60,20 @@
 				"end": 175
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " single row - stays inline ",
+				"start": 17,
+				"end": 48
+			},
+			{
+				"type": "CSSComment",
+				"value": " multiple rows - each on its own line ",
+				"start": 79,
+				"end": 121
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 176,

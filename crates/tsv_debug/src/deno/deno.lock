@@ -4,9 +4,9 @@
     "jsr:@std/streams@1": "1.1.2",
     "npm:@sveltejs/acorn-typescript@1.0.13": "1.0.13_acorn@8.16.0",
     "npm:acorn@8.16.0": "8.16.0",
-    "npm:prettier-plugin-svelte@4.1.1": "4.1.1_prettier@3.9.6_svelte@5.56.8",
+    "npm:prettier-plugin-svelte@4.1.1": "4.1.1_prettier@3.9.6_svelte@5.56.9",
     "npm:prettier@3.9.6": "3.9.6",
-    "npm:svelte@5.56.8": "5.56.8"
+    "npm:svelte@5.56.9": "5.56.9"
   },
   "jsr": {
     "@std/streams@1.1.2": {
@@ -93,7 +93,7 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "prettier-plugin-svelte@4.1.1_prettier@3.9.6_svelte@5.56.8": {
+    "prettier-plugin-svelte@4.1.1_prettier@3.9.6_svelte@5.56.9": {
       "integrity": "sha512-wXvbXMjSvb4C9ENWTHXyd+ihakKCsJ6rJhLP6/8HFNj4GkZr48jqL9PoKsl2sk7SyCZRTnJ7O2TTowUpOxP/KA==",
       "dependencies": [
         "prettier",
@@ -104,8 +104,8 @@
       "integrity": "sha512-OpN0zzVdiaiAhxpuuj5efpIS4sY9j7bY6uR5mnj5yPzGkdkjNKSJeUThPb60Jw29QuAZgA4o+/iB49kFiaBX6g==",
       "bin": true
     },
-    "svelte@5.56.8": {
-      "integrity": "sha512-PY8LOw7xP6c8IOiVqdo0sbbZVYhXRSfklOQLAUyGBKqjTX0wx/z4l/9J+PmBpmlLnxzEb1NqltxQ5/wZme/Cmg==",
+    "svelte@5.56.9": {
+      "integrity": "sha512-VT8kSnlEg8069w7AiCcAk3Yf5xvMnrGTagVOmU/OpOLHaHnNqXhWZCH/4EVga/bT/HtWhvE6/fHrXLErx7OnJA==",
       "dependencies": [
         "@jridgewell/remapping",
         "@jridgewell/sourcemap-codec",

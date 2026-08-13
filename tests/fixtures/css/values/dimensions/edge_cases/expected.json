@@ -263,6 +263,86 @@
 				"end": 1140
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Test dimension edge cases: zero, negative, decimals, signs ",
+				"start": 9,
+				"end": 73
+			},
+			{
+				"type": "CSSComment",
+				"value": " Zero with and without units ",
+				"start": 83,
+				"end": 116
+			},
+			{
+				"type": "CSSComment",
+				"value": " Negative zero preserved like Prettier ",
+				"start": 190,
+				"end": 233
+			},
+			{
+				"type": "CSSComment",
+				"value": " Positive zero preserved like Prettier ",
+				"start": 266,
+				"end": 309
+			},
+			{
+				"type": "CSSComment",
+				"value": " Positive sign preserved like Prettier ",
+				"start": 341,
+				"end": 384
+			},
+			{
+				"type": "CSSComment",
+				"value": " Negative values (lengths and percentages) ",
+				"start": 469,
+				"end": 516
+			},
+			{
+				"type": "CSSComment",
+				"value": " Decimal values ",
+				"start": 587,
+				"end": 607
+			},
+			{
+				"type": "CSSComment",
+				"value": " Leading decimal point (prettier adds leading zero) ",
+				"start": 669,
+				"end": 725
+			},
+			{
+				"type": "CSSComment",
+				"value": " Trailing zeros ",
+				"start": 792,
+				"end": 812
+			},
+			{
+				"type": "CSSComment",
+				"value": " Very small values ",
+				"start": 854,
+				"end": 877
+			},
+			{
+				"type": "CSSComment",
+				"value": " Very large values ",
+				"start": 931,
+				"end": 954
+			},
+			{
+				"type": "CSSComment",
+				"value": " Large percentages ",
+				"start": 1003,
+				"end": 1026
+			},
+			{
+				"type": "CSSComment",
+				"value": " Mixed in shorthand ",
+				"start": 1056,
+				"end": 1080
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1141,

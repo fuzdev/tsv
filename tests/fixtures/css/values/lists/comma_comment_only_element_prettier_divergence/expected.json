@@ -60,6 +60,41 @@
 				"end": 248
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A first element that is nothing but comments: tsv keeps the list inline ",
+				"start": 15,
+				"end": 92
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 108,
+				"end": 115,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " Same for a run of them, and with a later element that would break the list ",
+				"start": 122,
+				"end": 202
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 221,
+				"end": 228,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 229,
+				"end": 236,
+				"position": 0
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 249,

@@ -74,6 +74,32 @@
 				"end": 876
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline (at boundary) ",
+				"start": 17,
+				"end": 61
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - value wraps to next line ",
+				"start": 163,
+				"end": 205
+			},
+			{
+				"type": "CSSComment",
+				"value": " Long font-family list - exceeds 100 chars per line, tests comma-separated wrapping ",
+				"start": 311,
+				"end": 399
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple long gradients - exceeds 100 chars, tests outer comma list + function arg wrapping ",
+				"start": 563,
+				"end": 660
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 877,

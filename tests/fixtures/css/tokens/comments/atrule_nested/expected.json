@@ -81,6 +81,32 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before nested atrule ",
+				"start": 27,
+				"end": 61
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment in nested atrule ",
+				"start": 95,
+				"end": 125
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment in deeply nested rule ",
+				"start": 154,
+				"end": 189
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after nested atrule ",
+				"start": 199,
+				"end": 232
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 236,

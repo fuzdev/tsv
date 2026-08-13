@@ -67,6 +67,26 @@
 				"end": 247
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Empty var() fallback — the trailing comma is significant and preserved ",
+				"start": 21,
+				"end": 97
+			},
+			{
+				"type": "CSSComment",
+				"value": " Normal fallback is unaffected ",
+				"start": 120,
+				"end": 155
+			},
+			{
+				"type": "CSSComment",
+				"value": " Nested empty fallback ",
+				"start": 187,
+				"end": 214
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 248,

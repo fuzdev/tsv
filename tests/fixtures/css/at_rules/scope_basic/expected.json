@@ -372,6 +372,38 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Basic scoping ",
+				"start": 9,
+				"end": 28
+			},
+			{
+				"type": "CSSComment",
+				"value": " Scope with limit ",
+				"start": 88,
+				"end": 110
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple selectors ",
+				"start": 175,
+				"end": 199
+			},
+			{
+				"type": "CSSComment",
+				"value": " Complex limit ",
+				"start": 272,
+				"end": 291
+			},
+			{
+				"type": "CSSComment",
+				"value": " Nested scopes ",
+				"start": 380,
+				"end": 399
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 522,

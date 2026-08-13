@@ -189,6 +189,26 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " short comma-list - stays inline ",
+				"start": 9,
+				"end": 46
+			},
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline (both formatters) ",
+				"start": 94,
+				"end": 142
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - breaks at each comma (one query per line) ",
+				"start": 266,
+				"end": 325
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 451,

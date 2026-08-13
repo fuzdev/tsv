@@ -60,6 +60,28 @@
 				"end": 102
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 15,
+				"end": 36
+			},
+			{
+				"type": "CSSComment",
+				"value": " x ",
+				"start": 51,
+				"end": 58,
+				"position": 5
+			},
+			{
+				"type": "CSSComment",
+				"value": " y ",
+				"start": 70,
+				"end": 77,
+				"position": 17
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 103,

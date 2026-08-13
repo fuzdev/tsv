@@ -81,6 +81,38 @@
 				"end": 467
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Single string value led by a non-breaking space (U+00A0) — kept glued. ",
+				"start": 15,
+				"end": 91
+			},
+			{
+				"type": "CSSComment",
+				"value": " Single ident value led by a non-breaking space — kept glued (matches prettier). ",
+				"start": 111,
+				"end": 196
+			},
+			{
+				"type": "CSSComment",
+				"value": " Single string value trailed by a non-breaking space. ",
+				"start": 218,
+				"end": 276
+			},
+			{
+				"type": "CSSComment",
+				"value": " Single ident value trailed by a non-breaking space (matches prettier). ",
+				"start": 295,
+				"end": 371
+			},
+			{
+				"type": "CSSComment",
+				"value": " Single string value led by an em space (U+2003). ",
+				"start": 393,
+				"end": 447
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 468,

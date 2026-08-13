@@ -814,6 +814,20 @@
 				"end": 405
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars exactly - complex selector inside :is() stays inline (at boundary) ",
+				"start": 9,
+				"end": 91
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - nested list wraps, complex selector stays on one line ",
+				"start": 211,
+				"end": 282
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 406,

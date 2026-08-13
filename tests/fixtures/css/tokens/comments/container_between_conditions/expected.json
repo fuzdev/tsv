@@ -67,6 +67,35 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comments between @container condition parts ",
+				"start": 9,
+				"end": 58
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 71,
+				"end": 78,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 98,
+				"end": 105,
+				"position": 19
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 110,
+				"end": 117,
+				"position": 24
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 170,

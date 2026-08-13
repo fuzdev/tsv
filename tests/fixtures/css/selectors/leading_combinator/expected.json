@@ -452,6 +452,50 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " leading child combinator (top-level, no parent rule) ",
+				"start": 9,
+				"end": 67
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading next-sibling combinator ",
+				"start": 100,
+				"end": 137
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading subsequent-sibling combinator ",
+				"start": 170,
+				"end": 213
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading combinator continues into a full complex selector ",
+				"start": 246,
+				"end": 309
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading combinator on the first item of a selector list ",
+				"start": 352,
+				"end": 413
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading combinator inside :not() (complex-selector grammar) ",
+				"start": 456,
+				"end": 521
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading combinator inside an at-rule body ",
+				"start": 560,
+				"end": 607
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 661,

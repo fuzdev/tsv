@@ -250,6 +250,38 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " @media wraps at 101 chars (we wrap at >100, Prettier never wraps) ",
+				"start": 9,
+				"end": 80
+			},
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline (both agree) ",
+				"start": 83,
+				"end": 126
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - we wrap, Prettier stays inline ",
+				"start": 258,
+				"end": 306
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 chars - we wrap, Prettier stays inline or preserves wrapping ",
+				"start": 442,
+				"end": 512
+			},
+			{
+				"type": "CSSComment",
+				"value": " 103 chars - we wrap, Prettier stays inline ",
+				"start": 650,
+				"end": 698
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 836,

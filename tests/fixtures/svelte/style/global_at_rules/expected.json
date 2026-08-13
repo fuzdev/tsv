@@ -376,6 +376,32 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :global() inside @media ",
+				"start": 9,
+				"end": 38
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() inside @supports ",
+				"start": 116,
+				"end": 148
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() inside @layer ",
+				"start": 225,
+				"end": 254
+			},
+			{
+				"type": "CSSComment",
+				"value": " :global() inside nested @media ",
+				"start": 313,
+				"end": 349
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 446,

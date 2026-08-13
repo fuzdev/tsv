@@ -67,6 +67,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " An escaped control char is part of the at-rule NAME token (parseCss decodes\n\t   the whole run to the name; postcss/prettier instead splits it into name +\n\t   prelude and prints `@m \\A x {`). tsv preserves the source escape verbatim so\n\t   the decoded control char never lands raw in the output. ",
+				"start": 9,
+				"end": 309
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 342,

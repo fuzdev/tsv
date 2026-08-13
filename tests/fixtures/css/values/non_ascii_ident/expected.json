@@ -60,6 +60,20 @@
 				"end": 141
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " non-ASCII (CJK) custom-ident value ",
+				"start": 15,
+				"end": 55
+			},
+			{
+				"type": "CSSComment",
+				"value": " comma-separated non-ASCII idents ",
+				"start": 79,
+				"end": 117
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 142,

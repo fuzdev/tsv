@@ -548,6 +548,32 @@
 				"end": 390
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Compound selector inside :global() ",
+				"start": 9,
+				"end": 49
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple :global() with combinators ",
+				"start": 104,
+				"end": 145
+			},
+			{
+				"type": "CSSComment",
+				"value": " Descendant chain inside :global() ",
+				"start": 217,
+				"end": 256
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple selectors in :global() ",
+				"start": 312,
+				"end": 349
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 391,

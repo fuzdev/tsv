@@ -101,6 +101,14 @@
 				"end": 390
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Identity escapes (a backslash before a non-hex char) are kept verbatim in the\n\t   selector-name AST, matching Svelte's read_identifier half-decode: hex escapes\n\t   decode, identity escapes keep the backslash. The formatter preserves the raw\n\t   source either way. Mirrors class/id/type in escaped_names, now for pseudos. ",
+				"start": 9,
+				"end": 335
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 391,

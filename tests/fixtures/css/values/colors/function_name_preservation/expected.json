@@ -102,6 +102,32 @@
 				"end": 527
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " hsla without alpha - function name must be preserved ",
+				"start": 17,
+				"end": 75
+			},
+			{
+				"type": "CSSComment",
+				"value": " hsla with slash alpha - function name must be preserved ",
+				"start": 143,
+				"end": 204
+			},
+			{
+				"type": "CSSComment",
+				"value": " rgba without alpha - function name must be preserved ",
+				"start": 280,
+				"end": 338
+			},
+			{
+				"type": "CSSComment",
+				"value": " rgba with slash alpha - function name must be preserved ",
+				"start": 398,
+				"end": 459
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 528,

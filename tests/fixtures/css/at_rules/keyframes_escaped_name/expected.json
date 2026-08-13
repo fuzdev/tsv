@@ -189,6 +189,26 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " escaped @ keeps its backslash (a bare @ would start an at-keyword) ",
+				"start": 9,
+				"end": 81
+			},
+			{
+				"type": "CSSComment",
+				"value": " escape mid-identifier is preserved ",
+				"start": 134,
+				"end": 174
+			},
+			{
+				"type": "CSSComment",
+				"value": " hex escape with space terminator lets a name start with a digit ",
+				"start": 223,
+				"end": 292
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 341,

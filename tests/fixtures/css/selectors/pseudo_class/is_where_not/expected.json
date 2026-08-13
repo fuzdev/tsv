@@ -683,6 +683,26 @@
 				"end": 435
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :is() - matches-any pseudo-class ",
+				"start": 9,
+				"end": 47
+			},
+			{
+				"type": "CSSComment",
+				"value": " :where() - zero-specificity variant ",
+				"start": 154,
+				"end": 195
+			},
+			{
+				"type": "CSSComment",
+				"value": " :not() - negation pseudo-class ",
+				"start": 285,
+				"end": 321
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 436,

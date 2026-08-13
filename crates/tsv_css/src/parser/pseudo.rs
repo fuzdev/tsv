@@ -104,7 +104,7 @@ enum SelectorListGrammar {
     /// list too (`:lang(en, fr)` is two `TypeSelector`s, and a non-selector arg like
     /// `:lang("en")` is a parse error the strict grammar reproduces); `::slotted()` because
     /// parseCss models its arg as a `<complex-selector-list>` (see the `is_pseudo_element`
-    /// dispatch note) and drops it from the wire AST.
+    /// dispatch note).
     Complex,
 }
 
@@ -132,25 +132,24 @@ enum PseudoArgKind {
 /// the still-current name token (its decoded borrow is consumed immediately, so no arena
 /// copy of the name is needed).
 ///
-/// `is_pseudo_element` distinguishes `::slotted`/`::part` (the real pseudo-elements, whose
-/// args are dropped from the public AST) from a single-colon `:slotted(.x)`/`:part(foo)`,
-/// which Svelte accepts as an ordinary pseudo-class with a selector-list argument.
-/// `::slotted` shares the strict complex-selector-list grammar with `:not()` — parseCss
-/// models its arg as a `<complex-selector-list>` (accepting `::slotted(0)`,
-/// `::slotted(.a > .b)`, `::slotted(.a, .b)`, rejecting garbage/empty) and drops it from
-/// the wire AST, so tsv reuses the same production and drops it at the pseudo-element
-/// convert boundary. `::part` selects the dedicated `Part` arg. Gating on the flag keeps
-/// these off pseudo-classes, so the single-colon forms fall through to `Unknown`'s generic
-/// selector-list path and convert to a `PseudoClassSelector` matching Svelte — rather than
-/// reaching the convert layer, which exposes no pseudo-element args.
+/// `is_pseudo_element` distinguishes `::slotted`/`::part` (the real pseudo-elements) from a
+/// single-colon `:slotted(.x)`/`:part(foo)`, which Svelte accepts as an ordinary
+/// pseudo-class. `::slotted` shares the strict complex-selector-list grammar with `:not()`
+/// — parseCss models its arg as a `<complex-selector-list>` (accepting `::slotted(0)`,
+/// `::slotted(.a > .b)`, `::slotted(.a, .b)`, rejecting garbage/empty), so tsv reuses the
+/// same production. `::part` selects the dedicated `Part` arg — parseCss has no `::part`
+/// grammar at all (it reads *every* pseudo-element argument as a selector list), so the
+/// ident run is tsv's own model, re-projected onto that selector-list wire shape by the
+/// writer. Gating on the flag keeps these off pseudo-classes, so the single-colon forms
+/// fall through to `Unknown`'s generic selector-list path and convert to a
+/// `PseudoClassSelector` matching Svelte.
 ///
 /// `:dir()`/`:lang()`/`::highlight()` take a single identifier per CSS spec, but Svelte
 /// parses their argument as an ordinary selector list (a comma-separated `:lang(en, fr)`
 /// becomes two `TypeSelector`s, not one `"en, fr"` name), so they share the strict
 /// complex-selector-list grammar with `:not()`/`:global()`. That also matches prettier's
 /// argument formatting (comma-spacing normalization and wide-list breaking) and Svelte's
-/// rejection of non-selector args like `:lang("en")`. `::highlight`'s args are dropped at
-/// the pseudo-element convert boundary; the selector list only feeds the formatter.
+/// rejection of non-selector args like `:lang("en")`.
 fn classify_pseudo_args(pseudo_name: &str, is_pseudo_element: bool) -> PseudoArgKind {
     // CSS pseudo-class/element names are ASCII case-insensitive (Selectors 4
     // §"Case-Sensitivity"), and Svelte's parser accepts the uppercase forms

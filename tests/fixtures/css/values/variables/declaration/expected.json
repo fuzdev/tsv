@@ -158,6 +158,32 @@
 				"end": 533
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Simple custom properties ",
+				"start": 21,
+				"end": 51
+			},
+			{
+				"type": "CSSComment",
+				"value": " Complex values ",
+				"start": 119,
+				"end": 139
+			},
+			{
+				"type": "CSSComment",
+				"value": " Edge cases - all valid per CSS spec ",
+				"start": 271,
+				"end": 312
+			},
+			{
+				"type": "CSSComment",
+				"value": " Using other CSS values ",
+				"start": 411,
+				"end": 439
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 534,

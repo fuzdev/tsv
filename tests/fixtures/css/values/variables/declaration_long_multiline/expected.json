@@ -53,6 +53,14 @@
 				"end": 317
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Each comma item has space-separated values; first item exceeds width, second fits ",
+				"start": 17,
+				"end": 104
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 318,

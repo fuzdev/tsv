@@ -67,6 +67,21 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Long @media query with comment - we wrap at 101+ chars, Prettier doesn't ",
+				"start": 9,
+				"end": 87
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 117,
+				"end": 124,
+				"position": 20
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 221,

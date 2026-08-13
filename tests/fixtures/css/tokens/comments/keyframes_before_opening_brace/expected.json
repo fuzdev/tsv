@@ -189,6 +189,35 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment spacing in a raw at-rule prelude is preserved verbatim (matches prettier);\n\tthe single-space, no-space, and extra-space forms are each dual-stable ",
+				"start": 9,
+				"end": 169
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 188,
+				"end": 195,
+				"position": 6
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 258,
+				"end": 265,
+				"position": 5
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 316,
+				"end": 323,
+				"position": 7
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 355,

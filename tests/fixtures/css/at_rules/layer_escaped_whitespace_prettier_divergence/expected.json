@@ -75,6 +75,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the prelude ends in an escape whose payload IS that space (the layer is named\n\t   `a `), so trimming it strands the backslash onto the `;` ",
+				"start": 9,
+				"end": 153
+			},
+			{
+				"type": "CSSComment",
+				"value": " the block form: the payload space already separates the prelude from the `{`, so\n\t   no second separator is added ",
+				"start": 169,
+				"end": 288
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 332,

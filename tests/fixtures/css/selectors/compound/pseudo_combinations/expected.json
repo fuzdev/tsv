@@ -83,7 +83,35 @@
 											"type": "PseudoElementSelector",
 											"name": "slotted",
 											"start": 42,
-											"end": 51
+											"end": 54,
+											"args": {
+												"type": "SelectorList",
+												"start": 52,
+												"end": 53,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 52,
+														"end": 53,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "*",
+																		"start": 52,
+																		"end": 53
+																	}
+																],
+																"start": 52,
+																"end": 53
+															}
+														]
+													}
+												]
+											}
 										},
 										{
 											"type": "PseudoClassSelector",
@@ -116,6 +144,7 @@
 				"end": 73
 			}
 		],
+		"comments": [],
 		"content": {
 			"start": 7,
 			"end": 74,

@@ -6,13 +6,13 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-08-13T18:27:11.216Z — tsv 0.2.0 (76ee44f3)
+**Date:** 2026-08-13T20:15:33.197Z — tsv 0.2.0 (1ce605a3)
 
-**Corpus:** 4551 Svelte (1.1 MB), 52321 TypeScript (69.0 MB), 22641 CSS (7.7 MB) — 79513 files, 77.8 MB total
+**Corpus:** 4556 Svelte (1.1 MB), 52321 TypeScript (69.0 MB), 22641 CSS (7.7 MB) — 79518 files, 77.8 MB total
 
-**Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (793), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4467), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113), benches/js/.cache/ts_repo_files.json (8097)
+**Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (793), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4472), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113), benches/js/.cache/ts_repo_files.json (8097)
 
-**Versions:** svelte@5.56.8, acorn@8.16.0, acorn-typescript@1.0.13, prettier@3.9.6, prettier-plugin-svelte@4.1.1, oxc-parser@0.140.0, oxfmt@0.60.0, yuku-parser@0.8.1, @biomejs/wasm-bundler@2.5.4, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, postcss@8.5.26, @rsvelte/fmt@0.7.4, @rsvelte/vite-plugin-svelte-native@0.3.4 (targets svelte@5.56.8), @swc/core@1.15.47
+**Versions:** svelte@5.56.9, acorn@8.16.0, acorn-typescript@1.0.13, prettier@3.9.6, prettier-plugin-svelte@4.1.1, oxc-parser@0.140.0, oxfmt@0.60.0, yuku-parser@0.8.1, @biomejs/wasm-bundler@2.5.4, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, postcss@8.5.26, @rsvelte/fmt@0.7.4, @rsvelte/vite-plugin-svelte-native@0.3.4 (targets svelte@5.56.8), @swc/core@1.15.47
 
 **Excluded here:** yuku-parser (N-API) — its native binding faults the host process on this corpus (test262 escaped-identifier fixtures), so it cannot be measured against it. The WASM binding runs the same engine and carries the row; both are measured on the perf corpus.
 
@@ -22,7 +22,7 @@
 
 ## parse/svelte
 
-**Coverage:** svelte/compiler 4551/4551 (100%), tsv-json 4551/4551 (100%), tsv_wasm-json 4551/4551 (100%), tsv-json-no-locations 4551/4551 (100%), tsv_wasm-json-no-locations 4551/4551 (100%), tsv-internal 4551/4551 (100%), tsv_wasm-internal 4551/4551 (100%), rsvelte-parse 4550/4551 (99%), rsvelte-parse-skip-expr-loc 4550/4551 (99%)
+**Coverage:** svelte/compiler 4556/4556 (100%), tsv-json 4556/4556 (100%), tsv_wasm-json 4556/4556 (100%), tsv-json-no-locations 4556/4556 (100%), tsv_wasm-json-no-locations 4556/4556 (100%), tsv-internal 4556/4556 (100%), tsv_wasm-internal 4556/4556 (100%), rsvelte-parse 4555/4556 (99%), rsvelte-parse-skip-expr-loc 4555/4556 (99%)
 
 ## parse/typescript
 
@@ -38,7 +38,7 @@
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `../prettier-plugin-svelte/test` | 318 | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) |
 | `../prettier/tests/format/html` | 84 | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) |
-| `../svelte/packages/svelte/tests` | 4149 | 4149 (100%) | 4149 (100%) | 4149 (100%) | 4149 (100%) | 4149 (100%) | 4149 (100%) | 4149 (100%) | 4148 (99%) | 4148 (99%) |
+| `../svelte/packages/svelte/tests` | 4154 | 4154 (100%) | 4154 (100%) | 4154 (100%) | 4154 (100%) | 4154 (100%) | 4154 (100%) | 4154 (100%) | 4153 (99%) | 4153 (99%) |
 
 ### parse/typescript by corpus source
 

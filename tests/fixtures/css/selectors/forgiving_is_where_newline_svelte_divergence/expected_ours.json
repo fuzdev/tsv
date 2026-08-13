@@ -65,6 +65,14 @@
 				"end": 267
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " :is() forgiving list: the empty `.` class makes the complex selector invalid, so it is dropped from the AST; tsv keeps the dropped text but collapses its internal whitespace runs (incl. newlines) to single spaces ",
+				"start": 9,
+				"end": 227
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 268,

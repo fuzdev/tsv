@@ -311,6 +311,39 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A value spelled `and` is a value keyword, not a boolean operator ",
+				"start": 9,
+				"end": 79
+			},
+			{
+				"type": "CSSComment",
+				"value": " A boolean operator between two nested conditions does space ",
+				"start": 144,
+				"end": 209
+			},
+			{
+				"type": "CSSComment",
+				"value": " The space after `:` is decided by the property name, past the comment ",
+				"start": 356,
+				"end": 431
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 452,
+				"end": 459,
+				"position": 9
+			},
+			{
+				"type": "CSSComment",
+				"value": " A connector after a selector() part ",
+				"start": 501,
+				"end": 542
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 626,

@@ -158,6 +158,56 @@
 				"end": 995
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " HWB color space (CSS Color 4) ",
+				"start": 17,
+				"end": 52
+			},
+			{
+				"type": "CSSComment",
+				"value": " Lab color space (CSS Color 4) ",
+				"start": 116,
+				"end": 151
+			},
+			{
+				"type": "CSSComment",
+				"value": " OKLab color space (CSS Color 4) ",
+				"start": 210,
+				"end": 247
+			},
+			{
+				"type": "CSSComment",
+				"value": " color() function (CSS Color 4) ",
+				"start": 327,
+				"end": 363
+			},
+			{
+				"type": "CSSComment",
+				"value": " color-mix() function (CSS Color 5) ",
+				"start": 440,
+				"end": 480
+			},
+			{
+				"type": "CSSComment",
+				"value": " Relative colors (CSS Color 5) ",
+				"start": 615,
+				"end": 650
+			},
+			{
+				"type": "CSSComment",
+				"value": " light-dark() function (CSS Color 5) ",
+				"start": 748,
+				"end": 789
+			},
+			{
+				"type": "CSSComment",
+				"value": " contrast-color() function (CSS Color 6) ",
+				"start": 865,
+				"end": 910
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 996,

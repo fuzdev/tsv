@@ -356,6 +356,38 @@
 				"end": 466
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Case-insensitive flag ",
+				"start": 9,
+				"end": 36
+			},
+			{
+				"type": "CSSComment",
+				"value": " Case-sensitive flag ",
+				"start": 76,
+				"end": 101
+			},
+			{
+				"type": "CSSComment",
+				"value": " No flag (default) ",
+				"start": 142,
+				"end": 165
+			},
+			{
+				"type": "CSSComment",
+				"value": " Flag with different operators ",
+				"start": 205,
+				"end": 240
+			},
+			{
+				"type": "CSSComment",
+				"value": " Dash-match operator with flag ",
+				"start": 345,
+				"end": 380
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 467,

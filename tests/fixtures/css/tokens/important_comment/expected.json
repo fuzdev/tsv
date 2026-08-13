@@ -74,6 +74,67 @@
 				"end": 296
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before !important ",
+				"start": 17,
+				"end": 48
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 62,
+				"end": 70,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after !important ",
+				"start": 85,
+				"end": 115
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 146,
+				"end": 154,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " comments on both sides ",
+				"start": 158,
+				"end": 186
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 199,
+				"end": 207,
+				"position": 2
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 219,
+				"end": 227,
+				"position": 14
+			},
+			{
+				"type": "CSSComment",
+				"value": " control: comment in a plain value ",
+				"start": 231,
+				"end": 270
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 284,
+				"end": 292,
+				"position": 2
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 297,

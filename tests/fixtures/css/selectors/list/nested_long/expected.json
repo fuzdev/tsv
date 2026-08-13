@@ -1320,6 +1320,26 @@
 				"end": 616
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars exactly - stays inline (at boundary) ",
+				"start": 9,
+				"end": 61
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - wraps (exceeds print_width) ",
+				"start": 181,
+				"end": 226
+			},
+			{
+				"type": "CSSComment",
+				"value": " Long nested selector list in :where() - wraps when exceeding print width ",
+				"start": 394,
+				"end": 472
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 617,

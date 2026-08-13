@@ -519,6 +519,26 @@
 				"end": 707
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " tsv indents broken pseudo-class args one level relative to the selector,\n\t   uniformly — the compound's simple-selector count does not matter ",
+				"start": 9,
+				"end": 156
+			},
+			{
+				"type": "CSSComment",
+				"value": " 3 simple selectors (.a.b + :is) — still one level; prettier adds an extra ",
+				"start": 292,
+				"end": 371
+			},
+			{
+				"type": "CSSComment",
+				"value": " 4 simple selectors (.a.b.c + :is) — still one level ",
+				"start": 510,
+				"end": 567
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 708,

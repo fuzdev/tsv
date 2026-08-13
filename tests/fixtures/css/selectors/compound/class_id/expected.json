@@ -242,6 +242,14 @@
 				"end": 236
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Test compound selectors with type, class, and ID ",
+				"start": 9,
+				"end": 63
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 237,

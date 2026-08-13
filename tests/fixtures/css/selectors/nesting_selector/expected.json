@@ -242,6 +242,14 @@
 				"end": 161
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Test nesting selector (&) in selectors ",
+				"start": 9,
+				"end": 53
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 162,

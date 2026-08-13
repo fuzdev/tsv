@@ -233,6 +233,20 @@
 				"end": 241
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " An+B classification is active in nested pseudo-class args, and restores ",
+				"start": 9,
+				"end": 86
+			},
+			{
+				"type": "CSSComment",
+				"value": " the flag restores between siblings: .a stays a class after the odd Nth ",
+				"start": 123,
+				"end": 199
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 242,

@@ -53,6 +53,15 @@
 				"end": 45
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " x:y ",
+				"start": 26,
+				"end": 35,
+				"position": 0
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 46,

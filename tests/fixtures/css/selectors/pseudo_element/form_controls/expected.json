@@ -764,6 +764,38 @@
 				"end": 942
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " File input button ",
+				"start": 9,
+				"end": 32
+			},
+			{
+				"type": "CSSComment",
+				"value": " Range slider parts ",
+				"start": 119,
+				"end": 143
+			},
+			{
+				"type": "CSSComment",
+				"value": " Number input steppers ",
+				"start": 278,
+				"end": 305
+			},
+			{
+				"type": "CSSComment",
+				"value": " Form Control Icons ",
+				"start": 363,
+				"end": 387
+			},
+			{
+				"type": "CSSComment",
+				"value": " Form Field Components ",
+				"start": 688,
+				"end": 715
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 943,

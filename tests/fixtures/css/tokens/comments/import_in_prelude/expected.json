@@ -46,6 +46,94 @@
 				"block": null
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " leading comment before url ",
+				"start": 9,
+				"end": 41
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 51,
+				"end": 58,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading comment before bare string ",
+				"start": 75,
+				"end": 115
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 125,
+				"end": 132,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after url, before media type ",
+				"start": 144,
+				"end": 186
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 209,
+				"end": 216,
+				"position": 13
+			},
+			{
+				"type": "CSSComment",
+				"value": " comments around comma in media-query list ",
+				"start": 227,
+				"end": 274
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 297,
+				"end": 304,
+				"position": 13
+			},
+			{
+				"type": "CSSComment",
+				"value": " e ",
+				"start": 316,
+				"end": 323,
+				"position": 25
+			},
+			{
+				"type": "CSSComment",
+				"value": " f ",
+				"start": 325,
+				"end": 332,
+				"position": 27
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment before bare layer keyword ",
+				"start": 339,
+				"end": 378
+			},
+			{
+				"type": "CSSComment",
+				"value": " g ",
+				"start": 401,
+				"end": 408,
+				"position": 13
+			},
+			{
+				"type": "CSSComment",
+				"value": " h ",
+				"start": 415,
+				"end": 422,
+				"position": 20
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 431,

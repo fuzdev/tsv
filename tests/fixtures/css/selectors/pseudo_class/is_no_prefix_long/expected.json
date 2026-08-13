@@ -492,6 +492,20 @@
 				"end": 419
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " bare :is() (no element prefix) — 100 chars exactly, stays inline (boundary) ",
+				"start": 9,
+				"end": 90
+			},
+			{
+				"type": "CSSComment",
+				"value": " bare :is() — 101 chars, wraps one-per-line (exceeds print_width) ",
+				"start": 209,
+				"end": 279
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 420,

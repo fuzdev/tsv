@@ -170,6 +170,26 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " CSS Syntax 3 §4.3.7: an escape whose code point is zero, is a surrogate\n\t\t   (U+D800–U+DFFF), or is above the maximum allowed code point (U+10FFFF)\n\t\t   decodes to U+FFFD REPLACEMENT CHARACTER rather than being a parse error;\n\t\t   the neighbouring in-range code points decode normally. Names are emitted\n\t\t   from raw source, so only the accept/reject verdict is under test here. ",
+				"start": 17,
+				"end": 402
+			},
+			{
+				"type": "CSSComment",
+				"value": " The same rule applies inside a var() reference ",
+				"start": 504,
+				"end": 556
+			},
+			{
+				"type": "CSSComment",
+				"value": " ...and inside an @supports condition ",
+				"start": 615,
+				"end": 657
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 725,

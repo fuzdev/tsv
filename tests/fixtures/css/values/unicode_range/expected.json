@@ -48,6 +48,32 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " single codepoint ",
+				"start": 24,
+				"end": 46
+			},
+			{
+				"type": "CSSComment",
+				"value": " codepoint range ",
+				"start": 72,
+				"end": 93
+			},
+			{
+				"type": "CSSComment",
+				"value": " wildcard range ",
+				"start": 126,
+				"end": 146
+			},
+			{
+				"type": "CSSComment",
+				"value": " multiple values, range + wildcard ",
+				"start": 173,
+				"end": 212
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 253,

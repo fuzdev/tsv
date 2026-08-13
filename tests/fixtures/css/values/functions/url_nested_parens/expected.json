@@ -74,6 +74,32 @@
 				"end": 289
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " nested parens in unquoted url() are preserved verbatim ",
+				"start": 15,
+				"end": 75
+			},
+			{
+				"type": "CSSComment",
+				"value": " deeper nesting ",
+				"start": 103,
+				"end": 123
+			},
+			{
+				"type": "CSSComment",
+				"value": " inner group with a comma and space ",
+				"start": 154,
+				"end": 194
+			},
+			{
+				"type": "CSSComment",
+				"value": " content after the inner group ",
+				"start": 225,
+				"end": 260
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 290,

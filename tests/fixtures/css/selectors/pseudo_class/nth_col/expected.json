@@ -2257,6 +2257,98 @@
 				"end": 1824
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Basic :nth-col() - select specific columns ",
+				"start": 9,
+				"end": 57
+			},
+			{
+				"type": "CSSComment",
+				"value": " Even/odd columns ",
+				"start": 143,
+				"end": 165
+			},
+			{
+				"type": "CSSComment",
+				"value": " An+B formulas ",
+				"start": 258,
+				"end": 277
+			},
+			{
+				"type": "CSSComment",
+				"value": " Negative formulas - first N columns ",
+				"start": 467,
+				"end": 508
+			},
+			{
+				"type": "CSSComment",
+				"value": " :nth-last-col() - count from end ",
+				"start": 557,
+				"end": 595
+			},
+			{
+				"type": "CSSComment",
+				"value": " Even/odd from end ",
+				"start": 692,
+				"end": 715
+			},
+			{
+				"type": "CSSComment",
+				"value": " An+B formulas from end ",
+				"start": 820,
+				"end": 848
+			},
+			{
+				"type": "CSSComment",
+				"value": " Negative formulas from end - last N columns ",
+				"start": 956,
+				"end": 1005
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined with other selectors ",
+				"start": 1059,
+				"end": 1094
+			},
+			{
+				"type": "CSSComment",
+				"value": " With type selectors ",
+				"start": 1204,
+				"end": 1229
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple pseudo-classes ",
+				"start": 1319,
+				"end": 1348
+			},
+			{
+				"type": "CSSComment",
+				"value": " Edge cases - zero offset ",
+				"start": 1460,
+				"end": 1490
+			},
+			{
+				"type": "CSSComment",
+				"value": " With attribute selectors ",
+				"start": 1550,
+				"end": 1580
+			},
+			{
+				"type": "CSSComment",
+				"value": " Complex selectors ",
+				"start": 1645,
+				"end": 1668
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined :nth-col and :nth-last-col ",
+				"start": 1725,
+				"end": 1766
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1825,

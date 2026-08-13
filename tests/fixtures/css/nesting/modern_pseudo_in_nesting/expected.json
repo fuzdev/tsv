@@ -127,7 +127,35 @@
 														"type": "PseudoElementSelector",
 														"name": "highlight",
 														"start": 166,
-														"end": 177
+														"end": 185,
+														"args": {
+															"type": "SelectorList",
+															"start": 178,
+															"end": 184,
+															"children": [
+																{
+																	"type": "ComplexSelector",
+																	"start": 178,
+																	"end": 184,
+																	"children": [
+																		{
+																			"type": "RelativeSelector",
+																			"combinator": null,
+																			"selectors": [
+																				{
+																					"type": "TypeSelector",
+																					"name": "search",
+																					"start": 178,
+																					"end": 184
+																				}
+																			],
+																			"start": 178,
+																			"end": 184
+																		}
+																	]
+																}
+															]
+														}
 													}
 												],
 												"start": 165,
@@ -238,6 +266,26 @@
 				},
 				"start": 9,
 				"end": 338
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Modern pseudo-class in nesting ",
+				"start": 39,
+				"end": 75
+			},
+			{
+				"type": "CSSComment",
+				"value": " Modern pseudo-element in nesting ",
+				"start": 124,
+				"end": 162
+			},
+			{
+				"type": "CSSComment",
+				"value": " At-rule nesting with modern features ",
+				"start": 218,
+				"end": 260
 			}
 		],
 		"content": {

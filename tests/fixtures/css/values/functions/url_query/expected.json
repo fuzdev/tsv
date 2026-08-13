@@ -74,6 +74,32 @@
 				"end": 281
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " unquoted url() with a query string ",
+				"start": 15,
+				"end": 55
+			},
+			{
+				"type": "CSSComment",
+				"value": " query with multiple params ",
+				"start": 85,
+				"end": 117
+			},
+			{
+				"type": "CSSComment",
+				"value": " query with commas ",
+				"start": 149,
+				"end": 172
+			},
+			{
+				"type": "CSSComment",
+				"value": " query with escaped parens ",
+				"start": 205,
+				"end": 236
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 282,

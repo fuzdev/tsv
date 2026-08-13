@@ -60,6 +60,20 @@
 				"end": 295
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Single line 100 chars - fits ",
+				"start": 17,
+				"end": 51
+			},
+			{
+				"type": "CSSComment",
+				"value": " Single line 101 chars - wraps ",
+				"start": 154,
+				"end": 189
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 296,
