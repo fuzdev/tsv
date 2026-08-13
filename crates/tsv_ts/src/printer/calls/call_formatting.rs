@@ -32,6 +32,7 @@ use crate::ast::internal;
 use crate::printer::CommentVec;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, arrow_token_end,
+    callback_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
@@ -660,14 +661,23 @@ fn try_single_arg_hug(
             return Some(build_block_arrow_hug_states(printer, callee, arrow, arg));
         }
 
-        // Regular function expression: keep hugged (block body handles own formatting)
-        internal::Expression::FunctionExpression(_) => {
-            return Some(d.concat(&[
-                callee,
-                d.text("("),
-                printer.build_expression_doc(arg),
-                d.text(")"),
-            ]));
+        // Regular function expression: keep hugged (block body handles own formatting),
+        // unless a comment forces its parameter list multiline — the same refusal the block
+        // arrow one arm up makes (`build_block_arrow_hug_states`). The hug renders the
+        // callee and the signature's head on one line; a forced break inside that signature
+        // invalidates it, so the call expands instead.
+        internal::Expression::FunctionExpression(func) => {
+            let arg_doc = printer.build_expression_doc(arg);
+            if function_signature_has_breaking_comments(printer, func) {
+                return Some(d.concat(&[
+                    callee,
+                    d.text("("),
+                    d.indent(d.concat(&[d.softline(), arg_doc])),
+                    d.softline(),
+                    d.text(")"),
+                ]));
+            }
+            return Some(d.concat(&[callee, d.text("("), arg_doc, d.text(")")]));
         }
 
         // Object/array literals (or type assertions wrapping them): hug them
@@ -830,7 +840,7 @@ fn build_block_arrow_hug_states(
 
     // If the arrow has trailing param comments, the params will be multiline,
     // so we should force the wrapped state (prettier behavior)
-    if printer.arrow_has_trailing_param_comments(arrow) {
+    if arrow_signature_has_breaking_comments(printer, arrow) {
         // Force wrapped state when arrow has trailing param comments
         return d.concat(&[
             callee,
@@ -1137,6 +1147,17 @@ fn try_expand_last_function_arg(
                 if arrow.body.is_expression() && !could_expand_arrow_chain(arrow)
         );
         if !is_non_expandable_expr_arrow {
+            // A break forced inside the callback's signature invalidates the inline state
+            // here exactly as it does at the expression-body arms above, which have carried
+            // the refusal all along — this arm is the one that never asked, so a block-bodied
+            // callback (arrow or `function`) hugged where every sibling expands.
+            if call
+                .arguments
+                .last()
+                .is_some_and(|arg| callback_signature_has_breaking_comments(printer, arg))
+            {
+                return Some(build_expand_all_args(d, callee, all_args_broken));
+            }
             return Some(build_inline_or_expand_all(
                 d,
                 callee,
