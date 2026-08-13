@@ -1094,6 +1094,38 @@ impl<'a> Printer<'a> {
         comment.multiline || self.is_own_line_comment(comment)
     }
 
+    /// Whether any comment in `[start, end)` forces a break **by a property the surrounding
+    /// layout cannot manufacture** — a line comment, or a block whose own text spans lines.
+    ///
+    /// ⚠️ The **on-page** axis, deliberately: an owned comment is printed by its node's own
+    /// doc rather than by the surrounding gap, but it still occupies the page, so a glued
+    /// *multiline* block leading a parameter (`(/* a⏎b */ x) => …` — owned by `x`) breaks the
+    /// signature exactly like an unowned one. Asking the emit axis here reports a region clear
+    /// while its output spans three lines, which is hazard 2 in `docs/comments.md` and the
+    /// standing rule that a layout gate is an on-page question.
+    ///
+    /// ⚠️ **Own-line-ness is deliberately NOT a disjunct here, and that is a STABILITY
+    /// requirement rather than a scope choice.** It is the one break-forcing property a layout
+    /// can *create*: break a parameter list and every comment glued to a `(` or a comma lands
+    /// at a line start, becoming own-line in the output that a hug decision had already been
+    /// taken on. A refusal that asks it over a region the break relocates is therefore
+    /// self-fulfilling — `fn((/* c */ a,⏎⏎b) => call(a))` hugged on pass 1, the hug's own break
+    /// moved `/* c */` to a line start, and pass 2 read it as forcing and expanded. That is an
+    /// **F1 violation**, not a divergence, and `blanks:audit` is what catches it.
+    ///
+    /// A caller that genuinely needs the own-line kind must ask it only where breaking cannot
+    /// introduce it — see [`Printer::arrow_trailing_param_comment_forces_break`], whose region
+    /// sits *after* the last parameter, so a comment glued there stays glued to that parameter
+    /// however the list breaks.
+    pub(crate) fn range_has_layout_stable_break_forcing_comment(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> bool {
+        tsv_lang::comments_on_page_in_range(self.comments, start, end)
+            .any(|comment| comment.multiline || !comment.is_block)
+    }
+
     /// Check if a delimited list (tuple, type params, etc.) has line comments
     /// between any elements OR after the last element.
     ///

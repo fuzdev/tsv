@@ -24,20 +24,14 @@ use super::arg_wrapping::{
     wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
-use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
+use crate::printer::expressions::functions::{
+    arrow_signature_has_breaking_comments, callback_signature_has_breaking_comments,
+    function_signature_has_breaking_comments, prepend_leading,
+};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
-use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::has_newline_before_position;
-
-/// Prepend optional leading comments to a doc.
-#[inline]
-fn prepend_leading(d: &DocArena, leading: Option<DocId>, doc: DocId) -> DocId {
-    match leading {
-        Some(lc) => d.concat(&[lc, doc]),
-        None => doc,
-    }
-}
 
 /// Get type arguments for a call expression, checking both the call itself
 /// and a TSInstantiationExpression callee.
@@ -895,16 +889,23 @@ fn build_chain_args_single(
         (None, None) => arg_doc,
     };
 
-    // Check if it's a block arrow with trailing param comments
-    // These need soft-break wrapping to expand the call
-    let block_arrow_has_trailing_param_comments = matches!(
-        arg,
-        Expression::ArrowFunctionExpression(arrow)
-            if !arrow.body.is_expression() && printer.arrow_has_trailing_param_comments(arrow)
-    );
+    // Check if it's a block-bodied callback whose parameter list a comment forces multiline.
+    // These need soft-break wrapping to expand the call. A `function` expression is always
+    // block-bodied, so it asks the question unconditionally — the arrow's `is_expression`
+    // guard is about the arrow's *body* kind, not about the callee, and reading it as the
+    // whole gate is what left the `function` twin ungated here.
+    let callback_param_comment_forces_break = match arg {
+        Expression::ArrowFunctionExpression(arrow) => {
+            !arrow.body.is_expression() && arrow_signature_has_breaking_comments(printer, arrow)
+        }
+        Expression::FunctionExpression(func) => {
+            function_signature_has_breaking_comments(printer, func)
+        }
+        _ => false,
+    };
 
-    if block_arrow_has_trailing_param_comments {
-        // Block arrow with trailing param comments - force expansion
+    if callback_param_comment_forces_break {
+        // Callback with a forced-multiline parameter list - force expansion
         parts.push(wrap_args_with_soft_breaks(d, prefix, arg_with_comments));
         return d.concat(&parts);
     }
@@ -1047,6 +1048,19 @@ fn build_chain_args_multi(
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {
+            parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
+            return d.concat(&parts);
+        }
+
+        // The same refusal one argument over: a break forced inside the LAST argument's own
+        // signature invalidates `state_inline` just as a breaking head argument does. The
+        // expression-body arms below have always asked it; this one — the block-bodied
+        // callbacks, both spellings — never did.
+        if call
+            .arguments
+            .last()
+            .is_some_and(|arg| callback_signature_has_breaking_comments(printer, arg))
+        {
             parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
             return d.concat(&parts);
         }

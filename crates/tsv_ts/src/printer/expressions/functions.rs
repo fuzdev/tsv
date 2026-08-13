@@ -93,7 +93,11 @@ fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<Span> {
 /// paren tokens itself. The no-run case must stay node-free: this sits on the arrow-body
 /// hot path.
 #[inline]
-fn prepend_leading(d: &DocArena, leading: Option<DocId>, doc: DocId) -> DocId {
+pub(in crate::printer) fn prepend_leading(
+    d: &DocArena,
+    leading: Option<DocId>,
+    doc: DocId,
+) -> DocId {
     match leading {
         Some(run) => d.concat(&[run, doc]),
         None => doc,
@@ -198,8 +202,18 @@ fn bare_param_sharing_arrow_start(arrow: &internal::ArrowFunctionExpression<'_>)
 /// through this one predicate — the two disagreeing about when a hug is legal is exactly
 /// how the mangle survived on `arr.map(…)` while `fn(…)` was fine.
 ///
-/// A **single-line** block comment is deliberately absent: `fn(([/* c */ x, y]) => [y, x])`
-/// hugs, in tsv and prettier alike, because it inlines without forcing anything.
+/// A **glued single-line** block comment is deliberately absent:
+/// `fn(([/* c */ x, y]) => [y, x])` hugs, in tsv and prettier alike, because it inlines
+/// without forcing anything.
+///
+/// An **own-line** single-line block is not that case — it does force the signature open —
+/// but it is asked for over the *trailing-parameter* region only, never over the whole
+/// signature, and the reason is idempotence rather than taste: breaking a parameter list is
+/// itself what puts a comment glued to `(` or to a comma at a line start, so a signature-wide
+/// own-line test answers differently on the output of the hug it just permitted. See
+/// [`Printer::range_has_layout_stable_break_forcing_comment`] for the F1 failure that spells
+/// this out, and [`Printer::arrow_trailing_param_comment_forces_break`] for the region where
+/// the question *is* stable. The two disjuncts below are exactly that split.
 pub(in crate::printer) fn arrow_signature_has_breaking_comments(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
@@ -208,9 +222,45 @@ pub(in crate::printer) fn arrow_signature_has_breaking_comments(
     // An unparenthesized `x => …` has no `(`, so the signature starts at the arrow node
     // itself — which still catches `x /* a⏎b */ => y`.
     let start = arrow.params_start.unwrap_or(arrow.span.start);
-    let end = arrow.arrow_token;
-    printer.has_line_comments_between(start, end)
-        || printer.has_multiline_block_comments_on_page_between(start, end)
+    printer.range_has_layout_stable_break_forcing_comment(start, arrow.arrow_token)
+        || printer.arrow_trailing_param_comment_forces_break(arrow)
+}
+
+/// [`arrow_signature_has_breaking_comments`] for a `function` expression — the same refusal
+/// over the same kind of region, ending at the body's `{` since there is no `=>` to stop at.
+///
+/// The **expand-last-argument hug asks one question regardless of the callback's kind.** Its
+/// arrow twin was gated at every hug state and this had no gate at all, so a `function`
+/// callback whose signature is forced to break kept a hug the arrow refuses
+/// (`fn(x, function (y // c⏎) { … })`).
+pub(in crate::printer) fn function_signature_has_breaking_comments(
+    printer: &Printer<'_>,
+    func: &internal::FunctionExpression<'_>,
+) -> bool {
+    printer.range_has_layout_stable_break_forcing_comment(func.params_start, func.body.span.start)
+        || printer.function_trailing_param_comment_forces_break(func)
+}
+
+/// Whether a call argument is a callback whose signature a comment forces multiline, so the
+/// expand-last-argument hug — which renders that signature's head on the callee's line —
+/// cannot be honored and the call must expand instead.
+///
+/// The kind-agnostic entry point, so a hug state gates on "is this argument's signature
+/// broken?" rather than re-deciding per callback kind. Every arm that reached for the arrow
+/// predicate alone left the `function` spelling ungated.
+pub(in crate::printer) fn callback_signature_has_breaking_comments(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+) -> bool {
+    match arg {
+        internal::Expression::ArrowFunctionExpression(arrow) => {
+            arrow_signature_has_breaking_comments(printer, arrow)
+        }
+        internal::Expression::FunctionExpression(func) => {
+            function_signature_has_breaking_comments(printer, func)
+        }
+        _ => false,
+    }
 }
 
 /// Check if an expression has a huggable type annotation.
@@ -408,10 +458,10 @@ impl<'a> Printer<'a> {
             && crate::printer::arrow_chain_has_return_type(arrow);
 
         // Check if body arrow has trailing param comments (forces break)
-        let body_arrow_has_trailing_param_comments = matches!(
+        let body_arrow_param_comment_forces_break = matches!(
             expr,
             internal::Expression::ArrowFunctionExpression(body_arrow)
-                if self.arrow_has_trailing_param_comments(body_arrow)
+                if self.arrow_trailing_param_comment_forces_break(body_arrow)
         );
 
         // Inline block comments don't prevent hugging — only own-line comments do.
@@ -420,7 +470,7 @@ impl<'a> Printer<'a> {
         let should_hug = !has_own_line_comment
             && (should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr))
             && !chain_has_return_type
-            && !body_arrow_has_trailing_param_comments;
+            && !body_arrow_param_comment_forces_break;
 
         // The curried-chain and parenthesized-ternary arms below *reassemble* the body —
         // they build its doc and wrap it themselves — so nothing on those routes emits the
@@ -436,13 +486,20 @@ impl<'a> Printer<'a> {
         // and takes the same emitter the hug and normal arms use. The lookup is the *emit*
         // axis, which skips owned comments: one glued to the body's first token rides the
         // body's own doc and still prints exactly once.
-        // Lazy: only the four arms below read it. The own-line arm always has
-        // `has_post_arrow_comments` set (it is a conjunct of `has_own_line_comment`) and the
-        // hug and normal arms emit the run themselves, so building it up front would leave a
-        // dead comments doc in the arena on every commented arrow that isn't one of the four.
+        // Lazy: only the arms below read it, and the own-line arm never does — it always has
+        // `has_post_arrow_comments` set (a conjunct of `has_own_line_comment`) and routes to
+        // `build_arrow_body_with_comments_doc`, so building this up front would leave a dead
+        // comments doc in the arena on every commented arrow that isn't one of the rest.
+        //
+        // `AdjacentGlued` is the one glue mode that is provably a SPACE per comment here, which
+        // is what lets the whole glued half of this gap share the single leading-comment emitter
+        // (`docs/comments.md`) instead of hand-rolling the separator: every arm below is reached
+        // only once `has_own_line_comment` declined, so no comment in the gap can satisfy
+        // `comment_cannot_glue_to_operator`, and the mode's hug test is then unconditionally true.
         let gap_run = || {
             has_post_arrow_comments
-                .then(|| self.build_inline_post_arrow_comments_doc(arrow_end, body_start))
+                .then(|| self.build_rhs_comments_glued_opt(arrow_end, body_start))
+                .flatten()
         };
 
         // ⚠️ These arms are ORDERED and the order is LOAD-BEARING — each is reached only
@@ -475,8 +532,8 @@ impl<'a> Printer<'a> {
             // Hugged body (possibly with inline block comments):
             // `() => ({...})` or `() => /* c */ ({...})`
             parts.push(d.text(" "));
-            if has_post_arrow_comments {
-                parts.push(self.build_inline_post_arrow_comments_doc(arrow_end, body_start));
+            if let Some(run) = gap_run() {
+                parts.push(run);
             }
             parts.push(self.build_arrow_body_doc(expr));
         } else if is_arrow_body && (chain_has_return_type || self.in_curried_typed_arrow.get()) {
@@ -495,7 +552,7 @@ impl<'a> Printer<'a> {
                 self.build_arrow_body_doc_with_leading(expr, gap_run())
             });
             parts.push(d.concat(&[d.hardline(), body_doc]));
-        } else if is_arrow_body && body_arrow_has_trailing_param_comments {
+        } else if is_arrow_body && body_arrow_param_comment_forces_break {
             // Nested arrow with trailing param comments - first level gets indent,
             // subsequent levels align (use curried pattern)
             // (a, // c) => (b, // c) => {}
@@ -574,15 +631,13 @@ impl<'a> Printer<'a> {
             // Normal expression body: can break after => with indentation.
             // Template literal bodies with literalline nodes will propagate
             // breaks naturally, enabling chain/call expansion decisions.
+            // Inline block comments before a non-huggable body:
+            // `() => /* comment */ a + b`
             let body_doc = self.build_arrow_body_doc(expr);
-            if has_post_arrow_comments {
-                // Inline block comments before non-huggable body:
-                // `() => /* comment */ a + b`
-                let comments_doc = self.build_inline_post_arrow_comments_doc(arrow_end, body_start);
-                parts.push(hang_after_operator(d, d.concat(&[comments_doc, body_doc])));
-            } else {
-                parts.push(hang_after_operator(d, body_doc));
-            }
+            parts.push(hang_after_operator(
+                d,
+                prepend_leading(d, gap_run(), body_doc),
+            ));
         }
     }
 
@@ -965,7 +1020,7 @@ impl<'a> Printer<'a> {
     /// it: the parameter-list emitter ([`Self::build_arrow_params_doc_ungrouped`]'s
     /// `trailing_comments_end`, and through it the per-parameter
     /// [`Self::param_trailing_end`]), the force-break gate over that emitter
-    /// ([`Self::arrow_has_trailing_param_comments`]), and the signature end
+    /// ([`Self::arrow_trailing_param_comment_forces_break`]), and the signature end
     /// ([`Self::arrow_signature_end`]). A second derivation is how the gate and the emitter
     /// come to disagree about which comments are in the list — the gate opening a list for
     /// a comment no emitter there claims, or the pre-`=>` emitter reaching back over one
@@ -999,39 +1054,110 @@ impl<'a> Printer<'a> {
         })
     }
 
-    /// Whether a comment sits in an arrow's parameter list after its last parameter:
+    /// Whether a comment after an arrow's last parameter forces its parameter list
+    /// **multiline**:
     ///
     /// ```text
     /// (a: string, // comment
     /// ) => {}
     /// ```
     ///
-    /// The call printers read this as "the params will be multiline", and force their
-    /// wrapped state on it rather than hugging the callback.
+    /// Two readers, both in this module: the curried-arrow arm, which drops the chain onto
+    /// separate lines, and [`arrow_signature_has_breaking_comments`], which takes this as the
+    /// **trailing half** of the signature-wide question the call printers ask. (Those printers
+    /// once called this directly, and asking only about the trailing region is what left a
+    /// break-forcing comment in a *leading* parameter, between parameters, or in the
+    /// return-type gap hugging where prettier expands.)
     ///
-    /// ⚠️ It is a question about the **parameter list**, so it stops at
-    /// [`Self::arrow_params_end`] — never at the `=>`. Reading on to the `=>` swept in two
-    /// regions that hold no parameter comment at all, the return type and the signature→`=>`
-    /// gap, and force-wrapped the whole call around a comment that leaves the list flat:
-    /// `fn((a) /* c */ => { … })`, `fn((a): T /* c */ => …)` and `fn((a): /* c */ T => …)` each
-    /// lost prettier's hug. The over-reach was invisible while
-    /// [`Self::append_pre_arrow_comments`]'s gap went unprinted — the layout was wrong about a
-    /// comment that wasn't in the output.
+    /// ⚠️ It asks whether the comment **forces a break**, not whether one is merely present.
+    /// A single-line block glued to its parameter forces nothing — `(y /* c */) => z` is
+    /// legal on one line — so the presence reading broke a layout no comment had opened,
+    /// at every reader: `const f = (x) => (y /* c */) => z` split a curried chain three
+    /// ways, and `fn((y /* c */) => { … })` (plus its member-chain and `new` twins) lost
+    /// prettier's callback hug. The break-forcing kinds are the ones
+    /// [`Self::comment_cannot_glue_to_operator`] names — a line comment, a multiline
+    /// block, or a block on its own line — and prettier converges with tsv on all three
+    /// here, which is what makes the narrowing a pure deletion of the wrong cases.
+    /// tsv's own catalog already stated the target
+    /// ([conformance_prettier_ts_comments.md](../../../../docs/conformance_prettier_ts_comments.md)
+    /// §Comment relocation: the sanctioned divergence is the *multiline* block's, and a
+    /// single-line block "forces nothing and hugs everywhere in both").
+    ///
+    /// ⚠️ **The narrow region is what makes the own-line kind safe to ask about**, and that is
+    /// the whole reason this is not folded into [`arrow_signature_has_breaking_comments`].
+    /// Own-line-ness is manufactured by breaking (see
+    /// [`Printer::range_has_layout_stable_break_forcing_comment`]) — but only for a comment the
+    /// break can move to a line start. A comment *after the last parameter* stays glued to that
+    /// parameter however the list breaks, so here, and only here, the question is stable. The
+    /// signature-wide predicate reads on past [`Self::arrow_params_end`] to the `=>` precisely
+    /// because it drops the own-line disjunct when it does.
+    ///
+    /// ⚠️ Bounding it at [`Self::arrow_params_end`] is also what keeps the *presence* reading's
+    /// old over-reach from returning: `fn((a) /* c */ => { … })`, `fn((a): T /* c */ => …)` and
+    /// `fn((a): /* c */ T => …)` each lost prettier's hug when this swept the return type and the
+    /// signature→`=>` gap. The break-forcing question would not fire on those glued blocks today,
+    /// but the bound states the intent rather than relying on the kind test to cover for it.
     ///
     /// A `Printer` method rather than one more predicate in `calls/arg_predicates.rs`: it needs
     /// the comment table, and it owns its own bound, so no call site can hand it a different
     /// one.
-    pub(in crate::printer) fn arrow_has_trailing_param_comments(
+    fn arrow_trailing_param_comment_forces_break(
         &self,
         arrow: &internal::ArrowFunctionExpression<'_>,
     ) -> bool {
-        let Some(last_param) = arrow.params.last() else {
+        self.trailing_param_comment_forces_break(arrow.params, self.arrow_params_end(arrow))
+    }
+
+    /// [`Self::arrow_trailing_param_comment_forces_break`] for a `function` expression — the
+    /// same question about the same region, differing only in how the `)` is located (a
+    /// `function`'s parameter list always has parens, so there is no bare-parameter case).
+    ///
+    /// Its one reader is [`function_signature_has_breaking_comments`], the `function` half of
+    /// the callback-hug refusal. It exists because that hug **asks one question regardless of
+    /// the callee's shape** and the arrow twin was gated while this was not, so a `function`
+    /// callback whose signature is forced to break kept the hug where the arrow refused it —
+    /// `fn(function (y // c⏎) { … })` against `fn((y // c⏎) => { … })`, one arm apart in the
+    /// same builder (`docs/comments.md`, and the standing
+    /// two-parallel-call-argument-printers hazard).
+    ///
+    /// ⚠️ Prettier splits here and tsv deliberately does not: it expands only when the last
+    /// parameter is a **bare identifier**, and hugs once that parameter carries a type
+    /// annotation or a default. That is not a layout rule — it falls out of which node the
+    /// comment attached to (`handle-comments.js`'s last-function-arg handler fires on an
+    /// `Identifier` preceding node, and an annotation puts the type node there instead), so
+    /// tsv answers uniformly and catalogs the annotated case
+    /// ([conformance_prettier_ts_comments.md](../../../../docs/conformance_prettier_ts_comments.md)
+    /// §Comment relocation).
+    ///
+    /// ⚠️ **`new` is deliberately NOT on this rule.** Prettier hugs a `function` argument under
+    /// `new` uniformly — annotated or not — so there is no incoherence there to correct, and
+    /// tsv already matches it on both kinds. The uniformity this predicate buys is over the
+    /// *callback kind*, not over every construct that can hold one.
+    fn function_trailing_param_comment_forces_break(
+        &self,
+        func: &internal::FunctionExpression<'_>,
+    ) -> bool {
+        self.trailing_param_comment_forces_break(
+            func.params,
+            self.find_closing_paren(func.params_start, func.body.span.start),
+        )
+    }
+
+    /// The shared core of the two predicates above: whether a comment between the last
+    /// parameter and the list's `)` forces that list multiline. Split so the *question* is
+    /// stated once and only the **bound** derivation differs per callable — two copies of the
+    /// break-forcing test is exactly how the arrow's readers and the `function`'s came to
+    /// disagree in the first place.
+    fn trailing_param_comment_forces_break(
+        &self,
+        params: &[internal::Expression<'_>],
+        params_end: Option<u32>,
+    ) -> bool {
+        let (Some(last_param), Some(params_end)) = (params.last(), params_end) else {
             return false;
         };
-        let Some(params_end) = self.arrow_params_end(arrow) else {
-            return false;
-        };
-        self.has_comments_to_emit_between(last_param.span().end, params_end)
+        comments_to_emit_in_range(self.comments, last_param.span().end, params_end)
+            .any(|comment| self.comment_cannot_glue_to_operator(comment))
     }
 
     /// Append the comments an author wrote between an arrow's signature and its `=>`
@@ -1252,8 +1378,10 @@ impl<'a> Printer<'a> {
     /// Build doc for arrow function body with own-line leading comments.
     ///
     /// Called when at least one comment between `=>` and body is on its own line
-    /// (line comment or block comment with newline after). Inline block comments
-    /// use `build_inline_post_arrow_comments_doc` instead.
+    /// (line comment or block comment with newline after). The glued-only state takes
+    /// [`Printer::build_rhs_comments_glued_opt`] instead — the same shared emitter under
+    /// the one glue mode whose extra rule cannot fire here, since an own-line comment is
+    /// by definition not glued.
     /// ```typescript
     /// () =>
     ///     /* comment */
@@ -1304,20 +1432,6 @@ impl<'a> Printer<'a> {
             }
         }
         false
-    }
-
-    /// Build doc for inline block comments between `=>` and body.
-    ///
-    /// Only called when all comments are inline (no own-line comments).
-    /// Emits each comment followed by a space: `/* c1 */ /* c2 */ `
-    fn build_inline_post_arrow_comments_doc(&self, sig_end: u32, body_start: u32) -> DocId {
-        let d = self.d();
-        let mut parts: DocBuf = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, sig_end, body_start) {
-            parts.push(self.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
-        d.concat(&parts)
     }
 
     /// Build a Doc for an arrow function (simple, non-wrapping version for nested contexts)
