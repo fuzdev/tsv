@@ -21,7 +21,7 @@ use crate::printer::{
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_before_position};
 
@@ -83,6 +83,20 @@ fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<Span> {
     match leftmost_no_lookahead(expr) {
         internal::Expression::ObjectExpression(o) => Some(o.span),
         _ => None,
+    }
+}
+
+/// Prepend an optional leading comment run to a doc, allocating nothing when there is none.
+///
+/// One spelling, shared by [`Printer::build_arrow_body_doc_with_leading`] (which decides
+/// which side of the body's parens the run belongs on) and by the one arm that emits its
+/// paren tokens itself. The no-run case must stay node-free: this sits on the arrow-body
+/// hot path.
+#[inline]
+fn prepend_leading(d: &DocArena, leading: Option<DocId>, doc: DocId) -> DocId {
+    match leading {
+        Some(run) => d.concat(&[run, doc]),
+        None => doc,
     }
 }
 
@@ -386,6 +400,23 @@ impl<'a> Printer<'a> {
             && !chain_has_return_type
             && !body_arrow_has_trailing_param_comments;
 
+        // The curried-chain and parenthesized-ternary arms below *reassemble* the body —
+        // they build its doc and wrap it themselves — so nothing on those routes emits the
+        // `=>`→body gap and the comment is dropped outright (`(x) => /* c */ (a ? b : c)`).
+        // The run is handed to the body (`build_arrow_body_doc_with_leading`), which is the
+        // single place that decides which side of the body's parens it belongs on: inside a
+        // ternary's `if_break` layout parens, outside every required one. That is where the
+        // call-argument routes already put it (`prepend_arrow_body_comments`) and where
+        // prettier puts it — the ternary's parens are a layout artifact that vanishes when
+        // the body breaks, so a position outside them exists in only one rendering.
+        //
+        // Own-line comments took the first arm, so the gap holds nothing but inline blocks
+        // and takes the same emitter the hug and normal arms use. The lookup is the *emit*
+        // axis, which skips owned comments: one glued to the body's first token rides the
+        // body's own doc and still prints exactly once.
+        let gap_run = has_post_arrow_comments
+            .then(|| self.build_inline_post_arrow_comments_doc(arrow_end, body_start));
+
         if has_own_line_comment {
             // Own-line or line comments — always break
             let body_with_comments =
@@ -411,7 +442,9 @@ impl<'a> Printer<'a> {
             //
             // The flag is already set when reached via `in_curried_typed_arrow`, so
             // unconditionally setting it `true` for the body build is equivalent.
-            let body_doc = self.build_with_in_curried(true, || self.build_arrow_body_doc(expr));
+            let body_doc = self.build_with_in_curried(true, || {
+                self.build_arrow_body_doc_with_leading(expr, gap_run)
+            });
             parts.push(d.concat(&[d.hardline(), body_doc]));
         } else if is_arrow_body && body_arrow_has_trailing_param_comments {
             // Nested arrow with trailing param comments - first level gets indent,
@@ -421,7 +454,9 @@ impl<'a> Printer<'a> {
             // (a, // c) =>
             //     (b, // c) =>
             //     (c, // c) => {}
-            let body_doc = self.build_with_in_curried(true, || self.build_arrow_body_doc(expr));
+            let body_doc = self.build_with_in_curried(true, || {
+                self.build_arrow_body_doc_with_leading(expr, gap_run)
+            });
             parts.push(d.indent_hardline(body_doc));
         } else if self.in_curried_typed_arrow.get() {
             // Innermost arrow in curried chain - body is NOT another arrow.
@@ -429,7 +464,9 @@ impl<'a> Printer<'a> {
             // Reset flag so arrows inside the body (e.g. callback args) aren't
             // treated as part of the curried chain; restore to `true` (its value on
             // entry, since this arm is reached only when the flag is set) afterward.
-            let body_doc = self.build_with_in_curried(false, || self.build_arrow_body_doc(expr));
+            let body_doc = self.build_with_in_curried(false, || {
+                self.build_arrow_body_doc_with_leading(expr, gap_run)
+            });
             parts.push(d.indent_hardline(body_doc));
         } else if matches!(expr, internal::Expression::ConditionalExpression(_))
             && !has_leftmost_object_expression(expr)
@@ -462,15 +499,20 @@ impl<'a> Printer<'a> {
             } else {
                 self.build_expression_doc(expr)
             };
+            // This arm emits the paren tokens itself rather than going through
+            // `build_arrow_body_doc`, so it prepends the run on its own seam — the same
+            // side of the parens that helper picks for a ternary, i.e. inside.
+            // `will_break` asks about the BODY, so it reads the raw doc.
+            let with_leading = prepend_leading(d, gap_run, body_doc);
             if d.will_break(body_doc) {
                 // Body has hardlines (multiline template in ternary, etc.)
                 // Use normal break layout — no parens needed
-                parts.push(hang_after_operator(d, body_doc));
+                parts.push(hang_after_operator(d, with_leading));
             } else {
                 parts.push(d.text(" "));
                 parts.push(d.group(d.concat(&[
                     d.if_break(d.empty(), d.text("(")),
-                    d.indent(d.concat(&[d.softline(), body_doc])),
+                    d.indent(d.concat(&[d.softline(), with_leading])),
                     d.if_break(d.empty(), d.text(")")),
                 ])));
             }
@@ -1094,6 +1136,29 @@ impl<'a> Printer<'a> {
 
     /// Build doc for arrow function body expression.
     fn build_arrow_body_doc(&self, expr: &internal::Expression<'_>) -> DocId {
+        self.build_arrow_body_doc_with_leading(expr, None)
+    }
+
+    /// `build_arrow_body_doc` with a leading comment run placed correctly relative to
+    /// whatever parens the body takes.
+    ///
+    /// The run rides **inside** the ternary's `if_break` parens and **outside** every
+    /// other kind. The others are *required* parens (object / assignment
+    /// disambiguation), where both formatters keep a leading comment before the `(`;
+    /// the ternary's are a layout artifact that vanishes the moment the body breaks, so
+    /// a run left outside them would occupy a position that exists in one rendering
+    /// only, and the two renderings would disagree about what the comment leads. Inside
+    /// is also what lets the authored blank-after-`(` spelling reach its fixed point in
+    /// ONE pass, as prettier does, instead of relocating on a second.
+    ///
+    /// `None` is the no-run case and adds no doc node — this is a hot path.
+    fn build_arrow_body_doc_with_leading(
+        &self,
+        expr: &internal::Expression<'_>,
+        leading: Option<DocId>,
+    ) -> DocId {
+        let d = self.d();
+        let prepend = |doc: DocId| prepend_leading(d, leading, doc);
         // Expand-last-arg body reuse: when the enclosing call/new expand-last path has
         // pre-built this exact body (to also compose the break-body state), reuse that
         // DocId instead of rebuilding — rebuilding here *and* separately recurses into
@@ -1102,9 +1167,8 @@ impl<'a> Printer<'a> {
         if let Some((span, doc)) = self.arrow_body_inject.get()
             && span == expr.span().start
         {
-            return doc;
+            return prepend(doc);
         }
-        let d = self.d();
         // An arrow body is a value gap (`mark_jsdoc_cast_value_gap`).
         self.mark_jsdoc_cast_value_gap(expr);
         // Object at leftmost position in arrow body needs parens to avoid block ambiguity.
@@ -1117,7 +1181,7 @@ impl<'a> Printer<'a> {
             let prev = self.arrow_body_object_parens_target.replace(Some(obj_span));
             let doc = self.build_expression_doc(expr);
             self.arrow_body_object_parens_target.set(prev);
-            return doc;
+            return prepend(doc);
         }
 
         // Conditional expressions: parens when inline, none when on own line.
@@ -1128,19 +1192,22 @@ impl<'a> Printer<'a> {
         // the break variant (no parens).
         if matches!(expr, internal::Expression::ConditionalExpression(_)) {
             let body_doc = self.build_expression_doc(expr);
+            // The leading run rides INSIDE these parens, so the paren decision wraps
+            // both — but `will_break` still asks about the BODY alone.
+            let with_leading = prepend(body_doc);
             // If body contains hardlines (will definitely break), no parens
             if d.will_break(body_doc) {
-                return body_doc;
+                return with_leading;
             }
             // Otherwise, use if_break to check enclosing group
-            return d.if_break(body_doc, d.parens(body_doc));
+            return d.if_break(with_leading, d.parens(with_leading));
         }
 
         // Standard cases: objects and assignments always need parens
         if self.needs_parens(expr, ParenContext::ArrowBody) {
-            d.parens(self.build_expression_doc(expr))
+            prepend(d.parens(self.build_expression_doc(expr)))
         } else {
-            self.build_expression_doc(expr)
+            prepend(self.build_expression_doc(expr))
         }
     }
 
@@ -1175,10 +1242,11 @@ impl<'a> Printer<'a> {
             d.empty(),
         );
 
-        // Add the body expression
-        parts.push(self.build_arrow_body_doc(expr));
-
-        d.concat(&parts)
+        // The run is handed to the body rather than concatenated ahead of it, so it
+        // lands on the correct side of whatever parens the body takes — see
+        // `build_arrow_body_doc_with_leading`. For every body but a ternary the two are
+        // the same bytes; for a ternary the run belongs inside its layout parens.
+        self.build_arrow_body_doc_with_leading(expr, Some(d.concat(&parts)))
     }
 
     /// Check if any comment between `=>` and body is on its own line.
