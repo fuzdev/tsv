@@ -42,27 +42,19 @@ An author blank line between the pulled comment and the first specifier does not
 survive — tsv prints the specifier directly under the `{` line. That is a
 *consequence* of the position above, not a second choice: both formatters
 discard a blank in the **leading gap** (an opening delimiter's line → the first
-item), and Prettier's relocation moves the comment out of that gap, making the
-blank an inter-item one it then keeps. The authored shape is pinned by
-`unformatted_ours_blank_after_comment.svelte`, which tsv normalizes back to
-`input.svelte`.
+item) and both preserve one *between* items. Keeping the comment on the `{`
+line leaves the blank in the leading gap, so tsv's own leading-gap rule drops
+it; Prettier makes the comment the first body item, which moves the blank into
+an inter-item gap it then keeps. The derivation runs both ways — hand tsv
+Prettier's relocated form and tsv preserves the blank itself, which is why
+`variant_blank_after_comment.svelte` is dual-stable while
+`unformatted_ours_blank_after_comment.svelte` (the authored shape) normalizes
+back to `input.svelte`.
 
-⚠️ Unlike the rest of the open-delimiter family, Prettier's form here is **not**
-dual-stable — tsv rewrites it to a third form
-(`divergent_variant_blank_after_comment.svelte`). The specifier-list builder
-also drops an author blank after a **leading own-line** comment:
-
-```
-export {          export {
-	// c        →       // c
-                        a
-	a               };
-};
-```
-
-Nothing is pulled onto the `{` line there and both formatters agree on the
-comment's position, so that second drop is a separate behavior of the
-specifier-list builder — not a consequence of this divergence, and not
-sanctioned by it. Every other container in the family preserves that blank.
+Note that a specifier list preserves that blank *only* because the comment
+became a body item: blanks **between specifiers** are never preserved here (a
+`printModuleSpecifiers` property — see
+[specifier_comment_blank](../specifier_comment_blank/)), unlike the object-shaped
+members of this family.
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
