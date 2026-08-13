@@ -191,9 +191,24 @@ pub struct Printer<'a> {
     /// When true, nested arrows always break after `=>` regardless of their own return type.
     /// Used for: const f = (x: T): H => (y) => expr - ALL arrows break, not just the typed ones.
     pub(crate) in_curried_typed_arrow: Cell<bool>,
-    /// Whether to skip curried arrow chain detection (non-id param check).
-    /// Set when formatting arrows in call arg expand-last context, matching
-    /// prettier's `!args.expandLastArg` in shouldPrintAsChain.
+    /// tsv's spelling of prettier's `expandLastArg` — the argument is being printed for an
+    /// expand-last **hug** state, so it must render as prettier's `lastArg` rather than as
+    /// its `printedArguments` (the counterpart is
+    /// [`calls::build_printed_argument_doc`], which every broken-out argument goes through).
+    ///
+    /// ⚠️ **Its live job is the nested-arrow break, not the chain-layout bail.** Two readers
+    /// name it: `should_use_arrow_chain_layout`, where it is now REDUNDANT — the only two
+    /// sites that set it (`build_block_arrow_hug_states` and its `new` twin) do so solely for
+    /// a chain that already carries a return type / type params / a non-identifier param,
+    /// which that predicate refuses on its own — and `build_arrow_body`'s
+    /// `chain_has_return_type`, where it suppresses the break so the hugged body stays on the
+    /// `=>` line. That second reader is the whole reason the flag still exists; deleting it as
+    /// "the chain bail, already covered" would silently unhug every typed curried callback
+    /// (`calls/curried_arrow_chain` is the fixture that says so).
+    ///
+    /// ⚠️ **Ambient, where prettier's is per-`print()`.** It therefore has to be CLEARED on
+    /// the way into anything nested, which `build_printed_argument_doc` does — without that
+    /// it reached an unrelated chain inside the hugged body and suppressed its layout too.
     pub(crate) skip_arrow_chain: Cell<bool>,
     /// Whether to render arrow parameters flat (no break points) — mirrors
     /// prettier's `expandLastArg`/`expandFirstArg` path, which prints the
@@ -325,8 +340,11 @@ pub struct Printer<'a> {
     /// build runs once per candidate and a nested chain in a call arg compounds to
     /// O(4^depth) — the member-chain rebuild blowup. The flat and expanded builds
     /// differ in Printer state **only** via `skip_arrow_chain` /
-    /// `expand_last_arg_flat_params` (the sole `.set` sites in
-    /// `calls/chain_args.rs`); every other flag is statement-constant during a
+    /// `expand_last_arg_flat_params` — `expand_last_arg_flat_params` set within
+    /// `calls/chain_args.rs` itself, `skip_arrow_chain` only ever reachable from a call
+    /// NESTED in an argument (its two set sites live in `call_formatting.rs` /
+    /// `new_expression.rs`, and `build_printed_argument_doc` clears it on the way in);
+    /// every other flag is statement-constant during a
     /// chain or set identically by the shared AST traversal, so a given node is
     /// reached under identical state in both candidates. Hence the cache is
     /// consulted only when [`Self::chain_arg_share_eligible`] (active + both of

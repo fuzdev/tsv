@@ -18,15 +18,17 @@ use crate::printer::calls::{
     ArgItem, ArgsJoin, PartitionedComments, build_args_joined_with_comments, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_call_args_expanded, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    could_expand_arrow_chain, emit_first_arg_leading_comments, emit_last_arg_trailing_comments,
-    has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, last_two_args_same_type, prebuild_expand_last_break_body,
-    prepend_arrow_body_comments, should_force_expansion_for_comments,
-    wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
+    build_printed_argument_doc, could_expand_arrow_chain, emit_first_arg_leading_comments,
+    emit_last_arg_trailing_comments, has_inter_argument_comments_slice,
+    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
+    prebuild_expand_last_break_body, prepend_arrow_body_comments,
+    should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
+    wrap_call_with_will_break_guard,
 };
 use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
 use crate::printer::{
-    ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
+    ParenContext, Printer, arrow_chain_has_return_type, container_may_have_multiline_content,
+    has_multiline_content, is_curried_arrow_chain,
 };
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -173,7 +175,24 @@ impl<'a> Printer<'a> {
                 internal::Expression::ArrowFunctionExpression(arrow)
                     if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) =>
                 {
-                    let mut arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
+                    // Which of prettier's two renderings this ONE doc is — see
+                    // `call_formatting.rs`'s `build_block_arrow_hug_states`, which states the
+                    // rule (untyped chain → the progressive layout, whose flat rendering the
+                    // hug state measures identically; typed chain → `skip_arrow_chain`, whose
+                    // nested-arrow-break suppression is what the expand-last hug wants). One
+                    // doc, deliberately: a second build recurses into a nested call, and
+                    // paying it here would make the doc-node count 2^depth.
+                    let arg0 = &new_expr.arguments[0];
+                    let mut arrow_doc = if is_curried_arrow_chain(arg0)
+                        && arrow_chain_has_return_type(arrow)
+                    {
+                        self.skip_arrow_chain.set(true);
+                        let doc = self.build_expression_doc(arg0);
+                        self.skip_arrow_chain.set(false);
+                        doc
+                    } else {
+                        build_printed_argument_doc(self, arg0, || self.build_expression_doc(arg0))
+                    };
 
                     // Prepend leading comments (e.g., /** @param {any} x */ before arrow)
                     // and force wrapped state when present (prettier expands args with leading comments)
@@ -469,7 +488,7 @@ impl<'a> Printer<'a> {
                 // trailing-line-comment path — matching the no-comment path (the
                 // call/member-chain comment paths do the same). An own-line directive in
                 // this argument's gap freezes it verbatim (Rule A).
-                arg_parts.push(self.build_arg_item_doc(paren_open, new_expr.arguments, i));
+                arg_parts.push(ArgItem::ArgContext.build(self, paren_open, new_expr.arguments, i));
 
                 // Check for comments after this argument
                 if i < new_expr.arguments.len() - 1 {
@@ -830,12 +849,14 @@ impl<'a> Printer<'a> {
             return wrap_call_with_will_break_guard(d, callee_with_types, arg_parts);
         }
 
-        // Build args with line separators (one per line when broken)
+        // Build args with line separators (one per line when broken). Prettier shares one
+        // `printCallArguments` for Call and New, so this is its `printedArguments` — printed
+        // with no `expandLastArg` (`build_printed_argument_doc`), exactly as the plain call's
+        // twin does.
         let arg_parts = d.join_doc(
-            new_expr
-                .arguments
-                .iter()
-                .map(|arg| self.build_arg_expression_doc(arg)),
+            new_expr.arguments.iter().map(|arg| {
+                build_printed_argument_doc(self, arg, || self.build_arg_expression_doc(arg))
+            }),
             d.comma_line(),
         );
 

@@ -479,9 +479,11 @@ impl<'a> Printer<'a> {
 
         // Check if this is a curried arrow where ANY arrow triggers chain breaking.
         // Triggers: return type with params, type parameters, non-identifier params.
-        // Skip when skip_arrow_chain is set (call arg expand-last context) — prettier's
-        // shouldPrintAsChain is false when expandLastArg is true, so chain detection
-        // is disabled and the body is hugged.
+        // ⚠️ This reader is what `skip_arrow_chain` is FOR. Its other reader
+        // (`should_use_arrow_chain_layout`) is redundant with the flag's own set condition, so
+        // this is the flag's only live effect: in an expand-last hug (prettier's
+        // `expandLastArg`, where `shouldPrintAsChain` is false) the body must stay on the `=>`
+        // line rather than break. Dropping the term unhugs every typed curried callback.
         let chain_has_return_type = is_arrow_body
             && !self.skip_arrow_chain.get()
             && crate::printer::arrow_chain_has_return_type(arrow);
@@ -732,8 +734,23 @@ impl<'a> Printer<'a> {
     /// route through the existing break-after-operator path), and every comment
     /// must sit in a region [`Printer::build_arrow_chain_doc`] emits
     /// ([`Self::chain_comment_outside_emitted_regions`]). A `None` context (no
-    /// enclosing chain site) or the call-arg expand-last-arg path
-    /// (`skip_arrow_chain`) routes to the default arrow layout.
+    /// enclosing chain site) routes to the default arrow layout.
+    ///
+    /// The `skip_arrow_chain` term below is **redundant but kept**: its two set sites fire
+    /// only for a chain that already carries a return type / type params / a non-identifier
+    /// param, which the check further down refuses anyway. It states the expand-last-arg rule
+    /// at the place a reader looks for it — see the field's own doc for where the flag is
+    /// actually load-bearing.
+    ///
+    // TODO: the context set is narrower than prettier's rule. `ArrowChainContext` is set at
+    // three sites (assignment RHS, call arguments, binaryish operands), so `None` here also
+    // covers positions prettier DOES chain-layout — `shouldPrintAsChain` asks only
+    // `!expandLastArg && body is arrow`. Measured divergences: array element, `return`,
+    // ternary branch, IIFE callee, sequence operand, `export default`, `yield`, `throw`,
+    // default parameter, and a cast-wrapped call argument (`(chain) satisfies T`, where the
+    // wrapper hides the chain from `is_curried_arrow_chain` — `classify_chain_arg` already
+    // looks through such wrappers for its own question). Object property values, class
+    // properties and arrow bodies are fine: they route via `AssignmentRhs`.
     fn should_use_arrow_chain_layout(
         &self,
         arrow: &internal::ArrowFunctionExpression<'_>,

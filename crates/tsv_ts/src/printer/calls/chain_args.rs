@@ -4,7 +4,7 @@
 // is handled separately by the chain printer.
 
 use super::super::comments::CommentSpacing;
-use super::super::{Printer, is_multiline_template_expression};
+use super::super::{Printer, is_curried_arrow_chain, is_multiline_template_expression};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
     build_before_comma_trailing_comments, emit_last_arg_trailing_comments,
@@ -13,13 +13,12 @@ use super::arg_comments::{
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_concise_numeric_array,
-    is_curried_arrow, is_function_composition_args, is_ternary_arrow_body,
-    last_arg_is_array_or_object,
+    is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
-    build_chain_expand_all_args, classify_chain_arg, last_two_args_same_type,
-    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    ArgItem, ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
+    build_chain_expand_all_args, build_printed_argument_doc, classify_chain_arg,
+    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, wrap_args_with_soft_breaks,
     wrap_huggable_arg,
 };
@@ -573,11 +572,11 @@ fn build_chain_args_force_expand(
         // differently.
         let flat_sig = call.arguments.len() == 1
             && matches!(arg, Expression::ArrowFunctionExpression(arrow)
-                if arrow.body.is_expression() && !is_curried_arrow(arg));
+                if arrow.body.is_expression() && !is_curried_arrow_chain(arg));
         if flat_sig {
             printer.expand_last_arg_flat_params.set(true);
         }
-        arg_parts.push(printer.build_arg_item_doc(paren_open, call.arguments, i));
+        arg_parts.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, i));
         if flat_sig {
             printer.expand_last_arg_flat_params.set(false);
         }
@@ -853,17 +852,11 @@ fn build_chain_args_single(
         return d.concat(&parts);
     }
 
-    // Build arg doc in argument context.
-    // For curried arrows (body is another arrow), skip chain detection so the
-    // outer arrow hugs its body — matches prettier's expandLastArg behavior.
-    let curried = is_curried_arrow(arg);
-    if curried {
-        printer.skip_arrow_chain.set(true);
-    }
-    let arg_doc = printer.build_arg_expression_doc(arg);
-    if curried {
-        printer.skip_arrow_chain.set(false);
-    }
+    // Build arg doc in argument context. This is prettier's `printedArguments` — printed
+    // with no `expandLastArg`, so a curried chain takes the progressive layout
+    // (`build_printed_argument_doc`); the expand-last hug states above build their own.
+    let arg_doc =
+        build_printed_argument_doc(printer, arg, || printer.build_arg_expression_doc(arg));
     let arg_start = arg.span().start;
     let arg_end = arg.span().end;
 
@@ -881,7 +874,13 @@ fn build_chain_args_single(
         None
     };
 
-    // Build combined arg doc with leading/trailing comments
+    // Build combined arg doc with leading/trailing comments.
+    //
+    // ⚠️ Every layout arm below must splice THIS doc, never `arg_doc`. An arm that composes a
+    // state out of the bare argument drops the whole gap run whenever that state wins — the
+    // `})⟨⟩)` gap-injection shape, and hazard 4 in docs/comments.md. It is invisible to the
+    // fixture suite until some document puts a comment there, and it is exactly what the
+    // measured hug below reintroduced the first time it was written.
     let arg_with_comments = match (leading_comments_doc, trailing_comments_doc) {
         (Some(leading), Some(trailing)) => d.concat(&[leading, arg_doc, trailing]),
         (Some(leading), None) => d.concat(&[leading, arg_doc]),
@@ -998,11 +997,38 @@ fn build_chain_args_single(
             // when content breaks (no trailing comma; trailingComma: 'none').
             parts.push(wrap_huggable_arg(d, prefix, arg_with_comments));
         }
+        ChainArgKind::HugsNaturally if trailing_comments_doc.is_some() => {
+            // A comment TRAILING the last argument defeats the hug, exactly as the leading
+            // one two arms up does: prettier's `shouldExpandLastArg` refuses on both
+            // (`!hasComment(lastArg, Leading) && !hasComment(lastArg, Trailing)`), so the
+            // call takes the default broken-out layout. Only the two shapes that reach this
+            // arm *with* a trailing comment were hugging — a `function` expression and a
+            // block-terminal curried chain; every other trailing-comment argument
+            // (object, array, block arrow, ternary, cast) is routed by an earlier path.
+            parts.push(wrap_args_with_soft_breaks(d, prefix, arg_with_comments));
+        }
         ChainArgKind::HugsNaturally => {
-            // Objects/arrays/blocks that hug naturally
-            parts.push(d.text(prefix));
-            parts.push(arg_with_comments);
-            parts.push(d.text(")"));
+            // A curried arrow chain is the one shape here whose hug has to be MEASURED.
+            // Prettier reaches it through `shouldExpandLastArg`'s conditionalGroup, whose
+            // hug states print the argument with `expandLastArg: true` — heads welded onto
+            // the callee's line, which is what has to fit — and whose last state is
+            // `allArgsBrokenOut()`, printed from `printedArguments`. An unconditional hug
+            // measures the wrong thing: `arg_with_comments` already carries the progressive
+            // layout, whose short first line always fits, so the call hugs where prettier
+            // breaks out. Everything else here (objects, arrays, blocks, `function`s) hugs
+            // unconditionally in prettier too, so it keeps the single state.
+            if is_curried_arrow_chain(arg) {
+                let state_hug = d.concat(&[d.text(prefix), arg_with_comments, d.text(")")]);
+                parts.push(d.conditional_group(&[
+                    state_hug,
+                    wrap_args_with_soft_breaks(d, prefix, arg_with_comments),
+                ]));
+            } else {
+                // Objects/arrays/blocks that hug naturally
+                parts.push(d.text(prefix));
+                parts.push(arg_with_comments);
+                parts.push(d.text(")"));
+            }
         }
     }
     d.concat(&parts)
@@ -1361,7 +1387,11 @@ fn build_chain_args_multi(
             arg_parts.push(l);
         }
 
-        arg_parts.push(printer.build_arg_expression_doc(arg));
+        // Broken-out layout, so prettier's `printedArguments` shape — a curried chain takes
+        // the progressive layout (`build_printed_argument_doc`), as on the no-comment path.
+        arg_parts.push(build_printed_argument_doc(printer, arg, || {
+            printer.build_arg_expression_doc(arg)
+        }));
 
         if is_last {
             // Trailing inline block comments after the last arg (before `)`).
