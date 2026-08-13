@@ -57,8 +57,8 @@ Two deliberate choices:
    **non-terminal** run, one followed by another flowing element, takes the same per-width answer
    through a different mechanism, the fill's own boundary line rather than the fold
    (`inline_wide_content_text_sibling_long` for prose content,
-   `inline_wide_element_content_tail_long` for element-child content); only an element still
-   inside its leading inline-sibling wrap keeps the joint measurement
-   (`inline_sibling_drop_tail_flow_long`).
+   `inline_wide_element_content_tail_long` for element-child content) — including an element
+   inside a leading inline-sibling wrap, whose joint measurement was retired at the width it
+   broke on (`inline_sibling_drop_tail_wide_long`).
 
 See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

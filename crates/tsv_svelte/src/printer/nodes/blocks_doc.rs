@@ -66,7 +66,13 @@ fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expa
     let body_doc = if expand {
         printer.build_nodes_doc_multiline(fragment.nodes)
     } else {
-        printer.build_fragment_doc(fragment)
+        // `expand` is false only for a section-less await, whose every fragment is empty (see the
+        // doc comment above) — so there is nothing to lay out and the arm is spelled as the empty
+        // doc it always produced. It used to route through a whole general-purpose fragment
+        // builder to reach that same `empty()`, which made the builder look live: it was in fact
+        // this call, always with a zero-length slice, and its loop body never executed once across
+        // the fixture tree and ten real repos.
+        printer.d().empty()
     };
     printer.indent_body_expand(body_doc, expand)
 }

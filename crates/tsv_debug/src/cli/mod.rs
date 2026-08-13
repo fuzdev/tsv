@@ -33,9 +33,10 @@ use commands::{
     fuzz::FuzzCommand, json_profile::JsonProfileCommand, lex_diff::LexDiffCommand,
     line_width::LineWidthCommand, metrics::MetricsCommand,
     neutrality_audit::NeutralityAuditCommand, profile::ProfileCommand,
-    render_audit::RenderAuditCommand, render_compare::RenderCompareCommand,
-    roundtrip_audit::RoundtripAuditCommand, scan_audit::ScanAuditCommand, test262::Test262Command,
-    ts_fixture_audit::TsFixtureAuditCommand, tsc_conformance::TscConformanceCommand,
+    razor_audit::RazorAuditCommand, render_audit::RenderAuditCommand,
+    render_compare::RenderCompareCommand, roundtrip_audit::RoundtripAuditCommand,
+    scan_audit::ScanAuditCommand, test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
+    tsc_conformance::TscConformanceCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -140,6 +141,7 @@ pub enum Subcommand {
     LexDiff(LexDiffCommand),
     Metrics(MetricsCommand),
     NeutralityAudit(NeutralityAuditCommand),
+    RazorAudit(RazorAuditCommand),
     RenderAudit(RenderAuditCommand),
     RenderCompare(RenderCompareCommand),
     RoundtripAudit(RoundtripAuditCommand),
@@ -208,6 +210,7 @@ impl TopLevel {
             Subcommand::LexDiff(c) => c.run(),
             Subcommand::Metrics(c) => c.run(),
             Subcommand::NeutralityAudit(c) => c.run(),
+            Subcommand::RazorAudit(c) => c.run(),
             Subcommand::RenderAudit(c) => c.run(),
             Subcommand::RenderCompare(c) => c.run(),
             Subcommand::RoundtripAudit(c) => c.run(),

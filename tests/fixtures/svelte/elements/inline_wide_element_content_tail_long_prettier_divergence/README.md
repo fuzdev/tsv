@@ -21,10 +21,10 @@ answer: an element-content element's width-broken form emits boundary newlines t
 reads as the Tier-2 expansion signal — it regenerates as a *statically* multiline element — so its
 width-broken and statically-broken renderings must answer the tail boundary identically, or the
 document converges only on pass 2. For the prose twin the per-width answer is a design choice (its
-width breaks reflow rather than regenerate). The one shape that instead keeps the joint
-element+boundary measurement is an element still inside its **leading wrap** (a spaced comment or
-whitespace-only separator before it), where two boundaries meet on one element and resolve
-outside-in — see `inline_sibling_drop_tail_flow_long`.
+width breaks reflow rather than regenerate). An element inside a **leading wrap** (a spaced comment
+or whitespace-only separator before it) once kept a joint element+boundary measurement instead, so
+that the two boundaries meeting on it resolved outside-in; that is retired — see
+`inline_sibling_drop_tail_flow_long` and `inline_sibling_drop_tail_wide_long`.
 
 ## Prettier's forms
 

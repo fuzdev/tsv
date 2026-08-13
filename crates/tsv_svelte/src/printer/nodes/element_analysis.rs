@@ -67,13 +67,16 @@ struct MultilineInputs {
 }
 
 /// Whether every node here is a `Text` — content whose newlines are word separators, so width
-/// alone decides its layout. Two readers ask it of the SAME slice (a fragment's full node
-/// list), and that identity is load-bearing: `compute_multiline_cause` skips the
-/// authoring-derived trigger for such content (the `only_text_content` gate), and
-/// [`Printer::tail_boundary_regenerates_static_break`] mirrors that gate to answer what a
-/// width-broken element's output re-parses as — sharing the predicate and the slice is what
-/// keeps the mirror from drifting. (The answer is invariant under [`trimmed_content_run`]'s
-/// trim anyway — the trim removes only whitespace-only `Text` nodes.)
+/// alone decides its layout. `compute_multiline_cause` skips the authoring-derived trigger for
+/// such content (the `only_text_content` gate), which is why a text-only element authored with
+/// boundary air collapses back inline where any other content kind stays expanded. (The answer
+/// is invariant under [`trimmed_content_run`]'s trim anyway — the trim removes only
+/// whitespace-only `Text` nodes.)
+///
+/// It once had a second reader, a mirror answering what a width-broken element's OUTPUT
+/// re-parses as, so that the tail boundary after such an element could pre-empt the next pass.
+/// That reader is gone: the tail boundary is now decided per width at every site, so nothing
+/// needs to predict the re-parse.
 fn content_is_text_only(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)))
 }
@@ -280,10 +283,11 @@ impl<'a> Printer<'a> {
     /// one-sided authoring answers by the boundary rule alone
     /// (`elements/boundary_air_one_sided_prettier_divergence`).
     ///
-    /// ⚠️ [`Self::tail_boundary_regenerates_static_break`] mirrors the boundary-newline
-    /// honoring (a component unconditionally, an element via the fill answer) to ask what a
-    /// width-broken element's OUTPUT re-parses as — a change to the boundary arms or to
-    /// [`Self::content_is_reflowable_fill`] moves both.
+    /// This used to be mirrored by a second predicate asking what a width-broken element's
+    /// OUTPUT re-parses as, so the tail boundary after such an element could answer in advance
+    /// what the next pass would. The mirror is gone — every non-terminal tail boundary is now
+    /// decided per width from the closing tag's own column, so no caller has to predict the
+    /// re-parse and there is no second copy of these rules to keep in step.
     fn has_source_breaks_in_content(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -399,41 +403,6 @@ impl<'a> Printer<'a> {
                 !is_fill && raw.trim_matches(is_collapsible_ws_char).contains('\n')
             }
         })
-    }
-
-    /// Whether this inline sibling's **width-broken output re-parses as statically multiline** —
-    /// the block-style form it renders emits boundary newlines that
-    /// [`Self::has_source_breaks_in_content`]'s Tier-2 rule then honors via the both-or-neither
-    /// arm, unconditionally for a **component** and for an inline **element** with any
-    /// non-text-only content (the air is the author's whatever the content is made of; only
-    /// text-only content is exempt, via the caller's `only_text_content` gate).
-    ///
-    /// The reader is the tail boundary AFTER such an element (`handle_text_child`'s non-last
-    /// arm): where regeneration holds, that boundary must take the same per-width fill decision
-    /// the statically-broken case takes, or the two renderings of one document disagree across
-    /// passes — pass 1 width-breaks the element and hard-breaks the tail, pass 2 re-reads the
-    /// emitted newlines as the static trigger and hugs it, a period-2 the `authoring:audit`
-    /// mutants catch.
-    ///
-    /// A `SpecialElement` conservatively answers `false` (keeps the joint-group join): its kinds
-    /// are rare in inline runs and the join is the older, better-pinned behavior.
-    pub(super) fn tail_boundary_regenerates_static_break(&self, node: &FragmentNode<'_>) -> bool {
-        let FragmentNode::Element(el) = node else {
-            return false;
-        };
-        if el.facts.is_component_name() {
-            return true;
-        }
-        // Text-only content never regenerates: `compute_multiline_cause` skips the
-        // authoring-derived trigger for it (the `only_text_content` gate — the SAME predicate
-        // over the SAME slice, so the mirror cannot drift; an empty or all-whitespace fragment
-        // is text-only and answers `false` here, and such an element never width-breaks to
-        // block-style anyway). Every other content kind regenerates — the both-or-neither arm
-        // honors the emitted boundary air without asking what the content is made of.
-        // Answering `false` for a reflowable fill here kept the joint element+boundary join on
-        // pass 1 while the re-parse hugged the tail per width on pass 2, a period-2 on the
-        // formatter's own output (`inline_comment_wrap_fill_tail_long`).
-        !content_is_text_only(el.fragment.nodes)
     }
 
     /// Analyze an element to compute all formatting-relevant properties.
