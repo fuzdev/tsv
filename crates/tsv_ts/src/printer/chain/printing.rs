@@ -40,10 +40,19 @@ pub(crate) fn print_node_inner<'a>(
             followed_by_non_null,
         } => {
             if *needs_parens {
-                // Asked BEFORE the base's doc is built — building it can re-mark the
+                // Asked BEFORE any base doc is built — building one can re-mark the
                 // target from a nested value position inside the ternary's own branches.
                 let base_ternary = printer.chain_base_ternary(expr);
-                let inner = printer.build_expression_doc(expr);
+                // The plain expression doc, memoized lazily: every arm consumes it EXCEPT
+                // a binary base's common path, which builds the chain-for-parens operand
+                // doc instead — eager, a parenthesized binary base paid two full doc
+                // builds for one rendered doc. The rare paren-comment branch still
+                // consumes it (the line-comment layout's broken body), which is why it is
+                // a memo rather than moved into the arms that use it.
+                let mut inner_memo = None;
+                let mut inner = || -> DocId {
+                    *inner_memo.get_or_insert_with(|| printer.build_expression_doc(expr))
+                };
                 // The parens stay bare outside so the chain's conditionalGroup drives
                 // breaking; `build_expanding_parens_body_doc` is the shape every base kind
                 // below takes — await, binary, and everything else alike.
@@ -59,10 +68,11 @@ pub(crate) fn print_node_inner<'a>(
                     // DIRECT parent does the `)` additionally drop to its own line
                     // (prettier's `breakClosingParen`); a `!` in between is the parent
                     // instead, and there the `)` stays welded to the last arm.
+                    let body = inner();
                     if ternary.direct && !*followed_by_non_null {
-                        d.group(d.concat(&[inner, d.softline()]))
+                        d.group(d.concat(&[body, d.softline()]))
                     } else {
-                        inner
+                        body
                     }
                 } else {
                     match expr {
@@ -73,7 +83,7 @@ pub(crate) fn print_node_inner<'a>(
                             // never breaks after the `(` here. `(() => {...})().catch()`,
                             // `(function () {})().p`. Matches the bare-callee path
                             // (`call_formatting.rs`), which wraps with hugging parens.
-                            inner
+                            inner()
                         }
                         Expression::BinaryExpression(binary) => {
                             // The chain-for-parens operand doc, so the whole operand chain is
@@ -87,7 +97,7 @@ pub(crate) fn print_node_inner<'a>(
                             hang(printer.build_binary_chain_for_parens(binary))
                         }
                         // Every other base kind, and a ternary base that DOES expand.
-                        _ => hang(inner),
+                        _ => hang(inner()),
                     }
                 };
                 // Preserve a comment from the stripped grouping parens inside them,
@@ -99,7 +109,7 @@ pub(crate) fn print_node_inner<'a>(
                         expr.span().end,
                         end,
                         inner_group,
-                        inner,
+                        inner(),
                         ")",
                     )
                 {

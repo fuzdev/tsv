@@ -75,8 +75,9 @@ struct MultilineInputs {
 ///
 /// It once had a second reader, a mirror answering what a width-broken element's OUTPUT
 /// re-parses as, so that the tail boundary after such an element could pre-empt the next pass.
-/// That reader is gone: the tail boundary is now decided per width at every site, so nothing
-/// needs to predict the re-parse.
+/// That reader is gone: the tail boundary's space spelling is now decided per width at every
+/// site, and its newline spelling reads the actual render (the flow probe), so nothing needs
+/// to predict the re-parse.
 fn content_is_text_only(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)))
 }
@@ -286,10 +287,11 @@ impl<'a> Printer<'a> {
     /// This used to be mirrored by a second predicate asking what a width-broken element's
     /// OUTPUT re-parses as, so the tail boundary after such an element could answer in advance
     /// what the next pass would. The mirror is gone — a tail boundary's space spelling is
-    /// decided per width from the closing tag's own column, and its newline spelling rides the
-    /// joint `group([element, line])`, which breaks with the element's own layout — so no
-    /// caller has to predict the re-parse and there is no second copy of these rules to keep
-    /// in step.
+    /// decided per width from the closing tag's own column, and its newline spelling is
+    /// layout-keyed at render (the flow probe — [`tsv_lang::doc::DocContext::flow_break_probe`]
+    /// / `hold_line_after_broken_flow` — holds the tail's line exactly when the unit actually
+    /// rendered multiline) — so no caller has to predict the re-parse and there is no second
+    /// copy of these rules to keep in step.
     fn has_source_breaks_in_content(
         &self,
         nodes: &[FragmentNode<'_>],

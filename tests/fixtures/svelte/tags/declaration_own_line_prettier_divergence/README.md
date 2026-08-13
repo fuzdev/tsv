@@ -21,7 +21,9 @@ beside such a tag therefore changes no render, and the layout question is free �
 declaration tags across the corpus sit on their own line) and what makes a run of them read as the
 declarations they are. A render-free run must not select a layout, the rule this whole section rests
 on ([§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)),
-so the glued, spaced and newline authorings are one document and reach one form.
+so the glued, spaced and newline authorings are one document and reach one form. (An
+authored **blank line** beside the tag is a separate Tier-2 signal and survives, in every
+position — `tags/declaration_blank_line` pins it, with prettier agreeing.)
 
 ⚠️ **The one exception is a tag GLUED on both sides**, where the break is *not* render-free:
 `{#if c}a{@const x = 1}b{/if}` compiles to `ab`, while the own-line form compiles to `a b` — a

@@ -45,7 +45,7 @@ spelling after a multiline predecessor is a per-width fill decision measured fro
 predecessor's own end column, however it came to be multiline (an authored newline is
 layout-keyed instead — the catalog entry below), and a run that cannot hug spends its boundary
 space on the break — so
-every render-free authoring of the document reaches one fixed point. Prettier instead groups that
+every space-spelled authoring of the document reaches one fixed point. Prettier instead groups that
 boundary with the element, so a multiline element always drops a non-terminal tail while a
 terminal one hugs and the line runs past print width. The boundaries tsv moves are render-free
 under Svelte 5.
