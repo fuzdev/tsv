@@ -1109,9 +1109,10 @@ impl<'a> Printer<'a> {
     /// Build a binary operand's doc, routing a curried arrow-chain operand
     /// (`cond ?? ((a) => (b) => …)`) through the progressive call-arg/binaryish
     /// chain layout. Mirrors prettier's `isBinaryish(parent)` reaching
-    /// `printArrowFunctionSignatures`; `should_use_arrow_chain_layout` still gates
-    /// on untyped / comment-free chains, so a typed or comment-bearing operand
-    /// falls through to the default path.
+    /// `printArrowFunctionSignatures`; `should_use_arrow_chain_layout` still gates on
+    /// untyped chains, and on every comment sitting in a region the chain doc emits, so
+    /// a typed operand — or one whose comment lands in a gap that layout has no emitter
+    /// for — falls through to the default path.
     fn build_chain_aware_operand_doc(&self, operand: &Expression<'_>) -> DocId {
         if crate::printer::is_curried_arrow_chain(operand) {
             self.build_with_arrow_chain_context(
