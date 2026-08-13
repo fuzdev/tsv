@@ -106,6 +106,7 @@ deno task build:packages   # the 6 publishable WASM bundles (npm + deno) — sin
 deno task build:bench      # the artifact set `bench`/`smoke` measure (ffi×3 + the 3 wasm:deno variants + the node half: napi + wasm:all:nodejs)
 deno task build:ffi        # C FFI library (:format / :parse size-only variants; :all builds all three)
 deno task build:wasm:deno  # deno-target WASM bundle (requires wasm-pack; :parse:deno / :all:deno for the other variants)
+deno task install-cli      # build the release CLI and install it to ~/.local/bin/tsv (the local daily driver)
 deno task clean            # clean build artifacts
 deno task dev              # watch mode: check + test on changes (requires cargo-watch)
 

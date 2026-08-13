@@ -21,6 +21,7 @@
 		"build:npm:format": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/format/npm -- --no-default-features --features format && deno run --allow-read --allow-write=crates/tsv_wasm/pkg --allow-run=gzip scripts/patch_npm_package.ts format",
 		"build:npm:parse": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/parse/npm -- --no-default-features --features parse && deno run --allow-read --allow-write=crates/tsv_wasm/pkg --allow-run=gzip scripts/patch_npm_package.ts parse",
 		"build:npm:all": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/all/npm && deno run --allow-read --allow-write=crates/tsv_wasm/pkg --allow-run=gzip scripts/patch_npm_package.ts all",
+		"install-cli": "cargo build --release -p tsv_cli && mkdir -p ~/.local/bin && cp target/release/tsv ~/.local/bin/tsv",
 		"clean": "cargo clean",
 
 		"dev": "cargo watch -x 'check --workspace' -x 'test --workspace' || echo '⚠️  cargo-watch not installed. Run: cargo install cargo-watch'",
