@@ -1,0 +1,1528 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 760,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a blank line after an object pattern's `{` is dropped - the pattern collapses",
+			"start": 10,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an arrow parameter takes the same rule",
+			"start": 112,
+			"end": 153,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a function declaration parameter too",
+			"start": 185,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " and a catch binding",
+			"start": 267,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an assignment pattern is a pattern position too",
+			"start": 330,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a nested pattern hugged by a parameter stays inline - the blank adds no reason to expand",
+			"start": 416,
+			"end": 507,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " contrast - an object literal keeps the expansion, only patterns drop it",
+			"start": 547,
+			"end": 621,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " contrast - a blank line between a pattern's properties is preserved",
+			"start": 650,
+			"end": 720,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 71
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 759,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 750,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 35,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 92,
+					"end": 109,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 98,
+							"end": 108,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 98,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 100,
+										"end": 102,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 9
+											},
+											"end": {
+												"line": 3,
+												"column": 11
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 100,
+											"end": 102,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 9
+												},
+												"end": {
+													"line": 3,
+													"column": 11
+												}
+											},
+											"name": "a1"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 100,
+											"end": 102,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 9
+												},
+												"end": {
+													"line": 3,
+													"column": 11
+												}
+											},
+											"name": "a1"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 107,
+								"end": 108,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 16
+									},
+									"end": {
+										"line": 3,
+										"column": 17
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a blank line after an object pattern's `{` is dropped - the pattern collapses",
+							"start": 10,
+							"end": 90
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 155,
+					"end": 182,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 161,
+							"end": 181,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 161,
+								"end": 164,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"name": "fn1"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 167,
+								"end": 181,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 13
+									},
+									"end": {
+										"line": 6,
+										"column": 27
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 168,
+										"end": 174,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 14
+											},
+											"end": {
+												"line": 6,
+												"column": 20
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 170,
+												"end": 172,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 16
+													},
+													"end": {
+														"line": 6,
+														"column": 18
+													}
+												},
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 170,
+													"end": 172,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 16
+														},
+														"end": {
+															"line": 6,
+															"column": 18
+														}
+													},
+													"name": "a2"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 170,
+													"end": 172,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 16
+														},
+														"end": {
+															"line": 6,
+															"column": 18
+														}
+													},
+													"name": "a2"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 179,
+									"end": 181,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 25
+										},
+										"end": {
+											"line": 6,
+											"column": 27
+										}
+									},
+									"name": "a2"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an arrow parameter takes the same rule",
+							"start": 112,
+							"end": 153
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 226,
+					"end": 264,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 235,
+						"end": 238,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 9,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ObjectPattern",
+							"start": 239,
+							"end": 245,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 14
+								},
+								"end": {
+									"line": 9,
+									"column": 20
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 241,
+									"end": 243,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 16
+										},
+										"end": {
+											"line": 9,
+											"column": 18
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 241,
+										"end": 243,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 16
+											},
+											"end": {
+												"line": 9,
+												"column": 18
+											}
+										},
+										"name": "a3"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 241,
+										"end": 243,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 16
+											},
+											"end": {
+												"line": 9,
+												"column": 18
+											}
+										},
+										"name": "a3"
+									},
+									"kind": "init"
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 247,
+						"end": 264,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 22
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 251,
+								"end": 261,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 12
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 258,
+									"end": 260,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 9
+										},
+										"end": {
+											"line": 10,
+											"column": 11
+										}
+									},
+									"name": "a3"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a function declaration parameter too",
+							"start": 185,
+							"end": 224
+						}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"start": 291,
+					"end": 327,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 20
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 295,
+						"end": 309,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 5
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 299,
+								"end": 306,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 299,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 8
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 299,
+										"end": 302,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 5
+											}
+										},
+										"name": "fn2"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 303,
+											"end": 304,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 6
+												},
+												"end": {
+													"line": 15,
+													"column": 7
+												}
+											},
+											"name": "o"
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 310,
+						"end": 327,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 3
+							},
+							"end": {
+								"line": 16,
+								"column": 20
+							}
+						},
+						"param": {
+							"type": "ObjectPattern",
+							"start": 317,
+							"end": 323,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 10
+								},
+								"end": {
+									"line": 16,
+									"column": 16
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 319,
+									"end": 321,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 12
+										},
+										"end": {
+											"line": 16,
+											"column": 14
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 319,
+										"end": 321,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 12
+											},
+											"end": {
+												"line": 16,
+												"column": 14
+											}
+										},
+										"name": "a4"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 319,
+										"end": 321,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 12
+											},
+											"end": {
+												"line": 16,
+												"column": 14
+											}
+										},
+										"name": "a4"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 325,
+							"end": 327,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 18
+								},
+								"end": {
+									"line": 16,
+									"column": 20
+								}
+							},
+							"body": []
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " and a catch binding",
+							"start": 267,
+							"end": 289
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 382,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 388,
+							"end": 412,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 388,
+								"end": 391,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 10
+									}
+								},
+								"name": "fn3"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 394,
+								"end": 412,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 13
+									},
+									"end": {
+										"line": 19,
+										"column": 31
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "AssignmentPattern",
+										"start": 395,
+										"end": 405,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 14
+											},
+											"end": {
+												"line": 19,
+												"column": 24
+											}
+										},
+										"left": {
+											"type": "ObjectPattern",
+											"start": 395,
+											"end": 401,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 14
+												},
+												"end": {
+													"line": 19,
+													"column": 20
+												}
+											},
+											"properties": [
+												{
+													"type": "Property",
+													"start": 397,
+													"end": 399,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 16
+														},
+														"end": {
+															"line": 19,
+															"column": 18
+														}
+													},
+													"method": false,
+													"shorthand": true,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 397,
+														"end": 399,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 16
+															},
+															"end": {
+																"line": 19,
+																"column": 18
+															}
+														},
+														"name": "a5"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 397,
+														"end": 399,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 16
+															},
+															"end": {
+																"line": 19,
+																"column": 18
+															}
+														},
+														"name": "a5"
+													},
+													"kind": "init"
+												}
+											]
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 404,
+											"end": 405,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 23
+												},
+												"end": {
+													"line": 19,
+													"column": 24
+												}
+											},
+											"name": "o"
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 410,
+									"end": 412,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 29
+										},
+										"end": {
+											"line": 19,
+											"column": 31
+										}
+									},
+									"name": "a5"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an assignment pattern is a pattern position too",
+							"start": 330,
+							"end": 380
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 509,
+					"end": 544,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 515,
+							"end": 543,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 22,
+									"column": 35
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 515,
+								"end": 518,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 10
+									}
+								},
+								"name": "fn4"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 521,
+								"end": 543,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 13
+									},
+									"end": {
+										"line": 22,
+										"column": 35
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "ObjectPattern",
+										"start": 522,
+										"end": 536,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 14
+											},
+											"end": {
+												"line": 22,
+												"column": 28
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 524,
+												"end": 534,
+												"loc": {
+													"start": {
+														"line": 22,
+														"column": 16
+													},
+													"end": {
+														"line": 22,
+														"column": 26
+													}
+												},
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 524,
+													"end": 526,
+													"loc": {
+														"start": {
+															"line": 22,
+															"column": 16
+														},
+														"end": {
+															"line": 22,
+															"column": 18
+														}
+													},
+													"name": "a6"
+												},
+												"value": {
+													"type": "ObjectPattern",
+													"start": 528,
+													"end": 534,
+													"loc": {
+														"start": {
+															"line": 22,
+															"column": 20
+														},
+														"end": {
+															"line": 22,
+															"column": 26
+														}
+													},
+													"properties": [
+														{
+															"type": "Property",
+															"start": 530,
+															"end": 532,
+															"loc": {
+																"start": {
+																	"line": 22,
+																	"column": 22
+																},
+																"end": {
+																	"line": 22,
+																	"column": 24
+																}
+															},
+															"method": false,
+															"shorthand": true,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 530,
+																"end": 532,
+																"loc": {
+																	"start": {
+																		"line": 22,
+																		"column": 22
+																	},
+																	"end": {
+																		"line": 22,
+																		"column": 24
+																	}
+																},
+																"name": "b6"
+															},
+															"value": {
+																"type": "Identifier",
+																"start": 530,
+																"end": 532,
+																"loc": {
+																	"start": {
+																		"line": 22,
+																		"column": 22
+																	},
+																	"end": {
+																		"line": 22,
+																		"column": 24
+																	}
+																},
+																"name": "b6"
+															},
+															"kind": "init"
+														}
+													]
+												},
+												"kind": "init"
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 541,
+									"end": 543,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 33
+										},
+										"end": {
+											"line": 22,
+											"column": 35
+										}
+									},
+									"name": "b6"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a nested pattern hugged by a parameter stays inline - the blank adds no reason to expand",
+							"start": 416,
+							"end": 507
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 623,
+					"end": 647,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 629,
+							"end": 646,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 629,
+								"end": 631,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 9
+									}
+								},
+								"name": "o1"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 634,
+								"end": 646,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 12
+									},
+									"end": {
+										"line": 27,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 638,
+										"end": 643,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 638,
+											"end": 640,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 2
+												},
+												"end": {
+													"line": 26,
+													"column": 4
+												}
+											},
+											"name": "a7"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 642,
+											"end": 643,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 6
+												},
+												"end": {
+													"line": 26,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " contrast - an object literal keeps the expansion, only patterns drop it",
+							"start": 547,
+							"end": 621
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 722,
+					"end": 749,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 728,
+							"end": 748,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 728,
+								"end": 744,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 34,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 732,
+										"end": 734,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 732,
+											"end": 734,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 2
+												},
+												"end": {
+													"line": 31,
+													"column": 4
+												}
+											},
+											"name": "a8"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 732,
+											"end": 734,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 2
+												},
+												"end": {
+													"line": 31,
+													"column": 4
+												}
+											},
+											"name": "a8"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 739,
+										"end": 741,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 2
+											},
+											"end": {
+												"line": 33,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 739,
+											"end": 741,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 2
+												},
+												"end": {
+													"line": 33,
+													"column": 4
+												}
+											},
+											"name": "b8"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 739,
+											"end": 741,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 2
+												},
+												"end": {
+													"line": 33,
+													"column": 4
+												}
+											},
+											"name": "b8"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 747,
+								"end": 748,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 5
+									},
+									"end": {
+										"line": 34,
+										"column": 6
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " contrast - a blank line between a pattern's properties is preserved",
+							"start": 650,
+							"end": 720
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
