@@ -815,14 +815,14 @@ impl<'a> Printer<'a> {
     ///
     /// - *Does the fill have a word to pack here?* — **this** one, WIDE. An NBSP is not a word,
     ///   so a node made only of NBSPs is a separator and its run is not reflowable.
-    /// - *Is this separator interchangeable with a plain space?* — `is_one_line_separator`
-    ///   (`element_analysis.rs`), NARROW. An NBSP is **not**: it renders as itself and never
-    ///   collapses, so it may not be respelled and may not pick a layout.
+    /// - *Is this separator interchangeable with a plain space?* — the NARROW
+    ///   [`internal::is_collapsible_ws`] class, which every boundary and separator decision on
+    ///   this path asks instead. An NBSP is **not**: it renders as itself and never collapses,
+    ///   so it may not be respelled and may not pick a layout.
     ///
     /// An `&nbsp;` node therefore answers yes here and no there, which is correct on both
-    /// counts — and a single run may legitimately hold one node of each kind, so neither
-    /// predicate can stand in for the other. `Printer::run_is_one_line` documents the same
-    /// split from the third side.
+    /// counts — and a single run may legitimately hold one node of each kind, so neither class
+    /// can stand in for the other.
     pub(super) fn is_separator_like_text(data: &str) -> bool {
         !data.is_empty() && data.chars().all(char::is_whitespace)
     }

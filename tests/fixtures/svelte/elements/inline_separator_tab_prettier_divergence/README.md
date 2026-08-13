@@ -34,8 +34,11 @@ the closing sentence in `input.svelte`'s comment rather than an oversight. A run
 holds no prose, so it has no fill to reflow into; its authored lines are the only structure the
 author has, and collapsing them packs independent siblings onto one line. So the newline spelling
 keeps its lines — pinned next door by [inline_multiline_nontext](../inline_multiline_nontext/),
-where prettier agrees. What separates the tab from the newline is not the byte but the fact that
-the author left the siblings on **one line**, which is exactly the condition this arm reads.
+where prettier agrees. What separates the tab from the newline is not the byte but whether it is a
+**break**: a tab leaves the siblings on one line, so there is no authored break for the interior
+arms to honor, while a newline is one and they honor it. No fill answer is involved on either
+side — a pure-sibling run has none, and the arm that once granted it one is retired as
+decision-inert.
 
 ## Cases
 
