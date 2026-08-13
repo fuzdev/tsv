@@ -200,7 +200,7 @@ impl<'a> Printer<'a> {
                     // If the arrow has trailing param comments or leading comments,
                     // force wrapped state
                     let has_trailing_param_comments =
-                        new_has_comments && self.arrow_has_trailing_param_comments(arrow);
+                        new_has_comments && arrow_signature_has_breaking_comments(self, arrow);
 
                     if has_trailing_param_comments || has_leading_comment {
                         return d.concat(&[
@@ -685,12 +685,27 @@ impl<'a> Printer<'a> {
                         ]);
                     }
 
-                    // Block-body arrow/function: inline vs expand-all (no hug state)
-                    let state_inline =
-                        build_inline_args(d, callee_with_types, &head_parts, last_arg_doc);
-                    let state_expand_all =
-                        build_expand_all_args(d, callee_with_types, all_args_broken);
-                    return d.conditional_group(&[state_inline, state_expand_all]);
+                    // Block-body arrow/function: inline vs expand-all (no hug state).
+                    //
+                    // A break forced inside the last argument's signature invalidates
+                    // `state_inline`, as it does at every other hug state — but the question is
+                    // asked of an **arrow only**, deliberately. Prettier hugs a `function`
+                    // argument under `new` uniformly, so there is nothing incoherent to correct
+                    // there and tsv matches it; see
+                    // `functions::function_signature_has_breaking_comments`.
+                    if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
+                        new_expr.arguments.last()
+                        && arrow_signature_has_breaking_comments(self, arrow)
+                    {
+                        return build_expand_all_args(d, callee_with_types, all_args_broken);
+                    }
+                    return build_inline_or_expand_all(
+                        d,
+                        callee_with_types,
+                        &head_parts,
+                        last_arg_doc,
+                        all_args_broken,
+                    );
                 }
 
                 // Array/object last arg path (matches call_formatting.rs's expand-last array/object path)
