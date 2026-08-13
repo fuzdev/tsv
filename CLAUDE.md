@@ -198,7 +198,7 @@ deno task fuzz:audit                 # seeded mutational fuzzer (fixed seed/iter
 deno task swallow:audit              # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
 deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments
 deno task gaps:audit                 # gap-injection RATCHET, ~17 s (./docs/gap_audit.md; also :update and :rank for triage)
-deno task blanks:audit               # blank-line injection RATCHET, ~24 s (./docs/blank_audit.md; also :update)
+deno task blanks:audit               # blank-line injection RATCHET + the blank-DROP absorb pin (a new kind of silently-eaten blank fails), ~30 s (./docs/blank_audit.md; also :update)
 deno task fabrication:audit          # blank-FABRICATION on pristine seeds — the F1-blind counterpart to blanks (ratchet born EMPTY; also :update)
 deno task census:audit               # comment CENSUS: raw input-vs-output trivia multisets per language bucket (own scanners, never parse().comments) — catches parse-time drops/merges/rewrites the ledger can't see (also :update)
 deno task width:audit                # print-width RATCHET: a new KIND of over-width output line — the ONLY gate that measures a column. ⚠️ NOT a debt list (sanctioned overruns are real); also :update

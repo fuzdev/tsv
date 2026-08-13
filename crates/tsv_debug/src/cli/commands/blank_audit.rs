@@ -44,6 +44,31 @@
 //! carve-out is a filter on the graded key set ([`is_graded`] / [`snapshot_keys`]), **not**
 //! [`is_pinnable`] — a report-only kind must be *absent* from the ratchet, not *failing* it.
 //!
+//! ## The absorb pin — the blank-DROP class the invariants deliberately don't grade
+//!
+//! Invariant 2 lets pass 1 keep OR drop the injected blank (the invariants are policy-free), and
+//! the ABSORB fast path below grades every clean drop as success — so a formatter that silently
+//! EATS a blank at some gap passes all six invariants forever: the dropped-blank output is its
+//! own fixed point, so F1, fuzz, and round-trip are structurally blind too, and only a prettier
+//! compare on the authored shape can see it (the #759 class: an authored blank before a
+//! last-child declaration, deleted). The absorb pin closes the *silent* half of that hole: every
+//! **node-edge class** ([`node_edge_key_with_map`] — the innermost AST node holding the offset
+//! plus the child-role edge the gap sits in) whose injected blank is absorbed is pinned in a
+//! SECOND snapshot (`blank_absorb_known.txt`), a **behavior pin, not a bug list**
+//! (`width_audit`'s stance — most absorption is sanctioned; prettier collapses a blank in an
+//! expression or an argument list too). The key is deliberately the coarse node-edge class, not
+//! the fine [`site_shape`]: ~81% of injections absorb, so token granularity pins the fixture
+//! tree's whole token-adjacency vocabulary (~5.7k shapes, measured) and mints new ones on
+//! ordinary fixture PRs — the exact churn the snapshot header warns turns gates off — while a
+//! node-edge class ≈ one emitter decision, the grain a triage verdict actually covers. One
+//! absorption is exempt from the pin: an injection beside an already-authored blank
+//! ([`gap_holds_blank`]) reproduces the pristine output via the sanctioned 2+→1 run collapse,
+//! not a drop, and recording it would pin classes where blanks otherwise survive. The gate
+//! fails on a NEW absorbing class — the formatter newly eats a blank at a kind of gap the pin
+//! has never seen, which must be triaged against prettier rather than land silently — and on a
+//! stale one. Graded only on the full default corpus (absorption is normal behavior, so
+//! off-corpus absorb classes are not news the way findings are).
+//!
 //! ## Design
 //!
 //! Pure Rust, no sidecar, no new deps — the [`fuzz`](super::fuzz) / [`gap_audit`](super::gap_audit)
@@ -96,6 +121,7 @@ use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger::{self, CommentFindingKind};
 
 use crate::audit::examples::{ExampleOrd, ExampleSet};
+use crate::audit::node_edge::node_edge_key_with_map;
 use crate::audit::parallel::{ArmedRun, run_pool};
 use crate::audit::properties::{
     F1Outcome, Formatted, Pristine, Utf16ToByte, f1_check, leaf_conservation_diff, ledger_format,
@@ -121,9 +147,11 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 ///
 /// For each seed file, injects a blank line at each candidate byte offset (one at a time),
 /// formats, and reports every injection that panics, breaks idempotency, fails to reparse,
-/// corrupts a leaf, drops/double-prints a comment, or emits a 2+ blank run. Pure Rust — no
-/// Deno. Defaults to `tests/fixtures`; the real yield is external corpora. Exits 1 on a new /
-/// stale / panic finding shape (a ratchet, like `gap_audit`).
+/// corrupts a leaf, drops/double-prints a comment, or emits a 2+ blank run — plus the absorb
+/// pin over the silently-eaten blanks (the drop class the invariants don't grade). Pure Rust —
+/// no Deno. Defaults to `tests/fixtures`; the real yield is external corpora. Exits 1 on a new
+/// / stale / panic finding shape (a ratchet, like `gap_audit`) and on a new / stale absorb
+/// class.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "blank_audit")]
 #[allow(clippy::struct_excessive_bools)] // independent CLI flags
@@ -132,9 +160,10 @@ pub struct BlankAuditCommand {
     #[argh(switch)]
     json: bool,
 
-    /// print the full per-shape report even when the ratchet holds. A passing gate is
-    /// summary-only by default — the shapes it already knows about are noise in
-    /// `deno task check`. Any run with something to act on reports regardless
+    /// print the full per-shape report (plus the per-class absorb rows, each with its
+    /// reproducer) even when the gates hold. A passing gate is summary-only by default — the
+    /// shapes it already knows about are noise in `deno task check`. Any run with something to
+    /// act on reports regardless
     #[argh(switch)]
     report: bool,
 
@@ -147,9 +176,10 @@ pub struct BlankAuditCommand {
     #[argh(option, default = "0")]
     limit: usize,
 
-    /// rewrite the committed shape snapshot from this run. Only valid on a FULL default run —
-    /// the snapshot describes the blank payload over `tests/fixtures` and nothing else, so any
-    /// narrowing flag is refused rather than silently pinning a partial set
+    /// rewrite BOTH committed snapshots from this run (the bug shapes and the absorb pin).
+    /// Only valid on a FULL default run — each snapshot describes the blank payload over
+    /// `tests/fixtures` and nothing else, so any narrowing flag is refused rather than
+    /// silently pinning a partial set
     #[argh(switch)]
     update: bool,
 
@@ -281,12 +311,53 @@ const SNAPSHOT_HEADER: &str = "# Generated by `deno task blanks:audit:update` �
      # STRUCTURAL-DIVERGENCE is NOT here at all: it is held REPORT-ONLY (fuzz-soft parity), so\n\
      # it is reported but never gated. It is excluded from this file by construction.\n\
      #\n\
+     # ABSORBED shapes are not here either: they live in blank_absorb_known.txt — a\n\
+     # BEHAVIOR pin (not a bug list) over the gaps where an injected blank is silently\n\
+     # deleted, the blank-DROP class every invariant above is blind to.\n\
+     #\n\
      # Format: KIND<TAB>SHAPE\n";
 
 /// The ratchet over this audit's colocated snapshot — the one `deno task check` gates on —
 /// carrying its header + re-pin hint.
 fn ratchet() -> Ratchet {
     Ratchet::colocated("blank_audit_known.txt", SNAPSHOT_HEADER, REPIN_HINT)
+}
+
+/// The `#`-comment header of the ABSORB pin file — machine-generated, do NOT hand-edit.
+const ABSORB_HEADER: &str = "# Generated by `deno task blanks:audit:update` — do NOT hand-edit.\n\
+     #\n\
+     # ⚠️ NOT a bug list — a BEHAVIOR PIN (width_audit's stance). Each line is a\n\
+     # NODE-EDGE class — `(node_type, left_role→right_role)`, the innermost AST node\n\
+     # whose span holds the injection offset and the child-role edge the gap sits in —\n\
+     # where the formatter currently ABSORBS an injected blank line: the output is\n\
+     # byte-identical to the pristine output, i.e. the blank is silently deleted.\n\
+     # Most absorption is sanctioned — prettier collapses a blank in an expression, an\n\
+     # argument list, a parameter list too. But a blank eaten at a gap where authors'\n\
+     # blanks are meaningful is the blank-DROP bug class (#759's family), and every\n\
+     # other gate is blind to it by construction: the dropped-blank output is its own\n\
+     # fixed point, so the six invariants, F1, fuzz, and round-trip all pass. Only a\n\
+     # prettier compare on the authored shape can grade a pinned line, which is why a\n\
+     # NEW class here is a QUESTION to triage against prettier, never a silent pass.\n\
+     #\n\
+     # The key is deliberately the COARSE node-edge class, not the fine token shape the\n\
+     # bug ratchet uses: ~81% of injections absorb, so token granularity pins the whole\n\
+     # token-adjacency vocabulary of the fixture tree (~5.7k shapes, minting new ones on\n\
+     # ordinary fixture PRs — a gate that fails per added fixture gets turned off). A\n\
+     # node-edge class ≈ one emitter decision, which is the grain a triage verdict\n\
+     # actually covers. An injection beside an ALREADY-authored blank is exempt: there\n\
+     # the byte-identical output is the sanctioned 2+→1 run collapse, not a drop, and\n\
+     # recording it would pin classes where blanks otherwise survive.\n\
+     #\n\
+     # The gate fails on a class NOT here (the formatter newly eats a blank at a new\n\
+     # kind of gap) and on a listed class that no longer absorbs (a kept blank — a\n\
+     # fix — or a vanished site; re-pin either way).\n\
+     #\n\
+     # Format: (NODE_TYPE, LEFT→RIGHT)\n";
+
+/// The ratchet over the absorb pin file — the SECOND snapshot this audit grades. Same
+/// `--update` regenerates both.
+fn absorb_ratchet() -> Ratchet {
+    Ratchet::colocated("blank_absorb_known.txt", ABSORB_HEADER, REPIN_HINT)
 }
 
 /// One snapshot line: `KIND<TAB>SHAPE`. No payload dimension — there is one payload.
@@ -333,6 +404,31 @@ fn snapshot_keys(shapes: &BTreeMap<(BlankKind, String), ShapeAgg>) -> BTreeSet<B
         .collect()
 }
 
+/// One absorb-pin snapshot line: a rendered node-edge CLASS (`(node_type, left→right)`).
+/// Always pinnable — an absorbed blank is a behavior being pinned, not an invariant violation
+/// (the pin file's header states the stance).
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct AbsorbKey(String);
+
+impl SnapshotKey for AbsorbKey {
+    fn to_line(&self) -> String {
+        self.0.clone()
+    }
+
+    fn from_line(line: &str) -> Option<Self> {
+        Some(Self(line.to_string()))
+    }
+
+    fn is_pinnable(&self) -> bool {
+        true
+    }
+}
+
+/// The absorbed node-edge classes as [`AbsorbKey`]s — the set the absorb [`Ratchet`] sees.
+fn absorb_keys(absorb_shapes: &BTreeMap<String, ShapeAgg>) -> BTreeSet<AbsorbKey> {
+    absorb_shapes.keys().cloned().map(AbsorbKey).collect()
+}
+
 /// One reproducible instance of a shape — kept as the single smallest by `(path, offset)`
 /// (an [`ExampleSet`] at `N = 1`), so the chosen example is thread-count independent.
 #[derive(Clone)]
@@ -359,10 +455,50 @@ struct ShapeAgg {
     examples: ExampleSet<Example, 1>,
 }
 
+impl ShapeAgg {
+    /// Record one hit: count, distinct file, bounded example. The `contains` probe before the
+    /// insert skips the owned-`String` alloc on the common repeat-file hit — this runs on the
+    /// absorb fast path too (~80% of accepted injections), not just on findings.
+    fn record_hit(&mut self, path: &str, candidate: Example) {
+        self.count += 1;
+        if !self.files.contains(path) {
+            self.files.insert(path.to_string());
+        }
+        self.examples.offer(candidate);
+    }
+
+    /// Fold another aggregate in — the worker-pool merge.
+    fn merge(&mut self, other: Self) {
+        self.count += other.count;
+        self.files.extend(other.files);
+        self.examples.merge(other.examples);
+    }
+}
+
+/// Merge one worker's per-key aggregates into the total's — the shared body behind both of
+/// [`Tally::merge`]'s shape maps (the finding shapes and the absorb classes).
+fn merge_shape_map<K: Ord>(dst: &mut BTreeMap<K, ShapeAgg>, src: BTreeMap<K, ShapeAgg>) {
+    for (k, v) in src {
+        match dst.get_mut(&k) {
+            Some(e) => e.merge(v),
+            None => {
+                dst.insert(k, v);
+            }
+        }
+    }
+}
+
 /// One thread's slice of the work.
 #[derive(Default)]
 struct Tally {
     shapes: BTreeMap<(BlankKind, String), ShapeAgg>,
+    /// The absorb pin's aggregation: every node-edge CLASS (rendered [`NodeEdgeKey`]
+    /// — see [`node_edge_key_with_map`]) whose injected blank the formatter ABSORBED, with the
+    /// same per-shape bookkeeping as `shapes` (the example is the reproducer a NEW absorbing
+    /// class is triaged from). Keyed by class alone — absorption has one kind.
+    ///
+    /// [`NodeEdgeKey`]: crate::audit::node_edge::NodeEdgeKey
+    absorb_shapes: BTreeMap<String, ShapeAgg>,
     sites: usize,
     injections: usize,
     accepted: usize,
@@ -391,10 +527,26 @@ impl Tally {
             offset,
             snippet: snippet(source, offset),
         };
-        let e = self.shapes.entry((kind, shape)).or_default();
-        e.count += 1;
-        e.files.insert(path.to_string());
-        e.examples.offer(candidate);
+        self.shapes
+            .entry((kind, shape))
+            .or_default()
+            .record_hit(path, candidate);
+    }
+
+    /// Record one ABSORBED injection at `offset` under its precomputed node-edge `class` — the
+    /// absorb pin's aggregation. Runs on the fast path (~80% of accepted injections), so the
+    /// per-hit work is one containment descent (paid by the caller) and the bounded example
+    /// bookkeeping — trivial beside the format each injection already paid.
+    fn record_absorbed(&mut self, class: String, offset: usize, source: &str, path: &str) {
+        let candidate = Example {
+            path: path.to_string(),
+            offset,
+            snippet: snippet(source, offset),
+        };
+        self.absorb_shapes
+            .entry(class)
+            .or_default()
+            .record_hit(path, candidate);
     }
 
     /// Record a file skipped for not being a clean fixed point as authored.
@@ -411,19 +563,40 @@ impl Tally {
         self.parse_skipped += other.parse_skipped;
         self.dirty_files.extend(other.dirty_files);
         self.not_clean.merge(other.not_clean);
-        for (k, v) in other.shapes {
-            match self.shapes.get_mut(&k) {
-                Some(e) => {
-                    e.count += v.count;
-                    e.files.extend(v.files);
-                    e.examples.merge(v.examples);
-                }
-                None => {
-                    self.shapes.insert(k, v);
-                }
-            }
+        merge_shape_map(&mut self.shapes, other.shapes);
+        merge_shape_map(&mut self.absorb_shapes, other.absorb_shapes);
+    }
+}
+
+/// Whether the whitespace run containing `offset` already holds a blank line (≥2 newlines) in
+/// the SOURCE — the absorb pin's run-collapse exemption.
+///
+/// An injection adjacent to an authored blank forms a 2+ blank run, which the formatter
+/// collapses back to the single blank the pristine output already had — byte-identical output,
+/// so the fast path calls it ABSORBED. That absorption is the sanctioned 2+→1 collapse
+/// (invariant 6's own requirement), not a drop, and recording it would pin a class where blanks
+/// otherwise SURVIVE (a `Program.body` statement gap) just because one seed authors a blank
+/// beside one eligible site. A pristine seed is blank-run-clean, so "the run holds ≥2 newlines"
+/// is exactly "the gap already carries an authored blank".
+fn gap_holds_blank(source: &str, offset: usize) -> bool {
+    let bytes = source.as_bytes();
+    let is_ws = |b: u8| matches!(b, b' ' | b'\t' | b'\r' | b'\n');
+    let mut newlines = 0usize;
+    let mut i = offset;
+    while i > 0 && is_ws(bytes[i - 1]) {
+        i -= 1;
+        if bytes[i] == b'\n' {
+            newlines += 1;
         }
     }
+    let mut j = offset;
+    while j < bytes.len() && is_ws(bytes[j]) {
+        if bytes[j] == b'\n' {
+            newlines += 1;
+        }
+        j += 1;
+    }
+    newlines >= 2
 }
 
 /// Walk `node` collecting the verbatim-blank regions — template-literal quasis (verbatim text)
@@ -577,14 +750,19 @@ fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
 
     // Exclusion spans: the seed's own comments PLUS its string / template interiors (where a
     // blank would be lexed as content, not a gap). Non-overlapping, so one combined list feeds
-    // `injection_sites` directly.
+    // `injection_sites` directly. The wire is kept — it also keys the absorb pin's node-edge
+    // classes below.
+    let source_wire = tsv_parse_to_value(&source, parser);
     let mut exclusion = comment_spans;
-    if let Some(wire) = tsv_parse_to_value(&source, parser) {
-        exclusion.extend(string_and_template_spans(&source, &wire));
+    if let Some(wire) = &source_wire {
+        exclusion.extend(string_and_template_spans(&source, wire));
     }
     let regions = code_regions(&source, parser);
     let sites = injection_sites(&source, &regions, &exclusion, false);
     tally.sites += sites.len();
+    // The absorb keyer's wire→byte map, built ONCE per file and reused across every absorbed
+    // hit (`node_edge_key_with_map`'s contract — the per-offset wrapper must not enter a loop).
+    let byte_map = Utf16ToByte::new(&source);
 
     let mut injected = String::with_capacity(source.len() + PAYLOAD.len());
     for &offset in &sites {
@@ -616,6 +794,19 @@ fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
         // full property battery on every injection.
         if output == pristine_output {
             tally.absorbed += 1;
+            // The pin records only the DROP subset of absorption: an injection beside an
+            // authored blank is the sanctioned 2+→1 run collapse (`gap_holds_blank`), not a
+            // silently-eaten blank, and pinning it would dilute the class semantics.
+            if !gap_holds_blank(&source, offset) {
+                // `(unkeyed)` is the total fallback for an offset the wire walk cannot place
+                // (no parse, offset outside the root span) — pinned like any class rather than
+                // dropped, so keyer coverage is itself visible in the pin file.
+                let class = source_wire
+                    .as_ref()
+                    .and_then(|w| node_edge_key_with_map(w, &byte_map, offset))
+                    .map_or_else(|| "(unkeyed)".to_string(), |k| k.to_string());
+                tally.record_absorbed(class, offset, &source, &display);
+            }
             continue;
         }
 
@@ -747,6 +938,7 @@ impl BlankAuditCommand {
 
         if self.update {
             ratchet().write_pinned(&snapshot_keys(&total.shapes), "shape")?;
+            absorb_ratchet().write_pinned(&absorb_keys(&total.absorb_shapes), "absorb class")?;
             // The report-only STRUCTURAL-DIVERGENCE shapes are deliberately NOT in the file — name
             // the count at re-pin so it's clear they were seen and held soft, not lost.
             let soft = count_soft(&total.shapes);
@@ -764,19 +956,30 @@ impl BlankAuditCommand {
             );
         }
 
-        // Grade BEFORE printing (only a graded run can be quiet).
-        let graded = if default_paths && narrowed.is_empty() {
-            Some(ratchet().grade(&snapshot_keys(&total.shapes))?)
+        // Grade BEFORE printing (only a graded run can be quiet). The absorb pin is graded only
+        // here too — and ONLY on the full default corpus: absorption is normal behavior, so an
+        // off-corpus absorbed shape is not news the way an off-corpus finding is.
+        let (graded, absorb_graded) = if default_paths && narrowed.is_empty() {
+            (
+                Some(ratchet().grade(&snapshot_keys(&total.shapes))?),
+                Some(absorb_ratchet().grade(&absorb_keys(&total.absorb_shapes))?),
+            )
         } else {
-            None
+            (None, None)
         };
 
         let (summary, findings) = build_report(&total);
         let show_detail = self.report || !default_paths;
         if self.json {
             // The FULL finding set — each shape carries `gated`, so a consumer sees the report-only
-            // STRUCTURAL-DIVERGENCE shapes flagged rather than dropped.
-            report::print_json(&summary, &findings, &serde_json::Map::new());
+            // STRUCTURAL-DIVERGENCE shapes flagged rather than dropped. The absorb pin rides the
+            // extras as counts (the shapes themselves live in blank_absorb_known.txt).
+            let mut extras = serde_json::Map::new();
+            extras.insert(
+                "absorb_shapes".to_string(),
+                Value::from(total.absorb_shapes.len()),
+            );
+            report::print_json(&summary, &findings, &extras);
         } else {
             // Split the shared (ratchet-graded) findings from the report-only STRUCTURAL-DIVERGENCE
             // ones: the graded set drives the shared printers (so their "all pinned" is honest),
@@ -792,19 +995,37 @@ impl BlankAuditCommand {
         }
         report_not_clean(&total, self.json, show_detail);
         // The fast-path share — how much of the corpus the formatter simply absorbs — is the
-        // audit's cost story, worth surfacing on a non-JSON run.
+        // audit's cost story, worth surfacing on a non-JSON run. The distinct-class count is the
+        // absorb pin's size in the same breath.
         if !self.json && total.accepted > 0 {
             println!(
                 "\n○ {} of {} accepted injections were absorbed (the blank collapsed to the \
-                 pristine output — fast path); {} ran the full property battery.",
+                 pristine output — fast path; {} distinct DROP node-edge class(es) after the \
+                 run-collapse exemption, pinned by blank_absorb_known.txt); {} ran the full \
+                 property battery.",
                 total.absorbed,
                 total.accepted,
+                total.absorb_shapes.len(),
                 total.accepted - total.absorbed
             );
+            // The per-class rows are the triage view of the pin file (each class with its
+            // reproducer) — `--report` / explicit-path only, like the other detail sections.
+            if show_detail {
+                let mut rows: Vec<(&String, &ShapeAgg)> = total.absorb_shapes.iter().collect();
+                rows.sort_by_key(|(_, agg)| std::cmp::Reverse(agg.count));
+                for (class, agg) in rows {
+                    let ex = agg.examples.canonical();
+                    println!(
+                        "  {:>7}×  {:<48} e.g. inject blank at {}:{}  {}",
+                        agg.count, class, ex.path, ex.offset, ex.snippet
+                    );
+                }
+            }
         }
 
         // Off the default corpus the snapshot doesn't apply — every GRADED finding is news (a
-        // report-only STRUCTURAL-DIVERGENCE shape never fails, on or off corpus).
+        // report-only STRUCTURAL-DIVERGENCE shape never fails, on or off corpus, and an absorbed
+        // shape is graded only against the default corpus's pin).
         if !default_paths {
             let has_graded = total.shapes.keys().any(|(k, _)| is_graded(*k));
             return if has_graded {
@@ -819,10 +1040,16 @@ impl BlankAuditCommand {
             print_ratchet_skipped(&narrowed);
             return Ok(());
         }
-        match &graded {
+        // Report BOTH diffs before deciding the exit, so a run failing on each prints each.
+        let bug_gate = match &graded {
             Some(diff) => self.report_gate(diff, &total),
             None => Ok(()),
-        }
+        };
+        let absorb_gate = match &absorb_graded {
+            Some(diff) => report_absorb_gate(diff, &total),
+            None => Ok(()),
+        };
+        bug_gate.and(absorb_gate)
     }
 
     /// Report a [`GateDiff`] and turn it into an exit status.
@@ -899,6 +1126,64 @@ impl BlankAuditCommand {
         } else {
             Err(CliError::Failed)
         }
+    }
+}
+
+/// Report the absorb pin's [`GateDiff`] and turn it into an exit status — the second gate a
+/// full default run grades ([`absorb_ratchet`]). A NEW class is a **question, not a verdict**
+/// (the pin file's header states the stance): the formatter now eats a blank at a kind of gap
+/// the pin has never seen, and only a prettier compare on the authored shape can grade it —
+/// which is exactly why it must not land silently.
+fn report_absorb_gate(diff: &GateDiff<AbsorbKey>, total: &Tally) -> Result<(), CliError> {
+    let GateDiff { new, stale, .. } = diff;
+
+    if !new.is_empty() {
+        eprintln!(
+            "\n✗ {} NEW ABSORB class(es) — the formatter EATS an injected blank at a kind of gap \
+             the pin has never seen. A silently deleted blank is its own fixed point (no other \
+             invariant can see it — the blank-DROP class), so triage against prettier: if \
+             prettier collapses the blank there too, re-pin (`{REPIN_HINT}`); if prettier keeps \
+             it, this is a blank-DROP bug — fix it instead.",
+            new.len()
+        );
+        for k in new.iter().take(40) {
+            match total.absorb_shapes.get(&k.0) {
+                Some(agg) => {
+                    let ex = agg.examples.canonical();
+                    eprintln!(
+                        "    {:<40} e.g. inject blank at {}:{}  {}",
+                        k.0, ex.path, ex.offset, ex.snippet
+                    );
+                }
+                None => eprintln!("    {}", k.0),
+            }
+        }
+        if new.len() > 40 {
+            eprintln!("    … and {} more", new.len() - 40);
+        }
+    }
+    if !stale.is_empty() {
+        eprintln!(
+            "\n✗ {} STALE absorb pin entry/entries — these classes no longer absorb (a kept blank \
+             — a fix — or a vanished site). Re-pin (`{REPIN_HINT}`):",
+            stale.len()
+        );
+        for k in stale.iter().take(40) {
+            eprintln!("    {}", k.0);
+        }
+        if stale.len() > 40 {
+            eprintln!("    … and {} more", stale.len() - 40);
+        }
+    }
+
+    if diff.holds() {
+        println!(
+            "✓ absorb pin holds — no new kind of silently-eaten blank ({} classes pinned)",
+            diff.known
+        );
+        Ok(())
+    } else {
+        Err(CliError::Failed)
     }
 }
 
@@ -1240,6 +1525,74 @@ mod tests {
         );
         // A format-ignore-bearing file is exempt whole (via the `skip` flag).
         assert_eq!(scan("a;\n\n\nb;", true), None);
+    }
+
+    /// The absorb pin file round-trips through its rendered-class line format, and every absorb
+    /// key is pinnable (absorption is a behavior pin, never an always-fails class).
+    #[test]
+    fn absorb_snapshot_render_and_parse_round_trip() {
+        let mut absorb: BTreeMap<String, ShapeAgg> = BTreeMap::new();
+        absorb.insert(
+            "(CallExpression, arguments→arguments)".to_string(),
+            mk_agg(),
+        );
+        absorb.insert("(VariableDeclarator, id→init)".to_string(), mk_agg());
+
+        let r = Ratchet::new(PathBuf::from("/unused"), ABSORB_HEADER, REPIN_HINT);
+        let found = absorb_keys(&absorb);
+        assert!(found.iter().all(SnapshotKey::is_pinnable));
+        let rendered = r.render(&found);
+        let parsed: BTreeSet<AbsorbKey> = rendered
+            .lines()
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .filter_map(AbsorbKey::from_line)
+            .collect();
+        assert_eq!(parsed, found, "render → parse must round-trip");
+    }
+
+    /// The run-collapse exemption: a gap already holding an authored blank (≥2 newlines in its
+    /// whitespace run) is exempt from the absorb pin; a same-line gap, a single-newline gap,
+    /// and an offset mid-run all read their whole run.
+    #[test]
+    fn gap_holds_blank_reads_the_whole_ws_run() {
+        // Same-line gap — no newline at all.
+        let src = "const x = 1;";
+        assert!(!gap_holds_blank(src, src.find('=').unwrap()));
+        // A single newline is not a blank.
+        let src = "a;\nb;";
+        assert!(!gap_holds_blank(src, 3));
+        // An authored blank (two newlines) — exempt, wherever in the run the offset sits.
+        let src = "a;\n\nb;";
+        assert!(gap_holds_blank(src, 2), "run start sees both newlines");
+        assert!(gap_holds_blank(src, 3), "mid-run sees one back, one ahead");
+        assert!(gap_holds_blank(src, 4), "run end sees both behind");
+        // Indentation between the newlines still counts as one run.
+        let src = "a;\n\t \nb;";
+        assert!(gap_holds_blank(src, 3));
+    }
+
+    /// An absorbed injection aggregates by its precomputed node-edge class (one kind), with the
+    /// same smallest-example bookkeeping as a finding — the reproducer a NEW class is triaged
+    /// from.
+    #[test]
+    fn record_absorbed_keys_on_class() {
+        let src = "const x = 1;";
+        let eq = src.find('=').unwrap();
+        let class = "(VariableDeclarator, id→init)";
+        let mut tally = Tally::default();
+        tally.record_absorbed(class.to_string(), eq, src, "b.ts");
+        tally.record_absorbed(class.to_string(), eq, src, "a.ts");
+        let agg = tally
+            .absorb_shapes
+            .get(class)
+            .expect("keyed on the precomputed class");
+        assert_eq!(agg.count, 2);
+        assert_eq!(agg.files.len(), 2);
+        assert_eq!(
+            agg.examples.canonical().path,
+            "a.ts",
+            "the smallest (path, offset) is canonical"
+        );
     }
 
     /// A finding keys on the injection offset's [`site_shape`], and the kept example is the

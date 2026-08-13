@@ -5,13 +5,15 @@
 `blank_audit` mechanizes the **blank-line handling** bug family — a printer that reflows a list, a
 pattern, or a block and mishandles a blank line an author left in a gap: it fails to collapse a 2+
 blank run, settles on a *different* output on the second pass (a non-idempotent fixed point), drops
-a nearby comment, or corrupts the reparse. The specifier-list and array-pattern blank-line bugs are
+a nearby comment, corrupts the reparse — or silently **eats** the blank at a kind of gap where it
+should survive (the drop class, graded by [the absorb pin](#the-absorb-pin--the-blank-drop-class)
+rather than by the invariants). The specifier-list and array-pattern blank-line bugs are
 the named instances. Nothing else probes it: `fuzz`'s byte mutation essentially never forms a blank
 line in a gap, `gap_audit` injects comments, and the fixture suite only ever formats each file **as
 authored** — so a gap no fixture puts a blank in is a gap never checked.
 
 For each seed file it injects a **blank line** into every candidate gap, one at a time, formats, and
-grades six policy-free invariants on the result.
+grades six policy-free invariants on the result — plus the absorb pin over the drops.
 
 Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green gate — it was born
 RED over a live bug family, and the baseline (`blank_audit_known.txt`) is a snapshot of known bugs
@@ -38,6 +40,46 @@ Each injected blank is graded, keyed by the [site shape](#reading-a-finding) of 
 Invariants 1–4 are the shared `f1_check` (also driving `fuzz`); 5 is the print-once comment ledger;
 6 is a region-scoped output scan.
 
+## The absorb pin — the blank-DROP class
+
+The six invariants are deliberately policy-free, and invariant 2 lets pass 1 keep **or drop** the
+injected blank — so a formatter that silently EATS a blank at some gap passes all of them forever.
+The dropped-blank output is its own fixed point, which blinds every other standing gate too (F1,
+fuzz, round-trip, the ledger, the census); only a prettier compare on the authored shape can see
+one. That is the blank-DROP class (the #759 family: an authored blank before a last-child
+declaration, deleted), and the **absorb pin** closes its *silent* half.
+
+A second machine-generated snapshot, `blank_absorb_known.txt`, pins every **node-edge class** —
+`(node_type, left_role→right_role)`, the innermost AST node holding the injection offset and the
+child-role edge its gap sits in — where an injected blank is ABSORBED (the output is byte-identical
+to the pristine output, i.e. the blank was silently deleted). Two deliberate design points:
+
+- **It is a BEHAVIOR PIN, not a bug list** (`width_audit`'s stance). Most absorption is sanctioned —
+  prettier collapses a blank inside an expression, an argument list, a parameter list too — so a
+  pinned class is a *kind of gap that eats blanks*, not a defect. A **NEW class is a question, not a
+  verdict**: triage it against prettier (if prettier collapses the blank there too, re-pin; if
+  prettier keeps it, it is a blank-DROP bug — fix it instead). New and stale classes both fail the
+  gate, so a new kind of silently-eaten blank cannot land silently and the list cannot rot.
+- **The key is coarse on purpose.** ~80% of injections absorb, so the bug ratchet's fine token
+  shape would pin the fixture tree's whole token-adjacency vocabulary (~5.7k shapes, measured) and
+  mint new ones on ordinary fixture PRs — the churn that gets gates turned off. A node-edge class
+  (~530 over `tests/fixtures`) ≈ one emitter decision, the grain a triage verdict actually covers.
+
+One absorption is **exempt**: an injection beside an *already-authored* blank reproduces the
+pristine output via the sanctioned 2+→1 run collapse (invariant 6's own requirement), not a drop —
+recording it would pin classes where blanks otherwise survive (a `Program.body` statement gap)
+just because one seed authors a blank beside one eligible site.
+
+The pin is graded only on the **full default corpus** — absorption is normal behavior, so an
+off-corpus absorbed class is not news the way an off-corpus finding is. `--report` prints every
+class with its count and a reproducer (`e.g. inject blank at <path>:<offset>`), which is the
+triage view of the pin file.
+
+**What it still cannot see**: a drop at a gap the site enumeration never injects — the sites come
+from `code_regions` (JS spans), so a Svelte **template-text** gap (where #759 itself lived) is
+never probed; that needs the template-gap substrate extension, and as-authored drops over real
+corpora need the blank census. Both are tracked as follow-ups, not covered here.
+
 Every **policy** kind is **pinned** into the ratchet (NON-IDEMPOTENT, DROPPED, DOUBLE-PRINTED,
 UNREPARSEABLE, LEAF-CORRUPTION, BLANK-RUN) — deliberately unlike `fuzz` / `roundtrip_audit`, where
 non-idempotency is an absolute never-pinnable gate: this audit is a ratchet over a live bug family,
@@ -54,8 +96,8 @@ Two carve-outs:
 ## Running it
 
 ```bash
-deno task blanks:audit           # the gate: tests/fixtures, ~24 s
-deno task blanks:audit:update    # regenerate the snapshot after fixing a shape
+deno task blanks:audit           # the gate: tests/fixtures, ~30 s
+deno task blanks:audit:update    # regenerate BOTH snapshots (bug shapes + absorb pin)
 
 # Directly, against a real codebase — where the real yield is:
 cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/src
@@ -66,11 +108,11 @@ Build with **`--profile corpus`** (optimized + `panic = "unwind"`). Plain `--rel
 
 | flag | effect |
 | --- | --- |
-| `--json` | machine-readable report on stdout (logs go to stderr) |
-| `--report` | print the full per-shape report + the skipped-file list even when the ratchet holds |
+| `--json` | machine-readable report on stdout (logs go to stderr; `absorb_shapes` count in the extras) |
+| `--report` | print the full per-shape report, the skipped-file list, and the per-class absorb rows (each with its reproducer) even when the gates hold |
 | `--jobs N` | worker threads (default: available parallelism) |
 | `--limit N` | cap the seed files |
-| `--update` | rewrite the committed snapshot |
+| `--update` | rewrite BOTH committed snapshots (bug shapes + absorb pin) |
 
 `--json`, `--jobs`, and `--report` change how a run is reported and scheduled, never which sites it
 reaches, so they don't narrow it. `--limit` and an explicit path DO: `--update` refuses a narrowed
@@ -83,7 +125,9 @@ matching how it is held soft on the default corpus.
 
 The audit stays near `gap_audit`'s one-format-per-site cost via a **fast path**: when the formatter
 ABSORBS the blank (the output is byte-identical to the file's pristine, already-proven-idempotent
-output), every invariant holds by transitivity and nothing is checked. Over `tests/fixtures` ~81% of
+output), every invariant holds by transitivity and none of the property battery runs — the only
+per-hit work is [the absorb pin](#the-absorb-pin--the-blank-drop-class)'s node-edge keying (one
+span-containment descent over the file's already-parsed wire). Over `tests/fixtures` ~80% of
 accepted injections absorb; only the rest — a blank the formatter KEEPS — pay the full property
 battery, and that reuses the ledger's already-computed output rather than re-formatting. A run
 reports the split (`N of M accepted injections were absorbed …`).
@@ -92,7 +136,9 @@ reports the split (`N of M accepted injections were absorbed …`).
 
 `crates/tsv_debug/src/cli/commands/blank_audit_known.txt` is a **machine-generated** snapshot of
 every finding shape `tests/fixtures` currently produces. Every line is a **known bug**, and the file
-shrinking is the goal.
+shrinking is the goal. (The sibling `blank_absorb_known.txt` is a different kind of file — a
+behavior pin whose lines are mostly sanctioned; see
+[the absorb pin](#the-absorb-pin--the-blank-drop-class).)
 
 ```
 # Format: KIND<TAB>SHAPE

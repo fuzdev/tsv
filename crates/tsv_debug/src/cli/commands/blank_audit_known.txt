@@ -14,6 +14,10 @@
 # STRUCTURAL-DIVERGENCE is NOT here at all: it is held REPORT-ONLY (fuzz-soft parity), so
 # it is reported but never gated. It is excluded from this file by construction.
 #
+# ABSORBED shapes are not here either: they live in blank_absorb_known.txt — a
+# BEHAVIOR pin (not a bug list) over the gaps where an injected blank is silently
+# deleted, the blank-DROP class every invariant above is blind to.
+#
 # Format: KIND<TAB>SHAPE
 # shapes: 121
 NON-IDEMPOTENT	')⟨⟩.
