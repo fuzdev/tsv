@@ -1,3 +1,3 @@
 <script lang="ts">
-	interface L<out const T> {}
+	@g<number> class A {}
 </script>

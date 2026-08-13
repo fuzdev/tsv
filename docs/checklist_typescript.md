@@ -480,6 +480,7 @@ ES2015 module syntax with ES2025 additions.
 - Property decorators
 - Accessor decorators
 - Decorator factories (`@decorator()`)
+- Type arguments on a decorator, with a trailing call (`@g<number>()`, `@a.b<T>()`) or without one (`@a.b<number>`, a `TSInstantiationExpression` — prettier parenthesizes it, `@(a.b<number>)`, since it is no decorator member expression)
 - Parameter decorators (`fn(@dec x: T)`)
 - Decorators on ambient class members (`declare class C { @dec m() {} }`)
 - Decorators on ambient class declarations (`@dec declare class C {}`, `@dec declare abstract class C {}`)
@@ -531,7 +532,7 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 - Generic array (`Array<T>`)
 - Readonly array (`readonly T[]`)
 - Tuple types (`[T, U]`)
-- Named tuple members (`[name: string]`)
+- Named tuple members (`[name: string]`), including a **keyword** label — the label is an `IdentifierName`, so every reserved and contextual keyword spells one (`[function: string]`, `[string?: number]`, `[this?: T]`). Only the three keywords that need a *following* operand can't head a label under a postfix `?` (`[typeof?]` / `[new?]` / `[import?]` reject, as in tsc and acorn)
 - Optional tuple elements (`[T, U?]`)
 - Rest elements in tuples (`[T, ...U[]]`)
 
@@ -685,13 +686,15 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 
 - Const type parameters (`<const T>`) - TS 5.0
 - Variance modifiers (`in`, `out`) - TS 4.7
+- Modifiers in any ORDER (`<const in T>`, `<in const T>`, `<out in T>`) — tsc's parser collects them order-free and leaves the ordering rules ("'const' modifier must precede 'in' modifier", TS1029 for the variance pair) to its grammar checker, so tsv defers them alongside the context one; prettier formats every spelling. A **repeat** is the exception tsv rejects (`<out out T>` → `Duplicate modifier: 'out'`, matching acorn): a duplicate is invalid in every context and adjudicable from the construct alone — the unconditional-local bucket — where tsc again defers (TS1030) and prettier collapses it. The repeat check sits behind the name test, so a trailing repeat that IS the name is untouched (`<out out>`)
+- `out` as a type parameter NAME (`<out>`, `<out, T>`, `<out = string>`, `<in out>`, `<out out>`) — the variance keyword is contextual, so it is a modifier only when a name can still follow it (tsc's `nextTokenCanFollowModifier`); the test is the next token's shape, which is why `<out extends string>` keeps `out` a modifier and then rejects for want of a name, in tsc, prettier and acorn alike
 - Type instantiation expressions (`fn<T>`) - TS 4.7
 
 ### Function TypeScript Features
 
 **Return Types**:
 
-- Type predicates (`x is T`)
+- Type predicates (`x is T`), including a subject named `asserts` — an ordinary predicate outranks the `asserts` modifier, so `(asserts: unknown): asserts is string` reads the parameter, not the modifier
 - Assertion signatures (`asserts x is T`)
 - `asserts x`
 
@@ -817,7 +820,7 @@ Parse output matches acorn-typescript (the parser Svelte uses for `<script lang=
 
 ## Intentional Differences
 
-**`<const T>` in classes**: The tsv parser supports const type parameters on classes (`class Foo<const T>`), but acorn-typescript doesn't. See `typescript/generics/const_type_param_class_svelte_divergence/`.
+**`<const T>` outside a class**: acorn-typescript takes `const` on a **class** type parameter (in any order beside `in`/`out`) but rejects the token on an interface or type alias, where tsc's parser accepts and defers to its TS1277 checker error. tsv accepts everywhere. See `typescript/typescript_specific/generics/const_type_param_interface_svelte_divergence/`.
 
 **Parameter decorators**: Parsed as syntax (legacy-TypeScript, predating the TC39 decorators proposal) and attached to the parameter's `decorators` — see `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. tsv accepts decorators in every member position (class, method, field, accessor, auto-accessor) and on parameters in the positions acorn parses them (function/method/constructor/object-method/ambient params), while **rejecting** parameter decorators where acorn + tsc + prettier all reject — arrow parameters and type-member signatures (see the boundary note under §Decorators).
 

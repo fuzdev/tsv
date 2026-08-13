@@ -8,13 +8,10 @@
 //! parse it as a `TSTypeReference` whose `typeName` is a plain `Identifier`.
 //!
 //! The accepts, the AST shapes and the prettier formatting are pinned by the fixture
-//! `typescript/types/keyword_type_reference_svelte_divergence` (an acorn rejection is
-//! representable: `expected_ours.json` plus an `expected_svelte.json` holding
-//! `{"error": "failed to parse"}`), which is where the prettier claim belongs — against
-//! a live oracle rather than a hand-written string. What remains here is the
+//! `typescript/types/keyword_type_reference`, which is where the prettier claim belongs
+//! — against a live oracle rather than a hand-written string. What remains here is the
 //! **regression matrix** the fixture cannot express: the keyword list as a loop, and
-//! the contrast guards for keywords that head their own type production — those acorn
-//! *accepts*, so they cannot share a divergence fixture.
+//! the contrast guards for keywords that head their own type production.
 //!
 //! Contrast: the keywords that head their own type production stay on that
 //! production and do NOT collapse to a bare type reference — `void`/`null`/`string`

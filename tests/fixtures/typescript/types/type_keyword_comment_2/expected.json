@@ -546,7 +546,6 @@
 										"column": 32
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 225,
@@ -563,6 +562,7 @@
 									},
 									"name": "label"
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 240,

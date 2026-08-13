@@ -39,8 +39,9 @@ pub use types::{
     TSNamedTupleMember, TSOptionalType, TSParenthesizedType, TSPropertySignature, TSQualifiedName,
     TSRestType, TSThisType, TSTupleType, TSType, TSTypeAliasDeclaration, TSTypeAnnotation,
     TSTypeElement, TSTypeLiteral, TSTypeOperator, TSTypeOperatorKind, TSTypeParameter,
-    TSTypeParameterDeclaration, TSTypeParameterInstantiation, TSTypePredicate, TSTypeQuery,
-    TSTypeQueryExprName, TSTypeReference, TSUnionType, TemplateLiteralType,
+    TSTypeParameterDeclaration, TSTypeParameterInstantiation, TSTypeParameterModifier,
+    TSTypeParameterModifiers, TSTypePredicate, TSTypeQuery, TSTypeQueryExprName, TSTypeReference,
+    TSUnionType, TemplateLiteralType,
 };
 
 // Declarations

@@ -219,12 +219,13 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             close_node(w, "TSOptionalType", o.span, ctx);
         }
         internal::TSType::NamedTupleMember(n) => {
-            // Field order: `optional`, `label`, `elementType`.
+            // Field order: `label`, `optional`, `elementType` — acorn-typescript stamps
+            // the label first, reading it before the `?` it may carry.
             node_header(w, "TSNamedTupleMember", n.span, ctx);
-            w.raw(",\"optional\":");
-            w.bool(n.optional);
             w.raw(",\"label\":");
             write_identifier_plain(w, &n.label, ctx);
+            w.raw(",\"optional\":");
+            w.bool(n.optional);
             w.raw(",\"elementType\":");
             write_type(w, n.element_type, ctx);
             close_node(w, "TSNamedTupleMember", n.span, ctx);

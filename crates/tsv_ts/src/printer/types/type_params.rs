@@ -6,7 +6,9 @@
 
 use super::helpers::is_simple_type_arg;
 use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
-use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
+use crate::ast::internal::{
+    self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
+};
 use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -244,14 +246,16 @@ impl<'a> Printer<'a> {
         // generic function, class, interface and alias.
         let has_comments = self.has_comments_on_page_between(param.span.start, param.span.end);
 
-        // Add modifiers in order: const, in, out
-        if param.is_const {
+        // Modifiers print in the CANONICAL order — `const in out` — however the source
+        // spells them, matching prettier (`<in const T>` → `<const in T>`). The source
+        // order survives on the wire only; see `write_type_parameter`.
+        if param.modifiers.contains(TSTypeParameterModifier::Const) {
             parts.push(d.text("const "));
         }
-        if param.is_in {
+        if param.modifiers.contains(TSTypeParameterModifier::In) {
             parts.push(d.text("in "));
         }
-        if param.is_out {
+        if param.modifiers.contains(TSTypeParameterModifier::Out) {
             parts.push(d.text("out "));
         }
 

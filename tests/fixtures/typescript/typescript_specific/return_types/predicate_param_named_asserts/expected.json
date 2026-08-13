@@ -1,0 +1,1786 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 874,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A parameter may itself be named `asserts`: an ordinary `x is T` predicate",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " outranks the `asserts` modifier, and only the token AFTER the name tells them",
+			"start": 98,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " apart.",
+			"start": 180,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The modifier reading still wins when no `is` follows the name.",
+			"start": 594,
+			"end": 659,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " …and `asserts` alone is an ordinary type reference.",
+			"start": 773,
+			"end": 827,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 55
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 873,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 864,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 29,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 191,
+					"end": 259,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 200,
+						"end": 202,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 203,
+							"end": 219,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 13
+								},
+								"end": {
+									"line": 5,
+									"column": 29
+								}
+							},
+							"name": "asserts",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 210,
+								"end": 219,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 20
+									},
+									"end": {
+										"line": 5,
+										"column": 29
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnknownKeyword",
+									"start": 212,
+									"end": 219,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 22
+										},
+										"end": {
+											"line": 5,
+											"column": 29
+										}
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 220,
+						"end": 239,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 30
+							},
+							"end": {
+								"line": 5,
+								"column": 49
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 222,
+							"end": 239,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 32
+								},
+								"end": {
+									"line": 5,
+									"column": 49
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 222,
+								"end": 229,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 32
+									},
+									"end": {
+										"line": 5,
+										"column": 39
+									}
+								},
+								"name": "asserts"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 233,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 43
+									},
+									"end": {
+										"line": 5,
+										"column": 49
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 233,
+									"end": 239,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 43
+										},
+										"end": {
+											"line": 5,
+											"column": 49
+										}
+									}
+								}
+							},
+							"asserts": false
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 240,
+						"end": 259,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 50
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 244,
+								"end": 256,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 14
+									}
+								},
+								"argument": {
+									"type": "Literal",
+									"start": 251,
+									"end": 255,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 9
+										},
+										"end": {
+											"line": 6,
+											"column": 13
+										}
+									},
+									"value": true,
+									"raw": "true"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A parameter may itself be named `asserts`: an ordinary `x is T` predicate",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " outranks the `asserts` modifier, and only the token AFTER the name tells them",
+							"start": 98,
+							"end": 178
+						},
+						{
+							"type": "Line",
+							"value": " apart.",
+							"start": 180,
+							"end": 189
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 262,
+					"end": 322,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 61
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 268,
+							"end": 321,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 60
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 268,
+								"end": 273,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 12
+									}
+								},
+								"name": "arrow"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 276,
+								"end": 321,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 15
+									},
+									"end": {
+										"line": 9,
+										"column": 60
+									}
+								},
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 294,
+									"end": 313,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 33
+										},
+										"end": {
+											"line": 9,
+											"column": 52
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypePredicate",
+										"start": 296,
+										"end": 313,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 35
+											},
+											"end": {
+												"line": 9,
+												"column": 52
+											}
+										},
+										"parameterName": {
+											"type": "Identifier",
+											"start": 296,
+											"end": 303,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 35
+												},
+												"end": {
+													"line": 9,
+													"column": 42
+												}
+											},
+											"name": "asserts"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 307,
+											"end": 313,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 46
+												},
+												"end": {
+													"line": 9,
+													"column": 52
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 307,
+												"end": 313,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 46
+													},
+													"end": {
+														"line": 9,
+														"column": 52
+													}
+												}
+											}
+										},
+										"asserts": false
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 277,
+										"end": 293,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 16
+											},
+											"end": {
+												"line": 9,
+												"column": 32
+											}
+										},
+										"name": "asserts",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 284,
+											"end": 293,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 23
+												},
+												"end": {
+													"line": 9,
+													"column": 32
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSUnknownKeyword",
+												"start": 286,
+												"end": 293,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 25
+													},
+													"end": {
+														"line": 9,
+														"column": 32
+													}
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 317,
+									"end": 321,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 56
+										},
+										"end": {
+											"line": 9,
+											"column": 60
+										}
+									},
+									"value": true,
+									"raw": "true"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "TSDeclareFunction",
+					"start": 325,
+					"end": 387,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 63
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 342,
+						"end": 349,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 18
+							},
+							"end": {
+								"line": 11,
+								"column": 25
+							}
+						},
+						"name": "ambient"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 350,
+							"end": 366,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 26
+								},
+								"end": {
+									"line": 11,
+									"column": 42
+								}
+							},
+							"name": "asserts",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 357,
+								"end": 366,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 33
+									},
+									"end": {
+										"line": 11,
+										"column": 42
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnknownKeyword",
+									"start": 359,
+									"end": 366,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 35
+										},
+										"end": {
+											"line": 11,
+											"column": 42
+										}
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 367,
+						"end": 386,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 43
+							},
+							"end": {
+								"line": 11,
+								"column": 62
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 369,
+							"end": 386,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 45
+								},
+								"end": {
+									"line": 11,
+									"column": 62
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 369,
+								"end": 376,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 45
+									},
+									"end": {
+										"line": 11,
+										"column": 52
+									}
+								},
+								"name": "asserts"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 380,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 56
+									},
+									"end": {
+										"line": 11,
+										"column": 62
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 380,
+									"end": 386,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 56
+										},
+										"end": {
+											"line": 11,
+											"column": 62
+										}
+									}
+								}
+							},
+							"asserts": false
+						}
+					}
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 390,
+					"end": 503,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 400,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 11
+							},
+							"end": {
+								"line": 13,
+								"column": 21
+							}
+						},
+						"name": "Signatures"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 411,
+						"end": 503,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 22
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSMethodSignature",
+								"start": 415,
+								"end": 459,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 46
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 415,
+									"end": 421,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 8
+										}
+									},
+									"name": "method"
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 422,
+										"end": 438,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 9
+											},
+											"end": {
+												"line": 14,
+												"column": 25
+											}
+										},
+										"name": "asserts",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 429,
+											"end": 438,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 16
+												},
+												"end": {
+													"line": 14,
+													"column": 25
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSUnknownKeyword",
+												"start": 431,
+												"end": 438,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 18
+													},
+													"end": {
+														"line": 14,
+														"column": 25
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 439,
+									"end": 458,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 26
+										},
+										"end": {
+											"line": 14,
+											"column": 45
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypePredicate",
+										"start": 441,
+										"end": 458,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 28
+											},
+											"end": {
+												"line": 14,
+												"column": 45
+											}
+										},
+										"parameterName": {
+											"type": "Identifier",
+											"start": 441,
+											"end": 448,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 28
+												},
+												"end": {
+													"line": 14,
+													"column": 35
+												}
+											},
+											"name": "asserts"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 452,
+											"end": 458,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 39
+												},
+												"end": {
+													"line": 14,
+													"column": 45
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 452,
+												"end": 458,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 39
+													},
+													"end": {
+														"line": 14,
+														"column": 45
+													}
+												}
+											}
+										},
+										"asserts": false
+									}
+								},
+								"kind": "method"
+							},
+							{
+								"type": "TSCallSignatureDeclaration",
+								"start": 462,
+								"end": 500,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 40
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 463,
+										"end": 479,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 19
+											}
+										},
+										"name": "asserts",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 470,
+											"end": 479,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 10
+												},
+												"end": {
+													"line": 15,
+													"column": 19
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSUnknownKeyword",
+												"start": 472,
+												"end": 479,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 12
+													},
+													"end": {
+														"line": 15,
+														"column": 19
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 480,
+									"end": 499,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 20
+										},
+										"end": {
+											"line": 15,
+											"column": 39
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypePredicate",
+										"start": 482,
+										"end": 499,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 22
+											},
+											"end": {
+												"line": 15,
+												"column": 39
+											}
+										},
+										"parameterName": {
+											"type": "Identifier",
+											"start": 482,
+											"end": 489,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 22
+												},
+												"end": {
+													"line": 15,
+													"column": 29
+												}
+											},
+											"name": "asserts"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 493,
+											"end": 499,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 33
+												},
+												"end": {
+													"line": 15,
+													"column": 39
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 493,
+												"end": 499,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 33
+													},
+													"end": {
+														"line": 15,
+														"column": 39
+													}
+												}
+											}
+										},
+										"asserts": false
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 506,
+					"end": 591,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 512,
+						"end": 518,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 7
+							},
+							"end": {
+								"line": 18,
+								"column": 13
+							}
+						},
+						"name": "Holder"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 519,
+						"end": 591,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 14
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 523,
+								"end": 588,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 3
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 523,
+									"end": 529,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 8
+										}
+									},
+									"name": "method"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 529,
+									"end": 588,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 8
+										},
+										"end": {
+											"line": 21,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 530,
+											"end": 546,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 9
+												},
+												"end": {
+													"line": 19,
+													"column": 25
+												}
+											},
+											"name": "asserts",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 537,
+												"end": 546,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 16
+													},
+													"end": {
+														"line": 19,
+														"column": 25
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSUnknownKeyword",
+													"start": 539,
+													"end": 546,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 18
+														},
+														"end": {
+															"line": 19,
+															"column": 25
+														}
+													}
+												}
+											}
+										}
+									],
+									"returnType": {
+										"type": "TSTypeAnnotation",
+										"start": 547,
+										"end": 566,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 26
+											},
+											"end": {
+												"line": 19,
+												"column": 45
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypePredicate",
+											"start": 549,
+											"end": 566,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 28
+												},
+												"end": {
+													"line": 19,
+													"column": 45
+												}
+											},
+											"parameterName": {
+												"type": "Identifier",
+												"start": 549,
+												"end": 556,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 28
+													},
+													"end": {
+														"line": 19,
+														"column": 35
+													}
+												},
+												"name": "asserts"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 560,
+												"end": 566,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 39
+													},
+													"end": {
+														"line": 19,
+														"column": 45
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSStringKeyword",
+													"start": 560,
+													"end": 566,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 39
+														},
+														"end": {
+															"line": 19,
+															"column": 45
+														}
+													}
+												}
+											},
+											"asserts": false
+										}
+									},
+									"body": {
+										"type": "BlockStatement",
+										"start": 567,
+										"end": 588,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 46
+											},
+											"end": {
+												"line": 21,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 572,
+												"end": 584,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 3
+													},
+													"end": {
+														"line": 20,
+														"column": 15
+													}
+												},
+												"argument": {
+													"type": "Literal",
+													"start": 579,
+													"end": 583,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 10
+														},
+														"end": {
+															"line": 20,
+															"column": 14
+														}
+													},
+													"value": true,
+													"raw": "true"
+												}
+											}
+										]
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 661,
+					"end": 722,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 62
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 670,
+						"end": 678,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 10
+							},
+							"end": {
+								"line": 25,
+								"column": 18
+							}
+						},
+						"name": "modifier"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 679,
+							"end": 693,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 19
+								},
+								"end": {
+									"line": 25,
+									"column": 33
+								}
+							},
+							"name": "value",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 684,
+								"end": 693,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 24
+									},
+									"end": {
+										"line": 25,
+										"column": 33
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnknownKeyword",
+									"start": 686,
+									"end": 693,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 26
+										},
+										"end": {
+											"line": 25,
+											"column": 33
+										}
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 694,
+						"end": 719,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 34
+							},
+							"end": {
+								"line": 25,
+								"column": 59
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 696,
+							"end": 719,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 36
+								},
+								"end": {
+									"line": 25,
+									"column": 59
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 704,
+								"end": 709,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 44
+									},
+									"end": {
+										"line": 25,
+										"column": 49
+									}
+								},
+								"name": "value"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 713,
+								"end": 719,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 53
+									},
+									"end": {
+										"line": 25,
+										"column": 59
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 713,
+									"end": 719,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 53
+										},
+										"end": {
+											"line": 25,
+											"column": 59
+										}
+									}
+								}
+							},
+							"asserts": true
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 720,
+						"end": 722,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 60
+							},
+							"end": {
+								"line": 25,
+								"column": 62
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The modifier reading still wins when no `is` follows the name.",
+							"start": 594,
+							"end": 659
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 724,
+					"end": 771,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 48
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 733,
+						"end": 737,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 10
+							},
+							"end": {
+								"line": 26,
+								"column": 14
+							}
+						},
+						"name": "bare"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 738,
+							"end": 752,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 15
+								},
+								"end": {
+									"line": 26,
+									"column": 29
+								}
+							},
+							"name": "value",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 743,
+								"end": 752,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 20
+									},
+									"end": {
+										"line": 26,
+										"column": 29
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnknownKeyword",
+									"start": 745,
+									"end": 752,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 22
+										},
+										"end": {
+											"line": 26,
+											"column": 29
+										}
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 753,
+						"end": 768,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 30
+							},
+							"end": {
+								"line": 26,
+								"column": 45
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 755,
+							"end": 768,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 32
+								},
+								"end": {
+									"line": 26,
+									"column": 45
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 763,
+								"end": 768,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 40
+									},
+									"end": {
+										"line": 26,
+										"column": 45
+									}
+								},
+								"name": "value"
+							},
+							"asserts": true,
+							"typeAnnotation": null
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 769,
+						"end": 771,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 46
+							},
+							"end": {
+								"line": 26,
+								"column": 48
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "TSDeclareFunction",
+					"start": 829,
+					"end": 863,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 35
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 846,
+						"end": 851,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 18
+							},
+							"end": {
+								"line": 28,
+								"column": 23
+							}
+						},
+						"name": "plain"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 853,
+						"end": 862,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 25
+							},
+							"end": {
+								"line": 28,
+								"column": 34
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 855,
+							"end": 862,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 27
+								},
+								"end": {
+									"line": 28,
+									"column": 34
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 855,
+								"end": 862,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 27
+									},
+									"end": {
+										"line": 28,
+										"column": 34
+									}
+								},
+								"name": "asserts"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " …and `asserts` alone is an ordinary type reference.",
+							"start": 773,
+							"end": 827
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

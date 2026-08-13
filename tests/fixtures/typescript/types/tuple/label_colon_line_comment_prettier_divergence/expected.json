@@ -250,7 +250,6 @@
 										"column": 11
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 173,
@@ -275,6 +274,7 @@
 										}
 									]
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 185,
@@ -367,7 +367,6 @@
 										"column": 11
 									}
 								},
-								"optional": true,
 								"label": {
 									"type": "Identifier",
 									"start": 276,
@@ -384,6 +383,7 @@
 									},
 									"name": "b"
 								},
+								"optional": true,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 289,
@@ -492,7 +492,6 @@
 											"column": 13
 										}
 									},
-									"optional": false,
 									"label": {
 										"type": "Identifier",
 										"start": 353,
@@ -517,6 +516,7 @@
 											}
 										]
 									},
+									"optional": false,
 									"elementType": {
 										"type": "TSArrayType",
 										"start": 365,
@@ -619,7 +619,6 @@
 										"column": 11
 									}
 								},
-								"optional": false,
 								"label": {
 									"type": "Identifier",
 									"start": 467,
@@ -644,6 +643,7 @@
 										}
 									]
 								},
+								"optional": false,
 								"elementType": {
 									"type": "TSStringKeyword",
 									"start": 489,

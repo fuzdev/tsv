@@ -219,25 +219,25 @@ fn object_destructuring_assignment_unaffected() {
 // defer too. These previously lived as `input_invalid_*` variants under
 // `tests/fixtures/typescript/expressions/assignment/cast_target*`, and no longer
 // belong in an `input_invalid_*` slot now that they parse. Unlike the plain targets
-// above they stay Rust tests on their own merit: the convert layer *unwraps* the cast
-// from the `=` left, so the assertion is about a wire shape acorn has no reading of —
-// a fixture would pin tsv's own output as if it were an oracle.
+// above they stay Rust tests on their own merit: acorn rejects both, so the wire shape
+// they pin has no oracle reading — a fixture would pin tsv's own output as if it were
+// one.
 
 /// `([a, b] as T) = c;` — a type-assertion wrapping a destructuring array. The cast
-/// arm only accepts a *simple* inner, so this falls through to the deferral; the
-/// internal AST keeps the `TSAsExpression` (the formatter reproduces the `as T`),
-/// while the convert layer unwraps the cast from the `=` left, so the *wire* left is
-/// the inner `ArrayExpression`. It formats to prettier's canonical form and is
-/// idempotent. (acorn rejects, so there's no oracle for the wire shape — pinned to
-/// tsv's own unwrap behavior.)
+/// arm only accepts a *simple* inner, so this falls through to the deferral, and the
+/// `TSAsExpression` is what the `=` left carries on the wire as well as internally
+/// (the formatter reproduces the `as T`). It formats to prettier's canonical form and
+/// is idempotent. (acorn rejects, so there's no oracle for the wire shape — pinned to
+/// tsv's own behavior; the assertion-preserving half of it is the shape acorn *does*
+/// produce for the simple targets it accepts.)
 #[test]
 fn cast_wrapping_destructure_target_parses_and_formats() {
     assert_eq!(
         parse_json("([a, b] as T) = c;")
             .pointer("/body/0/expression/left/type")
             .and_then(Value::as_str),
-        Some("ArrayExpression"),
-        "convert unwraps the cast from the `=` left, exposing the inner array",
+        Some("TSAsExpression"),
+        "the `=` left keeps its assertion wrapper",
     );
     let canonical = "([a, b] as T) = c;\n";
     assert_eq!(format(canonical), canonical, "idempotent");
