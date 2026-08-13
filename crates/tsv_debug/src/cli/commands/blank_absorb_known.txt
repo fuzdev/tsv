@@ -27,7 +27,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 530
+# shapes: 531
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -297,6 +297,7 @@
 (ObjectPattern, ^→$)
 (ObjectPattern, ^→properties)
 (ObjectPattern, ^→typeAnnotation)
+(ObjectPattern, decorators→properties)
 (ObjectPattern, properties→$)
 (ObjectPattern, properties→properties)
 (ObjectPattern, properties→typeAnnotation)
