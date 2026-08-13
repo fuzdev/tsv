@@ -13,7 +13,8 @@
 //! - any **unpinnable** key (see [`SnapshotKey::is_pinnable`]) — an invariant so
 //!   absolute it is never allowed into the list whose shrinking is the goal.
 //!
-//! `gap_audit` (`gap_audit_known.txt`), `blank_audit` (`blank_audit_known.txt`),
+//! `gap_audit` (`gap_audit_known.txt`), `blank_audit` (`blank_audit_known.txt` +
+//! the absorb behavior pin `blank_absorb_known.txt` — one consumer, two ratchets),
 //! `ignore_audit` (`ignore_audit_known.txt`), `fabrication_audit`
 //! (`fabrication_audit_known.txt`), `census_audit` and `width_audit`
 //! (`width_audit_known.txt`) are the consumers. It is written

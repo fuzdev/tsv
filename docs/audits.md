@@ -15,7 +15,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Swallow](#line-comment-swallow-audit-swallowaudit) | `swallow:audit` | `//` line comment followed by content on one output line (silent content loss) | `deno task check`; `audit:corpus` (real code) |
 | [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check` |
 | [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops — and `//` swallows — in gaps no fixture covers | `deno task check` (ratchet) |
-| [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run | `deno task check` (ratchet) |
+| [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run — plus the blank-DROP absorb pin (a new kind of silently-eaten blank) | `deno task check` (ratchet) |
 | [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet) |
 | [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet) |
 | [Print width](#print-width-audit-widthaudit) | `width:audit` | a new KIND of over-width output line — the shape a hard-limit bug takes | `deno task check` (ratchet) |
@@ -149,7 +149,7 @@ cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/sr
 
 ## Blank-Line Injection Audit (`blanks:audit`)
 
-Full reference — flags, the ratchet, reading a finding, the six invariants, scope: **[blank_audit.md](./blank_audit.md)**. Design rationale (the fast path, why a blank is graded against the injected input not the pristine, the string-interior exclusion) lives in the `blank_audit` module docs.
+Full reference — flags, the ratchet, the absorb pin, reading a finding, the six invariants, scope: **[blank_audit.md](./blank_audit.md)**. Design rationale (the fast path, why a blank is graded against the injected input not the pristine, the string-interior exclusion) lives in the `blank_audit` module docs.
 
 ```bash
 # blank_audit - inject a blank line into EVERY code gap and grade six policy-free
@@ -173,13 +173,24 @@ cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/
 # (fuzz-soft parity — reported but never gated, filtered out of the ratchet, `"gated":
 # false` in --json). A FAST PATH — a blank the formatter ABSORBS reproduces the file's
 # proven-clean pristine output byte-for-byte, so nothing is checked — keeps it near
-# gap_audit's one-format-per-site cost; only a KEPT blank pays the full battery (~19%
-# of injections over tests/fixtures). ~24 s.
+# gap_audit's one-format-per-site cost; only a KEPT blank pays the full battery (~22%
+# of injections over tests/fixtures). ~30 s.
+#
+# A SECOND snapshot, `blank_absorb_known.txt`, pins the blank-DROP class the six
+# invariants deliberately don't grade (a silently deleted blank is its own fixed point,
+# so F1 / fuzz / roundtrip / ledger / census are all blind — only a prettier compare on
+# the authored shape sees one): every NODE-EDGE class `(node_type, left→right)` where an
+# injected blank is absorbed WITHOUT an authored blank already in the gap (that case is
+# the sanctioned 2+→1 run collapse, exempt). ⚠️ A BEHAVIOR PIN, not a bug list
+# (width_audit's stance — most absorption is sanctioned; prettier collapses those blanks
+# too): a NEW class is a QUESTION to triage against prettier, never a silent pass. New
+# and stale classes FAIL; graded only on the full default corpus. `--report` lists every
+# class with its reproducer.
 # Scope: TS + Svelte body; CSS deferred; string/template interiors excluded (a raw
 # newline there is lexed as content, not a gap); only format fixed points injected.
 ```
 
-`deno task blanks:audit:update` regenerates the snapshot after fixing a shape; it refuses a narrowed run.
+`deno task blanks:audit:update` regenerates both snapshots after fixing a shape (or sanctioning a new absorb class); it refuses a narrowed run.
 
 ## Blank-Fabrication Audit (`fabrication:audit`)
 
