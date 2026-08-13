@@ -68,11 +68,13 @@ pub(super) fn render_fill_iterative(
     // collapsible line the `leading_line` parity puts in the first content slot — renders as
     // a forced break instead of being measured, so the boundary follows the unit's rendered
     // layout. Everything else about the fill (and every outer measurement of it) is exactly
-    // an unflagged fill, which is what keeps this render-keyed rule free of measurement
-    // coupling: a `group([element, line])` join here re-broke the *preceding* boundary by
-    // extending its fit walk through the tail's first word (the razor-caught 2-cycle).
+    // an unflagged fill — measurement transparency is the load-bearing property; the full
+    // story (the razor-caught `group([element, line])` 2-cycle this replaced) lives on
+    // [`DocContext::flow_break_probe`]. `flow_probe_consume` also asserts the positional
+    // pairing in debug builds — the answer read here must be the immediately preceding
+    // sentinel's, never a stale one.
     if context.hold_line_after_broken_flow()
-        && arena.flow_probe_broke()
+        && arena.flow_probe_consume()
         && parts.first().is_some_and(|&p| arena.is_collapsible_line(p))
     {
         render_single_doc(

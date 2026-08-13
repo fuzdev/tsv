@@ -7,11 +7,11 @@ it onto its own line), followed by **terminal** trailing text authored with a **
 tsv lays the element out **block-style** (both tags intact, the over-wide content wrapped within
 printWidth) and the space-authored terminal text **hugs the intact closing tag** (`</tag> tail`),
 respecting the author's space — exactly as the first-child case does. A preceding sibling does
-**not** change that terminal trailing text hugs, because nothing follows the tail, so the hug stays
-convergent (contrast `inline_wide_content_text_sibling_long`, where the text is *non-terminal* and
-hugging it would be non-convergent). This is the guard that the terminal-hug is scoped to *terminal*
-trailing text, **not** to a first-child element — a wide element that drops to its own line via a
-preceding break still lets its terminal tail hug.
+**not** change that the space-spelled terminal text hugs — a non-terminal space tail answers the
+same per-width way through the fill's own boundary line
+(`inline_wide_content_text_sibling_long`), so what this fixture guards is the *sandwiched*
+position: a wide element that drops to its own line via a preceding break still lets its terminal
+tail hug.
 
 Prettier keeps this block-style form (a leading sibling forces the paragraph multiline, so prettier
 lays the wide child block-style too and hugs the tail the same way). On a **single-line** authoring
@@ -27,7 +27,9 @@ The `unformatted_ours_multiline` variant pins idempotence: the single-line autho
 
 A wide inline element's content lays out block-style to honor printWidth (prettier keeps it inline
 and dangles); its *terminal* trailing text respects the author's **space** boundary and hugs the
-closing tag, whether the element is a first child or sandwiched by a preceding sibling — the hug is
-convergent because nothing follows the tail.
+closing tag, whether the element is a first child or sandwiched by a preceding sibling — the same
+per-width answer a non-terminal space tail takes. (An authored **newline** tail beside this
+multiline-rendering element would instead keep its own line — the layout-keyed rule; the space
+authoring is this fixture's scope.)
 
 See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

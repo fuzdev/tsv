@@ -20,10 +20,13 @@ The mechanism is a render-time probe (`flow_break_probe` on the element,
 forced break exactly when the element's subtree actually emitted one — layout-keyed at
 render, with no measurement change anywhere. Prettier
 preserves the authored spelling at every one of these boundaries regardless of the
-element's layout (with one exception it normalizes itself: a **non-terminal** welded
-tail after a multiline element, `</a> text2⏎<a…`, which prettier moves to its own
-line — tsv keeps that space hugged, dual-stable, left unpinned here since neither
-formatter holds the other's form).
+element's layout (with one exception it normalizes itself: a **non-terminal**
+space-hugged tail after a multiline element, `</a> text2⏎<a…`, which prettier moves to
+its own line — tsv keeps that space hugged, dual-stable. Prettier's own-line target is
+the newline spelling the rule above preserves, so tsv holds *both* forms and only the
+hug side is one-sided; not pinned here — the re-break is
+[inline_wide_content_text_sibling_long](../inline_wide_content_text_sibling_long_prettier_divergence/)'s
+`output_prettier` claim).
 
 The divergences: tsv packs the fitting case's newline authoring where prettier
 preserves it, and tsv's welded terminal tails (`</a> text3.`, `</Comp> text8.`) are its

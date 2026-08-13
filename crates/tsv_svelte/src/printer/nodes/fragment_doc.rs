@@ -126,8 +126,8 @@ impl<'a> Printer<'a> {
 
         // Build docs matching prettier-plugin-svelte's structure:
         // - Each text node → fill([word, line, word, ...])
-        // - Inline elements → wrapped with group([line, element]) or group([element, line])
-        //   depending on surrounding whitespace
+        // - Inline elements → wrapped with group([line, element]) when the boundary before
+        //   them asks for it (the trailing boundary is the following text fill's own line)
         let mut child_docs = d.pooled_docbuf();
         let mut handle_whitespace_of_prev_text = false;
 
@@ -872,6 +872,15 @@ impl<'a> Printer<'a> {
         child_docs: &mut DocBuf,
     ) {
         let d = self.d();
+        // The declaration's boundary is a two-emitter PARTITION keyed on the neighbour's kind,
+        // and each side emits a fixed share: a WHITESPACE-ONLY neighbour emits the whole
+        // boundary itself (one line, plus a second for an authored blank — the `prev_owns_line
+        // || next_owns_line` arm in `handle_text_child`'s ws-only path), so this fn stays
+        // silent; a CONTENT neighbour gets exactly one line from here (`break_before` /
+        // `break_after`), and the neighbour's own arm adds the blank's extra hardline
+        // (`trailing_hardlines` / the leading blank push). An own-line neighbour already has
+        // its line. Emitting on both sides doubles a line; emitting on neither drops the
+        // boundary — the same claim/partition discipline as the element-comma seam.
         let break_before = i.checked_sub(1).is_some_and(|j| {
             !trimmed_nodes[j].is_whitespace_only_text() && !self.owns_own_line(trimmed_nodes, j)
         });

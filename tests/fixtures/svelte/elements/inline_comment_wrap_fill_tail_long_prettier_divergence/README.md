@@ -15,7 +15,7 @@ second pass — the regeneration invariant outranked the outside-in preference f
 whose content is not text-only. The joint measurement has since been retired for the text-only
 twin as well, on the same argument one width further out
 ([inline_sibling_drop_tail_wide_long](../inline_sibling_drop_tail_wide_long_prettier_divergence/)),
-so every non-terminal tail now answers per width.
+so every non-terminal tail's space spelling now answers per width.
 
 ## Cases
 
@@ -36,8 +36,10 @@ form rather than to `input`.
 
 ## Reason
 
-Design choice, the same one the unwrapped fixtures record: the tail boundary after an inline
-element is a per-width fill decision measured from the closing tag's own column, however the
-element came to be multiline, and every render-free authoring of the document converges on one
+Design choice, the same one the unwrapped fixtures record: the tail boundary's **space**
+spelling after an inline element is a per-width fill decision measured from the closing tag's
+own column, however the element came to be multiline (an authored newline is layout-keyed
+instead — preserved beside a multiline-rendering unwrapped element, as `variant_dropped_tail`'s
+dual-stability records), and every space-spelled authoring of the document converges on one
 fixed point. The boundaries tsv moves are render-free under Svelte 5.
 See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
