@@ -333,12 +333,7 @@ impl<'a> Printer<'a> {
             if is_leading {
                 // Leading comments: comment then separator
                 parts.push(self.build_comment_doc(comment));
-                if comment.is_block {
-                    parts.push(d.text(" "));
-                } else {
-                    // Line comment requires hardline after
-                    parts.push(d.hardline());
-                }
+                self.push_comment_kind_separator(&mut parts, comment);
             } else {
                 // Trailing comments: space then comment
                 parts.push(d.text(" "));
@@ -369,11 +364,7 @@ impl<'a> Printer<'a> {
         // Leading comments
         for comment in leading_comments {
             parts.push(self.build_comment_doc(comment));
-            if comment.is_block {
-                parts.push(d.text(" "));
-            } else {
-                parts.push(d.hardline());
-            }
+            self.push_comment_kind_separator(&mut parts, comment);
         }
 
         // Expression

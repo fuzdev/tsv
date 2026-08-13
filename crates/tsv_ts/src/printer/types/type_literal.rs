@@ -1103,11 +1103,7 @@ impl<'a> Printer<'a> {
                 }
                 for comment in &leading {
                     parts.push(self.build_comment_doc(comment));
-                    if comment.is_block {
-                        parts.push(d.text(" "));
-                    } else {
-                        parts.push(d.hardline());
-                    }
+                    self.push_comment_kind_separator(&mut parts, comment);
                 }
                 parts.push(inner);
                 // The shared trailing-gap emitter, never an open-coded loop: it takes the

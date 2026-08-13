@@ -381,11 +381,7 @@ impl<'a> Printer<'a> {
         {
             for comment in comments_to_emit_in_range(self.comments, new_end, pp) {
                 parts.push(self.build_comment_doc(comment));
-                if comment.is_block {
-                    parts.push(d.text(" "));
-                } else {
-                    parts.push(d.hardline());
-                }
+                self.push_comment_kind_separator(&mut parts, comment);
             }
         }
 
