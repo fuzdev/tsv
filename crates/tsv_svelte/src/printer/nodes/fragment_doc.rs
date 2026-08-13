@@ -14,7 +14,7 @@
 use super::element_doc::MultilineCause;
 use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{self, Fragment, FragmentNode};
+use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
@@ -56,67 +56,6 @@ pub(super) fn text_starts_with_linebreak(raw: &str) -> bool {
 }
 
 impl<'a> Printer<'a> {
-    /// Build a doc for an entire fragment (sequence of nodes)
-    ///
-    /// This is the entry point for doc-based inline content formatting.
-    /// The resulting doc includes all nodes, so fits() checks will
-    /// naturally account for siblings.
-    pub(super) fn build_fragment_doc(&self, fragment: &Fragment<'_>) -> DocId {
-        self.build_nodes_doc(fragment.nodes)
-    }
-
-    /// Build a doc for a slice of fragment nodes
-    ///
-    /// Accepts a slice directly, avoiding Fragment allocation when caller
-    /// already has a `&[FragmentNode]`.
-    pub(crate) fn build_nodes_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
-        let mut docs: DocBuf = DocBuf::new();
-        let mut format_ignore_next = false;
-        // Running flag for the control-flow `has_preceding_breakable` test below. `is_inline_content`
-        // is monotone over the prefix, so OR-in the prior node once per iteration instead of
-        // re-scanning `nodes[..i]` at each control-flow node (O(N²) over the sibling list). Reading
-        // `nodes[i - 1]` at the top keeps the flag equal to `nodes[..i]` through the `continue`s below
-        // (a format-ignored inline element must still count for a later block).
-        let mut has_preceding_breakable = false;
-        for (i, node) in nodes.iter().enumerate() {
-            if i > 0 && is_inline_content(&nodes[i - 1]) {
-                has_preceding_breakable = true;
-            }
-            // format-ignore: skip whitespace, emit raw source for ignored node
-            if format_ignore_next {
-                if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
-                    docs.push(raw_doc);
-                    format_ignore_next = false;
-                }
-                continue;
-            }
-            if Self::is_format_ignore_comment(node, self.source) {
-                if let Some(doc) = self.build_fragment_node_doc(node) {
-                    docs.push(doc);
-                }
-                format_ignore_next = true;
-                continue;
-            }
-
-            // For control flow blocks, check if there's preceding breakable content
-            let is_control_flow = is_control_flow_block(node);
-            let doc = if is_control_flow {
-                // "Breakable preceding content" is exactly the inline-content set — text never
-                // breaks before a control-flow block, so reuse the one predicate (tracked as the
-                // running flag above rather than re-scanned here).
-                self.build_fragment_node_doc_with_preceding_context(node, has_preceding_breakable)
-            } else {
-                self.build_fragment_node_doc(node)
-            };
-            if let Some(doc) = doc {
-                docs.push(doc);
-            }
-        }
-
-        // `concat` short-circuits the empty case to `empty()`.
-        self.d().concat(&docs)
-    }
-
     /// Find the inclusive-exclusive index range of `nodes` after trimming boundary nodes for
     /// which `skip` returns true. Returns `None` when every node is skipped (the range is empty),
     /// so callers can short-circuit to an empty doc.
@@ -1160,7 +1099,24 @@ impl<'a> Printer<'a> {
         has_preceding_breakable: bool,
     ) -> Option<DocId> {
         match node {
-            FragmentNode::Text(text) => self.build_text_doc(text),
+            // Unreachable, and structurally so: every caller of this dispatch is kind-guarded
+            // against `Text`. `build_nodes_doc_trimmed`'s chain claims a text in its FIRST arm
+            // (`handle_text_child`), `build_nodes_doc_multiline` diverts one to
+            // `build_text_fill_doc_trimmed` before its `else`, the glued-run builders take
+            // comments and elements by construction, and `is_inline_content` — the gate on the
+            // remaining arm — excludes `Text`. Confirmed empirically too: zero calls across the
+            // fixture tree and ten real repos, against 4304 calls to the builder below over the
+            // same runs. The arm is spelled as the trimmed build every live text path uses rather
+            // than as a `None` that would silently DROP the node if a future caller stopped
+            // guarding, or an `unreachable!()` that would turn a printer bug into a panic.
+            FragmentNode::Text(text) => self.build_text_fill_doc_trimmed(
+                text.raw(self.source),
+                true,
+                true,
+                false,
+                false,
+                None,
+            ),
             FragmentNode::Element(element) => Some(self.build_element_doc(element)),
             FragmentNode::SpecialElement(element) => Some(self.build_special_element_doc(element)),
             FragmentNode::ExpressionTag(tag) => Some(self.build_expression_tag_doc(tag)),
