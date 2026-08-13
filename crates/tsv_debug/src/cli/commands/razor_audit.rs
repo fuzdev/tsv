@@ -362,9 +362,10 @@ fn line_head_boundary_spaces(source: &str) -> Vec<(usize, String)> {
 /// *different* set from the one the printer emits verbatim would either accuse the author's
 /// bytes or blind itself to the printer's:
 ///
-/// - **`preserve`** — inside `<pre>`/`<textarea>` boundary whitespace is literal content, and
-///   those elements are dispatched to `build_whitespace_sensitive_element_doc` before any of
-///   the layout this audit grades ever runs.
+/// - **`preserve`** — inside `<pre>`/`<textarea>`, and inside a `<svelte:head>` `<title>`
+///   (`SpecialElementKind::preserves_content_whitespace`), boundary whitespace is literal
+///   content, and those elements are dispatched to the verbatim builders before any of the
+///   layout this audit grades ever runs.
 /// - **raw content** — `<script>`/`<style>`, and a `<template>` in a foreign language
 ///   ([`foreign_template_lang`]), whose bodies the printer emits verbatim.
 /// - **decoding** — a `Text` that is not [`TextDecoding::Fragment`] is raw-content element text
@@ -421,7 +422,12 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
                         walk(&e.fragment, source, child_preserve, f);
                     }
                 }
-                FragmentNode::SpecialElement(e) => walk(&e.fragment, source, preserve, f),
+                FragmentNode::SpecialElement(e) => {
+                    // A head `<title>` is the one special kind whose content the printer
+                    // emits verbatim, so its leading runs are the author's bytes.
+                    let child_preserve = preserve || e.kind.preserves_content_whitespace();
+                    walk(&e.fragment, source, child_preserve, f);
+                }
                 FragmentNode::IfBlock(b) => {
                     walk(&b.consequent, source, preserve, f);
                     if let Some(alt) = &b.alternate {
