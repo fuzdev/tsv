@@ -414,8 +414,14 @@ impl<'a> Printer<'a> {
         // and takes the same emitter the hug and normal arms use. The lookup is the *emit*
         // axis, which skips owned comments: one glued to the body's first token rides the
         // body's own doc and still prints exactly once.
-        let gap_run = has_post_arrow_comments
-            .then(|| self.build_inline_post_arrow_comments_doc(arrow_end, body_start));
+        // Lazy: only the four arms below read it. The own-line arm always has
+        // `has_post_arrow_comments` set (it is a conjunct of `has_own_line_comment`) and the
+        // hug and normal arms emit the run themselves, so building it up front would leave a
+        // dead comments doc in the arena on every commented arrow that isn't one of the four.
+        let gap_run = || {
+            has_post_arrow_comments
+                .then(|| self.build_inline_post_arrow_comments_doc(arrow_end, body_start))
+        };
 
         if has_own_line_comment {
             // Own-line or line comments — always break
@@ -443,7 +449,7 @@ impl<'a> Printer<'a> {
             // The flag is already set when reached via `in_curried_typed_arrow`, so
             // unconditionally setting it `true` for the body build is equivalent.
             let body_doc = self.build_with_in_curried(true, || {
-                self.build_arrow_body_doc_with_leading(expr, gap_run)
+                self.build_arrow_body_doc_with_leading(expr, gap_run())
             });
             parts.push(d.concat(&[d.hardline(), body_doc]));
         } else if is_arrow_body && body_arrow_has_trailing_param_comments {
@@ -455,7 +461,7 @@ impl<'a> Printer<'a> {
             //     (b, // c) =>
             //     (c, // c) => {}
             let body_doc = self.build_with_in_curried(true, || {
-                self.build_arrow_body_doc_with_leading(expr, gap_run)
+                self.build_arrow_body_doc_with_leading(expr, gap_run())
             });
             parts.push(d.indent_hardline(body_doc));
         } else if self.in_curried_typed_arrow.get() {
@@ -465,7 +471,7 @@ impl<'a> Printer<'a> {
             // treated as part of the curried chain; restore to `true` (its value on
             // entry, since this arm is reached only when the flag is set) afterward.
             let body_doc = self.build_with_in_curried(false, || {
-                self.build_arrow_body_doc_with_leading(expr, gap_run)
+                self.build_arrow_body_doc_with_leading(expr, gap_run())
             });
             parts.push(d.indent_hardline(body_doc));
         } else if matches!(expr, internal::Expression::ConditionalExpression(_))
@@ -503,7 +509,7 @@ impl<'a> Printer<'a> {
             // `build_arrow_body_doc`, so it prepends the run on its own seam — the same
             // side of the parens that helper picks for a ternary, i.e. inside.
             // `will_break` asks about the BODY, so it reads the raw doc.
-            let with_leading = prepend_leading(d, gap_run, body_doc);
+            let with_leading = prepend_leading(d, gap_run(), body_doc);
             if d.will_break(body_doc) {
                 // Body has hardlines (multiline template in ternary, etc.)
                 // Use normal break layout — no parens needed
