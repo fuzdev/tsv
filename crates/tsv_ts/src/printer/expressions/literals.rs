@@ -11,6 +11,7 @@
 use crate::ast::internal::{self, LiteralValue};
 use crate::printer::Printer;
 use crate::printer::analysis;
+use crate::printer::decorators::DecoratorHost;
 use smallvec::{SmallVec, smallvec};
 use std::borrow::Cow;
 use tsv_lang::Span;
@@ -413,7 +414,7 @@ impl<'a> Printer<'a> {
         // `id.span.start` is the name — the boundary for that after-decorator scan,
         // since acorn stores the decorators before it.
         if render_decorators && let Some(decorators) = id.decorators() {
-            self.with_param_decorators(Some(decorators), inner, id.span.start)
+            self.with_param_decorators(Some(decorators), inner, id.span.start, DecoratorHost::Plain)
         } else {
             inner
         }

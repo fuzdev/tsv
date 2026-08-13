@@ -1030,30 +1030,30 @@ impl<'a> PartitionedComments<'a> {
         self.has_trailing_block() || self.has_trailing_line()
     }
 
-    /// Check for a blank line in the gap between trailing and leading comments.
+    /// Whether the author left a blank line in this inter-argument gap.
     ///
-    /// When comments exist between arguments, we can't check the full arg-to-arg
-    /// range for blank lines because intermediate comment newlines would create
-    /// false positives. Instead, check the sub-range from:
-    /// - Start: after the last trailing line comment, or after the comma, or the gap start
-    /// - End: before the first leading comment, or the gap end
-    pub fn has_blank_line_in_gap(&self, source: &str, line_breaks: &[u32]) -> bool {
-        let comma_after = find_comma_pos(source, self.start, self.end).map(|c| c as u32 + 1);
-        let check_start = if let Some(last) = self.trailing_line.last() {
-            // A line comment trailing the arg before its comma (`a // c⏎,⏎b`) ends on
-            // an earlier line than the comma, which sits on its own line. Scanning from
-            // the comment's end would straddle the comma's line and miscount it as a
-            // blank line, so start after whichever of (comment end, comma) is later.
-            comma_after.map_or(last.span.end, |c| last.span.end.max(c))
-        } else {
-            comma_after.unwrap_or(self.start)
-        };
+    /// The scan runs from the previous argument's end to the first leading comment (or,
+    /// with none, the gap's end) — bounded there because a comment's own newlines would
+    /// otherwise read as the author's blank.
+    ///
+    /// ⚠️ **The argument family measures from the ARGUMENT's end, not from past the
+    /// comma** — `BlankRule::NextLineEmpty`, prettier's `print/call-arguments.js`
+    /// (`isNextLineEmpty(arg, options)`), not the array/tuple rule its own
+    /// `isLineAfterElementEmpty` advances to the comma for. The two agree on the ordinary
+    /// authoring and part where the author pushed the comma onto its own line
+    /// (`fn(a⏎⏎,⏎// c⏎b)`): scanning from past the comma cannot see the blank written
+    /// above it, so the blank was DROPPED where prettier keeps it, and only a prettier
+    /// compare could show it — the dropped-blank output is its own fixed point.
+    /// `is_next_line_empty` is that predicate, and it already steps over a trailing
+    /// comment on the argument's own line, which is what the hand-rolled `check_start`
+    /// below used to do by hand.
+    pub fn has_blank_line_in_gap(&self, printer: &Printer<'_>) -> bool {
         let check_end = if !self.leading.is_empty() {
             self.leading[0].span.start
         } else {
             self.end
         };
-        tsv_lang::printing::has_blank_line_between_fast(line_breaks, check_start, check_end)
+        printer.is_next_line_empty(self.start, check_end)
     }
 
     /// Emit trailing comments (block then line) with leading spaces to a parts vector.
@@ -1117,8 +1117,8 @@ impl<'a> PartitionedComments<'a> {
     /// comment.
     ///
     /// The separator goes BEFORE each comment (`docs/comments.md` §Trailing and dangling
-    /// runs) and is the shared trailing-run one
-    /// ([`Printer::push_trailing_run_separator`]): a comment the author glued to the
+    /// runs) and the whole walk is the shared trailing-run emitter
+    /// ([`Printer::push_trailing_comment_run`]): a comment the author glued to the
     /// previous one's line (`/* c */ // t`, `/* c1 */ /* c2 */`) stays on that line, and
     /// everything else takes the blank-preserving break. Giving each its own line
     /// unconditionally reads as the safer rule and is not — the run re-collapses on the
@@ -1137,16 +1137,10 @@ impl<'a> PartitionedComments<'a> {
     /// [`Printer::trailing_run_hugs_previous`] adopted; the "what follows the `*/`" one is
     /// the paraphrase that breaks on a deleted comma.
     pub fn emit_dangling_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
-        let mut prev_end = self.start;
-        let mut prev_comment: Option<&internal::Comment> = None;
-        for comment in &self.leading {
-            // Preserves an author blank line before an own-line trailing comment
-            // (`arg⏎⏎/* c */` before the closing `)`), matching prettier.
-            printer.push_trailing_run_separator(parts, prev_comment, prev_end, comment.span.start);
-            parts.push(printer.build_comment_doc(comment));
-            prev_end = comment.span.end;
-            prev_comment = Some(comment);
-        }
+        // The run's own cursor is the gap's `start`, so the first comment's blank scan
+        // preserves an author blank line before an own-line trailing comment
+        // (`arg⏎⏎/* c */` before the closing `)`), matching prettier.
+        printer.push_trailing_comment_run(parts, self.leading.iter().copied(), self.start);
     }
 
     /// Emit a last argument's complete trailing-comment region: same-line comments (via
