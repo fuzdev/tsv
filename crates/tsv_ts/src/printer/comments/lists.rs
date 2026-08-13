@@ -884,6 +884,31 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit a **trailing** comment run: every comment preceded by its separator
+    /// ([`Self::push_trailing_run_separator`]), so an author-glued pair keeps its line and
+    /// everything else takes the blank-preserving break.
+    ///
+    /// The third member of the run-emitter family, beside
+    /// [`Self::push_leading_comment_run`] and [`Self::push_dangling_comment_run`] — it is
+    /// the *separator-before-each* rule, and the `(prev_pos, prev_comment)` bookkeeping it
+    /// carries is exactly what every hand-rolled copy of this walk gets to restate. `scan_from`
+    /// is the caller's cursor, which bounds the first comment's blank scan.
+    pub(crate) fn push_trailing_comment_run<'c>(
+        &self,
+        parts: &mut DocBuf,
+        comments: impl IntoIterator<Item = &'c internal::Comment>,
+        scan_from: u32,
+    ) {
+        let mut prev_pos = scan_from;
+        let mut prev_comment: Option<&internal::Comment> = None;
+        for comment in comments {
+            self.push_trailing_run_separator(parts, prev_comment, prev_pos, comment.span.start);
+            parts.push(self.build_comment_doc(comment));
+            prev_pos = comment.span.end;
+            prev_comment = Some(comment);
+        }
+    }
+
     /// Compute the "delimiter-line prefix" for the open-delimiter trailing-comment
     /// divergence (object literals, array literals, and block bodies).
     ///

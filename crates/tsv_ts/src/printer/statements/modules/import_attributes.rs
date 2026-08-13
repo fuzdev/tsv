@@ -3,6 +3,7 @@
 // per-attribute key/value docs.
 
 use super::Printer;
+use super::specifier_list::{CommaListBlanks, CommaListSpans};
 use crate::ast::internal;
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -116,9 +117,15 @@ impl<'a> Printer<'a> {
                 // with_open_brace_line_comment_prettier_divergence.
                 self.build_braced_hardline_comma_list(
                     attributes,
-                    brace_start,
-                    brace_close,
-                    attributes[0].span.start,
+                    CommaListSpans {
+                        brace_start,
+                        end_boundary: brace_close,
+                        first_item_start: attributes[0].span.start,
+                    },
+                    // Prettier prints the whole clause through `printObject`, so the
+                    // attribute list takes the OBJECT blank rules, not the specifier
+                    // list's — the two share these builders but not this answer.
+                    CommaListBlanks::Object,
                     attr_span,
                     |a| self.build_import_attribute_doc(a),
                 )
@@ -127,6 +134,7 @@ impl<'a> Printer<'a> {
                     attributes,
                     brace_start,
                     brace_close,
+                    CommaListBlanks::Object,
                     attr_span,
                     |a| self.build_import_attribute_doc(a),
                 );
