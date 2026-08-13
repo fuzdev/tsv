@@ -6,10 +6,10 @@
 use super::super::comments::CommentSpacing;
 use super::super::{Printer, is_curried_arrow_chain, is_multiline_template_expression};
 use super::arg_comments::{
-    PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
-    build_before_comma_trailing_comments, emit_last_arg_trailing_comments,
-    first_arg_has_any_comments, has_inter_argument_comments, has_trailing_comments_on_args,
-    last_arg_has_comments, push_empty_args,
+    PartitionedComments, any_arg_empty_line, any_comment_forces_expansion,
+    build_after_comma_leading_comments, build_before_comma_trailing_comments,
+    emit_last_arg_trailing_comments, first_arg_has_any_comments, has_inter_argument_comments,
+    has_trailing_comments_on_args, last_arg_has_comments, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_concise_numeric_array,
@@ -233,14 +233,9 @@ fn build_call_args_doc_for_chain_impl(
     let type_args = get_call_type_arguments(call);
     let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
 
-    // Check for blank lines between arguments (forces expansion). Coarse over-check: a
-    // raw scan of every gap (it must catch a blank that sits *past* a same-line trailing
-    // comment, which the emitter's per-gap `blank_scan_end` measure would clamp away — so
-    // the two intentionally differ and are not shared).
-    let has_blank_lines = call
-        .arguments
-        .windows(2)
-        .any(|window| printer.is_next_line_empty(window[0].span().end, window[1].span().start));
+    // Prettier's `anyArgEmptyLine` — the shared predicate, so a member chain's arguments
+    // answer the blank question exactly as a plain call's do.
+    let has_blank_lines = any_arg_empty_line(call.arguments, printer);
 
     // Multiple arrow function arguments: always expand to multiple lines
     // Prettier always expands 2+ arrow function arguments, regardless of source formatting.

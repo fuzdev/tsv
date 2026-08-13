@@ -3,7 +3,8 @@
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
 use super::arg_comments::{
-    build_after_comma_leading_comments, first_arg_has_any_comments, last_arg_has_comments,
+    any_arg_empty_line, build_after_comma_leading_comments, first_arg_has_any_comments,
+    last_arg_has_comments,
 };
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, build_call_args_with_blank_lines, build_empty_args_doc,
@@ -124,6 +125,13 @@ impl<'a> Printer<'a> {
         // silently hug an argument prettier expands. Its analogs (`call_has_comments`)
         // in `calls/mod.rs`, `call_formatting.rs` and `chain_args.rs` count too.
         let new_has_comments = self.has_comments_on_page_between(paren_open, new_expr.span.end);
+
+        // Prettier's `anyArgEmptyLine` — `new` shares `printCallArguments` with a plain call,
+        // so the rule and its POSITION are the same: an author blank in any inter-argument gap
+        // forces `allArgsBrokenOut()`, ABOVE every specialized layout. See the twin in
+        // `call_formatting.rs` for the full argument; the single-argument hug arms between here
+        // and the first use are vacuously safe (a blank needs two arguments to sit between).
+        let any_arg_empty_line = any_arg_empty_line(new_expr.arguments, self);
 
         // Single huggable argument: object literal or function
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
@@ -356,6 +364,7 @@ impl<'a> Printer<'a> {
         // e.g., new Cls(() => a, () => b) → new Cls(\n\t...,\n)
         // Skip this path if there are trailing comments - let the comment handling paths handle it
         if is_function_composition_args(new_expr.arguments)
+            && !any_arg_empty_line
             && !(new_has_comments
                 && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self))
         {
@@ -388,7 +397,9 @@ impl<'a> Printer<'a> {
                 .iter()
                 .any(|arg| has_multiline_content(arg, self.source));
 
-        if has_multiline {
+        // `build_call_args_expanded` is the forced-expansion layout, not the blank-preserving
+        // one — `build_call_args_with_blank_lines` below is — so an author blank declines it.
+        if has_multiline && !any_arg_empty_line {
             // Force expansion with hardlines for multiline content
             return build_call_args_expanded(
                 self,
@@ -400,16 +411,9 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // Check for blank lines between arguments (forces expansion and preservation).
-        // Coarse over-check: a raw scan of every gap (it must catch a blank that sits
-        // *past* a same-line trailing comment, which the emitter's per-gap `blank_scan_end`
-        // measure would clamp away — so the two intentionally differ and are not shared).
-        let has_blank_lines = new_expr
-            .arguments
-            .windows(2)
-            .any(|window| self.is_next_line_empty(window[0].span().end, window[1].span().start));
-
-        if has_blank_lines {
+        // The blank-line layout — `anyArgEmptyLine`'s `allArgsBrokenOut()`, on the predicate
+        // hoisted above, which every layout between there and here declines on.
+        if any_arg_empty_line {
             // Unlike the plain call's twin, no comment path preempts this one, so both
             // edge gaps are live here: the builder puts a `(`-line run on the `(` line
             // and the last argument's trailing comments after that argument.
@@ -428,12 +432,14 @@ impl<'a> Printer<'a> {
         // a line comment anywhere in the args, or any comment on the first arg — those
         // break all args instead (a before-comma trailing block, a leading first-arg
         // comment). An after-comma inline block leading the second arg is carried below.
-        if should_expand_first_arg(self, new_expr.arguments)
-            && !(new_has_comments
+        // Named once, like the plain call's twin: three inline negations trip
+        // `clippy::nonminimal_bool`, and the list reads better as a name anyway.
+        let expand_first_blocked = any_arg_empty_line
+            || (new_has_comments
                 && has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self))
-            && !(new_has_comments
-                && first_arg_has_any_comments(new_expr.arguments, self, paren_open))
-        {
+            || (new_has_comments
+                && first_arg_has_any_comments(new_expr.arguments, self, paren_open));
+        if should_expand_first_arg(self, new_expr.arguments) && !expand_first_blocked {
             let first_arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
             let second_arg_doc = self.build_expression_doc(&new_expr.arguments[1]);
 
