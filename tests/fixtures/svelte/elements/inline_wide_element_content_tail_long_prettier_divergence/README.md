@@ -3,8 +3,9 @@
 The **non-terminal** tail boundary after an inline element whose content is a nested inline
 **element** (not text), at the exact 100/101 boundary. Another inline element follows the tail, so
 the terminal-hug rule (`inline_wide_content_trailing_long`) does not apply — what this fixture pins
-is that the boundary is nevertheless a **per-width fill decision**, measured from the closing tag's
-own column:
+is that the boundary's **space** spelling is nevertheless a **per-width fill decision**, measured
+from the closing tag's own column (its newline spelling is layout-keyed — preserved beside the
+multiline element, as `output_prettier`'s dual-stability records):
 
 - **100 chars** — the element fits inline and collapses; its line is exactly 100, so the tail
   cannot join it and takes its own line (the control: hug-when-fits still means *fits*).
@@ -33,9 +34,9 @@ always drops — it never holds the hugged form:
 
 | file | authoring | claim |
 | --- | --- | --- |
-| `output_prettier.svelte` | prettier from `input` | re-breaks the hugged tail to its own line; a form it keeps stable, which tsv folds back to `input` |
+| `output_prettier.svelte` | prettier from `input` | re-breaks the hugged tail to its own line; a form **both** formatters now keep stable — the tail's authored newline after this multiline-rendering, unwrapped element is preserved (the layout-keyed rule), dual-stable beside `input`'s hug |
 | `unformatted_ours_compact.svelte` | everything on one line | tsv → `input` in one pass; prettier does not reach `input` from it |
-| `prettier_variant_compact.svelte` | prettier from the compact authoring | the 101 case dangles the closing `>` (`</span⏎>`) with the tail on its own line; prettier keeps it, tsv → `input` |
+| `divergent_variant_compact.svelte` | prettier from the compact authoring | the 101 case dangles the closing `>` (`</span⏎>`) with the tail on its own line; prettier keeps it, tsv rewrites it to `output_prettier`'s form |
 
 The boundary tsv folds is inter-node whitespace that renders as one space either way, so the
 output renders identically to the input.

@@ -647,25 +647,29 @@ impl<'a> Printer<'a> {
     /// - a **block element**, which owns its own line via `handle_block_child`;
     /// - a **blank line** (2+ newlines), a Tier-2 authoring signal, screened by the callers;
     /// - a **control-flow block** (`{#if}` / `{#each}` / `{#key}` / `{#await}` / `{#snippet}`),
-    ///   which has **no way to pay an overflow except by tearing itself open**. An inline element
-    ///   that cannot fit drops to its own line *whole*, tags intact (`break_before_wide_flow`) —
-    ///   that escape is what makes flowing safe for elements, and it does not reach a block. A
-    ///   block's head and tail wrap a *fragment*, so its only available break is at its own
-    ///   head↔body seam: the body node lands on its own line and the flowed sibling text welds
-    ///   to the tail (`{#key key}⏎text6⏎{/key}text7` — `root_text_control_flow_adjacent`), and
-    ///   in a run of several blocks only the ones straddling the width boundary expand, so
-    ///   identical constructs render differently by horizontal accident.
+    ///   which as a FLOWED unit has **no way to pay an overflow except by tearing itself
+    ///   open**. An inline element that cannot fit drops to its own line *whole*, tags intact
+    ///   (`break_before_wide_flow`) — that escape is what makes flowing safe for elements. A
+    ///   **spaced** block follower now has it too (the spaced half of `break_before_wide_flow`
+    ///   admits blocks — `handle_text_child`'s flag computation, and the fresh-line drop for a
+    ///   multiline-rendering head it buys is cataloged at §Svelte: Blocks "Multiline block
+    ///   head after spaced text"), but a **glued** one still does not: a glued block detaches
+    ///   by its own layout, so its weld survives only in the source, and the only break left
+    ///   there is the block's own head↔body seam — the body node lands on its own line and the
+    ///   flowed sibling text welds to the tail (`{#key key}⏎text6⏎{/key}text7` —
+    ///   `root_text_control_flow_adjacent`), and in a run of several blocks only the ones
+    ///   straddling the width boundary expand, so identical constructs render differently by
+    ///   horizontal accident.
     ///
     ///   ⚠️ Do NOT re-derive this as "a block's width is not fixed" — that is false, and was the
     ///   doc's old wording: a breaking `{expr}` tag expands mid-run too (`{f(⏎…⏎)}text4`). The
     ///   difference is *where the break lands* — inside the tag's own expression (its call
     ///   arguments), leaving both of the tag's outer adjacencies untouched, versus at a block's
     ///   seam with its own children. So this exclusion is a consequence of a **missing
-    ///   mechanism**, not a property of blocks: admitting them is gated on giving a block the
-    ///   same whole-unit drop (widening the `next_is_flow` / `break_before_wide_flow` coupling
-    ///   past `is_inline_el_or_comp`), not on widening this predicate. The yield is real —
-    ///   admitting blocks as-is converges ~39 more `authoring_audit` sites — which is exactly
-    ///   why the bar is the resulting layout rather than the count.
+    ///   mechanism**, not a property of blocks: admitting them to the flow is gated on the
+    ///   remaining glued half of that whole-unit drop, not on widening this predicate. The
+    ///   yield is real — admitting blocks as-is converges ~39 more `authoring_audit` sites —
+    ///   which is exactly why the bar is the resulting layout rather than the count.
     ///
     /// Note this is orthogonal to whether the *element* lays out multiline, which an authored
     /// newline does still decide and which is preserved — so the convergence target is the

@@ -63,6 +63,30 @@ pub(super) fn render_fill_iterative(
 
     let mut offset = 0;
 
+    // The authored-newline hold ([`DocContext::hold_line_after_broken_flow`]): when the
+    // probed predecessor actually rendered multiline, the fill's LEADING separator — the
+    // collapsible line the `leading_line` parity puts in the first content slot — renders as
+    // a forced break instead of being measured, so the boundary follows the unit's rendered
+    // layout. Everything else about the fill (and every outer measurement of it) is exactly
+    // an unflagged fill, which is what keeps this render-keyed rule free of measurement
+    // coupling: a `group([element, line])` join here re-broke the *preceding* boundary by
+    // extending its fit walk through the tail's first word (the razor-caught 2-cycle).
+    if context.hold_line_after_broken_flow()
+        && arena.flow_probe_broke()
+        && parts.first().is_some_and(|&p| arena.is_collapsible_line(p))
+    {
+        render_single_doc(
+            ctx,
+            parts[0],
+            output,
+            pos,
+            indent,
+            Mode::Break,
+            should_remeasure,
+        );
+        offset = 1;
+    }
+
     while offset < parts.len() {
         let remaining = render.print_width.saturating_sub(*pos);
         let content = parts[offset];
