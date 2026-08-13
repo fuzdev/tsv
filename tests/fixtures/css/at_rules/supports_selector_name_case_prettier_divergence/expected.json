@@ -67,6 +67,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A CSS function name is ASCII case-insensitive ",
+				"start": 9,
+				"end": 60
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 124,

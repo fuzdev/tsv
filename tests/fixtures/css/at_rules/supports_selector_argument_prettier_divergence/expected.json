@@ -128,6 +128,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A selector list stays on the prelude's line ",
+				"start": 9,
+				"end": 58
+			},
+			{
+				"type": "CSSComment",
+				"value": " An attribute value must be an identifier or a string, so this is no selector ",
+				"start": 131,
+				"end": 213
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 284,

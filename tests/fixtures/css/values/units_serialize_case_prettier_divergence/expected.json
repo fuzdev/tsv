@@ -67,6 +67,14 @@
 				"end": 273
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Frequency units (hz/khz) and the quarter-millimeter (q) are ASCII\n\t\t   case-insensitive and serialize lowercase per CSS Values 4 §6.1/§6.3 —\n\t\t   canonicalized to lowercase like every other dimension unit. ",
+				"start": 15,
+				"end": 226
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 274,

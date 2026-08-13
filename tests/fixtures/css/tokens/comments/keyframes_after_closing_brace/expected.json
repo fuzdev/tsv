@@ -114,6 +114,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment after keyframes ",
+				"start": 118,
+				"end": 147
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 148,

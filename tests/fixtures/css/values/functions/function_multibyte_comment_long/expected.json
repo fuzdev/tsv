@@ -67,6 +67,47 @@
 				"end": 612
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Multibyte comment width is visual, not byte length. Exactly 100 cols: stays inline. ",
+				"start": 17,
+				"end": 106
+			},
+			{
+				"type": "CSSComment",
+				"value": " ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé ",
+				"start": 118,
+				"end": 201,
+				"position": 3
+			},
+			{
+				"type": "CSSComment",
+				"value": " One col longer (101): the function wraps to multiline args. ",
+				"start": 208,
+				"end": 273
+			},
+			{
+				"type": "CSSComment",
+				"value": " éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé ",
+				"start": 289,
+				"end": 373,
+				"position": 7
+			},
+			{
+				"type": "CSSComment",
+				"value": " Wrapped: a multibyte leading comment stays inline; trailing values fill-break. ",
+				"start": 383,
+				"end": 467
+			},
+			{
+				"type": "CSSComment",
+				"value": " éééééééééééééééééééééééééééééééééééééééééééééééééé ",
+				"start": 483,
+				"end": 539,
+				"position": 7
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 613,

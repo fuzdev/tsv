@@ -67,6 +67,26 @@
 				"end": 216
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " complete escape ending a string value ",
+				"start": 17,
+				"end": 60
+			},
+			{
+				"type": "CSSComment",
+				"value": " complete escape ending an unquoted ident value ",
+				"start": 81,
+				"end": 133
+			},
+			{
+				"type": "CSSComment",
+				"value": " complete escape inside url() ",
+				"start": 154,
+				"end": 188
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 217,

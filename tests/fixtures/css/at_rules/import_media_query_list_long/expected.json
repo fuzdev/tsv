@@ -62,6 +62,50 @@
 				"block": null
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comma list: packs greedily, breaks before the last query at +1 ",
+				"start": 9,
+				"end": 77
+			},
+			{
+				"type": "CSSComment",
+				"value": " one query overflows: breaks internally at +2, trailing comma forces next query to +1 ",
+				"start": 193,
+				"end": 283
+			},
+			{
+				"type": "CSSComment",
+				"value": " internal break +2, then short queries pack greedily at +1 ",
+				"start": 403,
+				"end": 466
+			},
+			{
+				"type": "CSSComment",
+				"value": " short multi-query: stays inline (both agree, regression guard) ",
+				"start": 598,
+				"end": 666
+			},
+			{
+				"type": "CSSComment",
+				"value": " comma-only media-type list (no and/or): also fills, breaks at the comma at +1 ",
+				"start": 731,
+				"end": 814
+			},
+			{
+				"type": "CSSComment",
+				"value": " boundary: 101 chars stays inline (the fill finds no needed break) ",
+				"start": 924,
+				"end": 995
+			},
+			{
+				"type": "CSSComment",
+				"value": " boundary: 102 chars wraps — last query to +1 (one char over the line above) ",
+				"start": 1099,
+				"end": 1180
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 1285,

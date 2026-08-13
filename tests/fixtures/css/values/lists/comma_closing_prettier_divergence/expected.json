@@ -81,6 +81,38 @@
 				"end": 456
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comma closing the value list is authored content, so it is kept ",
+				"start": 17,
+				"end": 88
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same, in a list that breaks one element per line ",
+				"start": 109,
+				"end": 167
+			},
+			{
+				"type": "CSSComment",
+				"value": " a function's argument list takes the same rule ",
+				"start": 213,
+				"end": 265
+			},
+			{
+				"type": "CSSComment",
+				"value": " a custom property substitutes its tokens verbatim ",
+				"start": 311,
+				"end": 366
+			},
+			{
+				"type": "CSSComment",
+				"value": " and the rule reaches a function nested in one ",
+				"start": 380,
+				"end": 431
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 457,

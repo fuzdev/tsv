@@ -43,6 +43,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " @include/@mixin are SCSS directives, not standard CSS: per CSS Syntax 3 an unknown at-rule's prelude is an opaque token stream, so tsv keeps it verbatim — prettier recognizes SCSS and normalizes the numbers (see README). ",
+				"start": 9,
+				"end": 235
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 323,

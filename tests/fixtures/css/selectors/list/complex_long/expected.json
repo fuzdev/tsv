@@ -779,6 +779,20 @@
 				"end": 618
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Short complex selectors - combinators stay inline (under 100 chars per selector) ",
+				"start": 9,
+				"end": 95
+			},
+			{
+				"type": "CSSComment",
+				"value": " Long complex selectors - test combinator wrapping (>, +, ~, space) ",
+				"start": 193,
+				"end": 265
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 619,

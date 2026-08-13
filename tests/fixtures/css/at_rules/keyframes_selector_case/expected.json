@@ -161,6 +161,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " `from`/`to` are case-insensitive keyframe-selector keywords; prettier (and\n\t   tsv) lowercase them. Percentage selectors are unaffected. ",
+				"start": 9,
+				"end": 151
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 252,

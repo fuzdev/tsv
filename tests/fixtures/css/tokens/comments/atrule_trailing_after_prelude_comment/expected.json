@@ -144,6 +144,60 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " prelude ",
+				"start": 25,
+				"end": 38,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " trailing ",
+				"start": 40,
+				"end": 54
+			},
+			{
+				"type": "CSSComment",
+				"value": " prelude ",
+				"start": 85,
+				"end": 98,
+				"position": 18
+			},
+			{
+				"type": "CSSComment",
+				"value": " ns-trailing ",
+				"start": 100,
+				"end": 117
+			},
+			{
+				"type": "CSSComment",
+				"value": " prelude ",
+				"start": 145,
+				"end": 158,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " supports-trailing ",
+				"start": 191,
+				"end": 214
+			},
+			{
+				"type": "CSSComment",
+				"value": " prelude ",
+				"start": 230,
+				"end": 243,
+				"position": 7
+			},
+			{
+				"type": "CSSComment",
+				"value": " media-trailing ",
+				"start": 277,
+				"end": 297
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 298,

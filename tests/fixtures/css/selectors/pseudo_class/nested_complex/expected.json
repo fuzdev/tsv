@@ -691,6 +691,20 @@
 				"end": 343
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Deeply nested logical combinations ",
+				"start": 9,
+				"end": 49
+			},
+			{
+				"type": "CSSComment",
+				"value": " All features combined ",
+				"start": 178,
+				"end": 205
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 344,

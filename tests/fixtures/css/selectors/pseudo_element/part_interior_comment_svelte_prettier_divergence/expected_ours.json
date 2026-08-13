@@ -25,7 +25,54 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 53,
-											"end": 59
+											"end": 81,
+											"args": {
+												"type": "SelectorList",
+												"start": 60,
+												"end": 80,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 60,
+														"end": 80,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name1",
+																		"start": 60,
+																		"end": 65
+																	}
+																],
+																"start": 60,
+																"end": 65
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 65,
+																	"end": 75
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name2",
+																		"start": 75,
+																		"end": 80
+																	}
+																],
+																"start": 65,
+																"end": 80
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 53,
@@ -72,7 +119,73 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 160,
-											"end": 166
+											"end": 194,
+											"args": {
+												"type": "SelectorList",
+												"start": 167,
+												"end": 193,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 167,
+														"end": 193,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name1",
+																		"start": 167,
+																		"end": 172
+																	}
+																],
+																"start": 167,
+																"end": 172
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 172,
+																	"end": 173
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name2",
+																		"start": 173,
+																		"end": 178
+																	}
+																],
+																"start": 172,
+																"end": 178
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 178,
+																	"end": 188
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name3",
+																		"start": 188,
+																		"end": 193
+																	}
+																],
+																"start": 178,
+																"end": 193
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 160,
@@ -119,7 +232,54 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 248,
-											"end": 254
+											"end": 285,
+											"args": {
+												"type": "SelectorList",
+												"start": 255,
+												"end": 284,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 255,
+														"end": 284,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name1",
+																		"start": 255,
+																		"end": 260
+																	}
+																],
+																"start": 255,
+																"end": 260
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 260,
+																	"end": 279
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name2",
+																		"start": 279,
+																		"end": 284
+																	}
+																],
+																"start": 260,
+																"end": 284
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 248,
@@ -166,7 +326,54 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 352,
-											"end": 358
+											"end": 398,
+											"args": {
+												"type": "SelectorList",
+												"start": 368,
+												"end": 388,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 368,
+														"end": 388,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name1",
+																		"start": 368,
+																		"end": 373
+																	}
+																],
+																"start": 368,
+																"end": 373
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 373,
+																	"end": 383
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name2",
+																		"start": 383,
+																		"end": 388
+																	}
+																],
+																"start": 373,
+																"end": 388
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 352,
@@ -192,6 +399,74 @@
 				},
 				"start": 352,
 				"end": 418
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment between two part identifiers ",
+				"start": 9,
+				"end": 51
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 66,
+				"end": 74
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment between the last two of three identifiers ",
+				"start": 103,
+				"end": 158
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 179,
+				"end": 187
+			},
+			{
+				"type": "CSSComment",
+				"value": " two comments in one gap ",
+				"start": 217,
+				"end": 246
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 261,
+				"end": 269
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 270,
+				"end": 278
+			},
+			{
+				"type": "CSSComment",
+				"value": " edge and interior comments together ",
+				"start": 309,
+				"end": 350
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 359,
+				"end": 367
+			},
+			{
+				"type": "CSSComment",
+				"value": " c6 ",
+				"start": 374,
+				"end": 382
+			},
+			{
+				"type": "CSSComment",
+				"value": " c7 ",
+				"start": 389,
+				"end": 397
 			}
 		],
 		"content": {

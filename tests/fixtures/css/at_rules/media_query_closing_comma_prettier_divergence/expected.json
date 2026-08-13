@@ -32,6 +32,14 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comma closing the query list is a separator with no entry after it ",
+				"start": 9,
+				"end": 83
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 148,

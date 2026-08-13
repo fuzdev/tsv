@@ -67,6 +67,26 @@
 				"end": 639
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " drop-shadow with nested calc() - 100 chars exactly - stays inline (at boundary) ",
+				"start": 17,
+				"end": 102
+			},
+			{
+				"type": "CSSComment",
+				"value": " drop-shadow with nested calc() - 101 chars - wraps (exceeds print_width) ",
+				"start": 205,
+				"end": 283
+			},
+			{
+				"type": "CSSComment",
+				"value": " drop-shadow with nested calc() - inner line exceeds 100 chars - wraps with continuation ",
+				"start": 394,
+				"end": 487
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 640,

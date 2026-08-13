@@ -99,6 +99,26 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comma spacing preserved verbatim (matches prettier + Svelte AST), not normalized ",
+				"start": 9,
+				"end": 95
+			},
+			{
+				"type": "CSSComment",
+				"value": " single-space form is already canonical — non-diverging sibling / regression guard ",
+				"start": 161,
+				"end": 248
+			},
+			{
+				"type": "CSSComment",
+				"value": " block form is unaffected ",
+				"start": 282,
+				"end": 312
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 362,

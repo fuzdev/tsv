@@ -74,6 +74,26 @@
 				"end": 561
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Over-arity space form: too many channels and no slash — not a valid color,\n\t\t   so it round-trips verbatim like any function (never reconstructed with\n\t\t   commas or with a channel dropped). ",
+				"start": 17,
+				"end": 213
+			},
+			{
+				"type": "CSSComment",
+				"value": " Over-arity comma form: the extra part is preserved, not dropped. ",
+				"start": 286,
+				"end": 356
+			},
+			{
+				"type": "CSSComment",
+				"value": " Slash-alpha form with too few channels: the slash alpha separator is kept\n\t\t   verbatim, never collapsed into a channel. ",
+				"start": 395,
+				"end": 521
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 562,

@@ -121,6 +121,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 27,
+				"end": 48
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 92,
+				"end": 113
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 159,

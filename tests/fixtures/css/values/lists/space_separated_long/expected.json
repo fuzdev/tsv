@@ -67,6 +67,32 @@
 				"end": 640
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Short transform chain - stays inline (under 100 chars) ",
+				"start": 17,
+				"end": 77
+			},
+			{
+				"type": "CSSComment",
+				"value": " Long transform chain - exceeds 100 chars, tests space-separated wrapping ",
+				"start": 136,
+				"end": 214
+			},
+			{
+				"type": "CSSComment",
+				"value": " (100/101 char boundary tested in ../functions/transform_long_prettier_divergence) ",
+				"start": 217,
+				"end": 304
+			},
+			{
+				"type": "CSSComment",
+				"value": " Long filter chain - exceeds 100 chars, tests space-separated wrapping ",
+				"start": 447,
+				"end": 522
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 641,

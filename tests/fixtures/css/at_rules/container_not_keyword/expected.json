@@ -128,6 +128,22 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 24,
+				"end": 37,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 111,
+				"end": 118,
+				"position": 12
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 173,

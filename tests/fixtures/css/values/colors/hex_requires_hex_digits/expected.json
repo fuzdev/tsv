@@ -109,6 +109,20 @@
 				"end": 386
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " valid hex — lowercased (all four lengths: 3/4/6/8) ",
+				"start": 17,
+				"end": 73
+			},
+			{
+				"type": "CSSComment",
+				"value": " body is not all hex digits: not a hex color, preserved verbatim ",
+				"start": 171,
+				"end": 240
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 387,

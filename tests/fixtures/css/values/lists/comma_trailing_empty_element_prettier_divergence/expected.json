@@ -67,6 +67,26 @@
 				"end": 304
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the list ends in an empty element, so it takes one more comma than separators ",
+				"start": 17,
+				"end": 100
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same inside a function ",
+				"start": 129,
+				"end": 161
+			},
+			{
+				"type": "CSSComment",
+				"value": " a custom property has no grammar to invalidate: the element is content outright ",
+				"start": 203,
+				"end": 288
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 305,

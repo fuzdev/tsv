@@ -189,6 +189,47 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " named with comment ",
+				"start": 9,
+				"end": 33
+			},
+			{
+				"type": "CSSComment",
+				"value": " after name ",
+				"start": 54,
+				"end": 70,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " or connector ",
+				"start": 124,
+				"end": 142
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 177,
+				"end": 190,
+				"position": 22
+			},
+			{
+				"type": "CSSComment",
+				"value": " not keyword ",
+				"start": 245,
+				"end": 262
+			},
+			{
+				"type": "CSSComment",
+				"value": " before not ",
+				"start": 275,
+				"end": 291,
+				"position": 0
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 349,

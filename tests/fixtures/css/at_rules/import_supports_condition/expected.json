@@ -62,6 +62,15 @@
 				"block": null
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 361,
+				"end": 368,
+				"position": 47
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 378,

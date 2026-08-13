@@ -67,6 +67,26 @@
 				"end": 227
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " trailing comma preserved verbatim in unquoted url() ",
+				"start": 15,
+				"end": 72
+			},
+			{
+				"type": "CSSComment",
+				"value": " consecutive empty segment preserved ",
+				"start": 93,
+				"end": 134
+			},
+			{
+				"type": "CSSComment",
+				"value": " query string with a trailing comma ",
+				"start": 155,
+				"end": 195
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 228,

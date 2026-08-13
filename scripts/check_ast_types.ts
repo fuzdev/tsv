@@ -158,6 +158,17 @@ const samples: Sample[] = [
 		type: 'StyleSheetFile'
 	},
 	{
+		// The stylesheet-level `comments` array, POPULATED — the sibling above only
+		// ever produces `[]`, which types the field's presence but no `CSSComment`.
+		// Three readings in one sample: a structural comment (no `position`), one
+		// lifted out of a declaration value, and one out of an at-rule prelude.
+		name: 'css_comments',
+		source:
+			'/* top */\n.foo { color: /* v */ red; }\n@media /* p */ screen {\n\t.bar { top: 0; }\n}',
+		parser: 'css',
+		type: 'StyleSheetFile'
+	},
+	{
 		name: 'svelte_script_element_style',
 		source: [
 			'<script lang="ts">',

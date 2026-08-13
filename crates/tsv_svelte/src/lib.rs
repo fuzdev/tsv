@@ -123,7 +123,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// byte→UTF-16 offset translation into the walk: the whole document — the
 /// Svelte spine (elements, blocks, tags, directives, attributes, `name_loc`),
 /// embedded template expressions and `<script>` content via `tsv_ts`'s
-/// embedded writers, `<style>` children via `tsv_css`'s `write_css_node` —
+/// embedded writers, `<style>` children via `tsv_css`'s `write_css_children` —
 /// emits final char-space positions directly. Comment-bearing islands
 /// (template expressions with comments, comment-carrying `<script>`s) first
 /// precompute a span-keyed `WriterComments` map off a byte-space skeleton

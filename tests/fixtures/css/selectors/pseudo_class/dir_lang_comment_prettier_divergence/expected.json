@@ -330,6 +330,56 @@
 				"end": 348
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before the direction ",
+				"start": 9,
+				"end": 43
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 51,
+				"end": 59
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after the direction ",
+				"start": 86,
+				"end": 119
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 131,
+				"end": 139
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment before the language ",
+				"start": 163,
+				"end": 196
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 208,
+				"end": 216
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after the language subtag ",
+				"start": 250,
+				"end": 289
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 307,
+				"end": 315
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 349,

@@ -74,6 +74,32 @@
 				"end": 412
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comma list, string element led by a non-breaking space (U+00A0). ",
+				"start": 16,
+				"end": 86
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comma list, string element led by an em space (U+2003). ",
+				"start": 123,
+				"end": 184
+			},
+			{
+				"type": "CSSComment",
+				"value": " Comma list, string element trailed by a non-breaking space. ",
+				"start": 215,
+				"end": 280
+			},
+			{
+				"type": "CSSComment",
+				"value": " Space list, string element trailed by a non-breaking space. ",
+				"start": 319,
+				"end": 384
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 413,

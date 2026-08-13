@@ -170,6 +170,32 @@
 				"end": 264
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment spacing inside a forgiving list (:is/:where/:not/:has) normalizes to single spaces ",
+				"start": 9,
+				"end": 105
+			},
+			{
+				"type": "CSSComment",
+				"value": " mid ",
+				"start": 115,
+				"end": 124
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment before the comma keeps its side; spacing still normalizes ",
+				"start": 150,
+				"end": 223
+			},
+			{
+				"type": "CSSComment",
+				"value": " before ",
+				"start": 228,
+				"end": 240
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 265,

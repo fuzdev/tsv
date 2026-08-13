@@ -67,6 +67,14 @@
 				"end": 362
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " dimension units are ASCII case-insensitive; tsv (and prettier)\n\t\t   canonicalize them to lowercase. (The frequency units hz/khz and the\n\t\t   quarter-millimeter q also lowercase but diverge from prettier — covered by\n\t\t   units_serialize_case_prettier_divergence.) ",
+				"start": 15,
+				"end": 284
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 363,

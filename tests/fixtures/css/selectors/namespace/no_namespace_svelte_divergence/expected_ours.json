@@ -207,6 +207,26 @@
 				"end": 259
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " No-namespace type selector ",
+				"start": 9,
+				"end": 41
+			},
+			{
+				"type": "CSSComment",
+				"value": " No-namespace universal selector ",
+				"start": 69,
+				"end": 106
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined with other selectors ",
+				"start": 138,
+				"end": 173
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 260,

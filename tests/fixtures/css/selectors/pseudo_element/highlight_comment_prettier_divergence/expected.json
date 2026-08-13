@@ -25,7 +25,35 @@
 											"type": "PseudoElementSelector",
 											"name": "highlight",
 											"start": 50,
-											"end": 61
+											"end": 77,
+											"args": {
+												"type": "SelectorList",
+												"start": 71,
+												"end": 76,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 71,
+														"end": 76,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name1",
+																		"start": 71,
+																		"end": 76
+																	}
+																],
+																"start": 71,
+																"end": 76
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 50,
@@ -72,7 +100,35 @@
 											"type": "PseudoElementSelector",
 											"name": "highlight",
 											"start": 139,
-											"end": 150
+											"end": 166,
+											"args": {
+												"type": "SelectorList",
+												"start": 151,
+												"end": 156,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 151,
+														"end": 156,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name2",
+																		"start": 151,
+																		"end": 156
+																	}
+																],
+																"start": 151,
+																"end": 156
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 139,
@@ -98,6 +154,32 @@
 				},
 				"start": 139,
 				"end": 186
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before the highlight name ",
+				"start": 9,
+				"end": 48
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 62,
+				"end": 70
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after the highlight name ",
+				"start": 99,
+				"end": 137
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 157,
+				"end": 165
 			}
 		],
 		"content": {

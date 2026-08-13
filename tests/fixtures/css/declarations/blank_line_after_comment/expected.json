@@ -247,6 +247,56 @@
 				"end": 439
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Blank line after comment before nested rule preserved ",
+				"start": 9,
+				"end": 68
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 79,
+				"end": 92
+			},
+			{
+				"type": "CSSComment",
+				"value": " Blank line after comment before declaration preserved ",
+				"start": 133,
+				"end": 192
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 202,
+				"end": 215
+			},
+			{
+				"type": "CSSComment",
+				"value": " No blank line after comment - stays compact ",
+				"start": 236,
+				"end": 285
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 293,
+				"end": 306
+			},
+			{
+				"type": "CSSComment",
+				"value": " Blank line after comment between declarations preserved ",
+				"start": 326,
+				"end": 387
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ",
+				"start": 409,
+				"end": 422
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 440,

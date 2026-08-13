@@ -2,8 +2,8 @@
 	"version": 9,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-08-13T18:27:11.216Z",
-	"git_commit": "76ee44f3",
+	"timestamp": "2026-08-13T20:15:33.197Z",
+	"git_commit": "1ce605a3",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -11,7 +11,7 @@
 		"runtime_version": "24.14.1"
 	},
 	"corpus": {
-		"svelte": 4551,
+		"svelte": 4556,
 		"typescript": 52321,
 		"css": 22641
 	},
@@ -93,16 +93,16 @@
 		},
 		{
 			"path": "../svelte/packages/svelte/tests",
-			"files": 4467,
+			"files": 4472,
 			"by_language": {
-				"svelte": 4149,
+				"svelte": 4154,
 				"typescript": 137,
 				"css": 181
 			},
 			"repo": {
 				"url": "https://github.com/sveltejs/svelte",
 				"slug": "sveltejs/svelte",
-				"commit": "44a7813730579b94004e182e5a67aab27aa9d2a6",
+				"commit": "20b341f10048cf1016a2028ac7eee5595cfef6a5",
 				"subpath": "packages/svelte/tests"
 			}
 		},
@@ -226,40 +226,40 @@
 			},
 			"../svelte/packages/svelte/tests": {
 				"svelte/compiler": {
-					"processed": 4149,
-					"total": 4149
+					"processed": 4154,
+					"total": 4154
 				},
 				"tsv-json": {
-					"processed": 4149,
-					"total": 4149
+					"processed": 4154,
+					"total": 4154
 				},
 				"tsv_wasm-json": {
-					"processed": 4149,
-					"total": 4149
+					"processed": 4154,
+					"total": 4154
 				},
 				"tsv-json-no-locations": {
-					"processed": 4149,
-					"total": 4149
+					"processed": 4154,
+					"total": 4154
 				},
 				"tsv_wasm-json-no-locations": {
-					"processed": 4149,
-					"total": 4149
+					"processed": 4154,
+					"total": 4154
 				},
 				"tsv-internal": {
-					"processed": 4149,
-					"total": 4149
+					"processed": 4154,
+					"total": 4154
 				},
 				"tsv_wasm-internal": {
-					"processed": 4149,
-					"total": 4149
+					"processed": 4154,
+					"total": 4154
 				},
 				"rsvelte-parse": {
-					"processed": 4148,
-					"total": 4149
+					"processed": 4153,
+					"total": 4154
 				},
 				"rsvelte-parse-skip-expr-loc": {
-					"processed": 4148,
-					"total": 4149
+					"processed": 4153,
+					"total": 4154
 				}
 			}
 		},
@@ -648,7 +648,7 @@
 	},
 	"versions": {
 		"tsv": "0.2.0",
-		"svelte": "5.56.8",
+		"svelte": "5.56.9",
 		"acorn": "8.16.0",
 		"acorn_ts": "1.0.13",
 		"prettier": "3.9.6",
@@ -675,9 +675,9 @@
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3724192,
+			"bytes": 3738064,
 			"kind": "native",
-			"gzip_bytes": 1596556
+			"gzip_bytes": 1603283
 		},
 		{
 			"label": "tsv_wasm",
@@ -768,9 +768,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4551,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4556,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{
@@ -788,9 +788,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4551,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4556,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{
@@ -808,9 +808,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4551,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4556,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{
@@ -828,9 +828,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4551,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4556,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{
@@ -848,9 +848,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4551,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4556,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{
@@ -868,9 +868,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4551,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4556,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{
@@ -888,9 +888,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4551,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4556,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{
@@ -908,9 +908,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4550,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4555,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{
@@ -928,9 +928,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4550,
-			"files_total": 4551,
-			"files_iterated": 4550,
+			"files_processed": 4555,
+			"files_total": 4556,
+			"files_iterated": 4555,
 			"runtime": "node"
 		},
 		{

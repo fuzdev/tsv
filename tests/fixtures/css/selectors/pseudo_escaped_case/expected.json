@@ -197,6 +197,38 @@
 				"end": 693
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " In a pseudo name, prettier lowercases everything up to the first whitespace\n\t   (a hex escape's terminator) and preserves the rest. So escape hex digits and\n\t   leading literals fold, but literal letters after a terminator keep their case.\n\t   This differs from class/id/type selectors, which never fold (see escaped_names). ",
+				"start": 9,
+				"end": 339
+			},
+			{
+				"type": "CSSComment",
+				"value": " hex escape digits fold to lowercase ",
+				"start": 342,
+				"end": 383
+			},
+			{
+				"type": "CSSComment",
+				"value": " pseudo-elements fold the same way ",
+				"start": 412,
+				"end": 451
+			},
+			{
+				"type": "CSSComment",
+				"value": " a literal letter after the escape's terminator keeps its case ",
+				"start": 482,
+				"end": 549
+			},
+			{
+				"type": "CSSComment",
+				"value": " an escaped leading dash is not a custom `:--` pseudo, so the name folds ",
+				"start": 581,
+				"end": 658
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 694,

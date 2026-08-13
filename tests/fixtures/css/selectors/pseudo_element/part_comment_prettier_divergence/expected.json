@@ -25,7 +25,35 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 51,
-											"end": 57
+											"end": 73,
+											"args": {
+												"type": "SelectorList",
+												"start": 67,
+												"end": 72,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 67,
+														"end": 72,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name1",
+																		"start": 67,
+																		"end": 72
+																	}
+																],
+																"start": 67,
+																"end": 72
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 51,
@@ -72,7 +100,35 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 136,
-											"end": 142
+											"end": 158,
+											"args": {
+												"type": "SelectorList",
+												"start": 143,
+												"end": 148,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 143,
+														"end": 148,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name2",
+																		"start": 143,
+																		"end": 148
+																	}
+																],
+																"start": 143,
+																"end": 148
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 136,
@@ -98,6 +154,32 @@
 				},
 				"start": 136,
 				"end": 178
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " comment before the part identifier ",
+				"start": 9,
+				"end": 49
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 58,
+				"end": 66
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment after the part identifier ",
+				"start": 95,
+				"end": 134
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 149,
+				"end": 157
 			}
 		],
 		"content": {

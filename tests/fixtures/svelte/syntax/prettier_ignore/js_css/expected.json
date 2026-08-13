@@ -107,6 +107,14 @@
 				"end": 278
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 180,
+				"end": 201
+			}
+		],
 		"content": {
 			"start": 178,
 			"end": 279,

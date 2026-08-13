@@ -192,5 +192,19 @@
 				"is_global_block": false
 			}
 		}
+	],
+	"comments": [
+		{
+			"type": "CSSComment",
+			"value": " format-ignore ",
+			"start": 0,
+			"end": 19
+		},
+		{
+			"type": "CSSComment",
+			"value": " prettier-ignore ",
+			"start": 48,
+			"end": 69
+		}
 	]
 }

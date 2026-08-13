@@ -121,6 +121,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " format-ignore ",
+				"start": 27,
+				"end": 46
+			},
+			{
+				"type": "CSSComment",
+				"value": " format-ignore ",
+				"start": 90,
+				"end": 109
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 155,

@@ -95,6 +95,107 @@
 				"end": 889
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Interior whitespace, an interior comma, and normalizable tokens survive verbatim ",
+				"start": 15,
+				"end": 101
+			},
+			{
+				"type": "CSSComment",
+				"value": " keep   this,  #FFF  .5px ",
+				"start": 130,
+				"end": 160,
+				"position": 11
+			},
+			{
+				"type": "CSSComment",
+				"value": " An interior whitespace run alone ",
+				"start": 184,
+				"end": 222
+			},
+			{
+				"type": "CSSComment",
+				"value": " a   b ",
+				"start": 251,
+				"end": 262,
+				"position": 11
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment before the first element content is between the colon and the value, so\n\t\t   single-node elements stay inline ",
+				"start": 286,
+				"end": 411
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 427,
+				"end": 434,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment on a later element makes that element multi-node, so the list breaks ",
+				"start": 443,
+				"end": 527
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 552,
+				"end": 559,
+				"position": 6
+			},
+			{
+				"type": "CSSComment",
+				"value": " When the list does break, that between comment stays on the colon line ",
+				"start": 565,
+				"end": 641
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 657,
+				"end": 664,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " A run of them, and one that belongs to an element, keep their own positions ",
+				"start": 688,
+				"end": 769
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 785,
+				"end": 792,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 793,
+				"end": 800,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 836,
+				"end": 843,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 858,
+				"end": 865,
+				"position": 11
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 890,

@@ -161,6 +161,20 @@
 				}
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " fractional-percentage keyframe selectors (value.fract() != 0) ",
+				"start": 29,
+				"end": 96
+			},
+			{
+				"type": "CSSComment",
+				"value": " integer stop for contrast ",
+				"start": 160,
+				"end": 191
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 223,

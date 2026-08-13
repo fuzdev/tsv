@@ -194,6 +194,32 @@
 				"end": 335
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " single non-ASCII symbol in an id selector ",
+				"start": 9,
+				"end": 56
+			},
+			{
+				"type": "CSSComment",
+				"value": " multiple non-ASCII code points exercise identifier continuation ",
+				"start": 82,
+				"end": 151
+			},
+			{
+				"type": "CSSComment",
+				"value": " astral-plane code point (a surrogate pair in UTF-16) ",
+				"start": 178,
+				"end": 236
+			},
+			{
+				"type": "CSSComment",
+				"value": " non-ASCII code point in a class selector ",
+				"start": 263,
+				"end": 309
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 336,

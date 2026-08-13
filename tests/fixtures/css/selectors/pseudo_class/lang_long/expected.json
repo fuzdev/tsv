@@ -252,6 +252,20 @@
 				"end": 349
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Fits at 100 columns — stays inline ",
+				"start": 9,
+				"end": 49
+			},
+			{
+				"type": "CSSComment",
+				"value": " Exceeds 100 columns (101) — one range per line ",
+				"start": 169,
+				"end": 221
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 350,

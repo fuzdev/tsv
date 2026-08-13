@@ -429,6 +429,56 @@
 				"end": 551
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Namespace prefix ",
+				"start": 9,
+				"end": 31
+			},
+			{
+				"type": "CSSComment",
+				"value": " Universal namespace ",
+				"start": 64,
+				"end": 89
+			},
+			{
+				"type": "CSSComment",
+				"value": " Explicit no namespace ",
+				"start": 123,
+				"end": 150
+			},
+			{
+				"type": "CSSComment",
+				"value": " Implicit no namespace (default) ",
+				"start": 188,
+				"end": 225
+			},
+			{
+				"type": "CSSComment",
+				"value": " With matcher ",
+				"start": 255,
+				"end": 273
+			},
+			{
+				"type": "CSSComment",
+				"value": " With matcher operators ",
+				"start": 314,
+				"end": 342
+			},
+			{
+				"type": "CSSComment",
+				"value": " Combined with other selectors ",
+				"start": 401,
+				"end": 436
+			},
+			{
+				"type": "CSSComment",
+				"value": " Multiple attributes ",
+				"start": 484,
+				"end": 509
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 552,

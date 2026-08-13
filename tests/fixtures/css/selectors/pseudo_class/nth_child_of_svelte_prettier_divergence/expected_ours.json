@@ -467,6 +467,20 @@
 				"end": 348
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " CSS Selectors Level 4: :nth-child(An+B of S) ",
+				"start": 9,
+				"end": 59
+			},
+			{
+				"type": "CSSComment",
+				"value": " Complex selector after 'of' ",
+				"start": 241,
+				"end": 274
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 349,

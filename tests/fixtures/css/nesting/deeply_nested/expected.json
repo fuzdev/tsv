@@ -251,6 +251,14 @@
 				"end": 190
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Deeply nested rules (4 levels) ",
+				"start": 9,
+				"end": 45
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 191,

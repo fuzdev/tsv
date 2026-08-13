@@ -458,6 +458,20 @@
 				"end": 561
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " descendant combinator — the complex selector breaks per-combinator, and the :is() on the continuation line also breaks; its args indent relative to that line ",
+				"start": 9,
+				"end": 172
+			},
+			{
+				"type": "CSSComment",
+				"value": " child combinator variant — same continuation-indent behavior ",
+				"start": 333,
+				"end": 399
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 562,

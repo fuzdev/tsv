@@ -25,7 +25,35 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 9,
-											"end": 15
+											"end": 22,
+											"args": {
+												"type": "SelectorList",
+												"start": 16,
+												"end": 21,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 16,
+														"end": 21,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name1",
+																		"start": 16,
+																		"end": 21
+																	}
+																],
+																"start": 16,
+																"end": 21
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 9,
@@ -72,7 +100,35 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 44,
-											"end": 50
+											"end": 57,
+											"args": {
+												"type": "SelectorList",
+												"start": 51,
+												"end": 56,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 51,
+														"end": 56,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name2",
+																		"start": 51,
+																		"end": 56
+																	}
+																],
+																"start": 51,
+																"end": 56
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 44,
@@ -119,7 +175,54 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 85,
-											"end": 91
+											"end": 104,
+											"args": {
+												"type": "SelectorList",
+												"start": 92,
+												"end": 103,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 92,
+														"end": 103,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name2",
+																		"start": 92,
+																		"end": 97
+																	}
+																],
+																"start": 92,
+																"end": 97
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 97,
+																	"end": 98
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name3",
+																		"start": 98,
+																		"end": 103
+																	}
+																],
+																"start": 97,
+																"end": 103
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 85,
@@ -166,7 +269,54 @@
 											"type": "PseudoElementSelector",
 											"name": "part",
 											"start": 134,
-											"end": 140
+											"end": 153,
+											"args": {
+												"type": "SelectorList",
+												"start": 141,
+												"end": 152,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 141,
+														"end": 152,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name4",
+																		"start": 141,
+																		"end": 146
+																	}
+																],
+																"start": 141,
+																"end": 146
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 146,
+																	"end": 147
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name5",
+																		"start": 147,
+																		"end": 152
+																	}
+																],
+																"start": 146,
+																"end": 152
+															}
+														]
+													}
+												]
+											}
 										}
 									],
 									"start": 134,
@@ -201,6 +351,7 @@
 				"end": 195
 			}
 		],
+		"comments": [],
 		"content": {
 			"start": 7,
 			"end": 196,

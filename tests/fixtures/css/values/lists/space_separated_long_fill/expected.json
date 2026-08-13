@@ -60,6 +60,20 @@
 				"end": 323
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Wrapped line 100 chars ",
+				"start": 17,
+				"end": 45
+			},
+			{
+				"type": "CSSComment",
+				"value": " Wrapped line 101 chars ",
+				"start": 170,
+				"end": 198
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 324,

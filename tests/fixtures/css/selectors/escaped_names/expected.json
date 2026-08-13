@@ -913,6 +913,86 @@
 				"end": 2669
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " identity escapes keep the backslash in the AST name ",
+				"start": 9,
+				"end": 66
+			},
+			{
+				"type": "CSSComment",
+				"value": " hex escapes decode (with optional whitespace terminator) ",
+				"start": 144,
+				"end": 206
+			},
+			{
+				"type": "CSSComment",
+				"value": " mixed identity and hex in one name ",
+				"start": 238,
+				"end": 278
+			},
+			{
+				"type": "CSSComment",
+				"value": " astral-plane (>BMP) hex escape decodes to a multi-byte char in the AST name\n\t   (exercises surrogate-pair / 4-byte offset translation); formatter keeps it raw ",
+				"start": 313,
+				"end": 477
+			},
+			{
+				"type": "CSSComment",
+				"value": " a hex escape's terminator whitespace right before the block is part of the\n\t   selector token, but the formatter must not re-emit it as a doubled separator ",
+				"start": 510,
+				"end": 671
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same terminator before a combinator is consumed once, not doubled — and\n\t   the single space inside the compound `.\\41 .b` (two simple selectors) stays ",
+				"start": 700,
+				"end": 861
+			},
+			{
+				"type": "CSSComment",
+				"value": " pseudo-class and pseudo-element names keep hex escapes raw too — Svelte\n\t   decodes them in the AST `name`, but the formatter preserves the source ",
+				"start": 901,
+				"end": 1053
+			},
+			{
+				"type": "CSSComment",
+				"value": " the terminator between two escaped pseudos in a compound stays; only the\n\t   trailing one (before the block) is dropped ",
+				"start": 1110,
+				"end": 1235
+			},
+			{
+				"type": "CSSComment",
+				"value": " a LITERAL escape's whitespace is the opposite of a hex terminator: the space is\n\t   the escape's PAYLOAD (the class is named `a `), so it must survive. Dropping it\n\t   strands the backslash onto the next separator, merging the descendant combinator\n\t   into the compound (`.a\\  .b` would re-parse as one compound, losing the space) ",
+				"start": 1269,
+				"end": 1606
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same escape with NO combinator after it: one compound (class `a ` and .b) ",
+				"start": 1639,
+				"end": 1722
+			},
+			{
+				"type": "CSSComment",
+				"value": " and before a selector-list comma / the block, where a stranded backslash would\n\t   escape the `,` / `{` instead. Before `{` the payload space IS the separator, so\n\t   no second one is added (the literal-escape twin of the hex-terminator rule) ",
+				"start": 1752,
+				"end": 2000
+			},
+			{
+				"type": "CSSComment",
+				"value": " the pseudo path has the same payload-vs-terminator split as a class/id leaf:\n\t   `:hover\\ ` is a pseudo named `hover `, so its payload must survive a\n\t   selector-list comma that would otherwise be escaped ",
+				"start": 2060,
+				"end": 2271
+			},
+			{
+				"type": "CSSComment",
+				"value": " a hex escape's whitespace TERMINATOR is Unicode-wide, not ASCII: Svelte's\n\t   read_identifier matches it with /\\\\[0-9a-fA-F]{1,6}(\\r\\n|\\s)?/, and JS `\\s`\n\t   covers the vertical tab — so `\\41<VT>b` is the single class `aAb`. Narrowing\n\t   this to ASCII moves the token boundary: it re-parses as `aA` + descendant + `b` ",
+				"start": 2313,
+				"end": 2637
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 2670,

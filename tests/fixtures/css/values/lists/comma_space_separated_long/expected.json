@@ -60,6 +60,20 @@
 				"end": 574
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - stays inline (see 101 divergence fixture for 101+ behavior) ",
+				"start": 17,
+				"end": 94
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 chars - wraps (both formatters) ",
+				"start": 308,
+				"end": 349
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 575,

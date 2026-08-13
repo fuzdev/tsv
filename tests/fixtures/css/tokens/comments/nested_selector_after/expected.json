@@ -119,6 +119,20 @@
 				"end": 139
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Comment after nested rule closing brace ",
+				"start": 9,
+				"end": 54
+			},
+			{
+				"type": "CSSComment",
+				"value": " end nested rule ",
+				"start": 115,
+				"end": 136
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 140,

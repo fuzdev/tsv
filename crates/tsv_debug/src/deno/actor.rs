@@ -31,7 +31,7 @@ pub(crate) const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
 /// The pinned literals in `sidecar.ts` cover only what the sidecar imports
 /// directly. Svelte's own dependencies float on their declared ranges, and one
 /// of them — `esrap`, which PRINTS the JS that `compile()` returns — is the
-/// oracle for every compile fixture. `svelte@5.56.8` depends on `esrap@^2.2.12`,
+/// oracle for every compile fixture. `svelte@5.56.9` depends on `esrap@^2.2.12`,
 /// so the compile oracle's output could change with no version in this repo
 /// changing, and no pin site could see it (that is exactly what happened: esrap
 /// 2.3.1 stopped dropping a string-literal specifier's `as` alias, silently

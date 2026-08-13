@@ -67,6 +67,26 @@
 				"end": 546
 			}
 		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " calc() - 100 chars exactly - stays inline (at boundary) ",
+				"start": 17,
+				"end": 78
+			},
+			{
+				"type": "CSSComment",
+				"value": " calc() - 101 chars - wraps (exceeds print_width) ",
+				"start": 181,
+				"end": 235
+			},
+			{
+				"type": "CSSComment",
+				"value": " calc() - expression exceeds 100 chars - wraps with continuation ",
+				"start": 346,
+				"end": 415
+			}
+		],
 		"content": {
 			"start": 7,
 			"end": 547,

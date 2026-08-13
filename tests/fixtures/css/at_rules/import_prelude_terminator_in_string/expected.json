@@ -1,0 +1,73 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 120,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 41,
+				"name": "import",
+				"prelude": "url('a;b.css')",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 43,
+				"end": 70,
+				"name": "import",
+				"prelude": "'d}e.css'",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 72,
+				"end": 111,
+				"name": "import",
+				"prelude": "url('f;g.css')  screen",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 32,
+				"end": 40,
+				"position": 15
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 61,
+				"end": 69,
+				"position": 10
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 95,
+				"end": 103,
+				"position": 15
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 112,
+			"styles": "\n\t@import url('a;b.css') /* c1 */;\n\t@import 'd}e.css' /* c2 */;\n\t@import url('f;g.css') /* c3 */ screen;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 121,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
