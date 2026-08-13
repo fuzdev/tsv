@@ -9,9 +9,7 @@
 use super::element_doc::MultilineCause;
 use super::fragment_doc::text_starts_with_linebreak;
 use super::helpers::is_inline_content;
-use crate::ast::internal::{
-    self, FragmentNode, is_collapsible_ws, is_collapsible_ws_char, split_collapsible_ws,
-};
+use crate::ast::internal::{FragmentNode, is_collapsible_ws_char, split_collapsible_ws};
 use crate::printer::Printer;
 use smallvec::SmallVec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -484,16 +482,55 @@ impl<'a> Printer<'a> {
             // strand a leading space — `space_after_block_prettier_divergence`).
             trim_left = true;
         } else if has_leading_ws && !is_first && position.prev_is_inline() {
-            if prev_is_tag || prev_will_break {
-                // A predecessor that carries its own break — any expression/html/render TAG, or an
-                // element whose doc holds a FORCED break (authored multiline, or multiline attrs).
+            // The **terminal fold** is the one shape that does not take the run's own fill
+            // `line` — a last text after a predecessor carrying no forced break. Everything else
+            // falls through to `leading_line` below, so the exception is the condition and there
+            // is one body rather than two identical ones.
+            //
+            // Pop the last doc (the inline element) and fold the trailing words into ONE fill so a
+            // wide element wraps its own content within printWidth and the words pack after it —
+            // see `build_after_element_fold`.
+            //
+            // The fold's head is the popped unit, so its leading boundary is the one in front of
+            // `prev_sibling_head` — the same question `glued_lead` asks of a text run, asked here
+            // of an element. A glued head must never drop to a fresh line: there is no whitespace
+            // at that boundary, so the drop would INJECT a rendered space (`</code>/` `<code>`),
+            // and the mangled form is its own fixed point, so F1 cannot see it.
+            trim_left = true;
+            if is_last && !prev_is_tag && !prev_will_break {
+                if let Some(last_doc) = child_docs.pop() {
+                    let glued_head = self.leading_boundary_glued(
+                        trimmed_nodes,
+                        prev_sibling_head,
+                        content_bounds.0,
+                    );
+                    let folded = self.rejoin_inside_leading_wrap(last_doc, |el| {
+                        self.build_after_element_fold(el, raw, glued_head)
+                    });
+                    child_docs.push(folded);
+                    return;
+                }
+                // No sibling doc to fold into (an empty `child_docs`): fall through with the
+                // trimmed boundary alone, as this arm always did.
+            } else {
                 // The boundary becomes the run's own fill `line` rather than a `group([prev,
-                // line])` wrap: the group would force that line to break whenever the predecessor
-                // breaks, tearing the closing tag from a tail that fits beside it — exactly what a
-                // TERMINAL tail must not take (`inline_wide_content_trailing_long`). The fill
-                // `line` is measured per width from the predecessor's actual end column instead,
-                // so the tail hugs the intact closing tag while it fits (rendered flat, the `line`
-                // IS the space it replaced) and the run moves whole when it does not.
+                // line])` wrap. Two reasons converge here, and both matter:
+                //
+                // - A predecessor that carries its own break (any expression/html/render TAG, or
+                //   an element whose doc holds a FORCED break — authored multiline, or multiline
+                //   attrs): a group would force that line to break whenever the predecessor
+                //   breaks, tearing the closing tag from a tail that fits beside it — exactly what
+                //   a TERMINAL tail must not take (`inline_wide_content_trailing_long`).
+                // - Any NON-TERMINAL tail, whatever precedes it: leaving the raw whitespace lets
+                //   the previous unit's fit walk run past the closing tag into the following words
+                //   and tear the element open block-style at a width where the folded form fits
+                //   (`inline_component_wide_multi_long`'s exactly-100 case). Pinned by
+                //   `inline_wide_element_content_tail_long` (element-child content) and
+                //   `inline_wide_content_text_sibling_long` (prose content).
+                //
+                // Either way the `line` is measured per width from the predecessor's actual end
+                // column, so the tail hugs the intact closing tag while it fits (rendered flat,
+                // the `line` IS the space it replaced) and the run moves whole when it does not.
                 //
                 // ⚠️ Leaving the boundary UNCLAIMED is not the same thing, and was the bug this
                 // arm exists to close. With no trim, `build_text_fill_doc_trimmed` bakes the
@@ -512,126 +549,47 @@ impl<'a> Printer<'a> {
                 // that separates the two. `fill_tail_move_after_break_long` pins both kinds, in
                 // the terminal and non-terminal positions.
                 //
-                // Unconditional for a tag — a run holding OTHER break-capable expression tags used to take
-                // a plain leading space here instead (the `breakable_exprs` hard-width carve-out),
-                // on the theory that a fill `line` renders in fits()-Break mode and short-circuits
-                // an earlier expression group's lookahead. That carve-out removed every boundary
-                // break point from the run, so the earlier group's measurement ran across the
-                // plain spaces into the NEXT breakable tag's head and tore a welded unit that fit
-                // at its own position (`fill_multi_expr_travel_long`). The stop at the boundary
-                // `line` is the correct answer under the travel doctrine: the boundary itself is
-                // measured pairwise against the whole flat unit that follows
-                // ([`tsv_lang::doc::DocContext::break_before_wide_flow`]), so a unit that does
-                // not fit travels there and nothing is stranded flat past printWidth.
-                trim_left = true;
-                leading_line = true;
-            } else if !is_last
-                && (child_docs
-                    .last()
-                    .is_none_or(|&doc| d.strip_leading_line_group(doc).is_none())
-                    || prev_node.is_some_and(|n| self.tail_boundary_regenerates_static_break(n))
-                    // The wrap keeps the joint join below only when its OTHER side pins its
-                    // line. A wrapped element whose far sibling FLOWS (an element or tag — the
-                    // ws-only separator's spellings converge, so neither is an outside-in
-                    // anchor) takes the same per-width boundary as the unwrapped shapes: the
-                    // §129 argument is that the own-line spelling is a fixed point the hugged
-                    // form must converge TO, and only a non-flowing neighbour (a comment, a
-                    // control-flow block) makes it one.
-                    || trimmed_nodes[..prev_sibling_head]
-                        .iter()
-                        .rev()
-                        .find(|n| !n.is_whitespace_only_text())
-                        .is_some_and(|n| self.sibling_newline_flows(n)))
-            {
-                // Non-last text after a NON-breaking element: the same treatment a non-breaking
-                // TAG gets — trim and lead the fill with its own `line`, a measured boundary the
-                // previous unit's fit walk stops at (the travel doctrine, see the tag arm above),
-                // so the tail hugs the closing tag when it fits and breaks per width when it does
-                // not. Leaving the raw whitespace instead lets that fit walk run past the closing
-                // tag into the following words and tear the element open block-style at a width
-                // where the folded form fits (`inline_component_wide_multi_long`'s exactly-100
-                // case). Pinned by `inline_wide_element_content_tail_long` (element-child
-                // content, incl. the one-pass width-transition claim of its
-                // `unformatted_ours_compact`) and `inline_wide_content_text_sibling_long` (prose
-                // content); cataloged in conformance_prettier_svelte.md §Svelte: Inline content
-                // block-style.
+                // Unconditional for a tag — a run holding OTHER break-capable expression tags used
+                // to take a plain leading space here instead (the `breakable_exprs` hard-width
+                // carve-out), on the theory that a fill `line` renders in fits()-Break mode and
+                // short-circuits an earlier expression group's lookahead. That carve-out removed
+                // every boundary break point from the run, so the earlier group's measurement ran
+                // across the plain spaces into the NEXT breakable tag's head and tore a welded
+                // unit that fit at its own position (`fill_multi_expr_travel_long`). The stop at
+                // the boundary `line` is the correct answer under the travel doctrine: the
+                // boundary itself is measured pairwise against the whole flat unit that follows
+                // ([`tsv_lang::doc::DocContext::break_before_wide_flow`]), so a unit that does not
+                // fit travels there and nothing is stranded flat past printWidth.
                 //
-                // The ONE shape that does not take this arm is an element still inside its
-                // inline-sibling wrap (`group([line, el])` — a spaced comment or a whitespace-only
-                // separator put it there) whose width-broken form would NOT regenerate the static
-                // Tier-2 trigger: two boundaries then meet on one element, and the §129 outside-in
-                // doctrine resolves the LEADING one first (`inline_sibling_drop_tail_flow_long`) —
-                // a greedy per-width tail there keeps the comment hug and re-answers the leading
-                // boundary against a column the converged output no longer contains, leaving the
-                // document a second stable fixed point. That shape keeps the joint join below.
+                // **Every** non-terminal tail lands here, wrapped or not. An element still inside
+                // its inline-sibling wrap (`group([line, el])` — a spaced comment or a
+                // control-flow block put it there) used to keep a JOINT `group([el, line])`
+                // instead, so the two boundaries meeting on the element resolved outside-in:
+                // fusing element and tail into one measurement is what pushed the leading boundary
+                // over, and the tail then rode that break. It bought a single fixed point for the
+                // comment boundary at the price of a line — but it was conditioned on a property
+                // its own output destroys. The wrap exists only while the sibling and the element
+                // share a line, and breaking that line is the join's whole action; the next parse
+                // sees no wrap and arrives here. Where the element stayed intact the two answers
+                // agreed by arithmetic (its closing tag sits at print width, so the tail did not
+                // fit after it either way), but a **block-styled** element puts `</tag>` back at
+                // the content indent, where the tail does fit — so the document formatted to the
+                // dropped tail and reformatted to the hugged one, forever
+                // (`inline_sibling_drop_tail_wide_long` pins that razor).
                 //
-                // A REGENERATING previous element (a component, or an inline element with any
-                // non-text-only content) takes this arm even when wrapped: its width-broken
-                // form re-parses as a statically-broken one (the emitted boundary newlines re-read
-                // as the Tier-2 signal), and the static path's tail hugs per width — so the
-                // width-broken rendering must answer the same or the document converges only on
-                // pass 2 (`authoring:audit` catches the mutants; a fill-content element in a
-                // comment wrap was the escaped instance, `inline_comment_wrap_fill_tail_long`).
-                // That invariant outranks the outside-in preference, which for these kinds has
-                // no stable joint answer to keep.
-                trim_left = true;
+                // Retiring the join gives up no convergence the project wanted: a comment's
+                // authored line is authorship (conformance_prettier.md §Comment Position
+                // Philosophy), so the hugged and own-line spellings are two legitimate fixed
+                // points — which `inline_sibling_drop_tail_flow_long` already held at its fitting
+                // width and the join overrode only once the run wrapped. It also puts the two
+                // non-flowing siblings (comment, control-flow block) back in step with the three
+                // flowing ones (element, tag, block element), which always took this answer.
                 leading_line = true;
-            } else {
-                // A NON-breaking element predecessor, in the two shapes the arm above leaves: a
-                // terminal tail (the fold) and a non-terminal one whose width break does not
-                // regenerate (the joint join).
-                trim_left = true;
-                // Pop the last doc (the inline element) and rejoin it with the trailing text.
-                if let Some(last_doc) = child_docs.pop() {
-                    if is_last {
-                        // Last child: fold the element and the trailing words into ONE fill so a
-                        // wide element wraps its own content within printWidth and the words pack
-                        // after it — see `build_after_element_fold`.
-                        //
-                        // The fold's head is the popped unit, so its leading boundary is the one in
-                        // front of `prev_sibling_head` — the same question `glued_lead` asks of a
-                        // text run, asked here of an element. A glued head must never drop to a
-                        // fresh line: there is no whitespace at that boundary, so the drop would
-                        // INJECT a rendered space (`</code>/` `<code>`), and the mangled form is
-                        // its own fixed point, so F1 cannot see it.
-                        let glued_head = self.leading_boundary_glued(
-                            trimmed_nodes,
-                            prev_sibling_head,
-                            content_bounds.0,
-                        );
-                        let folded = self.rejoin_inside_leading_wrap(last_doc, |el| {
-                            self.build_after_element_fold(el, raw, glued_head)
-                        });
-                        child_docs.push(folded);
-                        return;
-                    }
-                    // Non-last text after an element still inside its inline-sibling wrap, whose
-                    // width break does not regenerate (see the arm above for both halves of that
-                    // gate): keep the trailing boundary grouped WITH the element, so the two
-                    // boundaries meeting on it resolve outside-in — the leading wrap breaks first,
-                    // and the joint measurement is what pushes a too-wide-to-sit-flat element's
-                    // tail down (`inline_sibling_drop_tail_flow_long`, §129).
-                    //
-                    // A popped element that carries the welded-run marker (`LeadBoundary::Glued`)
-                    // takes the marker-hoisting join instead: a bare group would bury the marker,
-                    // the preceding boundary's welded walk would stop one node short, and the run
-                    // would stand and tear its last element open instead of travelling
-                    // (`inline_welded_run_travel_long`'s non-terminal-follower case).
-                    let joined = d.try_welded_sibling_join(last_doc).unwrap_or_else(|| {
-                        self.rejoin_inside_leading_wrap(last_doc, |el| {
-                            d.group(d.concat(&[el, d.line()]))
-                        })
-                    });
-                    child_docs.push(joined);
-                }
             }
             // The chain is TOTAL — every inline predecessor claims this boundary. Nothing falls
             // through unclaimed, which is what leaves the leading-half damage below unreachable
-            // from here: a run's boundary is either its own fill `line` (the first two arms) or a
-            // measurement carried on the popped element (the last), never a space baked into the
-            // first word. The NON-TERMINAL guard this used to hold — `group([element, line()])`
-            // for every non-tag prev, which forced the boundary to break whenever the element
-            // broke — is retired; the regenerating-kinds argument is on the `leading_line` arm.
+            // from here: a run's boundary is either its own fill `line` or a measurement carried
+            // on the popped element, never a space baked into the first word.
         } else if has_leading_ws && !is_first {
             // ┌─ THE UNCLAIMED-BOUNDARY RULE (this arm is its leading half; the trailing half is
             // │  the last arm of the `trailing_line` chain below, and the two are exact mirrors).
@@ -933,25 +891,17 @@ impl<'a> Printer<'a> {
     /// breaking forces the other. Hoisting the boundary back out afterwards keeps them separate,
     /// and is why both arms route through here rather than each re-deriving the shape.
     ///
-    /// The weld is not merely untidy — it costs the document its fixed point, differently per arm:
+    /// The weld is not merely untidy — it costs the document its fixed point: the boundary is
+    /// *double-counted*, since the fill breaks before the fold AND the wrapping group re-renders
+    /// its own leading line flat, stranding a leading space
+    /// (`inline_break_before_prev_inline_long`).
     ///
-    /// - **Terminal tail** (the after-element fold): the boundary is *double-counted* — the fill
-    ///   breaks before the fold AND the wrapping group re-renders its own leading line flat,
-    ///   stranding a leading space (`inline_break_before_prev_inline_long`).
-    /// - **Non-terminal tail**: the welded group measures the trailing boundary against the column
-    ///   *before* the leading break — a column that no longer exists once the leading boundary
-    ///   breaks and the element starts a fresh line. The next pass, reading that fresh line,
-    ///   measures the trailing boundary from it and answers differently, so the two passes
-    ///   disagree forever (`inline_sibling_drop_tail_flow_long`). Breaking outside-in is what makes
-    ///   the first pass ask the question the second pass will ask.
-    ///
-    /// The non-terminal join keeps the trailing boundary grouped *with* the element only for the
-    /// shape that still reaches it — an element inside its leading wrap whose width break does
-    /// not regenerate (the gate is on `handle_text_child`'s `leading_line` arm): there an element
-    /// too wide to sit flat must push its tail to the next line, only measuring the two together
-    /// sees that, and the leading wrap stays the boundary that breaks first. Every other
-    /// non-terminal tail boundary is the text fill's own `leading_line`, decided per width from
-    /// the element's actual end column.
+    /// Only the **terminal** tail reaches here now. A non-terminal one used to take a joint
+    /// `group([el, line])` for the wrapped shapes, fusing the two boundaries so they resolved
+    /// outside-in; that fusion was retired because it was conditioned on the wrap, which its own
+    /// leading break destroys — see `handle_text_child`'s `leading_line` arm and
+    /// `inline_sibling_drop_tail_wide_long`. Every non-terminal tail boundary is now the text
+    /// fill's own `leading_line`, decided per width from the element's actual end column.
     fn rejoin_inside_leading_wrap(
         &self,
         last_doc: DocId,
@@ -1030,31 +980,6 @@ impl<'a> Printer<'a> {
                 .with_after_element_fold(true)
                 .with_glued_lead(glued_lead),
         )
-    }
-
-    /// Build a doc for a text node
-    ///
-    /// Returns None for empty text; a whitespace-only node collapses to a single
-    /// inter-sibling space. For text with content, normalizes internal whitespace to
-    /// single spaces (fill).
-    pub(super) fn build_text_doc(&self, text: &internal::Text) -> Option<DocId> {
-        let raw = text.raw(self.source);
-        // ASCII (collapsible) whitespace only: a non-breaking space (U+00A0) is content,
-        // so a node made only of NBSP is NOT empty here and flows to the fill path below
-        // (preserved verbatim), never dropped or collapsed to a regular space.
-        let trimmed = raw.trim_matches(is_collapsible_ws_char);
-        if trimmed.is_empty() {
-            // Pure (ASCII) whitespace: collapse to a single inter-sibling space
-            if raw.bytes().any(is_collapsible_ws) {
-                Some(self.d().text(" "))
-            } else {
-                None
-            }
-        } else {
-            // Has content: use fill() for word-level line breaking
-            // This matches Prettier's splitTextToDocs behavior
-            self.build_text_fill_doc_trimmed(raw, false, false, false, false, None)
-        }
     }
 
     /// Build a fill doc for text with separate control over leading/trailing trimming.

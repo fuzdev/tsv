@@ -28,6 +28,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; commit drift (warn) | `deno task conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check` |
+| [Razor sweep](#print-width-razor-sweep-razoraudit) | `razor:audit` | width-keyed layout bugs — an F1 break at some column, and the stray line-head boundary space that is its OWN fixed point | `deno task check` |
 | [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present) |
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check` |
 | [Render equivalence](#render-equivalence-audit-renderaudit) | `render:audit` | `tsv format` changing what a Svelte component renders | `deno task conformance` (release) |
@@ -707,6 +708,63 @@ cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
 # Also: --json, --verbose, --limit N (sites/file), --examples N.
 cargo run -p tsv_debug authoring_audit ~/dev/zzz/src --prettier --dump-dir /tmp/audit
 ```
+
+## Print-Width Razor Sweep (`razor:audit`)
+
+```bash
+# razor_audit - walk each Svelte seed ACROSS the print-width razor and grade the
+# output at every width. Pure Rust, no Deno. Defaults to tests/fixtures, .svelte
+# seeds only. Exits 1 on any finding.
+cargo run --profile corpus -p tsv_debug razor_audit                 # sweep all fixtures
+cargo run --profile corpus -p tsv_debug razor_audit --width 8       # cheaper/narrower sweep
+cargo run --profile corpus -p tsv_debug razor_audit ~/dev/zzz/src   # sweep a real codebase
+# Also: --json, --limit N.
+```
+
+**The dimension no other gate varies.** `authoring:audit` mutates the *spelling* of a
+document's whitespace, `fuzz:audit` its *structure*, `gaps`/`blanks` inject at *sites* — every
+one of them formats each document at the single width its content happens to have. The Svelte
+inline-layout family's bugs are **width-keyed**: a rule fires only once a construct crosses
+column 100, so a document one character short of the razor exercises none of it. This audit
+supplies that variation by padding a text word, which shifts everything downstream by `k`
+columns, so `--width k` formats each seed at `k + 1` geometries instead of one. Seeds are
+padded from their own **fixed point**, not from the bytes on disk, so the sweep perturbs one
+known geometry rather than confounding width with the first format's reflow.
+
+**Two properties per width, and neither subsumes the other:**
+
+- **F1** (`format(out) == out`) catches the half where two authorings of one document disagree
+  forever.
+- **The line-head boundary space** catches the half F1 **cannot see**. When a text run's
+  leading boundary is baked into its first word instead of claimed as a break point, the space
+  rides the fill's fresh-line drop to the head of a continuation line — and after a predecessor
+  whose break is *forced* (a tag, a component, a `svelte:*`), that mangled form keeps its own
+  break under every authoring, so it is **its own fixed point**. F1, the fuzzer, the round-trip
+  and `render:audit` all pass straight through it (the space is render-free — Svelte collapses
+  the run to one space either way); only a column separates the two forms.
+
+**The oracle is structural, and that is measured, not assumed.** A raw text scan for "line
+starts with indent + a space" is unusable: 406 lines across the fixture tree's own *output*
+files already do, dominated by block-comment continuations (` *`, ` */`), expression alignment
+(` )`, ` }`), multiline attribute values and `<pre>` content — all legitimate. So the scan asks
+the **parse**: a violation is a space at a line head *inside a fragment `Text` node*. The
+exclusions mirror the printer's own verbatim-emission dispatch rather than re-deriving a rule
+— `<pre>`/`<textarea>`, `<script>`/`<style>`, a foreign-language `<template>`, non-`Fragment`
+text decodings, and format-ignore in **both** its node and **range** forms. (Missing the range
+form was a real false-positive class caught on the first run: it accused 476 lines of the
+author's own frozen bytes.)
+
+**Validated against a known bug rather than asserted.** Built pre-fix (the tail-boundary claim
+reverse-applied, gated on an `objcopy .text` comparison so no stale binary could fake either
+column), it reports 2412 findings — every one inside the fixture that pins that bug, both
+kinds, zero false positives; on the fixed tree it reports **0** across 45,905 graded widths.
+
+**Its first catch, and what it cost to find.** The fused element+tail measurement an inline-sibling
+wrap used to take was a live F1 break at every width where the wrapped element lays its own content
+out block-style — and no other gate could see it, because the strayed pass is only reachable at
+widths no fixture happened to sit at. The sweep found it on its first run past `--width 17`
+(`inline_sibling_drop_tail_wide_long` pins the razor). Green since, over both the fixture tree and
+real code, and gated in `deno task check` (~5 s at the default width).
 
 ## Format→Reparse Round-Trip Audit (`roundtrip:audit`)
 

@@ -62,9 +62,8 @@ pub struct DocContext {
     /// The per-fill layout flag bits — one packed word rather than `bool` fields, so a new flag
     /// never moves `DocNode`'s size (the note below the struct carries the budget). Read through
     /// the named getters ([`Self::break_before_wide_flow`], [`Self::after_element_fold`],
-    /// [`Self::glued_lead`], [`Self::glued_atom`],
-    /// [`Self::joined_atom`] — each carries its flag's full contract), set through the matching
-    /// `with_*` builders.
+    /// [`Self::glued_lead`], [`Self::glued_atom`] — each carries its flag's full contract), set
+    /// through the matching `with_*` builders.
     flags: u16,
 }
 
@@ -92,7 +91,6 @@ impl DocContext {
     const AFTER_ELEMENT_FOLD: u16 = 1 << 1;
     const GLUED_LEAD: u16 = 1 << 2;
     const GLUED_ATOM: u16 = 1 << 3;
-    const JOINED_ATOM: u16 = 1 << 4;
 
     /// A context that only reserves `columns` trailing columns — the CSS trailing-punctuation
     /// case, and the sole reason [`Self::trailing_reserve`] exists.
@@ -275,8 +273,8 @@ impl DocContext {
     /// suppression (this flag, Case 3 at `offset == 0`), the trailing measurement
     /// ([`Self::break_before_wide_flow`], Cases 1/2 at `is_final_segment`), and the upstream
     /// walk (entry classification) — so the flags never contend, but a builder that WRAPS a
-    /// fill carrying them hides all three at once (the marker-burial hazard
-    /// [`Self::joined_atom`] exists to defuse for the sibling join).
+    /// fill carrying them hides all three at once (the marker-burial hazard — a wrapping
+    /// builder must re-hoist the marker's flags onto the wrapper).
     ///
     /// ⚠️ The head's drop suppression is **two** render sites, not one: Case 3's arm and Case 1's,
     /// the latter reached whenever the run is a fill of a single item (`is_glued_head` in
@@ -324,36 +322,6 @@ impl DocContext {
     #[must_use]
     pub const fn with_glued_atom(self, on: bool) -> Self {
         self.with_flag(Self::GLUED_ATOM, on)
-    }
-
-    /// Set beside [`Self::glued_atom`] when the wrapped doc is not the atom itself but the
-    /// **sibling join** `group([atom, line])` — a welded-run atom rejoined with its trailing
-    /// boundary by the non-last text arm
-    /// ([`crate::doc::arena::DocArena::try_welded_sibling_join`], the sole producer). The join
-    /// must carry the popped marker's flags on top: buried inside the group, the preceding
-    /// boundary's welded walk reads the join as not-glued, stops one node short, and the run
-    /// stands and tears its last element open instead of travelling.
-    ///
-    /// [`crate::doc::arena::DocArena::welded_atom`] recognizes the join by this flag and
-    /// resolves the measured atom to the group's first child — the element alone. The trailing
-    /// `line` is the unit's own first whitespace, where everything after is free to wrap, so it
-    /// must not enter the boundary's fit check (the same cut the fold's lead extraction makes).
-    ///
-    /// ⚠️ A separate flag because the resolution is **not** safe on shape alone: a bare glued
-    /// element's own doc is routinely a `Group(Concat([…]))` too, so "look through the group"
-    /// keyed on [`Self::glued_atom`] would descend into an ordinary element and measure its
-    /// first part (the open tag) as the atom.
-    #[inline]
-    #[must_use]
-    pub const fn joined_atom(&self) -> bool {
-        self.flag(Self::JOINED_ATOM)
-    }
-
-    /// Returns `self` with [`Self::joined_atom`] set to `on`.
-    #[inline]
-    #[must_use]
-    pub const fn with_joined_atom(self, on: bool) -> Self {
-        self.with_flag(Self::JOINED_ATOM, on)
     }
 }
 

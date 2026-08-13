@@ -1225,11 +1225,9 @@ impl DocArena {
     }
 
     /// The **breakable atom** `id` contributes to a flow-boundary measurement, if it is one — an
-    /// after-element fold's LEAD element (the inline element its trailing text packs after), a
-    /// sibling join's element ([`DocContext::joined_atom`] — the join's trailing separator stays
-    /// out of the unit), or a bare glued element / glued element run
-    /// ([`DocContext::glued_atom`]). `None` for anything else — a text run, a plain concat, a
-    /// bare element carrying no context.
+    /// after-element fold's LEAD element (the inline element its trailing text packs after), or a
+    /// bare glued element / glued element run ([`DocContext::glued_atom`]). `None` for anything
+    /// else — a text run, a plain concat, a bare element carrying no context.
     ///
     /// This is the question asked of the node at the TOP of the look-ahead stack, and unlike
     /// [`Self::welded_entry`] it does NOT ask whether `id` is glued: the top node sits behind the
@@ -1253,19 +1251,6 @@ impl DocArena {
         if context.after_element_fold() {
             // The fold is `fill([element, line, words…])`; its breakable atom is the lead element.
             let DocNode::Fill(range) = &nodes[doc.index()] else {
-                return None;
-            };
-            return range.resolve(&self.children.borrow()).first().copied();
-        }
-        if context.joined_atom() {
-            // The sibling join is `group([atom, line])` ([`Self::try_welded_sibling_join`]); its
-            // breakable atom is the group's first child — the fold's lead extraction, one shape
-            // over. The trailing `line` is the unit's own first whitespace, where everything
-            // after is free to wrap, so it stays out of the boundary's fit check.
-            let DocNode::Group { contents, .. } = &nodes[doc.index()] else {
-                return None;
-            };
-            let DocNode::Concat(range) = &nodes[contents.index()] else {
                 return None;
             };
             return range.resolve(&self.children.borrow()).first().copied();
@@ -1326,8 +1311,8 @@ impl DocArena {
     /// chain and panic if a [`DocContext::glued_lead`] marker sits inside.
     ///
     /// Every builder that WRAPS a marked doc is a burial hazard: [`Self::welded_entry`] reads only
-    /// the top node, so a marker inside a bare wrapper (`group([marked, line])` — the sibling-join
-    /// bug's exact shape, since fixed by [`Self::try_welded_sibling_join`] re-hoisting the flags)
+    /// the top node, so a marker inside a bare wrapper (`group([marked, line])` — the shape a
+    /// since-retired sibling join took, and the bug it caused before it re-hoisted the flags)
     /// is invisible, the walk stops one entry short, and the run stands and tears its last element
     /// open instead of travelling. Burial keeps the marker as the wrapper's FIRST structural child;
     /// a legitimately nested marker (a glued boundary in some deeper fill) sits behind a `Fill` or
@@ -1350,8 +1335,7 @@ impl DocArena {
                         !context.glued_lead(),
                         "buried welded-run marker: a glued_lead-marked doc is the first \
                          structural child of a NotGlued welded-walk entry — a wrapping builder \
-                         hid the marker from welded_entry (re-hoist its flags onto the wrapper, \
-                         as DocArena::try_welded_sibling_join does)"
+                         hid the marker from welded_entry — re-hoist its flags onto the wrapper"
                     );
                     *doc
                 }
@@ -1445,36 +1429,6 @@ impl DocArena {
             return None;
         }
         Some(*x)
-    }
-
-    /// Join a welded-run atom with its trailing sibling boundary — the non-last text arm's
-    /// `group([atom, line])`, with the marker's flags re-hoisted onto the join
-    /// ([`DocContext::joined_atom`]) so a preceding boundary's welded walk
-    /// ([`Self::welded_entry`]) still sees the run. Buried inside a bare group, the marker is
-    /// invisible, the walk stops one node short, and the run stands and tears its last element
-    /// open instead of travelling.
-    ///
-    /// `None` when `id` is not a welded-atom marker (the `LeadBoundary::Glued` shape
-    /// `push_inline_child_doc` pushes in `tsv_svelte` — [`DocContext::glued_atom`] without the
-    /// fold or join identities); the caller then joins the ordinary way. The sole producer of
-    /// the join shape, and [`Self::welded_atom`]'s `joined_atom` arm is its exact structural
-    /// inverse — keep them in lockstep, like the [`Self::inline_sibling_line_group`] /
-    /// [`Self::strip_leading_line_group`] pair above.
-    pub fn try_welded_sibling_join(&self, id: DocId) -> Option<DocId> {
-        let context = {
-            let nodes = self.nodes.borrow();
-            let DocNode::WithContext { context, .. } = &nodes[id.index()] else {
-                return None;
-            };
-            if !context.glued_atom() || context.after_element_fold() || context.joined_atom() {
-                return None;
-            }
-            context.clone()
-        };
-        Some(self.with_context(
-            self.group(self.concat(&[id, self.line()])),
-            context.with_joined_atom(true),
-        ))
     }
 
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
@@ -3069,14 +3023,14 @@ mod inline_sibling_line_group_tests {
 }
 
 #[cfg(test)]
-mod welded_sibling_join_tests {
-    //! The welded sibling join producer/matcher must stay in lockstep, like the inline-sibling
-    //! wrap pair above. The producer ([`super::DocArena::try_welded_sibling_join`]) is called a
-    //! crate away in `tsv_svelte`'s non-last text arm; the matcher is
-    //! [`super::DocArena::welded_atom`]'s `joined_atom` arm, consumed by `flow_lookahead`'s
-    //! welded walk. A silent shape drift makes the walk read the join as `NotGlued`, and the run
-    //! stands and tears its last element open instead of travelling — invisible to every
-    //! idempotency-shaped gate, since the torn form is its own fixed point.
+mod welded_marker_burial_tests {
+    //! [`super::DocArena::welded_entry`] reads only the top node, so ANY builder that wraps a
+    //! marked doc can bury the marker: the walk then stops one entry short, and the run stands
+    //! and tears its last element open instead of travelling — invisible to every
+    //! idempotency-shaped gate, since the torn form is its own fixed point. A retired sibling
+    //! join (`group([marked, line])`) was the historical instance, and had to re-hoist the
+    //! marker's flags onto the wrapper to stay visible; the tripwire below is what keeps the
+    //! next such builder from repeating it.
     use super::{DocArena, DocContext, WeldedEntry};
 
     fn marker(a: &DocArena) -> super::DocId {
@@ -3088,38 +3042,8 @@ mod welded_sibling_join_tests {
         )
     }
 
-    #[test]
-    fn welded_sibling_join_round_trips() {
-        let a = DocArena::new();
-        let m = marker(&a);
-        let joined = a.try_welded_sibling_join(m).expect("a marker must join");
-        // The walk must still see the run through the join, and the measured atom is the marker
-        // alone — the join's trailing `line` stays out of the boundary's fit check.
-        assert!(
-            matches!(a.welded_entry(joined), WeldedEntry::Atom(atom) if atom == m),
-            "welded_atom's joined_atom arm must be the exact inverse of try_welded_sibling_join",
-        );
-    }
-
-    #[test]
-    fn welded_sibling_join_rejects_non_markers() {
-        let a = DocArena::new();
-        // A bare doc joins the ordinary way.
-        let x = a.text("x");
-        assert!(a.try_welded_sibling_join(x).is_none());
-        // A glued text run (`glued_lead` without `glued_atom`) is not an atom marker.
-        let run = a.with_context(x, DocContext::default().with_glued_lead(true));
-        assert!(a.try_welded_sibling_join(run).is_none());
-        // An existing join is never re-joined.
-        let joined = a
-            .try_welded_sibling_join(marker(&a))
-            .expect("a marker must join");
-        assert!(a.try_welded_sibling_join(joined).is_none());
-    }
-
     /// The burial tripwire must FIRE on the historical bug shape — a marker wrapped in a bare
-    /// `group([marked, line])` with its flags NOT re-hoisted (the exact form
-    /// [`super::DocArena::try_welded_sibling_join`] exists to prevent).
+    /// `group([marked, line])` with its flags NOT re-hoisted.
     #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "buried welded-run marker")]

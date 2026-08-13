@@ -28,7 +28,7 @@
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace --all-features --all-targets -- -D warnings",
 		"format:audit": "cargo run --profile corpus -p tsv_cli --quiet -- format --check .",
-		"check": "cargo fmt --check && deno task format:audit && deno task pins:audit && deno task docs:audit && deno task typecheck && deno task conformance:audit && deno task conformance:audit:compiler && deno task scan:audit && deno task fanout:audit && deno task roundtrip:audit && deno task roundtrip:audit:prettier && deno task canonicalize:audit && deno task binding:audit && deno task authoring:audit && deno task fuzz:audit && deno task test:deno && deno task test && deno task test:audits && deno task swallow:audit && deno task comments:audit && deno task gaps:audit && deno task blanks:audit && deno task fabrication:audit && deno task census:audit && deno task width:audit && deno task ignore:audit && deno task check:ast-types && deno task lint",
+		"check": "cargo fmt --check && deno task format:audit && deno task pins:audit && deno task docs:audit && deno task typecheck && deno task conformance:audit && deno task conformance:audit:compiler && deno task scan:audit && deno task fanout:audit && deno task roundtrip:audit && deno task roundtrip:audit:prettier && deno task canonicalize:audit && deno task binding:audit && deno task authoring:audit && deno task razor:audit && deno task fuzz:audit && deno task test:deno && deno task test && deno task test:audits && deno task swallow:audit && deno task comments:audit && deno task gaps:audit && deno task blanks:audit && deno task fabrication:audit && deno task census:audit && deno task width:audit && deno task ignore:audit && deno task check:ast-types && deno task lint",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 		"doctor": "deno run --allow-read --allow-sys --allow-run=deno,node,bun,cargo,wasm-pack,npm --config benches/js/deno.json scripts/doctor.ts",
 
@@ -65,6 +65,7 @@
 		"fabrication:audit:update": "cargo run --profile corpus -p tsv_debug --features audits --quiet fabrication_audit --update",
 		"census:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet census_audit",
 		"census:audit:update": "cargo run --profile corpus -p tsv_debug --features audits --quiet census_audit --update",
+		"razor:audit": "cargo run --profile corpus -p tsv_debug --quiet razor_audit",
 		"width:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet width_audit",
 		"width:audit:update": "cargo run --profile corpus -p tsv_debug --features audits --quiet width_audit --update",
 		"ignore:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet ignore_audit",

@@ -202,6 +202,7 @@ deno task fabrication:audit          # blank-FABRICATION on pristine seeds — t
 deno task census:audit               # comment CENSUS: raw input-vs-output trivia multisets per language bucket (own scanners, never parse().comments) — catches parse-time drops/merges/rewrites the ledger can't see (also :update)
 deno task width:audit                # print-width RATCHET: a new KIND of over-width output line — the ONLY gate that measures a column. ⚠️ NOT a debt list (sanctioned overruns are real); also :update
 deno task ignore:audit               # `prettier-ignore` honoring RATCHET: honoring, second-pass stability, freeze scope, trailing inertness (also :update)
+deno task razor:audit                # print-width RAZOR SWEEP: pads a text word to walk each Svelte seed across column 100, grading F1 + the stray line-head boundary space at every width — the ONLY instrument that varies WIDTH, and the only one that can see a mangled form that is its own fixed point (pure Rust; ./docs/audits.md)
 deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar — NOT in check; release-gated leg of `deno task conformance`)
 deno task idempotency:sweep          # F1 idempotency sweep over the real-code corpus (minutes — NOT in check; conformance cadence)
 deno task audit:corpus               # the standing content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
