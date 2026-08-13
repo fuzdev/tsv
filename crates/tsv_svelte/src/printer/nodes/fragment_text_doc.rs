@@ -407,10 +407,6 @@ impl<'a> Printer<'a> {
         let mut trim_left = is_first;
         let mut trim_right = is_last;
 
-        // Track if we need to add a space to replace trimmed whitespace (fill-adjacency cases)
-        let mut add_leading_space = false;
-        let mut add_trailing_space = false;
-
         // If text starts with whitespace and prev is inline element:
         // trim the leading ws and wrap the previous element with a trailing line.
         //
@@ -453,7 +449,6 @@ impl<'a> Printer<'a> {
             // boundary — the tag's own break_after is the line. Checked ahead of the
             // `splitTextToDocs` linebreak arm below, which would double it.
             trim_left = true;
-            add_leading_space = false;
             if leading_run.matches('\n').count() >= 2 {
                 child_docs.push(d.hardline());
             }
@@ -472,7 +467,6 @@ impl<'a> Printer<'a> {
             // drops it onto its own line right after `>`, which re-parses as a leading break and
             // flip-flops the parent element's start boundary (Hug ⇄ Hard).
             trim_left = true;
-            add_leading_space = false;
             // A blank line (2+ leading newlines) is preserved as `[hardline, hardline]` —
             // prettier's `splitTextToDocs` startsWithLinebreak(_, 2). A single newline → one
             // hardline.
@@ -489,16 +483,36 @@ impl<'a> Printer<'a> {
             // fold/group here (the inline-element fold below would pop that break_after doc and
             // strand a leading space — `space_after_block_prettier_divergence`).
             trim_left = true;
-            add_leading_space = false;
         } else if has_leading_ws && !is_first && position.prev_is_inline() {
-            if prev_is_tag && (is_last || !prev_will_break) {
-                // Text after expression/html/render tag: use leading_line in fill instead of
-                // wrapping the tag with group([tag, line()]). The group approach forces line()
-                // to break after multiline tags, pushing text to a new line. leading_line lets
-                // fill continue on the tag's continuation line (line() → space in flat, newline
-                // in break).
+            if prev_is_tag || prev_will_break {
+                // A predecessor that carries its own break — any expression/html/render TAG, or an
+                // element whose doc holds a FORCED break (authored multiline, or multiline attrs).
+                // The boundary becomes the run's own fill `line` rather than a `group([prev,
+                // line])` wrap: the group would force that line to break whenever the predecessor
+                // breaks, tearing the closing tag from a tail that fits beside it — exactly what a
+                // TERMINAL tail must not take (`inline_wide_content_trailing_long`). The fill
+                // `line` is measured per width from the predecessor's actual end column instead,
+                // so the tail hugs the intact closing tag while it fits (rendered flat, the `line`
+                // IS the space it replaced) and the run moves whole when it does not.
                 //
-                // Unconditional — a run holding OTHER break-capable expression tags used to take
+                // ⚠️ Leaving the boundary UNCLAIMED is not the same thing, and was the bug this
+                // arm exists to close. With no trim, `build_text_fill_doc_trimmed` bakes the
+                // boundary space into word 0 (`prepend_space`), where it is not a break point at
+                // all: it renders as the hug while the first word fits, and the moment it does not
+                // the fill's fresh-line drop carries that space to the HEAD of the continuation
+                // line — the leading half of the unclaimed-boundary damage spelled out below, and
+                // against the standing rule that a run which must move spends its boundary space
+                // on the break (conformance_prettier_svelte.md §Svelte: Inline content
+                // block-style). The two predecessor kinds hid it differently: an ELEMENT reaches
+                // this site with `prev_will_break` false when the same document is authored on one
+                // line (it width-breaks instead), so the boundary was claimed there and the two
+                // authorings disagreed forever — an F1 break; a TAG keeps its forced break under
+                // every authoring, so the strayed form is its own fixed point and idempotency, the
+                // fuzzer and the round-trip are all blind to it, leaving the column the only thing
+                // that separates the two. `fill_tail_move_after_break_long` pins both kinds, in
+                // the terminal and non-terminal positions.
+                //
+                // Unconditional for a tag — a run holding OTHER break-capable expression tags used to take
                 // a plain leading space here instead (the `breakable_exprs` hard-width carve-out),
                 // on the theory that a fill `line` renders in fits()-Break mode and short-circuits
                 // an earlier expression group's lookahead. That carve-out removed every boundary
@@ -510,20 +524,8 @@ impl<'a> Printer<'a> {
                 // ([`tsv_lang::doc::DocContext::break_before_wide_flow`]), so a unit that does
                 // not fit travels there and nothing is stranded flat past printWidth.
                 trim_left = true;
-                add_leading_space = false;
                 leading_line = true;
-            } else if is_last && prev_will_break {
-                // Last child after breaking element (e.g. multiline attrs):
-                // skip wrapping because group([breaking_element, line()]) forces
-                // line() to break too, incorrectly separating closing tag from text.
-                // That forced break is exactly what a TERMINAL tail must not take — it hugs the
-                // intact closing tag per the author's space (`inline_wide_content_trailing_long`).
-                // Note: non-last text after a breaking *tag* (`prev_is_tag && !is_last &&
-                // prev_will_break`) still falls through without action — group() would force
-                // line() to break, and leading_line is only for non-breaking continuation. The
-                // text's leading ws handles spacing.
-            } else if !prev_will_break
-                && !is_last
+            } else if !is_last
                 && (child_docs
                     .last()
                     .is_none_or(|&doc| d.strip_leading_line_group(doc).is_none())
@@ -573,11 +575,12 @@ impl<'a> Printer<'a> {
                 // That invariant outranks the outside-in preference, which for these kinds has
                 // no stable joint answer to keep.
                 trim_left = true;
-                add_leading_space = false;
                 leading_line = true;
-            } else if !prev_will_break {
+            } else {
+                // A NON-breaking element predecessor, in the two shapes the arm above leaves: a
+                // terminal tail (the fold) and a non-terminal one whose width break does not
+                // regenerate (the joint join).
                 trim_left = true;
-                add_leading_space = false; // line() handles the space
                 // Pop the last doc (the inline element) and rejoin it with the trailing text.
                 if let Some(last_doc) = child_docs.pop() {
                     if is_last {
@@ -622,15 +625,13 @@ impl<'a> Printer<'a> {
                     child_docs.push(joined);
                 }
             }
-            // Non-last text after a BREAKING inline element falls through without action,
-            // exactly like the breaking-tag case above: the element already carries its hard
-            // break, so the text's own fill leading `line` owns the boundary, measured at render
-            // from the element's actual end column — it hugs the closing tag when it fits and
-            // breaks per width when it does not, converging both authorings (the flow rule
-            // respells a single authored newline as the space). This used to be the NON-TERMINAL
-            // guard (`group([element, line()])` for every non-tag prev), which forced the
-            // boundary to break whenever the element broke; the regenerating-kinds argument for
-            // retiring it is on the `leading_line` arm above.
+            // The chain is TOTAL — every inline predecessor claims this boundary. Nothing falls
+            // through unclaimed, which is what leaves the leading-half damage below unreachable
+            // from here: a run's boundary is either its own fill `line` (the first two arms) or a
+            // measurement carried on the popped element (the last), never a space baked into the
+            // first word. The NON-TERMINAL guard this used to hold — `group([element, line()])`
+            // for every non-tag prev, which forced the boundary to break whenever the element
+            // broke — is retired; the regenerating-kinds argument is on the `leading_line` arm.
         } else if has_leading_ws && !is_first {
             // ┌─ THE UNCLAIMED-BOUNDARY RULE (this arm is its leading half; the trailing half is
             // │  the last arm of the `trailing_line` chain below, and the two are exact mirrors).
@@ -672,7 +673,6 @@ impl<'a> Printer<'a> {
             //
             // `leading_line` is the same parity-shifted mechanism the after-a-tag boundary uses.
             trim_left = true;
-            add_leading_space = false;
             leading_line = true;
         }
 
@@ -706,7 +706,6 @@ impl<'a> Printer<'a> {
             // rather than printed. Reached at a fragment edge too, where `is_last` already trims —
             // the arm is what carries the *interior* position, and the blank line in both.
             trim_right = true;
-            add_trailing_space = false;
             if trailing_ws_newlines >= 2 {
                 trailing_hardlines = 1;
             }
@@ -719,7 +718,6 @@ impl<'a> Printer<'a> {
             // trailing newline — replacing the collapsible `group([line, …])` / `trailing_line`
             // the inline path uses for a same-line (space-only) boundary.
             trim_right = true;
-            add_trailing_space = false;
             trailing_hardlines = if trailing_ws_newlines >= 2 { 2 } else { 1 };
         } else if has_trailing_ws && !is_last && position.next_is_inline() {
             if is_first || next_is_flow_or_tag {
@@ -745,7 +743,6 @@ impl<'a> Printer<'a> {
                 //
                 // The boundary is the same pairwise fill question however the container's content
                 // came to lay out multiline, and whatever flow node follows it.
-                add_trailing_space = false;
                 trailing_line = true;
                 // A first child's leading boundary is the parent's, already trimmed.
                 trim_right = !is_first;
@@ -755,7 +752,6 @@ impl<'a> Printer<'a> {
                 // with `group([line, element])`. (Not a comment — see the arm below, which is
                 // where a comment follower actually lands.)
                 trim_right = true;
-                add_trailing_space = false;
                 *handle_whitespace_of_prev_text = true;
             }
         } else if has_trailing_ws && !is_last {
@@ -763,7 +759,6 @@ impl<'a> Printer<'a> {
             // the `leading_line` arm above, which states the rule, both failure modes, and why
             // neither half is `multiline`-gated. This arm is its exact mirror.
             trim_right = true;
-            add_trailing_space = false;
             trailing_line = true;
         }
 
@@ -810,9 +805,12 @@ impl<'a> Printer<'a> {
         // Build fill for this text node's words.
         // leading_line: fill starts with line() (text after expression tag)
         // trailing_line: fill ends with line() (text before expression tag or first-child)
-        if add_leading_space {
-            child_docs.push(d.text(" "));
-        }
+        //
+        // A boundary space is never pushed as a sibling doc here: every arm above answers its
+        // boundary with a trim plus (where the run owns it) a fill `line`, so the space is either
+        // spent on a break point or carried inside the fill's own first/last item. A separate
+        // ` ` doc would be neither — it cannot break, and it would sit outside the fill where no
+        // width measurement reaches it.
         if let Some(fill_doc) = self.build_text_fill_doc_trimmed(
             raw,
             trim_left,
@@ -917,9 +915,6 @@ impl<'a> Printer<'a> {
                 fill_doc
             };
             child_docs.push(fill_doc);
-        }
-        if add_trailing_space {
-            child_docs.push(d.text(" "));
         }
         for _ in 0..trailing_hardlines {
             child_docs.push(d.hardline());

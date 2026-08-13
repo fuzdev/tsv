@@ -40,8 +40,8 @@ decoders agree there, so those rows are the same in both expectations, and the d
 between them is exactly the dropped second code point.
 
 Formatting is unaffected throughout — the printer emits the source text of a reference
-verbatim, so this is a parse-side divergence only. The two layout questions that *do* read
-the decoded text (`is_separator_like_text` / `is_one_line_separator`, which ask what the
+verbatim, so this is a parse-side divergence only. The layout questions that *do* read
+the decoded text (`is_separator_like_text` and the separator-collapse tests, which ask what the
 characters are rather than how they are spelled) test `is_collapsible_ws`, i.e. `[ \t\n\r]`,
 and no second code point in the table is in that class — not even `&ThickSpace;`, whose
 U+200A is a space the layout never collapses.
