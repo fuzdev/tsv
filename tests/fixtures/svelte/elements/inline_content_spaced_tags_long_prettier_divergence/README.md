@@ -23,7 +23,7 @@ so the block-style form tsv emits is its own fixed point.
 ## Reason
 
 tsv treats printWidth as a hard limit and prefers block-style content over a dangled,
-over-width line. Content-boundary whitespace is render-free under Svelte 5, so it must
-not select the layout — otherwise the block-style form tsv emits would reflow on the
-next pass. See
+over-width line. Content-boundary whitespace is render-free under Svelte 5, so its spelling
+must not select the tags' layout — and the block-style form tsv emits is its own fixed point,
+since the emitted boundary air re-selects the multiline form on the next parse. See
 [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

@@ -76,11 +76,6 @@ impl ElementKind {
     pub(super) fn is_inline(self) -> bool {
         matches!(self, ElementKind::Inline)
     }
-
-    /// Whether this element type preserves source structure at boundaries
-    pub(super) fn preserves_boundary_breaks(self) -> bool {
-        matches!(self, ElementKind::Block | ElementKind::Component)
-    }
 }
 
 /// The element-shaped inputs the shared analyze → layout → build pipeline reads.
@@ -313,9 +308,9 @@ pub(super) enum MultilineCause {
     /// children, mixed block/inline content, an expanding control-flow block, block flow, or a
     /// whitespace-collapsing container. Reformatting cannot change the answer.
     Structural,
-    /// The content's own authored newlines forced it (`has_source_breaks_in_content` /
-    /// `text_has_internal_newlines`) — the Tier-2 element-expansion signal. Reformatting the
-    /// content can add or remove those newlines, so this decision is not stable across passes.
+    /// The content's own authored newlines forced it (`has_source_breaks_in_content`) — the
+    /// Tier-2 element-expansion signal. Reformatting the content can add or remove those
+    /// newlines, so this decision is not stable across passes.
     SourceBreaks,
 }
 

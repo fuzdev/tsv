@@ -1,16 +1,15 @@
 <!--
-	Air on ONE boundary. Where both boundaries carry a newline every container kind preserves the
-	air alike (inline_boundary_air); asked of one boundary the kinds answer differently, and the
-	arity is the whole rule:
+	Air on ONE boundary. Where both content boundaries carry a newline every container kind
+	preserves the air alike (inline_boundary_air); asked of a single boundary each kind answers
+	by its boundary rule alone:
 
 	- an INLINE element is both-or-neither — one boundary is not a request for air, so it collapses
-	- a BLOCK expands on its leading boundary alone
-	- a COMPONENT is both-or-neither too, but any newline inside a CONTENT TEXT counts for it, so a
-	  leading boundary that lands in a text node expands it while the same boundary in front of an
-	  element does not
+	- a COMPONENT is both-or-neither too
+	- a BLOCK expands on its leading boundary alone; a trailing boundary alone collapses
 
-	The last pair is the one that looks like an exception and is not: the newline is in a different
-	NODE, not in a different position.
+	Where the newline LANDS is not part of the question: a leading boundary in front of text sits
+	inside that text node's edge run, in front of an element it is a whitespace-only node — both
+	are the same boundary and answer alike.
 -->
 
 <!-- inline, leading only: collapses -->
@@ -30,14 +29,22 @@
 	</p>
 </div>
 
-<!-- component, leading only, content STARTS WITH TEXT: expands -->
+<!-- block, trailing only: collapses -->
 <div>
-	<Comp>
-		text1 <b>x</b> text2
-	</Comp>
+	<p>text1 <b>x</b> text2</p>
+</div>
+
+<!-- component, leading only, content starts with text: collapses -->
+<div>
+	<Comp>text1 <b>x</b> text2</Comp>
 </div>
 
 <!-- component, leading only, content starts with an ELEMENT: collapses -->
 <div>
 	<Comp><b>x</b> text2</Comp>
+</div>
+
+<!-- component, trailing only: collapses -->
+<div>
+	<Comp>text1 <b>x</b> text2</Comp>
 </div>
