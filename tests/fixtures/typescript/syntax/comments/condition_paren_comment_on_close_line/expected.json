@@ -1,0 +1,982 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 575,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " If - block comment sharing the closing paren's line",
+			"start": 10,
+			"end": 64,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 77,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " While - same",
+			"start": 103,
+			"end": 118,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 134,
+			"end": 142,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Do-while - same",
+			"start": 160,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 209,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Catch - same, in the parameter parens",
+			"start": 224,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 296,
+			"end": 304,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Run - a line comment trailing the condition, then a block on the closing paren's line",
+			"start": 313,
+			"end": 401,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 412,
+			"end": 417,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 4
+				},
+				"end": {
+					"line": 36,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 420,
+			"end": 428,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Run - an own-line comment, then one sharing the closing paren's line",
+			"start": 446,
+			"end": 517,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 530,
+			"end": 538,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 2
+				},
+				"end": {
+					"line": 45,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 541,
+			"end": 549,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 2
+				},
+				"end": {
+					"line": 46,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 574,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 565,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 50,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 66,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 73,
+						"end": 74,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 89,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 3
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 93,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 93,
+									"end": 96,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 93,
+										"end": 94,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 77,
+								"end": 85
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " If - block comment sharing the closing paren's line",
+							"start": 10,
+							"end": 64
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 120,
+					"end": 157,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 130,
+						"end": 131,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 2
+							},
+							"end": {
+								"line": 12,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 146,
+						"end": 157,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 3
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 150,
+								"end": 154,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 150,
+									"end": 153,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 150,
+										"end": 151,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 134,
+								"end": 142
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " While - same",
+							"start": 103,
+							"end": 118
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 180,
+					"end": 221,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 183,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 4
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 187,
+								"end": 191,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 187,
+									"end": 190,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 187,
+										"end": 188,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 205,
+						"end": 206,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 2
+							},
+							"end": {
+								"line": 22,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Do-while - same",
+							"start": 160,
+							"end": 178
+						}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"start": 266,
+					"end": 310,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 5
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 270,
+						"end": 281,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 5
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 274,
+								"end": 278,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 274,
+									"end": 277,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 2
+										},
+										"end": {
+											"line": 28,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 274,
+										"end": 275,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 282,
+						"end": 310,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 3
+							},
+							"end": {
+								"line": 32,
+								"column": 5
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 292,
+							"end": 293,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 2
+								},
+								"end": {
+									"line": 30,
+									"column": 3
+								}
+							},
+							"name": "e"
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 308,
+							"end": 310,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 3
+								},
+								"end": {
+									"line": 32,
+									"column": 5
+								}
+							},
+							"body": [],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c4 ",
+									"start": 296,
+									"end": 304
+								}
+							]
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c3 ",
+							"start": 209,
+							"end": 217
+						},
+						{
+							"type": "Line",
+							"value": " Catch - same, in the parameter parens",
+							"start": 224,
+							"end": 264
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 403,
+					"end": 443,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 410,
+						"end": 411,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 2
+							},
+							"end": {
+								"line": 36,
+								"column": 3
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c5",
+								"start": 412,
+								"end": 417
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 432,
+						"end": 443,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 3
+							},
+							"end": {
+								"line": 40,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 436,
+								"end": 440,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 2
+									},
+									"end": {
+										"line": 39,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 436,
+									"end": 439,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 2
+										},
+										"end": {
+											"line": 39,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 436,
+										"end": 437,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 2
+											},
+											"end": {
+												"line": 39,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c6 ",
+								"start": 420,
+								"end": 428
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Run - a line comment trailing the condition, then a block on the closing paren's line",
+							"start": 313,
+							"end": 401
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 519,
+					"end": 564,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 1
+						},
+						"end": {
+							"line": 49,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 526,
+						"end": 527,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 2
+							},
+							"end": {
+								"line": 44,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 553,
+						"end": 564,
+						"loc": {
+							"start": {
+								"line": 47,
+								"column": 3
+							},
+							"end": {
+								"line": 49,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 557,
+								"end": 561,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 2
+									},
+									"end": {
+										"line": 48,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 557,
+									"end": 560,
+									"loc": {
+										"start": {
+											"line": 48,
+											"column": 2
+										},
+										"end": {
+											"line": 48,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 557,
+										"end": 558,
+										"loc": {
+											"start": {
+												"line": 48,
+												"column": 2
+											},
+											"end": {
+												"line": 48,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c7 ",
+								"start": 530,
+								"end": 538
+							},
+							{
+								"type": "Block",
+								"value": " c8 ",
+								"start": 541,
+								"end": 549
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Run - an own-line comment, then one sharing the closing paren's line",
+							"start": 446,
+							"end": 517
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

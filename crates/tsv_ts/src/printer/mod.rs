@@ -81,7 +81,8 @@ use tsv_lang::{
     },
     has_comments_to_emit_in_range, has_line_comments_in_range, printing,
     source_scan::{
-        TriviaProfile, has_newline_before_position, is_regex_start, skip_regex_literal, skip_trivia,
+        TriviaProfile, has_newline_before_position, is_regex_start_after, operand_end_after,
+        skip_regex_literal, skip_trivia, trivia_ends_operand,
     },
 };
 
@@ -1278,9 +1279,15 @@ impl<'a> Printer<'a> {
         let end = (end as usize).min(source.len());
         let mut depth = 0;
         let mut i = start as usize;
+        // Just past the last significant byte — the anchor `is_regex_start_after`
+        // reads. A skipped string ends an operand; a comment leaves it alone.
+        let mut operand_end = start as usize;
 
         while i < end {
             if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
+                if trivia_ends_operand(source, i) {
+                    operand_end = past;
+                }
                 i = past;
                 continue;
             }
@@ -1293,7 +1300,7 @@ impl<'a> Printer<'a> {
                     }
                 }
                 // Regex literals are the one trivia kind the shared cursor leaves
-                // significant (it needs a backward token lookback), so they are
+                // significant (it needs previous-token context), so they are
                 // skipped here. A regex whose body holds comment bytes — `/\//`,
                 // `/[//]/`, `/\/*/` — would otherwise read as a comment from the
                 // inside and swallow the rest of the line, losing the `)` this
@@ -1301,13 +1308,15 @@ impl<'a> Printer<'a> {
                 // paren. The scan reaches the literal's OPENING `/` first, whose
                 // next byte is never `/` or `*`, so `skip_trivia` can't claim it.
                 b'/' => {
-                    if is_regex_start(source, i, start as usize) {
+                    if is_regex_start_after(source, operand_end, start as usize) {
                         i = skip_regex_literal(source, i, end);
+                        operand_end = i;
                         continue;
                     }
                 }
                 _ => {}
             }
+            operand_end = operand_end_after(source, i, operand_end);
             i += 1;
         }
         None
