@@ -68,6 +68,14 @@ and the edge trim but not *which nodes the edge is measured against*. The behavi
 it; tsv normalizes it to `input`) with the interior control unchanged, so the file isolates the
 edge/interior split on its own.
 
+`unformatted_ours_blank.svelte` carries the **blank-line** authoring of every case, and
+`prettier_variant_blank.svelte` is prettier's stable form of it (blanks kept, continuation
+indents). The trim consumes the blank too: a deleted run has no boundary left to carry a Tier-2
+signal, so "every authoring reaches this one form" includes the blank spelling — deliberately the
+opposite answer from the **declaration** family, whose licence is spent on a *break* (a break can
+carry a blank, so there the blank survives — `tags/declaration_blank_line`). Render-safe like the
+rest: the compiler deletes the edge run wholesale, blank included (render-equivalence verified).
+
 `divergent_variant_boundary_newline.svelte` is the newline authoring of the first case. It shows
 the rule firing in the **multiline** arm as well: tsv collapses the hoisted run
 (`text{@debug cond}`) but leaves the block body on its own line, so it lands on a *third* stable
