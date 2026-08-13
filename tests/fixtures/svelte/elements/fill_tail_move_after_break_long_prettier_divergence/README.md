@@ -30,7 +30,9 @@ the **position** of the run (non-terminal, terminal).
 
 `unformatted_ours_compact` authors every element case on one line; tsv normalizes each to `input`
 in one pass. Prettier holds a stable form per authoring — `output_prettier.svelte` is its form
-from `input` — and tsv normalizes those to `input` too.
+from `input`, `divergent_variant_compact` its form from the compact authoring — and tsv rewrites
+both to a shared third stable form: the newline tails they carry after the multiline predecessors
+are **preserved** (the layout-keyed rule) and each run refills from its fresh line.
 
 ⚠️ Only the element cases carry an F1 claim. A forced-break **tag** breaks identically under every
 authoring, so a stray leading space there is its own fixed point: idempotency, the fuzzer and the
@@ -38,9 +40,11 @@ round-trip are all blind to it and only the column separates the two forms.
 
 ## Reason
 
-Design choice, the same one the rest of this family records. The tail boundary after a multiline
-predecessor is a per-width fill decision measured from that predecessor's own end column, however
-it came to be multiline, and a run that cannot hug spends its boundary space on the break — so
+Design choice, the same one the rest of this family records. The tail boundary's **space**
+spelling after a multiline predecessor is a per-width fill decision measured from that
+predecessor's own end column, however it came to be multiline (an authored newline is
+layout-keyed instead — the catalog entry below), and a run that cannot hug spends its boundary
+space on the break — so
 every render-free authoring of the document reaches one fixed point. Prettier instead groups that
 boundary with the element, so a multiline element always drops a non-terminal tail while a
 terminal one hugs and the line runs past print width. The boundaries tsv moves are render-free

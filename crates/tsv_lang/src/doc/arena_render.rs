@@ -721,6 +721,12 @@ fn render_doc_core<P: RenderPolicy>(
     debug_assert!(commands.is_empty());
     let mut cmd = ArenaCommand { indent, mode, doc };
 
+    // Pre-intern the flow-probe sentinel BEFORE taking the loop-long node borrow below —
+    // interning allocates into the node store, which must not happen mid-render (the
+    // whole-render immutable borrow would panic). One generation-gated cell hit after the
+    // first call, so an unprobed document pays a single node once.
+    let flow_probe_end = arena.flow_probe_end_node();
+
     // Hoist arena borrows out of the loop: the arena is read-only during
     // rendering, so a single immutable borrow held for the whole render
     // avoids the per-iteration dynamic borrow-check cost.
@@ -1005,6 +1011,17 @@ fn render_doc_core<P: RenderPolicy>(
             DocNode::WithContext { doc, context } => {
                 let inner_doc = *doc;
 
+                if context.flow_break_probe() && policy.tracking_suffix() {
+                    // Open a flow probe around this subtree: the sentinel pushed BELOW the
+                    // inner doc pops after the whole subtree has rendered and records
+                    // whether it emitted a newline — the answer the immediately following
+                    // `hold_line_after_broken_flow` fill reads. Suffix-flush renders skip
+                    // probes entirely (no flagged doc renders there, and state written
+                    // out of order would go stale).
+                    commands.push(cmd.with_doc(flow_probe_end));
+                    arena.flow_probe_begin(output.len());
+                }
+
                 if policy.tracking_suffix() {
                     if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
                         let context = context.clone();
@@ -1065,6 +1082,12 @@ fn render_doc_core<P: RenderPolicy>(
 
             DocNode::BreakParent | DocNode::FlushBreak => {
                 // No-op during rendering (both act only on fits decisions)
+            }
+
+            DocNode::FlowProbeEnd => {
+                // Close the innermost flow probe: record whether the probed subtree —
+                // whose commands all popped before this sentinel — emitted a newline.
+                arena.flow_probe_finish(output);
             }
         }
 

@@ -91,6 +91,8 @@ impl DocContext {
     const AFTER_ELEMENT_FOLD: u16 = 1 << 1;
     const GLUED_LEAD: u16 = 1 << 2;
     const GLUED_ATOM: u16 = 1 << 3;
+    const FLOW_BREAK_PROBE: u16 = 1 << 4;
+    const HOLD_LINE_AFTER_BROKEN_FLOW: u16 = 1 << 5;
 
     /// A context that only reserves `columns` trailing columns — the CSS trailing-punctuation
     /// case, and the sole reason [`Self::trailing_reserve`] exists.
@@ -322,6 +324,52 @@ impl DocContext {
     #[must_use]
     pub const fn with_glued_atom(self, on: bool) -> Self {
         self.with_flag(Self::GLUED_ATOM, on)
+    }
+
+    /// When set, rendering this node records whether its subtree actually emitted a line
+    /// break: the renderer snapshots the output length on entry, pushes a
+    /// [`super::arena::DocNode::FlowProbeEnd`] sentinel behind the subtree, and the sentinel
+    /// stores "the subtree's output contained a newline" as the arena's most-recent flow-probe
+    /// answer. Paired with [`Self::hold_line_after_broken_flow`] on the *immediately following*
+    /// fill — the two are built together by the Svelte authored-newline boundary rule, and the
+    /// pairing is positional: the sentinel completes right before the fill renders, so the
+    /// answer cannot be stale. Invisible to measurement (`arena_fits` skips the sentinel), so
+    /// flagging a doc never changes any fit decision — the whole point, after a
+    /// `group([element, line])` join was measured through and re-broke the *preceding*
+    /// boundary (the razor-caught 2-cycle this replaced).
+    #[inline]
+    #[must_use]
+    pub const fn flow_break_probe(&self) -> bool {
+        self.flag(Self::FLOW_BREAK_PROBE)
+    }
+
+    /// Returns `self` with [`Self::flow_break_probe`] set to `on`.
+    #[inline]
+    #[must_use]
+    pub const fn with_flow_break_probe(self, on: bool) -> Self {
+        self.with_flag(Self::FLOW_BREAK_PROBE, on)
+    }
+
+    /// When set on a fill, its LEADING separator (a collapsible line in the first content
+    /// slot — the `leading_line` parity) renders as a forced break when the flow probe's
+    /// most-recent answer ([`Self::flow_break_probe`]) says the probed predecessor rendered
+    /// multiline; otherwise the fill renders exactly as an unflagged one. This is the Svelte
+    /// authored-newline boundary rule's render half: `</a>⏎text` keeps the text's own line
+    /// beside an element that actually rendered multiline, and reflows beside one that
+    /// rendered inline — layout-keyed at render, with no build-side prediction and no
+    /// measurement change (an outer fits walk sees an ordinary fill whose leading line is an
+    /// ordinary break opportunity).
+    #[inline]
+    #[must_use]
+    pub const fn hold_line_after_broken_flow(&self) -> bool {
+        self.flag(Self::HOLD_LINE_AFTER_BROKEN_FLOW)
+    }
+
+    /// Returns `self` with [`Self::hold_line_after_broken_flow`] set to `on`.
+    #[inline]
+    #[must_use]
+    pub const fn with_hold_line_after_broken_flow(self, on: bool) -> Self {
+        self.with_flag(Self::HOLD_LINE_AFTER_BROKEN_FLOW, on)
     }
 }
 
