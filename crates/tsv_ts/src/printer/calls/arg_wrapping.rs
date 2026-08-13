@@ -459,9 +459,10 @@ pub(crate) fn build_args_split_last(
     //
     // A curried arrow-chain argument (`fn(x, (a) => (b) => …)`) routes through the
     // progressive call-arg chain layout: set the context so the outermost chain
-    // arrow flattens its heads (`should_use_arrow_chain_layout` still gates on
-    // untyped / comment-free, and `skip_arrow_chain` keeps the expand-last-arg hug
-    // states on the default path). Mirrors prettier's `isCallLikeExpression(parent)`
+    // arrow flattens its heads (`should_use_arrow_chain_layout` still gates on untyped,
+    // and on every comment sitting in a region the chain doc emits, and
+    // `skip_arrow_chain` keeps the expand-last-arg hug states on the default path).
+    // Mirrors prettier's `isCallLikeExpression(parent)`
     // reaching `printArrowFunctionSignatures`.
     let arg_docs: DocBuf = arguments
         .iter()

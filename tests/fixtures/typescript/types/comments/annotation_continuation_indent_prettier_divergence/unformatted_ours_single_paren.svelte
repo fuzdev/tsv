@@ -40,4 +40,30 @@
 	const j: // c8
 		// c9
 		A & B = null as any;
+
+	// Class-method and object-method return types read the same way as a function
+	// declaration's - the continuation indents one level below the method's own head
+	class K {
+		m(): (// c10
+			X) {
+			return null as any;
+		}
+	}
+	const n = {
+		m(): (// c11
+			X) {
+			return null as any;
+		}
+	};
+
+	// An arrow argument's return type: the continuation indents one level below the
+	// arrow's head wherever that head sits, call argument included
+	fn2(
+		(
+			a
+		): // c12
+			X => {
+			call(a);
+		}
+	);
 </script>
