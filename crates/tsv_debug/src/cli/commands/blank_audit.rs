@@ -632,6 +632,14 @@ fn collect_blank_skip(node: &Value, map: &Utf16ToByte, out: &mut Vec<(usize, usi
                         out.push(span);
                     }
                 }
+                // The wire spelling of the one special kind in that same class
+                // (`SpecialElementKind::preserves_content_whitespace`): a `<svelte:head>`
+                // `<title>`, whose children the compiler pushes verbatim.
+                Some("TitleElement") => {
+                    if let Some(span) = map.node_byte_span(node) {
+                        out.push(span);
+                    }
+                }
                 _ => {}
             }
             for (k, v) in obj {
