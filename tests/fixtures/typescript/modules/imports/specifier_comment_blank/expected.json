@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 640,
+	"end": 820,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -249,24 +249,72 @@
 					"column": 7
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a blank written before the COMMA is not a specifier blank — the list never",
+			"start": 632,
+			"end": 709,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 1
+				},
+				"end": {
+					"line": 49,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " carries one, so only the comment's own line survives",
+			"start": 711,
+			"end": 766,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 784,
+			"end": 790,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 2
+				},
+				"end": {
+					"line": 53,
+					"column": 8
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 639,
+		"end": 819,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 630,
+			"end": 810,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 48,
+					"line": 56,
 					"column": 9
 				}
 			},
@@ -1024,6 +1072,159 @@
 							"value": " head comment, no blank — base form for the dropped-blank variant",
 							"start": 520,
 							"end": 587
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 768,
+					"end": 809,
+					"loc": {
+						"start": {
+							"line": 51,
+							"column": 1
+						},
+						"end": {
+							"line": 55,
+							"column": 14
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 779,
+							"end": 780,
+							"loc": {
+								"start": {
+									"line": 52,
+									"column": 2
+								},
+								"end": {
+									"line": 52,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 779,
+								"end": 780,
+								"loc": {
+									"start": {
+										"line": 52,
+										"column": 2
+									},
+									"end": {
+										"line": 52,
+										"column": 3
+									}
+								},
+								"name": "j"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 779,
+								"end": 780,
+								"loc": {
+									"start": {
+										"line": 52,
+										"column": 2
+									},
+									"end": {
+										"line": 52,
+										"column": 3
+									}
+								},
+								"name": "j"
+							},
+							"importKind": "value"
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 793,
+							"end": 794,
+							"loc": {
+								"start": {
+									"line": 54,
+									"column": 2
+								},
+								"end": {
+									"line": 54,
+									"column": 3
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 793,
+								"end": 794,
+								"loc": {
+									"start": {
+										"line": 54,
+										"column": 2
+									},
+									"end": {
+										"line": 54,
+										"column": 3
+									}
+								},
+								"name": "k"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 793,
+								"end": 794,
+								"loc": {
+									"start": {
+										"line": 54,
+										"column": 2
+									},
+									"end": {
+										"line": 54,
+										"column": 3
+									}
+								},
+								"name": "k"
+							},
+							"importKind": "value",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c10",
+									"start": 784,
+									"end": 790
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 803,
+						"end": 808,
+						"loc": {
+							"start": {
+								"line": 55,
+								"column": 8
+							},
+							"end": {
+								"line": 55,
+								"column": 13
+							}
+						},
+						"value": "./g",
+						"raw": "'./g'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a blank written before the COMMA is not a specifier blank — the list never",
+							"start": 632,
+							"end": 709
+						},
+						{
+							"type": "Line",
+							"value": " carries one, so only the comment's own line survives",
+							"start": 711,
+							"end": 766
 						}
 					]
 				}

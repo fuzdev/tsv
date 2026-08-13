@@ -15,6 +15,26 @@ use tsv_lang::{
 
 use super::Printer;
 
+/// What a parameter's decorators decorate — the axis prettier's comment ATTACHMENT
+/// turns on, and therefore the axis an author blank before the decorator's comment run
+/// turns on ([`Printer::push_decorator_run_blank`]).
+///
+/// `handleMethodNameComments` (prettier's `comments/handle-comments.js`) trails a
+/// decorator-gap comment onto the decorator when the enclosing node is
+/// `isPropertyLikeNode` — a list that includes `TSParameterProperty` but no plain
+/// binding — so a constructor's `@dec⏎⏎// c⏎private p: T` keeps the blank and the same
+/// decorators on `m(@dec⏎⏎// c⏎p: T)` do not. One builder serves both, so the caller
+/// names which it is rather than the builder guessing from `inner_start`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum DecoratorHost {
+    /// A parameter **property** (`constructor(@dec private p: T)`) — property-like, so
+    /// prettier trails the comment onto the decorator and the author blank survives.
+    PropertyLike,
+    /// A plain parameter binding — the comment leads the next node and the blank is
+    /// dropped, by both formatters.
+    Plain,
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for a decorator's expression, parenthesizing when the bare
     /// decorator grammar doesn't cover it.
@@ -73,6 +93,77 @@ impl<'a> Printer<'a> {
             decorator.expression.span().end,
             decorator.span.end,
         );
+    }
+
+    /// Push the author's blank line before a decorator's own-line comment run — the
+    /// `literalline` half of the blank-preserving separator, left for the caller's own
+    /// break (the member path's item `line`, the class-level and parameter paths'
+    /// `hardline`) to supply the other half.
+    ///
+    /// Prettier reaches this blank through its **comment** printer, not through any
+    /// decorator rule: the run is attached as the preceding decorator's TRAILING
+    /// comments, and `printTrailingComment`'s own-line branch emits
+    /// `isPreviousLineEmpty ? hardline : ""` before each one. The null control is what
+    /// makes that reading necessary — with NO comment in the gap both formatters drop a
+    /// blank between two decorators byte-identically, so this is not a decorator gap
+    /// that preserves blanks, it is a comment run that does. Which gaps attach that way
+    /// is the callers' question ([`DecoratorHost`], and the class-level path's
+    /// follower test); this only emits.
+    ///
+    /// ⚠️ The scan is the **in-source** question, so it opens at
+    /// [`blank_scan_start`](Printer::blank_scan_start): a comment already emitted inline
+    /// after the decorator (`@fn /* t */⏎⏎// c`) still occupies its bytes, and a
+    /// multi-line one would otherwise hand its OWN newlines to the scan as an author
+    /// blank (`docs/comments.md` §Trailing and dangling runs).
+    fn push_decorator_run_blank(&self, parts: &mut DocBuf, scan_from: u32, first: &Comment) {
+        let from = self.blank_scan_start(scan_from, first.span.start);
+        if self.has_blank_line_between(from, first.span.start) {
+            parts.push(self.d().literalline());
+        }
+    }
+
+    /// Route one decorator's trailing gap, the walk all three decorator printers share.
+    ///
+    /// Each comment goes where [`Self::classify_decorator_gap_comment`] says: a same-line
+    /// **trailing** one inline onto `buf` (behind the decorator just pushed), one the author
+    /// left on the NEXT decorator's line into `pending` (drained at the top of the next
+    /// iteration by [`Self::push_pending_decorator_prefix`]), and the **own-line** run
+    /// handed back — because that is the one thing the three layouts genuinely disagree
+    /// about, each placing it in its own list (`parts` + `hardline`, a join item, a join
+    /// segment). `has_line` rides along for the member printer's group-break gate.
+    ///
+    /// One walk rather than three copies because every rule that reaches a decorator gap
+    /// has to reach all three printers: the author-blank rule
+    /// ([`Self::push_decorator_run_blank`]) had to be added at three sites, and the sites
+    /// only agreed because they were read side by side.
+    fn collect_decorator_gap_comments<'c>(
+        &'c self,
+        buf: &mut DocBuf,
+        pending: &mut DocBuf,
+        decorator: &internal::Decorator<'_>,
+        boundary: u32,
+        is_last: bool,
+    ) -> (CommentVec<'c>, bool) {
+        let d = self.d();
+        let mut own_line: CommentVec<'c> = CommentVec::new();
+        let mut has_line = false;
+        for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
+            has_line |= !comment.is_block;
+            match self.classify_decorator_gap_comment(
+                comment,
+                decorator.span.end,
+                boundary,
+                is_last,
+            ) {
+                CommentPosition::Trailing => {
+                    buf.push(d.text(" "));
+                    buf.push(self.build_comment_doc(comment));
+                }
+                CommentPosition::LeadingInline => pending.push(self.build_comment_doc(comment)),
+                CommentPosition::LeadingOwnLine => own_line.push(comment),
+            }
+        }
+        (own_line, has_line)
     }
 
     /// Build the run of consecutive own-line leading comments authored between a
@@ -277,6 +368,9 @@ impl<'a> Printer<'a> {
             param_decorators(param),
             self.build_frozen_span_doc(frozen),
             frozen.start,
+            // The binding this freezes is the parameter node itself; a parameter
+            // property reaches its decorators through its own builder below.
+            DecoratorHost::Plain,
         ))
     }
 
@@ -297,6 +391,7 @@ impl<'a> Printer<'a> {
         decorators: Option<&[internal::Decorator<'_>]>,
         inner: DocId,
         inner_start: u32,
+        host: DecoratorHost,
     ) -> DocId {
         let Some(decorators) = decorators.filter(|d| !d.is_empty()) else {
             return inner;
@@ -320,7 +415,7 @@ impl<'a> Printer<'a> {
             parts.push(inner);
             return d.concat(&parts);
         }
-        self.build_param_decorators_doc(decorators, inner, inner_start)
+        self.build_param_decorators_doc(decorators, inner, inner_start, host)
     }
 
     /// The comment-aware core of `with_param_decorators` (decorators non-empty and
@@ -340,6 +435,7 @@ impl<'a> Printer<'a> {
         decorators: &[internal::Decorator<'_>],
         inner: DocId,
         inner_start: u32,
+        host: DecoratorHost,
     ) -> DocId {
         let d = self.d();
 
@@ -370,26 +466,19 @@ impl<'a> Printer<'a> {
             // that decorator. Classified by the shared
             // [`Self::classify_decorator_gap_comment`], the same routing as the
             // class-level and member printers.
-            let mut own_line_refs: CommentVec<'_> = CommentVec::new();
-            for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
-                let position = self.classify_decorator_gap_comment(
-                    comment,
-                    decorator.span.end,
-                    boundary,
-                    is_last,
-                );
-                match position {
-                    CommentPosition::Trailing => {
-                        seg.push(d.text(" "));
-                        seg.push(self.build_comment_doc(comment));
-                    }
-                    CommentPosition::LeadingInline => {
-                        pending.push(self.build_comment_doc(comment));
-                    }
-                    CommentPosition::LeadingOwnLine => {
-                        own_line_refs.push(comment);
-                    }
-                }
+            let (own_line_refs, _) = self.collect_decorator_gap_comments(
+                &mut seg,
+                &mut pending,
+                decorator,
+                boundary,
+                is_last,
+            );
+            // Only a parameter PROPERTY is property-like, so only there does the run
+            // attach as the decorator's trailing comments and carry the author blank.
+            if host == DecoratorHost::PropertyLike
+                && let Some(first) = own_line_refs.first()
+            {
+                self.push_decorator_run_blank(&mut seg, decorator.span.end, first);
             }
             segments.push(d.concat(&seg));
             // Consecutive own-line comments the author left on one source line stay
@@ -426,26 +515,22 @@ impl<'a> Printer<'a> {
             self.push_pending_decorator_prefix(&mut parts, &mut pending_leading);
             self.push_decorator_head(&mut parts, decorator);
             let boundary = Self::decorator_gap_end(decorators, i, next_token_start);
-            let mut own_line_refs: CommentVec<'_> = CommentVec::new();
-            for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
-                let position = self.classify_decorator_gap_comment(
-                    comment,
-                    decorator.span.end,
-                    boundary,
-                    is_last,
-                );
-                match position {
-                    CommentPosition::Trailing => {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                    }
-                    CommentPosition::LeadingInline => {
-                        pending_leading.push(self.build_comment_doc(comment));
-                    }
-                    CommentPosition::LeadingOwnLine => {
-                        own_line_refs.push(comment);
-                    }
-                }
+            let (own_line_refs, _) = self.collect_decorator_gap_comments(
+                &mut parts,
+                &mut pending_leading,
+                decorator,
+                boundary,
+                is_last,
+            );
+            // ⚠️ The author blank survives only in the LAST decorator's gap. Prettier's
+            // class-like handler (`handleClassComments`) trails a comment onto
+            // `decorators.at(-1)` only when the follower is **not** itself a Decorator,
+            // so `@fn1⏎⏎// c⏎class A {}` keeps the blank while `@fn1⏎⏎// c⏎@fn2⏎class A {}`
+            // — where the follower IS a decorator, leaving the comment to LEAD it —
+            // drops it. Both spellings verified against prettier; the member path below
+            // needs no such test because every one of its gaps attaches the other way.
+            if is_last && let Some(first) = own_line_refs.first() {
+                self.push_decorator_run_blank(&mut parts, decorator.span.end, first);
             }
             parts.push(d.hardline());
             // Consecutive own-line comments the author left on one source line stay
@@ -509,37 +594,28 @@ impl<'a> Printer<'a> {
             self.push_pending_decorator_prefix(&mut dec_parts, &mut pending_leading);
             self.push_decorator_head(&mut dec_parts, decorator);
 
-            let mut own_line_refs: CommentVec<'_> = CommentVec::new();
-            for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
-                if !comment.is_block {
-                    has_line_comment = true;
-                }
-                let position = self.classify_decorator_gap_comment(
-                    comment,
-                    decorator.span.end,
-                    boundary,
-                    is_last,
-                );
-                match position {
-                    CommentPosition::Trailing => {
-                        dec_parts.push(d.text(" "));
-                        dec_parts.push(self.build_comment_doc(comment));
-                    }
-                    // A LeadingInline comment prefixes the NEXT decorator (carried in
-                    // `pending_leading`, consumed at the top of the next iteration); the
-                    // classifier never returns it at the last boundary, where a comment
-                    // leading the *member* joins the own-line run instead — space-joined
-                    // with any sibling on its source line by
-                    // `build_decorator_own_line_comment_run`.
-                    CommentPosition::LeadingInline => {
-                        pending_leading.push(self.build_comment_doc(comment));
-                    }
-                    CommentPosition::LeadingOwnLine => {
-                        own_line_refs.push(comment);
-                    }
-                }
-            }
+            // A LeadingInline comment prefixes the NEXT decorator (carried in
+            // `pending_leading`, consumed at the top of the next iteration); the
+            // classifier never returns it at the last boundary, where a comment leading
+            // the *member* joins the own-line run instead — space-joined with any sibling
+            // on its source line by `build_decorator_own_line_comment_run`.
+            let (own_line_refs, gap_has_line) = self.collect_decorator_gap_comments(
+                &mut dec_parts,
+                &mut pending_leading,
+                decorator,
+                boundary,
+                is_last,
+            );
+            has_line_comment |= gap_has_line;
 
+            // The author blank rides the END of the decorator's own item, ahead of the
+            // join's `line` — the two render as `literalline` + break, the same order
+            // `push_blank_preserving_hardline` emits. Every gap here attaches as the
+            // decorator's trailing run (a class member is `isPropertyLikeNode`), so
+            // unlike the class-level path there is no follower test.
+            if let Some(first) = own_line_refs.first() {
+                self.push_decorator_run_blank(&mut dec_parts, decorator.span.end, first);
+            }
             items.push(d.concat(&dec_parts));
             // Consecutive own-line comments the author left on one source line stay
             // together as one item (`/* c1 */ /* c2 */`), not split across lines.

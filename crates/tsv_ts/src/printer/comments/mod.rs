@@ -635,16 +635,26 @@ impl<'a> Printer<'a> {
     /// caller's ([`Self::build_trailing_closer_comments_doc`], whose container may still
     /// collapse) asks the predicate directly and keeps its own arm.
     ///
-    /// ⚠️ **The blank-line scan is an IN-SOURCE question**, so it opens at
-    /// [`blank_scan_start`](Self::blank_scan_start) rather than at `scan_from` itself: a
-    /// comment physically in the gap that this run did not emit — one an earlier emitter
-    /// claimed, or an OWNED one printed from inside a node's doc — still occupies those
-    /// bytes, and a multi-line block containing a blank line then hands its OWN newlines to
-    /// the scan as an author blank. That fabricates a blank line the author never wrote
-    /// (`[1 /* x⏎⏎y */⏎// c]`, `fn(a /* x⏎⏎y */⏎// c)`), and the fabricated form is a fixed
-    /// point both formatters then agree on — so F1, the ledger and the census are all blind
-    /// to it and only a prettier `compare` on the pristine seed shows it. `scan_from` stays
-    /// the caller's cursor, which is what bounds the search.
+    /// ⚠️ **The blank question is `isPreviousLineEmpty`, asked of the COMMENT** — is the
+    /// line DIRECTLY ABOVE it blank ([`Self::previous_line_is_empty`]) — not "does this gap
+    /// hold a blank line somewhere". Prettier's `printTrailingComment` emits its extra
+    /// `hardline` from `isPreviousLineEmpty(locStart(comment))`, and the two readings part
+    /// wherever re-emitted structure sits between the author's blank and the comment. The
+    /// list's own **comma** is exactly such structure: `import {a⏎⏎,⏎// c⏎b}` leaves a blank
+    /// in the gap while the line above the comment is the comma's, so a gap-wide scan
+    /// preserved a blank `printModuleSpecifiers` has no way to emit (it is a bare
+    /// `join([",", line], …)`).
+    ///
+    /// ⚠️ **The scan is still an IN-SOURCE question, and `blank_scan_start` is its FLOOR**
+    /// rather than `scan_from` itself: a comment physically in the gap that this run did not
+    /// emit — one an earlier emitter claimed, or an OWNED one printed from inside a node's
+    /// doc — still occupies those bytes. The predicate above already refuses a multi-line
+    /// block's own newlines (`[1 /* x⏎⏎y */⏎// c]`: the line above `// c` ends in `y */`, so
+    /// it is not blank), but the floor is what keeps the backward walk inside this run's
+    /// gap. Both readings of that shape fabricate a blank the author never wrote, and the
+    /// fabricated form is a fixed point both formatters then agree on — so F1, the ledger
+    /// and the census are all blind to it and only `fabrication:audit` on the pristine seed,
+    /// or a prettier `compare`, shows it.
     pub(crate) fn push_trailing_run_separator(
         &self,
         parts: &mut DocBuf,
@@ -656,7 +666,19 @@ impl<'a> Printer<'a> {
             parts.push(self.d().text(" "));
         } else {
             let from = self.blank_scan_start(scan_from, next_start);
-            self.push_blank_preserving_hardline(parts, from, next_start);
+            // ⚠️ `isPreviousLineEmpty`, asked of the COMMENT — not "does this gap hold a
+            // blank". Prettier's `printTrailingComment` emits its extra `hardline` from
+            // `isPreviousLineEmpty(locStart(comment))`, so the blank has to be adjacent to
+            // the comment; a gap-wide scan additionally fires when re-emitted structure
+            // separates the two. The specifier list is where that bites — `import {a⏎⏎,⏎//
+            // c⏎b}` put the author's blank above the COMMA, which prettier never
+            // reproduces there (`printModuleSpecifiers` is a bare `join([",", line], …)`),
+            // so tsv preserved a blank prettier has no way to emit. `blank_scan_start`
+            // still supplies the floor, keeping an earlier comment's own newlines out.
+            if self.previous_line_is_empty(from, next_start) {
+                parts.push(self.d().literalline());
+            }
+            parts.push(self.d().hardline());
         }
     }
 

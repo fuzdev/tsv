@@ -47,4 +47,14 @@
 
 		i
 	} from './f';
+
+	// a blank written before the COMMA is not a specifier blank — the list never
+	// carries one, so only the comment's own line survives
+	import {
+		j
+
+		,
+		// c10
+		k
+	} from './g';
 </script>

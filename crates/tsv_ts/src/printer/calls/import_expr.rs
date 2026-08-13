@@ -202,9 +202,8 @@ pub(in crate::printer) fn build_import_args_comment_layout(
 
     // Blank line in the gap, comment-aware once routed (so a comment's own newlines
     // don't read as a blank line).
-    let inter_blank = inter_blank_no_comments
-        || (has_inter_comments
-            && inter.has_blank_line_in_gap(printer.source, printer.layout_line_breaks));
+    let inter_blank =
+        inter_blank_no_comments || (has_inter_comments && inter.has_blank_line_in_gap(printer));
 
     // Leading comments (own-line + hugged after-comma) lead the options arg; its
     // trailing region follows: same-line block/line comments inline, then own-line

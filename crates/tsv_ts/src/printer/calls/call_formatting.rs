@@ -1469,8 +1469,7 @@ fn build_call_with_arg_comments(
                     force_expansion = true;
                 }
 
-                let has_blank_line =
-                    pc.has_blank_line_in_gap(printer.source, printer.layout_line_breaks);
+                let has_blank_line = pc.has_blank_line_in_gap(printer);
                 if has_blank_line || pc.has_trailing_line() {
                     force_expansion = true;
                 }

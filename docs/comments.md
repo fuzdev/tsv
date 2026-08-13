@@ -107,11 +107,15 @@ The one thing that separator asks is whether the author **glued** this comment t
 
 ⚠️ **EVERY comment→comment separator asks it, not just the ones at a container's end.** The question belongs to the *separator*, not to the position, so a run in the middle of a construct answers it identically: the specifier list's trailing run, a spread's stripped-paren interior (both the parent's emitter and the array's own end-of-array group scan), a binary chain's operand→operator and operator→operand gaps, a ternary branch's `?`/`:` run, a type alias's `=` run, and the leading run before a non-first parameter. Each of those hand-rolled a bare `hardline` (or, in the array group's case, a bare `line`) and split a pair the author wrote as one; the parameter one emitted **nothing at all**, welding them (`/* c1 *//* c2 */`). The remaining `push_blank_preserving_hardline` callers are exactly those whose *next* is not a comment — a value, an item, a delimiter — and that is the invariant to keep. Pinned by `syntax/comments/separator_glued_run`; the operand→operator one rides inside its own cataloged divergence (`expressions/binary/operand_operator_line_comment_prettier_divergence`), where the comment's position relative to the operator is what differs, not the run's own line.
 
+⚠️ **Whether a gap HAS a trailing run at all is prettier's comment-ATTACHMENT question, and a decorator gap answers it three different ways.** The run after a decorator (`@fn1⏎⏎// c⏎@fn2⏎a = 1;`) is attached as that decorator's *trailing* comments — so the author's blank survives, by the adjacency rule above — but only where prettier's handlers say so, and the null control is what makes that reading necessary: with **no** comment in the gap both formatters discard a blank between two decorators byte-identically, so this is not a decorator rule at all, it is a comment run's. `handleMethodNameComments` trails the decorator when the enclosing node is `isPropertyLikeNode` (`PropertyDefinition`, `MethodDefinition`, `AccessorProperty`, and — the carve-out worth naming — **`TSParameterProperty`**, so `constructor(@fn⏎⏎// c⏎private p: T)` keeps the blank while the same decorators on a plain parameter do not). A **class-like** node takes `handleClassComments` instead, which trails the LAST decorator only when the follower is *not* itself a Decorator: `@fn1⏎⏎// c⏎class A {}` keeps the blank, `@fn1⏎⏎// c⏎@fn2⏎class A {}` drops it. Everywhere the handler does not fire the comment simply LEADS the next node, and `printLeadingComment` emits a blank *after* a comment, never before. tsv's three decorator builders each state their own half of that gate (`DecoratorHost` for the parameter path, the follower test for the class-level one) over one emitter, `push_decorator_run_blank`. Pinned by `statements/class/decorator_comment_blank`.
+
 ⚠️ **A separator emitted AFTER each comment must ask the glue question of what FOLLOWS, and only when a comment does.** One site is written that way (the type alias's `=` run, whose loop pairs each comment with the gap behind it): there the predicate takes the *next* comment's start, and past the last comment the `next` is the **value**, whose placement is the leading-side question that loop does not own — asking it there hands the value a space it never asked for.
 
 ⚠️ **The question is asked BETWEEN the two comments, never of the source right after the `*/`** — and the two are not the same question, which is why the trailing side has a predicate of its own rather than calling `comment_hugs_next`. They part on exactly the byte these runs exist for: the list's own **comma**, deleted under `trailingComma: 'none'`. A scan for "what follows the `*/`" stops at that comma, reports no newline, and WELDS a comment the author gave its own line onto the previous one (`[A /* c1 */,⏎// c2]` → `A /* c1 */ // c2` — and a `//` landing there swallows whatever is printed behind it). Asking whether the author put a newline *between* the two reads past the comma, because a deleted separator is not a line. Every other trailing-run site was blind to the difference for the same structural reason: elsewhere the comma always sits behind a comment an earlier emitter already claimed, so the predecessor is `None` there — only the walk that covers a whole gap in one pass reaches it. Pinned by `syntax/comments/trailing_gap_glued_run`'s `unformatted_trailing_comma` variant, which is the authoring that carries the comma.
 
-⚠️ **That separator's blank-line scan is an IN-SOURCE question**, so it opens at `blank_scan_start` — past every comment physically in the gap, not just the ones this run emits. A comment an earlier emitter claimed still occupies its bytes, and a multi-line block containing a blank line hands the scan its OWN newlines: `[1 /* x⏎⏎y */⏎// c]` and `fn(a /* x⏎⏎y */⏎// c)` both grew a blank line the author never wrote. The fabricated form is a fixed point both formatters then agree on, so F1, the ledger, the census and `blanks:audit` are all blind to it — only `fabrication:audit` on the pristine seed, or a prettier `compare`, shows it.
+⚠️ **That separator's blank question is `isPreviousLineEmpty`, asked of the COMMENT** — is the line DIRECTLY ABOVE it blank (`Printer::previous_line_is_empty`, prettier's `printTrailingComment` reading it off `locStart(comment)`) — and NOT "does this gap hold a blank line somewhere". The two part wherever re-emitted structure sits between the author's blank and the comment, and the list's own **comma** is exactly that: `import {a⏎⏎,⏎// c⏎b}` leaves a blank in the gap while the line above the comment is the comma's, so the gap-wide reading preserved a blank `printModuleSpecifiers` — a bare `join([",", line], …)` — has no way to emit. The run is emitted *against* the comment, so the comment is what the blank has to be adjacent to.
+
+⚠️ **The scan is still an IN-SOURCE question, and `blank_scan_start` is its FLOOR** rather than the caller's cursor: a comment an earlier emitter claimed, or an OWNED one printed from inside a node's doc, still occupies its bytes, and the backward walk must not leave this run's gap. The adjacency rule already refuses a multi-line block's own newlines — in `[1 /* x⏎⏎y */⏎// c]` and `fn(a /* x⏎⏎y */⏎// c)` the line above the `//` ends in `y */`, so it is not blank — where the gap-wide reading grew a blank line the author never wrote. The fabricated form is a fixed point both formatters then agree on, so F1, the ledger, the census and `blanks:audit` are all blind to it — only `fabrication:audit` on the pristine seed, or a prettier `compare`, shows it.
 
 ⚠️ The mirror-image formulation is the trap, and it has bitten every site that tried it. Emitting the separator *after* each non-last comment forces the emitter to ask what **kind** the comment was, and the answer it reaches for — "a block comment needs no break, the closing `}` follows immediately" — is false the moment another comment follows. Whatever comes next is then welded onto the block's line: `/* c1 *//* c2 */`, `/* c1 *///  c2`. Asking it before instead needs no kind test at all, because a run is a list of own-line comments and the closer supplies its own break.
 
@@ -251,6 +255,30 @@ Three slot rules bound the scan, because the gap can hold erased structure:
   floor reads the source, past the LAST stray `;` in the gap
   (`a = 1; /* c */ ; b = 2;` trails, `a = 1; ; /* c */ b = 2;` leads, both matching
   prettier).
+
+⚠️ **The BLANK question wants the opposite treatment of that same dropped `;`, so the
+list carries two cursors.** The comment cursor advances past a `;` that prints nothing
+(the slot rules above); the blank question must not, because prettier's
+`printStatementSequence` skips an `EmptyStatement` outright and asks `isNextLineEmpty`
+of the previous **printed** statement — the `;` is never asked about and can never move
+the anchor. Measuring from the shared cursor was wrong in both directions at once:
+`a();⏎⏎;⏎b();` lost the author's blank (it sits *above* the `;`, behind the cursor) and
+`a();⏎;⏎⏎b();` gained one prettier drops (it sits *below*). So `blank_anchor` tracks the
+last thing actually PRINTED — a `;` whose orphan comment run emits nothing leaves it
+alone — and `blank_bound` caps the scan at that same `;`, the two halves of one
+sentence: *the author's blank is whatever sits between the last printed statement and
+the next thing in the gap*. Two rules bound the bound itself, each found by an existing
+fixture: only a `;` that **starts a line** counts (one the author left on the previous
+statement's own line, `a();; // c`, is trivia prettier walks straight over —
+`skipToLineEnd` is `skip(",; \t")`), and it must lie **ahead** of the anchor (a `;` the
+previous statement's trailing run already consumed sits behind it, and bounding there
+inverts the range so every later blank reads as absent). Both copies of the walk carry
+it — the block/program list and the switch consequent's own. ⚠️ Prettier's
+`isNextLineEmpty` is **not** a drop-in for the count here: it byte-scans for `\n`/`\r`
+and is blind to U+2028 / U+2029, which the line-break table sees (`syntax/whitespace/
+line_terminators`). Capping the table-based count keeps the wider terminator class,
+which is the mirror of the trailing-run separator above, where matching prettier's
+byte-scanning helper is the whole point.
 
 The split decides only the one-line authoring, where the forced statement-per-line
 break must put the comment somewhere; both two-line authorings are dual-stable and

@@ -3,6 +3,7 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use crate::ast::internal::{self, Statement};
+use crate::printer::expressions::blocks::StatementBlankScan;
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer, next_printed_stmt_start,
 };
@@ -360,6 +361,9 @@ impl<'a> Printer<'a> {
         // Consequent statements (indented from case line)
         // Handle comments between statements like block statements do
         let mut prev_end = label_trailing_end;
+        // The consequent's BLANK cursor — the same type, and therefore the same rule, the
+        // block list uses ([`StatementBlankScan`]).
+        let mut blanks = StatementBlankScan::new(label_trailing_end);
         let mut prev_stmt_end: Option<u32> = None;
         // Set when the statement just emitted deferred a line comment past its own `;`, so
         // its doc ends on a later line than the `;` and cannot carry that line's comments.
@@ -419,6 +423,13 @@ impl<'a> Printer<'a> {
                 }
 
                 prev_end = search_end;
+                // The orphan run is content and moves the anchor; a `;` that printed
+                // nothing becomes the bound instead.
+                if leading_comments.is_empty() {
+                    blanks.skipped_semi(self, stmt.span().start);
+                } else {
+                    blanks.printed(search_end);
+                }
                 continue;
             }
 
@@ -538,10 +549,14 @@ impl<'a> Printer<'a> {
                 // pass 1 disagree with pass 2 (an F1 non-idempotency); the block and class
                 // lists preserve it in both passes and so keep it.
                 if prev_stmt_end.is_some() && !prev_deferred_line_comment {
-                    let check_end = leading_comments
-                        .first()
-                        .map_or(stmt_start, |c| c.span.start);
-                    if self.has_blank_line_between(prev_end, check_end) {
+                    // Anchored and bounded exactly as the block list's twin — a dropped
+                    // `;` neither moves the start nor is scanned past.
+                    let check_end = blanks.bound(
+                        leading_comments
+                            .first()
+                            .map_or(stmt_start, |c| c.span.start),
+                    );
+                    if self.has_blank_line_between(blanks.anchor(), check_end) {
                         stmt_parts.push(d.hardline());
                     }
                 }
@@ -577,6 +592,7 @@ impl<'a> Printer<'a> {
                 self.find_end_with_trailing_comments(stmt_end)
                     .min(claim_end)
             };
+            blanks.printed(prev_end);
             prev_stmt_end = Some(stmt_end);
             prev_deferred_line_comment = this_defers_line_comment;
         }

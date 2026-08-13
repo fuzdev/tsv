@@ -1,0 +1,954 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 515,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A blank before a dropped `;` belongs to the statement above it.",
+			"start": 20,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank after a dropped `;` sits in a gap the printer does not reproduce.",
+			"start": 104,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank on both sides collapses to the one the statement above owns.",
+			"start": 197,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block body, same rule.",
+			"start": 286,
+			"end": 311,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Switch case consequent, same rule.",
+			"start": 351,
+			"end": 388,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Namespace body, same rule.",
+			"start": 440,
+			"end": 469,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 30
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 514,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 505,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 37,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 88,
+					"end": 93,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 88,
+						"end": 92,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 88,
+							"end": 90,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "a1"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank before a dropped `;` belongs to the statement above it.",
+							"start": 20,
+							"end": 86
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 96,
+					"end": 101,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 96,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 96,
+							"end": 98,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"name": "b1"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 182,
+					"end": 187,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 182,
+						"end": 186,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 182,
+							"end": 184,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 3
+								}
+							},
+							"name": "a2"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank after a dropped `;` sits in a gap the printer does not reproduce.",
+							"start": 104,
+							"end": 180
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 189,
+					"end": 194,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 189,
+						"end": 193,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 189,
+							"end": 191,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 1
+								},
+								"end": {
+									"line": 9,
+									"column": 3
+								}
+							},
+							"name": "b2"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 270,
+					"end": 275,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 270,
+						"end": 274,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 270,
+							"end": 272,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 3
+								}
+							},
+							"name": "a3"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank on both sides collapses to the one the statement above owns.",
+							"start": 197,
+							"end": 268
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 278,
+					"end": 283,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 278,
+						"end": 282,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 278,
+							"end": 280,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 3
+								}
+							},
+							"name": "b3"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 313,
+					"end": 348,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 322,
+						"end": 324,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 10
+							},
+							"end": {
+								"line": 17,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 327,
+						"end": 348,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 15
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 331,
+								"end": 336,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 331,
+									"end": 335,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 331,
+										"end": 333,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 4
+											}
+										},
+										"name": "a4"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 340,
+								"end": 345,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 340,
+									"end": 344,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 340,
+										"end": 342,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 4
+											}
+										},
+										"name": "b4"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block body, same rule.",
+							"start": 286,
+							"end": 311
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 390,
+					"end": 437,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 398,
+						"end": 402,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 9
+							},
+							"end": {
+								"line": 24,
+								"column": 13
+							}
+						},
+						"name": "cond"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 408,
+							"end": 434,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 8
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 419,
+									"end": 424,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 3
+										},
+										"end": {
+											"line": 26,
+											"column": 8
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 419,
+										"end": 423,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 3
+											},
+											"end": {
+												"line": 26,
+												"column": 7
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 419,
+											"end": 421,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 3
+												},
+												"end": {
+													"line": 26,
+													"column": 5
+												}
+											},
+											"name": "a5"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								{
+									"type": "ExpressionStatement",
+									"start": 429,
+									"end": 434,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 3
+										},
+										"end": {
+											"line": 28,
+											"column": 8
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 429,
+										"end": 433,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 3
+											},
+											"end": {
+												"line": 28,
+												"column": 7
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 429,
+											"end": 431,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 3
+												},
+												"end": {
+													"line": 28,
+													"column": 5
+												}
+											},
+											"name": "b5"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 413,
+								"end": 414,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Switch case consequent, same rule.",
+							"start": 351,
+							"end": 388
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 471,
+					"end": 504,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 481,
+						"end": 482,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 11
+							},
+							"end": {
+								"line": 32,
+								"column": 12
+							}
+						},
+						"name": "N"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 483,
+						"end": 504,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 13
+							},
+							"end": {
+								"line": 36,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 487,
+								"end": 492,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 2
+									},
+									"end": {
+										"line": 33,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 487,
+									"end": 491,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 2
+										},
+										"end": {
+											"line": 33,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 487,
+										"end": 489,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 2
+											},
+											"end": {
+												"line": 33,
+												"column": 4
+											}
+										},
+										"name": "a6"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 496,
+								"end": 501,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 2
+									},
+									"end": {
+										"line": 35,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 496,
+									"end": 500,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 2
+										},
+										"end": {
+											"line": 35,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 496,
+										"end": 498,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 2
+											},
+											"end": {
+												"line": 35,
+												"column": 4
+											}
+										},
+										"name": "b6"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Namespace body, same rule.",
+							"start": 440,
+							"end": 469
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

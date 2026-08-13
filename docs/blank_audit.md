@@ -75,6 +75,28 @@ off-corpus absorbed class is not news the way an off-corpus finding is. `--repor
 class with its count and a reproducer (`e.g. inject blank at <path>:<offset>`), which is the
 triage view of the pin file.
 
+**Grading a line means running the prettier compare yourself**, since nothing here does it: splice
+`\n\n` at the reproducer's offset and ask whether *prettier* still reproduces its own pristine
+output. Three things make that harness easy to get wrong, each of which inflates the candidate
+list rather than shrinking it:
+
+- The offsets are **byte** offsets. Splicing at a UTF-16 index (a JS `String.slice`) splits tokens
+  in every non-ASCII seed.
+- **`prettier-plugin-svelte` swallows an embedded-TS parse failure** — it logs and emits the
+  `<script>` body verbatim, so `format` *resolves* with a different output that has nothing to do
+  with blank-line policy. Capture `console.error` around the call and treat a non-empty capture as
+  its own verdict: the injected source is not valid TS, which is a parser over-acceptance question,
+  not a blank one.
+- **"The outputs differ" is not "prettier kept the blank."** Split it on whether the two are equal
+  *modulo blank lines*; anything else changed the parse or the layout and is a different finding.
+
+⚠️ **A class that reads ABSORBS on its canonical example is not cleared.** The key is one node-edge
+class but the reproducer is one *textual shape*, and a class routinely spans many — an inline
+comment, a glued run, an own-line run all key the same line. So the sweep under-reports (a fix can
+clear several classes while flagging one), and, in the other direction, **a line does not go stale
+until NO injection at that edge absorbs** — a real fix will often leave its line in place, which is
+correct and must not be "corrected" with `blanks:audit:update`.
+
 **What it still cannot see**: a drop at a gap the site enumeration never injects — the sites come
 from `code_regions` (JS spans), so a Svelte **template-text** gap (where #759 itself lived) is
 never probed; that needs the template-gap substrate extension, and as-authored drops over real

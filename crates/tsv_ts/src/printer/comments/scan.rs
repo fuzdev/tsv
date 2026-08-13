@@ -113,6 +113,52 @@ impl<'a> Printer<'a> {
     /// `,; \t` run to end of line, require the very next byte to be the line break, consume
     /// exactly one, then look for a second before any non-whitespace. Bounded by `upper` (the
     /// next element's start), so it never reads past its own gap.
+    /// Prettier's `isPreviousLineEmpty` — is the line **directly above** `next_start`
+    /// blank? — scanning backwards and stopping at `floor`.
+    ///
+    /// The trailing-run separator's question ([`Printer::push_trailing_run_separator`]), and
+    /// NOT the same as "does the gap hold a blank line anywhere". The two part exactly where
+    /// re-emitted structure sits between the author's blank and the comment: a comma the
+    /// author pushed onto its own line (`a⏎⏎,⏎// c`) leaves a blank in the gap while the line
+    /// above the comment is the comma's, so prettier writes no blank and a gap-wide scan
+    /// writes one. `printTrailingComment` reads it off `locStart(comment)` for the same
+    /// reason — the run is emitted against the comment, so the comment is what the blank has
+    /// to be adjacent to.
+    ///
+    /// Byte-scanning, and therefore blind to U+2028 / U+2029 exactly as prettier's own
+    /// helper is — this predicate exists to match it, so the narrower terminator class is
+    /// the faithful one here (contrast the statement-gap count, which keeps the line-break
+    /// table precisely because nothing upstream is byte-scanning it).
+    pub(crate) fn previous_line_is_empty(&self, floor: u32, next_start: u32) -> bool {
+        if self.canonical {
+            return false;
+        }
+        let bytes = self.source.as_bytes();
+        let floor = floor as usize;
+        let mut pos = (next_start as usize).min(bytes.len());
+        let back_over_spaces = |pos: &mut usize| {
+            while *pos > floor && matches!(bytes[*pos - 1], b' ' | b'\t') {
+                *pos -= 1;
+            }
+        };
+        // The comment's own line, back to its start.
+        back_over_spaces(&mut pos);
+        // Consume exactly one line terminator; without one there is no previous line.
+        match bytes.get(pos.wrapping_sub(1)) {
+            Some(b'\n') if pos > floor => {
+                pos -= 1;
+                if pos > floor && bytes[pos - 1] == b'\r' {
+                    pos -= 1;
+                }
+            }
+            Some(b'\r') if pos > floor => pos -= 1,
+            _ => return false,
+        }
+        // Whatever is left of the previous line: blank iff it holds nothing but spaces.
+        back_over_spaces(&mut pos);
+        pos > floor && matches!(bytes[pos - 1], b'\n' | b'\r')
+    }
+
     pub(crate) fn is_next_line_empty(&self, from: u32, upper: u32) -> bool {
         // A direct `self.source` newline scan, so it must be gated on the canonical
         // flag (see the `Printer::canonical` doc): the canonical reprint empties the

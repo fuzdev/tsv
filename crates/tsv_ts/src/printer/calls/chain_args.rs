@@ -607,7 +607,7 @@ fn build_chain_args_force_expand(
             let has_comments_before_next =
                 printer.has_comments_to_emit_between(arg_end, next_arg_start);
             let next_has_blank = if has_comments_before_next {
-                pc.has_blank_line_in_gap(printer.source, printer.layout_line_breaks)
+                pc.has_blank_line_in_gap(printer)
             } else {
                 // Measure the no-comment gap's blank once; the top of the next iteration
                 // reuses it (same gap, same guard) instead of re-scanning the window.
