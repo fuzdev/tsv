@@ -396,15 +396,20 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
             collect_sites(el.fragment.nodes, src, child_ws_sig, out);
         }
         FragmentNode::SpecialElement(el) => {
-            // No special element preserves whitespace (svelte:*, slot, title).
+            // One special kind preserves whitespace — a `<svelte:head>` `<title>`, whose
+            // content the compiler never runs `clean_nodes` over
+            // (`SpecialElementKind::preserves_content_whitespace`). Mutating a boundary there
+            // is a CONTENT edit, so the two spellings are two documents and requiring them to
+            // converge would be asking the formatter to destroy one of them.
             // `<svelte:element this={tag}>` could resolve to <pre> at runtime, but
             // the tag is dynamic and unknowable statically; treat as non-pre
             // (the conservative miss is a `<svelte:element this="pre">` literal,
             // vanishingly rare and not worth a special case here).
-            if !ws_sig {
+            let child_ws_sig = ws_sig || el.kind.preserves_content_whitespace();
+            if !child_ws_sig {
                 collect_boundary_sites(el.fragment.nodes, src, ELEMENT_BOUNDARY, out);
             }
-            collect_sites(el.fragment.nodes, src, ws_sig, out);
+            collect_sites(el.fragment.nodes, src, child_ws_sig, out);
         }
         FragmentNode::IfBlock(b) => {
             collect_block_fragment(&b.consequent, src, ws_sig, out);
