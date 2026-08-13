@@ -31,6 +31,9 @@
 	// leading + trailing — leading hugs `=>`, trailing keeps parens
 	const h = () => /* lead */ x; /* trail */
 
+	// ternary body, leading + trailing — the retained parens keep the leading comment outside
+	const k = () => (/* lead */ cond ? a : b /* trail */);
+
 	// same-line comment group after a body break — block + line stay together
 	const i = () => x;
 	/* i1 */ // i2

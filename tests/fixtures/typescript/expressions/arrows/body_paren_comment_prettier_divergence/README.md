@@ -17,8 +17,16 @@ A few cases go further:
   comment is folded into another's text.
 - A same-line comment group the author wrote together (a block then a line
   comment, `/* i1 */ // i2`) stays together on one line after a body break.
-- With a leading and a trailing comment, the leading comment hugs `=>` (both
-  formatters keep it there) while the trailing comment keeps the parens.
+- With a leading and a trailing comment, the leading comment hugs `=>` while the
+  trailing comment keeps the parens. Both formatters keep the leading comment there
+  over a plain body; over a **ternary** body prettier prints its own layout paren and
+  moves the leading comment inside it (`() => (/* lead */ cond ? a : b /* trail */)`),
+  while tsv keeps it outside — the parens tsv prints are the authored ones it retained
+  for the trailing comment, so outside them is a position the author chose. Drop the
+  trailing comment and the authored parens are stripped, leaving only the ternary's
+  layout paren, which vanishes as soon as the body breaks; there tsv converges with
+  prettier and puts the comment inside
+  ([arrow/body_stripped_paren_comment_long](../../arrow/body_stripped_paren_comment_long/)).
 - For an object-literal body the parens are **required** (object/block
   disambiguation), not redundant grouping parens. tsv keeps the comment inside
   (`({ k: 1 } /* c */)`); prettier moves it outside the required paren
