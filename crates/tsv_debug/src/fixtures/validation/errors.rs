@@ -33,6 +33,36 @@ impl fmt::Display for AuditSignatureStaleness {
     }
 }
 
+/// Why an `unformatted_ours_*` prettier output REQUIRES a chain pin (N10's blocking arm in
+/// a fixture documenting no stable forms): the two shapes where no single-form marker is
+/// expressible — the mirror of `fixtures:update:formatted`'s `needs_chain_pin`, asked from
+/// the absence side so a deleted pin blocks instead of degrading to an informational note.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnpinnedChainReason {
+    /// Prettier's output is not a fixed point — the chain continues past pass 1, so only a
+    /// `prettier_intermediate*_*` (one unstable pass) or `audit_signature_<suffix>.txt`
+    /// (the full chain) can pin it.
+    MultiPass,
+    /// Prettier's output is a fixed point tsv cannot format — every single-form marker
+    /// asserts something about `ours(V)`, so only `audit_signature_<suffix>.txt` can pin it.
+    StableFormOursRejects,
+}
+
+impl fmt::Display for UnpinnedChainReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MultiPass => write!(
+                f,
+                "not a fixed point (its chain continues past pass 1) and no prettier_intermediate*_* / audit_signature_<suffix>.txt pins the chain"
+            ),
+            Self::StableFormOursRejects => write!(
+                f,
+                "a fixed point tsv cannot format (no single-form marker is expressible) and no audit_signature_<suffix>.txt pins the chain"
+            ),
+        }
+    }
+}
+
 /// Validation error with self-describing names
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ValidationError {
@@ -69,6 +99,10 @@ pub enum ValidationError {
     FormatterAuditSignatureMalformed(String),
     #[error("audit_signature.txt walk failed: {0}")]
     FormatterAuditSignatureWalkFailed(String),
+    #[error(
+        "prettier is not idempotent on output_prettier.* and no audit_signature.txt pins the multi-pass chain (F4b)"
+    )]
+    FormatterUnpinnedPrettierChain,
     #[error("Formatter error: {0}")]
     FormatterError(String),
     #[error("Formatter error (svelte_divergence): {0}")]
@@ -238,6 +272,8 @@ pub enum ValidationError {
         "prettier output of {0} matches no documented form (output_prettier / prettier_variant_* / variant_* / divergent_variant_*) — prettier may have drifted, or the target is undocumented"
     )]
     UndocumentedPrettierOutput(String),
+    #[error("prettier's output from {0} is {1}")]
+    UnpinnedPrettierChain(String, UnpinnedChainReason),
 
     // Per-variant chain signature (N12): `audit_signature_<suffix>.txt` pins prettier's
     // full chain from `unformatted_ours_<suffix>`, the pin for outputs no single-form
@@ -380,7 +416,10 @@ impl ValidationError {
                 "Delete and regenerate: deno task fixtures:update:formatted <pattern>"
             }
             Self::FormatterAuditSignatureWalkFailed(_) => {
-                "Investigate prettier error or non-converging chain; check input syntax. Then: deno task fixtures:update:formatted <pattern>"
+                "Investigate prettier error or non-converging chain; check input syntax. On a truncated chain, fixtures:update:formatted keeps the existing signature rather than regenerating"
+            }
+            Self::FormatterUnpinnedPrettierChain => {
+                "Run: deno task fixtures:update:formatted <pattern> (writes the audit_signature.txt that pins the multi-pass chain)"
             }
             Self::FormatterError(_) => "Fix the formatter implementation",
             Self::FormatterErrorInDivergence(_) => {
@@ -468,7 +507,7 @@ impl ValidationError {
                 "Check prettier_intermediate_* content - should converge to input after re-formatting"
             }
             Self::NormalizationPrettierIntermediateMissingSource(_) => {
-                "Add corresponding unformatted_ours_* file or remove prettier_intermediate_* file"
+                "Add corresponding unformatted_ours_* file, or run: deno task fixtures:update:formatted <pattern> (removes orphaned intermediates)"
             }
             Self::NormalizationPrettierIntermediateToVariantMismatch(_) => {
                 "Update prettier_intermediate_to_variant_* to match prettier's actual first-pass output"
@@ -483,7 +522,7 @@ impl ValidationError {
                 "Check that the file's second prettier pass produces content matching some variant_* or prettier_variant_* sibling"
             }
             Self::NormalizationPrettierIntermediateToVariantMissingSource(_) => {
-                "Add corresponding unformatted_ours_* file or remove prettier_intermediate_to_variant_* file"
+                "Add corresponding unformatted_ours_* file, or run: deno task fixtures:update:formatted <pattern> (removes orphaned intermediates)"
             }
             Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_) => {
                 "Add a variant_* or prettier_variant_* file documenting the convergence target"
@@ -501,13 +540,19 @@ impl ValidationError {
                 "Check that the file's second prettier pass produces content matching some divergent_variant_* sibling (if it matches a variant_*/prettier_variant_*, use prettier_intermediate_to_variant_*)"
             }
             Self::NormalizationPrettierIntermediateToDivergentVariantMissingSource(_) => {
-                "Add corresponding unformatted_ours_* file or remove prettier_intermediate_to_divergent_variant_* file"
+                "Add corresponding unformatted_ours_* file, or run: deno task fixtures:update:formatted <pattern> (removes orphaned intermediates)"
             }
             Self::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(_) => {
                 "Add a divergent_variant_* file documenting the convergence target"
             }
             Self::UndocumentedPrettierOutput(_) => {
                 "Document prettier's output: add a variant_* / prettier_variant_* / divergent_variant_* (or prettier_intermediate*_*) sibling matching it, or update the existing one if prettier changed"
+            }
+            Self::UnpinnedPrettierChain(_, UnpinnedChainReason::MultiPass) => {
+                "Run: deno task fixtures:update:formatted <pattern> (writes the prettier_intermediate*_* or audit_signature_<suffix>.txt this chain needs)"
+            }
+            Self::UnpinnedPrettierChain(_, UnpinnedChainReason::StableFormOursRejects) => {
+                "Run: deno task fixtures:update:formatted <pattern> (writes audit_signature_<suffix>.txt — the marker of last resort)"
             }
             Self::VariantChainSignatureOutdated(_, AuditSignatureStaleness::Drift) => {
                 "Run: deno task fixtures:update:formatted <pattern> (regenerates audit_signature_<suffix>.txt)"
@@ -590,6 +635,7 @@ impl ValidationError {
             | Self::FormatterAuditSignatureOutdated(_)
             | Self::FormatterAuditSignatureMalformed(_)
             | Self::FormatterAuditSignatureWalkFailed(_)
+            | Self::FormatterUnpinnedPrettierChain
             | Self::FormatterError(_)
             | Self::FormatterErrorInDivergence(_)
             | Self::NonconvergentMarkerButPrettierIdempotent(_)
@@ -630,6 +676,7 @@ impl ValidationError {
             | Self::NormalizationPrettierIntermediateToDivergentVariantMissingSource(_)
             | Self::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(_)
             | Self::UndocumentedPrettierOutput(_)
+            | Self::UnpinnedPrettierChain(_, _)
             | Self::VariantChainSignatureOutdated(_, _)
             | Self::VariantChainSignatureMalformed(_, _)
             | Self::VariantChainSignatureWalkFailed(_, _)

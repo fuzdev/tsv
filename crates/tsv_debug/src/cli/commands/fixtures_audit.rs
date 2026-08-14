@@ -1,6 +1,8 @@
 use crate::cli::CliError;
 use crate::deno::run_prettier;
-use crate::fixtures::{self, AuditSignature, Fixture, FixtureFiles, StableFormMarker, read_file};
+use crate::fixtures::{
+    self, AuditSignature, ChainWalk, Fixture, FixtureFiles, StableFormMarker, read_file,
+};
 use argh::FromArgs;
 use futures_util::StreamExt;
 use std::collections::HashMap;
@@ -250,10 +252,15 @@ async fn check_chain_signature(
     };
     let parser = fixture.input_type().prettier_parser();
     match AuditSignature::walk(anchor_content, parser).await {
-        Ok(Some(live)) if live.passes == recorded.passes => {
+        Ok(ChainWalk::Pinned(live)) if live.passes == recorded.passes => {
             AuditSignatureCheck::MatchesRecorded(live.passes.len())
         }
-        Ok(_) => AuditSignatureCheck::Drift,
+        Ok(ChainWalk::Pinned(_) | ChainWalk::Collapsed) => AuditSignatureCheck::Drift,
+        // NOT a drift and NOT a collapse: prettier errors partway along the chain, which
+        // no regenerate can repair (the updater refuses a truncated chain) — investigate.
+        Ok(ChainWalk::Truncated { completed, error }) => AuditSignatureCheck::Error(format!(
+            "prettier chain truncated after {completed} successful pass(es): {error}"
+        )),
         Err(e) => AuditSignatureCheck::Error(format!("prettier chain walk: {e}")),
     }
 }

@@ -339,14 +339,15 @@ Quirk name — description (example):
 - Be specific: `parens_spaces` not just `spaces`
 - Match pattern consistently across fixtures
 
-**For documenting prettier's unstable intermediate output** (`prettier_intermediate_*.*` / `prettier_intermediate_to_variant_*.*`):
+**For documenting prettier's unstable intermediate output** (`prettier_intermediate_*.*` / `prettier_intermediate_to_variant_*.*` / `prettier_intermediate_to_divergent_variant_*.*`):
 
 Capture prettier's actual first-pass output (not hand-written) from the same-suffix
 `unformatted_ours_*` source — the shared suffix links them (e.g.
 `unformatted_ours_expanded` → `prettier_intermediate_expanded`). Use the
 `_to_variant_` form when prettier's second pass lands on a documented
-`variant_*`/`prettier_variant_*` sibling instead of `input.*`. Validation: rules
-N7/N7b in ./fixture_overview.md.
+`variant_*`/`prettier_variant_*` sibling instead of `input.*`, and the
+`_to_divergent_variant_` form when it lands on a documented `divergent_variant_*`.
+Validation: rules N7/N7b/N7c in ./fixture_overview.md.
 
 **Example:**
 
