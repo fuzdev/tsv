@@ -1,0 +1,798 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 329,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Single argument",
+			"start": 10,
+			"end": 28,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Identifier as the second argument",
+			"start": 57,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Object literal as the second argument",
+			"start": 170,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With await",
+			"start": 267,
+			"end": 280,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 14
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 328,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 319,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 30,
+					"end": 54,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 36,
+							"end": 53,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 36,
+								"end": 37,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 40,
+								"end": 53,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 24
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 47,
+									"end": 52,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 18
+										},
+										"end": {
+											"line": 3,
+											"column": 23
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'"
+								},
+								"options": null
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single argument",
+							"start": 10,
+							"end": 28
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 95,
+					"end": 135,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 41
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 101,
+							"end": 134,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 40
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 101,
+								"end": 105,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"name": "expr"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 108,
+								"end": 134,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 14
+									},
+									"end": {
+										"line": 6,
+										"column": 40
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 110,
+										"end": 132,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 16
+											},
+											"end": {
+												"line": 6,
+												"column": 38
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 110,
+											"end": 114,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 16
+												},
+												"end": {
+													"line": 6,
+													"column": 20
+												}
+											},
+											"name": "with"
+										},
+										"value": {
+											"type": "ObjectExpression",
+											"start": 116,
+											"end": 132,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 22
+												},
+												"end": {
+													"line": 6,
+													"column": 38
+												}
+											},
+											"properties": [
+												{
+													"type": "Property",
+													"start": 118,
+													"end": 130,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 24
+														},
+														"end": {
+															"line": 6,
+															"column": 36
+														}
+													},
+													"method": false,
+													"shorthand": false,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 118,
+														"end": 122,
+														"loc": {
+															"start": {
+																"line": 6,
+																"column": 24
+															},
+															"end": {
+																"line": 6,
+																"column": 28
+															}
+														},
+														"name": "type"
+													},
+													"value": {
+														"type": "Literal",
+														"start": 124,
+														"end": 130,
+														"loc": {
+															"start": {
+																"line": 6,
+																"column": 30
+															},
+															"end": {
+																"line": 6,
+																"column": 36
+															}
+														},
+														"value": "json",
+														"raw": "'json'"
+													},
+													"kind": "init"
+												}
+											]
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Identifier as the second argument",
+							"start": 57,
+							"end": 93
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 137,
+					"end": 167,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 31
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 143,
+							"end": 166,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 30
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 143,
+								"end": 144,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 147,
+								"end": 166,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 30
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 154,
+									"end": 159,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 18
+										},
+										"end": {
+											"line": 7,
+											"column": 23
+										}
+									},
+									"value": "./b",
+									"raw": "'./b'"
+								},
+								"options": {
+									"type": "Identifier",
+									"start": 161,
+									"end": 165,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 25
+										},
+										"end": {
+											"line": 7,
+											"column": 29
+										}
+									},
+									"name": "expr"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 212,
+					"end": 264,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 53
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 218,
+							"end": 263,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 52
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 218,
+								"end": 219,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 222,
+								"end": 263,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 52
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 229,
+									"end": 234,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 18
+										},
+										"end": {
+											"line": 10,
+											"column": 23
+										}
+									},
+									"value": "./c",
+									"raw": "'./c'"
+								},
+								"options": {
+									"type": "ObjectExpression",
+									"start": 236,
+									"end": 262,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 25
+										},
+										"end": {
+											"line": 10,
+											"column": 51
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 238,
+											"end": 260,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 27
+												},
+												"end": {
+													"line": 10,
+													"column": 49
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 238,
+												"end": 242,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 27
+													},
+													"end": {
+														"line": 10,
+														"column": 31
+													}
+												},
+												"name": "with"
+											},
+											"value": {
+												"type": "ObjectExpression",
+												"start": 244,
+												"end": 260,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 33
+													},
+													"end": {
+														"line": 10,
+														"column": 49
+													}
+												},
+												"properties": [
+													{
+														"type": "Property",
+														"start": 246,
+														"end": 258,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 35
+															},
+															"end": {
+																"line": 10,
+																"column": 47
+															}
+														},
+														"method": false,
+														"shorthand": false,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 246,
+															"end": 250,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 35
+																},
+																"end": {
+																	"line": 10,
+																	"column": 39
+																}
+															},
+															"name": "type"
+														},
+														"value": {
+															"type": "Literal",
+															"start": 252,
+															"end": 258,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 41
+																},
+																"end": {
+																	"line": 10,
+																	"column": 47
+																}
+															},
+															"value": "json",
+															"raw": "'json'"
+														},
+														"kind": "init"
+													}
+												]
+											},
+											"kind": "init"
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Object literal as the second argument",
+							"start": 170,
+							"end": 210
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 282,
+					"end": 318,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 288,
+							"end": 317,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 288,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "AwaitExpression",
+								"start": 292,
+								"end": 317,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 36
+									}
+								},
+								"argument": {
+									"type": "ImportExpression",
+									"start": 298,
+									"end": 317,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 17
+										},
+										"end": {
+											"line": 13,
+											"column": 36
+										}
+									},
+									"source": {
+										"type": "Literal",
+										"start": 305,
+										"end": 310,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 24
+											},
+											"end": {
+												"line": 13,
+												"column": 29
+											}
+										},
+										"value": "./d",
+										"raw": "'./d'"
+									},
+									"options": {
+										"type": "Identifier",
+										"start": 312,
+										"end": 316,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 31
+											},
+											"end": {
+												"line": 13,
+												"column": 35
+											}
+										},
+										"name": "expr"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With await",
+							"start": 267,
+							"end": 280
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

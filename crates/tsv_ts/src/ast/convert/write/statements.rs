@@ -1,7 +1,6 @@
 // Statement dispatcher and simple statements.
 
 use super::super::super::internal;
-use super::super::Schema;
 use super::control_flow::{
     write_break_statement, write_continue_statement, write_do_while_statement,
     write_for_in_statement, write_for_of_statement, write_for_statement, write_if_statement,
@@ -56,7 +55,6 @@ fn write_attributes_field(
     w: &mut JsonWriter,
     attributes: Option<&[internal::ImportAttribute<'_>]>,
     ctx: &Ctx<'_>,
-    schema: Schema,
 ) {
     match attributes {
         Some(attrs) => {
@@ -64,7 +62,7 @@ fn write_attributes_field(
             write_array(w, attrs, |w, a| write_import_attribute(w, a, ctx));
         }
         None => {
-            if schema.is_svelte_script() {
+            if ctx.vanilla_acorn {
                 w.raw(",\"attributes\":[]");
             }
         }
@@ -72,12 +70,7 @@ fn write_attributes_field(
 }
 
 /// Emit a `Statement`, dispatching on its variant.
-pub(super) fn write_statement(
-    w: &mut JsonWriter,
-    stmt: &internal::Statement<'_>,
-    ctx: &Ctx<'_>,
-    schema: Schema,
-) {
+pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>, ctx: &Ctx<'_>) {
     match stmt {
         internal::Statement::ExpressionStatement(expr_stmt) => {
             node_header(w, "ExpressionStatement", expr_stmt.span, ctx);
@@ -116,7 +109,7 @@ pub(super) fn write_statement(
         }
         internal::Statement::ExportNamedDeclaration(export_decl) => {
             let is_type_export = matches!(export_decl.export_kind, internal::ExportKind::Type);
-            let export_kind = kind_token(is_type_export, schema);
+            let export_kind = kind_token(is_type_export, ctx);
             let start = export_start(
                 ctx.source,
                 export_decl.span.start,
@@ -131,21 +124,21 @@ pub(super) fn write_statement(
             }
             w.raw(",\"declaration\":");
             write_or_null(w, export_decl.declaration.as_ref(), |w, d| {
-                write_exported_declaration(w, d, ctx, schema, is_type_export);
+                write_exported_declaration(w, d, ctx, is_type_export);
             });
             w.raw(",\"specifiers\":");
             write_array(w, export_decl.specifiers, |w, s| {
-                write_export_specifier(w, s, ctx, schema);
+                write_export_specifier(w, s, ctx);
             });
             w.raw(",\"source\":");
             write_or_null(w, export_decl.source.as_ref(), |w, s| {
                 write_literal(w, s, ctx);
             });
-            write_attributes_field(w, export_decl.attributes, ctx, schema);
+            write_attributes_field(w, export_decl.attributes, ctx);
             close_node(w, "ExportNamedDeclaration", export_span, ctx);
         }
         internal::Statement::ExportDefaultDeclaration(export_decl) => {
-            let export_kind = kind_token(false, schema);
+            let export_kind = kind_token(false, ctx);
             let start = export_start(
                 ctx.source,
                 export_decl.span.start,
@@ -165,7 +158,7 @@ pub(super) fn write_statement(
         internal::Statement::ExportAllDeclaration(export_decl) => {
             let export_kind = kind_token(
                 matches!(export_decl.export_kind, internal::ExportKind::Type),
-                schema,
+                ctx,
             );
             node_header(w, "ExportAllDeclaration", export_decl.span, ctx);
             if let Some(kind) = export_kind {
@@ -178,7 +171,7 @@ pub(super) fn write_statement(
             });
             w.raw(",\"source\":");
             write_literal(w, &export_decl.source, ctx);
-            write_attributes_field(w, export_decl.attributes, ctx, schema);
+            write_attributes_field(w, export_decl.attributes, ctx);
             close_node(w, "ExportAllDeclaration", export_decl.span, ctx);
         }
         internal::Statement::TSExportAssignment(export_assign) => {
@@ -196,7 +189,7 @@ pub(super) fn write_statement(
         internal::Statement::ImportDeclaration(import_decl) => {
             let import_kind = kind_token(
                 matches!(import_decl.import_kind, internal::ImportKind::Type),
-                schema,
+                ctx,
             );
             node_header(w, "ImportDeclaration", import_decl.span, ctx);
             if let Some(kind) = import_kind {
@@ -209,11 +202,11 @@ pub(super) fn write_statement(
             }
             w.raw(",\"specifiers\":");
             write_array(w, import_decl.specifiers, |w, s| {
-                write_import_specifier(w, s, ctx, schema);
+                write_import_specifier(w, s, ctx);
             });
             w.raw(",\"source\":");
             write_literal(w, &import_decl.source, ctx);
-            write_attributes_field(w, import_decl.attributes, ctx, schema);
+            write_attributes_field(w, import_decl.attributes, ctx);
             close_node(w, "ImportDeclaration", import_decl.span, ctx);
         }
         internal::Statement::TSImportEqualsDeclaration(import_eq) => {
@@ -308,12 +301,9 @@ pub(super) fn write_module_declaration(
         w.raw(",\"body\":");
         match body {
             internal::TSModuleDeclarationBody::TSModuleBlock(block) => {
-                // Always TypeScript context (declare namespace/module).
                 node_header(w, "TSModuleBlock", block.span, ctx);
                 w.raw(",\"body\":");
-                write_array(w, block.body, |w, s| {
-                    write_statement(w, s, ctx, Schema::Acorn);
-                });
+                write_array(w, block.body, |w, s| write_statement(w, s, ctx));
                 close_node(w, "TSModuleBlock", block.span, ctx);
             }
             internal::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
@@ -327,7 +317,7 @@ pub(super) fn write_module_declaration(
     close_node(w, "TSModuleDeclaration", decl.span, ctx);
 }
 
-/// Emits a `BlockStatement` node (always TypeScript context).
+/// Emits a `BlockStatement` node.
 pub(super) fn write_block_statement(
     w: &mut JsonWriter,
     block: &internal::BlockStatement<'_>,
@@ -335,9 +325,7 @@ pub(super) fn write_block_statement(
 ) {
     node_header(w, "BlockStatement", block.span, ctx);
     w.raw(",\"body\":");
-    write_array(w, block.body, |w, s| {
-        write_statement(w, s, ctx, Schema::Acorn);
-    });
+    write_array(w, block.body, |w, s| write_statement(w, s, ctx));
     close_node(w, "BlockStatement", block.span, ctx);
 }
 
@@ -357,7 +345,6 @@ fn write_exported_declaration(
     w: &mut JsonWriter,
     stmt: &internal::Statement<'_>,
     ctx: &Ctx<'_>,
-    schema: Schema,
     is_type_export: bool,
 ) {
     match stmt {
@@ -371,7 +358,7 @@ fn write_exported_declaration(
             write_interface_declaration(w, iface, ctx, true);
         }
         internal::Statement::TSDeclareFunction(func) => write_declare_function(w, func, ctx, true),
-        _ => write_statement(w, stmt, ctx, schema),
+        _ => write_statement(w, stmt, ctx),
     }
 }
 

@@ -1,16 +1,11 @@
 // Control flow statement writers.
 
 use super::super::super::internal;
-use super::super::Schema;
 use super::expressions::write_expression;
 use super::statements::{write_block_statement, write_statement, write_variable_declaration};
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_array, write_identifier_plain, write_or_null,
 };
-
-/// Control flow bodies never contain import/export declarations, so the schema
-/// doesn't matter; `Acorn` for simplicity.
-const SCHEMA: Schema = Schema::Acorn;
 
 /// Emits an `IfStatement` node.
 pub(super) fn write_if_statement(
@@ -22,10 +17,10 @@ pub(super) fn write_if_statement(
     w.raw(",\"test\":");
     write_expression(w, &if_stmt.test, ctx);
     w.raw(",\"consequent\":");
-    write_statement(w, if_stmt.consequent, ctx, SCHEMA);
+    write_statement(w, if_stmt.consequent, ctx);
     w.raw(",\"alternate\":");
     write_or_null(w, if_stmt.alternate.as_ref(), |w, alt| {
-        write_statement(w, alt, ctx, SCHEMA);
+        write_statement(w, alt, ctx);
     });
     close_node(w, "IfStatement", if_stmt.span, ctx);
 }
@@ -54,7 +49,7 @@ pub(super) fn write_for_statement(
         write_expression(w, update, ctx);
     });
     w.raw(",\"body\":");
-    write_statement(w, for_stmt.body, ctx, SCHEMA);
+    write_statement(w, for_stmt.body, ctx);
     close_node(w, "ForStatement", for_stmt.span, ctx);
 }
 
@@ -80,7 +75,7 @@ pub(super) fn write_for_in_statement(
     w.raw(",\"right\":");
     write_expression(w, &for_in.right, ctx);
     w.raw(",\"body\":");
-    write_statement(w, for_in.body, ctx, SCHEMA);
+    write_statement(w, for_in.body, ctx);
     close_node(w, "ForInStatement", for_in.span, ctx);
 }
 
@@ -99,7 +94,7 @@ pub(super) fn write_for_of_statement(
     w.raw(",\"right\":");
     write_expression(w, &for_of.right, ctx);
     w.raw(",\"body\":");
-    write_statement(w, for_of.body, ctx, SCHEMA);
+    write_statement(w, for_of.body, ctx);
     close_node(w, "ForOfStatement", for_of.span, ctx);
 }
 
@@ -113,7 +108,7 @@ pub(super) fn write_while_statement(
     w.raw(",\"test\":");
     write_expression(w, &while_stmt.test, ctx);
     w.raw(",\"body\":");
-    write_statement(w, while_stmt.body, ctx, SCHEMA);
+    write_statement(w, while_stmt.body, ctx);
     close_node(w, "WhileStatement", while_stmt.span, ctx);
 }
 
@@ -125,7 +120,7 @@ pub(super) fn write_do_while_statement(
 ) {
     node_header(w, "DoWhileStatement", do_while.span, ctx);
     w.raw(",\"body\":");
-    write_statement(w, do_while.body, ctx, SCHEMA);
+    write_statement(w, do_while.body, ctx);
     w.raw(",\"test\":");
     write_expression(w, &do_while.test, ctx);
     close_node(w, "DoWhileStatement", do_while.span, ctx);
@@ -146,7 +141,7 @@ pub(super) fn write_switch_statement(
         node_header(w, "SwitchCase", case.span, ctx);
         w.raw(",\"consequent\":");
         write_array(w, case.consequent, |w, s| {
-            write_statement(w, s, ctx, SCHEMA);
+            write_statement(w, s, ctx);
         });
         w.raw(",\"test\":");
         write_or_null(w, case.test.as_ref(), |w, t| write_expression(w, t, ctx));
@@ -230,7 +225,7 @@ pub(super) fn write_labeled_statement(
     node_header(w, "LabeledStatement", labeled.span, ctx);
     // acorn assigns `body` before `label`, so it serializes first.
     w.raw(",\"body\":");
-    write_statement(w, labeled.body, ctx, SCHEMA);
+    write_statement(w, labeled.body, ctx);
     w.raw(",\"label\":");
     write_identifier_plain(w, &labeled.label, ctx);
     close_node(w, "LabeledStatement", labeled.span, ctx);

@@ -42,17 +42,17 @@ fn skeleton_writer(island_span: Span) -> JsonWriter {
 /// The `EmbedWriter` a byte-space skeleton pass hands to a `tsv_ts` embedded
 /// writer: identity map (comment-attach spans line up in byte space), the
 /// `Record` role, and `emit_loc: true` — the skeleton bytes are discarded, only
-/// the recorded tree is used, so the emitted `loc` is irrelevant.
-fn skeleton_env<'a>(
-    source: &'a str,
-    tracker: &'a LocationTracker,
-    recorder: &'a SkeletonRecorder,
-) -> EmbedWriter<'a> {
+/// the recorded tree is used, so the emitted `loc` is irrelevant. The parser
+/// variant is **not** irrelevant, and comes from the same component-global fact
+/// the fused emit uses: the tree recorded here keys the map that emit consults,
+/// so a variant that disagreed would key it off a shape nothing emits.
+fn skeleton_env<'a>(attach: AttachInputs<'a>, recorder: &'a SkeletonRecorder) -> EmbedWriter<'a> {
     EmbedWriter {
-        source,
-        loc: LocationMapper::identity(tracker),
+        source: attach.source,
+        loc: LocationMapper::identity(attach.tracker),
         comments: CommentMode::Record(recorder),
         emit_loc: true,
+        vanilla_acorn: attach.vanilla_acorn,
     }
 }
 
@@ -60,12 +60,11 @@ fn skeleton_env<'a>(
 /// (identity map) — the structure the island-scoped attach passes walk.
 fn expression_skeleton(
     expr: &tsv_ts::ast::internal::Expression<'_>,
-    source: &str,
-    tracker: &LocationTracker,
+    attach: AttachInputs<'_>,
 ) -> SkeletonTree {
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(expr.span());
-    write_expression_embedded(&mut w, expr, skeleton_env(source, tracker, &recorder));
+    write_expression_embedded(&mut w, expr, skeleton_env(attach, &recorder));
     recorder.finish()
 }
 
@@ -84,7 +83,7 @@ pub(super) fn build_expression_writer_comments(
     container_start: u32,
     range_end: u32,
 ) -> WriterComments {
-    let tree = expression_skeleton(expr, attach.source, attach.tracker);
+    let tree = expression_skeleton(expr, attach);
     let mut out = WriterComments::default();
     try_attach_comments_to_node(
         &tree,
@@ -119,7 +118,7 @@ pub(super) fn build_const_tag_writer_comments(
     // the annotation to the init window instead.
     let binding_end = tsv_ts::pattern_binding_end(&tag.id);
     let mut out = WriterComments::default();
-    let id_tree = expression_skeleton(&tag.id, attach.source, attach.tracker);
+    let id_tree = expression_skeleton(&tag.id, attach);
     // The pattern window's parse ran through the annotation, but an annotated
     // block binding's root span stops at the bare name, so the end is handed in
     // rather than read off the root — otherwise the window collapses to the name
@@ -133,7 +132,7 @@ pub(super) fn build_const_tag_writer_comments(
         binding_end,
         &mut out,
     );
-    let init_tree = expression_skeleton(&tag.init, attach.source, attach.tracker);
+    let init_tree = expression_skeleton(&tag.init, attach);
     try_attach_comments_to_node(
         &init_tree,
         init_tree.roots()[0],
@@ -158,11 +157,7 @@ pub(super) fn build_declaration_tag_writer_comments(
 ) -> WriterComments {
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(var_decl.span);
-    write_variable_declaration_embedded(
-        &mut w,
-        var_decl,
-        skeleton_env(attach.source, attach.tracker, &recorder),
-    );
+    write_variable_declaration_embedded(&mut w, var_decl, skeleton_env(attach, &recorder));
     let tree = recorder.finish();
     let mut out = WriterComments::default();
     try_attach_comments_to_node(&tree, tree.roots()[0], attach, tag_start, tag_end, &mut out);
@@ -188,7 +183,7 @@ pub(super) fn build_expression_list_writer_comments(
 ) -> WriterComments {
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(Span::new(container_start, range_end));
-    let env = skeleton_env(attach.source, attach.tracker, &recorder);
+    let env = skeleton_env(attach, &recorder);
     for item in items {
         write_expression_embedded(&mut w, item, env);
     }

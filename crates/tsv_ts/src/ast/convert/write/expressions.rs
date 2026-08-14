@@ -410,18 +410,22 @@ pub(super) fn write_expression_inner(
                 w.raw(",\"phase\":");
                 w.token(phase);
             }
-            // `arguments` is skip-if-empty: only the import-attributes options
-            // object populates it (a single-element array).
-            if let Some(opts) = &import_expr.options {
+            // The two parser variants spell the second argument differently, and
+            // each spells it exclusively. Vanilla acorn (a Svelte non-`lang="ts"`
+            // script) is ESTree: the argument IS `options`, always emitted and
+            // `null` when absent, with no `arguments` field. acorn-typescript uses
+            // its own dialect instead: a single-element `arguments` array,
+            // skip-if-empty, with no `options` field.
+            if ctx.vanilla_acorn {
+                w.raw(",\"options\":");
+                match &import_expr.options {
+                    Some(opts) => write_expression(w, opts, ctx),
+                    None => w.raw("null"),
+                }
+            } else if let Some(opts) = &import_expr.options {
                 w.raw(",\"arguments\":[");
                 write_expression(w, opts, ctx);
                 w.raw("]");
-            }
-            // Svelte non-`lang="ts"` script quirk: vanilla acorn appends
-            // `options: null`; acorn-typescript omits it. Appended last (after
-            // `arguments`) so field order matches vanilla acorn.
-            if ctx.vanilla_acorn {
-                w.raw(",\"options\":null");
             }
             close_node(w, "ImportExpression", import_expr.span, ctx);
         }
