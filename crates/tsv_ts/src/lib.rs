@@ -836,6 +836,15 @@ pub fn build_program_doc(
 // break-after-operator rules as our own assignment printer.
 pub use printer::{conditional_should_break_after_op, should_inline_logical_expression};
 
+// The ECMAScript identifier grammar, for embedders that read an identifier out of
+// their OWN syntax rather than through this crate's lexer: a `{#snippet}` name and
+// an `{#each}` index are JS identifiers that Svelte reads with acorn's
+// `isIdentifierStart` / `isIdentifierChar`, so tsv_svelte must ask the same
+// question. Exported rather than re-derived — `char::is_alphabetic` /
+// `is_alphanumeric` is not this class in either direction (U+2118 is `ID_Start`
+// and not alphabetic; U+00B2 is alphanumeric and not `ID_Continue`).
+pub use lexer::ident::{is_id_continue, is_id_start};
+
 /// Printer buffer-population sampling for `tsv_debug buffer_sizes`. Behind the
 /// `buffer_stats` feature (off in production builds).
 #[cfg(feature = "buffer_stats")]

@@ -1,0 +1,152 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 309,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 261,
+				"data": "\n\tAn attribute's brace interior takes Svelte's `allow_whitespace`, i.e. any JS\n\t`\\s` character, so U+FEFF pads the shorthand and the spread (see\n\tunformatted_zwnbsp). U+0085 NEL is not in JS `\\s` and is rejected there (see\n\tinput_invalid_nel_shorthand).\n"
+			},
+			{
+				"type": "Text",
+				"start": 261,
+				"end": 262,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 262,
+				"end": 308,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 263
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 266
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 267,
+						"end": 273,
+						"name": "prop",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 6,
+								"character": 268
+							},
+							"end": {
+								"line": 7,
+								"column": 10,
+								"character": 272
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 268,
+							"end": 272,
+							"expression": {
+								"type": "Identifier",
+								"name": "prop",
+								"start": 268,
+								"end": 272,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 6,
+										"character": 268
+									},
+									"end": {
+										"line": 7,
+										"column": 10,
+										"character": 272
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "SpreadAttribute",
+						"start": 274,
+						"end": 284,
+						"expression": {
+							"type": "Identifier",
+							"start": 278,
+							"end": 283,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 16
+								},
+								"end": {
+									"line": 7,
+									"column": 21
+								}
+							},
+							"name": "props"
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 285,
+						"end": 301,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 23,
+								"character": 285
+							},
+							"end": {
+								"line": 7,
+								"column": 32,
+								"character": 294
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 295,
+							"end": 301,
+							"expression": {
+								"type": "Identifier",
+								"start": 296,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 34
+									},
+									"end": {
+										"line": 7,
+										"column": 38
+									}
+								},
+								"name": "expr"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

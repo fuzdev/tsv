@@ -8,6 +8,7 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, ParseError, Span};
 use tsv_ts::Expression;
 use tsv_ts::TSTypeAnnotation;
+use tsv_ts::{is_id_continue, is_id_start};
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
@@ -63,6 +64,79 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// attribute). Monotonic within a subtree (descendants inherit) but scoped to the template
     /// (restored for siblings). Suppresses `<slot>` → `SlotElement` (it stays a `RegularElement`).
     pub(crate) in_shadowroot_template: bool,
+}
+
+/// Svelte's reserved-word list (`RESERVED_WORDS`, `svelte/src/utils.js`): the JS
+/// keywords, the strict-mode future-reserved set, and `eval` / `arguments`.
+///
+/// `read_identifier` rejects every one (`e.unexpected_reserved_word`), at PARSE time and
+/// regardless of mode — so this is a rule of Svelte's own template grammar, not a JS early
+/// error, which is why it is enforced here rather than deferred the way tsv's TypeScript
+/// parser defers "reserved word as identifier" (root `CLAUDE.md` §Strict Mode Only).
+///
+/// Canonical calls `read_identifier` from **six** positions and every one takes this rule:
+/// a `{#snippet}` name and an `{#each}` index (`1-parse/state/tag.js`), the
+/// plain-identifier binding of `{#each … as p}` / `{:then p}` / `{:catch p}` — `read_pattern`
+/// opens with `parser.read_identifier()` (`1-parse/read/context.js:16`) — and a shorthand
+/// attribute `{name}` (`1-parse/state/element.js:575`).
+///
+/// ⚠️ Only `read_pattern`'s **destructuring** branch (`{`/`[`) falls through to acorn, and
+/// that is the sole position where the deferral is right. Reading the split the other way
+/// round — "a `read_pattern` position goes to acorn" — is wrong for the binding shape
+/// people actually write, and left four of the six positions unguarded.
+/// [`SvelteParser::read_identifier`] is tsv's single reader for the six.
+fn is_reserved_word(name: &str) -> bool {
+    matches!(
+        name,
+        "arguments"
+            | "await"
+            | "break"
+            | "case"
+            | "catch"
+            | "class"
+            | "const"
+            | "continue"
+            | "debugger"
+            | "default"
+            | "delete"
+            | "do"
+            | "else"
+            | "enum"
+            | "eval"
+            | "export"
+            | "extends"
+            | "false"
+            | "finally"
+            | "for"
+            | "function"
+            | "if"
+            | "implements"
+            | "import"
+            | "in"
+            | "instanceof"
+            | "interface"
+            | "let"
+            | "new"
+            | "null"
+            | "package"
+            | "private"
+            | "protected"
+            | "public"
+            | "return"
+            | "static"
+            | "super"
+            | "switch"
+            | "this"
+            | "throw"
+            | "true"
+            | "try"
+            | "typeof"
+            | "var"
+            | "void"
+            | "while"
+            | "with"
+            | "yield"
+    )
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -359,6 +433,75 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Create "Duplicate X found" error at current position
     pub(crate) fn error_duplicate(&self, what: &str) -> ParseError {
         ParseError::invalid_syntax(format!("Duplicate {what} found"), self.current_start)
+    }
+
+    /// Create "Duplicate {:kw} clause found" error at current position — a block
+    /// continuation REPEATING one the block already has.
+    ///
+    /// The `{:…}` braces are spelled here rather than by the caller so the continuation
+    /// guards (`{:then}`, `{:catch}`, `{:else}`) share one wording, and so no call site
+    /// carries a literal that reads as a format argument.
+    pub(crate) fn error_duplicate_clause(&self, keyword: &str) -> ParseError {
+        self.error_duplicate(&format!("{{:{keyword}}} clause"))
+    }
+
+    /// Create "{:a} cannot follow {:b}" error at current position — the sibling of
+    /// [`Self::error_duplicate_clause`] for a continuation that is **not** a repeat but
+    /// still lands on a slot its predecessor filled.
+    ///
+    /// The distinction is the whole point: `{#if a}1{:else}2{:else if b}3{/if}` holds one
+    /// `{:else}` and one `{:else if}`, so calling either a duplicate names a thing the
+    /// author did not write. What is taken is the block's single alternate, and the
+    /// clearest way to say so is to name the pair.
+    pub(crate) fn error_clause_after(&self, clause: &str, predecessor: &str) -> ParseError {
+        ParseError::invalid_syntax(
+            format!("{{:{clause}}} cannot follow {{:{predecessor}}}"),
+            self.current_start,
+        )
+    }
+
+    /// Read a JS identifier off the front of `s`, exactly as Svelte's `read_identifier`
+    /// does (`1-parse/index.js:243`): an `ID_Start` char, then an `ID_Continue` run, then
+    /// a rejection if the result is a reserved word. `offset` is the absolute source
+    /// offset of `s[0]`.
+    ///
+    /// `Ok(None)` means *no identifier starts here* — the caller decides whether that is
+    /// an error (a `{#snippet}` name is mandatory, a shorthand attribute's is too) or
+    /// simply the absence of an optional piece (an `{#each}` index, where a non-start
+    /// leaves the comma unconsumed so the trailing check reports it). Only the reserved
+    /// word is an error the reader itself can raise, because it is the one case where an
+    /// identifier WAS read.
+    ///
+    /// ⚠️ The character class is `tsv_ts`'s [`is_id_start`] / [`is_id_continue`], the
+    /// ECMAScript one canonical reaches through acorn (`isIdentifierStart(code, true)` /
+    /// `isIdentifierChar(code, true)`), never a local approximation. Rust's
+    /// `char::is_alphabetic` / `is_alphanumeric` is NOT this class and misses in **both**
+    /// directions: U+2118 is `ID_Start` but not alphabetic, and U+00B2 is alphanumeric but
+    /// not `ID_Continue`. This function is their only reader in the crate, which is what
+    /// keeps that answer in one place.
+    ///
+    /// The single reader for all six positions canonical reads this way, each of which had
+    /// an inline copy and had drifted: the snippet's ran `is_id_continue` from the FIRST
+    /// character (a leading digit joined the name), the pattern and shorthand copies never
+    /// asked the reserved question, and the shorthand's spelled the class as
+    /// `is_alphanumeric() || '_' || '$'` — diverging in both of the directions above
+    /// (`{℘}` rejected though canonical accepts it, `{a²}` accepted though canonical stops
+    /// the identifier at the `²` and then fails to eat `}`).
+    pub(crate) fn read_identifier(
+        &self,
+        s: &'a str,
+        offset: usize,
+    ) -> Result<Option<&'a str>, ParseError> {
+        let Some(first) = s.chars().next().filter(|c| is_id_start(*c)) else {
+            return Ok(None);
+        };
+        debug_assert!(is_id_continue(first), "ID_Start is a subset of ID_Continue");
+        let end = s.find(|c: char| !is_id_continue(c)).unwrap_or(s.len());
+        let name = &s[..end];
+        if is_reserved_word(name) {
+            return Err(self.error_msg_at(&format!("Unexpected reserved word '{name}'"), offset));
+        }
+        Ok(Some(name))
     }
 
     /// Create "Unknown X: Y" error at specified position

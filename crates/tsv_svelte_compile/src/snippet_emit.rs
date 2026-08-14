@@ -47,22 +47,15 @@ pub(crate) fn emit_snippet<'arena>(
 }
 
 /// Build a `{#snippet}` as a `function name($$renderer, ...params) { … }`
-/// declaration (with its plain name). Refuses typed/generic snippets and escaped
-/// names. Shared by the template-hoist path ([`emit_snippet`]) and the component
-/// snippet-prop path (where the function lives in the component's wrapping block).
+/// declaration (with its plain name). Refuses a top-level rest parameter and an
+/// escaped name; typed and generic signatures COMPILE (they erase). Shared by the
+/// template-hoist path ([`emit_snippet`]) and the component snippet-prop path
+/// (where the function lives in the component's wrapping block).
 pub(crate) fn build_snippet_function<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     snippet: &'arena SnippetBlock<'arena>,
 ) -> Result<(Statement<'arena>, String), CompileError> {
     let arena = env.b.arena;
-    // The snippet's signature head (`<T>(params)`) is parsed by wrapping it in a
-    // synthetic `function f<T>(params) {}`. When that inner parse FAILS the AST is
-    // empty and the raw text is kept instead — nothing to erase or emit, so refuse.
-    if snippet.raw_parameters.is_some()
-        || (snippet.type_params_raw.is_some() && snippet.type_parameters.is_none())
-    {
-        return Err(unsupported(Refusal::SnippetSignatureUnparsed));
-    }
     // A **top-level** rest parameter is a `snippet_invalid_rest_parameter` error in
     // the oracle's analysis phase (`2-analyze/visitors/SnippetBlock.js`), which
     // scans `node.parameters` itself and never descends — so a rest element NESTED

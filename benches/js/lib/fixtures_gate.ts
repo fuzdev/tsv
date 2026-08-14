@@ -272,7 +272,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 	console.error(`    parity (both reject):     ${buckets.parity}`);
 	console.error(`    both accept:              ${buckets.both_accept}`);
 	console.error(
-		`    over-acceptance:          ${buckets.over_acceptance.length}  (deferred early-errors; not gated)`
+		`    over-acceptance:          ${buckets.over_acceptance.length}  (deferred early-errors; findings not gated, COUNT pinned)`
 	);
 	console.error(
 		`    over-rejection sanctioned:${buckets.sanctioned.length}  (${config.sanctioned_note})`
@@ -389,6 +389,11 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 			scanned !== config.pins.scanned ? `scanned ${scanned} ≠ pinned ${config.pins.scanned}` : null,
 			buckets.both_accept !== config.pins.both_accept
 				? `both-accept ${buckets.both_accept} ≠ pinned ${config.pins.both_accept}`
+				: null,
+			// The one bucket the other two are blind to: a new over-acceptance comes out
+			// of `parity`, moving neither of them. See `GatePins.over_acceptance`.
+			buckets.over_acceptance.length !== config.pins.over_acceptance
+				? `over-acceptance ${buckets.over_acceptance.length} ≠ pinned ${config.pins.over_acceptance}`
 				: null
 		].filter((f): f is string => f !== null);
 		if (pin_failures.length > 0) {
