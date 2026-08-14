@@ -1,5 +1,6 @@
 // try/catch/finally, throw, break/continue, and labeled statement printing
 
+use super::OpenParenLineComments;
 use crate::ast::internal::{self, Statement};
 use crate::printer::{CommentVec, Printer};
 use smallvec::smallvec;
@@ -95,10 +96,14 @@ impl<'a> Printer<'a> {
 
             // Check for comments in catch parameter
             if let (Some(open), Some(close)) = (open_paren, close_paren)
-                && (self.has_comments_to_emit_between(open + 1, param.span().start)
-                    || self.has_comments_to_emit_between(param.span().end, close))
+                && self.header_parens_hold_comments(open, close, param)
             {
-                parts.push(self.build_condition_group_with_comments(param, open, close));
+                parts.push(self.build_condition_group_with_comments(
+                    param,
+                    open,
+                    close,
+                    OpenParenLineComments::Normalize,
+                ));
             } else {
                 parts.push(self.build_expression_doc(param));
             }
