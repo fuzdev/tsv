@@ -40,17 +40,16 @@ impl<'a> Printer<'a> {
         // brace and dropping the comment.
         let body_open_brace = close_paren
             .and_then(|close| self.find_char_outside_comments(close + 1, stmt.span.end, b'{'));
-        // Build condition group (handles breaking within discriminant and comments)
-        let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
-            self.build_condition_group_with_comments(
-                &stmt.discriminant,
-                open,
-                close,
-                OpenParenLineComments::Normalize,
-            )
-        } else {
-            self.build_condition_group(&stmt.discriminant)
-        };
+        // Build condition group (handles breaking within discriminant and comments).
+        // Deliberately the inner builder, not `build_statement_condition_doc`: prettier
+        // excludes `switch` from `shouldInlineCondition`, so a negated parenthesized
+        // discriminant does not hug its `(`.
+        let condition_group = self.build_condition_group_for_parens(
+            &stmt.discriminant,
+            open_paren,
+            close_paren,
+            OpenParenLineComments::Normalize,
+        );
 
         // Build cases - they handle their own internal indentation
         // Join cases with hardlines, handling comments between cases

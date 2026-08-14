@@ -34,7 +34,7 @@ pub use summary::{ValidationSummary, print_validation_results};
 pub const FIXTURES_MIN: usize = 2_899;
 
 use parsed_input::{input_ast_paths, parse_input};
-use structure::validate_fixture_structure;
+use structure::{validate_divergence_readme, validate_fixture_structure};
 
 use crate::fixtures::{Fixture, FixtureFiles, read_file};
 
@@ -184,6 +184,14 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     // Unknown files catch typos like "unformated_*.svelte"
     for unknown_file in &files.unknown {
         result.add_error(ValidationError::UnknownFile(unknown_file.clone()));
+    }
+
+    // D1: the divergence README. Reported here rather than from the gate above
+    // because it is documentation, not layout — a missing README cannot make a
+    // phase unreadable, and short-circuiting on it hid the CLAIM the marker makes
+    // (see `validate_divergence_readme`).
+    if let Some(e) = validate_divergence_readme(fixture, &files) {
+        result.add_error(ValidationError::StructureValidationFailed(e));
     }
 
     result.add_success(ValidationSuccess::StructureValid(16));

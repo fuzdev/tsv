@@ -1068,11 +1068,12 @@ impl<'a> Printer<'a> {
         let arg_end = i.argument.span.end;
 
         // Leading comments between `import` and the specifier.
-        let (arg_doc, leading_forces_break) = self.build_paren_leading_value_doc(
+        let leading = self.build_paren_leading_value_doc(
             paren_gap_start,
             i.argument.span.start,
             self.build_literal_doc(&i.argument),
         );
+        let arg_doc = leading.value;
 
         // Rule A over the options argument, exactly as the dynamic-import expression
         // applies it to its own: an alone-on-line directive in the specifier→options gap
@@ -1090,11 +1091,10 @@ impl<'a> Printer<'a> {
         if let Some(doc) = build_import_args_comment_layout(
             self,
             open,
-            arg_doc,
+            &leading,
             arg_end,
             options_arg,
             paren_close,
-            leading_forces_break,
         ) {
             return doc;
         }

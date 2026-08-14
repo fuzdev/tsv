@@ -1,0 +1,899 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 680,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " line comment trailing `(` — sole argument",
+			"start": 20,
+			"end": 64,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 84,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 19
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment trailing `(` — with an options argument",
+			"start": 104,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 179,
+			"end": 184,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 19
+				},
+				"end": {
+					"line": 8,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment trailing `(`, then an own-line leading comment",
+			"start": 229,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " paren ",
+			"start": 312,
+			"end": 323,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 19
+				},
+				"end": {
+					"line": 14,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 326,
+			"end": 333,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a run that begins BEFORE the `(` is the head's and stays whole below it —",
+			"start": 348,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " both formatters agree here, so this is the null control for the pull",
+			"start": 426,
+			"end": 497,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " pre ",
+			"start": 519,
+			"end": 528,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " post",
+			"start": 529,
+			"end": 536,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 12
+				},
+				"end": {
+					"line": 22,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the import TYPE shares the argument layout, so it answers the gap identically",
+			"start": 551,
+			"end": 631,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 650,
+			"end": 655,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 18
+				},
+				"end": {
+					"line": 27,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 679,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 670,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 66,
+					"end": 101,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 72,
+							"end": 100,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 72,
+								"end": 73,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 76,
+								"end": 100,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 92,
+									"end": 97,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 84,
+											"end": 89
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing `(` — sole argument",
+							"start": 20,
+							"end": 64
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 161,
+					"end": 226,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 167,
+							"end": 225,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 167,
+								"end": 168,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 171,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 187,
+									"end": 192,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 7
+										}
+									},
+									"value": "./b",
+									"raw": "'./b'",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 179,
+											"end": 184
+										}
+									]
+								},
+								"arguments": [
+									{
+										"type": "ObjectExpression",
+										"start": 196,
+										"end": 222,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 28
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 198,
+												"end": 220,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 4
+													},
+													"end": {
+														"line": 10,
+														"column": 26
+													}
+												},
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 198,
+													"end": 202,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 4
+														},
+														"end": {
+															"line": 10,
+															"column": 8
+														}
+													},
+													"name": "with"
+												},
+												"value": {
+													"type": "ObjectExpression",
+													"start": 204,
+													"end": 220,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 10
+														},
+														"end": {
+															"line": 10,
+															"column": 26
+														}
+													},
+													"properties": [
+														{
+															"type": "Property",
+															"start": 206,
+															"end": 218,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 12
+																},
+																"end": {
+																	"line": 10,
+																	"column": 24
+																}
+															},
+															"method": false,
+															"shorthand": false,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 206,
+																"end": 210,
+																"loc": {
+																	"start": {
+																		"line": 10,
+																		"column": 12
+																	},
+																	"end": {
+																		"line": 10,
+																		"column": 16
+																	}
+																},
+																"name": "type"
+															},
+															"value": {
+																"type": "Literal",
+																"start": 212,
+																"end": 218,
+																"loc": {
+																	"start": {
+																		"line": 10,
+																		"column": 18
+																	},
+																	"end": {
+																		"line": 10,
+																		"column": 24
+																	}
+																},
+																"value": "json",
+																"raw": "'json'"
+															},
+															"kind": "init"
+														}
+													]
+												},
+												"kind": "init"
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing `(` — with an options argument",
+							"start": 104,
+							"end": 159
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 294,
+					"end": 345,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 300,
+							"end": 344,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 17,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 300,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 304,
+								"end": 344,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 17,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 336,
+									"end": 341,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 7
+										}
+									},
+									"value": "./c",
+									"raw": "'./c'",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " paren ",
+											"start": 312,
+											"end": 323
+										},
+										{
+											"type": "Line",
+											"value": " lead",
+											"start": 326,
+											"end": 333
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing `(`, then an own-line leading comment",
+							"start": 229,
+							"end": 292
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 499,
+					"end": 548,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 505,
+							"end": 547,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 505,
+								"end": 506,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 509,
+								"end": 547,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 539,
+									"end": 544,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 7
+										}
+									},
+									"value": "./e",
+									"raw": "'./e'",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " pre ",
+											"start": 519,
+											"end": 528
+										},
+										{
+											"type": "Line",
+											"value": " post",
+											"start": 529,
+											"end": 536
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run that begins BEFORE the `(` is the head's and stays whole below it —",
+							"start": 348,
+							"end": 424
+						},
+						{
+							"type": "Line",
+							"value": " both formatters agree here, so this is the null control for the pull",
+							"start": 426,
+							"end": 497
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 633,
+					"end": 669,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 638,
+						"end": 639,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 642,
+						"end": 668,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 10
+							},
+							"end": {
+								"line": 29,
+								"column": 4
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 658,
+							"end": 663,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 7
+								}
+							},
+							"value": "./f",
+							"raw": "'./f'",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 650,
+									"end": 655
+								}
+							]
+						},
+						"qualifier": {
+							"type": "Identifier",
+							"start": 667,
+							"end": 668,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 3
+								},
+								"end": {
+									"line": 29,
+									"column": 4
+								}
+							},
+							"name": "B"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the import TYPE shares the argument layout, so it answers the gap identically",
+							"start": 551,
+							"end": 631
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -31,8 +31,12 @@ impl<'a> Printer<'a> {
 
         // Build condition group (handles breaking within condition and comments,
         // and the `!(logical)` inline-negation hug).
-        let condition_group =
-            self.build_statement_condition_doc(&stmt.test, open_paren, close_paren);
+        let condition_group = self.build_statement_condition_doc(
+            &stmt.test,
+            open_paren,
+            close_paren,
+            OpenParenLineComments::Normalize,
+        );
 
         if let Statement::BlockStatement(block) = stmt.body {
             // Block body: while (cond) { ... }
@@ -163,27 +167,19 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" ("));
         }
 
-        // A commented condition takes the comment-aware group with the do-while
-        // `(`-line policy: a comment after `while (` stays in place, where prettier
-        // relocates it outside the parens (`OpenParenLineComments::Preserve`).
-        if let (Some(open), Some(close)) = (open_paren, close_paren)
-            && self.header_parens_hold_comments(open, close, &stmt.test)
-        {
-            parts.push(self.build_condition_group_with_comments(
-                &stmt.test,
-                open,
-                close,
-                OpenParenLineComments::Preserve,
-            ));
-        } else {
-            // Double-parens an assignment for clarity (`do {} while ((x = y))`),
-            // matching if/while/for. Unlike those, keep the plain (self-grouping)
-            // expression doc — the do-while condition has no enclosing group, so the
-            // ungrouped-binary path would strand a broken `&&` chain.
-            parts.push(
-                self.wrap_statement_test_parens(&stmt.test, self.build_expression_doc(&stmt.test)),
-            );
-        }
+        // The same entry point `if` / `while` use, as in prettier (whose
+        // `printDoWhileStatementCondition` is `printIfStatementCondition` under another
+        // name): the width-driven condition group, the `!(…)` negation hug, and the
+        // clarity parens an assignment takes (`do {} while ((x = y))`). The one axis
+        // that parts do-while from the rest is the `(`-line comment policy — a comment
+        // after `while (` stays in place, where prettier relocates it outside the parens
+        // (`OpenParenLineComments::Preserve`).
+        parts.push(self.build_statement_condition_doc(
+            &stmt.test,
+            open_paren,
+            close_paren,
+            OpenParenLineComments::Preserve,
+        ));
 
         // Comments between the condition's `)` and the do-while's terminating `;`,
         // with the `;` bound to the statement: a same-line block trails *after* it

@@ -1,6 +1,7 @@
 <script lang="ts">
 // leading line comment - breaks to multiline
-type A=import(// c
+type A=import(
+// c
 'a');
 
 // leading block comment on its own line - breaks

@@ -320,7 +320,20 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// the file drops out of `partial`; widening one is a follow-up, not a precondition.
 	// A/B'd against a reverse-patched HEAD binary over the full corpus: this file is the ONLY
 	// move in any bucket — `safety` is 0 both sides and `errors` is byte-identical.
-	typescript: 110,
+	//
+	// 110 → 109: `js/while/indent.js` LEAVES the bucket by MATCHING (`match` 4353 → 4354) —
+	// prettier's own adversarial test for this behavior, whose every case is a long `if` /
+	// `while` / do-while head. A do-while's condition now takes the same condition group
+	// `if` and `while` take, so its parens open for width instead of wrapping the operands at
+	// the statement's own indent, where they read as statements. tsv had kept the plain
+	// self-grouping expression doc on the reading that the do-while has no enclosing group
+	// for the ungrouped binary chain to break with; it has one — the condition group itself,
+	// which is what prettier's `printDoWhileStatementCondition` (its
+	// `printIfStatementCondition` under another name) builds too. A/B'd against a
+	// HEAD-source rebuild over the full corpus: this file is the ONLY move in any bucket —
+	// nothing arrived in `unknown`, and `partial` / `safety` / `errors` / `expected_errors`
+	// are byte-identical.
+	typescript: 109,
 	css: 23
 };
 
