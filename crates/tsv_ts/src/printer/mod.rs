@@ -971,6 +971,14 @@ impl<'a> Printer<'a> {
     /// [`Self::comments_force_own_line_between`], which collapses an authored
     /// own-line single-line block inline; that is the gate for every other
     /// keyword→value gap.
+    ///
+    /// ⚠️ **A gap whose shell is a real GROUP wants no gate at all** — the third case,
+    /// and the one the routing rule above will mislead you into missing. The unary
+    /// comment-holder parens took `comment_cannot_glue_to_operator` and pre-empted their
+    /// own width decision with it (`docs/comments.md` §Own-line-ness is a SOURCE
+    /// question); they now emit prettier's `group(["(", indent([softline, …]), softline,
+    /// ")"])` and let the leading run's own soft `line` decide. Reach for a gate only
+    /// where the layout genuinely cannot express both forms.
     pub(crate) fn comment_hangs_binary_operand(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| {
             !c.is_block || self.has_newline_between(c.span.end, next)

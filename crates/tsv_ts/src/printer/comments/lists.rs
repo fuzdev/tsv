@@ -1378,7 +1378,35 @@ impl<'a> Printer<'a> {
             sep_pos,
             block_after_separator,
             block_after_separator,
+            self.d().hardline(),
         )
+    }
+
+    /// The **for-header `;`** variant of
+    /// [`split_separator_gap_comments`](Self::split_separator_gap_comments): the same
+    /// binding (a same-line block stays before the `;`, no blank preserved), but the
+    /// break onto the deferred run's **first** line is the header's own `line`.
+    ///
+    /// A statement or member terminator ends its line outright, so a `hardline` there
+    /// states a fact about the construct. A `for` header does not: it is a group that
+    /// decides its own width, and prettier reaches this run through the very `line` that
+    /// follows the `;` in `printForStatement` — so a `hardline` answers a width question
+    /// with a comment answer and forces open a header prettier keeps flat
+    /// (`docs/comments.md` §Own-line-ness is a SOURCE question). Only the FIRST break is
+    /// the caller's; every break *within* the run stays the shared site's, so two
+    /// comments the author gave two lines still take two.
+    ///
+    /// A `//` in this gap is still safe from the flat rendering — it would swallow the
+    /// clauses behind it — because any line comment inside the parens forces the header
+    /// open through `build_for_header_doc`'s own `has_line_comment_in_header`, which
+    /// covers the whole paren interior and so strictly contains this gap.
+    pub(crate) fn split_for_header_gap_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        sep_pos: u32,
+    ) -> DocBuf {
+        self.push_gap_comments(parts, start, sep_pos, false, false, self.d().line())
     }
 
     /// The [`split_separator_gap_comments`](Self::split_separator_gap_comments) caller
@@ -1420,7 +1448,7 @@ impl<'a> Printer<'a> {
         start: u32,
         sep_pos: u32,
     ) -> DocBuf {
-        self.push_gap_comments(parts, start, sep_pos, false, true)
+        self.push_gap_comments(parts, start, sep_pos, false, true, self.d().hardline())
     }
 
     /// Where a separator gap's ANCHOR-LINE run ENDS — the split
@@ -1494,6 +1522,15 @@ impl<'a> Printer<'a> {
     /// same side: a deferred comment sharing a source line with an anchor-line one is
     /// impossible, since [`Self::gap_anchor_line_end`] follows that line (a multi-line
     /// block included) to its end.
+    ///
+    /// `first_break` is the third axis, and the narrowest: the break onto the deferred
+    /// run's **first** line, which is the one break this gap does not own — it belongs to
+    /// whatever precedes the separator. A statement or member terminator ends its line
+    /// outright and passes `hardline`; a `for` header is a group that decides its own
+    /// width and passes its own `line`
+    /// ([`Self::split_for_header_gap_comments`]). Every break *within* the run is this
+    /// site's and stays a `hardline`, so the caller can only move the run's first line,
+    /// never merge two lines the author wrote.
     fn push_gap_comments(
         &self,
         parts: &mut DocBuf,
@@ -1501,6 +1538,7 @@ impl<'a> Printer<'a> {
         sep_pos: u32,
         block_after: bool,
         preserve_blank: bool,
+        first_break: DocId,
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
@@ -1517,6 +1555,11 @@ impl<'a> Printer<'a> {
             start
         };
         let mut prev_comment: Option<&internal::Comment> = None;
+        // Whether the deferred run has been opened — the `first_break` axis is about the
+        // break INTO the run, so it is spent once and never on a later comment. Tracked
+        // rather than read off `prev_comment`, which the anchor-line arm also sets, or off
+        // `deferred`, which `block_after` may already have pushed a trailing block into.
+        let mut deferred_open = false;
         for comment in gap {
             if comment.span.start < anchor_line_end {
                 if block_after && comment.is_block {
@@ -1526,15 +1569,21 @@ impl<'a> Printer<'a> {
                 }
             } else {
                 // The separator, BEFORE the comment — a space where the author glued the
-                // pair, otherwise this site's own break (the caller owns the blank rule).
+                // pair, otherwise a break: the caller's onto the run's first line, this
+                // site's own after that (the caller owns the blank rule).
                 if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
                     deferred.push(d.text(" "));
                 } else {
                     if preserve_blank && self.has_blank_line_between(prev, comment.span.start) {
                         deferred.push(d.literalline());
                     }
-                    deferred.push(d.hardline());
+                    deferred.push(if deferred_open {
+                        d.hardline()
+                    } else {
+                        first_break
+                    });
                 }
+                deferred_open = true;
                 deferred.push(self.build_comment_doc(comment));
             }
             prev = comment.span.end;

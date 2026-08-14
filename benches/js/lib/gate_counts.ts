@@ -288,7 +288,22 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// Hoisting it as a decline conjunct is the whole change. A/B'd against a HEAD-equivalent
 	// binary over the full corpus: this file is the ONLY move in any bucket — nothing was
 	// added to `unknown`, and `partial` / `safety` / `errors` are byte-identical.
-	typescript: 109,
+	//
+	// 109 → 110: `js/unary-expression/comments.js` arrives from `partial`, and — like the two
+	// arrivals above — it arrives by getting BETTER (9/11 differing lines → 6/6). The unary
+	// comment-holder parens are now prettier's own `group(["(", indent([softline, arg]),
+	// softline, ")"])` instead of a gate-selected hard-broken arm, so a `function`-expression
+	// operand's body break reaches them (`!(⏎\tfunction () {…} /* foo */⏎)` — the hunk
+	// `comment_position` was claiming) and a run the author glued onto its own line no longer
+	// pre-empts the width decision. What is left is six hunks of ONE cataloged divergence:
+	// prettier hoists a leading comment out of an operand's required parens
+	// (`!(/* foo */ (x = y))`) where tsv keeps it inside the single pair — the assignment,
+	// conditional, sequence, arrow, `yield` and `await` operands, all of
+	// `conformance_prettier_ts_comments.md` §Comment relocation. No detector reaches it, so
+	// the file drops out of `partial`; widening one is a follow-up, not a precondition.
+	// A/B'd against a reverse-patched HEAD binary over the full corpus: this file is the ONLY
+	// move in any bucket — `safety` is 0 both sides and `errors` is byte-identical.
+	typescript: 110,
 	css: 23
 };
 
@@ -307,7 +322,12 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// 34 → 33: `js/comments/jsdoc-nestled.js` leaves for `unknown` — not a loss but a
 	// shrink, its remaining hunk too narrow for the detector that used to match it. The
 	// reasoning is on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step.
-	typescript: 33,
+	//
+	// 33 → 32: `js/unary-expression/comments.js` leaves for `unknown` the same way — the
+	// hunk `comment_position` matched is FIXED, and its residue is one cataloged divergence
+	// no detector recognizes. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other
+	// way in the same step.
+	typescript: 32,
 	css: 9
 };
 
