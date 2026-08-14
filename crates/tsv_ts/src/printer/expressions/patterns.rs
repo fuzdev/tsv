@@ -1161,9 +1161,14 @@ impl<'a> Printer<'a> {
                         // `[a⏎⏎,⏎b]` — one line break each side, no blank line anywhere —
                         // both FABRICATED one, in the one family whose siblings do not.
                         // Stable once printed, so only a `compare` finds it.
+                        //
+                        // `next_start` bounds the SEPARATOR search, `check_pos` the blank
+                        // scan: the comma may sit below the next element's leading comment,
+                        // where the content bound cannot see it
+                        // ([`Printer::has_blank_line_after_comma`]).
                         let (from, check_pos) =
                             self.item_gap_blank_scan(trailing.end_pos, next_start);
-                        if self.has_blank_line_after_comma(from, check_pos) {
+                        if self.has_blank_line_after_comma(from, check_pos, next_start) {
                             parts.push(d.literalline());
                         }
                     }

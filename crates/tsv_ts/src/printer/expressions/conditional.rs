@@ -54,6 +54,25 @@ fn ternary_test_needs_parens(expr: &internal::Expression<'_>) -> bool {
         )
 }
 
+/// Where a ternary branch's value sits relative to the comment run in its gap —
+/// [`Printer::emit_ternary_branch_comments`]'s answer, spent by
+/// [`Printer::push_ternary_branch_value`].
+///
+/// A named pair rather than a `(bool, bool)`: the two flags have the same type and are read
+/// at **two** gaps (`?`→consequent, `:`→alternate), so a positional tuple is one
+/// transposition away from hanging a value that should trail and keeping a blank that should
+/// collapse — a swap the compiler cannot see and every fixture in the file would still pass
+/// on one of the two gaps.
+#[derive(Clone, Copy)]
+struct TernaryBranchPlacement {
+    /// The value drops below the run: a comment in the gap can't share its line (a line
+    /// comment, a later own-line comment, or a blank before the value).
+    on_own_line: bool,
+    /// The author left a blank line between the run and the value, which survives when the
+    /// value takes its own line.
+    blank_before: bool,
+}
+
 /// Check if an expression is a template literal containing newlines
 ///
 /// When a template literal contains embedded newlines in its quasi strings,
@@ -519,7 +538,7 @@ impl<'a> Printer<'a> {
         // their own indented line (author blanks preserved). `consequent_on_own_line`
         // is set when a comment can't share the consequent's line (the blank, if any,
         // is preserved below).
-        let (consequent_on_own_line, blank_before_consequent) =
+        let consequent_placement =
             self.emit_ternary_branch_comments(&mut q_parts, question_pos, consequent_start);
 
         // Consequent expression — when the outer ternary enters breaking layout
@@ -550,19 +569,7 @@ impl<'a> Printer<'a> {
         } else {
             d.indent(consequent)
         };
-        if consequent_on_own_line {
-            // A comment can't share the consequent's line — consequent on a new line
-            // (preserving an author blank line before it).
-            if blank_before_consequent {
-                q_parts.push(d.literalline());
-            }
-            q_parts.push(d.hardline());
-            q_parts.push(d.text(INDENT));
-        } else {
-            // Single block comment or no comment - space then consequent
-            q_parts.push(d.text(" "));
-        }
-        q_parts.push(placed_consequent);
+        self.push_ternary_branch_value(&mut q_parts, consequent_placement, placed_consequent);
 
         // Comments between consequent and :. Mirrors the test→? handling above
         // (same shared helper): same-line comments trail the consequent, later-line
@@ -583,7 +590,7 @@ impl<'a> Printer<'a> {
         q_parts.push(d.text(":"));
 
         // Comments between : and alternate — same shape as the ?→consequent gap.
-        let (alternate_on_own_line, blank_before_alternate) =
+        let alternate_placement =
             self.emit_ternary_branch_comments(&mut q_parts, colon_pos, alternate_start);
 
         // Alternate expression - nested conditionals cascade the break without extra indent
@@ -599,16 +606,7 @@ impl<'a> Printer<'a> {
                 d.indent(self.parenthesize_ternary_branch(cond.alternate, expr_doc))
             };
 
-        if alternate_on_own_line {
-            if blank_before_alternate {
-                q_parts.push(d.literalline());
-            }
-            q_parts.push(d.hardline());
-            q_parts.push(d.text(INDENT));
-        } else {
-            q_parts.push(d.text(" "));
-        }
-        q_parts.push(alternate_doc);
+        self.push_ternary_branch_value(&mut q_parts, alternate_placement, alternate_doc);
 
         // The alternate's OWN trailing gap — everything between the alternate's inner end
         // and the ternary's end. Nothing else scans it, and the consequent's twin gap is
@@ -641,15 +639,16 @@ impl<'a> Printer<'a> {
     /// takes its own indented line (author blanks preserved). Shared by the
     /// ?→consequent and :→alternate gaps.
     ///
-    /// Returns `(value_on_own_line, blank_before_value)`: the value drops onto its own
-    /// line when a comment can't share it — a line comment, a later own-line comment,
-    /// or a blank line before the value — and the caller preserves that trailing blank.
+    /// Returns the branch's [`TernaryBranchPlacement`]: the value drops onto its own line
+    /// when a comment can't share it — a line comment, a later own-line comment, or a blank
+    /// line before the value — and that blank survives below the run. Spending the answer is
+    /// [`Self::push_ternary_branch_value`]'s job, not the caller's.
     fn emit_ternary_branch_comments(
         &self,
         parts: &mut DocBuf,
         op_pos: Option<u32>,
         value_start: u32,
-    ) -> (bool, bool) {
+    ) -> TernaryBranchPlacement {
         let d = self.d();
         let comments: CommentVec<'_> = op_pos
             .map(|p| comments_to_emit_in_range(self.comments, p + 1, value_start).collect())
@@ -681,13 +680,54 @@ impl<'a> Printer<'a> {
                 has_line_comment = true;
             }
         }
+        // The same question [`Printer::push_blank_preserving_hardline`] answers three lines
+        // above for the run's own separators, so it takes the same spelling: the STRICT
+        // scan, never the table-only newline count. `value_start` is the branch's span
+        // start, which for a parenthesized branch lies INSIDE the stripped shell, so the
+        // `(` the printer erases sits between the comment and it — and counting newlines
+        // reads that `(`'s two line breaks as an author blank (`a ? /* c */⏎(⏎b⏎) : c`
+        // grew one, and since the blank also feeds the break gate below, the whole ternary
+        // came open). A leading run measures forward from the previous comment
+        // (`printLeadingComment`'s `skipNewline` + `hasNewline`), which lands on the `(`
+        // and reports no blank — exactly what the strict reading says.
         let blank_before_value = comments
             .last()
-            .is_some_and(|c| self.has_blank_line_between(c.span.end, value_start));
-        (
-            has_line_comment || last_own_line || blank_before_value,
-            blank_before_value,
-        )
+            .is_some_and(|c| self.has_blank_line_between_strict(c.span.end, value_start));
+        TernaryBranchPlacement {
+            on_own_line: has_line_comment || last_own_line || blank_before_value,
+            blank_before: blank_before_value,
+        }
+    }
+
+    /// Emit a ternary branch's separator and its value — the one place a
+    /// [`TernaryBranchPlacement`] is spent, for both the `?`→consequent and `:`→alternate
+    /// gaps.
+    ///
+    /// The two gaps had this shape open-coded twice, which is the same re-derivation the
+    /// blank rule itself was paying one level down (`docs/comments.md` §A gap emitter that
+    /// re-derives the BLANK rule): a later change to how a branch hangs lands on one gap and
+    /// not its mirror, and the tell — tsv disagreeing with itself between symmetric
+    /// positions — is exactly what this file's own bugs have looked like.
+    fn push_ternary_branch_value(
+        &self,
+        parts: &mut DocBuf,
+        placement: TernaryBranchPlacement,
+        value: DocId,
+    ) {
+        let d = self.d();
+        if placement.on_own_line {
+            // A comment can't share the value's line — the value takes a new one, below any
+            // blank the author left above it.
+            if placement.blank_before {
+                parts.push(d.literalline());
+            }
+            parts.push(d.hardline());
+            parts.push(d.text(INDENT));
+        } else {
+            // A single block comment, or none at all — a space, and the value trails it.
+            parts.push(d.text(" "));
+        }
+        parts.push(value);
     }
 
     /// Split the comments in a ternary operand→operator gap into trailing vs
