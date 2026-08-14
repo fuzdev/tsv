@@ -1482,6 +1482,17 @@ impl<'a> Printer<'a> {
     /// inside a `d.indent()` and so must carry explicit `INDENT` text (the
     /// variable-declarator gap); every other site passes `d.empty()`.
     ///
+    /// **Returns whether the run pushed a `hardline`** — i.e. whether it ends a line
+    /// unconditionally. Only the third separator does; the space and the soft `line`
+    /// both leave the enclosing group free to stay flat. A site that must open its
+    /// own shell around a forced break needs that answer and cannot re-derive it:
+    /// tsv has no `propagateBreaks`, so a hardline buried in this run is invisible to
+    /// the group that would have to break for it ([`Printer::build_paren_leading_value_doc`]
+    /// is the caller, and the import parens are the shell). Re-deriving it caller-side
+    /// is the same three-way rule spelled a second time, which is what
+    /// `docs/comments.md` §Leading comments exists to prevent — so the emitter reports
+    /// on its own output instead. Callers with no shell to open ignore it.
+    ///
     /// The single leading-comment emitter: every site that puts comments before an
     /// item routes here, so the rule lives once. Behind
     /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt),
@@ -1511,8 +1522,9 @@ impl<'a> Printer<'a> {
         terminal_pos: u32,
         glue: LeadingGlue,
         continuation: DocId,
-    ) {
+    ) -> bool {
         let d = self.d();
+        let mut forces_break = false;
         let mut comments = comments.peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
@@ -1583,8 +1595,10 @@ impl<'a> Printer<'a> {
                 // can't absorb the value).
                 self.push_blank_preserving_hardline(parts, comment.span.end, next);
                 parts.push(continuation);
+                forces_break = true;
             }
         }
+        forces_break
     }
 
     /// Build a leading-comment run over `[start, end)` into a fresh `DocBuf`,
@@ -1597,19 +1611,35 @@ impl<'a> Printer<'a> {
         end: u32,
         glue: LeadingGlue,
     ) -> Option<DocId> {
+        self.build_leading_comment_run_with_break(start, end, glue)
+            .map(|(doc, _)| doc)
+    }
+
+    /// [`build_leading_comment_run_opt`](Self::build_leading_comment_run_opt) plus the
+    /// run's own forced-break report — for the caller that must open a **shell** around
+    /// it ([`Self::build_paren_leading_value_doc`], the `import(…)` parens).
+    ///
+    /// The two share one body because the shell question is not separable from the run:
+    /// re-deriving "did this break" caller-side is
+    /// [`push_leading_comment_run`](Self::push_leading_comment_run)'s three-way rule
+    /// spelled a second time, and a *range*-shaped approximation of it is the bug the
+    /// import gap had. Callers with no shell take the `_opt` form and the report is
+    /// dropped here rather than at each of them.
+    fn build_leading_comment_run_with_break(
+        &self,
+        start: u32,
+        end: u32,
+        glue: LeadingGlue,
+    ) -> Option<(DocId, bool)> {
         let mut parts = DocBuf::new();
-        self.push_leading_comment_run(
+        let forces_break = self.push_leading_comment_run(
             &mut parts,
             comments_to_emit_in_range(self.comments, start, end),
             end,
             glue,
             self.d().empty(),
         );
-        if parts.is_empty() {
-            None
-        } else {
-            Some(self.d().concat(&parts))
-        }
+        (!parts.is_empty()).then(|| (self.d().concat(&parts), forces_break))
     }
 
     /// Prepend optional RHS leading comments — block comments in the gap between an
