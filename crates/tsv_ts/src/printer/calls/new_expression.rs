@@ -3,7 +3,8 @@
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
 use super::arg_comments::{
-    build_after_comma_leading_comments, first_arg_has_any_comments, last_arg_has_comments,
+    any_arg_empty_line, build_after_comma_leading_comments, first_arg_has_any_comments,
+    last_arg_has_comments,
 };
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, build_call_args_with_blank_lines, build_empty_args_doc,
@@ -124,6 +125,13 @@ impl<'a> Printer<'a> {
         // silently hug an argument prettier expands. Its analogs (`call_has_comments`)
         // in `calls/mod.rs`, `call_formatting.rs` and `chain_args.rs` count too.
         let new_has_comments = self.has_comments_on_page_between(paren_open, new_expr.span.end);
+
+        // Prettier's `anyArgEmptyLine` — `new` shares `printCallArguments` with a plain call,
+        // so the rule and its POSITION are the same: an author blank in any inter-argument gap
+        // forces `allArgsBrokenOut()`, ABOVE every specialized layout. See the twin in
+        // `call_formatting.rs` for the full argument; the single-argument hug arms between here
+        // and the first use are vacuously safe (a blank needs two arguments to sit between).
+        let any_arg_empty_line = any_arg_empty_line(new_expr.arguments, self);
 
         // Single huggable argument: object literal or function
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
@@ -350,6 +358,24 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // Prettier's POSITION for `anyArgEmptyLine` — above every specialized layout, the
+        // plain call's twin (see `call_formatting.rs` for the full argument). ONE site rather
+        // than a conjunct per arm; the arms above are all inside the single-argument block, so
+        // the question is vacuous there and lifting the gate over them changes nothing.
+        //
+        // Unlike the plain call, no comment path preempts this builder, so both edge gaps are
+        // live here: it puts a `(`-line run on the `(` line and the last argument's trailing
+        // comments after that argument.
+        if any_arg_empty_line {
+            return build_call_args_with_blank_lines(
+                self,
+                callee_with_types,
+                new_expr.arguments,
+                paren_open,
+                new_expr.span.end,
+            );
+        }
+
         // Function composition pattern: when any argument is a call containing a callback
         // OR when there are multiple function arguments
         // e.g., new Cls(arr.map((x) => x), b) → new Cls(\n\t...,\n)
@@ -400,40 +426,18 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // Check for blank lines between arguments (forces expansion and preservation).
-        // Coarse over-check: a raw scan of every gap (it must catch a blank that sits
-        // *past* a same-line trailing comment, which the emitter's per-gap `blank_scan_end`
-        // measure would clamp away — so the two intentionally differ and are not shared).
-        let has_blank_lines = new_expr
-            .arguments
-            .windows(2)
-            .any(|window| self.is_next_line_empty(window[0].span().end, window[1].span().start));
-
-        if has_blank_lines {
-            // Unlike the plain call's twin, no comment path preempts this one, so both
-            // edge gaps are live here: the builder puts a `(`-line run on the `(` line
-            // and the last argument's trailing comments after that argument.
-            return build_call_args_with_blank_lines(
-                self,
-                callee_with_types,
-                new_expr.arguments,
-                paren_open,
-                new_expr.span.end,
-            );
-        }
-
         // "Expand first arg" pattern: callback first, short/empty container last
         // e.g., new Proxy((x) => { ... }, {}) - callback hugs, empty obj stays inline.
         // Block for comments the inline tail can't carry (matching the plain-call path):
         // a line comment anywhere in the args, or any comment on the first arg — those
         // break all args instead (a before-comma trailing block, a leading first-arg
         // comment). An after-comma inline block leading the second arg is carried below.
-        if should_expand_first_arg(self, new_expr.arguments)
-            && !(new_has_comments
-                && has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self))
-            && !(new_has_comments
-                && first_arg_has_any_comments(new_expr.arguments, self, paren_open))
-        {
+        // Named once, like the plain call's twin — and factored on `new_has_comments`, the
+        // cascade's zero-comment fast gate, so a comment-free `new` asks neither predicate.
+        let expand_first_blocked = new_has_comments
+            && (has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self)
+                || first_arg_has_any_comments(new_expr.arguments, self, paren_open));
+        if should_expand_first_arg(self, new_expr.arguments) && !expand_first_blocked {
             let first_arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
             let second_arg_doc = self.build_expression_doc(&new_expr.arguments[1]);
 

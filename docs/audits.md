@@ -190,7 +190,7 @@ cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/
 # newline there is lexed as content, not a gap); only format fixed points injected.
 ```
 
-`deno task blanks:audit:update` regenerates both snapshots after fixing a shape (or sanctioning a new absorb class); it refuses a narrowed run. ⚠️ A fix routinely shrinks the **bug** snapshot while leaving its **absorb** line in place — the absorb key is a node edge and its reproducer only one of the textual shapes that key it, so a line goes stale only when nothing at that edge absorbs anymore. Grading a pinned absorb line means running the prettier compare by hand; [blank_audit.md](./blank_audit.md#the-absorb-pin--the-blank-drop-class) carries that harness and its traps.
+`deno task blanks:audit:update` regenerates both snapshots after fixing a shape (or sanctioning a new absorb class); it refuses a narrowed run. ⚠️ A fix routinely shrinks the **bug** snapshot while leaving its **absorb** line in place — the absorb key is a node edge and its reproducer only one of the textual shapes that key it, so a line goes stale only when nothing at that edge absorbs anymore. Grading a pinned absorb line means running the prettier compare by hand; [blank_audit.md](./blank_audit.md#the-absorb-pin--the-blank-drop-class) carries that harness and its traps — and grade the `--json` `absorb_variants` work-list (one row per class × textual shape) rather than the per-class reproducers, which under-report by a measured ~40×.
 
 ## Blank-Fabrication Audit (`fabrication:audit`)
 

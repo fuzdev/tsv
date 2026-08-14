@@ -278,7 +278,17 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// `styled(Component)`, `keyframes`, `createGlobalStyle`). Both halves are cataloged
 	// behavior, so the arrival is pinned; widening the detectors is a follow-up with its own
 	// overmatch questions, not a precondition for the pin.
-	typescript: 110,
+	//
+	// 110 → 109: `js/preserve-line/argument-list.js` LEAVES the bucket — prettier's own
+	// adversarial test for exactly this behavior, now matching byte-for-byte. tsv asked
+	// prettier's `anyArgEmptyLine` only at the BOTTOM of its call dispatcher, below every
+	// specialized layout's early return, so an author blank between arguments survived a
+	// plain argument list and was silently eaten by each hug / expand-first / expand-last /
+	// composition path; prettier asks it ABOVE them all and returns `allArgsBrokenOut()`.
+	// Hoisting it as a decline conjunct is the whole change. A/B'd against a HEAD-equivalent
+	// binary over the full corpus: this file is the ONLY move in any bucket — nothing was
+	// added to `unknown`, and `partial` / `safety` / `errors` are byte-identical.
+	typescript: 109,
 	css: 23
 };
 

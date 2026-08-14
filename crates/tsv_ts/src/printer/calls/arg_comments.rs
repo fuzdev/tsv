@@ -346,6 +346,37 @@ pub(crate) fn has_inter_argument_comments_slice(
         .any(|pair| printer.has_comments_to_emit_between(pair[0].span().end, pair[1].span().start))
 }
 
+/// Prettier's **`anyArgEmptyLine`** (`print/call-arguments.js`): does any inter-argument gap
+/// hold an author blank line?
+///
+/// The gaps are exactly [`has_inter_argument_comments_slice`]'s — its blank-line sibling, which
+/// is why the two live together. In prettier this decides `allArgsBrokenOut()`, and it is asked
+/// **above** `shouldExpandFirstArg` / `shouldExpandLastArg`, so a blank defeats every specialized
+/// argument layout instead of being asked about after one has been chosen. Every tsv caller uses
+/// it the same way — as a DECLINE conjunct on its layout arms — so the four call-like builders
+/// (plain call, `new`, member-chain arguments, the curried-callee inline path) can't drift into
+/// four answers to one question; they had already drifted into four spellings of the scan.
+///
+/// A blank needs two arguments to sit between, so this is `false` for a shorter list — which is
+/// what makes the single-argument hug arms safe to leave above the callers' gates.
+///
+/// **Coarse over-check by design**: a raw scan of every gap, because it must catch a blank that
+/// sits *past* a same-line trailing comment, which the emitters' per-gap `blank_scan_end` measure
+/// would clamp away. The two intentionally differ and are not shared.
+///
+/// ⚠️ A caller whose construct prettier prints WITHOUT `printCallArguments` must exclude it
+/// itself: a **test call** is joined by `printCallExpression` directly, so it has no
+/// `anyArgEmptyLine` at all (see `call_formatting.rs`, which asks `is_test_call` — the callee, not
+/// the layout).
+pub(crate) fn any_arg_empty_line(
+    arguments: &[internal::Expression<'_>],
+    printer: &Printer<'_>,
+) -> bool {
+    arguments
+        .windows(2)
+        .any(|pair| printer.is_next_line_empty(pair[0].span().end, pair[1].span().start))
+}
+
 /// Check if the gap between two source positions contains only whitespace and parens,
 /// with the first paren on the same line as `start`.
 ///

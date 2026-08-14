@@ -8,9 +8,9 @@ use super::super::{
     has_multiline_content, is_curried_arrow_chain,
 };
 use super::arg_comments::{
-    PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
-    first_arg_has_any_comments, has_inter_argument_comments, has_trailing_comments_on_args,
-    last_arg_has_comments, should_force_expansion_for_comments,
+    PartitionedComments, any_arg_empty_line, any_comment_forces_expansion,
+    build_after_comma_leading_comments, first_arg_has_any_comments, has_inter_argument_comments,
+    has_trailing_comments_on_args, last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_concise_numeric_array,
@@ -28,7 +28,9 @@ use super::arg_wrapping::{
 };
 use super::call_paren_open;
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
-use super::test_patterns::{build_test_callee_flat_doc, test_call_flat_layout_applies};
+use super::test_patterns::{
+    build_test_callee_flat_doc, is_test_call, test_call_flat_layout_applies,
+};
 use crate::ast::internal;
 use crate::printer::CommentVec;
 use crate::printer::expressions::functions::{
@@ -220,6 +222,74 @@ pub(super) fn build_call_doc_with_wrapping(
     let arg_trailing_line_comment =
         call_has_comments && has_trailing_comments_on_args(call, printer);
 
+    // Prettier's `anyArgEmptyLine` (`print/call-arguments.js`): an author blank line in ANY
+    // inter-argument gap forces `allArgsBrokenOut()` — and that test sits ABOVE
+    // `shouldExpandFirstArg` / `shouldExpandLastArg`, so the blank defeats every specialized
+    // layout rather than being asked about after one has been chosen. tsv used to ask it only
+    // at the bottom of this dispatcher, below every early return, so the blank survived a
+    // plain argument list and was silently eaten by each hug / expand / composition path — the
+    // blank-DROP class (docs/blank_audit.md), invisible to every gate but a prettier compare.
+    // Hoisted here as a DECLINE conjunct on those arms rather than as an early return, so a
+    // call whose gaps also hold comments still reaches `build_call_with_arg_comments` (which
+    // owns the blank question for a commented gap) — the same shape as
+    // `arg_trailing_line_comment` above, and what keeps `build_call_args_with_blank_lines`'s
+    // "no inter-arg comments here" invariant true.
+    //
+    // ⚠️ A **test call has no `anyArgEmptyLine`**, and the predicate is `is_test_call` — the
+    // CALLEE — not `test_call_flat_layout_applies`, the layout that fired above. Prettier's
+    // `printCallExpression` takes its `isTestCall` branch unconditionally and joins the
+    // arguments itself, so `printCallArguments` (and with it `anyArgEmptyLine`) is never
+    // reached for one; tsv's flat layout additionally DECLINES when an argument gap holds a
+    // comment it has no emitter for (the sanctioned divergence pinned by
+    // `test_call_arg_comment_prettier_divergence`). Keying the blank on the layout would let
+    // a declined test call keep the blank, and that is not idempotent: pass 1 glues the
+    // own-line comment to its argument, which makes the flat layout apply on pass 2, which
+    // drops the blank again. Keying it on the callee gives both passes the same answer —
+    // prettier's — and `blanks:audit` caught exactly this as three NON-IDEMPOTENT shapes.
+    let any_arg_empty_line =
+        !is_test_call(call, printer) && any_arg_empty_line(call.arguments, printer);
+
+    // A trailing BLOCK comment on the last argument — the block twin of the predicate above,
+    // disqualifying the hug arms the same way. Computed here rather than at the first hug
+    // because the blank gate below hands it to `build_call_with_arg_comments`; it is pure and
+    // already short-circuited by `call_has_comments`, so hoisting it costs nothing.
+    let has_trailing_block_comment = call_has_comments
+        && call.arguments.last().is_some_and(|last_arg| {
+            printer
+                .comments_on_page_between(last_arg.span().end, call.span.end)
+                .any(|c| c.is_block)
+        });
+
+    // Prettier's POSITION for `anyArgEmptyLine` — it short-circuits to `allArgsBrokenOut()`
+    // above every specialized layout. ONE site rather than a decline conjunct on each arm, so
+    // a layout added below cannot forget to ask; the two forms are equivalent because every
+    // arm this jumps over is either single-argument (a blank needs two arguments to sit
+    // between, so the question is vacuous there) or would have declined on the blank anyway.
+    //
+    // WHICH builder owns it is the gaps' answer, not this gate's: a commented gap belongs to
+    // `build_call_with_arg_comments`, which carries the blank through its own per-gap
+    // emitters, and only a comment-free one reaches `build_call_args_with_blank_lines` —
+    // whose "no inter-argument comments here" invariant is exactly what this fallback states.
+    if any_arg_empty_line {
+        return build_call_with_arg_comments(
+            printer,
+            call,
+            callee,
+            paren_open,
+            has_trailing_block_comment,
+            call_has_comments,
+        )
+        .unwrap_or_else(|| {
+            build_call_args_with_blank_lines(
+                printer,
+                callee,
+                call.arguments,
+                paren_open,
+                call.span.end,
+            )
+        });
+    }
+
     // Module path calls that should not break at arguments (e.g., require.resolve)
     // Keep the call on one line; let assignment/parent break instead
     if is_module_path_no_break(call, printer) && !arg_trailing_line_comment {
@@ -263,13 +333,6 @@ pub(super) fn build_call_doc_with_wrapping(
     // - Block arrows stay hugged if first line fits, wrap if it doesn't
     // - Expression arrows use width-aware group (wrap when exceeds line limit)
     // Skip hugging if there are trailing comments - let comment handling block handle it
-    // Note: Check both trailing line comments AND trailing block comments
-    let has_trailing_block_comment = call_has_comments
-        && call.arguments.last().is_some_and(|last_arg| {
-            printer
-                .comments_on_page_between(last_arg.span().end, call.span.end)
-                .any(|c| c.is_block)
-        });
     if call.arguments.len() == 1
         && !arg_trailing_line_comment
         && !has_trailing_block_comment
@@ -326,10 +389,11 @@ pub(super) fn build_call_doc_with_wrapping(
     // "Expand first arg" pattern: when first arg is a function with block body
     // and remaining args are short, hug the function and put tail args after closing }
     // e.g., setTimeout(() => { tick(); }, 100);
-    if should_expand_first_arg(printer, call.arguments)
-        && !arg_trailing_line_comment
-        && !(call_has_comments && first_arg_has_any_comments(call.arguments, printer, paren_open))
-    {
+    // The inline tail can carry neither a comment running to EOL nor one leading the first
+    // argument. Named rather than inlined, matching the `new` twin.
+    let expand_first_blocked = arg_trailing_line_comment
+        || (call_has_comments && first_arg_has_any_comments(call.arguments, printer, paren_open));
+    if should_expand_first_arg(printer, call.arguments) && !expand_first_blocked {
         let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
 
         // Build tail args (everything after first), carrying any inline block comment
@@ -422,31 +486,6 @@ pub(super) fn build_call_doc_with_wrapping(
         call_has_comments,
     ) {
         return doc;
-    }
-
-    // Check for blank lines between arguments (forces expansion and preservation).
-    // NOTE: This path is only reached when has_inter_arg_comments is false (the
-    // comment-handling path above returns early). No comment handling needed here.
-    // Coarse over-check: a raw scan of every gap (it must catch a blank that sits
-    // *past* a same-line trailing comment, which the emitter's per-gap `blank_scan_end`
-    // measure would clamp away — so the two intentionally differ and are not shared).
-    let has_blank_lines = call
-        .arguments
-        .windows(2)
-        .any(|window| printer.is_next_line_empty(window[0].span().end, window[1].span().start));
-
-    if has_blank_lines {
-        // Build arguments with blank line preservation (forced expansion).
-        // The shared builder's comment branches never fire here: the comment
-        // handling path above returns early when any inter-arg comments exist —
-        // so its `(`-line run stays empty and the wrap it applies is the plain one.
-        return build_call_args_with_blank_lines(
-            printer,
-            callee,
-            call.arguments,
-            paren_open,
-            call.span.end,
-        );
     }
 
     // Build args with line separators (one per line when broken)

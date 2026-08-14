@@ -50,7 +50,7 @@ pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_com
 use super::Printer;
 use super::chain;
 use crate::ast::internal;
-use arg_comments::{any_comment_forces_expansion, last_arg_has_comments};
+use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
 use tsv_lang::doc::arena::DocId;
 
@@ -121,10 +121,7 @@ impl<'a> Printer<'a> {
                         | internal::Expression::ObjectExpression(_)
                 )
             });
-            let has_blank_lines_between_args = call
-                .arguments
-                .windows(2)
-                .any(|w| self.is_next_line_empty(w[0].span().end, w[1].span().start));
+            let any_arg_empty_line = any_arg_empty_line(call.arguments, self);
             let paren_open = call.callee.span().end;
             // Whole-call comment-presence gate (one binary search over the argument
             // window); short-circuits the comment predicates below and threads into
@@ -137,7 +134,7 @@ impl<'a> Printer<'a> {
             let call_has_comments = self.has_comments_on_page_between(paren_open, call.span.end);
             if call.arguments.len() >= 2
                 && call.arguments.last().is_some_and(is_block_function)
-                && !has_blank_lines_between_args
+                && !any_arg_empty_line
                 && !(call_has_comments && any_comment_forces_expansion(call, self, paren_open))
                 && !(call_has_comments
                     && last_arg_has_comments(call.arguments, self, call.span.end, paren_open))

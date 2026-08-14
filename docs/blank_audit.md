@@ -92,10 +92,20 @@ list rather than shrinking it:
 
 ⚠️ **A class that reads ABSORBS on its canonical example is not cleared.** The key is one node-edge
 class but the reproducer is one *textual shape*, and a class routinely spans many — an inline
-comment, a glued run, an own-line run all key the same line. So the sweep under-reports (a fix can
-clear several classes while flagging one), and, in the other direction, **a line does not go stale
-until NO injection at that edge absorbs** — a real fix will often leave its line in place, which is
-correct and must not be "corrected" with `blanks:audit:update`.
+comment, a glued run, an own-line run all key the same line. So a sweep over the per-class
+reproducers under-reports (a fix can clear several classes while flagging one), and, in the other
+direction, **a line does not go stale until NO injection at that edge absorbs** — a real fix will
+often leave its line in place, which is correct and must not be "corrected" with
+`blanks:audit:update`.
+
+**`--json` therefore carries the real work-list**: `absorb_variants`, one row per
+`(class, `[site shape](#reading-a-finding)`)` pair rather than per class, each with its own
+reproducer (`class`, `shape`, `path`, `offset`, `snippet`). Over `tests/fixtures` that is ~14.8k
+rows against 530 classes, and the difference is not academic — the first per-class sweep of the
+pin graded 10 divergences where the per-shape sweep of the same corpus graded 404. `--report`'s
+per-class rows carry the pair count in a `[N shapes]` column, so a class whose reproducer reads
+ABSORBS still shows how much of it that one reading covered. The pin file itself stays keyed by
+class: the variants are a triage view, never pinned.
 
 **What it still cannot see**: a drop at a gap the site enumeration never injects — the sites come
 from `code_regions` (JS spans), so a Svelte **template-text** gap (where #759 itself lived) is
