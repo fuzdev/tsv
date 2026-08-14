@@ -148,7 +148,7 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202 };
  * code-range heuristic reads it as a parser rejection it is not. `accept_parity` is unmoved by
  * design — a file tsc's baseline calls invalid was never in that bucket.
  */
-export const TS_REPO_PINS = { scanned: 13708, accept_parity: 12284, over_acceptance: 488 };
+export const TS_REPO_PINS = { scanned: 13708, accept_parity: 12284, over_acceptance: 487 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
