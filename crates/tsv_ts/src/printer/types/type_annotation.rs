@@ -120,19 +120,12 @@ impl<'a> Printer<'a> {
                     // alias RHS (`build_union_value_doc`). Exactly one of the two
                     // prints the run.
                     let (type_doc, run_handed) = self.build_union_value_doc(colon_end, u);
-                    // Comments between `:` and the union type (e.g., `: /* c */ A | B`);
-                    // omit the empty child on the comment-free common path. Byte-identical.
-                    let hung = if gap_has_comments && !run_handed {
-                        let comments_doc = self.build_comments_between(
-                            colon_end,
-                            type_start,
-                            CommentSpacing::Trailing,
-                        );
-                        d.concat(&[comments_doc, type_doc])
-                    } else {
-                        type_doc
-                    };
-                    d.concat(&[d.text(":"), hang_after_operator(d, hung)])
+                    self.hang_annotation_union_doc(
+                        colon_end,
+                        type_start,
+                        type_doc,
+                        gap_has_comments && !run_handed,
+                    )
                 }
                 TSType::Intersection(i) => {
                     // Build intersection with proper indentation for type annotation context:
@@ -246,6 +239,37 @@ impl<'a> Printer<'a> {
         parts.push(self.build_comments_between(colon_end, type_start, CommentSpacing::Trailing));
         parts.push(self.build_type_doc(ty));
         d.concat(&parts)
+    }
+
+    /// Emit `: <run?><union>` with the gap's unclaimed run riding INSIDE the hang
+    /// group via the value-gap leading emitter, so each comment's separator (space /
+    /// soft `line` / hardline — `push_leading_comment_run`'s three-way rule)
+    /// materializes exactly when the `:` seam breaks: a glued run keeps its bytes
+    /// and rides down glued, a broke-after run's soft `line` drops the union below
+    /// it, and an own-line run's hardline holds its authored line and forces the
+    /// hang open. Emitted outside the group (the former `Trailing` glue), the soft
+    /// and hard separators were invisible to it — an own-line run got welded back
+    /// onto the union's head, which is not a fixed point.
+    ///
+    /// The one emission for both annotation union arms (simple + wrapping);
+    /// `gap_run` is the caller's "unclaimed to-emit run in the gap" answer
+    /// (`has_comments && !run_handed` — hazard 3's exactly-one-printer split with
+    /// `build_union_value_doc`), so the comment-free common path carries no empty
+    /// child.
+    fn hang_annotation_union_doc(
+        &self,
+        colon_end: u32,
+        type_start: u32,
+        type_doc: DocId,
+        gap_run: bool,
+    ) -> DocId {
+        let d = self.d();
+        let hung = if gap_run {
+            self.prepend_rhs_comments(type_doc, colon_end, type_start)
+        } else {
+            type_doc
+        };
+        d.concat(&[d.text(":"), hang_after_operator(d, hung)])
     }
 
     /// Build type annotation doc with width-aware type argument wrapping.
@@ -378,16 +402,22 @@ impl<'a> Printer<'a> {
             // `comments_doc` then stays `None` so exactly one of the two prints the
             // run.
             let (type_doc, run_handed) = self.build_union_value_doc(colon_end, u);
+            let gap_run = has_comments && !run_handed;
 
-            // Comments between `:` and the union type (e.g., `: /* c */ A | B`). `None`
-            // on the comment-free path, so the concats below carry no empty child.
-            let comments_doc = if has_comments && !run_handed {
-                self.build_inline_comments_between_doc_trailing_space_opt(
-                    colon_end,
-                    value_type_start,
-                )
-            } else {
-                None
+            // Glued comments between `:` and the union (`: /* c */ A | B`), for the
+            // two hug paths below — their layouts never synthesize the break the
+            // hang emission's soft separators key on. Built lazily: the hang path
+            // routes the run through `hang_annotation_union_doc` instead, and the
+            // comment-free common path carries no empty child.
+            let comments_doc = || {
+                gap_run
+                    .then(|| {
+                        self.build_inline_comments_between_doc_trailing_space_opt(
+                            colon_end,
+                            value_type_start,
+                        )
+                    })
+                    .flatten()
             };
 
             // A brace-hugging union return (`{ … } | null` / `| void`) hugs `:`
@@ -400,7 +430,7 @@ impl<'a> Printer<'a> {
             // `union_prints_hugged` branch below), and any comment that makes the printer
             // decline the hug disqualifies it here too.
             if self.union_return_hugs(value_type, colon_end, value_type_start) {
-                return match comments_doc {
+                return match comments_doc() {
                     Some(c) => d.concat(&[d.text(": "), c, type_doc]),
                     None => d.concat(&[d.text(": "), type_doc]),
                 };
@@ -416,7 +446,7 @@ impl<'a> Printer<'a> {
                 // directly, which correctly handles nested hardlines (returns true).
                 // State 0: `: Promise<…> | null` (inline, no break after colon)
                 // State 1: `:\n  Promise<…> | null` (break after colon, for long names)
-                return match comments_doc {
+                return match comments_doc() {
                     Some(c) => d.conditional_group(&[
                         d.concat(&[d.text(": "), c, type_doc]),
                         d.concat(&[d.text(":"), d.indent_line(d.concat(&[c, type_doc]))]),
@@ -428,12 +458,7 @@ impl<'a> Printer<'a> {
                 };
             }
 
-            let hung = match comments_doc {
-                Some(c) => d.concat(&[c, type_doc]),
-                None => type_doc,
-            };
-            let union_group = hang_after_operator(d, hung);
-            return d.concat(&[d.text(":"), union_group]);
+            return self.hang_annotation_union_doc(colon_end, value_type_start, type_doc, gap_run);
         }
 
         // Handle Intersection types - first member hugs `:`, continuations indented.

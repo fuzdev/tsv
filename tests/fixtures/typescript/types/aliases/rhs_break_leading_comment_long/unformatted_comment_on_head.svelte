@@ -33,20 +33,16 @@
 
 	// An own-line run above a relocated RHS is a second stable form beside the glued
 	// ride-down above: the reference renders below the run.
-	type R2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx =
-		/* c */
-		SomeVeryLongTypeReferenceNameThatForcesTheRhsBelowTheEqualsSign;
+	type R2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = /* c */
+	SomeVeryLongTypeReferenceNameThatForcesTheRhsBelowTheEqualsSign;
 
 	// Same for a conditional whose head overflows the `=` line: head and branches
 	// render below the own-line run.
-	type C2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx =
-		/* c */
-		Param extends Ccccccccccccccccccccccccccccccc ? Tnnnnnnnnn : Fnnnnnnnnn;
+	type C2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = /* c */
+	Param extends Ccccccccccccccccccccccccccccccc ? Tnnnnnnnnn : Fnnnnnnnnn;
 
 	// Same for an intersection too wide for the continuation line: the first member
 	// renders below the own-line run and continuation members indent one deeper.
-	type I2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx =
-		/* c */
-		Mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm &
-			Nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn;
+	type I2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = /* c */
+	Mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm & Nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn;
 </script>

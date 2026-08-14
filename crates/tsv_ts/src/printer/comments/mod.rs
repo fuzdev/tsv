@@ -1711,11 +1711,14 @@ impl<'a> Printer<'a> {
     /// soft `line`. Prettier gets the materialization free from `propagateBreaks`
     /// (the value's hard break marks every enclosing group broken, so the `line`
     /// renders as a break); tsv has no `propagateBreaks`, so the caller asks
-    /// `will_break` of the value doc and routes here only when it holds — which is
-    /// why the final separator is a (blank-preserving) `hardline` rather than a
-    /// `line` whose mode this seam cannot see. A value that FITS collapses the
-    /// `line` to a space in both formatters, so the caller's glued path already
-    /// renders that case.
+    /// `will_break` of the value doc and routes here only when it holds — the
+    /// final separator is a (blank-preserving) `hardline` because the break is
+    /// already forced, and forced is what lets it carry an author blank. The
+    /// width-driven half of the same rule — no hard break, the seam itself
+    /// deciding — is [`hang_after_operator_run_doc`](Self::hang_after_operator_run_doc),
+    /// whose soft `line` rides the seam's own hang group and absorbs the blank
+    /// with the unforced break. A value that FITS collapses the `line` to a space
+    /// in both formatters, so the caller's glued path already renders that case.
     ///
     /// The run's interior takes the single leading-run emitter
     /// ([`push_leading_comment_run`](Self::push_leading_comment_run)) — glue,
@@ -1726,12 +1729,27 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_leading_run_before_breaking_value(
         &self,
         parts: &mut DocBuf,
-        comments: &[&Comment],
+        comments: &[&'a Comment],
         value_start: u32,
     ) {
-        let Some((last, interior)) = comments.split_last() else {
-            return;
-        };
+        if let Some(last) = self.push_breaking_value_run_body(parts, comments) {
+            self.push_blank_preserving_hardline(parts, last.span.end, value_start);
+        }
+    }
+
+    /// Push a broke-after run's interior (via the single leading-run emitter) and
+    /// its last comment, leaving the final separator toward the value to the
+    /// caller — the shared body of
+    /// [`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
+    /// (a blank-preserving hardline) and
+    /// [`hang_after_operator_run_doc`](Self::hang_after_operator_run_doc) (a soft
+    /// `line`). Returns the last comment so the caller can anchor that separator.
+    fn push_breaking_value_run_body(
+        &self,
+        parts: &mut DocBuf,
+        comments: &[&'a Comment],
+    ) -> Option<&'a Comment> {
+        let (last, interior) = comments.split_last()?;
         self.push_leading_comment_run(
             parts,
             interior.iter().copied(),
@@ -1740,15 +1758,16 @@ impl<'a> Printer<'a> {
             self.d().empty(),
         );
         parts.push(self.build_comment_doc(last));
-        self.push_blank_preserving_hardline(parts, last.span.end, value_start);
+        Some(last)
     }
 
-    /// The `=`-seam emission for a [`Self::breaking_value_leading_run`] hit —
-    /// prettier's break-after-operator body, everything after the operator in one
-    /// indent: a hardline, the run
+    /// The `=`-seam emission for a broke-after run before a value that **will
+    /// break** — prettier's break-after-operator body, everything after the
+    /// operator in one indent: a hardline, the run
     /// ([`Self::push_leading_run_before_breaking_value`]), then the value. The
-    /// type-alias and variable-declarator `=` arms share it; the `:` seam emits
-    /// the run un-indented on the caller's own line instead and does not.
+    /// type-alias, variable-declarator, and assignment-expression `=` seams share
+    /// it; the `:` seam emits the run un-indented on the caller's own line
+    /// instead and does not.
     pub(crate) fn break_after_operator_run_doc(
         &self,
         run: &[&Comment],
@@ -1763,15 +1782,49 @@ impl<'a> Printer<'a> {
         d.indent(d.concat(&indent_content))
     }
 
-    /// The gate for
-    /// [`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value):
-    /// `Some((run, value_doc))` when the `[gap_start, value_start)` gap holds a
-    /// block-only leading run whose last comment the author broke after, and the
-    /// value doc (built here, via the caller's builder) will break. Anything else —
-    /// an empty gap, a line comment (those routes own their own mandatory-break
-    /// layouts), a glued last comment, a value that fits — declines, and the caller
-    /// keeps its glued path, whose flat render is the same bytes prettier's
-    /// collapsed `line` produces.
+    /// The width-keyed sibling of [`Self::break_after_operator_run_doc`], for a
+    /// broke-after run before a value whose doc carries NO hard break: the run,
+    /// its newline-after soft `line`, and the value inside ONE
+    /// `hang_after_operator` group, so the separator materializes exactly when
+    /// the operator seam itself breaks — prettier's `printLeadingComment` `line`,
+    /// which rides the enclosing assignment group and breaks with it (its
+    /// hard-break half comes free from `propagateBreaks`, and that half is
+    /// [`Self::break_after_operator_run_doc`]'s job here). Flat, the group
+    /// renders the glued bytes (`= /* c */ value`); broken, the run holds its
+    /// own line and the value — its own group — re-fits below
+    /// (`=⏎\t/* c */⏎\tvalue`), exploding further only when that line also
+    /// overflows. An author blank after the run yields with the unforced break
+    /// ([`LeadingGlue::AdjacentValueGap`]'s rule), unlike the hard sibling,
+    /// whose forced break carries it.
+    pub(crate) fn hang_after_operator_run_doc(
+        &self,
+        run: &[&'a Comment],
+        value_doc: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let mut content = DocBuf::new();
+        if self
+            .push_breaking_value_run_body(&mut content, run)
+            .is_some()
+        {
+            content.push(d.line());
+        }
+        content.push(value_doc);
+        layout::hang_after_operator(d, d.concat(&content))
+    }
+
+    /// The geometry half of the broke-after value gate: `Some(run)` when the
+    /// `[gap_start, value_start)` gap holds a block-only leading run whose last
+    /// comment the author broke after. Anything else — an empty gap, a line
+    /// comment (those routes own their own mandatory-break layouts), a glued
+    /// last comment — declines, and the caller keeps its glued path, whose flat
+    /// render is the same bytes prettier's collapsed `line` produces. Asks
+    /// nothing of the value doc: the caller pairs a hit with
+    /// [`Self::break_after_operator_run_doc`] when the value `will_break` (the
+    /// hard materialization) and with [`Self::hang_after_operator_run_doc`]
+    /// otherwise (the width-keyed one); a caller whose other layouts already
+    /// render the width-driven case takes the combined
+    /// [`Self::breaking_value_leading_run`] instead.
     ///
     /// ⚠️ The broke-after question is asked against the **physical** next thing in
     /// the gap, not the emit-set's view of it: an OWNED comment glued to the value
@@ -1781,12 +1834,11 @@ impl<'a> Printer<'a> {
     /// run, and the owned multiline block's own newlines answer `will_break` for a
     /// value prettier keeps flat (its `fits` stops at the first newline in comment
     /// text). Any owned comment between the run and the value therefore declines.
-    pub(crate) fn breaking_value_leading_run(
+    pub(crate) fn broke_after_value_leading_run(
         &self,
         gap_start: u32,
         value_start: u32,
-        build_value: impl FnOnce() -> DocId,
-    ) -> Option<(CommentVec<'a>, DocId)> {
+    ) -> Option<CommentVec<'a>> {
         let comments: CommentVec<'a> =
             comments_to_emit_in_range(self.comments, gap_start, value_start).collect();
         let last = comments.last()?;
@@ -1796,6 +1848,24 @@ impl<'a> Printer<'a> {
         {
             return None;
         }
+        Some(comments)
+    }
+
+    /// [`Self::broke_after_value_leading_run`] plus the hard-break question:
+    /// `Some((run, value_doc))` only when the value doc (built here, via the
+    /// caller's builder) **will break** — the gate for
+    /// [`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
+    /// at the seams whose remaining layouts already render the width-driven case
+    /// (the declarator and assignment-expression `=`, the simple `:`
+    /// annotation). A value that fits declines, and the caller keeps its glued
+    /// path.
+    pub(crate) fn breaking_value_leading_run(
+        &self,
+        gap_start: u32,
+        value_start: u32,
+        build_value: impl FnOnce() -> DocId,
+    ) -> Option<(CommentVec<'a>, DocId)> {
+        let comments = self.broke_after_value_leading_run(gap_start, value_start)?;
         let value_doc = build_value();
         if self.d().will_break(value_doc) {
             Some((comments, value_doc))
