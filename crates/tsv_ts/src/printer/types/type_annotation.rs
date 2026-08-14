@@ -114,10 +114,15 @@ impl<'a> Printer<'a> {
             // (prettier strips them too); other parens keep the `_` fall-through.
             match self.unwrap_redundant_parens(ty) {
                 TSType::Union(u) => {
-                    let type_doc = self.build_union_type_doc(u);
+                    // A glued block run between `:` and a union with no authored
+                    // leading `|` is handed INTO the union, which binds it to the
+                    // first member after its synthesized `| ` — the same seam as the
+                    // alias RHS (`build_union_value_doc`). Exactly one of the two
+                    // prints the run.
+                    let (type_doc, run_handed) = self.build_union_value_doc(colon_end, u);
                     // Comments between `:` and the union type (e.g., `: /* c */ A | B`);
                     // omit the empty child on the comment-free common path. Byte-identical.
-                    let hung = if gap_has_comments {
+                    let hung = if gap_has_comments && !run_handed {
                         let comments_doc = self.build_comments_between(
                             colon_end,
                             type_start,
@@ -205,21 +210,41 @@ impl<'a> Printer<'a> {
         // annotations are one of the most frequent TS constructs, so a wasted child here
         // (walked by render + every fits pass) is ubiquitous. Byte-identical: the gap is
         // comment-free, so the comment doc would be `empty()`.
-        if gap_has_comments {
+        if !gap_has_comments {
+            parts.push(self.build_type_doc(ty));
+            return d.concat(&parts);
+        }
+        // A glued format-ignore directive in the gap freezes a non-composite type
+        // verbatim (`let v: /* format-ignore */ {x:   1}` — the directive itself is
+        // emitted inline; own-line directives took the own-line branch).
+        if self.single_child_frozen(colon_end, ty) {
             parts.push(self.build_comments_between(
                 colon_end,
                 type_start,
                 CommentSpacing::Trailing,
             ));
-        }
-        // A glued format-ignore directive in the gap freezes a non-composite type
-        // verbatim (`let v: /* format-ignore */ {x:   1}` — the directive itself was
-        // just emitted inline above; own-line directives took the own-line branch).
-        if gap_has_comments && self.single_child_frozen(colon_end, ty) {
             parts.push(self.build_frozen_single_child_doc(ty));
-        } else {
-            parts.push(self.build_type_doc(ty));
+            return d.concat(&parts);
         }
+        // A block run the author broke AFTER, before a type that actually breaks
+        // (`let x: /* c */⏎{ …multiline… }`): the run keeps the head line and the
+        // type opens on the next, un-indented — prettier's `printLeadingComment`
+        // newline-after `line`, materialized by the type's own break (the
+        // annotation adds no indent group, so the type lands at the statement's
+        // level). A type that FITS collapses that `line` to a space in both
+        // formatters — the glued path below. The gate is the shared
+        // [`Printer::breaking_value_leading_run`] — including its physical-next
+        // decline, so an OWNED comment glued to the type keeps the glued path here
+        // exactly as it does at the `=` seams.
+        if let Some((run, type_doc)) =
+            self.breaking_value_leading_run(colon_end, type_start, || self.build_type_doc(ty))
+        {
+            self.push_leading_run_before_breaking_value(&mut parts, &run, type_start);
+            parts.push(type_doc);
+            return d.concat(&parts);
+        }
+        parts.push(self.build_comments_between(colon_end, type_start, CommentSpacing::Trailing));
+        parts.push(self.build_type_doc(ty));
         d.concat(&parts)
     }
 
@@ -347,11 +372,16 @@ impl<'a> Printer<'a> {
 
         // Handle Union types - break after colon with indent when long
         if let TSType::Union(u) = value_type {
-            let type_doc = self.build_union_type_doc(u);
+            // A glued block run between `:` and a union with no authored leading `|`
+            // is handed INTO the union — the same value seam as the alias RHS and the
+            // simple-annotation arm (`build_union_value_doc`); the caller-side
+            // `comments_doc` then stays `None` so exactly one of the two prints the
+            // run.
+            let (type_doc, run_handed) = self.build_union_value_doc(colon_end, u);
 
             // Comments between `:` and the union type (e.g., `: /* c */ A | B`). `None`
             // on the comment-free path, so the concats below carry no empty child.
-            let comments_doc = if has_comments {
+            let comments_doc = if has_comments && !run_handed {
                 self.build_inline_comments_between_doc_trailing_space_opt(
                     colon_end,
                     value_type_start,
