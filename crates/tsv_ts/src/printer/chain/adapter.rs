@@ -6,7 +6,7 @@
 // their only implementor.
 
 use crate::ast::internal;
-use crate::printer::{CommentSpacing, Printer, comments_to_emit_in_range};
+use crate::printer::{CommentSpacing, Printer, RunLeadingBlank, comments_to_emit_in_range};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment, Span};
@@ -53,10 +53,11 @@ impl<'a> Printer<'a> {
     ///
     /// tsv keeps such a comment INSIDE the parens, where it was written; prettier
     /// relocates it past the `)` (cataloged as the non-null grouped-operand
-    /// divergences). Two callers reach the same gap and must answer it identically:
-    /// the chain's parenthesized base (`ChainNode::Base`'s `paren_comment_end`) and
-    /// the required-paren positions that never enter a chain — a `new` callee and a
-    /// template tag (`build_sealed_non_null_paren_doc`).
+    /// divergences). Three callers reach the same gap and must answer it identically:
+    /// the standalone non-null whose operand needs its parens (`build_non_null_doc`'s
+    /// needs-parens arm), the chain's parenthesized base (`ChainNode::Base`'s
+    /// `paren_comment_end`), and the required-paren positions that never enter a
+    /// chain — a `new` callee and a template tag (`build_sealed_non_null_paren_doc`).
     ///
     /// Returns `None` when the gap holds nothing to emit, leaving the caller to
     /// render its own bare parens.
@@ -75,25 +76,21 @@ impl<'a> Printer<'a> {
         close: &'static str,
     ) -> Option<DocId> {
         let d = self.arena();
-        let classified = self.classify_comments(start, end);
-        if classified.has_line_comments() {
-            let leading_block = self.build_chain_leading_comments_doc(&classified.leading_block);
-            let leading_line = self.build_chain_leading_comments_doc(&classified.leading_line);
-            let trailing_block = self.build_trailing_block_doc(&classified.trailing_block);
-            // No boundary: the layout's own `hardline` before `)` flushes the suffix,
-            // and a boundary would end the line first, landing a blank between the
-            // comment and the closer.
-            let trailing_line = self.build_deferred_line_comments_doc(&classified.trailing_line);
+        if self.has_line_comments_between(start, end) {
+            // Every comment in this gap was authored AFTER the operand — there is no
+            // next node for one to lead — so the whole run trails, in authored order,
+            // on the anchored emitter (the layout is vertical: the closer's hardline
+            // below ends every line, and flushes the run's deferred `//`s; a boundary
+            // instead would end the line first, landing a blank before the closer).
+            // A chain-gap classification here is a category error: its `leading_*`
+            // buckets would hoist an own-line comment above the operand.
+            let mut inner = DocBuf::with_capacity(4);
+            inner.push(d.hardline());
+            inner.push(broken_body);
+            self.push_anchored_trailing_run(&mut inner, start, end, RunLeadingBlank::Keep);
             return Some(d.concat(&[
                 d.text("("),
-                d.indent(d.concat(&[
-                    d.hardline(),
-                    leading_block,
-                    leading_line,
-                    broken_body,
-                    trailing_block,
-                    trailing_line,
-                ])),
+                d.indent(d.concat(&inner)),
                 d.hardline(),
                 d.text(close),
             ]));
