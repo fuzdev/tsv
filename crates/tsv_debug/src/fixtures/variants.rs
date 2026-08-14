@@ -68,6 +68,16 @@ impl StableFormMarker {
             Self::OursNotIdempotent | Self::OursRejects => None,
         }
     }
+
+    /// Does a prettier-STABLE form with this classification require the chain pin
+    /// (`audit_signature_<suffix>.txt`)? Only `OursRejects`: every single-form marker
+    /// asserts something about `ours(V)`, so none is reachable there. `OursNotIdempotent`
+    /// deliberately answers NO — that is a tsv bug, and pinning the chain would paper
+    /// over it. One predicate for the two askers — the updater's `needs_chain_pin`
+    /// (writing side) and N10's blocking arm (absence side) — so they cannot drift.
+    pub const fn requires_chain_pin(self) -> bool {
+        matches!(self, Self::OursRejects)
+    }
 }
 
 /// Classify a prettier-stable form `V` by what our formatter does with it.
@@ -168,6 +178,24 @@ pub struct FixtureFiles {
 }
 
 impl FixtureFiles {
+    /// The three intermediate lists paired with their filename prefixes — the one table
+    /// for callers that walk "every intermediate kind" (`SingleFormPins::collect`, the
+    /// updater's orphan sweep), so a fourth kind cannot be added to one walker and
+    /// silently missed by another.
+    pub fn intermediate_kinds(&self) -> [(&Vec<String>, &'static str); 3] {
+        [
+            (&self.prettier_intermediate, "prettier_intermediate_"),
+            (
+                &self.prettier_intermediate_to_variant,
+                "prettier_intermediate_to_variant_",
+            ),
+            (
+                &self.prettier_intermediate_to_divergent_variant,
+                "prettier_intermediate_to_divergent_variant_",
+            ),
+        ]
+    }
+
     /// Scan the fixture directory once and partition entries by filename.
     pub fn scan(fixture: &Fixture) -> Self {
         let ext = fixture.input_type().extension();
@@ -351,6 +379,19 @@ mod tests {
         assert_eq!(bucket_of("unformatted_x.svelte", ".svelte.ts"), None);
         assert_eq!(bucket_of("unformated_typo.svelte", ".svelte"), None);
         assert_eq!(bucket_of("notes.svelte", ".svelte"), None);
+    }
+
+    /// Only `OursRejects` requires the chain pin: a formattable stable form takes a
+    /// single-form marker instead, and `OursNotIdempotent` is a tsv bug a pin would
+    /// paper over. The updater's `needs_chain_pin` and N10's blocking arm both ride
+    /// this predicate, so its answer set is pinned here.
+    #[test]
+    fn only_ours_rejects_requires_the_chain_pin() {
+        assert!(StableFormMarker::OursRejects.requires_chain_pin());
+        assert!(!StableFormMarker::PrettierVariant.requires_chain_pin());
+        assert!(!StableFormMarker::Variant.requires_chain_pin());
+        assert!(!StableFormMarker::DivergentVariant.requires_chain_pin());
+        assert!(!StableFormMarker::OursNotIdempotent.requires_chain_pin());
     }
 
     #[test]

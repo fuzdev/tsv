@@ -5,12 +5,14 @@ use std::collections::{HashMap, HashSet};
 use crate::deno::run_prettier;
 use crate::diff;
 use crate::fixtures::{
-    self, AuditSignature, ChainAnchor, Fixture, FixtureFiles, SingleFormPins, StableFormMarker,
+    self, AuditSignature, ChainAnchor, ChainWalk, Fixture, FixtureFiles, SingleFormPins,
     audit_signature_variant_suffix, classify_stable_form, read_file, unformatted_ours_filename,
     unformatted_ours_suffix,
 };
 
-use super::super::errors::{AuditSignatureStaleness, ValidationError, ValidationSuccess};
+use super::super::errors::{
+    AuditSignatureStaleness, UnpinnedChainReason, ValidationError, ValidationSuccess,
+};
 use super::super::{FixtureValidation, UndocumentedPrettierOutput};
 
 /// Find the first `prettier_variant_*` file whose content equals `content`.
@@ -1231,8 +1233,13 @@ async fn validate_n8_unformatted_prettier(
 /// The last word on every `unformatted_ours_*` prettier output: whatever N7/N7b/N7c did not
 /// claim by suffix, N12 did not pin as a chain, and no documented stable form holds
 /// (`SingleFormPins`) is reported here. Blocking when the fixture documents any stable form
-/// at all — an unmatched output then means prettier drifted or the target is undocumented —
-/// and informational when it documents the divergence by README alone.
+/// at all — an unmatched output then means prettier drifted or the target is undocumented.
+/// In a README-only fixture the report splits by what pin the output REQUIRES (the mirror of
+/// the updater's `needs_chain_pin`): a multi-pass chain or a stable form tsv cannot format
+/// has an auto-generated pin as its only expression, so its absence BLOCKS
+/// (`UnpinnedPrettierChain` — a deleted pin must not degrade the claim to a note); a stable
+/// form a single-form marker could express, a tsv non-idempotency, or a truncated chain
+/// stays informational.
 async fn validate_n10_cross_path_discovery(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -1275,24 +1282,69 @@ async fn validate_n10_cross_path_discovery(
             if pins.has_documented_forms() {
                 result.add_error(ValidationError::UndocumentedPrettierOutput(source_file));
             } else {
-                // Name the file to add rather than punting to `fixtures:audit`: the bytes
-                // are in hand and the `ours(V)` test is pure Rust. Only prettier's
-                // idempotence on the output needs the oracle — one pass, and only for an
-                // output that reached this arm, which by construction is rare.
-                let prettier_stable = matches!(
-                    run_prettier(prettier_output, fixture.input_type().prettier_parser()).await,
-                    Ok(second) if second == *prettier_output
-                );
-                let suggested_pin = prettier_stable
-                    .then(|| classify_stable_form(prettier_output, input, &fixture.input_file))
-                    .and_then(StableFormMarker::file_prefix)
-                    .map(|prefix| format!("{prefix}{suffix}{input_ext}"));
-                result
-                    .undocumented_prettier_outputs
-                    .push(UndocumentedPrettierOutput {
-                        source_file,
-                        suggested_pin,
-                    });
+                // The fixture documents no stable form (a README-only divergence). Split by
+                // what prettier's own next pass says — the same classification the updater
+                // uses to decide the required pin (`needs_chain_pin`), asked here from the
+                // ABSENCE side: the two shapes whose only pin is auto-generated
+                // (a multi-pass chain; a stable form tsv cannot format) BLOCK when that pin
+                // is missing, since a deleted `prettier_intermediate*_*` /
+                // `audit_signature_<suffix>.txt` otherwise degrades the claim to a note.
+                // One extra prettier pass, and only for an output that reached this arm,
+                // which by construction is rare.
+                match run_prettier(prettier_output, fixture.input_type().prettier_parser()).await {
+                    Ok(second) if second == *prettier_output => {
+                        // A one-pass-stable output; which pin (if any) can hold it is the
+                        // shared `ours(V)` test.
+                        let marker =
+                            classify_stable_form(prettier_output, input, &fixture.input_file);
+                        match marker.file_prefix() {
+                            Some(prefix) => {
+                                // A single-form marker can express it — deliberately left
+                                // unpinned (N12 declines these so the audit keeps suggesting
+                                // the more informative marker). Name the file to add.
+                                result.undocumented_prettier_outputs.push(
+                                    UndocumentedPrettierOutput {
+                                        source_file,
+                                        suggested_pin: Some(format!("{prefix}{suffix}{input_ext}")),
+                                    },
+                                );
+                            }
+                            None if marker.requires_chain_pin() => {
+                                result.add_error(ValidationError::UnpinnedPrettierChain(
+                                    source_file,
+                                    UnpinnedChainReason::StableFormOursRejects,
+                                ));
+                            }
+                            None => {
+                                // `OursNotIdempotent`: a tsv idempotency bug, not a pin
+                                // choice — pinning the chain would paper over it. Report only.
+                                result.undocumented_prettier_outputs.push(
+                                    UndocumentedPrettierOutput {
+                                        source_file,
+                                        suggested_pin: None,
+                                    },
+                                );
+                            }
+                        }
+                    }
+                    Ok(_) => {
+                        result.add_error(ValidationError::UnpinnedPrettierChain(
+                            source_file,
+                            UnpinnedChainReason::MultiPass,
+                        ));
+                    }
+                    Err(_) => {
+                        // Prettier cannot re-parse its own first pass — a prettier bug the
+                        // fixture's README documents. No pin can represent a truncated
+                        // chain, so none is required. Report only.
+                        result
+                            .undocumented_prettier_outputs
+                            .push(UndocumentedPrettierOutput {
+                                source_file,
+                                suggested_pin: None,
+                            });
+                    }
+                }
             }
         } else {
             pinned += 1;
@@ -1377,8 +1429,8 @@ async fn validate_n12_variant_chain_signatures(
         };
 
         let live = match AuditSignature::walk(&source_content, parser).await {
-            Ok(Some(s)) => s,
-            Ok(None) => {
+            Ok(ChainWalk::Pinned(s)) => s,
+            Ok(ChainWalk::Collapsed) => {
                 // Prettier holds the source itself stable, so there is no chain — the
                 // source is a prettier fixed point and wants a single-form pin instead.
                 result.add_error(ValidationError::VariantChainSignatureOutdated(
@@ -1387,10 +1439,20 @@ async fn validate_n12_variant_chain_signatures(
                 ));
                 continue;
             }
+            Ok(ChainWalk::Truncated { completed, error }) => {
+                // The chain still exists but prettier now errors partway along it — NOT a
+                // collapse, and no regenerate can repair it (the updater refuses a
+                // truncated chain rather than deleting the pin). Investigate.
+                result.add_error(ValidationError::VariantChainSignatureWalkFailed(
+                    signature_name.clone(),
+                    ChainAnchor::UnformattedOurs.truncated_message(completed, &error),
+                ));
+                continue;
+            }
             Err(e) => {
-                // Distinct from `Malformed`: the signature parsed fine, but walking the
-                // live chain failed (prettier error or non-converging chain). Investigate
-                // the failure rather than blindly regenerating.
+                // Distinct from `Malformed`: the signature parsed fine, but the live chain
+                // does not converge within the depth bound. Investigate rather than
+                // regenerate.
                 result.add_error(ValidationError::VariantChainSignatureWalkFailed(
                     signature_name.clone(),
                     e,

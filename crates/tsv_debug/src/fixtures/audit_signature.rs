@@ -115,6 +115,16 @@ impl ChainAnchor {
         }
     }
 
+    /// Render the standard message for a [`ChainWalk::Truncated`] outcome under this
+    /// anchor's numbering: the pass that failed is the one after `completed` successful
+    /// walk passes, and the walk's first pass already carries this anchor's first number.
+    pub fn truncated_message(self, completed: usize, error: &str) -> String {
+        format!(
+            "prettier failed at pass {}: {error}",
+            completed + self.first_pass_number()
+        )
+    }
+
     /// Header lines prepended to a signature file with this anchor.
     const fn header(self) -> &'static str {
         match self {
@@ -167,18 +177,7 @@ impl SingleFormPins {
         let fixture_dir = &fixture.path;
 
         let mut claimed_suffixes: HashSet<String> = HashSet::new();
-        let intermediates: [(&Vec<String>, &str); 3] = [
-            (&files.prettier_intermediate, "prettier_intermediate_"),
-            (
-                &files.prettier_intermediate_to_variant,
-                "prettier_intermediate_to_variant_",
-            ),
-            (
-                &files.prettier_intermediate_to_divergent_variant,
-                "prettier_intermediate_to_divergent_variant_",
-            ),
-        ];
-        for (names, prefix) in intermediates {
+        for (names, prefix) in files.intermediate_kinds() {
             for name in names {
                 let suffix = name
                     .strip_prefix(prefix)
@@ -234,7 +233,8 @@ impl SingleFormPins {
     }
 
     /// Does the fixture document any prettier-stable form at all? When it documents none,
-    /// it makes its case by README alone, which is what keeps N10's report informational.
+    /// it makes its case by README alone, and N10 splits its report by which pin the
+    /// output REQUIRES (blocking only where that pin is auto-generated and missing).
     pub fn has_documented_forms(&self) -> bool {
         !self.known_contents.is_empty()
     }
@@ -270,34 +270,50 @@ pub struct AuditSignature {
     pub passes: Vec<String>,
 }
 
+/// Outcome of walking prettier's chain from an anchor (see [`AuditSignature::walk`]).
+///
+/// `Collapsed` and `Truncated` used to share one `None` reading, and the conflation was a
+/// live mis-remediation: a reader mapping a mid-chain prettier ERROR to "the chain
+/// collapsed" prescribes regenerating — which deletes the signature and, with it, the
+/// multi-pass claim. The two now name themselves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChainWalk {
+    /// Prettier is idempotent on the anchor — there is no chain and no signature is needed.
+    Collapsed,
+    /// The chain reached a fixed point past the anchor; the signature's `passes` are non-empty.
+    Pinned(AuditSignature),
+    /// Prettier errored before the chain reached a fixed point, after `completed` successful
+    /// passes past the anchor (e.g. a fixture documents prettier producing invalid syntax —
+    /// re-running prettier on that captured output reasonably fails). No signature can
+    /// represent such a chain, but an EXISTING signature must not be deleted over it —
+    /// investigate instead.
+    Truncated { completed: usize, error: String },
+}
+
 impl AuditSignature {
-    /// Walk prettier on `start` until reaching a fixed point or `MAX_CHAIN_DEPTH`.
-    ///
-    /// Returns `None` when there's no useful chain to record:
-    /// - Prettier is idempotent on `start` (no signature needed).
-    /// - Prettier errors on `start` or some intermediate step (e.g., a fixture documents
-    ///   prettier producing invalid syntax — re-running prettier on that captured output
-    ///   reasonably fails; we don't pin those chains).
-    ///
-    /// Returns `Err` only when the chain hits `MAX_CHAIN_DEPTH` without converging — that's
-    /// a real escape hatch worth surfacing.
-    pub async fn walk(
-        start: &str,
-        parser: PrettierParser<'_>,
-    ) -> Result<Option<AuditSignature>, String> {
+    /// Walk prettier on `start` until reaching a fixed point, a prettier error, or
+    /// `MAX_CHAIN_DEPTH`. The first two outcomes are data ([`ChainWalk`]); `Err` is reserved
+    /// for the chain hitting `MAX_CHAIN_DEPTH` without converging — the real escape hatch.
+    pub async fn walk(start: &str, parser: PrettierParser<'_>) -> Result<ChainWalk, String> {
         let mut passes = Vec::new();
         let mut current = start.to_string();
         for _ in 0..MAX_CHAIN_DEPTH {
-            let Ok(next) = run_prettier(&current, parser).await else {
-                return Ok(None);
+            let next = match run_prettier(&current, parser).await {
+                Ok(next) => next,
+                Err(e) => {
+                    return Ok(ChainWalk::Truncated {
+                        completed: passes.len(),
+                        error: e.to_string(),
+                    });
+                }
             };
             if next == current {
                 // Reached fixed point.
                 if passes.is_empty() {
                     // Prettier is idempotent on `start` — no signature needed.
-                    return Ok(None);
+                    return Ok(ChainWalk::Collapsed);
                 }
-                return Ok(Some(AuditSignature { passes }));
+                return Ok(ChainWalk::Pinned(AuditSignature { passes }));
             }
             passes.push(next.clone());
             current = next;
@@ -460,8 +476,9 @@ mod tests {
         assert!(!pins.matches_documented_form("anything\n", input));
         assert!(pins.matches_documented_form("stable\n", input));
 
-        // A fixture documenting no stable form makes its case by README alone — what keeps
-        // N10's report informational rather than blocking.
+        // A fixture documenting no stable form makes its case by README alone — what routes
+        // N10 through the absence-side split (blocking only where the output REQUIRES an
+        // auto-generated pin; informational where a single-form marker could express it).
         assert!(pins.has_documented_forms());
         assert!(!SingleFormPins::from_parts(&[], &[]).has_documented_forms());
     }

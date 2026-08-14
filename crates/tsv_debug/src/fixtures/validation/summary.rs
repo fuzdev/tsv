@@ -355,9 +355,10 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
                     let source = &undoc.source_file;
                     println!("    Prettier({source}) produces a novel stable form");
                     // N10 classified it, so state the verdict here. The fallback line still
-                    // points at `fixtures:audit` for the case it can't name — prettier not
-                    // idempotent on the output, where the chain, not a single form, is the
-                    // question.
+                    // points at `fixtures:audit` for the two cases with no file to name —
+                    // tsv non-idempotent on the output (a tsv bug), or prettier erroring
+                    // on its own first pass (a truncated chain). A chain that CONTINUES
+                    // never reaches this note: it blocks as `UnpinnedPrettierChain`.
                     match &undoc.suggested_pin {
                         Some(pin) => {
                             println!("    Pin it: add {pin} holding that output");

@@ -2,7 +2,7 @@
 
 use crate::deno::run_prettier;
 use crate::diff;
-use crate::fixtures::{self, AuditSignature, Fixture, read_file};
+use crate::fixtures::{self, AuditSignature, ChainAnchor, ChainWalk, Fixture, read_file};
 
 use super::super::FixtureValidation;
 use super::super::errors::{AuditSignatureStaleness, ValidationError, ValidationSuccess};
@@ -233,15 +233,29 @@ pub(in crate::fixtures::validation) async fn validate_formatter_prettier(
 /// `output_prettier.*` to its fixed point. This catches drift that F2 (pass-1 only)
 /// would miss — if prettier's pass-2+ output changes byte-for-byte, F4 fails.
 ///
-/// When the signature file is absent, this check is skipped: most fixtures have
-/// prettier idempotent on `output_prettier`, so no signature is needed.
+/// F4b: when the signature file is absent, one extra prettier pass asserts the chain
+/// actually ENDS at `output_prettier.*` — otherwise the multi-pass chain is unpinned
+/// and validation fails. Without this arm, F4's when-present scope made the signature's
+/// existence unpoliced: deleting `audit_signature.txt` silently unmade the multi-pass
+/// claim while every remaining check stayed green.
 async fn validate_audit_signature(
     result: &mut FixtureValidation,
     fixture: &Fixture,
     output_prettier_content: &str,
 ) {
     let signature_path = fixture.audit_signature_path();
+    let parser = fixture.input_type().prettier_parser();
     if !signature_path.exists() {
+        match run_prettier(output_prettier_content, parser).await {
+            Ok(second) if second == *output_prettier_content => {}
+            Ok(_) => {
+                result.add_error(ValidationError::FormatterUnpinnedPrettierChain);
+            }
+            // Prettier cannot re-format its own output — a prettier bug the fixture's
+            // README documents. No signature can represent a truncated chain, so none
+            // is required.
+            Err(_) => {}
+        }
         return;
     }
 
@@ -260,10 +274,9 @@ async fn validate_audit_signature(
         }
     };
 
-    let parser = fixture.input_type().prettier_parser();
     let live = match AuditSignature::walk(output_prettier_content, parser).await {
-        Ok(Some(s)) => s,
-        Ok(None) => {
+        Ok(ChainWalk::Pinned(s)) => s,
+        Ok(ChainWalk::Collapsed) => {
             // Prettier idempotent on output_prettier but signature file exists →
             // chain collapsed since capture; the regenerate will delete the file.
             result.add_error(ValidationError::FormatterAuditSignatureOutdated(
@@ -271,10 +284,18 @@ async fn validate_audit_signature(
             ));
             return;
         }
+        Ok(ChainWalk::Truncated { completed, error }) => {
+            // The chain still exists but prettier now errors partway along it — NOT a
+            // collapse, and no regenerate can repair it (the updater refuses a truncated
+            // chain rather than deleting the pin). Investigate.
+            result.add_error(ValidationError::FormatterAuditSignatureWalkFailed(
+                ChainAnchor::OutputPrettier.truncated_message(completed, &error),
+            ));
+            return;
+        }
         Err(e) => {
-            // Distinct from `Malformed`: the signature parsed fine, but walking the
-            // live chain failed (prettier error or non-converging chain). The remediation
-            // differs — investigate the prettier failure or the input, don't blindly regenerate.
+            // Distinct from `Malformed`: the signature parsed fine, but the live chain
+            // does not converge within the depth bound. Investigate rather than regenerate.
             result.add_error(ValidationError::FormatterAuditSignatureWalkFailed(e));
             return;
         }

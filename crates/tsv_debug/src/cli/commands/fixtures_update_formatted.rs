@@ -1,8 +1,8 @@
 use crate::cli::CliError;
 use crate::fixtures::{
-    self, AUDIT_SIGNATURE_FILENAME, AuditSignature, ChainAnchor, FixtureFiles, SingleFormPins,
-    StableFormMarker, audit_signature_variant_filename, audit_signature_variant_suffix,
-    unformatted_ours_filename, unformatted_ours_suffix,
+    self, AUDIT_SIGNATURE_FILENAME, AuditSignature, ChainAnchor, ChainWalk, FixtureFiles,
+    SingleFormPins, StableFormMarker, audit_signature_variant_filename,
+    audit_signature_variant_suffix, unformatted_ours_filename, unformatted_ours_suffix,
 };
 use argh::FromArgs;
 use futures_util::StreamExt;
@@ -316,6 +316,8 @@ async fn process_fixture(fixture: &fixtures::Fixture) -> FixtureOutcome {
 /// The signature pins prettier's multi-pass chain starting from `output_prettier.*`. It's
 /// created/updated when `prettier(output_prettier) != output_prettier` (prettier non-idempotent),
 /// and removed when prettier is idempotent on output_prettier (chain depth zero — nothing to pin).
+/// A chain prettier ERRORS partway along is neither: an existing signature is kept and the
+/// update fails (`refuse_truncated_signature`) rather than silently dropping the claim.
 ///
 /// Skips silently if output_prettier doesn't exist (idempotent case — no chain to record).
 async fn update_audit_signature(fixture: &fixtures::Fixture) -> FormattedResult {
@@ -340,8 +342,36 @@ async fn update_audit_signature(fixture: &fixtures::Fixture) -> FormattedResult 
 
     match chain {
         // Prettier idempotent — no signature needed. Remove stale file if any.
-        None => remove_signature(&signature_path),
-        Some(sig) => write_signature(&signature_path, &sig, ChainAnchor::OutputPrettier),
+        ChainWalk::Collapsed => remove_signature(&signature_path),
+        ChainWalk::Pinned(sig) => {
+            write_signature(&signature_path, &sig, ChainAnchor::OutputPrettier)
+        }
+        ChainWalk::Truncated { completed, error } => refuse_truncated_signature(
+            &signature_path,
+            ChainAnchor::OutputPrettier,
+            completed,
+            &error,
+        ),
+    }
+}
+
+/// Refuse to touch an existing signature over a truncated chain (prettier errored
+/// mid-walk): the file is a live multi-pass claim this run cannot re-derive, so deleting
+/// it here would silently drop the claim — fail and keep it instead. With no existing
+/// file there is no chain to record and nothing to refuse.
+fn refuse_truncated_signature(
+    path: &std::path::Path,
+    anchor: ChainAnchor,
+    completed: usize,
+    error: &str,
+) -> FormattedResult {
+    if path.exists() {
+        FormattedResult::Failed(format!(
+            "{} — the chain is truncated; keeping the existing signature, investigate",
+            anchor.truncated_message(completed, error)
+        ))
+    } else {
+        FormattedResult::NotNeeded
     }
 }
 
@@ -496,6 +526,7 @@ async fn update_intermediate_files(
     }
 
     remove_orphan_chain_signatures(fixture, input_ext, &files, &mut results);
+    remove_orphan_intermediates(fixture, input_ext, &files, &mut results);
 
     for variant_name in &files.unformatted_ours {
         let suffix = unformatted_ours_suffix(variant_name, input_ext).unwrap_or("");
@@ -546,28 +577,37 @@ async fn update_intermediate_files(
         // every fixture that still wants one.
         //
         // A stable first pass is a candidate for one of those three, decided by the shared
-        // `ours(V)` test; only `OursRejects` leaves every marker unreachable (each asserts
-        // something about `ours(V)`). `OursNotIdempotent` is a tsv bug, not a marker choice —
-        // pinning its chain would paper over it, so that arm declines too.
+        // `ours(V)` test; `StableFormMarker::requires_chain_pin` names which classification
+        // leaves every marker unreachable (N10's blocking arm asks the same predicate from
+        // the absence side).
         let stable_form = (first_pass_unpinned && matches!(shape, ChainShape::StableFirstPass))
             .then(|| fixtures::classify_stable_form(&formatted, &input, &fixture.input_file));
         let no_single_form_marker = match shape {
             // Two or more distinct intermediates; `prettier_intermediate*_*` pins exactly one.
             ChainShape::UnstableNotConverging => true,
-            ChainShape::StableFirstPass => stable_form == Some(StableFormMarker::OursRejects),
+            ChainShape::StableFirstPass => {
+                stable_form.is_some_and(StableFormMarker::requires_chain_pin)
+            }
             _ => false,
         };
         let needs_chain_pin = first_pass_unpinned && no_single_form_marker;
 
         // Say what was declined and why — an unpinned output that regenerates silently reads
         // as "nothing to do" when the answer is a one-file addition the tool already knows.
-        if let Some(marker) = stable_form
-            && let Some(prefix) = marker.file_prefix()
-        {
-            results.push(IntermediateOutput::Note(format!(
-                "- {}/{variant_name}: prettier's output is a stable form no sibling holds — add {prefix}{suffix}{input_ext} (not auto-generated: it is a claim about tsv, not a prettier chain)",
-                fixture.relative_path
-            )));
+        if let Some(marker) = stable_form {
+            if let Some(prefix) = marker.file_prefix() {
+                results.push(IntermediateOutput::Note(format!(
+                    "- {}/{variant_name}: prettier's output is a stable form no sibling holds — add {prefix}{suffix}{input_ext} (not auto-generated: it is a claim about tsv, not a prettier chain)",
+                    fixture.relative_path
+                )));
+            } else if marker == StableFormMarker::OursNotIdempotent {
+                // The one decline with no file to name: pinning would paper over a tsv
+                // bug, so say what was found instead of regenerating silently.
+                results.push(IntermediateOutput::Note(format!(
+                    "- {}/{variant_name}: prettier's stable output is one tsv formats NON-IDEMPOTENTLY — a tsv bug, not a pin choice; fix tsv rather than pinning",
+                    fixture.relative_path
+                )));
+            }
         }
 
         match shape {
@@ -673,11 +713,17 @@ async fn update_intermediate_files(
             };
             let parser = fixture.input_type().prettier_parser();
             match AuditSignature::walk(&variant_content, parser).await {
-                Ok(Some(sig)) => {
+                Ok(ChainWalk::Pinned(sig)) => {
                     write_signature(&chain_signature_path, &sig, ChainAnchor::UnformattedOurs)
                 }
                 // Prettier holds the source itself stable, so there is no chain to record.
-                Ok(None) => remove_signature(&chain_signature_path),
+                Ok(ChainWalk::Collapsed) => remove_signature(&chain_signature_path),
+                Ok(ChainWalk::Truncated { completed, error }) => refuse_truncated_signature(
+                    &chain_signature_path,
+                    ChainAnchor::UnformattedOurs,
+                    completed,
+                    &error,
+                ),
                 Err(e) => FormattedResult::Failed(e),
             }
         } else {
@@ -692,6 +738,39 @@ async fn update_intermediate_files(
     }
 
     results
+}
+
+/// Delete `prettier_intermediate*_<suffix>` files whose `unformatted_ours_<suffix>` source
+/// is gone — the intermediates' twin of `remove_orphan_chain_signatures` below, for the
+/// same reason: `update_intermediate_files` iterates the sources, so it only ever visits
+/// suffixes that still have one, and without a sweep an orphan would survive every
+/// regeneration and fail N7/N7b/N7c's MissingSource forever. Safe to delete outright:
+/// every intermediate is auto-generated content, recreated from its source on the next run.
+fn remove_orphan_intermediates(
+    fixture: &fixtures::Fixture,
+    input_ext: &str,
+    files: &FixtureFiles,
+    results: &mut Vec<IntermediateOutput>,
+) {
+    for (names, prefix) in files.intermediate_kinds() {
+        for name in names {
+            let Some(suffix) = name
+                .strip_prefix(prefix)
+                .and_then(|s| s.strip_suffix(input_ext))
+            else {
+                continue;
+            };
+            let source = unformatted_ours_filename(suffix, input_ext);
+            if files.unformatted_ours.contains(&source) {
+                continue;
+            }
+            let result = match fixtures::delete_file_if_exists(&fixture.path.join(name)) {
+                Ok(()) => FormattedResult::Removed,
+                Err(e) => FormattedResult::Failed(e),
+            };
+            results.push(IntermediateOutput::File(name.clone(), result));
+        }
+    }
 }
 
 /// Delete `audit_signature_<suffix>.txt` files whose `unformatted_ours_<suffix>` source is
