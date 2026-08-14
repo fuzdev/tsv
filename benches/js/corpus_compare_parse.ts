@@ -491,10 +491,21 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		// that arm cannot be scoped per index — it is scoped to the root `comments`
 		// array of a document that actually contains the garbage. It is scoped by
 		// DIRECTION too (the `comment_dedup` discipline, mirrored): the divergence
-		// is an INSERTION, so the array is longer on OUR side and the extra entries
-		// are `missing_canonical`. A comment tsv *loses* — the failure that matters
-		// — is the opposite direction and still surfaces undocumented, as does any
+		// is an INSERTION, so the array must be longer on OUR side. A comment tsv
+		// *loses* — the failure that matters — is the opposite direction, and its
+		// `length_mismatch` still surfaces undocumented, as does a `missing_ours`
+		// on the array ITSELF (tsv emitting no comments array at all) and any
 		// comment-array divergence in a file with no garbage declaration.
+		//
+		// ⚠️ The direction lives on the ARRAY, never on the entry kind. Inside an
+		// element the shift can only reach the FIELDS — an element always pairs
+		// with an element — and `position` is the one OPTIONAL field (Svelte sets
+		// it on a `read_value` comment only), so a value comment paired with a
+		// non-value one reports it missing on whichever side lacks it. That is why
+		// all three of `value_mismatch` / `missing_canonical` / `missing_ours` land
+		// on `comments[i].position`, and why the refusal below is keyed on the PATH
+		// rather than the kind — keyed on the kind it claims one renumbering and
+		// refuses another that is the same fact told from the other side.
 		name: 'css_declaration_tokenization',
 		conformance_section:
 			'CSS Parser Corrections (corpus-enforced) — Declaration tokenization garbage',
@@ -505,7 +516,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			if (entry.kind === 'length_mismatch' && Number(entry.ours) <= Number(entry.canonical)) {
 				return false;
 			}
-			if (entry.kind === 'missing_ours') return false;
+			if (entry.kind === 'missing_ours' && !/\[\d+\]\.position$/.test(entry.path)) return false;
 			return subtree_has_garbage_declaration(ctx.canonical_root);
 		}
 	},
