@@ -200,6 +200,10 @@ impl<'a> Printer<'a> {
         // For anything else (component, `{expr}`, control-flow block, comment) the
         // whitespace text is printed via `splitTextToDocs`, so a newline becomes a hardline.
         let next_is_inline_el = self.next_is_inline_element(trimmed_nodes, i);
+        // The follower the line above excludes, named from the other side — a component takes no
+        // inline-sibling wrap at the whitespace-only separator, in either multiline arm. See
+        // [`Self::next_is_component`].
+        let next_is_component = self.next_is_component(trimmed_nodes, i);
         let next_is_block_el = next_node.is_some_and(|n| self.is_block_element_node(n));
         // Whether the next sibling is a flowing inline element OR component (the
         // Fill-idempotency boundary). Text before such a node ends its fill with a trailing
@@ -237,6 +241,41 @@ impl<'a> Printer<'a> {
         if text.is_collapsible_ws_only {
             // Whitespace-only text node (never at a fragment boundary — those are skipped
             // by `build_nodes_doc_trimmed`).
+            //
+            // The sibling-newline flow rule ([`Self::sibling_newline_flows`]) at its
+            // standalone-separator site: this node sits between two *non-text* siblings and carries
+            // no prose of its own, so it flows only when its inline RUN holds some
+            // (`run_has_prose`, computed once per run by the caller). That gate is the rule's
+            // boundary and it is structural rather than mechanical — flowing means *reflowing into
+            // a text fill*, and a run with no content text has none. Its newlines are then the
+            // author's only structure (a vertical list of siblings), and collapsing them packs
+            // independent items onto one line — which, for a short list, cascades into the parent
+            // element's own hug decision, an F1 break. See the standalone-separator paragraph in
+            // [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
+            //
+            // Both spellings of a *flowing* separator — an authored space and an authored single
+            // newline — must land on the same doc, or the pair diverges (and, once the formatter
+            // emits one of them, flip-flops). So the test is spelling-independent, and the
+            // multiline arm's newline case re-spells itself as the space rather than emitting a
+            // parallel form.
+            //
+            // ⚠️ **Asked once, ahead of the multiline split, because both arms below need this
+            // same answer.** The question is about the RUN and its two neighbours; nothing in it
+            // depends on WHY the container went multiline. A conjunct on the cause would be dead in
+            // the arm the `!multiline` test already selected, and wrong as a narrowing: the flow
+            // rule's other two call sites — a content text's leading and trailing runs — carry no
+            // cause gate at all, so a container-keyed one half-applies the rule. Within a single
+            // run the boundaries touching a text node would flow while the one between two adjacent
+            // siblings did not, and `text1 <span>a</span>⏎<span>b</span> text2` would come out
+            // broken in a line that fits — a form neither formatter produces. A rule keyed on the
+            // CONTAINER cannot be right at one of its boundaries and wrong at the next.
+            //
+            // Flowing converges a tag pair onto one line where prettier splits it — a deliberate
+            // divergence in the same family as the rest of this rule, pinned by
+            // `elements/inline_adjacent_sibling_newline_flow_prettier_divergence`.
+            let separator_flows = run_has_prose
+                && self.neighbour_newline_flows(prev_node)
+                && self.neighbour_newline_flows(next_node);
             if !multiline {
                 // Before a tag the separator is a bare collapsible break — a space while
                 // the fragment fits, a newline once it breaks — exactly as the multiline
@@ -268,10 +307,19 @@ impl<'a> Printer<'a> {
                 // reflowable-fill suppression keeps the authored form out of the multiline arm,
                 // and becomes a two-pass cycle the moment it doesn't
                 // (`inline_content_spaced_tags_tail_long`).
-                let flows = run_has_prose
-                    && self.neighbour_newline_flows(prev_node)
-                    && self.neighbour_newline_flows(next_node);
-                if next_is_tag && !flows {
+                //
+                // ⚠️ A **component** follower is the other exception, and it is that same parity
+                // read the other way round: the multiline arm below never wraps one — its
+                // `trim_to_collapsible` excludes components on purpose (a space-separated
+                // component sibling breaks to its own line, which is prettier's answer too), so
+                // the separator falls through to a bare `line` there. Wrapping it *here* gave one
+                // prose run two interiors again, and this half is the one that packs: a preceding
+                // sibling that renders multiline leaves the closing tag at a short column, the
+                // wrap's per-width break then fits the component after it, and the emitted
+                // container boundary newline makes the NEXT pass read `SourceBreaks` and split the
+                // pair back apart — a two-pass cycle whose first form is also a prettier
+                // divergence ([`Printer::next_is_component`]).
+                if (next_is_tag && !separator_flows) || next_is_component {
                     child_docs.push(d.line());
                 } else {
                     // Signal the next inline element to lead with a line.
@@ -307,52 +355,20 @@ impl<'a> Printer<'a> {
             // rather than collapsing as it did before this convergence.
             //
             let newline_count = text.newline_count as usize;
-            // The sibling-newline flow rule ([`Self::sibling_newline_flows`]) reaches this site —
-            // a whitespace-only separator between two *non-text* siblings — but only when the
-            // separator's own inline RUN holds prose (`run_has_prose`, computed once per run by
-            // the caller). That gate is the rule's boundary, and it is structural rather than
-            // mechanical: flowing means *reflowing into a text fill*, and a run with no content
-            // text has no fill to reflow into. Its newlines are then the author's only structure —
-            // a vertical list of siblings — and collapsing them packs independent items onto one
-            // line (and, for a short list, lets the collapse cascade into the parent element's own
-            // hug decision, an F1 break). See the standalone-separator paragraph in
-            // [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
-            // Both spellings of a *flowing* separator — an authored space and an authored single
-            // newline — must land on the same doc, or the pair diverges (and, once the formatter
-            // emits one of them, flip-flops). So the flow test is spelling-independent and the
-            // newline arm below simply re-spells itself as the space.
+            // A flowing separator collapses here rather than pinning its authored line — the shared
+            // `separator_flows` answer above, which is deliberately blind to the container's
+            // multiline cause.
             //
-            // The enclosing element need only be multiline AT ALL — `run_has_prose` is this site's
-            // whole boundary, and the cause is not a second one.
-            //
-            // ⚠️ This conjunct read `cause == MultilineCause::Structural` and that was too narrow,
-            // in a way only a whole run could show. The flow rule has three call sites and the
-            // OTHER two — a content text's leading and trailing runs — carry no cause gate at all,
-            // so a `SourceBreaks` container half-applied it: within one run the boundaries touching
-            // a text node flowed while the one between two adjacent siblings did not, and
-            // `text1 <span>a</span>⏎<span>b</span> text2` came out broken in a line that fits —
-            // a form neither formatter produces. A rule keyed on the CONTAINER cannot be right at
-            // one of its boundaries and wrong at the next.
-            //
-            // The narrow gate was written against a period-2 cycle: collapsing the separator was
-            // held to delete the very break that chose the multiline arm, so the next pass would
-            // take the inline arm, whose `next_is_tag` case emits a bare `line` (all-or-nothing
-            // with the already-broken parent group) and splits the run apart again. That does not
-            // occur, and the reason is structural rather than lucky — this separator is *interior*
-            // to the content, so collapsing it cannot touch the element's own boundary newlines,
-            // which are what the multiline decision reads. Both spellings converge, for element
-            // and tag siblings alike, and `authoring:audit` is the standing guard.
-            // `elements/inline_content_spaced_tags_tail_long` reaches the SAME interior through
-            // the non-multiline arm above (a width-broken element), which is what keeps one prose
-            // run from having two layouts depending on why its element expanded.
-            //
-            // Widening it makes tsv converge a tag pair onto one line where prettier splits it —
-            // a deliberate divergence in the same family as the rest of this rule, pinned by
-            // `elements/inline_adjacent_sibling_newline_flow_prettier_divergence`.
-            let separator_flows = run_has_prose
-                && cause.is_multiline()
-                && self.neighbour_newline_flows(prev_node)
-                && self.neighbour_newline_flows(next_node);
+            // Collapsing it cannot cost the arm that chose it: this separator is *interior* to the
+            // content, so removing its break cannot touch the element's own BOUNDARY newlines,
+            // which are what the multiline decision reads. (The period-2 cycle that argument rules
+            // out is real where it does reach the boundary — the next pass would take the inline
+            // arm, whose `next_is_tag` case emits a bare `line`, all-or-nothing with the
+            // already-broken parent group, and split the run apart again.) Both spellings converge,
+            // for element and tag siblings alike, and `authoring:audit` is the standing guard.
+            // `elements/inline_content_spaced_tags_tail_long` reaches the SAME interior through the
+            // non-multiline arm above (a width-broken element), which is what keeps one prose run
+            // from having two layouts depending on why its element expanded.
             let ws_flows = newline_count == 1 && separator_flows;
             // The rule's own claim, applied literally: a flowing single newline IS the space
             // separator, differently spelled. So it takes the space arm verbatim rather than a
