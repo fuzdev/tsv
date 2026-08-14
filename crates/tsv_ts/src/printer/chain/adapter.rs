@@ -197,34 +197,12 @@ impl<'a> Printer<'a> {
         ClassifiedComments::from_range(self.comments, start, end, self.comment_line_breaks)
     }
 
+    /// A gap's same-line block run, each comment behind a space
+    /// (`method() /* c */`). The named entry for
+    /// [`format_block_comments`](Self::format_block_comments) at `Leading` spacing,
+    /// so the spacing rule lives once.
     pub(crate) fn build_trailing_block_doc(&self, comments: &[&Comment]) -> DocId {
-        let d = self.d();
-        if comments.is_empty() {
-            return d.empty();
-        }
-
-        let mut parts = DocBuf::with_capacity(comments.len() * 2);
-        for comment in comments {
-            // Space before comment (for inline trailing comments: `method() /* c */`)
-            parts.push(d.text(" "));
-            parts.push(self.build_comment_doc(comment));
-        }
-        d.concat(&parts)
-    }
-
-    pub(crate) fn build_chain_leading_comments_doc(&self, comments: &[&Comment]) -> DocId {
-        let d = self.d();
-        if comments.is_empty() {
-            return d.empty();
-        }
-
-        // Emit each comment on its own line (with hardline after each)
-        let mut parts = DocBuf::with_capacity(comments.len() * 2);
-        for comment in comments {
-            parts.push(self.build_comment_doc(comment));
-            parts.push(d.hardline());
-        }
-        d.concat(&parts)
+        self.format_block_comments(comments, CommentSpacing::Leading)
     }
 
     /// A chain gap's trailing line comments, deferred via `line_suffix` — the run

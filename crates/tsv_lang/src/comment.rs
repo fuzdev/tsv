@@ -322,12 +322,14 @@ impl<'a> ClassifiedComments<'a> {
     /// All leading (own-line) comments in source order, merging the `leading_block`
     /// and `leading_line` buckets.
     ///
-    /// `from_range` splits leading comments by kind because chain printers emit the
-    /// two runs separately (all blocks, then all lines). Callers that emit a gap's
-    /// leading comments in authored order — ternary operand→operator gaps,
-    /// call-argument gaps — use this instead, so an interleaved block/line sequence
-    /// keeps the order the author wrote it. Each bucket is already source-sorted, so
-    /// this is a linear two-way merge on `span.start`.
+    /// `from_range` splits by kind for the TRAILING half of a gap, where the kinds
+    /// genuinely emit differently (a block trails inline, a `//` defers via
+    /// `line_suffix`), and for the flat member arm that defers every line comment.
+    /// A gap's leading run prints each comment the same way, so every emitter of one
+    /// — the breaking chain gap, ternary operand→operator gaps, call-argument gaps —
+    /// takes this merge instead: kind-by-kind emission there reorders an interleaved
+    /// authoring (`// c⏎/* d */` → `/* d */⏎// c`). Each bucket is already
+    /// source-sorted, so this is a linear two-way merge on `span.start`.
     pub fn leading_in_source_order(&self) -> SmallVec<[&'a Comment; 2]> {
         let (block, line) = (&self.leading_block, &self.leading_line);
         let mut out: SmallVec<[&'a Comment; 2]> = SmallVec::with_capacity(block.len() + line.len());

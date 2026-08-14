@@ -1600,7 +1600,8 @@ impl<'a> Printer<'a> {
     /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt), the
     /// arrow-body run, the member-leading sites (interface / intersection members),
     /// the comma-separated inter-item gaps (declarators, for-init, heritage,
-    /// switch cases), the forced-multiline lists via
+    /// switch cases), the breaking chain gap's leading run
+    /// (`chain::push_gap_comments_and_break`), the forced-multiline lists via
     /// [`build_leading_comments_multiline`](Self::build_leading_comments_multiline)
     /// (tuples, type params/args, function-type params, the union's first member, the
     /// bracket-break shell, the broken `<T>` cast), the array literal / array pattern
