@@ -433,8 +433,34 @@ impl SnapshotKey for AbsorbKey {
 }
 
 /// The absorbed node-edge classes as [`AbsorbKey`]s — the set the absorb [`Ratchet`] sees.
-fn absorb_keys(absorb_shapes: &BTreeMap<String, ShapeAgg>) -> BTreeSet<AbsorbKey> {
+fn absorb_keys(absorb_shapes: &BTreeMap<String, AbsorbAgg>) -> BTreeSet<AbsorbKey> {
     absorb_shapes.keys().cloned().map(AbsorbKey).collect()
+}
+
+/// The absorb pin's per-class triage work-list as JSON — one row per class × [`site_shape`]
+/// pair, each with the reproducer to splice a blank at.
+///
+/// This is what a prettier sweep over the pin should grade: one row per class grades one
+/// textual shape and so under-reports (see [`AbsorbAgg`]).
+///
+/// [`site_shape`]: crate::audit::sites::site_shape
+fn absorb_variants_json(total: &Tally) -> Vec<Value> {
+    total
+        .absorb_shapes
+        .iter()
+        .flat_map(|(class, agg)| {
+            agg.variants.iter().map(move |(shape, set)| {
+                let ex = set.canonical();
+                serde_json::json!({
+                    "class": class,
+                    "shape": shape,
+                    "path": ex.path,
+                    "offset": ex.offset,
+                    "snippet": ex.snippet,
+                })
+            })
+        })
+        .collect()
 }
 
 /// One reproducible instance of a shape — kept as the single smallest by `(path, offset)`
@@ -483,12 +509,63 @@ impl ShapeAgg {
     }
 }
 
+/// One absorb class's aggregate: the shared [`ShapeAgg`] bookkeeping plus the class's distinct
+/// **textual** shapes, one reproducer each — the class's triage work-list.
+///
+/// The pin's key is a node EDGE, but a triage verdict is read off one *textual* shape, and a
+/// class routinely spans many (an inline comment, a glued run, an own-line run all key the same
+/// line). So grading a class from `ShapeAgg`'s single canonical example UNDER-reports, by a known
+/// amount: the decorator blank-drop flagged one pinned line while probing showed it covered four.
+/// The variants are the fix — one reproducer per distinct [`site_shape`], the same fine token key
+/// the bug ratchet uses, so a prettier sweep grades every textual shape a class spans rather than
+/// whichever one happened to sort smallest.
+///
+/// Deliberately **unbounded** where [`ShapeAgg::examples`] is bounded, because the bound is
+/// already structural: `site_shape` abstracts identifiers, so the map's size is capped by the
+/// token-shape *vocabulary* (~5.7k over `tests/fixtures`, measured — the very number that ruled
+/// it out as the ratchet key), not by corpus size. Reported, never pinned.
+///
+/// [`site_shape`]: crate::audit::sites::site_shape
+#[derive(Default)]
+struct AbsorbAgg {
+    shape: ShapeAgg,
+    /// Distinct [`site_shape`] → its smallest example by `(path, offset)`.
+    ///
+    /// [`site_shape`]: crate::audit::sites::site_shape
+    variants: BTreeMap<String, ExampleSet<Example, 1>>,
+}
+
+impl AbsorbAgg {
+    /// Record one absorbed injection: the shared aggregate plus the per-textual-shape reproducer.
+    fn record_hit(&mut self, path: &str, shape: String, candidate: Example) {
+        self.shape.record_hit(path, candidate.clone());
+        self.variants.entry(shape).or_default().offer(candidate);
+    }
+
+    /// Fold another aggregate in — the worker-pool merge.
+    fn merge(&mut self, other: Self) {
+        self.shape.merge(other.shape);
+        for (shape, set) in other.variants {
+            match self.variants.get_mut(&shape) {
+                Some(e) => e.merge(set),
+                None => {
+                    self.variants.insert(shape, set);
+                }
+            }
+        }
+    }
+}
+
 /// Merge one worker's per-key aggregates into the total's — the shared body behind both of
 /// [`Tally::merge`]'s shape maps (the finding shapes and the absorb classes).
-fn merge_shape_map<K: Ord>(dst: &mut BTreeMap<K, ShapeAgg>, src: BTreeMap<K, ShapeAgg>) {
+fn merge_shape_map<K: Ord, V>(
+    dst: &mut BTreeMap<K, V>,
+    src: BTreeMap<K, V>,
+    merge: impl Fn(&mut V, V),
+) {
     for (k, v) in src {
         match dst.get_mut(&k) {
-            Some(e) => e.merge(v),
+            Some(e) => merge(e, v),
             None => {
                 dst.insert(k, v);
             }
@@ -503,10 +580,11 @@ struct Tally {
     /// The absorb pin's aggregation: every node-edge CLASS (rendered [`NodeEdgeKey`]
     /// — see [`node_edge_key_with_map`]) whose injected blank the formatter ABSORBED, with the
     /// same per-shape bookkeeping as `shapes` (the example is the reproducer a NEW absorbing
-    /// class is triaged from). Keyed by class alone — absorption has one kind.
+    /// class is triaged from) plus [`AbsorbAgg`]'s per-textual-shape work-list. Keyed by class
+    /// alone — absorption has one kind.
     ///
     /// [`NodeEdgeKey`]: crate::audit::node_edge::NodeEdgeKey
-    absorb_shapes: BTreeMap<String, ShapeAgg>,
+    absorb_shapes: BTreeMap<String, AbsorbAgg>,
     sites: usize,
     injections: usize,
     accepted: usize,
@@ -543,18 +621,21 @@ impl Tally {
 
     /// Record one ABSORBED injection at `offset` under its precomputed node-edge `class` — the
     /// absorb pin's aggregation. Runs on the fast path (~80% of accepted injections), so the
-    /// per-hit work is one containment descent (paid by the caller) and the bounded example
-    /// bookkeeping — trivial beside the format each injection already paid.
+    /// per-hit work is one containment descent (paid by the caller), the [`site_shape`] key, and
+    /// the bounded example bookkeeping — trivial beside the format each injection already paid.
+    ///
+    /// [`site_shape`]: crate::audit::sites::site_shape
     fn record_absorbed(&mut self, class: String, offset: usize, source: &str, path: &str) {
         let candidate = Example {
             path: path.to_string(),
             offset,
             snippet: snippet(source, offset),
         };
-        self.absorb_shapes
-            .entry(class)
-            .or_default()
-            .record_hit(path, candidate);
+        self.absorb_shapes.entry(class).or_default().record_hit(
+            path,
+            site_shape(source, offset),
+            candidate,
+        );
     }
 
     /// Record a file skipped for not being a clean fixed point as authored.
@@ -571,8 +652,12 @@ impl Tally {
         self.parse_skipped += other.parse_skipped;
         self.dirty_files.extend(other.dirty_files);
         self.not_clean.merge(other.not_clean);
-        merge_shape_map(&mut self.shapes, other.shapes);
-        merge_shape_map(&mut self.absorb_shapes, other.absorb_shapes);
+        merge_shape_map(&mut self.shapes, other.shapes, ShapeAgg::merge);
+        merge_shape_map(
+            &mut self.absorb_shapes,
+            other.absorb_shapes,
+            AbsorbAgg::merge,
+        );
     }
 }
 
@@ -995,6 +1080,14 @@ impl BlankAuditCommand {
                 "absorb_shapes".to_string(),
                 Value::from(total.absorb_shapes.len()),
             );
+            // The per-class TRIAGE WORK-LIST — every distinct textual shape each absorbed class
+            // spans, one reproducer each ([`AbsorbAgg::variants`]). The pin file carries classes
+            // only; grading one reproducer per class is what under-reports, so the sweep harness
+            // reads this instead. JSON-only: it is thousands of rows, and it is machine input.
+            extras.insert(
+                "absorb_variants".to_string(),
+                Value::Array(absorb_variants_json(&total)),
+            );
             report::print_json(&summary, &findings, &extras);
         } else {
             // Split the shared (ratchet-graded) findings from the report-only STRUCTURAL-DIVERGENCE
@@ -1027,13 +1120,21 @@ impl BlankAuditCommand {
             // The per-class rows are the triage view of the pin file (each class with its
             // reproducer) — `--report` / explicit-path only, like the other detail sections.
             if show_detail {
-                let mut rows: Vec<(&String, &ShapeAgg)> = total.absorb_shapes.iter().collect();
-                rows.sort_by_key(|(_, agg)| std::cmp::Reverse(agg.count));
+                let mut rows: Vec<(&String, &AbsorbAgg)> = total.absorb_shapes.iter().collect();
+                rows.sort_by_key(|(_, agg)| std::cmp::Reverse(agg.shape.count));
                 for (class, agg) in rows {
-                    let ex = agg.examples.canonical();
+                    let ex = agg.shape.examples.canonical();
+                    // The `[N shapes]` column is the class's textual span — the reason ONE
+                    // reproducer does not clear it (see `AbsorbAgg`). The rows themselves are
+                    // `--json`'s `absorb_variants`.
                     println!(
-                        "  {:>7}×  {:<48} e.g. inject blank at {}:{}  {}",
-                        agg.count, class, ex.path, ex.offset, ex.snippet
+                        "  {:>7}×  {:<48} [{:>3} shapes]  e.g. inject blank at {}:{}  {}",
+                        agg.shape.count,
+                        class,
+                        agg.variants.len(),
+                        ex.path,
+                        ex.offset,
+                        ex.snippet
                     );
                 }
             }
@@ -1165,7 +1266,7 @@ fn report_absorb_gate(diff: &GateDiff<AbsorbKey>, total: &Tally) -> Result<(), C
         for k in new.iter().take(40) {
             match total.absorb_shapes.get(&k.0) {
                 Some(agg) => {
-                    let ex = agg.examples.canonical();
+                    let ex = agg.shape.examples.canonical();
                     eprintln!(
                         "    {:<40} e.g. inject blank at {}:{}  {}",
                         k.0, ex.path, ex.offset, ex.snippet
@@ -1193,7 +1294,9 @@ fn report_absorb_gate(diff: &GateDiff<AbsorbKey>, total: &Tally) -> Result<(), C
     }
 
     if diff.holds() {
-        println!(
+        // stderr, like every other verdict line here and like the bug ratchet's own: `--json`
+        // puts the machine-readable report on stdout, and a `println!` verdict lands INSIDE it.
+        eprintln!(
             "✓ absorb pin holds — no new kind of silently-eaten blank ({} classes pinned)",
             diff.known
         );
@@ -1547,12 +1650,15 @@ mod tests {
     /// key is pinnable (absorption is a behavior pin, never an always-fails class).
     #[test]
     fn absorb_snapshot_render_and_parse_round_trip() {
-        let mut absorb: BTreeMap<String, ShapeAgg> = BTreeMap::new();
+        let mut absorb: BTreeMap<String, AbsorbAgg> = BTreeMap::new();
         absorb.insert(
             "(CallExpression, arguments→arguments)".to_string(),
-            mk_agg(),
+            AbsorbAgg::default(),
         );
-        absorb.insert("(VariableDeclarator, id→init)".to_string(), mk_agg());
+        absorb.insert(
+            "(VariableDeclarator, id→init)".to_string(),
+            AbsorbAgg::default(),
+        );
 
         let r = Ratchet::new(PathBuf::from("/unused"), ABSORB_HEADER, REPIN_HINT);
         let found = absorb_keys(&absorb);
@@ -1589,7 +1695,7 @@ mod tests {
 
     /// An absorbed injection aggregates by its precomputed node-edge class (one kind), with the
     /// same smallest-example bookkeeping as a finding — the reproducer a NEW class is triaged
-    /// from.
+    /// from — PLUS the per-textual-shape work-list a class's triage actually needs.
     #[test]
     fn record_absorbed_keys_on_class() {
         let src = "const x = 1;";
@@ -1602,12 +1708,34 @@ mod tests {
             .absorb_shapes
             .get(class)
             .expect("keyed on the precomputed class");
-        assert_eq!(agg.count, 2);
-        assert_eq!(agg.files.len(), 2);
+        assert_eq!(agg.shape.count, 2);
+        assert_eq!(agg.shape.files.len(), 2);
         assert_eq!(
-            agg.examples.canonical().path,
+            agg.shape.examples.canonical().path,
             "a.ts",
             "the smallest (path, offset) is canonical"
+        );
+        assert_eq!(
+            agg.variants.len(),
+            1,
+            "both hits are the same textual shape (`x⟨⟩=`)"
+        );
+
+        // A second offset in the SAME class with a different textual shape splits the work-list:
+        // this is the under-reporting the variants exist to close — one reproducer per class
+        // would grade `x⟨⟩=` and never see `=⟨⟩1`.
+        tally.record_absorbed(class.to_string(), eq + 1, src, "a.ts");
+        let agg = tally.absorb_shapes.get(class).expect("same class");
+        assert_eq!(agg.shape.count, 3, "the class count still counts every hit");
+        assert_eq!(agg.variants.len(), 2, "two distinct textual shapes");
+        let offsets: Vec<usize> = agg
+            .variants
+            .values()
+            .map(|s| s.canonical().offset)
+            .collect();
+        assert!(
+            offsets.contains(&eq) && offsets.contains(&(eq + 1)),
+            "each shape keeps its OWN reproducer, not the class's smallest: {offsets:?}"
         );
     }
 
