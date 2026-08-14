@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 530
+# shapes: 531
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -266,6 +266,7 @@
 (ImportDeclaration, specifiers→specifiers)
 (ImportExpression, ^→source)
 (ImportExpression, arguments→$)
+(ImportExpression, options→$)
 (ImportExpression, source→$)
 (ImportExpression, source→arguments)
 (ImportNamespaceSpecifier, ^→local)

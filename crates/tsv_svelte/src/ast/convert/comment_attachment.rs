@@ -21,10 +21,11 @@ use tsv_ts::ast::convert::{AttachedComment, SkeletonTree, WriterComments};
 
 /// The inputs every template comment-attach builder (`ast/convert/special.rs`'s
 /// `build_*_writer_comments`) and every attach entry point below
-/// share: the template comments to place, the source text, and the byte-offset
-/// tracker its byte-space skeleton pass runs under. Bundled so the call sites —
-/// and `build_expression_list_writer_comments`, which would otherwise trip
-/// `too_many_arguments` — thread one value instead of the same three.
+/// share: the template comments to place, the source text, the byte-offset
+/// tracker its byte-space skeleton pass runs under, and the parser variant that
+/// pass emits under. Bundled so the call sites — and
+/// `build_expression_list_writer_comments`, which would otherwise trip
+/// `too_many_arguments` — thread one value instead of the same four.
 /// (`build_script_writer_comments` is not in the set: it attaches the script's
 /// *own* comments, not the template set, and is schema-driven.)
 #[derive(Clone, Copy)]
@@ -32,6 +33,10 @@ pub(super) struct AttachInputs<'a> {
     pub(super) template_comments: &'a [&'a Comment],
     pub(super) source: &'a str,
     pub(super) tracker: &'a LocationTracker,
+    /// The skeleton pass's parser variant — see `tsv_ts`'s `Ctx::vanilla_acorn`.
+    /// It must match the fused emit's, since the recorded tree is what keys the
+    /// per-node comment map the emit then consults.
+    pub(super) vanilla_acorn: bool,
 }
 
 /// Context for the comment attachment process.

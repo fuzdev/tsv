@@ -474,8 +474,19 @@ export interface ImportExpression {
 	source: Expression;
 	/** Import phase (`'source'`/`'defer'`) for `import.source(…)` / `import.defer(…)`; omitted otherwise. */
 	phase?: 'source' | 'defer';
-	/** Import attribute arguments. Omitted from JSON when empty. */
+	/**
+	 * The second argument, acorn-typescript's spelling: a single-element array.
+	 * Omitted from JSON when there is no second argument, and absent entirely
+	 * under vanilla acorn, which spells it `options`.
+	 */
 	arguments?: Expression[];
+	/**
+	 * The second argument, vanilla acorn's ESTree spelling (a Svelte
+	 * non-`lang="ts"` component): always present there, `null` when there is no
+	 * second argument. Absent under acorn-typescript, which spells it
+	 * `arguments`.
+	 */
+	options?: Expression | null;
 }
 
 /** `import.meta` or `new.target`. */

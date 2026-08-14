@@ -168,7 +168,14 @@ impl<'a> Ctx<'a> {
     }
 
     /// The shared inputs for an embedded `tsv_ts` writer — this document's
-    /// `source` / `loc` / `emit_loc` paired with the per-call comment `mode`.
+    /// `source` / `loc` / `emit_loc` / parser variant paired with the per-call
+    /// comment `mode`.
+    ///
+    /// Every expression island funnels through here, which is what makes the
+    /// parser variant reach them: it is component-global (the same fact that
+    /// selects each `<script>`'s schema in `write_script`), so a `{expr}` tag,
+    /// an attribute or directive value, a `{@const}` and a `{#snippet}` body all
+    /// carry vanilla acorn's wire quirks in a non-TS component.
     #[inline]
     fn embed(&self, mode: CommentMode<'a>) -> EmbedWriter<'a> {
         EmbedWriter {
@@ -176,18 +183,20 @@ impl<'a> Ctx<'a> {
             loc: self.loc,
             comments: mode,
             emit_loc: self.emit_loc,
+            vanilla_acorn: !self.component_is_ts,
         }
     }
 
     /// The shared inputs for a template comment-attach builder
     /// (`build_*_writer_comments`) — this document's template comments, source,
-    /// and byte-offset tracker.
+    /// byte-offset tracker, and parser variant.
     #[inline]
     fn attach(&self) -> AttachInputs<'a> {
         AttachInputs {
             template_comments: self.comments,
             source: self.source,
             tracker: self.loc.tracker,
+            vanilla_acorn: !self.component_is_ts,
         }
     }
 
@@ -1413,7 +1422,9 @@ fn write_style_sheet(
 ///
 /// - **Schema**: `lang="ts"` → `Schema::Acorn`; a plain `<script>` →
 ///   `Schema::SvelteScript` (omit `importKind`/`exportKind="value"`, always emit
-///   `attributes`, append `options: null` on `ImportExpression`).
+///   `attributes`, and select vanilla acorn's expression quirks — see
+///   `Ctx::vanilla_acorn` in `tsv_ts`, which the expression islands reach
+///   through `Ctx::embed` instead).
 /// - **Comments**: a script whose `Program` carries comments (its own or a
 ///   preceding HTML comment) precomputes acorn's leading/trailing assignments
 ///   into a `WriterComments` map (`build_script_writer_comments`); the common
@@ -1437,7 +1448,8 @@ fn write_script(
     w.raw(",\"content\":");
     // The schema is component-global (Svelte's single `this.ts`): a TS component uses acorn's
     // schema for *every* script, a non-TS one uses Svelte's (omit `importKind`/`exportKind="value"`,
-    // always emit `attributes`, and — at emit time — append `options: null` on `ImportExpression`).
+    // always emit `attributes`, and — at emit time — vanilla acorn's expression quirks). The
+    // expression islands read that same component-global fact through `Ctx::embed`.
     let schema = if ctx.component_is_ts {
         Schema::Acorn
     } else {
