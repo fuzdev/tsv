@@ -100,6 +100,32 @@ pub(crate) enum CommentFilter {
     BlockOnly,
 }
 
+/// Whether an author blank line **above a comment run's first comment** survives.
+///
+/// The Trailing-vs-Leading question, at the one emitter two kinds of run share
+/// ([`Printer::push_anchored_trailing_run`]). A **trailing** run's blank sits between the
+/// value and the comment and prettier's `printTrailingComment` emits it
+/// (`isPreviousLineEmpty`); a **leading** run's sits between the introducer — an operator,
+/// a keyword, a delimiter — and the comment, where `printLeadingComment` has no emitter
+/// for it at all, so it is dropped. tsv drops it at every other leading gap (a value's
+/// `=`, an object `:`, a call argument, an array element, a `return` operand); the binary
+/// operator→operand gap kept it only because it borrows the trailing emitter for its
+/// anchor rule.
+///
+/// A blank *between* two comments is a different question, never this one: it separates
+/// two distinct remarks and survives in both kinds of run.
+///
+/// The same split the control-flow gaps name as `GapCommentRun::blank_seed`
+/// (`Some`/`None`) — one concept, stated per emitter because the two emitters take
+/// different shapes of it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RunLeadingBlank {
+    /// A trailing run: the blank is the author's, between the value and its comment.
+    Keep,
+    /// A leading run: the blank sits above the run, where prettier cannot emit one.
+    Drop,
+}
+
 /// How a leading-comment run decides whether a *block* comment hugs the token
 /// that follows it (a trailing space, `/* c */ X`) rather than dropping to its
 /// own line. The rest of the run is identical across sites — one
@@ -635,26 +661,14 @@ impl<'a> Printer<'a> {
     /// caller's ([`Self::build_trailing_closer_comments_doc`], whose container may still
     /// collapse) asks the predicate directly and keeps its own arm.
     ///
-    /// ⚠️ **The blank question is `isPreviousLineEmpty`, asked of the COMMENT** — is the
-    /// line DIRECTLY ABOVE it blank ([`Self::previous_line_is_empty`]) — not "does this gap
-    /// hold a blank line somewhere". Prettier's `printTrailingComment` emits its extra
-    /// `hardline` from `isPreviousLineEmpty(locStart(comment))`, and the two readings part
-    /// wherever re-emitted structure sits between the author's blank and the comment. The
-    /// list's own **comma** is exactly such structure: `import {a⏎⏎,⏎// c⏎b}` leaves a blank
-    /// in the gap while the line above the comment is the comma's, so a gap-wide scan
-    /// preserved a blank `printModuleSpecifiers` has no way to emit (it is a bare
-    /// `join([",", line], …)`).
-    ///
-    /// ⚠️ **The scan is still an IN-SOURCE question, and `blank_scan_start` is its FLOOR**
-    /// rather than `scan_from` itself: a comment physically in the gap that this run did not
-    /// emit — one an earlier emitter claimed, or an OWNED one printed from inside a node's
-    /// doc — still occupies those bytes. The predicate above already refuses a multi-line
-    /// block's own newlines (`[1 /* x⏎⏎y */⏎// c]`: the line above `// c` ends in `y */`, so
-    /// it is not blank), but the floor is what keeps the backward walk inside this run's
-    /// gap. Both readings of that shape fabricate a blank the author never wrote, and the
+    /// ⚠️ **The blank question is `isPreviousLineEmpty`, asked of the COMMENT** — the
+    /// own-line arm is [`Self::push_adjacent_blank_hardline`], which carries that rule and
+    /// its `blank_scan_start` floor. Both are the recurring bug here: a gap-wide reading
+    /// preserves a blank prettier has no way to emit, and an unfloored scan reads a
+    /// multi-line block's own newlines as one (`[1 /* x⏎⏎y */⏎// c]`). Either way the
     /// fabricated form is a fixed point both formatters then agree on — so F1, the ledger
-    /// and the census are all blind to it and only `fabrication:audit` on the pristine seed,
-    /// or a prettier `compare`, shows it.
+    /// and the census are all blind to it, and only `fabrication:audit` on the pristine
+    /// seed, or a prettier `compare`, shows it.
     pub(crate) fn push_trailing_run_separator(
         &self,
         parts: &mut DocBuf,
@@ -665,21 +679,46 @@ impl<'a> Printer<'a> {
         if self.trailing_run_hugs_previous(prev, next_start) {
             parts.push(self.d().text(" "));
         } else {
-            let from = self.blank_scan_start(scan_from, next_start);
-            // ⚠️ `isPreviousLineEmpty`, asked of the COMMENT — not "does this gap hold a
-            // blank". Prettier's `printTrailingComment` emits its extra `hardline` from
-            // `isPreviousLineEmpty(locStart(comment))`, so the blank has to be adjacent to
-            // the comment; a gap-wide scan additionally fires when re-emitted structure
-            // separates the two. The specifier list is where that bites — `import {a⏎⏎,⏎//
-            // c⏎b}` put the author's blank above the COMMA, which prettier never
-            // reproduces there (`printModuleSpecifiers` is a bare `join([",", line], …)`),
-            // so tsv preserved a blank prettier has no way to emit. `blank_scan_start`
-            // still supplies the floor, keeping an earlier comment's own newlines out.
-            if self.previous_line_is_empty(from, next_start) {
-                parts.push(self.d().literalline());
-            }
-            parts.push(self.d().hardline());
+            self.push_adjacent_blank_hardline(parts, scan_from, next_start);
         }
+    }
+
+    /// The own-line arm of a TRAILING run's separator: the comment's own `hardline`,
+    /// preceded by a `literalline` where the author left a blank line **directly above
+    /// it**.
+    ///
+    /// ⚠️ `isPreviousLineEmpty`, asked of the COMMENT ([`Self::previous_line_is_empty`])
+    /// — not "does this gap hold a blank". Prettier's `printTrailingComment` emits its
+    /// extra `hardline` from `isPreviousLineEmpty(locStart(comment))`, so the blank has to
+    /// be adjacent to the comment; the gap-wide scan
+    /// ([`Self::push_blank_preserving_hardline`], which is prettier's *leading* reading)
+    /// additionally fires when re-emitted structure separates the two. Two places that
+    /// bites: the specifier list's own comma (`import {a⏎⏎,⏎// c⏎b}` put the author's blank
+    /// above the COMMA, which `printModuleSpecifiers` — a bare `join([",", line], …)` — has
+    /// no way to emit), and a stripped grouping paren in a condition's trailing gap
+    /// (`if (⏎(⏎x⏎⏎)⏎/* c */⏎)`, where the blank is the shell's and is erased with it).
+    ///
+    /// ⚠️ **The scan is still an IN-SOURCE question, and `blank_scan_start` is its FLOOR**
+    /// rather than `scan_from` itself: a comment physically in the gap that this run did
+    /// not emit — one an earlier emitter claimed, or an OWNED one printed from inside a
+    /// node's doc — still occupies those bytes, and the backward walk must not read its
+    /// newlines as the author's.
+    ///
+    /// The single statement of that arm, for the trailing-run separator above and for the
+    /// control-flow gap builder's trailing run
+    /// (`Printer::build_comments_between_parts`), whose glue policy differs per gap but
+    /// whose blank question is this same one.
+    pub(crate) fn push_adjacent_blank_hardline(
+        &self,
+        parts: &mut DocBuf,
+        scan_from: u32,
+        next_start: u32,
+    ) {
+        let from = self.blank_scan_start(scan_from, next_start);
+        if self.previous_line_is_empty(from, next_start) {
+            parts.push(self.d().literalline());
+        }
+        parts.push(self.d().hardline());
     }
 
     /// Emit the whole trailing comment run in `[anchor, end)` for a gap whose layout is
@@ -702,11 +741,18 @@ impl<'a> Printer<'a> {
     /// [`push_trailing_comments_in_range`](Self::push_trailing_comments_in_range) or, at
     /// a stripped operand paren, `append_trailing_paren_comments`. See
     /// [docs/comments.md](../../../../../docs/comments.md) §Trailing and dangling runs.
+    ///
+    /// ⚠️ `leading_blank` is the one thing the three gaps do NOT share: whether an author
+    /// blank ABOVE the run's first comment survives ([`RunLeadingBlank`]). Two of them are
+    /// genuinely trailing runs and keep it; the operator→operand gap is a **leading** run
+    /// of the right operand that borrows this emitter for its anchor rule, and prettier's
+    /// `printLeadingComment` has no emitter for such a blank at all.
     pub(crate) fn push_anchored_trailing_run(
         &self,
         parts: &mut DocBuf,
         anchor: u32,
         end: u32,
+        leading_blank: RunLeadingBlank,
     ) -> u32 {
         let mut pos = anchor;
         let mut prev_comment: Option<&Comment> = None;
@@ -718,6 +764,11 @@ impl<'a> Printer<'a> {
                 // comment never forces the preceding group to break, matching prettier's
                 // `lineSuffix`), a block inline with its width counted.
                 parts.push(self.build_trailing_comment_doc(comment));
+            } else if prev_comment.is_none() && leading_blank == RunLeadingBlank::Drop {
+                // The run's first comment in a gap that drops the blank above it: the
+                // separator is the bare break, with no scan to make.
+                parts.push(self.d().hardline());
+                parts.push(self.build_comment_doc(comment));
             } else {
                 // On its own line — unless the author GLUED it to the previous comment,
                 // which keeps that line; otherwise an author blank above it is preserved.

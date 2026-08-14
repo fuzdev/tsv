@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 371,
+	"end": 519,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -108,9 +108,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " same-line block comment stays inline (no break)",
+			"value": " blank line before the comment is dropped - it sits above a leading run, where",
 			"start": 284,
-			"end": 334,
+			"end": 364,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -118,6 +118,54 @@
 				},
 				"end": {
 					"line": 21,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier has no emitter for it",
+			"start": 366,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " e",
+			"start": 420,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same-line block comment stays inline (no break)",
+			"start": 432,
+			"end": 482,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
 					"column": 51
 				}
 			}
@@ -125,15 +173,15 @@
 		{
 			"type": "Block",
 			"value": " d ",
-			"start": 350,
-			"end": 357,
+			"start": 498,
+			"end": 505,
 			"loc": {
 				"start": {
-					"line": 22,
+					"line": 29,
 					"column": 15
 				},
 				"end": {
-					"line": 22,
+					"line": 29,
 					"column": 22
 				}
 			}
@@ -142,19 +190,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 370,
+		"end": 518,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 361,
+			"end": 509,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 23,
+					"line": 30,
 					"column": 9
 				}
 			},
@@ -500,44 +548,163 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 336,
-					"end": 360,
+					"start": 401,
+					"end": 429,
 					"loc": {
 						"start": {
-							"line": 22,
+							"line": 23,
 							"column": 1
 						},
 						"end": {
-							"line": 22,
+							"line": 26,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 407,
+							"end": 428,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 407,
+								"end": 408,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 413,
+								"end": 428,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 3
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 413,
+									"end": 414,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 3
+										}
+									},
+									"name": "x"
+								},
+								"operator": "||",
+								"right": {
+									"type": "Identifier",
+									"start": 427,
+									"end": 428,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 2
+										},
+										"end": {
+											"line": 26,
+											"column": 3
+										}
+									},
+									"name": "y",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " e",
+											"start": 420,
+											"end": 424
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blank line before the comment is dropped - it sits above a leading run, where",
+							"start": 284,
+							"end": 364
+						},
+						{
+							"type": "Line",
+							"value": " prettier has no emitter for it",
+							"start": 366,
+							"end": 399
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 484,
+					"end": 508,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
 							"column": 25
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 342,
-							"end": 359,
+							"start": 490,
+							"end": 507,
 							"loc": {
 								"start": {
-									"line": 22,
+									"line": 29,
 									"column": 7
 								},
 								"end": {
-									"line": 22,
+									"line": 29,
 									"column": 24
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 342,
-								"end": 343,
+								"start": 490,
+								"end": 491,
 								"loc": {
 									"start": {
-										"line": 22,
+										"line": 29,
 										"column": 7
 									},
 									"end": {
-										"line": 22,
+										"line": 29,
 										"column": 8
 									}
 								},
@@ -545,29 +712,29 @@
 							},
 							"init": {
 								"type": "BinaryExpression",
-								"start": 346,
-								"end": 359,
+								"start": 494,
+								"end": 507,
 								"loc": {
 									"start": {
-										"line": 22,
+										"line": 29,
 										"column": 11
 									},
 									"end": {
-										"line": 22,
+										"line": 29,
 										"column": 24
 									}
 								},
 								"left": {
 									"type": "Identifier",
-									"start": 346,
-									"end": 347,
+									"start": 494,
+									"end": 495,
 									"loc": {
 										"start": {
-											"line": 22,
+											"line": 29,
 											"column": 11
 										},
 										"end": {
-											"line": 22,
+											"line": 29,
 											"column": 12
 										}
 									},
@@ -576,15 +743,15 @@
 								"operator": "+",
 								"right": {
 									"type": "Identifier",
-									"start": 358,
-									"end": 359,
+									"start": 506,
+									"end": 507,
 									"loc": {
 										"start": {
-											"line": 22,
+											"line": 29,
 											"column": 23
 										},
 										"end": {
-											"line": 22,
+											"line": 29,
 											"column": 24
 										}
 									},
@@ -593,8 +760,8 @@
 										{
 											"type": "Block",
 											"value": " d ",
-											"start": 350,
-											"end": 357
+											"start": 498,
+											"end": 505
 										}
 									]
 								}
@@ -606,8 +773,8 @@
 						{
 							"type": "Line",
 							"value": " same-line block comment stays inline (no break)",
-							"start": 284,
-							"end": 334
+							"start": 432,
+							"end": 482
 						}
 					]
 				}

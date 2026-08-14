@@ -314,12 +314,17 @@ impl<'a> Printer<'a> {
         if relocate {
             for (i, comment) in gap_comments.iter().enumerate() {
                 parts.push(self.build_comment_doc(comment));
-                // A space keeps a same-line block + line pair together (`/* c */ // d`);
-                // otherwise break. The last comment always breaks before the label.
+                // A space keeps a pair the author glued together (`/* c */ // d`);
+                // otherwise break. The glue question is `comment_hugs_next`, the single
+                // glue test — not an `is_same_line` restatement of it, which only
+                // coincides here because this gap holds nothing but trivia between two
+                // comments (`docs/comments.md` §Own-line-ness is a SOURCE question).
+                //
+                // ⚠️ The **last** comment always breaks, whatever the source says: it is
+                // followed by the label the run was relocated off, so hugging it would
+                // undo the relocation this arm exists for.
                 match gap_comments.get(i + 1) {
-                    Some(next) if self.is_same_line(comment.span.end, next.span.start) => {
-                        parts.push(d.text(" "));
-                    }
+                    Some(_) if self.comment_hugs_next(comment) => parts.push(d.text(" ")),
                     _ => parts.push(d.hardline()),
                 }
             }

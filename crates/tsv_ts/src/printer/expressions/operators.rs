@@ -6,7 +6,7 @@
 
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use crate::printer::comments::CommentSpacing;
-use crate::printer::{CommentVec, ParenContext, Printer};
+use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -258,7 +258,12 @@ impl<'a> Printer<'a> {
             // as own-line and split it, and asking the comment's KIND instead welded an
             // own-line `//` onto whatever preceded it (`docs/comments.md` §Trailing and
             // dangling runs).
-            self.push_anchored_trailing_run(&mut parts, argument_end, unary.span.end);
+            self.push_anchored_trailing_run(
+                &mut parts,
+                argument_end,
+                unary.span.end,
+                RunLeadingBlank::Keep,
+            );
             // The one break the group cannot see for itself. A trailing **line** comment
             // is deferred through a `line_suffix` (`build_trailing_line_comment_doc`), so
             // `will_break` reports nothing and a flat shell would carry the `//` out past
@@ -825,7 +830,7 @@ impl<'a> Printer<'a> {
 
         // Keep each comment where the author wrote it, then break before the operator —
         // the shared anchored-run emitter ([`Printer::push_anchored_trailing_run`]).
-        self.push_anchored_trailing_run(parts, operand_end, op_start);
+        self.push_anchored_trailing_run(parts, operand_end, op_start, RunLeadingBlank::Keep);
 
         parts.push(d.hardline());
         parts.push(d.text(op_str));
@@ -867,12 +872,9 @@ impl<'a> Printer<'a> {
             return;
         }
 
-        // A comment forces the operand onto its own (broken) line when it's a line
-        // comment OR a block comment with a newline AFTER it (toward the next comment
-        // / the operand) — prettier's `hasLeadingOwnLineComment`. Keying on the newline
-        // *after* (not before) is what makes this idempotent: prettier's own
-        // width-broken output puts an inline-leading block at line start (newline
-        // before, none after — `&&⏎/* c */ b`), which must stay inline, not re-break.
+        // Whether the run forces the operand onto its own (broken) line — a **line**
+        // comment, or a block the author gave a line of its own. Anything else is
+        // inline-leading and lets the chain's group decide on width.
         let forces_own_line = self.comment_hangs_binary_operand(op_end, operand.span.start);
 
         if !forces_own_line {
@@ -896,7 +898,12 @@ impl<'a> Printer<'a> {
         // operator (no newline after it) stays inline-leading it. The shared
         // anchored-run emitter ([`Printer::push_anchored_trailing_run`]), which hands
         // back the cursor the operand separator below reads.
-        let pos = self.push_anchored_trailing_run(parts, op_end, operand.span.start);
+        let pos = self.push_anchored_trailing_run(
+            parts,
+            op_end,
+            operand.span.start,
+            RunLeadingBlank::Drop,
+        );
 
         // Operand: on its own line when the last comment has a newline after it
         // (preserving an author blank line), else glued inline (`/* c */ operand`).

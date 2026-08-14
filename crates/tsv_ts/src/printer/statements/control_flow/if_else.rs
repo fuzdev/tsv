@@ -179,23 +179,15 @@ impl<'a> Printer<'a> {
         let else_end = self.find_else_keyword_end_between(consequent_end, alt_start);
 
         if matches!(alternate, Statement::EmptyStatement(_)) {
-            // Empty alternate: `} else;`, `} else /* c */ ;`, or `} else // c\n;`
-            if let Some(else_end) = else_end
-                && self.has_comments_to_emit_between(else_end, alt_start)
-            {
-                let has_line = self.has_line_comments_between(else_end, alt_start);
-                parts.push(d.text(" else"));
-                parts.push(self.build_inline_comments_between_doc(else_end, alt_start));
-                if has_line {
-                    // Line comment: `} else // c\n;`
-                    parts.push(d.hardline());
-                    parts.push(d.text(";"));
-                } else {
-                    // Block comment: `} else /* c */ ;`
-                    parts.push(d.text(" ;"));
+            // Empty alternate: `} else;`, `} else /* c */ ;`, or `} else // c\n;` — the
+            // same gap the `)`→`;` one is, so it shares that emitter. `else_end` is
+            // `None` only when the keyword scan failed, which leaves no gap to emit.
+            match else_end {
+                Some(else_end) => {
+                    parts.push(d.text(" else"));
+                    self.push_empty_statement_gap(parts, else_end, alt_start);
                 }
-            } else {
-                parts.push(d.text(" else;"));
+                None => parts.push(d.text(" else;")),
             }
         } else if let Some(else_end) = else_end
             && self.has_comments_to_emit_between(else_end, alt_start)
