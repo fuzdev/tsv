@@ -155,6 +155,74 @@ fn is_single_arrow_with_breakable_body(arg: &Expression<'_>) -> bool {
     false
 }
 
+/// A lone arrow argument with an EXPRESSION body — the shape the two
+/// expandable-literal hug arms in [`build_chain_args_force_expand`] share, before
+/// either asks its own body kind.
+fn single_arrow_expression_body<'a>(
+    call: &'a internal::CallExpression<'a>,
+) -> Option<(
+    &'a internal::ArrowFunctionExpression<'a>,
+    &'a Expression<'a>,
+)> {
+    if call.arguments.len() != 1 {
+        return None;
+    }
+    let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0] else {
+        return None;
+    };
+    match &arrow.body {
+        internal::ArrowFunctionBody::Expression(body) => Some((arrow, body)),
+        internal::ArrowFunctionBody::BlockStatement(_) => None,
+    }
+}
+
+/// Whether a comment sits in the arrow's body-end→arrow-end gap — an
+/// author-parenthesized body's stripped `)` region, or (for an object body) the
+/// grammar-required parens this layout synthesizes.
+///
+/// The hug arms reassemble the argument from its signature and body docs, so they
+/// are blind to that gap: a comment there reaches no emitter and the arm must
+/// decline, leaving the generic loop to print the argument through the
+/// comment-aware path — which is also prettier's settled form for the commented
+/// shape. **On page**, not to-emit: an owned comment still rides that region.
+///
+/// Asked last in each arm's guard, after the body kind, so an arrow heading for
+/// another arm pays no comment lookup.
+fn arrow_body_tail_has_comments(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    body_expr: &Expression<'_>,
+) -> bool {
+    printer.has_comments_on_page_between(body_expr.span().end, call.arguments[0].span().end)
+}
+
+/// The hugged-arrow layout both expandable-literal arms emit: `(sig => <body>)`,
+/// the signature hugged to the call paren and the body expanding internally behind
+/// its own delimiters. `body_doc` arrives already built — the object arm's
+/// grammar-required parens are the only thing the two assemble differently.
+fn build_hugged_arrow_arg_doc(
+    printer: &Printer<'_>,
+    mut parts: DocBuf,
+    ctx: ChainArgsContext,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body_expr: &Expression<'_>,
+    body_doc: DocId,
+) -> DocId {
+    let d = printer.d();
+    let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+    let sig_doc = prepend_leading(
+        d,
+        ctx.leading_comment_doc,
+        build_arrow_sig_doc(printer, arrow),
+    );
+    parts.push(d.text(ctx.prefix));
+    parts.push(sig_doc);
+    parts.push(d.text(" => "));
+    parts.push(body_doc);
+    parts.push(d.text(")"));
+    d.concat(&parts)
+}
+
 /// Build a Doc for call arguments with forced expansion (hardlines instead of softlines)
 ///
 /// Used for the "args expanded, chain inline" state in conditionalGroup.
@@ -428,31 +496,40 @@ fn build_chain_args_force_expand(
         }
     }
 
-    // Special case: single arrow arg with array body — the array expands internally.
-    // Layout: `(sig => [\n  items,\n])` — array content on new lines, bracket hugged.
+    // Special case: single arrow arg with an expandable LITERAL body — the body expands
+    // internally and the signature hugs the call paren (prettier's couldExpandArg), so
+    // fits() measures only `chain.map((sig) => [` / `=> ({` and truncates at the body's
+    // first hardline.
     // Skip when comments_force_expansion — this layout has no line to put a comment that
     // must own one on, and the `(`-line channel `leading_comment_doc` cannot carry has no
     // home here either.
     // Skip on a commented last argument — see `last_arg_commented` above.
-    if call.arguments.len() == 1
-        && !last_arg_commented
+    if !last_arg_commented
         && !comments_force_expansion
-        && let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]
-        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-        && matches!(&**body_expr, Expression::ArrayExpression(_))
+        && let Some((arrow, body_expr)) = single_arrow_expression_body(call)
     {
-        let body_doc = printer.build_arg_expression_doc_expanded(body_expr);
-        let body_doc =
-            prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
-        let sig_doc = build_arrow_sig_doc(printer, arrow);
-        let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
+        // ARRAY body: `(sig => [\n  items,\n])` — array content on new lines, bracket
+        // hugged.
+        if matches!(body_expr, Expression::ArrayExpression(_))
+            && !arrow_body_tail_has_comments(printer, call, body_expr)
+        {
+            let body_doc = printer.build_arg_expression_doc_expanded(body_expr);
+            return build_hugged_arrow_arg_doc(printer, parts, ctx, arrow, body_expr, body_doc);
+        }
 
-        parts.push(d.text(prefix));
-        parts.push(sig_doc);
-        parts.push(d.text(" => "));
-        parts.push(body_doc);
-        parts.push(d.text(")"));
-        return d.concat(&parts);
+        // OBJECT body: `(sig => ({\n  props\n}))` — the object expands behind its
+        // grammar-required parens, synthesized here. Skipped under standard expansion —
+        // prettier's all-broken fallback prints the argument normally (`(\n  sig => ({ … })
+        // \n)`), the object breaking by width alone — and when a break forced inside the
+        // signature invalidates the hug (`arrow_signature_has_breaking_comments`).
+        if matches!(body_expr, Expression::ObjectExpression(_))
+            && !standard_expansion
+            && !arrow_signature_has_breaking_comments(printer, arrow)
+            && !arrow_body_tail_has_comments(printer, call, body_expr)
+        {
+            let body_doc = d.parens(printer.build_arg_expression_doc_expanded(body_expr));
+            return build_hugged_arrow_arg_doc(printer, parts, ctx, arrow, body_expr, body_doc);
+        }
     }
 
     // Special case: single arrow arg with breakable body (call, ternary).

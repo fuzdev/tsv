@@ -215,6 +215,22 @@ pub enum DocNode {
     /// [`DocContext::hold_line_after_broken_flow`] reads at the immediately following
     /// fill. Zero-width and skipped by every measurement walk; invisible to `will_break`.
     FlowProbeEnd,
+
+    /// A conditional-group state guarded by a never-fits probe — the
+    /// member-chain flat-object hug window.
+    ///
+    /// Meaningful only as a non-final state of a conditional group. At state
+    /// selection the renderer first measures `probe` flat on a hypothetical
+    /// fresh line one indent level deeper than the group; if THAT fits, the
+    /// state is skipped entirely — the layout the probe stands for (the
+    /// expanded member chain keeping its last argument flat on the
+    /// continuation line) is the settled form, and admitting this state would
+    /// steal it. Only when the probe cannot fit anywhere is `contents`
+    /// measured and rendered like any other state. Everywhere else — fits
+    /// walks, `will_break`, rebuilds — the node is transparent to `contents`;
+    /// `probe` is measured only, never rendered (its nodes are shared with the
+    /// group's flat state, so nothing exists only inside it).
+    GatedState { probe: DocId, contents: DocId },
 }
 
 // `DocNode` must stay free of drop glue: dynamically-built text lives in the
@@ -1709,6 +1725,13 @@ impl DocArena {
         })
     }
 
+    /// Create a conditional-group state admitted only while `probe` cannot fit
+    /// flat on a fresh line one indent level deeper than the enclosing
+    /// conditional group — see [`DocNode::GatedState`].
+    pub fn gated_state(&self, probe: DocId, contents: DocId) -> DocId {
+        self.alloc(DocNode::GatedState { probe, contents })
+    }
+
     /// Increase indentation for nested doc.
     pub fn indent(&self, doc: DocId) -> DocId {
         self.alloc(DocNode::Indent(doc))
@@ -2079,6 +2102,12 @@ impl DocArena {
             // containing group is NOT unconditionally broken.
             DocNode::FlushBreak => false,
             DocNode::FlowProbeEnd => false,
+            // Transparent to contents (the probe is measure-only). As a
+            // conditional-group state this is never asked through the group —
+            // a Group's `will_break` reads `contents` (state 0) alone.
+            DocNode::GatedState { contents, .. } => {
+                Self::will_break_memo(*contents, nodes, children, cache)
+            }
         };
         cache[id.index()] = Some(result);
         result
@@ -2149,6 +2178,10 @@ impl DocArena {
             }
             DocNode::WithContext { doc, .. } => Self::can_break_inner(*doc, nodes, children),
             DocNode::LineSuffix(inner) => Self::can_break_inner(*inner, nodes, children),
+            // Transparent to contents (the probe is measure-only).
+            DocNode::GatedState { contents, .. } => {
+                Self::can_break_inner(*contents, nodes, children)
+            }
             DocNode::MultilineText { .. } => true,
             // deliberately newline-blind, unlike `will_break_fill`: canBreak asks
             // "is there a breakable `line` in here?", and a Text's embedded newline
@@ -2249,6 +2282,7 @@ impl DocArena {
             WithContext(DocId, DocContext),
             LineSuffix(DocId),
             BreakParent,
+            GatedState(DocId, DocId),
         }
 
         let info = {
@@ -2297,6 +2331,7 @@ impl DocArena {
                 // Both are pure layout-forcing markers with no content: flattening
                 // drops them the same way (`Info::BreakParent` → `empty()`).
                 DocNode::BreakParent | DocNode::FlushBreak => Info::BreakParent,
+                DocNode::GatedState { probe, contents } => Info::GatedState(*probe, *contents),
             }
         }; // nodes borrow dropped here
 
@@ -2411,6 +2446,15 @@ impl DocArena {
                 self.line_suffix(new_inner)
             }
             Info::BreakParent => self.empty(),
+            // Rebuild both halves, keeping the gate: under `remove_lines` (which
+            // keeps conditional-group states) the state must stay gated; under
+            // `atomize` the node is unreachable through a group (states dropped)
+            // and the rebuild is inert.
+            Info::GatedState(probe, contents) => {
+                let new_probe = self.flatten_lines_impl(probe, mode);
+                let new_contents = self.flatten_lines_impl(contents, mode);
+                self.gated_state(new_probe, new_contents)
+            }
         };
 
         // Rebuilding the tree strands a comment doc's ledger tag on the discarded original

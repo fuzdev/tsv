@@ -133,6 +133,13 @@ fn flat_width_fill(
         DocNode::FlushBreak => None,
         // Render-only sentinel; zero columns, no layout effect.
         DocNode::FlowProbeEnd => Some(0),
+        // Transparent to `contents` — the width of a gated state is the width of
+        // what it would render; the probe is measure-only and never reaches output.
+        // (Unreachable in practice: a `GatedState` is only ever a conditional-group
+        // state, and a fill's items are not states.)
+        DocNode::GatedState { contents, .. } => {
+            flat_width_memo(*contents, nodes, children, cache, source)
+        }
     };
     cache[id.index()] = match result {
         Some(w) => w,
@@ -379,6 +386,14 @@ pub(super) fn arena_fits_with_lookahead(
                 // Render-only sentinel: zero columns, no layout effect — the probe it
                 // completes exists only on the real render's command stack.
                 DocNode::FlowProbeEnd => {}
+
+                // Transparent to contents: only conditional-group state
+                // selection reads the probe (arena_render's states loop); a
+                // fits walk that reaches the node measures what would render.
+                DocNode::GatedState { contents, .. } => {
+                    current_id = *contents;
+                    continue;
+                }
             }
         }
 

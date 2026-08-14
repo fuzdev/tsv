@@ -367,6 +367,7 @@ fn classify_node(n: &DocNode) -> &'static str {
         DocNode::BreakParent => "BreakParent",
         DocNode::FlushBreak => "FlushBreak",
         DocNode::FlowProbeEnd => "FlowProbeEnd",
+        DocNode::GatedState { .. } => "GatedState",
     }
 }
 

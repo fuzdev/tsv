@@ -1451,6 +1451,57 @@ const member_expression_call: DivergencePattern = {
 	}
 };
 
+const member_chain_hug_convergence: DivergencePattern = {
+	id: 'member_chain_hug_convergence',
+	description:
+		'Member-chain wide-last-argument hug printed in one pass (prettier reaches the same form on its second)',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: [
+		'typescript/expressions/calls/chained/last_arg_hug_convergence_long_prettier_divergence'
+	],
+	detect(ctx) {
+		// Prettier's single pass breaks the chain (its non-idempotent intermediate);
+		// tsv prints prettier's own settled second pass: the chain flat with the last
+		// call's object-rooted argument hugging. The match is a byte-precise
+		// pure-reflow proof, so a real bug cannot ride it:
+		//   1. prettier's side opens with a chain head plus >=1 member lines
+		//      (trimmed lines starting with `.` / `?.`), the last opening the
+		//      argument;
+		//   2. ours' first line is EXACTLY those lines' trims joined (the flat
+		//      chain — member joins are space-free);
+		//   3. every remaining line is identical except prettier's carries exactly
+		//      one extra tab (the broken chain's indent level).
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const removed = hunk.removed_lines;
+			const added = hunk.added_lines;
+			if (removed.length < 3 || added.length < 2) return false;
+			let k = 1;
+			while (k < removed.length && /^[?.]/.test(removed[k].trimStart())) k++;
+			if (k < 2 || k >= removed.length) return false;
+			const joined = removed
+				.slice(0, k)
+				.map((l) => l.trim())
+				.join('');
+			if (added[0].trim() !== joined) return false;
+			const rest_removed = removed.slice(k);
+			const rest_added = added.slice(1);
+			if (rest_removed.length !== rest_added.length) return false;
+			return rest_removed.every((l, i) => l === '\t' + rest_added[i]);
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'member_chain_hug_convergence',
+				confidence: 'certain',
+				hunk_indices,
+				reason: 'Member chain collapsed to the hug prettier itself converges to on a second pass'
+			};
+		}
+		return null;
+	}
+};
+
 const return_type_generic_union: DivergencePattern = {
 	id: 'return_type_generic_union',
 	description: 'Return type generic with union wraps at print width',
@@ -3433,6 +3484,7 @@ export const PATTERNS: DivergencePattern[] = [
 	field_key_unquote,
 	block_expression_logical,
 	member_expression_call,
+	member_chain_hug_convergence,
 	return_type_generic_union,
 	non_null_paren_base,
 	union_paren_member_inline,

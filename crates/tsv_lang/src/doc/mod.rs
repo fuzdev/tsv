@@ -1150,6 +1150,48 @@ mod arena_tests {
     }
 
     #[test]
+    fn test_gated_state_admission_tracks_the_probe() {
+        // A miniature member-chain hug window (see `DocNode::GatedState`):
+        //   state 0 — everything flat:        `x.f().m({ aaaa })`   (17 wide)
+        //   state 1 — gated hug:              `x.f().m({⏎  aaaa⏎})` (head 9 wide)
+        //   state 2 — expanded fallback:      `x⏎  .f()⏎  m({ aaaa })`
+        // The probe is the last group's flat form, `m({ aaaa })` (11 wide),
+        // measured on a fresh line one indent level deeper (tab = 2 → 13
+        // columns needed). The hug is admitted only while that line cannot
+        // hold it — otherwise the fallback keeping the argument flat is the
+        // settled form and must win.
+        fn build(a: &DocArena) -> DocId {
+            let last_flat = a.concat(&[a.text("m("), a.text("{ aaaa }"), a.text(")")]);
+            let one_line = a.concat(&[a.text("x.f()."), last_flat]);
+            let hug = a.concat(&[
+                a.text("x.f()."),
+                a.group_break(a.concat(&[
+                    a.text("m({"),
+                    a.indent(a.concat(&[a.hardline(), a.text("aaaa")])),
+                    a.hardline(),
+                    a.text("})"),
+                ])),
+            ]);
+            let expanded = a.concat(&[
+                a.text("x"),
+                a.indent(a.concat(&[a.hardline(), a.text(".f()"), a.hardline(), last_flat])),
+            ]);
+            a.conditional_group(&[one_line, a.gated_state(last_flat, hug), expanded])
+        }
+        let a = DocArena::new();
+        let doc = build(&a);
+        // Everything fits flat → state 0.
+        assert_eq!(render_pw_tab(&a, doc, 20), "x.f().m({ aaaa })");
+        // Flat overflows, but the probe fits on the fallback's continuation
+        // line (2 + 11 = 13 ≤ 14) → the hug is SKIPPED → expanded fallback.
+        assert_eq!(render_pw_tab(&a, doc, 14), "x\n\t.f()\n\tm({ aaaa })");
+        // Probe cannot fit (13 > 12) and the hug's head fits (9 ≤ 12) → hug.
+        assert_eq!(render_pw_tab(&a, doc, 12), "x.f().m({\n\taaaa\n})");
+        // Probe cannot fit AND the hug's head overflows (9 > 8) → fallback.
+        assert_eq!(render_pw_tab(&a, doc, 8), "x\n\t.f()\n\tm({ aaaa })");
+    }
+
+    #[test]
     #[should_panic(expected = "conditional_group requires at least one state")]
     fn test_conditional_group_empty_panics() {
         let a = DocArena::new();
