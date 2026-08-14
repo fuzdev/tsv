@@ -13,17 +13,30 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: minor -->
 
-- many formatting fixes
-- feat: publish native binaries, both CLI and JS lib
-  for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64
-  ([#725](https://github.com/fuzdev/tsv/pull/725), [#726](https://github.com/fuzdev/tsv/pull/726))
+- many formatting fixes — including closing the known comment content-loss classes
+  (comments dropped, doubled, or merged by printer gaps), now held by standing audits
+- feat: publish native binaries, both CLI and JS lib — install `@fuzdev/tsv`
+  (N-API addon plus the real native `tsv` CLI; `npx tsv` execs the binary), over
+  `@fuzdev/tsv-<triple>` platform packages for Linux (x64 gnu and musl, arm64 gnu),
+  macOS arm64, and Windows x64; API-identical to `@fuzdev/tsv_wasm`, which stays the
+  universal fallback ([#717], [#718], [#720], [#725], [#726])
 - **breaking** feat: every WASM export now takes an optional acorn-style options object —
-  `parse_*(source, {locations?, goal?})` and `format_*(source, {goal?})`,
-  replacing the flat `*_no_locations` / `*_with_goal` / `*_with_goal_no_locations` names
-  ([#645](https://github.com/fuzdev/tsv/pull/645), [#713](https://github.com/fuzdev/tsv/pull/713))
+  `parse_*(source, {locations?, goal?})` and `format_*(source, {goal?})`, replacing the
+  flat `*_no_locations` / `*_with_goal` names; unknown keys throw, `goal` is
+  TypeScript-only ([#645], [#713])
+- **breaking** fix: parse output tracks its canonical oracles — CSS roots gain
+  `comments: CSSComment[]`, Svelte components without `lang="ts"` emit vanilla acorn's
+  `ImportExpression.options` instead of `arguments`, plus small acorn-typescript 1.0.13
+  alignments ([#702], [#764], [#766], [#774])
+- **breaking** fix: naming a file tsv doesn't format (`tsv format some.json`) is now an
+  upfront argument error instead of being parsed as TypeScript; directory arguments are
+  unaffected ([#709])
+- fix: a panic can no longer take down the host — the WASM instance survives a trap and
+  stays callable, the native addon throws a JS error instead of aborting, and format
+  workers reserve an 8 MiB stack for deeply nested files ([#616], [#717])
 - feat: more formatting choices to take advantage of Svelte 5 whitespace changes
-  ([#558](https://github.com/fuzdev/tsv/pull/558), [#600](https://github.com/fuzdev/tsv/pull/600),
-  [#601](https://github.com/fuzdev/tsv/pull/601), [#607](https://github.com/fuzdev/tsv/pull/607))
+  ([#558], [#600], [#601], [#607])
+- feat: `tsv --version`
 
 ## 0.2.0
 
