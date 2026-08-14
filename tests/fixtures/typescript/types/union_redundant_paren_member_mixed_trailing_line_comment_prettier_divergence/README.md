@@ -8,15 +8,14 @@ comment together with a **leading block** (mixed, `A | (/* b */ // c\n B)`) or a
 double-nested forms.
 
 **tsv** strips the parens (they don't survive, so the run cannot stay "inside")
-and renders it between the `| ` members — the block and line each on their own
-line before the member's `| `, a trailing block staying inline after the member,
-each comment kept where the author wrote it:
+and renders it between the `| ` members — above the member's `| `, a trailing
+block staying inline after the member, each comment kept where the author wrote
+it:
 
 ```ts
 type U1 =
 	| A
-	/* b */
-	// c
+	/* b */ // c
 	| B;
 
 type U2 =
@@ -24,6 +23,11 @@ type U2 =
 	// c
 	| B /* t */;
 ```
+
+The run keeps the author's own **glue**: `/* b */` shares the line comment's line
+because that is where it was written. Only the run's POSITION is at issue below —
+its interior is prettier's leading-comment rule, which both formatters apply the
+same way here.
 
 **Prettier** floats the leading run across the member boundary to **trail the
 previous member** (`| A /* b */ // c`), keeping the rest inline —

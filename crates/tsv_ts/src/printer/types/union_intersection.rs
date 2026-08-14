@@ -75,7 +75,7 @@ impl<'a> Printer<'a> {
     /// parens that don't survive — whose leading gap holds a **line** comment. Covers the
     /// pure-line (`(// c⏎ b)`), mixed (`(/* b */ // c⏎ b)`), and trailing (`(// c⏎ b /* t */)`)
     /// shells uniformly: the whole run hoists losslessly — the leading block + line each on
-    /// their own line before the `| ` (this run, via [`Self::push_own_line_comment_run`]),
+    /// their own line before the `| ` (this run, via [`Self::push_union_member_leading_run`]),
     /// the trailing comment appended to the member via [`Self::with_stripped_paren_trailing`].
     /// Declines a **retained**-paren member (union / intersection / function / conditional —
     /// its comment stays inside, the arms further down) and a non-paren member. Requires a
@@ -99,13 +99,40 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Push each comment on its own line (comment + `hardline`), the layout a
-    /// stripped-redundant-paren member's leading line run takes before its `| `
-    /// separator ([`Self::stripped_redundant_paren_member_leading_run`]).
-    fn push_own_line_comment_run(&self, parts: &mut DocBuf, comments: &CommentVec<'_>) {
+    /// Push a comment run that leads a union member from ABOVE its `| ` separator —
+    /// the layout both runs at that seam take: the member gap's own-line side
+    /// ([`Self::union_gap_inline_run_start`]) and a stripped-redundant-paren member's
+    /// hoisted leading run ([`Self::stripped_redundant_paren_member_leading_run`]).
+    ///
+    /// The run's INTERNAL shape is prettier's leading-comment rule, asked per comment of
+    /// its own neighbour: a comment the author glued to the next one keeps it on the same
+    /// line, an author blank between two of them survives, and everything else takes a
+    /// line of its own. The LAST comment always breaks — the `| ` opens the member's line,
+    /// so this side of the seam cannot end inline — and no blank is emitted toward the
+    /// member, which is the one place this run departs from
+    /// [`Self::push_leading_comment_run`] and why it cannot simply delegate.
+    ///
+    /// ⚠️ **Both runs take this rule because glue is the AUTHOR's, not the seam's.** The
+    /// stripped-paren run used to hardline unconditionally, so `(/* b */ // c⏎ b)` came out
+    /// with the block and the line on separate lines — a pair the author wrote on one. The
+    /// enclosing divergence sanctions only the run's POSITION (tsv leads the member, prettier
+    /// trails the previous one); it says nothing about the run's interior, where prettier
+    /// glues exactly as tsv does everywhere else.
+    fn push_union_member_leading_run(&self, parts: &mut DocBuf, run: &[&Comment]) {
         let d = self.d();
-        for comment in comments {
+        for (j, comment) in run.iter().enumerate() {
             parts.push(self.build_comment_doc(comment));
+            let Some(next) = run.get(j + 1) else {
+                parts.push(d.hardline());
+                continue;
+            };
+            if self.comment_hugs_next(comment) {
+                parts.push(d.text(" "));
+                continue;
+            }
+            if self.has_blank_line_between(comment.span.end, next.span.start) {
+                parts.push(d.literalline());
+            }
             parts.push(d.hardline());
         }
     }
@@ -816,33 +843,11 @@ impl<'a> Printer<'a> {
                         parts.push(d.literalline());
                     }
                     parts.push(d.hardline());
-                    for (j, comment) in own_line.iter().enumerate() {
-                        parts.push(self.build_comment_doc(comment));
-                        let Some(next) = own_line.get(j + 1) else {
-                            // The last comment always breaks — the `| ` below opens the
-                            // member's line, so this side of the split cannot end inline.
-                            // It may still be glued forward in SOURCE (to the member, or
-                            // to a comment the chain rule kept on this side); the split
-                            // already decided that, and re-asking here would put the `|`
-                            // on the comment's line. No blank line is emitted toward the
-                            // member (see the blank-line note above).
-                            parts.push(d.hardline());
-                            continue;
-                        };
-                        // A block the author glued to the next comment leads it inline,
-                        // matching prettier's leading-comment rule. This run brackets the
-                        // `| ` separator and has its own blank-line policy, so it can't use
-                        // `push_leading_comment_run` — but it shares the rule.
-                        if self.comment_hugs_next(comment) {
-                            parts.push(d.text(" "));
-                            continue;
-                        }
-                        if self.has_blank_line_between(comment.span.end, next.span.start) {
-                            parts.push(d.literalline());
-                        }
-                        parts.push(d.hardline());
-                    }
-                    self.push_own_line_comment_run(&mut parts, &stripped_paren_leading);
+                    // Both runs at this seam take one rule — see
+                    // [`Self::push_union_member_leading_run`]. The last comment of either
+                    // breaks, so the two compose without a separator of their own.
+                    self.push_union_member_leading_run(&mut parts, own_line);
+                    self.push_union_member_leading_run(&mut parts, &stripped_paren_leading);
                     parts.push(d.text("| "));
                     for comment in inline {
                         parts.push(self.build_comment_doc(comment));
@@ -851,7 +856,7 @@ impl<'a> Printer<'a> {
                 } else {
                     // No pipe found, just add separator
                     parts.push(d.hardline());
-                    self.push_own_line_comment_run(&mut parts, &stripped_paren_leading);
+                    self.push_union_member_leading_run(&mut parts, &stripped_paren_leading);
                     parts.push(d.text("| "));
                 }
             } else {
