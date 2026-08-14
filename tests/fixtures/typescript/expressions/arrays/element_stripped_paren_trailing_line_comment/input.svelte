@@ -23,4 +23,12 @@
 		// c
 		y
 	];
+
+	// the same behind a shell whose closer takes its own line — the `)` and the
+	// comment sit on two lines the element's span excludes, and those are not a blank
+	const e = [
+		x,
+		// c
+		y
+	];
 </script>

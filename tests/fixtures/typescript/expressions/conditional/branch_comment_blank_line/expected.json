@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 623,
+	"end": 709,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -201,24 +201,56 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the alternate gap's inline form, the mirror of t4",
+			"start": 615,
+			"end": 667,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 688,
+			"end": 695,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 20
+				},
+				"end": {
+					"line": 36,
+					"column": 27
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 622,
+		"end": 708,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 613,
+			"end": 699,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 34,
+					"line": 37,
 					"column": 9
 				}
 			},
@@ -872,6 +904,134 @@
 							"value": " comment (now on its own line) drops the consequent below it",
 							"start": 500,
 							"end": 562
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 669,
+					"end": 698,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 675,
+							"end": 697,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 675,
+								"end": 677,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 7
+									},
+									"end": {
+										"line": 36,
+										"column": 9
+									}
+								},
+								"name": "t6"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 680,
+								"end": 697,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 12
+									},
+									"end": {
+										"line": 36,
+										"column": 29
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 680,
+									"end": 681,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 12
+										},
+										"end": {
+											"line": 36,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 684,
+									"end": 685,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 16
+										},
+										"end": {
+											"line": 36,
+											"column": 17
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 696,
+									"end": 697,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 28
+										},
+										"end": {
+											"line": 36,
+											"column": 29
+										}
+									},
+									"name": "c",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 688,
+											"end": 695
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the alternate gap's inline form, the mirror of t4",
+							"start": 615,
+							"end": 667
 						}
 					]
 				}

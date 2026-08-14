@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 481,
+	"end": 677,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -153,24 +153,72 @@
 					"column": 6
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the same behind a shell whose closer takes its own line — the `)` and the",
+			"start": 473,
+			"end": 549,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment sit on two lines the element's span excludes, and those are not a blank",
+			"start": 551,
+			"end": 633,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 654,
+			"end": 658,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 6
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 480,
+		"end": 676,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 471,
+			"end": 667,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 26,
+					"line": 34,
 					"column": 9
 				}
 			},
@@ -636,6 +684,126 @@
 							"value": " a line comment that leads its own line leads the next element instead",
 							"start": 365,
 							"end": 437
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 635,
+					"end": 666,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 641,
+							"end": 665,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 641,
+								"end": 642,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 645,
+								"end": 665,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 11
+									},
+									"end": {
+										"line": 33,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 649,
+										"end": 650,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 2
+											},
+											"end": {
+												"line": 30,
+												"column": 3
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 661,
+										"end": 662,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 2
+											},
+											"end": {
+												"line": 32,
+												"column": 3
+											}
+										},
+										"name": "y",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 654,
+												"end": 658
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same behind a shell whose closer takes its own line — the `)` and the",
+							"start": 473,
+							"end": 549
+						},
+						{
+							"type": "Line",
+							"value": " comment sit on two lines the element's span excludes, and those are not a blank",
+							"start": 551,
+							"end": 633
 						}
 					]
 				}

@@ -539,7 +539,7 @@ impl<'a> Printer<'a> {
     /// ([`printing::has_blank_line_between_strict`], the shared statement of the
     /// intervening-line rule), over a gap that is whitespace and at most a delimiter or
     /// two.
-    fn has_blank_line_between_strict(&self, from: u32, next: u32) -> bool {
+    pub(in crate::printer) fn has_blank_line_between_strict(&self, from: u32, next: u32) -> bool {
         self.has_blank_line_between(from, next)
             && printing::has_blank_line_between_strict(self.source, from, next)
     }

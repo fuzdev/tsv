@@ -1021,9 +1021,16 @@ impl<'a> Printer<'a> {
     /// comment is itself a break trigger — e.g. a ternary branch (`a ? /* c */⏎⏎b`),
     /// where prettier breaks on the blank even though the own-line comment alone
     /// does not.
+    ///
+    /// A **break gate must ask its emitter's question in the emitter's spelling**, so this
+    /// is the STRICT scan: the ternary branch gap's own blank emitter takes it, and `end`
+    /// there is a branch span that starts inside a stripped paren shell. The table-only
+    /// count reads the erased `(`'s two line breaks as an author blank and opens a ternary
+    /// that fits — the gate and the emitter fabricating in lockstep, which is why the
+    /// output stayed a fixed point and only a prettier `compare` found it.
     pub(crate) fn comment_followed_by_blank(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| {
-            self.has_blank_line_between(c.span.end, next)
+            self.has_blank_line_between_strict(c.span.end, next)
         })
     }
 
