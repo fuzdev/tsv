@@ -152,20 +152,14 @@ impl<'a> Printer<'a> {
 
         // Preserve comments between `while` keyword and `(` in place:
         //   do{}while/* c */(a); → do {} while /* c */ (a);
-        let keyword_comments = if let Some(wp) = while_pos {
-            let while_keyword_end = wp + "while".len() as u32;
-            self.build_keyword_paren_comments(while_keyword_end, open_paren)
-        } else {
-            None
-        };
+        let keyword_comments = while_pos.and_then(|wp| {
+            self.build_keyword_paren_comments(wp + "while".len() as u32, open_paren)
+        });
 
+        // The keyword is pushed here rather than by `push_keyword_open_paren`: the
+        // `}`→`while` gap above already owns everything ahead of it.
         parts.push(d.text("while"));
-        if let Some(kc) = keyword_comments {
-            parts.push(kc);
-            parts.push(d.text("("));
-        } else {
-            parts.push(d.text(" ("));
-        }
+        self.push_open_paren_after_keyword(&mut parts, keyword_comments);
 
         // The same entry point `if` / `while` use, as in prettier (whose
         // `printDoWhileStatementCondition` is `printIfStatementCondition` under another
