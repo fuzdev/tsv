@@ -55,10 +55,30 @@ impl<'a> Printer<'a> {
     /// It arises both ways round: the parser *strips* grouping parens (`await (x /* c */)`
     /// → the arg is `x`, orphaning `/* c */` before the expression's span end), and the
     /// restricted-production hanging layout *retains* them (the comment prints inside the
-    /// parens, bounded by the `)` rather than the span end). Layout by kind:
-    /// - Same-line block comments: inline with leading space (`x /* c */`)
-    /// - Line comments: deferred via `line_suffix` to appear after the semicolon (`x; // c`)
-    /// - Own-line block comments: deferred via `line_suffix` with hardline (`x;\n/* c */`)
+    /// parens, bounded by the `)` rather than the span end). Layout per comment:
+    /// - Glued to the operand's line, block: inline with leading space (`x /* c */`)
+    /// - Own line: deferred via `line_suffix` with a hardline, keeping an author blank
+    ///   above it (`x;\n\n/* c */`) — prettier's `printTrailingComment`, its
+    ///   `hasNewline(…, { backwards: true })` + `isPreviousLineEmpty` arm
+    /// - Anything else: deferred via `line_suffix` on the previous comment's line
+    ///   (`x; // c`, `x;\n/* c1 */ /* c2 */`)
+    ///
+    /// ⚠️ **The question is the SOURCE, asked per comment, and only then the kind.** The
+    /// anchor advances over every comment emitted here, so the second half of a run the
+    /// author glued (`x⏎/* c1 */ /* c2 */`) is not own-line and keeps that line; a fixed
+    /// `argument_end` anchor read it across `c1` and split the pair. Asking the KIND
+    /// first is the mirror-image formulation `docs/comments.md` §Trailing and dangling
+    /// runs names: it gave an own-line `//` the inline suffix, WELDING it onto the
+    /// previous comment's output line (`x; // c1 // c2` — the second delimiter becomes
+    /// text inside the first, and the comment stops existing).
+    ///
+    /// ⚠️ **A comment glued BEHIND a deferred one is deferred too.** Deferral is what
+    /// carries this run past the terminator, so an inline block emitted after the run has
+    /// started renders *ahead* of it and the authored pair comes out REORDERED. Unlike
+    /// [`Printer::push_trailing_comments_in_range`], where only a `//` can open the run
+    /// (and nothing can follow one on its line), an own-line **block** opens it here —
+    /// this gap floats own-line comments out rather than keeping them inline — so the
+    /// glued-behind case is reachable and needs its own arm.
     ///
     /// Keeps a same-line block comment with its operand (before any terminator) — the
     /// expression-level operand callers (await, yield, binary, sequence) where the
@@ -75,21 +95,31 @@ impl<'a> Printer<'a> {
         argument_end: u32,
         span_end: u32,
     ) {
-        let d = self.d();
+        // Whether anything has been deferred yet — a `//`, or an own-line comment.
+        let mut deferred_run = false;
+        // What physically precedes the next comment: an **in-source** cursor, so it
+        // advances over every comment in the gap (docs/comments.md §the three axes).
+        let mut prev_end = argument_end;
         for comment in comments_to_emit_in_range(self.comments, argument_end, span_end) {
-            if comment.is_block && !self.has_newline_between(argument_end, comment.span.start) {
-                // Same-line block comment: `expr /* c */`
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            } else if !comment.is_block {
-                // Line comment: defer to after semicolon via line_suffix
-                let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
-                parts.push(d.line_suffix(suffix));
+            // The *comment* line-break table, never the layout one: this decides whether
+            // a `//` is followed by a break, so it must stay real under the canonical
+            // reprint, where an erased read would weld the run.
+            let own_line = self.comment_has_newline_between(prev_end, comment.span.start);
+            parts.push(if own_line {
+                self.build_trailing_comment_doc_own_line_blank(
+                    comment,
+                    self.previous_line_is_empty(
+                        self.blank_scan_start(prev_end, comment.span.start),
+                        comment.span.start,
+                    ),
+                )
+            } else if deferred_run || !comment.is_block {
+                self.build_trailing_line_comment_doc(comment)
             } else {
-                // Own-line block comment: defer to own line after semicolon
-                let suffix = d.concat(&[d.hardline(), self.build_comment_doc(comment)]);
-                parts.push(d.line_suffix(suffix));
-            }
+                self.build_trailing_comment_doc(comment)
+            });
+            deferred_run |= own_line || !comment.is_block;
+            prev_end = comment.span.end;
         }
     }
 

@@ -172,6 +172,11 @@ impl<'a> Printer<'a> {
     /// Wrapping in line_suffix excludes the comment from width calculations,
     /// so elements can stay compact even when the trailing comment would push
     /// the line over print_width.
+    ///
+    /// Kind-agnostic like its own-line sibling
+    /// ([`Self::build_trailing_comment_doc_own_line`]): a **block** takes it too where
+    /// the run it belongs to has already deferred, since an inline emission there would
+    /// render *ahead* of the buffered text and reorder the pair (`append_trailing_paren_comments`).
     pub(crate) fn build_trailing_line_comment_doc(&self, comment: &internal::Comment) -> DocId {
         let d = self.d();
         d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)]))
@@ -214,5 +219,30 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_trailing_comment_doc_own_line(&self, comment: &internal::Comment) -> DocId {
         let d = self.d();
         d.line_suffix(d.concat(&[d.hardline(), self.build_comment_doc(comment)]))
+    }
+
+    /// [`Self::build_trailing_comment_doc_own_line`] with an author BLANK line above the
+    /// comment preserved — prettier's `printTrailingComment` emits a second `hardline`
+    /// from `isPreviousLineEmpty(locStart(comment))`, asked of the COMMENT rather than of
+    /// the gap ([`Self::push_trailing_run_separator`] carries the same rule at the
+    /// non-deferred sites). The caller answers that question; this only emits it.
+    ///
+    /// ⚠️ The blank is a **second `hardline`**, not the `literalline` + `hardline` pair
+    /// every non-deferred site uses ([`Self::push_blank_preserving_separator`]). Those
+    /// sites emit their blank while the previous line is still open, so the `literalline`
+    /// is the break that ends it; here the run's own leading `hardline` has already ended
+    /// it, and a `literalline` after that one would leave its indent on the blank line
+    /// (it is the one line kind the renderer does not trim behind) and start the comment
+    /// at column 0.
+    pub(crate) fn build_trailing_comment_doc_own_line_blank(
+        &self,
+        comment: &internal::Comment,
+        blank_above: bool,
+    ) -> DocId {
+        if !blank_above {
+            return self.build_trailing_comment_doc_own_line(comment);
+        }
+        let d = self.d();
+        d.line_suffix(d.concat(&[d.hardline(), d.hardline(), self.build_comment_doc(comment)]))
     }
 }
