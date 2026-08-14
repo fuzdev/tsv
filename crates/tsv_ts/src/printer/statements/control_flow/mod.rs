@@ -17,11 +17,115 @@ mod try_jump;
 use smallvec::SmallVec;
 
 use crate::ast::internal::{Expression, Statement, UnaryOperator};
-use crate::printer::{CommentVec, Printer};
+use crate::printer::{CommentVec, LeadingGlue, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, comments_to_emit_in_range};
+
+/// Which of prettier's three comment runs a control-flow gap's off-the-anchor-line
+/// comments form — the single fact all three of
+/// [`Printer::build_comments_between_parts`]'s per-gap policies follow from.
+///
+/// The three gaps this builder serves are three different things in prettier's model,
+/// and every difference between them is downstream of that: `handleIfStatementComments`
+/// (and its `while`-like / `try` / for-x siblings) attaches a condition→`)` comment as a
+/// **trailing** comment of the test, a header→body comment as a **leading** comment of
+/// the body, and a `}`→continuation-keyword comment as a **dangling** comment of the
+/// statement — then `printTrailingComment` / `printLeadingComment` /
+/// `printDanglingComments` answer the questions below differently. Naming the run
+/// rather than the policies is what stops a new gap from taking the glue rule of one and
+/// the blank rule of another: they are **not** correlated (a leading run glues and
+/// drops the leading blank, a trailing run glues and keeps it, a dangling run does
+/// neither), so a flag per policy would have more states than are real.
+#[derive(Clone, Copy)]
+enum GapCommentRun {
+    /// A **trailing** run of the thing behind it: the condition→`)` gap, where the
+    /// comments trail the test inside the parens.
+    ///
+    /// A pair the author glued onto one line keeps that line —
+    /// `printTrailingComment` gives the second comment of a glued pair a
+    /// `lineSuffix([" ", …])` where the first took the `hardline` — which is the same
+    /// answer [`Printer::trailing_run_hugs_previous`] states for every other trailing run
+    /// in tsv. A blank above the run's first comment survives: there is no body `{` here
+    /// for one to sit below, only the `)`. `blank_seed` is where that scan is floored.
+    ///
+    /// It is `isPreviousLineEmpty` — the blank must sit **directly above the comment** —
+    /// because that is what `printTrailingComment` reads
+    /// ([`Printer::push_adjacent_blank_hardline`]), and this is the one gap of the three
+    /// that can hold re-emitted structure between the two: a grouping paren the
+    /// condition's span starts inside. `if (⏎(⏎x⏎⏎)⏎/* c */⏎)` writes its blank inside
+    /// the shell, so the shell's erasure takes the blank with it and the gap-wide
+    /// reading keeps a blank prettier has no way to emit.
+    Trailing { blank_seed: u32 },
+    /// A **leading** run of what follows it: the comments introduce the body below them —
+    /// every header→body gap (`if` / `while` / `do` / `for` / for-in / for-of / `switch` /
+    /// `try` / `catch` / `finally`, block body or not).
+    ///
+    /// A pair the author glued onto one line **keeps that line**: `printLeadingComment`
+    /// asks its glue test of the source right after each `*/`, so a run the author wrote
+    /// glued stays glued and only a real newline between two comments starts a new line
+    /// (`docs/comments.md` §Own-line-ness is a SOURCE question — a glued run given its
+    /// own line does not own it, comment by comment). A blank above the run's **first**
+    /// comment is dropped, so a body block's `{` never sits below one.
+    Leading,
+    /// A **dangling** run in the statement that spans it: the `}`→continuation-keyword
+    /// gap (`else`, `catch`, `finally`, a do-while's `while`).
+    ///
+    /// Every comment takes a line of its own — `printDanglingComments` is a
+    /// `join(hardline, …)`, so prettier **splits** a glued pair here and tsv matches it.
+    /// That is why the glue rule is a per-run policy rather than one emitter-wide fix:
+    /// the same authoring is one line at the other two gaps and two here. A blank above
+    /// the first comment survives, measured from `blank_seed` — there is no body `{` to
+    /// sit below it, so it separates two branches of a chain.
+    Dangling { blank_seed: u32 },
+}
+
+impl GapCommentRun {
+    /// Whether a pair the author glued onto one line keeps that line.
+    fn glues(self) -> bool {
+        !matches!(self, Self::Dangling { .. })
+    }
+
+    /// The position an author blank *above the run's first comment* is measured from, or
+    /// `None` where that blank is dropped. One value rather than a policy flag plus a
+    /// position that could contradict it.
+    fn blank_seed(self) -> Option<u32> {
+        match self {
+            Self::Leading => None,
+            Self::Trailing { blank_seed } | Self::Dangling { blank_seed } => Some(blank_seed),
+        }
+    }
+
+    /// Which END of the region between two comments this run's separator questions are
+    /// asked from — **backward from the comment** (a trailing run) or **forward from the
+    /// previous comment's `*/`** (a leading run). One fact, because prettier's two
+    /// printers are each internally consistent about it: `printTrailingComment` reads
+    /// `hasNewline(…, locStart(comment), { backwards: true })` and
+    /// `isPreviousLineEmpty(locStart(comment))`, both anchored on the comment;
+    /// `printLeadingComment` reads `hasNewline(locEnd(comment))` and
+    /// `skipNewline(skipSpaces(locEnd(comment)))`, both anchored on the `*/`.
+    ///
+    /// It decides both of this emitter's per-comment questions — the **glue** test
+    /// ([`Printer::trailing_run_hugs_previous`] vs [`Printer::comment_hugs_next`]) and the
+    /// **blank** test ([`Printer::push_adjacent_blank_hardline`] vs
+    /// [`Printer::push_blank_preserving_hardline`]) — and the two readings part on exactly
+    /// one thing: re-emitted structure sitting between the two comments. Of the three gaps
+    /// only the trailing one can hold any, a grouping paren the condition's span starts
+    /// inside, and it broke both questions there: `if (⏎(⏎x⏎/* c1 */)⏎/* c2 */⏎)` WELDED
+    /// `c2` onto `c1`'s line (the forward scan stops at the erased `)` and reports "no
+    /// newline"), and `if (⏎(⏎x⏎⏎)⏎/* c */⏎)` kept a blank that belongs to the shell.
+    ///
+    /// ⚠️ **Not a general improvement — it is wrong for a leading run**, which is why it is
+    /// keyed on the run. At the `(`→condition gap (a leading run, emitted elsewhere)
+    /// prettier really does read forward from the `*/`: it keeps an author blank written
+    /// *above* the shell (`if (⏎/* c1 */⏎⏎(⏎/* c2 */⏎x⏎)⏎)`) that the backward reading
+    /// would drop, and it welds across a `(` glued to a comment (`/* c1 */(⏎/* c2 */`)
+    /// exactly as tsv does.
+    fn reads_backward_from_comment(self) -> bool {
+        matches!(self, Self::Trailing { .. })
+    }
+}
 
 impl<'a> Printer<'a> {
     /// Build a control-flow *body* whose empty block form collapses (`do {} while (cond)`,
@@ -56,6 +160,16 @@ impl<'a> Printer<'a> {
     /// ([`Self::partition_body_gap_comments`]). Destructuring the tuple here is how the
     /// third bucket got bound to `_` and every comment in it silently dropped, so the
     /// wrappers exist to make that fold unforgettable rather than conventional.
+    ///
+    /// ⚠️ **These are LINE buckets — which line a comment leaves the anchor for — and
+    /// they say nothing about how the run's comments sit relative to EACH OTHER.** The
+    /// fixed anchors are right for that question (a glued pair shares one physical line,
+    /// so both halves answer `is_same_line(prev_end, …)` alike) and wrong for any other:
+    /// asked whether a comment ends the line, `is_same_line(c.span.end, next_start)`
+    /// measures across every later comment in the gap. Whether the author glued a pair is
+    /// therefore the emitter's question, asked per comment against its own neighbour
+    /// ([`Self::build_comments_between_parts`], gated by [`GapCommentRun`]) — reading it
+    /// off these buckets is what split `if (a)⏎/* c1 */ /* c2 */⏎{}` onto two lines.
     fn partition_comments_by_line(
         &self,
         prev_end: u32,
@@ -164,13 +278,13 @@ impl<'a> Printer<'a> {
     ///
     /// ⚠️ **That is why this is NO LONGER the `own_line` bucket of
     /// [`Self::partition_comments_by_line`]**, which it used to be an allocation-free
-    /// restatement of. The partition still asks both halves against fixed anchors, so it
-    /// still splits a glued pair — visibly, at the head→body gap it serves
-    /// (`if (a)⏎/* c1 */ /* c2 */⏎{}` comes out two lines where prettier keeps one). The
-    /// readings must be reconciled by fixing that, not by reverting this: a gate and its
-    /// emitter have to agree, and this gate's emitter
-    /// (`Printer::push_for_clause_leading_section` → `push_leading_comment_run`) already
-    /// keeps the run glued.
+    /// restatement of. The two now answer different questions rather than the same one
+    /// two ways: the partition classifies which LINE a comment leaves the anchor for —
+    /// where its fixed anchors are exact — while this asks whether a comment owns a line,
+    /// which only its own neighbours can answer. Both readings are now spelled where they
+    /// belong; the header→body gap keeps a glued run glued through its emitter
+    /// ([`Self::build_comments_between_parts`]), the same place this gate's own emitter
+    /// (`Printer::push_for_clause_leading_section` → `push_leading_comment_run`) keeps it.
     fn has_isolated_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
         let mut comments =
             comments_to_emit_in_range(self.comments, prev_end, next_start).peekable();
@@ -194,9 +308,12 @@ impl<'a> Printer<'a> {
     /// comment the author put on its own line must break to keep that line. Only a
     /// block comment trailing the anchor leaves the body free to stay inline.
     ///
-    /// The gap emitters answer this by construction once they have partitioned; this is
-    /// for the caller that must choose an inline-capable layout *before* building one
-    /// ([`Self::build_adjust_clause_with_comments`]).
+    /// The single statement of that question, for the caller that must choose an
+    /// inline-capable layout *before* building one
+    /// ([`Self::build_adjust_clause_with_comments`]) **and** for the emitter it then
+    /// calls ([`Self::push_header_to_body_gap`]). Those two must agree — the caller
+    /// commits to a layout the emitter has to deliver — so the emitter asks this rather
+    /// than restating it over its own buckets, which is what it used to do.
     fn header_to_body_gap_breaks(&self, gap_start: u32, body_start: u32) -> bool {
         comments_to_emit_in_range(self.comments, gap_start, body_start)
             .any(|comment| !comment.is_block || !self.is_same_line(gap_start, comment.span.start))
@@ -297,7 +414,14 @@ impl<'a> Printer<'a> {
         let (inline_prev, all_own_line) =
             self.partition_comments_trailing_vs_own_line(gap_start, keyword_start);
 
-        self.build_comments_between_parts(parts, &inline_prev, &all_own_line, Some(gap_start));
+        self.build_comments_between_parts(
+            parts,
+            &inline_prev,
+            &all_own_line,
+            GapCommentRun::Dangling {
+                blank_seed: gap_start,
+            },
+        );
 
         let keyword_hugs_brace =
             prev_is_block && all_own_line.is_empty() && inline_prev.iter().all(|c| c.is_block);
@@ -348,14 +472,22 @@ impl<'a> Printer<'a> {
         let (inline_prev, own_line, glued) =
             self.partition_body_gap_comments(gap_start, body_start);
 
-        self.build_comments_between_parts(parts, &inline_prev, &own_line, None);
+        self.build_comments_between_parts(parts, &inline_prev, &own_line, GapCommentRun::Leading);
 
         // Anything on its own line already forced a break; otherwise only a `//` does,
         // since it would swallow the body. A glued comment is one of the own-line ones:
         // `partition_comments_by_line` hands the anchor's line to `inline_prev`, so
         // everything in `glued` was authored *below* the anchor and keeps that line —
         // gluing it to the body must not also hoist it up onto the header's.
-        if !own_line.is_empty() || !glued.is_empty() || inline_prev.iter().any(|c| !c.is_block) {
+        //
+        // Asked through the shared predicate rather than re-derived from the buckets
+        // (`!own_line.is_empty() || !glued.is_empty() || inline_prev.iter().any(|c|
+        // !c.is_block)`, which is the same set said in terms of the partition): the
+        // caller that must pick an inline-capable layout *before* building one asks
+        // `header_to_body_gap_breaks` directly, so a bucket-shaped restatement here is a
+        // gate and its emitter answering one question two ways — agreeing today only by
+        // hand, and silently diverging the moment a bucket boundary moves.
+        if self.header_to_body_gap_breaks(gap_start, body_start) {
             parts.push(d.hardline());
         } else {
             parts.push(d.text(" "));
@@ -385,7 +517,8 @@ impl<'a> Printer<'a> {
     /// the own-line form under **both** formatters.
     ///
     /// A blank line between two own-line comments survives via the shared comment-run
-    /// builder ([`Self::push_gap_blank_before`]'s counterpart in `build_comments_between`).
+    /// builder ([`Self::build_comments_between_parts`], on the same
+    /// [`Printer::push_blank_preserving_hardline`] rule `build_comments_between` follows).
     ///
     /// ⚠️ The **`else`**→non-block gap does NOT share this — see
     /// [`Self::push_indented_else_to_body_gap`], which preserves the authored position.
@@ -420,7 +553,7 @@ impl<'a> Printer<'a> {
         run.extend(own_line);
 
         let mut inner = DocBuf::new();
-        self.build_comments_between_parts(&mut inner, &inline_prev, &run, None);
+        self.build_comments_between_parts(&mut inner, &inline_prev, &run, GapCommentRun::Leading);
         inner.push(d.hardline());
         self.push_glued_comment_run(&mut inner, &glued);
         inner.push(body_doc);
@@ -455,30 +588,41 @@ impl<'a> Printer<'a> {
     /// Build docs for comments between statement parts (e.g., between `}` and `else`).
     ///
     /// - `inline_prev` — emitted on the anchor's line, each after a space
-    /// - `own_line` — emitted each on its own line; an authored blank line *between* two
-    ///   of them always survives (it separates two distinct remarks)
-    /// - `blank_seed` — whether an authored blank *above the first* own-line comment
-    ///   survives, and the position to measure it from. `Some(pos)` preserves it,
-    ///   `None` drops it. The two gaps disagree on exactly this, so it is one value
-    ///   rather than a policy flag plus a position that could contradict it
-    ///   (see [`Self::push_block_to_keyword_gap`] / [`Self::push_header_to_body_gap`]).
+    /// - `own_line` — the comments that leave the anchor's line, emitted one line each
+    ///   except where the author glued a pair (see `run`); an authored blank line
+    ///   *between* two of them always survives (it separates two distinct remarks)
+    /// - `run` — which of prettier's three runs these comments form, the single fact all
+    ///   three per-gap policies below follow from ([`GapCommentRun`])
     ///
-    /// ⚠️ **The blank scan is raw `has_blank_line_between`, not the
-    /// `blank_scan_start`/`blank_scan_end` helpers** that CLAUDE.md §Comment Handling
-    /// prescribes for in-source scans — a raw scan cannot tell a comment's own newlines
-    /// from an author's blank line. It is sound here *only* because **no comment in
-    /// these gaps can be owned**: both `owned_by_node = true` sites live in
-    /// `parser/expression.rs` and bind to expression starts, and neither a
-    /// `}`→continuation-keyword gap nor a header→body gap contains one — so the
-    /// to-emit set and the in-source set coincide and the scan can never straddle a
-    /// comment this caller didn't emit. Verified 2026-07-20. If ownership ever extends
-    /// to a token these gaps can hold, this must move to the helpers.
+    /// The glue test and the blank both go through a shared emitter either way — the run
+    /// picks which end each reads from ([`GapCommentRun::reads_backward_from_comment`]):
+    /// [`Printer::trailing_run_hugs_previous`] + [`Self::push_adjacent_blank_hardline`]
+    /// for the trailing run (anchored on the comment) and [`Printer::comment_hugs_next`] +
+    /// [`Self::push_blank_preserving_hardline`] for the other two (anchored on the `*/`). **Both read what sits between the newlines rather than counting
+    /// them**, and that is the point: a gap's endpoint is a node span that excludes a
+    /// delimiter the printer still emits — a grouping paren the condition's span starts
+    /// inside, `if (⏎(⏎x⏎)⏎/* c */⏎)` — so a counting scan reads that `)`'s two newlines
+    /// as an author blank and **fabricates** one. This emitter re-derived the rule and
+    /// paid exactly that bug, in a form every standing gate is blind to: the fabricated
+    /// line is its own fixed point.
+    ///
+    /// ⚠️ The strict arm is still not the `blank_scan_start`/`blank_scan_end` pair
+    /// CLAUDE.md §Comment Handling prescribes for in-source scans — a multiline comment
+    /// *this caller does not emit* would carry its own blank line into it. Sound here
+    /// *only* because **no comment in these gaps can be owned**: both
+    /// `owned_by_node = true` sites live in `parser/expression.rs` and bind to expression
+    /// starts, and none of the three gaps contains one — a `}`→continuation-keyword gap
+    /// is followed by a keyword, a header→body gap by the body's own leading position,
+    /// and a condition→`)` gap by the `)`. So the to-emit set and the in-source set
+    /// coincide. Verified 2026-07-20, re-checked for the condition gap 2026-08-14. If
+    /// ownership ever extends to a token these gaps can hold, this must move to the
+    /// helpers (the adjacent arm already carries its floor).
     fn build_comments_between_parts(
         &self,
         parts: &mut DocBuf,
         inline_prev: &[&Comment],
         own_line: &[&Comment],
-        blank_seed: Option<u32>,
+        run: GapCommentRun,
     ) {
         let d = self.d();
         // Trailing comments stay on same line
@@ -489,74 +633,80 @@ impl<'a> Printer<'a> {
 
         // `None` until a comment has been emitted, so the *first* comment's blank is
         // checked only when the gap seeds one; every later blank is always checked.
-        let mut prev_end = blank_seed;
+        let mut prev_end = run.blank_seed();
+        // The previous comment *this loop* emitted, and deliberately not the last
+        // `inline_prev` one: a comment glued to a comment that trails the anchor is a
+        // different question (prettier drops the whole run below the header there, via
+        // `shouldPrintLeadingHardline`, a rule tsv does not have), so gluing it here
+        // would reach a third form neither formatter produces.
+        let mut prev: Option<&Comment> = None;
         for comment in own_line {
-            self.push_gap_blank_before(parts, prev_end, comment.span.start);
-            parts.push(d.hardline());
+            // The author wrote this comment on the previous one's line, so the run keeps
+            // that line. Which spelling of that question is the run's
+            // ([`GapCommentRun::reads_backward_from_comment`]) — a blank cannot sit here
+            // either way, which is why this arm skips the scan.
+            let hugs = if run.reads_backward_from_comment() {
+                self.trailing_run_hugs_previous(prev, comment.span.start)
+            } else {
+                prev.is_some_and(|prev| self.comment_hugs_next(prev))
+            };
+            if run.glues() && hugs {
+                parts.push(d.text(" "));
+            } else if let Some(end) = prev_end {
+                if run.reads_backward_from_comment() {
+                    self.push_adjacent_blank_hardline(parts, end, comment.span.start);
+                } else {
+                    self.push_blank_preserving_hardline(parts, end, comment.span.start);
+                }
+            } else {
+                // The run's first comment in a gap that drops a blank above it — no scan
+                // to make, since there is no position to measure one from.
+                parts.push(d.hardline());
+            }
             parts.push(self.build_comment_doc(comment));
+            prev = Some(*comment);
             prev_end = Some(comment.span.end);
         }
     }
 
-    /// Preserve an authored blank line before an own-line comment in a control-flow gap:
-    /// a `literalline` (an empty, unindented line) ahead of the `hardline` that starts
-    /// the comment's own line.
+    /// Emit an **EmptyStatement body's** gap: its comments, the separator, and the `;`.
+    /// The caller pushes the anchor token before this (`)`, or ` else`).
     ///
-    /// `prev_end` is `None` for the first comment of a run whose gap drops a leading
-    /// blank — every header→body gap, block body or not, so a body never sits below a
-    /// blank. Every *subsequent* comment passes the previous comment's end, because a
-    /// blank *between* two comments separates two distinct remarks and is always kept
-    /// (`conformance_prettier_ts_comments.md` §"No blank above a body block's `{`").
+    /// The single place that question is answered, for both constructs whose body can be
+    /// an `EmptyStatement` and whose gap can hold comments:
     ///
-    /// This is the rule for gap emitters that build their own comment run. A run emitted
-    /// through the generic builder (`build_comments_between`) gets the same treatment
-    /// there, at its own `hardline` seams — between them the rule is written twice, in
-    /// the only two places a control-flow comment run is ever assembled.
+    /// - No comments: `if (a);` / `} else;` — no space, so the `;` hugs the anchor
+    /// - Block comments: `if (a) /* c */ ;` / `} else /* c */ ;`
+    /// - Line comments: `if (a) // c⏎;` / `} else // c⏎;` — the `//` must break or it
+    ///   swallows the `;`, and an EmptyStatement body swallowed whole is lost content
     ///
-    /// Each emitter still owns its comment **separators**; those legitimately differ, and
-    /// one of them (for-in/of keeping a comment trailing `)`) is a sanctioned divergence.
-    /// Only the blank rule is shared — re-deriving it per emitter is how `if`/`while`/
-    /// for-in/of came to drop the blank while the C-style `for` kept it via a hand-rolled
-    /// positional test.
-    fn push_gap_blank_before(&self, parts: &mut DocBuf, prev_end: Option<u32>, next_start: u32) {
-        if let Some(end) = prev_end
-            && self.has_blank_line_between(end, next_start)
-        {
-            parts.push(self.d().literalline());
+    /// Both sites spelled this out separately (one through `CommentSpacing::None` plus
+    /// its own `" "`, one through `Leading`, which is the same doc) — the shape where a
+    /// later rule change lands on one construct and not the other.
+    fn push_empty_statement_gap(&self, parts: &mut DocBuf, gap_start: u32, empty_start: u32) {
+        let d = self.d();
+        if !self.has_comments_to_emit_between(gap_start, empty_start) {
+            parts.push(d.text(";"));
+            return;
+        }
+        parts.push(self.build_inline_comments_between_doc(gap_start, empty_start));
+        if self.has_line_comments_between(gap_start, empty_start) {
+            parts.push(d.hardline());
+            parts.push(d.text(";"));
+        } else {
+            parts.push(d.text(" ;"));
         }
     }
 
-    /// Append `)` + comments + `;` for empty statement bodies.
-    ///
-    /// Handles comments between `)` and `;`:
-    /// - Block comments: `if (a) /* comment */ ;`
-    /// - Line comments: `if (a) // comment\n;`
-    /// - No comments: `if (a);`
+    /// Append `)` + an empty statement body's gap ([`Self::push_empty_statement_gap`]).
     fn append_close_paren_empty_stmt_with_comments(
         &self,
         parts: &mut DocBuf,
         paren_end: u32,
         empty_start: u32,
     ) {
-        let d = self.d();
-        parts.push(d.text(")"));
-        if self.has_comments_to_emit_between(paren_end, empty_start) {
-            let has_line = self.has_line_comments_between(paren_end, empty_start);
-            let comment_doc =
-                self.build_inline_comments_between_doc_no_leading_space(paren_end, empty_start);
-            if has_line {
-                parts.push(d.text(" "));
-                parts.push(comment_doc);
-                parts.push(d.hardline());
-                parts.push(d.text(";"));
-            } else {
-                parts.push(d.text(" "));
-                parts.push(comment_doc);
-                parts.push(d.text(" ;"));
-            }
-        } else {
-            parts.push(d.text(";"));
-        }
+        parts.push(self.d().text(")"));
+        self.push_empty_statement_gap(parts, paren_end, empty_start);
     }
 
     /// Push `)` and the gap that follows it — the `)` anchor for
@@ -783,6 +933,10 @@ impl<'a> Printer<'a> {
             .iter()
             .any(|c| !self.is_same_line(open_paren_pos, c.span.start));
 
+        // Whether the leading section forced a break — the run's own report, which the
+        // closing separator below reads rather than re-deriving (see the `else` arm).
+        let leading_run_breaks;
+
         if preserve_inline {
             // Preserve inline comments after open paren (used for do-while divergence)
             let mut has_inline_comment_followed_by_newline = false;
@@ -809,80 +963,52 @@ impl<'a> Printer<'a> {
                 inner_parts.push(d.hardline());
             }
 
-            // Own-line comments: exactly one separator *before* each (plus any authored
-            // blank), then one before the condition after the last.
-            //
-            // ⚠️ This used to push a break both after each comment and before the next,
-            // which **fabricated a blank line between every pair** — `// c1⏎// c2` came
-            // out `// c1⏎⏎// c2`, a blank the author never wrote. It was a stable fixed
-            // point, so idempotency never caught it, and prettier agrees with the
-            // adjacent form (it is no oracle for a comment after `(` here, but it is for
-            // this shape). Pinned by `do_while/condition_own_line_comment_run`.
-            let mut prev_end: Option<u32> = None;
-            for comment in &leading_comments {
-                if self.is_same_line(open_paren_pos, comment.span.start) {
-                    continue;
-                }
-                // The first own-line comment needs no break of its own when an inline
-                // comment already ended the line above it.
-                if prev_end.is_some() || !has_inline_comment_followed_by_newline {
-                    self.push_gap_blank_before(&mut inner_parts, prev_end, comment.span.start);
-                    inner_parts.push(d.hardline());
-                }
-                inner_parts.push(self.build_comment_doc(comment));
-                prev_end = Some(comment.span.end);
+            // Everything below the `(` line: the shared leading run (see the `else` arm).
+            // Only the comments ON that line are this arm's business — the run itself
+            // answers identically in both.
+            if has_own_line_leading && !has_inline_comment_followed_by_newline {
+                inner_parts.push(d.softline());
             }
-            if let Some(end) = prev_end {
-                if self.is_same_line(end, test_start) {
-                    inner_parts.push(d.text(" "));
-                } else {
-                    inner_parts.push(d.hardline());
-                }
-            }
+            leading_run_breaks = has_inline_comment_followed_by_newline
+                | self.push_leading_comment_run(
+                    &mut inner_parts,
+                    leading_comments
+                        .iter()
+                        .copied()
+                        .filter(|c| !self.is_same_line(open_paren_pos, c.span.start)),
+                    test_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
 
             if !has_inline_comment_followed_by_newline && !has_own_line_leading {
                 inner_parts.push(d.softline());
             }
         } else {
-            // Normalize comments based on their position:
-            // - Comments on own line (not same line as open paren): force break with hardline
-            // - Comments inline with open paren: allow collapsing with softline
-            // `None` for the first comment: a blank directly under `(` is dropped (both
-            // formatters), while a blank *between* two comments separates two distinct
-            // remarks and survives — the same split the gap emitters make.
-            let mut prev_end: Option<u32> = None;
-            for comment in &leading_comments {
-                if self.is_same_line(open_paren_pos, comment.span.start) {
-                    // Comment is inline with open paren - use softline to allow collapse
-                    inner_parts.push(d.softline());
-                } else {
-                    // Comment is on its own line - force break
-                    self.push_gap_blank_before(&mut inner_parts, prev_end, comment.span.start);
-                    inner_parts.push(d.hardline());
-                }
-                prev_end = Some(comment.span.end);
-                inner_parts.push(self.build_comment_doc(comment));
-
-                // A comment sharing the condition's line is separated from it by a
-                // space. Emitted per comment rather than once after the loop because it
-                // doubles as the separator between two comments on that same line; the
-                // break case needs nothing here, since the next iteration (or the
-                // closing separator below) supplies it.
-                if self.is_same_line(comment.span.end, test_start) {
-                    inner_parts.push(d.text(" "));
-                }
-            }
-
-            // The separator before the condition. With no comments the group is free to
-            // collapse; otherwise the last comment decides — one sharing the condition's
-            // line already pushed its space above.
-            match leading_comments.last() {
-                None => inner_parts.push(d.softline()),
-                Some(last) if !self.is_same_line(last.span.end, test_start) => {
-                    inner_parts.push(d.hardline());
-                }
-                Some(_) => {}
-            }
+            // The shared leading run — prettier's `printLeadingComment`, which picks the
+            // separator after each comment from the source right after *that* comment's
+            // `*/`: a space when the author glued the next one to it, a soft `line` when
+            // a newline follows but none precedes, a blank-preserving `hardline` for an
+            // own-line block or any line comment.
+            //
+            // ⚠️ **The opening separator is a `softline` whatever the run holds, and the
+            // shell's break is the run's REPORT, not a re-derivation.** This gap used to
+            // push a `hardline` per comment off `is_same_line(open_paren, c.start)` and
+            // open the parens off `has_own_line_leading` — the same range-shaped reading
+            // `push_for_clause_leading_section`'s ⚠️ names, one construct over: in
+            // `(⏎/* c1 */ /* c2 */⏎x)` only `c1` has a newline before it and only `c2`
+            // has one after, so neither owns a line, yet both got a break and the parens
+            // were forced open on a condition prettier keeps flat. Everything that must
+            // break still does — through the run's own `hardline` and
+            // `DocArena::will_break`, which breaks this `softline` with it.
+            inner_parts.push(d.softline());
+            leading_run_breaks = self.push_leading_comment_run(
+                &mut inner_parts,
+                leading_comments.iter().copied(),
+                test_start,
+                LeadingGlue::Adjacent,
+                d.empty(),
+            );
         }
 
         // The condition itself
@@ -896,26 +1022,35 @@ impl<'a> Printer<'a> {
         let (trailing_inline, trailing_own_line) =
             self.partition_comments_trailing_vs_own_line(test_end, close_paren_pos);
 
-        // Trailing comments — the shared run builder, which owns the blank rule. An
-        // authored blank survives both above the first own-line comment (`blank_seed` =
-        // `Some(test_end)`; there is no body `{` here for one to sit below, only the
-        // `)`) and between subsequent ones. Prettier keeps both, and tsv's own call-arg
-        // and array builders already did; this gap re-derived the run by hand and
-        // dropped every blank.
+        // Trailing comments — the shared run builder, which owns the blank and glue
+        // rules. This is prettier's TRAILING run of the test (`addTrailingComment`, the
+        // `nextCharacter === ")"` arm of `handleIfStatementComments`), so an authored
+        // blank survives both above the first own-line comment (there is no body `{`
+        // here for one to sit below, only the `)`) and between subsequent ones, and a
+        // pair the author glued onto one line keeps it. Prettier keeps all three, and
+        // tsv's own call-arg and array builders already did; this gap re-derived the run
+        // by hand and dropped every blank.
         self.build_comments_between_parts(
             &mut inner_parts,
             &trailing_inline,
             &trailing_own_line,
-            Some(test_end),
+            GapCommentRun::Trailing {
+                blank_seed: test_end,
+            },
         );
 
         // Structure: group([indent([softline/hardline, comments, condition, comments]), softline/hardline])
         // The closing softline/hardline is OUTSIDE the indent so `)` aligns with `(`
         // Force break when trailing inline line comments exist — flattening would cause
         // the // comment to swallow the closing `) {` producing unparseable output
+        //
+        // ⚠️ The leading half of that question is the RUN's report (`leading_run_breaks`),
+        // never "is any leading comment off the `(`'s line": a run the author glued onto
+        // one line leaves none of its comments owning one, and reading the range instead
+        // forced these parens open on a condition prettier keeps flat.
         let has_trailing_line_comment = trailing_inline.iter().any(|c| !c.is_block);
         let closing =
-            if has_own_line_leading || !trailing_own_line.is_empty() || has_trailing_line_comment {
+            if leading_run_breaks || !trailing_own_line.is_empty() || has_trailing_line_comment {
                 d.hardline()
             } else {
                 d.softline()

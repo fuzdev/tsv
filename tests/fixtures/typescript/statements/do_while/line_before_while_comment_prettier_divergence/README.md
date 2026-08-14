@@ -11,10 +11,11 @@ continuation keyword and is authoring intent (see §"No blank above a body block
 `{`" in the conformance doc). Prettier is no oracle for it here: it relocates the
 comment into the condition parens and the blank goes with it.
 `variant_comment_before_while.svelte` pins prettier's relocated form (comment
-inside the condition parens), which is dual-stable. `divergent_variant_spaces.svelte`
-pins prettier's stable blank-line-*inside*-parens form: prettier keeps *that* blank,
-but tsv drops it and settles on a third stable form (distinct from both prettier's
-and the input) — a divergent variant.
+inside the condition parens), which is dual-stable. `variant_spaces.svelte` pins
+prettier's blank-line-*inside*-parens form, which is dual-stable too: the blank sits
+between a leading comment and the condition, where tsv's `(`→condition run preserves
+it exactly as prettier's `printLeadingComment` does. It was a `divergent_variant_*`
+for as long as that gap hand-rolled its own run and dropped the blank.
 
 ## Reason
 

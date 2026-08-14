@@ -196,7 +196,7 @@ impl<'a> Printer<'a> {
             // PREVIOUS comment, and the one before the body on the last — identical to
             // keying each separator on the comment it follows, but it leaves a seam for
             // the blank line an author put between two own-line comments
-            // (`push_gap_blank_before`, the one place that rule lives).
+            // (`Printer::push_blank_preserving_separator`, the one place that rule lives).
             //
             // The separator preserves the authored line: what the author wrote on one
             // line stays on one line. A line comment is the one override — it must end
@@ -214,14 +214,12 @@ impl<'a> Printer<'a> {
             for comment in own_line {
                 match prev {
                     None => inner.push(d.hardline()),
-                    Some(p) => {
-                        self.push_gap_blank_before(
-                            &mut inner,
-                            Some(p.span.end),
-                            comment.span.start,
-                        );
-                        inner.push(sep_after(p));
-                    }
+                    Some(p) => self.push_blank_preserving_separator(
+                        &mut inner,
+                        p.span.end,
+                        comment.span.start,
+                        sep_after(p),
+                    ),
                 }
                 inner.push(self.build_comment_doc(comment));
                 prev = Some(comment);

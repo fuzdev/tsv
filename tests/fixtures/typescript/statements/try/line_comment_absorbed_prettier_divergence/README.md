@@ -21,8 +21,11 @@ keeps each where it was written. This mirrors the `if`/`while` `)`→`{` gap exa
 | bare `catch` | absorbed into the catch block | absorbed into the catch block |
 | `finally` | absorbed into the finally block | absorbed into the finally block |
 
-Only **line** comments are covered: an own-line **block** comment normalizes to trailing the
-keyword in both formatters (`try⏎/* c */⏎{` → `try /* c */ {`), so it is not a divergence.
+Only **line** comments are covered here. A block comment in the same gap diverges the same
+way — prettier absorbs `try⏎/* c */⏎{` into the block body, tsv keeps the authored line —
+and is pinned by [keyword_body_blank_comment](../keyword_body_blank_comment_prettier_divergence/),
+alongside a whole **run** the author glued onto one line
+([head_body_glued_comment_run](../head_body_glued_comment_run_prettier_divergence/)).
 
 The absorbed form (`variant_absorbed.svelte`) is dual-stable: both formatters keep it as-is, so it is a `variant_*`, not the canonical input.
 
