@@ -85,6 +85,46 @@ pub(super) struct RenderCtx<'a> {
     pub(super) source: Option<&'a str>,
 }
 
+/// The doc a conditional-group state contributes to the fits ladder, or `None`
+/// when the state is inadmissible and the ladder must skip it.
+///
+/// Every state but a [`DocNode::GatedState`] is measured as itself. A gated state
+/// carries a never-fits admission probe: it stands for a layout that is correct
+/// only because that probe CANNOT be laid flat on the fallback's continuation line
+/// — one indent level deeper than the group, completed by the same rest commands.
+/// So the probe's line is measured first, and a probe that *fits* there withdraws
+/// the state: the fallback layout it would have stolen is the settled form.
+///
+/// The probe measurement passes `has_line_suffix: false`, unlike the caller's fits
+/// on the returned state. That one measures from the CURRENT column, where a
+/// pending deferred run is still pending; the probe measures a line the fallback
+/// reaches only past a hardline, which flushes the run first. Passing the live flag
+/// here would charge the probe for a suffix that cannot still be pending on the
+/// line it stands for.
+#[inline]
+fn admissible_group_state(
+    ctx: &RenderCtx<'_>,
+    nodes: &[DocNode],
+    state: DocId,
+    indent: RenderIndent,
+    rest_commands: &[ArenaCommand],
+) -> Option<DocId> {
+    let DocNode::GatedState { probe, contents } = &nodes[state.index()] else {
+        return Some(state);
+    };
+    let fresh_pos = line_start_column(indent.indented(), ctx.render, ctx.embed);
+    let probe_fits = arena_fits_with_lookahead(
+        ctx.arena,
+        *probe,
+        Mode::Flat,
+        rest_commands,
+        remaining_width(fresh_pos, ctx.render, ctx.embed),
+        false,
+        ctx.source,
+    );
+    (!probe_fits).then_some(*contents)
+}
+
 /// Render text content and update position.
 ///
 /// Uses cached width when available to skip `visual_width()` for the common
@@ -898,43 +938,12 @@ fn render_doc_core<P: RenderPolicy>(
                             let last = states.len() - 1;
                             let mut chosen = (Mode::Break, states[last]);
                             for &state in &states[..last] {
-                                // A `GatedState` carries a never-fits admission
-                                // probe: the state stands for a layout that is
-                                // correct only because its probe CANNOT be laid
-                                // flat on the fallback's continuation line (one
-                                // indent level deeper, completed by the same
-                                // rest commands). Measure that line first; if
-                                // the probe fits there, skip the state — the
-                                // fallback layout is the settled form. See
-                                // `DocNode::GatedState`.
-                                let state = if let DocNode::GatedState { probe, contents } =
-                                    &nodes[state.index()]
-                                {
-                                    let fresh_pos =
-                                        line_start_column(cmd.indent.indented(), render, embed);
-                                    // `has_line_suffix: false`, unlike the state fits
-                                    // just below: that one measures from the CURRENT
-                                    // column, where a pending deferred run is still
-                                    // pending, while the probe measures a line the
-                                    // fallback reaches only past a hardline — which
-                                    // flushes the run first. Passing the live flag here
-                                    // would charge the probe for a suffix that cannot
-                                    // still be pending on the line it stands for.
-                                    let probe_fits = arena_fits_with_lookahead(
-                                        arena,
-                                        *probe,
-                                        Mode::Flat,
-                                        commands,
-                                        remaining_width(fresh_pos, render, embed),
-                                        false,
-                                        source,
-                                    );
-                                    if probe_fits {
-                                        continue;
-                                    }
-                                    *contents
-                                } else {
-                                    state
+                                // A gated state whose probe fits is inadmissible —
+                                // see `admissible_group_state`.
+                                let Some(state) =
+                                    admissible_group_state(ctx, nodes, state, cmd.indent, commands)
+                                else {
+                                    continue;
                                 };
                                 let state_fits = arena_fits_with_lookahead(
                                     arena,

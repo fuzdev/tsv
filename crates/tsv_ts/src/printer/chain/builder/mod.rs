@@ -699,30 +699,27 @@ fn build_long_chain_doc<'a>(
         );
     }
 
-    // Handle chains with breaking object in last call
-    if let Some(args_expanded_doc) =
-        build_breaking_object_chain_doc(first_groups, rest_groups, printer)
-    {
-        return d.conditional_group(&[on_line_doc, args_expanded_doc, expanded]);
-    }
+    // The optional MIDDLE state — chain prefix flat, last group broken — between
+    // `on_line` and the fully expanded fallback. Two builders answer for it, in
+    // precedence order, and they partition the same shape by how the last call's
+    // argument was AUTHORED:
+    //
+    // - it already BREAKS (multiline as written): the argument re-reads as
+    //   authored-expanded and this state is the hug prettier settles on;
+    // - it is authored FLAT: the hug is still prettier's settled form, but only
+    //   from its SECOND pass, so the state is admitted through a never-fits gate
+    //   that withdraws it wherever the broken chain is the shared fixed point.
+    //
+    // With neither, the chain is the plain two-state group.
+    let middle_state =
+        build_breaking_object_chain_doc(first_groups, rest_groups, printer).or_else(|| {
+            build_flat_object_hug_state(first_groups, rest_groups, *on_line.last()?, printer)
+        });
 
-    // The flat-authored hug window (the member-chain hug convergence): the last
-    // call's single argument is object-rooted, authored FLAT, and too wide for
-    // any chain line — prettier settles on the flat chain with the argument
-    // hugging, but only on its SECOND pass. tsv prints that settled form in one
-    // pass via a never-fits-gated state; outside the window (the argument fits
-    // flat on the expanded chain's continuation line) the gate keeps the broken
-    // chain, which is the shared stable form there. See
-    // `build_flat_object_hug_state`.
-    if let Some(&probe) = on_line.last()
-        && let Some(hug_state) =
-            build_flat_object_hug_state(first_groups, rest_groups, probe, printer)
-    {
-        return d.conditional_group(&[on_line_doc, hug_state, expanded]);
+    match middle_state {
+        Some(state) => d.conditional_group(&[on_line_doc, state, expanded]),
+        None => d.conditional_group(&[on_line_doc, expanded]),
     }
-
-    // Default: two-state conditional group
-    d.conditional_group(&[on_line_doc, expanded])
 }
 
 /// Build doc for chains ending with member access (e.g., `.length`)
@@ -788,25 +785,15 @@ fn build_breaking_object_chain_doc<'a>(
     // would accumulate the properties' width and overflow before ever reaching the
     // break. This state's `group_break`-wrapped last group restores exactly that
     // truncation. Other callbacks (block bodies, non-object bodies) stay excluded.
-    let last_group_will_break_object = rest_groups.last().is_some_and(|g| {
-        g.nodes
-            .iter()
-            .rev()
-            .find_map(ChainNode::as_call_expression)
-            .is_some_and(|call| {
-                call.arguments.len() == 1
-                    && (matches!(
-                        &call.arguments[0],
-                        Expression::ObjectExpression(_)
-                            | Expression::ArrayExpression(_)
-                            | Expression::NewExpression(_)
-                            | Expression::CallExpression(_)
-                    ) || is_arrow_with_paren_object_body(&call.arguments[0]))
-                    && {
-                        let arg_doc = printer.build_expression_doc(&call.arguments[0]);
-                        d.will_break(arg_doc)
-                    }
-            })
+    let last_group_will_break_object = last_group_single_argument(rest_groups).is_some_and(|arg| {
+        (matches!(
+            arg,
+            Expression::ObjectExpression(_)
+                | Expression::ArrayExpression(_)
+                | Expression::NewExpression(_)
+                | Expression::CallExpression(_)
+        ) || is_arrow_with_paren_object_body(arg))
+            && d.will_break(printer.build_expression_doc(arg))
     });
 
     if !last_group_will_break_object {
@@ -840,14 +827,10 @@ fn build_prefix_flat_last_expanded_doc<'a>(
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
-    let rest_len = rest_groups.len();
     let mut all_parts = build_groups_flat_docs(first_groups, printer);
-    for (i, g) in rest_groups.iter().enumerate() {
-        if i == rest_len - 1 {
-            all_parts.push(d.group_break(print_group_expanded(g, printer)));
-        } else {
-            all_parts.push(print_group(g, printer));
-        }
+    if let Some((last, prefix)) = rest_groups.split_last() {
+        all_parts.extend(prefix.iter().map(|g| print_group(g, printer)));
+        all_parts.push(d.group_break(print_group_expanded(last, printer)));
     }
     d.concat(&all_parts)
 }
@@ -903,16 +886,7 @@ fn build_flat_object_hug_state<'a>(
     if d.will_break(probe) {
         return None;
     }
-    let last_call = rest_groups
-        .last()?
-        .nodes
-        .iter()
-        .rev()
-        .find_map(ChainNode::as_call_expression)?;
-    if last_call.arguments.len() != 1 {
-        return None;
-    }
-    let arg = &last_call.arguments[0];
+    let arg = last_group_single_argument(rest_groups)?;
     // TODO: widen to a `new`/call wrapper whose own last argument is an object —
     // the settled form there is the args-expanded shape, not this hug state, so it
     // needs a second state rather than a wider kind test (`last_arg_wrapped_object`).
@@ -926,6 +900,27 @@ fn build_flat_object_hug_state<'a>(
     }
     let contents = build_prefix_flat_last_expanded_doc(first_groups, rest_groups, printer);
     Some(d.gated_state(probe, contents))
+}
+
+/// The SOLE argument of the chain's last call — the one whose kind decides which
+/// hug state (if any) the chain admits.
+///
+/// The call is found by scanning the last group's nodes in reverse, since a group
+/// is `[member, …, call]` and may carry a trailing non-call node (a `!`). Stated
+/// once because the two hug-state builders ask it of the same group and must not
+/// drift: one reading the last call and the other the last node would let a shape
+/// into one state that the other's gate had already refused.
+fn last_group_single_argument<'a>(rest_groups: &[ChainGroup<'a>]) -> Option<&'a Expression<'a>> {
+    let call = rest_groups
+        .last()?
+        .nodes
+        .iter()
+        .rev()
+        .find_map(ChainNode::as_call_expression)?;
+    match call.arguments {
+        [arg] => Some(arg),
+        _ => None,
+    }
 }
 
 /// An arrow whose grammar-parenthesized expression body is an object literal —
