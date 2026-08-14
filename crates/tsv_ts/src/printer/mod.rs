@@ -57,7 +57,7 @@ pub(crate) use analysis::{
 pub(crate) use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
     MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberGap, MemberSeam,
-    OwnedCommentEffect, StandaloneGlue,
+    OwnedCommentEffect, RunLeadingBlank, StandaloneGlue,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
@@ -920,9 +920,10 @@ impl<'a> Printer<'a> {
     /// stays inline even at line start in already-broken output, and only an
     /// authored break hangs it. Contrast
     /// [`Self::comment_hangs_binary_operand`], which *also* hangs a
-    /// single-line own-line block — the two differ only in that `c.multiline`
-    /// guard; use that variant only at the one carve-out site where prettier
-    /// *keeps* that break (binary/logical operands).
+    /// single-line own-line block (it has no `c.multiline` guard) but demands the
+    /// comment genuinely own its line, which this one never asks; use that variant
+    /// only at the one carve-out site where prettier *keeps* that break
+    /// (binary/logical operands).
     pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| self.comment_hangs_next(c, next))
     }
@@ -952,17 +953,28 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether a comment in `(start, end)` forces the *following* value onto its own
-    /// line: a line comment (runs to EOL), or a block comment with a newline AFTER it
-    /// — toward the next comment, or `end` for the last (prettier's
-    /// `hasLeadingOwnLineComment`). Keying on the newline *after* the comment (not
-    /// before) keeps the layout idempotent: a block glued to the value (`/* c */ v`,
-    /// even at line start in already-broken output) stays inline, only an authored
-    /// break (`/* c */⏎v`) forces the value down.
+    /// line: a line comment (runs to EOL), or a block comment the author gave a line of
+    /// its **own** — a newline after it (toward the next comment, or `end` for the last)
+    /// **and** nothing before it on its line. Keying the newline half on what comes
+    /// *after* the comment (not before) keeps the layout idempotent: a block glued to the
+    /// value (`/* c */ v`, even at line start in already-broken output) stays inline, and
+    /// only an authored break (`/* c */⏎v`) forces the value down.
+    ///
+    /// ⚠️ **Both halves, per comment — this is prettier's `printLeadingComment` hardline
+    /// arm, not its `hasLeadingOwnLineComment`.** The newline-after half alone reads the
+    /// LAST comment of a run the author glued onto one line as owning it (`x +⏎/* c1 */
+    /// /* c2 */⏎y`: `c2` has a newline after it, `c1` one before, and neither owns a
+    /// line), which forced the chain — and its enclosing `=` — open on an expression
+    /// prettier keeps flat (`docs/comments.md` §Own-line-ness is a SOURCE question).
+    /// `hasLeadingOwnLineComment` really is the newline-after half alone, but prettier
+    /// asks it at the **assignment** seam, of the node the comments lead; at an
+    /// operator→operand gap prettier asks nothing and prints the run. Pinned by
+    /// `expressions/binary/operator_glued_comment_run` and, for the position tsv holds
+    /// against prettier's relocation, `operator_trailing_block_comment_prettier_divergence`.
     ///
     /// ⚠️ **Site-specific — the name says which.** This serves binary/logical
-    /// operands only (`operators.rs`), mirroring prettier's own
-    /// `hasLeadingOwnLineComment` for that layout, where prettier *keeps* the operand
-    /// break so hanging is the smaller divergence than collapsing. It is NOT a
+    /// operands only (`operators.rs`), where prettier *keeps* an own-line operand break
+    /// so hanging is the smaller divergence than collapsing. It is NOT a
     /// general keyword→value gate: `export default` reached for it (under its old,
     /// general-sounding name) and became the lone value gap preserving an unforced
     /// break, disagreeing with its own twin `export =`. A keyword→value gap wants
@@ -981,7 +993,8 @@ impl<'a> Printer<'a> {
     /// where the layout genuinely cannot express both forms.
     pub(crate) fn comment_hangs_binary_operand(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| {
-            !c.is_block || self.has_newline_between(c.span.end, next)
+            !c.is_block
+                || (self.has_newline_between(c.span.end, next) && self.is_own_line_comment(c))
         })
     }
 

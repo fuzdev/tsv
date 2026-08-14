@@ -1,0 +1,1234 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 812,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A pair the author glued onto one line leads the condition inline",
+			"start": 10,
+			"end": 77,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 83,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 5
+				},
+				"end": {
+					"line": 3,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 92,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 14
+				},
+				"end": {
+					"line": 3,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " While - the same gap",
+			"start": 118,
+			"end": 141,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 150,
+			"end": 158,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 8
+				},
+				"end": {
+					"line": 8,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 159,
+			"end": 167,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 17
+				},
+				"end": {
+					"line": 8,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Do-while - the same gap through its own emitter",
+			"start": 185,
+			"end": 235,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 259,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 10
+				},
+				"end": {
+					"line": 15,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 268,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 19
+				},
+				"end": {
+					"line": 15,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Switch - the discriminant parens",
+			"start": 283,
+			"end": 318,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 328,
+			"end": 336,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 9
+				},
+				"end": {
+					"line": 18,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 337,
+			"end": 345,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 18
+				},
+				"end": {
+					"line": 18,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Width still opens the parens when the glued run does not fit",
+			"start": 376,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 448,
+			"end": 456,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 457,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 11
+				},
+				"end": {
+					"line": 25,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - comments the author gave separate lines keep them, and the parens open",
+			"start": 574,
+			"end": 657,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 666,
+			"end": 674,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 2
+				},
+				"end": {
+					"line": 34,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 677,
+			"end": 685,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - a line comment forces the break wherever it sits",
+			"start": 707,
+			"end": 768,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 777,
+			"end": 782,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 2
+				},
+				"end": {
+					"line": 43,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 811,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 802,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 48,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 79,
+					"end": 115,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 101,
+						"end": 102,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 23
+							},
+							"end": {
+								"line": 3,
+								"column": 24
+							}
+						},
+						"name": "x",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 83,
+								"end": 91
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 92,
+								"end": 100
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 104,
+						"end": 115,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 26
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 108,
+								"end": 112,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 108,
+									"end": 111,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 108,
+										"end": 109,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A pair the author glued onto one line leads the condition inline",
+							"start": 10,
+							"end": 77
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 143,
+					"end": 182,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 168,
+						"end": 169,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 26
+							},
+							"end": {
+								"line": 8,
+								"column": 27
+							}
+						},
+						"name": "x",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 150,
+								"end": 158
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 159,
+								"end": 167
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 171,
+						"end": 182,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 29
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 175,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 175,
+									"end": 178,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 175,
+										"end": 176,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " While - the same gap",
+							"start": 118,
+							"end": 141
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 237,
+					"end": 280,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 31
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 240,
+						"end": 251,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 4
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 244,
+								"end": 248,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 244,
+									"end": 247,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 244,
+										"end": 245,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 3
+											}
+										},
+										"name": "c"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 277,
+						"end": 278,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 28
+							},
+							"end": {
+								"line": 15,
+								"column": 29
+							}
+						},
+						"name": "x",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 259,
+								"end": 267
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 268,
+								"end": 276
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Do-while - the same gap through its own emitter",
+							"start": 185,
+							"end": 235
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 320,
+					"end": 373,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 346,
+						"end": 347,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 27
+							},
+							"end": {
+								"line": 18,
+								"column": 28
+							}
+						},
+						"name": "x",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 328,
+								"end": 336
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 337,
+								"end": 345
+							}
+						]
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 353,
+							"end": 370,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 20,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 364,
+									"end": 370,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 3
+										},
+										"end": {
+											"line": 20,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 358,
+								"end": 359,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Switch - the discriminant parens",
+							"start": 283,
+							"end": 318
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 441,
+					"end": 571,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "LogicalExpression",
+						"start": 466,
+						"end": 556,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 20
+							},
+							"end": {
+								"line": 27,
+								"column": 28
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 466,
+							"end": 524,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 20
+								},
+								"end": {
+									"line": 26,
+									"column": 28
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 466,
+								"end": 492,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 20
+									},
+									"end": {
+										"line": 25,
+										"column": 46
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 498,
+								"end": 524,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 28
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+							}
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 530,
+							"end": 556,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 2
+								},
+								"end": {
+									"line": 27,
+									"column": 28
+								}
+							},
+							"name": "cccccccccccccccccccccccccc"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 448,
+								"end": 456
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 457,
+								"end": 465
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 560,
+						"end": 571,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 3
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 564,
+								"end": 568,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 564,
+									"end": 567,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 564,
+										"end": 565,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 3
+											}
+										},
+										"name": "d"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Width still opens the parens when the glued run does not fit",
+							"start": 376,
+							"end": 439
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 659,
+					"end": 704,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 688,
+						"end": 689,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 2
+							},
+							"end": {
+								"line": 36,
+								"column": 3
+							}
+						},
+						"name": "x",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 666,
+								"end": 674
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 677,
+								"end": 685
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 693,
+						"end": 704,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 3
+							},
+							"end": {
+								"line": 39,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 697,
+								"end": 701,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 697,
+									"end": 700,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 697,
+										"end": 698,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 3
+											}
+										},
+										"name": "e"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - comments the author gave separate lines keep them, and the parens open",
+							"start": 574,
+							"end": 657
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 770,
+					"end": 801,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 47,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 785,
+						"end": 786,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 2
+							},
+							"end": {
+								"line": 44,
+								"column": 3
+							}
+						},
+						"name": "x",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 777,
+								"end": 782
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 790,
+						"end": 801,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 3
+							},
+							"end": {
+								"line": 47,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 794,
+								"end": 798,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 2
+									},
+									"end": {
+										"line": 46,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 794,
+									"end": 797,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 2
+										},
+										"end": {
+											"line": 46,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 794,
+										"end": 795,
+										"loc": {
+											"start": {
+												"line": 46,
+												"column": 2
+											},
+											"end": {
+												"line": 46,
+												"column": 3
+											}
+										},
+										"name": "f"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - a line comment forces the break wherever it sits",
+							"start": 707,
+							"end": 768
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

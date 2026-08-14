@@ -1,0 +1,329 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 207,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment the author left trailing the operator stays after it",
+			"start": 10,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 105,
+			"end": 113,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 23
+				},
+				"end": {
+					"line": 3,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Logical operator - the same gap",
+			"start": 122,
+			"end": 156,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 182,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 25
+				},
+				"end": {
+					"line": 6,
+					"column": 33
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 206,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 197,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 83,
+					"end": 119,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 89,
+							"end": 118,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 89,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "first"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 97,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 36
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 97,
+									"end": 102,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 15
+										},
+										"end": {
+											"line": 3,
+											"column": 20
+										}
+									},
+									"name": "alpha"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 114,
+									"end": 118,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 32
+										},
+										"end": {
+											"line": 3,
+											"column": 36
+										}
+									},
+									"name": "beta",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 105,
+											"end": 113
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment the author left trailing the operator stays after it",
+							"start": 10,
+							"end": 81
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 158,
+					"end": 196,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 39
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 164,
+							"end": 195,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 38
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 164,
+								"end": 170,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 13
+									}
+								},
+								"name": "second"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 173,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 16
+									},
+									"end": {
+										"line": 6,
+										"column": 38
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 173,
+									"end": 178,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 16
+										},
+										"end": {
+											"line": 6,
+											"column": 21
+										}
+									},
+									"name": "alpha"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 191,
+									"end": 195,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 34
+										},
+										"end": {
+											"line": 6,
+											"column": 38
+										}
+									},
+									"name": "beta",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 182,
+											"end": 190
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Logical operator - the same gap",
+							"start": 122,
+							"end": 156
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
