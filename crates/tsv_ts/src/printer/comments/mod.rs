@@ -682,6 +682,54 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit the whole trailing comment run in `[anchor, end)` for a gap whose layout is
+    /// **already vertical** — the run's first comment trails `anchor` on its line if the
+    /// author put it there, every later one takes
+    /// [`push_trailing_run_separator`](Self::push_trailing_run_separator). Returns the
+    /// end of the last comment emitted (`anchor` when the gap holds none), which is the
+    /// cursor a caller needs for whatever it emits next.
+    ///
+    /// The anchor question is asked **once**, of the first comment only: past it the
+    /// thing behind a comment is another comment, so the separator's own glue test
+    /// answers it. A loop that re-asks the anchor per comment reads the second half of a
+    /// pair the author glued *across the first* and splits it — the bug this shape
+    /// exists to prevent, which is why the three gaps that share it (a binary chain's
+    /// operand→operator and operator→operand gaps, a unary operand's stripped-paren
+    /// trailing gap) call this rather than each carrying the loop.
+    ///
+    /// For a gap that may still collapse — where the run has to DEFER past a closer
+    /// instead of taking real breaks — the emitter is
+    /// [`push_trailing_comments_in_range`](Self::push_trailing_comments_in_range) or, at
+    /// a stripped operand paren, `append_trailing_paren_comments`. See
+    /// [docs/comments.md](../../../../../docs/comments.md) §Trailing and dangling runs.
+    pub(crate) fn push_anchored_trailing_run(
+        &self,
+        parts: &mut DocBuf,
+        anchor: u32,
+        end: u32,
+    ) -> u32 {
+        let mut pos = anchor;
+        let mut prev_comment: Option<&Comment> = None;
+        for comment in comments_to_emit_in_range(self.comments, anchor, end) {
+            if prev_comment.is_none() && !self.comment_has_newline_between(pos, comment.span.start)
+            {
+                // On the anchor's own line (`x /* c */`, `a && // c`): it trails there —
+                // a line comment via `line_suffix` (zero width, so a long trailing
+                // comment never forces the preceding group to break, matching prettier's
+                // `lineSuffix`), a block inline with its width counted.
+                parts.push(self.build_trailing_comment_doc(comment));
+            } else {
+                // On its own line — unless the author GLUED it to the previous comment,
+                // which keeps that line; otherwise an author blank above it is preserved.
+                self.push_trailing_run_separator(parts, prev_comment, pos, comment.span.start);
+                parts.push(self.build_comment_doc(comment));
+            }
+            pos = comment.span.end;
+            prev_comment = Some(comment);
+        }
+        pos
+    }
+
     /// Emit the whole gap between two comma-separated items when the gap contains a
     /// **line** comment (the forced-break case): the comma, the comments, and the
     /// break to the next item, leaving `parts` positioned to emit that item.

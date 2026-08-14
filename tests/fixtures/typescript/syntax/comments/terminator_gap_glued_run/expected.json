@@ -1,0 +1,969 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 703,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A pair the author GLUED onto one line keeps that line in a terminator's",
+			"start": 20,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " content-to-`;` gap too, the same rule every other comment RUN reads",
+			"start": 96,
+			"end": 166,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (separator_glued_run, trailing_gap_glued_run, body_trailing_glued_run). One gap",
+			"start": 168,
+			"end": 250,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " emitter serves all three positions below, so the question is asked once.",
+			"start": 252,
+			"end": 327,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Statement terminator.",
+			"start": 330,
+			"end": 354,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 390,
+			"end": 398,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 399,
+			"end": 407,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 11
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Class member terminator.",
+			"start": 413,
+			"end": 440,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 463,
+			"end": 471,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 472,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 11
+				},
+				"end": {
+					"line": 16,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Type member terminator.",
+			"start": 486,
+			"end": 512,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 535,
+			"end": 543,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 544,
+			"end": 552,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 11
+				},
+				"end": {
+					"line": 22,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - two lines the author gave two comments stay two lines.",
+			"start": 567,
+			"end": 634,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 670,
+			"end": 678,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 2
+				},
+				"end": {
+					"line": 29,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 681,
+			"end": 689,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 702,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 693,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 356,
+					"end": 410,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 365,
+						"end": 368,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 371,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 16
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 375,
+								"end": 387,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 381,
+										"end": 386,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 8
+											},
+											"end": {
+												"line": 9,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 381,
+											"end": 382,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 8
+												},
+												"end": {
+													"line": 9,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 385,
+											"end": 386,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 12
+												},
+												"end": {
+													"line": 9,
+													"column": 13
+												}
+											},
+											"name": "x"
+										}
+									}
+								],
+								"kind": "const",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 390,
+										"end": 398
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 399,
+										"end": 407
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A pair the author GLUED onto one line keeps that line in a terminator's",
+							"start": 20,
+							"end": 94
+						},
+						{
+							"type": "Line",
+							"value": " content-to-`;` gap too, the same rule every other comment RUN reads",
+							"start": 96,
+							"end": 166
+						},
+						{
+							"type": "Line",
+							"value": " (separator_glued_run, trailing_gap_glued_run, body_trailing_glued_run). One gap",
+							"start": 168,
+							"end": 250
+						},
+						{
+							"type": "Line",
+							"value": " emitter serves all three positions below, so the question is asked once.",
+							"start": 252,
+							"end": 327
+						},
+						{
+							"type": "Line",
+							"value": " Statement terminator.",
+							"start": 330,
+							"end": 354
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 442,
+					"end": 483,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 448,
+						"end": 449,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 7
+							},
+							"end": {
+								"line": 14,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 450,
+						"end": 483,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 9
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 454,
+								"end": 460,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 454,
+									"end": 455,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 458,
+									"end": 459,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 6
+										},
+										"end": {
+											"line": 15,
+											"column": 7
+										}
+									},
+									"name": "x"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class member terminator.",
+							"start": 413,
+							"end": 440
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 514,
+					"end": 564,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 519,
+						"end": 520,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 6
+							},
+							"end": {
+								"line": 20,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 523,
+						"end": 563,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 10
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 527,
+								"end": 532,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 527,
+									"end": 528,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 2
+										},
+										"end": {
+											"line": 21,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 528,
+									"end": 531,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 530,
+										"end": 531,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 5
+											},
+											"end": {
+												"line": 21,
+												"column": 6
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 530,
+											"end": 531,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 5
+												},
+												"end": {
+													"line": 21,
+													"column": 6
+												}
+											},
+											"name": "C"
+										}
+									}
+								}
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 555,
+								"end": 560,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 555,
+									"end": 556,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"name": "d"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 556,
+									"end": 559,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 3
+										},
+										"end": {
+											"line": 23,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 558,
+										"end": 559,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 5
+											},
+											"end": {
+												"line": 23,
+												"column": 6
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 558,
+											"end": 559,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 5
+												},
+												"end": {
+													"line": 23,
+													"column": 6
+												}
+											},
+											"name": "D"
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 535,
+										"end": 543
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 544,
+										"end": 552
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c1 ",
+							"start": 463,
+							"end": 471
+						},
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 472,
+							"end": 480
+						},
+						{
+							"type": "Line",
+							"value": " Type member terminator.",
+							"start": 486,
+							"end": 512
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 636,
+					"end": 692,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 645,
+						"end": 648,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 10
+							},
+							"end": {
+								"line": 27,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 651,
+						"end": 692,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 16
+							},
+							"end": {
+								"line": 31,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 655,
+								"end": 667,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 661,
+										"end": 666,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 8
+											},
+											"end": {
+												"line": 28,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 661,
+											"end": 662,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 8
+												},
+												"end": {
+													"line": 28,
+													"column": 9
+												}
+											},
+											"name": "e"
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 665,
+											"end": 666,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 12
+												},
+												"end": {
+													"line": 28,
+													"column": 13
+												}
+											},
+											"name": "x"
+										}
+									}
+								],
+								"kind": "const",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 670,
+										"end": 678
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 681,
+										"end": 689
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - two lines the author gave two comments stay two lines.",
+							"start": 567,
+							"end": 634
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

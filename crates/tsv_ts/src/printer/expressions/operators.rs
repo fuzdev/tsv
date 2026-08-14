@@ -218,6 +218,13 @@ impl<'a> Printer<'a> {
         // For trailing comments, check if the comment itself is on a different line
         // from the argument (not just whether there's a newline in the whole range,
         // which could be between the comment and the closing paren).
+        //
+        // ⚠️ The `argument_end` anchor is LOOP-INVARIANT on purpose, and is not the
+        // per-comment question the run's own separator asks below. This is a LAYOUT
+        // gate — "can the whole trailing gap still sit on the operand's line?" — so a
+        // comment reachable only across another comment's newlines still opens the
+        // vertical form, which is what keeps a run behind a MULTILINE block broken
+        // (`x /* c1⏎c2 */ /* c3 */`) the way prettier keeps it.
         let has_own_line_trailing_comment = self
             .comments_on_page_between(argument_end, unary.span.end)
             .any(|c| !c.is_block || self.has_newline_between(argument_end, c.span.start));
@@ -255,22 +262,15 @@ impl<'a> Printer<'a> {
                     indent_parts.push(leading);
                 }
                 indent_parts.push(inner);
-                // Add trailing comments with appropriate spacing
-                for comment in
-                    comments_to_emit_in_range(self.comments, argument_end, unary.span.end)
-                {
-                    if !comment.is_block
-                        || !self.has_newline_between(argument_end, comment.span.start)
-                    {
-                        // Line comment or block comment on same line as argument
-                        indent_parts.push(d.text(" "));
-                        indent_parts.push(self.build_comment_doc(comment));
-                    } else {
-                        // Block comment on its own line
-                        indent_parts.push(d.hardline());
-                        indent_parts.push(self.build_comment_doc(comment));
-                    }
-                }
+                // The trailing run, one separator BEFORE each comment — the shared
+                // anchored-run emitter, so this gap answers the glue question the way
+                // every other trailing run does. It is the layout that is already
+                // vertical here, not the run: a fixed `argument_end` anchor re-asked per
+                // comment read the *second* half of a pair the author glued
+                // (`x⏎/* c1 */ /* c2 */`) as own-line and split it, and asking the
+                // comment's KIND instead welded an own-line `//` onto whatever preceded
+                // it (`docs/comments.md` §Trailing and dangling runs).
+                self.push_anchored_trailing_run(&mut indent_parts, argument_end, unary.span.end);
                 d.concat(&[
                     d.text("("),
                     d.indent(d.concat(&indent_parts)),
@@ -839,27 +839,9 @@ impl<'a> Printer<'a> {
             return false;
         }
 
-        // Keep each comment where the author wrote it, then break before the operator.
-        let mut pos = operand_end;
-        let mut prev_comment: Option<&internal::Comment> = None;
-        for (i, comment) in
-            comments_to_emit_in_range(self.comments, operand_end, op_start).enumerate()
-        {
-            if i == 0 && !self.comment_has_newline_between(pos, comment.span.start) {
-                // On the operand's line (`1 // c`): trail via `line_suffix` (zero width)
-                // so a long comment never forces the preceding operand group to break.
-                parts.push(self.build_trailing_comment_doc(comment));
-            } else {
-                // On its own line — unless the author GLUED it to the previous comment,
-                // which keeps that line. Otherwise an author blank before it is preserved.
-                // The shared run separator ([`Printer::push_trailing_run_separator`]), so
-                // this gap answers the glue question the same way every other run does.
-                self.push_trailing_run_separator(parts, prev_comment, pos, comment.span.start);
-                parts.push(self.build_comment_doc(comment));
-            }
-            pos = comment.span.end;
-            prev_comment = Some(comment);
-        }
+        // Keep each comment where the author wrote it, then break before the operator —
+        // the shared anchored-run emitter ([`Printer::push_anchored_trailing_run`]).
+        self.push_anchored_trailing_run(parts, operand_end, op_start);
 
         parts.push(d.hardline());
         parts.push(d.text(op_str));
@@ -886,19 +868,11 @@ impl<'a> Printer<'a> {
         chain_has_comments: bool,
     ) {
         let d = self.d();
-        // Collect all comments in the range between operator and next operand. The
-        // whole-chain gate skips this per-gap scan + collect for the ~all chains with no
-        // comment: `chain_has_comments` false ⇒ this gap (⊆ the chain span) holds none to
-        // emit, so the collect would be empty and the `is_empty()` path below runs — the
-        // gate reaches it without the scan. Byte-identical (a *presence* flag: on-page ⊇
-        // to-emit, so a false gate proves this gap emits nothing).
-        let comments: CommentVec<'_> = if chain_has_comments {
-            comments_to_emit_in_range(self.comments, op_end, operand.span.start).collect()
-        } else {
-            CommentVec::new()
-        };
-
-        if comments.is_empty() {
+        // Zero-comment fast path, the same shape as the operand→operator gap's: the
+        // whole-chain gate short-circuits the per-gap scan for the ~all chains with no
+        // comment (`chain_has_comments` false ⇒ this gap, ⊆ the chain span, holds none to
+        // emit). A *presence* flag, so a false gate proves this gap emits nothing.
+        if !chain_has_comments || !self.has_comments_to_emit_between(op_end, operand.span.start) {
             // No comments - simple case
             if allow_breaks && !lead_with_space {
                 parts.push(d.line());
@@ -935,33 +909,10 @@ impl<'a> Printer<'a> {
 
         // An own-line (or line) comment forces the chain to break. Each comment keeps
         // its line; authored blank lines are preserved. A trailing comment glued to the
-        // operand (no newline after it) stays inline-leading it.
-        let mut pos = op_end;
-        let mut prev_comment: Option<&internal::Comment> = None;
-        for (i, comment) in comments.iter().enumerate() {
-            let is_first = i == 0;
-            // Comment-adjacency read (real even in canonical mode): decides
-            // line_suffix-vs-own-line emission, so it must see source newlines.
-            let has_newline_before = self.comment_has_newline_between(pos, comment.span.start);
-
-            if is_first && !has_newline_before {
-                // First comment on same line as operator: `a && // comment`. A
-                // line comment goes through `line_suffix` (zero width), so a long
-                // trailing comment never forces the preceding operand group to
-                // break — matching prettier's `lineSuffix`. Block comments stay
-                // inline, width counted.
-                parts.push(self.build_trailing_comment_doc(comment));
-            } else {
-                // Comment on its own line — unless the author GLUED it to the previous
-                // one, which keeps that line; otherwise an author blank before it is
-                // preserved. The shared run separator
-                // ([`Printer::push_trailing_run_separator`]).
-                self.push_trailing_run_separator(parts, prev_comment, pos, comment.span.start);
-                parts.push(self.build_comment_doc(comment));
-            }
-            pos = comment.span.end;
-            prev_comment = Some(comment);
-        }
+        // operator (no newline after it) stays inline-leading it. The shared
+        // anchored-run emitter ([`Printer::push_anchored_trailing_run`]), which hands
+        // back the cursor the operand separator below reads.
+        let pos = self.push_anchored_trailing_run(parts, op_end, operand.span.start);
 
         // Operand: on its own line when the last comment has a newline after it
         // (preserving an author blank line), else glued inline (`/* c */ operand`).

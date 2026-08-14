@@ -892,7 +892,18 @@ and the break rides **inside** the `line_suffix` — a real break between two de
 comments splits the very construct they sit in. Only a **line** comment defers by
 construction; a block defers solely to stay behind one. Back-to-back emission welds the run,
 and an inline block mixed into a deferred one **reorders** it — so open-coding this loop is
-the recurring bug rather than a shortcut.
+the recurring bug rather than a shortcut. Its float-out sibling
+(`Printer::append_trailing_paren_comments`, a stripped grouping paren's orphaned region)
+defers an **own-line block** too, which makes that reorder reachable there — and a run whose
+enclosing layout is already vertical takes real breaks instead
+(`Printer::push_anchored_trailing_run`).
+
+⚠️ **A run's ANCHOR advances over each comment it emits.** Own-line-ness is a question about
+a comment's own neighbours, so re-asking a *fixed* anchor per comment
+(`has_newline_between(node_end, c.span.start)`) reads the second half of an author-glued
+pair across the first, calls it own-line, and splits it — the same defect as the kind-keyed
+separator above, reached without ever asking the glue question. The anchor is legitimate
+only for the run's **first** comment, where the thing behind it really is the node.
 
 ⚠️ **A deferred run must not leave the construct it was written in.** Deferring is *end of
 line*, not *escape*: a construct that closes without breaking carries the comment past its
