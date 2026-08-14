@@ -6,7 +6,7 @@
 
 use super::types::{ChainGroup, ChainNode, NonNullGap, is_numeric_index};
 use crate::ast::internal::{self, Expression};
-use crate::printer::{ParenContext, Printer, needs_parens};
+use crate::printer::{LeadingGlue, ParenContext, Printer, needs_parens};
 use tsv_lang::doc::{
     DocBuf,
     arena::{DocArena, DocId},
@@ -585,9 +585,11 @@ fn find_bracket_position(printer: &Printer<'_>, start: u32, end: u32) -> u32 {
 /// between `object_end` and `property_start` (i.e. before a `.member`).
 ///
 /// Order: trailing block comments (`prev /* c */`), trailing line comments (same
-/// line, via `line_suffix`), the line break (blank-line aware), then leading block
-/// and line comments on their own lines — with blank-line preservation around the
-/// leading run. Uses single-pass classification (one binary search).
+/// line, via `line_suffix`), the line break (blank-line aware), then the gap's
+/// leading run in authored order on the shared leading-run emitter
+/// (`push_leading_comment_run` — glue, inter-comment blanks and the break toward
+/// the property are its separators; the blank ABOVE the run is this gap's own, a
+/// between-segments blank). Uses single-pass classification (one binary search).
 ///
 /// This is the single definition of "how a forced chain break renders the comments
 /// in its gap", shared by the call-chain group path (the `ChainPartsBuilder` group path) and the
@@ -599,7 +601,7 @@ fn find_bracket_position(printer: &Printer<'_>, start: u32, end: u32) -> u32 {
 // split_pre_operator_comments and `calls/arg_comments.rs` PartitionedComments, so the
 // "same-line trails, later-line breaks, never merge" rule lives in one place. Only the
 // emission differs per shape — dot (here) / operator / comma — which is intentional
-// (this dot path also owns blank-line preservation around the leading run).
+// (this dot path also owns the blank-line preservation ABOVE the leading run).
 pub(crate) fn push_gap_comments_and_break(
     parts: &mut DocBuf,
     printer: &Printer<'_>,
@@ -628,44 +630,31 @@ pub(crate) fn push_gap_comments_and_break(
     // Line break with blank line preservation
     parts.push(build_chain_line_break(printer, object_end, property_start));
 
-    // When comments exist, build_chain_line_break skips blank line detection.
-    // Check for blank lines before the first comment and after the last comment.
-    let has_leading_comments =
-        !classified.leading_block.is_empty() || !classified.leading_line.is_empty();
-
-    // Blank line before first leading comment
-    if has_leading_comments {
-        let first_start = classified
-            .leading_block
-            .first()
-            .map(|c| c.span.start)
-            .into_iter()
-            .chain(classified.leading_line.first().map(|c| c.span.start))
-            .min();
-        if let Some(start) = first_start
-            && has_blank_line_between_strict(printer.get_source(), object_end, start)
-        {
+    // The gap's own-line run, in AUTHORED order, on the single leading-run emitter.
+    // The kind-split buckets exist for the trailing half above (a block trails inline,
+    // a `//` defers); emitted kind-by-kind here they regrouped an interleaved
+    // authoring (`// c⏎/* d */` → `/* d */⏎// c`), split authored glue
+    // (`/* d */ // e`, `/* d */ .member`) and dropped the author blank between two
+    // comments — all separator questions `push_leading_comment_run` owns, including
+    // the blank-preserving break toward the property.
+    let leading = classified.leading_in_source_order();
+    if let Some(first) = leading.first() {
+        // The blank ABOVE the run's first comment is NOT the leading-run rule
+        // (`RunLeadingBlank::Drop` — prettier's `printLeadingComment` has no emitter
+        // for it): here it is a blank between chain SEGMENTS, which prettier's
+        // member-chain group separator preserves, so this gap keeps it —
+        // `build_chain_line_break` skipped blank detection because comments exist
+        // (`calls/chained/blank_line_before_comment` pins it).
+        if has_blank_line_between_strict(printer.get_source(), object_end, first.span.start) {
             parts.push(printer.arena().hardline());
         }
-    }
-
-    // Leading block comments (on their own line)
-    parts.push(printer.build_chain_leading_comments_doc(&classified.leading_block));
-    // Leading line comments (on their own line)
-    parts.push(printer.build_chain_leading_comments_doc(&classified.leading_line));
-
-    // Blank line after last leading comment (before property)
-    if has_leading_comments {
-        let last_end = classified
-            .leading_line
-            .last()
-            .or_else(|| classified.leading_block.last())
-            .map(|c| c.span.end);
-        if let Some(end) = last_end
-            && has_blank_line_between_strict(printer.get_source(), end, property_start)
-        {
-            parts.push(printer.arena().hardline());
-        }
+        printer.push_leading_comment_run(
+            parts,
+            leading.iter().copied(),
+            property_start,
+            LeadingGlue::Adjacent,
+            printer.arena().empty(),
+        );
     }
 }
 
