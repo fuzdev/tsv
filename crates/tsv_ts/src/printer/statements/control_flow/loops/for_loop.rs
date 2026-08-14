@@ -725,9 +725,11 @@ impl<'a> Printer<'a> {
     /// bound to the `;` **like a list separator** (`split_separator_gap_comments`,
     /// `block_after_separator: false`): a same-line block stays before the `;`
     /// (`a /* c */;`), a same-line line trails it via `line_suffix` (`a; // c`),
-    /// and an own-line comment defers to its own line **after** the `;`
-    /// (matching prettier, which keeps a for-header comment inline only when all
-    /// three clauses are empty — see `build_for_empty_with_comments`). A blank
+    /// and an own-line comment defers **after** the `;`, opening on the header's own
+    /// `line` rather than on a break of its own
+    /// ([`Printer::split_for_header_gap_comments`] — the header decides its own width,
+    /// so `x = 0⏎/* c1 */ /* c2 */;⏎b` collapses back onto one line the way prettier
+    /// prints it). A blank
     /// line before an own-line comment is not preserved, as prettier collapses it
     /// in a for-header gap. `clause_end`/`semi` are the clause's end and the
     /// source `;` position; either being absent emits a bare `;`.
@@ -739,7 +741,7 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         let after = match (clause_end, semi) {
-            (Some(start), Some(sep)) => self.split_separator_gap_comments(parts, start, sep, false),
+            (Some(start), Some(sep)) => self.split_for_header_gap_comments(parts, start, sep),
             _ => DocBuf::new(),
         };
         parts.push(d.text(";"));
@@ -860,16 +862,22 @@ impl<'a> Printer<'a> {
     /// `\r`, so `// c\r i < 10` does read as same-line. Landing that in the hug arm
     /// would emit `// c i < 10` and swallow the clause; the run gives it its own line.
     ///
-    /// Only the break onto the run's first line belongs to this site; every separator
-    /// within the run, and the one before the clause, comes from the shared
-    /// [`Printer::push_leading_comment_run`], so this gap follows the same rules as
-    /// every other leading run: an author blank line between two comments survives and
-    /// a run glued onto one line stays glued. Hand-rolling a `hardline` per comment
-    /// lost both. The break onto the first line preserves the authored one: an
-    /// **own-line** first comment (every line comment, and a block with a newline
-    /// before it) starts a fresh line, while a block written on the `(`/`;` line takes
-    /// `separator` and stays there — which is what lets `for (/* a */ x = 0; …)` keep
-    /// one line, as prettier prints it.
+    /// **No separator here is the run's own**: the header's `separator` leads it and the
+    /// shared [`Printer::push_leading_comment_run`] supplies every break inside it and
+    /// the one before the clause, so this gap follows the same rules as every other
+    /// leading run — an author blank line between two comments survives, and a run glued
+    /// onto one line stays glued. Hand-rolling a `hardline` per comment lost both.
+    ///
+    /// ⚠️ **And the site must not pre-empt the header's width decision either.** Asking
+    /// [`Printer::is_own_line_comment`] of the run's FIRST comment and pushing a
+    /// `hardline` for it reads as preserving the authored line and is the one-sided
+    /// reading: in `x = 0;⏎/* c1 */ /* c2 */⏎b` only `c1` has a newline before it and
+    /// only `c2` has one after, so neither owns a line, and prettier keeps the whole
+    /// header flat (`docs/comments.md` §Own-line-ness is a SOURCE question). A run whose
+    /// first comment IS isolated needs no help from here: it takes the emitter's
+    /// `hardline`, which opens the header through `DocArena::will_break` and breaks this
+    /// `separator` with it — so the two arms rendered identically wherever the pre-empt
+    /// was right, and differed only where it was wrong.
     ///
     /// `search_start` - where to start looking for comments
     /// `clause_start` - start of the next clause
@@ -892,24 +900,14 @@ impl<'a> Printer<'a> {
                 .filter(|c| !prev_end.is_some_and(|pe| self.is_same_line(pe, c.span.start))),
         );
 
-        match run.first() {
-            None => parts.push(separator),
-            Some(first) => {
-                parts.push(if self.is_own_line_comment(first) {
-                    d.hardline()
-                } else {
-                    separator
-                });
-                self.push_leading_comment_run(
-                    parts,
-                    run.iter().copied(),
-                    clause_start,
-                    LeadingGlue::Adjacent,
-                    d.empty(),
-                );
-            }
-        }
-
+        parts.push(separator);
+        self.push_leading_comment_run(
+            parts,
+            run.iter().copied(),
+            clause_start,
+            LeadingGlue::Adjacent,
+            d.empty(),
+        );
         self.push_glued_comment_run(parts, &hug);
     }
 

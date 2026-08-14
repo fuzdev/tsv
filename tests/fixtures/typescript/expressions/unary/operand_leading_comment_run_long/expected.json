@@ -1,0 +1,495 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 575,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The glued run fits at exactly 100 chars, so it rides the operator's line.",
+			"start": 10,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 101,
+			"end": 109,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 14
+				},
+				"end": {
+					"line": 3,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 110,
+			"end": 118,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 23
+				},
+				"end": {
+					"line": 3,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " One char wider, the parens break and the run keeps the line the author gave it.",
+			"start": 189,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 289,
+			"end": 297,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 298,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 11
+				},
+				"end": {
+					"line": 7,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At the same width, a run the author glued to the operand travels with it.",
+			"start": 382,
+			"end": 458,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 476,
+			"end": 484,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 485,
+			"end": 493,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 11
+				},
+				"end": {
+					"line": 13,
+					"column": 19
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 574,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 565,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 88,
+					"end": 186,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 94,
+							"end": 185,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 98
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 94,
+								"end": 96,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 99,
+								"end": 185,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 98
+									}
+								},
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 119,
+									"end": 184,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 32
+										},
+										"end": {
+											"line": 3,
+											"column": 97
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 101,
+											"end": 109
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 110,
+											"end": 118
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The glued run fits at exactly 100 chars, so it rides the operator's line.",
+							"start": 10,
+							"end": 86
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 273,
+					"end": 379,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 279,
+							"end": 378,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 279,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 284,
+								"end": 378,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 9,
+										"column": 2
+									}
+								},
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 309,
+									"end": 375,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 68
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 289,
+											"end": 297
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 298,
+											"end": 306
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " One char wider, the parens break and the run keeps the line the author gave it.",
+							"start": 189,
+							"end": 271
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 460,
+					"end": 564,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 466,
+							"end": 563,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 466,
+								"end": 468,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 9
+									}
+								},
+								"name": "a3"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 471,
+								"end": 563,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 12
+									},
+									"end": {
+										"line": 14,
+										"column": 2
+									}
+								},
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 494,
+									"end": 560,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 20
+										},
+										"end": {
+											"line": 13,
+											"column": 86
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 476,
+											"end": 484
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 485,
+											"end": 493
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At the same width, a run the author glued to the operand travels with it.",
+							"start": 382,
+							"end": 458
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

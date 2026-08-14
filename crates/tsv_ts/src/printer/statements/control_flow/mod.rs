@@ -130,33 +130,61 @@ impl<'a> Printer<'a> {
 
     /// Whether any comment between two positions falls in the `inline_prev` bucket of
     /// [`Self::partition_comments_by_line`] — a comment trailing the anchor on its
-    /// own line. The existence-only twin of [`Self::has_isolated_comment_between`],
-    /// for a layout gate that would otherwise build three `SmallVec`s to read one
-    /// `is_empty`.
+    /// own line — asked without building the three `SmallVec`s a layout gate would
+    /// then throw away to read one `is_empty`.
+    ///
+    /// This one really is the partition's bucket: a fixed `prev_end` anchor, matching
+    /// the emitter it gates. [`Self::has_isolated_comment_between`] no longer is, and
+    /// its own doc says why — do not read the two as a pair.
     fn has_anchor_trailing_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
         comments_to_emit_in_range(self.comments, prev_end, next_start)
             .any(|comment| self.is_same_line(prev_end, comment.span.start))
     }
 
-    /// Whether any comment between two positions falls in the `own_line` bucket of
-    /// [`Self::partition_comments_by_line`] — the same classification, asked without
-    /// building the two buckets the caller would throw away. For a caller that only
-    /// needs the *existence* answer (a break gate) this short-circuits on the first hit
-    /// and allocates nothing.
+    /// Whether any comment between two positions **owns a line of its own** — the `for`
+    /// header's expansion gate. For a caller that needs only the *existence* answer this
+    /// short-circuits on the first hit and allocates nothing.
     ///
-    /// Isolation is judged by the neighboring **clause positions**, and for **every**
+    /// Isolation is judged by the neighbouring **clause positions**, and for **every**
     /// comment kind — both halves of what separates this from
     /// [`Printer::comment_isolated_on_its_line`], which reads the source and calls every
     /// line comment isolated (a `//` forces the list open wherever it sits). Here a `//`
-    /// sharing the previous clause's line is that clause's trailing comment and belongs
-    /// to the `inline_prev` bucket, so it must not answer yes; and the clause boundaries
-    /// are the right anchors because this gap's re-emitted text — a `;` — is what the
-    /// buckets are being partitioned around.
+    /// sharing the previous clause's line is that clause's trailing comment, so it must
+    /// not answer yes; and the clause boundaries are the right anchors because this gap's
+    /// re-emitted text — a `;` — is what the emitters partition around.
+    ///
+    /// ⚠️ **But a comment's neighbour is the next COMMENT when there is one**, on both
+    /// sides — hence the advancing cursor and the one-ahead peek, the shape
+    /// [`Printer::any_comment_on_page_with_next`] states for the source reading. Two
+    /// clause-anchored questions asked of each comment independently read a run the author
+    /// glued onto one line (`x = 0;⏎/* c1 */ /* c2 */⏎b`) as isolated — `c1`'s trailing
+    /// side gets measured against the *clause*, right across `c2` — and force a header
+    /// open that prettier keeps flat (`docs/comments.md` §Own-line-ness is a SOURCE
+    /// question: a glued run given its own line does not own it).
+    ///
+    /// ⚠️ **That is why this is NO LONGER the `own_line` bucket of
+    /// [`Self::partition_comments_by_line`]**, which it used to be an allocation-free
+    /// restatement of. The partition still asks both halves against fixed anchors, so it
+    /// still splits a glued pair — visibly, at the head→body gap it serves
+    /// (`if (a)⏎/* c1 */ /* c2 */⏎{}` comes out two lines where prettier keeps one). The
+    /// readings must be reconciled by fixing that, not by reverting this: a gate and its
+    /// emitter have to agree, and this gate's emitter
+    /// (`Printer::push_for_clause_leading_section` → `push_leading_comment_run`) already
+    /// keeps the run glued.
     fn has_isolated_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
-        comments_to_emit_in_range(self.comments, prev_end, next_start).any(|comment| {
-            !self.is_same_line(prev_end, comment.span.start)
-                && !self.is_same_line(comment.span.end, next_start)
-        })
+        let mut comments =
+            comments_to_emit_in_range(self.comments, prev_end, next_start).peekable();
+        let mut prev = prev_end;
+        while let Some(comment) = comments.next() {
+            let next = comments.peek().map_or(next_start, |c| c.span.start);
+            if !self.is_same_line(prev, comment.span.start)
+                && !self.is_same_line(comment.span.end, next)
+            {
+                return true;
+            }
+            prev = comment.span.end;
+        }
+        false
     }
 
     /// Does a header→body gap's comment run force the body onto its own line?

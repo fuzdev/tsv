@@ -162,9 +162,14 @@ impl<'a> Printer<'a> {
         // records nothing (prettier's `child === node` guard), which is why `!(c ? a : b)`
         // keeps the hanging form while `!((c ? a : b) as T)` expands.
         self.mark_ternary_extra_indent(unary.argument);
-        // A single-line block glued to the operator hugs the operand even across a
-        // source newline (`!/* c */⏎x` → `!(/* c */ x)`), matching prettier.
-        let leading_comments_opt = self.build_rhs_comments_glued_opt(operator_end, argument_start);
+        // The shared leading-comment emitter, in its plain `Adjacent` mode — prettier's
+        // `printLeadingComment` exactly. Its third separator is what makes the shell below
+        // a width decision rather than a comment one: a single-line block glued to the
+        // operator (`!/* c */⏎x`) takes the soft `line`, so the operand pulls up to
+        // `!(/* c */ x)` while it fits and drops below the comment once it doesn't. The
+        // gluing variant (`build_rhs_comments_glued_opt`) spends that `line` on an
+        // unconditional space and can only ever reach the first of those two forms.
+        let leading_comments_opt = self.build_rhs_comments_opt(operator_end, argument_start);
         // Whether a leading comment is *present* — the gate for re-adding the parens — as
         // opposed to whether this emitter has to print it. A **forward-binding** comment (a
         // bundler annotation, a JSDoc cast) is `owned_by_node`, so the operand's own doc
@@ -213,30 +218,6 @@ impl<'a> Printer<'a> {
         // between argument end and unary span end is lost if we don't re-add parens.
         let has_trailing_comments = self.has_comments_to_emit_between(argument_end, unary.span.end);
 
-        // Determine if multiline layout is needed: line comments force newlines,
-        // and block comments on their own line (newline in source) preserve structure.
-        // For trailing comments, check if the comment itself is on a different line
-        // from the argument (not just whether there's a newline in the whole range,
-        // which could be between the comment and the closing paren).
-        //
-        // ⚠️ The `argument_end` anchor is LOOP-INVARIANT on purpose, and is not the
-        // per-comment question the run's own separator asks below. This is a LAYOUT
-        // gate — "can the whole trailing gap still sit on the operand's line?" — so a
-        // comment reachable only across another comment's newlines still opens the
-        // vertical form, which is what keeps a run behind a MULTILINE block broken
-        // (`x /* c1⏎c2 */ /* c3 */`) the way prettier keeps it.
-        let has_own_line_trailing_comment = self
-            .comments_on_page_between(argument_end, unary.span.end)
-            .any(|c| !c.is_block || self.has_newline_between(argument_end, c.span.start));
-        // A line comment is already caught by `has_line_comments_between` above; here
-        // a leading block forces the multiline layout only when it can't glue inline
-        // (multiline, or own-line with a newline before it).
-        let needs_multiline = self.has_line_comments_between(operator_end, argument_start)
-            || has_own_line_trailing_comment
-            || self
-                .comments_on_page_between(operator_end, argument_start)
-                .any(|c| self.comment_cannot_glue_to_operator(c));
-
         let argument_doc = if has_leading_comments || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
             let inner = self.build_expression_doc(unary.argument);
@@ -251,49 +232,52 @@ impl<'a> Printer<'a> {
             } else {
                 inner
             };
-            if needs_multiline {
-                // Multiline layout: !(\n  /* c */\n  expr\n) or !(\n  expr // c\n)
-                let mut indent_parts: DocBuf = smallvec![d.hardline()];
-                // Leading comments between operator and operand: same per-line
-                // block/line layout (blank-preserving hardlines, inline blocks hugged)
-                // as the inline path. Non-gluing here — the layout is already vertical,
-                // so a single-line block keeps the author's break to the next line.
-                if let Some(leading) = self.build_rhs_comments_opt(operator_end, argument_start) {
-                    indent_parts.push(leading);
-                }
-                indent_parts.push(inner);
-                // The trailing run, one separator BEFORE each comment — the shared
-                // anchored-run emitter, so this gap answers the glue question the way
-                // every other trailing run does. It is the layout that is already
-                // vertical here, not the run: a fixed `argument_end` anchor re-asked per
-                // comment read the *second* half of a pair the author glued
-                // (`x⏎/* c1 */ /* c2 */`) as own-line and split it, and asking the
-                // comment's KIND instead welded an own-line `//` onto whatever preceded
-                // it (`docs/comments.md` §Trailing and dangling runs).
-                self.push_anchored_trailing_run(&mut indent_parts, argument_end, unary.span.end);
-                d.concat(&[
-                    d.text("("),
-                    d.indent(d.concat(&indent_parts)),
-                    d.hardline(),
-                    d.text(")"),
-                ])
+            // Prettier's `printUnaryExpression` shell verbatim
+            // (`print/estree.js`: `group(["(", indent([softline, argumentDoc]), softline,
+            // ")"])`), so the two questions stay separate: the GROUP decides flat vs
+            // broken on width, and the comment runs inside it decide their own
+            // separators. Nothing here asks whether a comment "owns its line" — a gate
+            // that did (`comment_cannot_glue_to_operator` over the leading gap) answered
+            // a width question with a comment answer, and read the FIRST comment of a run
+            // the author glued onto one line as owning it, which it does not
+            // (`docs/comments.md` §Own-line-ness is a SOURCE question).
+            //
+            // Everything that genuinely must break still does, through the run's own
+            // hardline and `DocArena::will_break`: an own-line comment, a `//`, a
+            // multiline block. Those reach the group as a forced break instead of as a
+            // pre-empted layout, which is the whole difference.
+            let mut parts: DocBuf = smallvec![d.softline()];
+            if let Some(leading) = leading_comments_opt {
+                parts.push(leading);
+            }
+            parts.push(inner);
+            // The trailing run, one separator BEFORE each comment — the shared
+            // anchored-run emitter, so this gap answers the glue question the way every
+            // other trailing run does. A fixed `argument_end` anchor re-asked per comment
+            // read the *second* half of a pair the author glued (`x⏎/* c1 */ /* c2 */`)
+            // as own-line and split it, and asking the comment's KIND instead welded an
+            // own-line `//` onto whatever preceded it (`docs/comments.md` §Trailing and
+            // dangling runs).
+            self.push_anchored_trailing_run(&mut parts, argument_end, unary.span.end);
+            // The one break the group cannot see for itself. A trailing **line** comment
+            // is deferred through a `line_suffix` (`build_trailing_line_comment_doc`), so
+            // `will_break` reports nothing and a flat shell would carry the `//` out past
+            // its own `)` and `;` — the deferred run escaping the construct it was written
+            // in, which is content loss rather than a layout choice
+            // (`docs/comments.md` §Trailing and dangling runs). Every other break-forcing
+            // comment reaches the group as a real hardline: an own-line trailing comment
+            // through `push_trailing_run_separator`, a `//` or own-line block in the
+            // LEADING run through `push_leading_comment_run`'s third separator.
+            let shell = d.concat(&[
+                d.text("("),
+                d.indent(d.concat(&parts)),
+                d.softline(),
+                d.text(")"),
+            ]);
+            if self.has_line_comments_between(argument_end, unary.span.end) {
+                d.group_break(shell)
             } else {
-                // Inline layout: !(/* c */ expr) or !(expr /* c */)
-                let mut parts = DocBuf::new();
-                parts.push(d.text("("));
-                if let Some(leading) = leading_comments_opt {
-                    parts.push(leading);
-                }
-                parts.push(inner);
-                // Trailing block comments inline: `expr /* c */`
-                for comment in
-                    comments_to_emit_in_range(self.comments, argument_end, unary.span.end)
-                {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
-                parts.push(d.text(")"));
-                d.concat(&parts)
+                d.group(shell)
             }
         } else if arg_needs_parens {
             // Binary expressions need parens - grouping lets the parens expand when the arg is long
