@@ -847,7 +847,27 @@ pub(crate) fn build_args_joined_with_comments(
         d.comma_line()
     };
 
+    // Whether the gap just closed — between `arguments[i - 1]` and `arguments[i]` — carries an
+    // author blank line. Computed once at the bottom of the previous iteration (the no-comment
+    // branch below) and reused here, since the top of this iteration and that bottom look at
+    // the same gap under the same no-comment guard. Stays `false` for every join but
+    // [`ArgsJoin::HardlinePreserveBlanks`].
+    let mut prev_gap_has_blank = false;
     for (i, arg) in arguments.iter().enumerate() {
+        // The preserved blank is emitted at the TOP of the next iteration, not at the bottom of
+        // the previous one, so it lands after the comma rather than before it. Nothing to emit
+        // in the gap, but a comment can still physically *be* there — an owned annotation
+        // leading this argument. `prev_gap_has_blank` was measured with `blank_scan_end`, so
+        // the annotation's own newlines don't read as a blank line yet an authored blank
+        // *before* it is kept.
+        if prev_gap_has_blank
+            && i > 0
+            && !printer.has_comments_to_emit_between(arguments[i - 1].span().end, arg.span().start)
+        {
+            parts.push(d.literalline());
+            parts.push(d.hardline());
+        }
+
         parts.push(item.build(printer, paren_open, arguments, i));
 
         if i < arguments.len() - 1 {
@@ -861,6 +881,12 @@ pub(crate) fn build_args_joined_with_comments(
                 // `any_spread_paren_comment_forces_expansion`, return first — and every
                 // other join is hardline.
                 debug_assert!(!gap.forces_expansion || use_hardline);
+                // A commented gap's blank is comment-aware (routed, so a comment's own
+                // newlines don't read as one) and rides here rather than at the next
+                // iteration's top, whose guard skips a gap that holds a comment.
+                if join.preserves_blanks() && gap.comments.has_blank_line_in_gap(printer) {
+                    parts.push(d.literalline());
+                }
                 // A line comment runs to EOL → hard-break; otherwise honor the caller's style.
                 parts.push(if gap.comments.has_trailing_line() || use_hardline {
                     d.hardline()
@@ -870,6 +896,17 @@ pub(crate) fn build_args_joined_with_comments(
                 // hugging after-comma + own-line comments lead the next arg (`C`).
                 gap.comments
                     .emit_leading_comments_inline_aware(&mut parts, printer);
+                prev_gap_has_blank = false;
+            } else if join.preserves_blanks() {
+                // Split from `no_comment_sep`: the comma is emitted now and the break is
+                // DEFERRED to the next iteration's top, which owns the blank's own pair.
+                parts.push(d.text(","));
+                let arg_end = arg.span().end;
+                prev_gap_has_blank = printer
+                    .is_next_line_empty(arg_end, printer.blank_scan_end(arg_end, next_arg_start));
+                if !prev_gap_has_blank {
+                    parts.push(d.hardline());
+                }
             } else {
                 parts.push(no_comment_sep);
             }
@@ -923,6 +960,11 @@ pub(crate) enum ArgsJoin {
     /// inside an already-emitted gap still freezes the first argument, and passing the
     /// first argument's own start as `paren_open` would leave that window empty.
     HardlineLeadingGapEmitted,
+    /// [`Self::Hardline`], but an author blank line in a gap is PRESERVED rather than
+    /// collapsed — prettier's `anyArgEmptyLine` layout, reached through
+    /// [`build_call_args_with_blank_lines`]. A separate variant rather than a `bool`
+    /// parameter because it is the same axis as the other three: how the arguments separate.
+    HardlinePreserveBlanks,
     /// Soft-line separators — break only when the enclosing group breaks. A trailing line
     /// comment in a gap still forces a hardline.
     SoftLine,
@@ -931,6 +973,13 @@ pub(crate) enum ArgsJoin {
 impl ArgsJoin {
     fn use_hardline(self) -> bool {
         !matches!(self, Self::SoftLine)
+    }
+
+    /// Whether an author blank line in a gap survives. Only [`Self::HardlinePreserveBlanks`]
+    /// keeps it; every other layout is reached by a force-expansion trigger that has no
+    /// author blank to preserve in the first place.
+    fn preserves_blanks(self) -> bool {
+        matches!(self, Self::HardlinePreserveBlanks)
     }
 }
 
@@ -1107,19 +1156,24 @@ pub(super) fn try_hug_multiline_template_arg(
     Some(d.concat(&parts))
 }
 
-/// Build a call/new whose arguments have blank lines between them (hardline
-/// expansion, preserving at most one blank line per gap): `callee(\n\targ1,\n\n\targ2\n)`.
+/// Build a call/new whose arguments have blank lines between them (hardline expansion,
+/// preserving at most one blank line per gap): `callee(\n\targ1,\n\n\targ2\n)` — prettier's
+/// `allArgsBrokenOut()` under `anyArgEmptyLine`.
 ///
-/// Handles comments in the gaps; a gap without comments preserves its blank
-/// line at the top of the next iteration. The blank-line twin of
-/// [`build_call_args_expanded`] — it owns the wrap for the same reason, so the `(`-line
-/// comment run never escapes as an out-param a caller could forget to inject.
+/// The exact shape of [`build_call_args_expanded`], differing only in the two arguments that
+/// say so: [`ArgsJoin::HardlinePreserveBlanks`] instead of [`ArgsJoin::Hardline`]. It was a
+/// hand-rolled second copy of [`build_args_joined_with_comments`]'s per-argument loop until
+/// the blank seams moved into that loop — which is where they belong, because the loop owns
+/// all four gap questions (the `(`→first-argument run, each inter-argument gap's comments,
+/// that gap's blank, and the last argument's run to `)`), and a second copy meant each new
+/// answer had to be written twice or silently diverge. It still owns the WRAP for its own
+/// reason: the `(`-line comment run must not escape as an out-param a caller could forget to
+/// inject.
 ///
-/// The per-argument loop below only opens the gaps BETWEEN arguments (each via the
-/// previous argument's end), so BOTH edge gaps are emitted here or their comments are
-/// DROPPED — the hazard-4 shape in docs/comments.md. Reachable from the `new` cascade,
-/// whose comment paths do not preempt this one the way the plain call's do; `blanks:audit`
-/// found the `(`→first-argument half by injecting a blank line beside a leading comment.
+/// Both edge gaps are the shared loop's — emitted there or DROPPED, the hazard-4 shape in
+/// docs/comments.md. Reachable from the `new` cascade, whose comment paths do not preempt
+/// this one the way the plain call's do; `blanks:audit` found the `(`→first-argument half by
+/// injecting a blank line beside a leading comment.
 pub(super) fn build_call_args_with_blank_lines(
     printer: &Printer<'_>,
     callee: DocId,
@@ -1127,83 +1181,15 @@ pub(super) fn build_call_args_with_blank_lines(
     paren_open: u32,
     paren_close: u32,
 ) -> DocId {
-    let d = printer.d();
     let mut paren_line = DocBuf::new();
-    let mut arg_parts = DocBuf::new();
-    if let Some(first) = args.first() {
-        emit_first_arg_leading_comments(
-            printer,
-            &mut paren_line,
-            &mut arg_parts,
-            paren_open,
-            first.span().start,
-        );
-    }
-    // Whether the gap just closed — between `args[i - 1]` and `args[i]` — carries an
-    // author blank line. Computed once at the bottom of the previous iteration (the
-    // no-comment branch below) and reused here, since the top of this iteration and
-    // that bottom look at the same gap under the same no-comment guard.
-    let mut prev_gap_has_blank = false;
-    for (i, arg) in args.iter().enumerate() {
-        // Check for blank line before this arg (no-comment case only).
-        // When comments exist, blank lines are handled in the separator
-        // logic of the previous iteration.
-        if i > 0 {
-            let prev_end = args[i - 1].span().end;
-            let curr_start = arg.span().start;
-            // Nothing to emit in the gap, but a comment can still physically *be* there —
-            // an owned annotation leading this argument. `prev_gap_has_blank` was measured
-            // with `blank_scan_end`, so the annotation's own newlines don't read as a blank
-            // line yet an authored blank *before* it is kept.
-            if !printer.has_comments_to_emit_between(prev_end, curr_start) && prev_gap_has_blank {
-                arg_parts.push(d.literalline());
-                arg_parts.push(d.hardline());
-            }
-        }
-
-        // Argument-context builder so a binary/logical chain (or conditional) keeps
-        // its continuation indent, and an assignment gets clarity parens — same as
-        // the no-blank-line path; the blank-line forced expansion is just another
-        // reason the args break. Through [`ArgItem`] rather than `build_arg_item_doc`
-        // directly, so this layout gets the Rule A freeze AND the broken-out argument's
-        // chain routing from the one place that states both.
-        arg_parts.push(ArgItem::ArgContext.build(printer, paren_open, args, i));
-
-        if i < args.len() - 1 {
-            let arg_end = arg.span().end;
-            let next_start = args[i + 1].span().start;
-
-            if printer.inter_arg_gap_has_comments(arg, next_start) {
-                let gap = printer.open_inter_arg_gap(&mut arg_parts, arg, next_start);
-
-                let next_has_blank = gap.comments.has_blank_line_in_gap(printer);
-                if next_has_blank {
-                    arg_parts.push(d.literalline());
-                }
-                arg_parts.push(d.hardline());
-                // hugging after-comma + own-line comments lead the next arg (`C`).
-                gap.comments
-                    .emit_leading_comments_inline_aware(&mut arg_parts, printer);
-                // The comment gap's blank is emitted here; the next iteration's top guard
-                // (a comment exists) skips the reuse anyway, so leave it false.
-                prev_gap_has_blank = false;
-            } else {
-                arg_parts.push(d.text(","));
-                // Measure the no-comment gap's blank once; the top of the next iteration
-                // reuses it (same gap, same guard) instead of re-scanning the window.
-                prev_gap_has_blank = printer
-                    .is_next_line_empty(arg_end, printer.blank_scan_end(arg_end, next_start));
-                // Skip the hardline when the gap has a blank; its literalline + hardline are
-                // emitted at the top of the next iteration.
-                if !prev_gap_has_blank {
-                    arg_parts.push(d.hardline());
-                }
-            }
-        } else {
-            // The last argument's gap to `)`, the other edge this loop must own (see
-            // the doc comment above).
-            emit_last_arg_trailing_comments(printer, &mut arg_parts, arg, paren_close);
-        }
-    }
-    wrap_call_with_hard_breaks_paren_line(d, callee, &paren_line, d.concat(&arg_parts))
+    let args_doc = build_args_joined_with_comments(
+        printer,
+        args,
+        paren_open,
+        paren_close,
+        ArgsJoin::HardlinePreserveBlanks,
+        ArgItem::ArgContext,
+        &mut paren_line,
+    );
+    wrap_call_with_hard_breaks_paren_line(printer.d(), callee, &paren_line, args_doc)
 }
