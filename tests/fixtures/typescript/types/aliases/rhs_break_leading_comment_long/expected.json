@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1665,
+	"end": 2523,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -297,24 +297,168 @@
 					"column": 54
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line run above a relocated RHS is a second stable form beside the glued",
+			"start": 1657,
+			"end": 1738,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ride-down above: the reference renders below the run.",
+			"start": 1740,
+			"end": 1796,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1865,
+			"end": 1872,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same for a conditional whose head overflows the `=` line: head and branches",
+			"start": 1942,
+			"end": 2020,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " render below the own-line run.",
+			"start": 2022,
+			"end": 2055,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2104,
+			"end": 2111,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 2
+				},
+				"end": {
+					"line": 43,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same for an intersection too wide for the continuation line: the first member",
+			"start": 2189,
+			"end": 2269,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 1
+				},
+				"end": {
+					"line": 46,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " renders below the own-line run and continuation members indent one deeper.",
+			"start": 2271,
+			"end": 2348,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 1
+				},
+				"end": {
+					"line": 47,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 2397,
+			"end": 2404,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 2
+				},
+				"end": {
+					"line": 49,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1664,
+		"end": 2522,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1655,
+			"end": 2513,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 33,
+					"line": 52,
 					"column": 9
 				}
 			},
@@ -1279,6 +1423,414 @@
 							"value": " there and breaks between members.",
 							"start": 1489,
 							"end": 1525
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1798,
+					"end": 1939,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 66
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1803,
+						"end": 1860,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 6
+							},
+							"end": {
+								"line": 36,
+								"column": 63
+							}
+						},
+						"name": "R2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 1875,
+						"end": 1938,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 2
+							},
+							"end": {
+								"line": 38,
+								"column": 65
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 1875,
+							"end": 1938,
+							"loc": {
+								"start": {
+									"line": 38,
+									"column": 2
+								},
+								"end": {
+									"line": 38,
+									"column": 65
+								}
+							},
+							"name": "SomeVeryLongTypeReferenceNameThatForcesTheRhsBelowTheEqualsSign"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 1865,
+								"end": 1872
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line run above a relocated RHS is a second stable form beside the glued",
+							"start": 1657,
+							"end": 1738
+						},
+						{
+							"type": "Line",
+							"value": " ride-down above: the reference renders below the run.",
+							"start": 1740,
+							"end": 1796
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 2057,
+					"end": 2186,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 44,
+							"column": 74
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 2062,
+						"end": 2099,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 6
+							},
+							"end": {
+								"line": 42,
+								"column": 43
+							}
+						},
+						"name": "C2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 2114,
+						"end": 2185,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 2
+							},
+							"end": {
+								"line": 44,
+								"column": 73
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 2114,
+							"end": 2119,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 2
+								},
+								"end": {
+									"line": 44,
+									"column": 7
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 2114,
+								"end": 2119,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 7
+									}
+								},
+								"name": "Param"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 2128,
+							"end": 2159,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 16
+								},
+								"end": {
+									"line": 44,
+									"column": 47
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 2128,
+								"end": 2159,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 16
+									},
+									"end": {
+										"line": 44,
+										"column": 47
+									}
+								},
+								"name": "Ccccccccccccccccccccccccccccccc"
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 2162,
+							"end": 2172,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 50
+								},
+								"end": {
+									"line": 44,
+									"column": 60
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 2162,
+								"end": 2172,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 50
+									},
+									"end": {
+										"line": 44,
+										"column": 60
+									}
+								},
+								"name": "Tnnnnnnnnn"
+							}
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 2175,
+							"end": 2185,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 63
+								},
+								"end": {
+									"line": 44,
+									"column": 73
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 2175,
+								"end": 2185,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 63
+									},
+									"end": {
+										"line": 44,
+										"column": 73
+									}
+								},
+								"name": "Fnnnnnnnnn"
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 2104,
+								"end": 2111
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same for a conditional whose head overflows the `=` line: head and branches",
+							"start": 1942,
+							"end": 2020
+						},
+						{
+							"type": "Line",
+							"value": " render below the own-line run.",
+							"start": 2022,
+							"end": 2055
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 2350,
+					"end": 2512,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 51,
+							"column": 52
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 2355,
+						"end": 2392,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 6
+							},
+							"end": {
+								"line": 48,
+								"column": 43
+							}
+						},
+						"name": "I2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 2407,
+						"end": 2511,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 2
+							},
+							"end": {
+								"line": 51,
+								"column": 51
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 2407,
+								"end": 2457,
+								"loc": {
+									"start": {
+										"line": 50,
+										"column": 2
+									},
+									"end": {
+										"line": 50,
+										"column": 52
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 2407,
+									"end": 2457,
+									"loc": {
+										"start": {
+											"line": 50,
+											"column": 2
+										},
+										"end": {
+											"line": 50,
+											"column": 52
+										}
+									},
+									"name": "Mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 2463,
+								"end": 2511,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 3
+									},
+									"end": {
+										"line": 51,
+										"column": 51
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 2463,
+									"end": 2511,
+									"loc": {
+										"start": {
+											"line": 51,
+											"column": 3
+										},
+										"end": {
+											"line": 51,
+											"column": 51
+										}
+									},
+									"name": "Nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 2397,
+								"end": 2404
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same for an intersection too wide for the continuation line: the first member",
+							"start": 2189,
+							"end": 2269
+						},
+						{
+							"type": "Line",
+							"value": " renders below the own-line run and continuation members indent one deeper.",
+							"start": 2271,
+							"end": 2348
 						}
 					]
 				}

@@ -463,9 +463,25 @@ impl<'a> Printer<'a> {
                 "an alone-on-line directive always takes the force-break branch"
             );
             let build_value = || -> DocId { self.build_type_doc(value_type) };
-            // For union/intersection types, build without their own group so they inherit
-            // breaking from this context's group.
-            if let TSType::Union(u) = value_type {
+            // A block run the author broke AFTER (`type A = /* c */⏎<value>`) takes
+            // prettier's break-after-operator for EVERY value kind — `chooseLayout`'s
+            // `hasLeadingOwnLineComment` arm wins ahead of the per-kind layouts, so it
+            // is asked FIRST here: left to the arms below, the run glues onto a value
+            // whose width-driven expansion then strands it mid-line (`⏎\t/* c */ | A`,
+            // a form prettier never emits). A value that already carries a hard break
+            // materializes the run's newline-after `line` as a blank-preserving
+            // hardline; anything else rides one hang group with a soft `line`, which
+            // breaks exactly when the `=` seam does — a value that FITS collapses to
+            // the glued bytes in both formatters, so the flat render is unchanged.
+            // (Own-line runs never reach this branch: `force_break` above owns them.)
+            if let Some(run) = self.broke_after_value_leading_run(eq_pos + 1, type_start) {
+                let type_doc = build_value();
+                if d.will_break(type_doc) {
+                    parts.push(self.break_after_operator_run_doc(&run, type_start, type_doc));
+                } else {
+                    parts.push(self.hang_after_operator_run_doc(&run, type_doc));
+                }
+            } else if let TSType::Union(u) = value_type {
                 // A glued block run between `=` and a union with no authored leading
                 // `|` is handed INTO the union, which binds it to the first member —
                 // after the `| ` its broken layout synthesizes — instead of stranding
@@ -544,22 +560,6 @@ impl<'a> Printer<'a> {
                 } else {
                     parts.push(fluid(make_rhs(type_doc)));
                 }
-            } else if let Some((run, type_doc)) =
-                self.breaking_value_leading_run(eq_pos + 1, type_start, build_value)
-            {
-                // A block run the author broke AFTER, before a value that actually
-                // breaks (`type A = /* c */⏎{ …multiline… }`): prettier's
-                // break-after-operator (`chooseLayout`'s `hasLeadingOwnLineComment`
-                // arm) — `=`, then the run and the value below it in the indent, the
-                // run's newline-after `line` materialized by the value's break
-                // ([`Printer::break_after_operator_run_doc`]). A value that
-                // FITS collapses to the glued form in both formatters, so that case
-                // stays on the arms below. Precedes the `has_complex_params` break-lhs
-                // arm exactly as prettier's layout choice does. The union /
-                // intersection / conditional arms above keep their own layouts — their
-                // docs carry no hard break for a width-driven expansion, so this gate
-                // cannot fire for one of those unless a comment already breaks it.
-                parts.push(self.break_after_operator_run_doc(&run, type_start, type_doc));
             } else if type_has_internal_breaking(self, value_type) {
                 // Types with internal breaking (braces, brackets, parens, angle brackets):
                 // prettier's `fluid`. The marker hugs the `=` line when the value's first

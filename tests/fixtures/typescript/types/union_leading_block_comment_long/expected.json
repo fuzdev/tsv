@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 925,
+	"end": 1199,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -153,24 +153,72 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " exactly 101 chars inline (case D's width) — with the run on its own line the",
+			"start": 917,
+			"end": 996,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `=` breaks and the union renders flat below it, a second stable form at this width",
+			"start": 998,
+			"end": 1083,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1096,
+			"end": 1103,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 924,
+		"end": 1198,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 915,
+			"end": 1189,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 20,
+					"line": 26,
 					"column": 9
 				}
 			},
@@ -682,6 +730,138 @@
 							"value": " an own-line-authored leading comment stays above the union's first `| `",
 							"start": 694,
 							"end": 768
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1085,
+					"end": 1188,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 84
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1090,
+						"end": 1091,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 6
+							},
+							"end": {
+								"line": 23,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1106,
+						"end": 1187,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 2
+							},
+							"end": {
+								"line": 25,
+								"column": 83
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1106,
+								"end": 1146,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 42
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1106,
+									"end": 1146,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 42
+										}
+									},
+									"name": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1149,
+								"end": 1187,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 45
+									},
+									"end": {
+										"line": 25,
+										"column": 83
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1149,
+									"end": 1187,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 45
+										},
+										"end": {
+											"line": 25,
+											"column": 83
+										}
+									},
+									"name": "llllllllllllllllllllllllllllllllllllll"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 1096,
+								"end": 1103
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " exactly 101 chars inline (case D's width) — with the run on its own line the",
+							"start": 917,
+							"end": 996
+						},
+						{
+							"type": "Line",
+							"value": " `=` breaks and the union renders flat below it, a second stable form at this width",
+							"start": 998,
+							"end": 1083
 						}
 					]
 				}
