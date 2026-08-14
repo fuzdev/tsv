@@ -843,19 +843,7 @@ impl<'a> Printer<'a> {
     /// printed glued blocks correctly while dropping every line and own-line comment beside
     /// them — the ownership mask on hazard 4 (`docs/comments.md`).
     fn arrow_gap_leading_run(&self, start: u32, end: u32) -> Option<DocId> {
-        if !self.has_comments_to_emit_between(start, end) {
-            return None;
-        }
-        let d = self.d();
-        let mut parts = DocBuf::new();
-        self.push_leading_comment_run(
-            &mut parts,
-            comments_to_emit_in_range(self.comments, start, end),
-            end,
-            LeadingGlue::Adjacent,
-            d.empty(),
-        );
-        Some(d.concat(&parts))
+        self.build_rhs_comments_opt(start, end)
     }
 
     /// Build a flattened curried arrow chain: the signature heads

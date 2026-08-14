@@ -6,7 +6,7 @@
 // re-added with the parens when stripping would relocate them, or prepended at a
 // chain base.
 
-use super::{CommentSpacing, CommentVec, Printer};
+use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
@@ -17,45 +17,36 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 impl<'a> Printer<'a> {
     /// Build the leading-comment doc for comments between an opening `(` and the
     /// value that follows, concatenated with `value_doc`. Returns the combined doc
-    /// plus whether a line or own-line block comment forces the enclosing parens to
-    /// break across lines.
+    /// plus whether the run ends a line unconditionally, which the caller answers by
+    /// opening its parens ([`Printer::push_leading_comment_run`]'s own report — tsv
+    /// has no `propagateBreaks`, so a hardline in here is invisible to the group).
     ///
-    /// An own-line block comment requires a newline BOTH before and after it —
-    /// prettier keeps `(\n/* c */value)` inline because nothing separates the comment
-    /// from the value. Shared by dynamic `import(...)` and TS `import(...)` types.
+    /// The gap is a call-argument leading run — `import(…)`'s first argument, for both
+    /// the dynamic-import EXPRESSION and the TS import TYPE — so it takes the argument
+    /// list's mode and the shared emitter decides its separators per comment.
+    ///
+    /// ⚠️ **The three-way rule cannot be approximated by a whole-range scan**, which is
+    /// what this site did before: it asked "is there a newline anywhere between the `(`
+    /// and this comment", so the second comment of a run the author GLUED
+    /// (`import(⏎/* a */ /* b */⏎'./a')`) read as own-line, split the pair, and forced
+    /// the parens open — where prettier keeps the pair and, for a run with no line
+    /// comment, collapses the whole call. Own-line-ness is per comment and anchored on
+    /// its own neighbours ([`Printer::is_own_line_comment`]), and the author blank the
+    /// old loop's bare `hardline` deleted is likewise the emitter's to preserve.
     pub(crate) fn build_paren_leading_value_doc(
         &self,
         open_paren_end: u32,
         value_start: u32,
         value_doc: DocId,
     ) -> (DocId, bool) {
-        let d = self.d();
-        let own_line = self
-            .comments_on_page_between(open_paren_end, value_start)
-            .any(|c| {
-                c.is_block
-                    && self.has_newline_between(open_paren_end, c.span.start)
-                    && self.has_newline_between(c.span.end, value_start)
-            });
-        let line = self.has_line_comments_between(open_paren_end, value_start);
-        let force_break = own_line || line;
-
-        let doc = if force_break {
-            // Each comment on its own line inside the broken parens.
-            let mut parts = DocBuf::new();
-            for comment in comments_to_emit_in_range(self.comments, open_paren_end, value_start) {
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.hardline());
-            }
-            parts.push(value_doc);
-            d.concat(&parts)
-        } else if let Some(lead) = self.build_rhs_comments_opt(open_paren_end, value_start) {
-            // Inline block comment(s): `/* c */ value`
-            d.concat(&[lead, value_doc])
-        } else {
-            value_doc
+        let Some((run, force_break)) = self.build_leading_comment_run_with_break(
+            open_paren_end,
+            value_start,
+            LeadingGlue::AdjacentStrippedParen,
+        ) else {
+            return (value_doc, false);
         };
-        (doc, force_break)
+        (self.d().concat(&[run, value_doc]), force_break)
     }
 
     /// Append the trailing comments in an operand's closing gap to a parts vec.

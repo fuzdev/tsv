@@ -863,10 +863,14 @@ merge, or an interior rewrite still counts.
 
 ⚠️ **Leading comments have one rule and one emitter** — `Printer::push_leading_comment_run`
 (prettier's `printLeadingComment`), with `Printer::comment_hugs_next` as the single glue
-test and `Printer::push_leading_run_separator` for the three hand-rolled always-broken
+test and `Printer::push_leading_run_separator` for the two hand-rolled always-broken
 sites. Don't hand-roll `is_block && is_same_line(...)` at a new site or re-derive the
 anchor+separator inline — keying the hug on the *item* rather than on *what follows the
-comment* was a whole bug family. Whether the soft `line` after a leading run collapses is
+comment* was a whole bug family, and asking the whole `(`→value RANGE instead of the
+comment's own neighbours is the same error one step out (it splits an author-glued run and
+forces the shell open). A caller that owns a shell asks the emitter, which **returns
+whether it pushed a hardline** — tsv has no `propagateBreaks`, so a break inside the run is
+invisible to the group that must open for it. Whether the soft `line` after a leading run collapses is
 per-element grouping (the array family groups each element → collapses; the params family
 doesn't → breaks), mirrored from prettier; full rule in ./docs/comments.md.
 
