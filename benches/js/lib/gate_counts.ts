@@ -111,13 +111,30 @@ export interface GatePins {
 	scanned: number;
 	/** Both-accept count — also catches an oracle collapse (everything "parity") that `scanned` can't see. */
 	both_accept: number;
+	/**
+	 * Over-acceptance count (tsv accepts, the oracle rejects) — the deferred
+	 * early-error frontier.
+	 *
+	 * A *finding* here is not gated (that is the deliberate deferral), but the COUNT
+	 * is, because nothing else moves when the frontier grows: a new over-acceptance
+	 * comes out of `parity` (both rejected, now only the oracle does), leaving both
+	 * `scanned` and `both_accept` untouched. Without this pin the one direction the
+	 * gate is *supposed* to tolerate is also the one direction it cannot see, so tsv
+	 * could drift into accepting more of the oracle's parse errors release after
+	 * release with every gate green. Lower it deliberately when a gap is closed.
+	 */
+	over_acceptance: number;
 }
 
 /** conformance:svelte-fixtures — `scanned` suite inputs + `both_accept`; provenance in `GATE_CHECKOUT_COMMITS`. */
-export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3392, both_accept: 3297 };
+export const SVELTE_FIXTURES_PINS: GatePins = {
+	scanned: 3392,
+	both_accept: 3297,
+	over_acceptance: 16
+};
 
 /** conformance:ts-fixtures — provenance in `GATE_CHECKOUT_COMMITS` (../acorn-typescript, oracle @sveltejs/acorn-typescript). */
-export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202 };
+export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over_acceptance: 8 };
 
 /**
  * conformance:ts-repo — `scanned` corpus files + `accept_parity` (tsv/tsc-baseline agreement);

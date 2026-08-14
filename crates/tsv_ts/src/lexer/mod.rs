@@ -6,7 +6,7 @@
 mod comments;
 mod core;
 pub mod escapes;
-pub(crate) mod ident;
+pub mod ident;
 mod token;
 
 // Shared lexer-error constructor: `core` / `comments` reach it via `super::lex_err`.

@@ -77,45 +77,6 @@ fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expa
     printer.indent_body_expand(body_doc, expand)
 }
 
-/// Split a raw parameter string at top-level commas, returning trimmed param strings.
-///
-/// Handles nesting for `()`, `[]`, `{}`, `<>`, and string literals (`'...'`, `"..."`).
-/// E.g., `"a: A | 'x', b: B<C, D>"` → `["a: A | 'x'", "b: B<C, D>"]`.
-fn split_raw_params_at_commas(raw: &str) -> Vec<&str> {
-    let mut result = Vec::new();
-    let mut depth = 0i32;
-    let mut start = 0;
-    let bytes = raw.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'\'' | b'"' => {
-                let quote = bytes[i];
-                i += 1;
-                while i < bytes.len() && bytes[i] != quote {
-                    if bytes[i] == b'\\' {
-                        i += 1; // skip escaped char
-                    }
-                    i += 1;
-                }
-            }
-            b'(' | b'[' | b'{' | b'<' => depth += 1,
-            b')' | b']' | b'}' | b'>' => depth -= 1,
-            b',' if depth == 0 => {
-                result.push(raw[start..i].trim());
-                start = i + 1;
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    let last = raw[start..].trim();
-    if !last.is_empty() {
-        result.push(last);
-    }
-    result
-}
-
 /// Whether a wrapped block head's clause + `}` should hug the expression's last
 /// line (`) as item}`, `)}`) rather than dropping to their own line.
 ///
@@ -1269,15 +1230,13 @@ impl<'a> Printer<'a> {
         // space-only boundary is render-free and gets trimmed by the body builder.
         let is_inline = self.fragment_inline_authored(&block.body);
 
-        // Type parameters (generics). Parsed nodes route through tsv_ts's type-parameter
-        // printer (constraints, defaults, modifiers, interior comments, width-based
-        // wrapping of a long generic list — its own group, so it breaks independently of
-        // the parameter list). The raw-text fallback (parse failure) emits the source
-        // verbatim between `<` and `>`.
+        // Type parameters (generics). They route through tsv_ts's type-parameter printer
+        // (constraints, defaults, modifiers, interior comments, width-based wrapping of a
+        // long generic list — its own group, so it breaks independently of the parameter
+        // list). A head the parser could not read never gets here: it is a parse error, so
+        // `type_parameters` is `Some` whenever the source wrote a `<…>`.
         let type_params_part = if let Some(decl) = &block.type_parameters {
             tsv_ts::build_type_parameters_doc_with_comments(d, decl, &self.ts_inputs(), &self.embed)
-        } else if let Some(raw) = block.type_params_raw {
-            d.concat(&[d.text("<"), d.text_pooled(raw), d.text(">")])
         } else {
             d.empty()
         };
@@ -1285,45 +1244,23 @@ impl<'a> Printer<'a> {
         // Parameter list `(…)`. The parens fold so that when they wrap, `)` dedents to
         // base and `}` hugs it (`)}`) — no dangle (no trailing comma; trailingComma:
         // 'none').
-        let params_inner = if let Some(raw) = &block.raw_parameters {
-            // Parse-failure fallback: emit the raw parameter source (comments preserved
-            // verbatim), split at top-level commas so a long list still wraps one-per-line.
-            let params_docs: DocBuf = split_raw_params_at_commas(raw)
-                .iter()
-                .map(|s| d.text_pooled(s))
-                .collect();
-            let mut parts: DocBuf = DocBuf::with_capacity(params_docs.len() * 2);
-            for (i, param_doc) in params_docs.into_iter().enumerate() {
-                if i > 0 {
-                    parts.push(d.text(","));
-                    parts.push(d.line());
-                }
-                parts.push(param_doc);
-            }
-            d.concat(&[
-                d.text("("),
-                d.indent_softline(d.concat(&parts)),
-                d.softline(),
-                d.text(")"),
-            ])
-        } else {
-            // Parsed parameters route through the same comment-aware,
-            // `FunctionParameter`-context printer a real function signature uses, so
-            // interior comments (`{ a = /* c */ 1 }`), boundary comments (`a /* c */, b`),
-            // the single-pattern hug, and nesting-depth expansion all match a standalone
-            // parameter list. `build_function_params_doc_with_comments` emits the `(…)`
-            // with no group of its own — the `group` below drives the wrap.
-            match block.params_paren {
-                Some(paren) => tsv_ts::build_function_params_doc_with_comments(
-                    d,
-                    block.parameters,
-                    Some(paren.start),
-                    Some(paren.end),
-                    &self.ts_inputs(),
-                    &self.embed,
-                ),
-                None => d.text("()"),
-            }
+        //
+        // Parameters route through the same comment-aware, `FunctionParameter`-context
+        // printer a real function signature uses, so interior comments (`{ a = /* c */ 1 }`),
+        // boundary comments (`a /* c */, b`), the single-pattern hug, and nesting-depth
+        // expansion all match a standalone parameter list.
+        // `build_function_params_doc_with_comments` emits the `(…)` with no group of its
+        // own — the `group` below drives the wrap.
+        let params_inner = match block.params_paren {
+            Some(paren) => tsv_ts::build_function_params_doc_with_comments(
+                d,
+                block.parameters,
+                Some(paren.start),
+                Some(paren.end),
+                &self.ts_inputs(),
+                &self.embed,
+            ),
+            None => d.text("()"),
         };
         // The parameter list gets its OWN group so it breaks independently of the
         // type-parameter group (mirroring a real function signature, where `<…>` and

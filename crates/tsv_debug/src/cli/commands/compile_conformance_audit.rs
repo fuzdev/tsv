@@ -407,7 +407,6 @@ mod tests {
         "{#snippet children()} alongside other default content (the oracle rejects it)",
         "{#snippet} alongside a {@const}/<svelte:head> in the same fragment (hoist order)",
         "{#snippet} rest parameter (the oracle rejects it)",
-        "{#snippet} signature the parser fell back to raw text for",
         "{#snippet} with an escaped name",
         "{#snippet} {name} hoist classification ambiguous",
         "{#snippet} {name} is already declared by the instance script (the oracle rejects it)",

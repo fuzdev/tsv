@@ -1,0 +1,133 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 340,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 317,
+				"data": "\n\tA shorthand attribute's interior is a JS identifier, so it takes the Unicode\n\tID_Start / ID_Continue classes rather than Rust's alphanumeric one: U+2118 is\n\tID_Start but not alphabetic, and U+200C ZWNJ is ID_Continue but not alphanumeric.\n\tU+00B2 is the reverse in both arms (see the input_invalid_* files).\n"
+			},
+			{
+				"type": "Text",
+				"start": 317,
+				"end": 318,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 318,
+				"end": 339,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 319
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 322
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 323,
+						"end": 326,
+						"name": "℘",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 6,
+								"character": 324
+							},
+							"end": {
+								"line": 7,
+								"column": 7,
+								"character": 325
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 324,
+							"end": 325,
+							"expression": {
+								"type": "Identifier",
+								"name": "℘",
+								"start": 324,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 6,
+										"character": 324
+									},
+									"end": {
+										"line": 7,
+										"column": 7,
+										"character": 325
+									}
+								}
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 327,
+						"end": 332,
+						"name": "fn‌",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 10,
+								"character": 328
+							},
+							"end": {
+								"line": 7,
+								"column": 13,
+								"character": 331
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 328,
+							"end": 331,
+							"expression": {
+								"type": "Identifier",
+								"name": "fn‌",
+								"start": 328,
+								"end": 331,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 10,
+										"character": 328
+									},
+									"end": {
+										"line": 7,
+										"column": 13,
+										"character": 331
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
