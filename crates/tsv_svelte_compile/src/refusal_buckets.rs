@@ -257,9 +257,6 @@ impl Refusal {
             Self::EachKeyWithoutAs => {
                 Cow::Borrowed("{#each} with a key but no `as` clause (the oracle rejects it)")
             }
-            Self::SnippetSignatureUnparsed => {
-                Cow::Borrowed("{#snippet} signature the parser fell back to raw text for")
-            }
             Self::SnippetEscapedName => Cow::Borrowed("{#snippet} with an escaped name"),
             Self::SnippetRestParameter => {
                 Cow::Borrowed("{#snippet} rest parameter (the oracle rejects it)")
@@ -524,7 +521,6 @@ impl Refusal {
             Self::ConstTagOutsideBlock,
             Self::NestedEach,
             Self::EachKeyWithoutAs,
-            Self::SnippetSignatureUnparsed,
             Self::SnippetEscapedName,
             Self::SnippetRestParameter,
             Self::SnippetHoistAmbiguous {

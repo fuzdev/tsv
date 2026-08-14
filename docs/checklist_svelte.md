@@ -66,7 +66,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 - Expression attributes (`name={expr}`)
 - Mixed text+expression (`"text{expr}text"`)
-- Shorthand attributes (`{variable}`)
+- Shorthand attributes (`{variable}`) — the interior goes through the same `read_identifier` as the block-head and block-binding positions, so all of its rules apply: the ECMAScript `ID_Start`/`ID_Continue` classes (`{℘}` valid, `{a²}` not), an empty name (`{123}`, `{1a}`, `{²}`), and a reserved word (`{this}`, `{class}`). See `attributes/{shorthand_numeric_invalid,shorthand_reserved_invalid,shorthand_unicode_identifier}` and, for the whole 48-word list across all six `read_identifier` positions, `tests/svelte_read_identifier.rs`
 - Spread attributes (`{...object}`)
 - Multiple spread attributes
 
@@ -124,6 +124,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Else branch (`{:else}`)
 - Else-if branch (`{:else if cond}`)
 - Else-if chains (multiple)
+- A block's alternate is filled once — a second `{:else}`, or an `{:else if}` following an `{:else}`, is rejected. Svelte's reader replaces `block.alternate` unguarded and loses the first branch's markup; tsv declines that content loss. See [conformance_svelte.md](./conformance_svelte.md) §Block Continuation Corrections
 - Nested if blocks
 - If with expressions only
 - If with mixed content
@@ -134,7 +135,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - With index (`{#each items as item, i}`)
 - With key (`{#each items as item (item.id)}`)
 - With index and key (`{#each items as item, i (key)}`)
-- Each else (`{:else}`)
+- Each else (`{:else}`) — filled once, like an if block's alternate: a second `{:else}` is rejected rather than replacing `block.fallback`. See [conformance_svelte.md](./conformance_svelte.md) §Block Continuation Corrections
 - Destructuring - object (`{#each items as { a, b }}`) — spaced braces match prettier; the lone divergence is the empty pattern (`{}`), see [conformance_prettier_svelte.md](./conformance_prettier_svelte.md)
 - Destructuring - array (`{#each items as [a, b]}`)
 - Destructuring with rest (`{#each items as {a, ...rest}}`)
@@ -144,6 +145,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Each without `as` (`{#each items}`, `{#each items, i}`, `{#each items, i (key)}`) — index/key are valid without a context binding; all route through the same index/key parser as the `as` form
 - Nested each blocks
 - Binding ends at `}` — a stray comment, leftover index/key fragment, or junk after the binding is rejected (matching Svelte's final `eat('}')`), never silently dropped. Index must be a bare identifier; the key `(…)` is matched with the trivia-aware bracket scanner. See `blocks/each/{no_as_with_index_key, with_index_key/input_invalid_*}`
+- A **plain-identifier** binding is read by Svelte's `read_identifier`, so a reserved word (`{#each items as eval}`) is rejected — the same rule as the index and a `{#snippet}` name, since `read_pattern` opens with that call. Only the **destructuring** branch (`{#each items as { eval }}`) falls through to acorn, where the strict-mode early error answers instead. See `blocks/head_reserved_identifier/` and `tests/svelte_read_identifier.rs`
 
 ### Await Blocks
 
@@ -156,6 +158,8 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Destructuring in `then`/`catch` bindings (`{:then {a = 1}}`) — same brace-hugging + default-value divergences as each blocks
 - Typed `then`/`catch` value (`{:then value: number}`, `{:catch error: Error}`, lang="ts") — including a destructured pattern (`{:then { a }: { a: number }}`), which carries the same `end`/`loc` asymmetry as a typed each binding
 - `then`/`catch` value is a bare pattern — a comment immediately before it, or between it and the `:`/`}`, is rejected (matching Svelte's `read_pattern`), never relocated or dropped; a comment *inside* a destructure (`{a /* c */}`) or *inside* the type (`value: /* c */ number`) stays valid. See `await/{then_shorthand,then,catch_shorthand,catch}/input_invalid_*_comment`
+- Each clause is filled once — a repeated `{:then}` or `{:catch}` is rejected (Svelte's `block_duplicate_clause`) rather than overwriting the earlier fragment, in the full form and after either shorthand head. See `await/{then_catch,then_shorthand,catch_shorthand,then_shorthand_catch}/input_invalid_duplicate_*`, with the error wording pinned by `tests/svelte_block_continuation_clause.rs`
+- A **plain-identifier** `{:then}` / `{:catch}` binding takes the reserved-word rule, like an `{#each}` binding — both are `read_pattern` positions, and only its destructuring branch defers to acorn
 - Nested await blocks
 
 ### Key Blocks
@@ -238,6 +242,11 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - With default parameters
 - With destructuring
 - Parameter comments — interior (`{ a = /* c */ 1 }`), boundary (`a /* c */, b`), dangling (`(/* c */)`)
+- Signature head `<TP>(PARAMS)` parsed as a synthetic `function f<TP>(PARAMS) {}`; a parse
+  failure rejects the component, matching Svelte's own reader (which hands the same slice to
+  `parse_expression_at` as `(PARAMS) => {}` and lets the throw out). A malformed head —
+  `fn(a b)`, `fn(,,)`, `fn(1 + )`, `fn(() => 1)`, `fn<T extends>()`, `fn<>()` — is never kept
+  as raw text. See `blocks/snippet/{params,ts_generic,ts_generic_constraints}/input_invalid_*`
 - Nested snippets
 - Recursive snippets
 - Own line in its fragment, except when glued to content on both sides — the same rule as the

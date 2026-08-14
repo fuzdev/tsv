@@ -602,11 +602,6 @@ pub enum Refusal {
     EachKeyWithoutAs,
 
     // ── Snippets / render tags ─────────────────────────────────────────────
-    /// A `{#snippet}` whose signature head (`<T>(params)`) the parser could not
-    /// parse: it kept the raw text instead of an AST, so there is nothing to
-    /// erase or emit.
-    #[error("{{#snippet}} signature the parser fell back to raw text for")]
-    SnippetSignatureUnparsed,
     /// A `{#snippet}` whose name is an escaped identifier — the name-based port
     /// can't reproduce it.
     #[error("{{#snippet}} with an escaped name")]

@@ -289,6 +289,55 @@ value). One case is corrected:
   the matched half of the reader is
   [static_attribute_grammar](../tests/fixtures/svelte/script/static_attribute_grammar/).
 
+### Block Continuation Corrections
+
+Svelte reads a `{:…}` continuation with one function, `next`
+(`1-parse/state/tag.js`), which dispatches on the open block. Its `{#await}` arm
+guards each clause — `if (block.then) e.block_duplicate_clause(start, '{:then}')`,
+and the same for `{:catch}` — but its `{#if}` and `{#each}` arms assign
+`block.alternate = create_fragment()` / `block.fallback = create_fragment()`
+**unguarded**. So a repeated `{:else}` parses, replacing the alternate outright:
+`{#if cond}text1{:else}text2{:else}text3{/if}` yields an AST holding `text1` and
+`text3` only, and prettier, printing from that AST, emits the loss. tsv rejects every
+spelling that reaches those two unguarded assignments instead:
+
+- **Duplicated `{:else}`** — reproducing the overwrite means a formatter that
+  silently deletes a branch of the author's markup, and no reading of the input
+  keeps those bytes, so rejecting is the only lossless answer. Svelte itself takes
+  that view one block over, which makes the gap an inconsistency in the reader
+  rather than a designed behavior; tsv applies the `{#await}` rule uniformly.
+  Three spellings reach the same unguarded assignment and each is pinned with the
+  canonical AST *including* its missing branch, so the argument dies loudly if
+  Svelte ever adds the guard: `{#if}`'s repeated `{:else}`
+  (`Duplicate {:else} clause`,
+  [if/else_duplicate](../tests/fixtures/svelte/blocks/if/else_duplicate_svelte_divergence/)),
+  an `{:else if}` following an `{:else}` on the same block
+  (`{:else if} cannot follow {:else}` — not the duplicate wording, since that one is
+  the block's *first* `{:else if}` and only the alternate it lands on is taken,
+  [if/elseif_after_else](../tests/fixtures/svelte/blocks/if/elseif_after_else_svelte_divergence/)),
+  and `{#each}`'s repeated `{:else}`
+  (`Duplicate {:else} clause`,
+  [each/else_duplicate](../tests/fixtures/svelte/blocks/each/else_duplicate_svelte_divergence/)).
+  A continuation that is neither (`{:catch}` after an `{:else}`) is left to the
+  unclosed-block error, since canonical rejects it too and the verdict already
+  matches.
+
+The `{#await}` arm is **matched**, not corrected — tsv had been the permissive side
+there, overwriting `then` / `catch` exactly the way canonical's `{:else}` does; the
+duplicate-clause verdicts are pinned as `input_invalid_*` files beside the
+[then_catch](../tests/fixtures/svelte/blocks/await/then_catch/),
+[then_shorthand](../tests/fixtures/svelte/blocks/await/then_shorthand/),
+[catch_shorthand](../tests/fixtures/svelte/blocks/await/catch_shorthand/) and
+[then_shorthand_catch](../tests/fixtures/svelte/blocks/await/then_shorthand_catch/)
+fixtures.
+
+The wording of every rejection above is pinned by
+[`tests/svelte_block_continuation_clause.rs`](../tests/svelte_block_continuation_clause.rs),
+not by the fixtures: `input_invalid_*` asserts only *that* both parsers reject, and
+`tsv_rejects.txt` — which does pin a substring — is valid only in a `_svelte_divergence`
+directory, i.e. one where canonical *accepts*. So the `{#await}` half has no fixture
+vehicle for its message at all.
+
 ### TypeScript Corrections
 
 Svelte uses acorn + acorn-typescript, which lags behind TypeScript's parser. tsv implements the full spec.

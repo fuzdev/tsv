@@ -612,7 +612,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         else {
             return Err(self.error_expected_at("'attach' keyword", content_start));
         };
-        let expr_str = after_attach.trim();
+        let expr_str = after_attach.trim_matches(is_svelte_ws);
 
         if expr_str.is_empty() {
             return Err(self.error_msg_at("{@attach} requires an expression", content_start));
@@ -662,14 +662,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Extract content: "...expr" or " ...expr " (with whitespace)
         let content = &self.source[content_start..content_end];
-        let trimmed = content.trim_start();
+        let trimmed = content.trim_start_matches(is_svelte_ws);
 
         // Parse: "...expr"
         let Some(after_dots) = trimmed.strip_prefix("...") else {
             return Err(self.error_expected_at("'...' in spread attribute", content_start));
         };
 
-        if after_dots.trim().is_empty() {
+        if after_dots.trim_matches(is_svelte_ws).is_empty() {
             return Err(self.error_msg_at("Spread attribute requires an expression", content_start));
         }
 
@@ -729,28 +729,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Extract content: the identifier name
         let interior = &self.source[content_start..content_end];
-        let name_str = interior.trim();
+        let name_str = interior.trim_matches(is_svelte_ws);
 
         if name_str.is_empty() {
             return Err(
                 self.error_msg_at("Shorthand attribute requires an identifier", content_start)
             );
-        }
-
-        // Validate it's a valid identifier: every char is an identifier char and it does
-        // not start with a digit (`svelte.parse`'s `read_identifier` reads an empty
-        // identifier from `{123}` / `{1a}` and rejects). Only an ASCII-digit start is
-        // rejected — a non-ASCII start stays permissive so no valid Unicode identifier is
-        // over-rejected.
-        if name_str.starts_with(|c: char| c.is_ascii_digit())
-            || !name_str
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
-        {
-            return Err(self.error_msg_at(
-                &format!("Invalid shorthand attribute: '{name_str}'"),
-                content_start,
-            ));
         }
 
         // Every span below is the identifier's own — the braces and any padding are outside
@@ -760,15 +744,35 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`create_attribute(id.name, id.loc, …)`). Pinned by
         // `tests/svelte_shorthand_attribute_span.rs` — `format` normalizes `{ x }` → `{x}`,
         // so no fixture can hold the padded trigger.
-        let ident_start = content_start + (interior.len() - interior.trim_start().len());
+        let ident_start =
+            content_start + (interior.len() - interior.trim_start_matches(is_svelte_ws).len());
+
+        // The interior IS a `read_identifier` position, so it takes that reader rather than
+        // a local character test: `{123}` / `{1a}` / `{²}` read an empty name (canonical's
+        // "Attribute shorthand cannot be empty") and `{this}` is a reserved word. The local
+        // test this replaced spelled the class as `is_alphanumeric() || '_' || '$'`, which
+        // is neither `ID_Start` nor `ID_Continue` and so missed in BOTH directions — `{℘}`
+        // rejected where canonical accepts, `{a²}` accepted where canonical stops the
+        // identifier at the `²` and then fails to eat `}`.
+        let name = match self.read_identifier(name_str, ident_start)? {
+            Some(name) if name.len() == name_str.len() => name,
+            // A name shorter than the interior is trailing junk canonical's `eat('}', true)`
+            // rejects; no name at all is its empty-shorthand error. One message for both —
+            // the interior is what the author must fix either way.
+            _ => {
+                return Err(self.error_msg_at(
+                    &format!("Invalid shorthand attribute: '{name_str}'"),
+                    content_start,
+                ));
+            }
+        };
+
         let ident_span = Span {
             start: ident_start as u32,
-            end: (ident_start + name_str.len()) as u32,
+            end: (ident_start + name.len()) as u32,
         };
-        let identifier = Identifier::simple(
-            self.synthesized_ident_name(name_str, ident_span),
-            ident_span,
-        );
+        let identifier =
+            Identifier::simple(self.synthesized_ident_name(name, ident_span), ident_span);
 
         let expression_tag = ExpressionTag {
             expression: Expression::Identifier(identifier),

@@ -52,7 +52,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Svelte requires whitespace after the keyword.
         let expr_str = self
             .strip_block_keyword(tag_content, keyword, tag_content_start)?
-            .trim();
+            .trim_matches(is_svelte_ws);
 
         let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
@@ -79,7 +79,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse: "const name = expression" — Svelte requires whitespace after the keyword.
         let decl_str = self
             .strip_block_keyword(tag_content, "const", tag_content_start)?
-            .trim();
+            .trim_matches(is_svelte_ws);
 
         let decl_offset = tag_content_start + subslice_offset(tag_content, decl_str);
 
@@ -125,7 +125,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn opens_declaration_tag(&self) -> bool {
         let after_brace = self.current_end;
         let rest = &self.source[after_brace..];
-        let kw_start = after_brace + (rest.len() - rest.trim_start().len());
+        let kw_start = after_brace + (rest.len() - rest.trim_start_matches(is_svelte_ws).len());
         matches!(self.keyword_at(kw_start), "const" | "let")
     }
 
@@ -215,8 +215,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         decl_offset: usize,
         eq_pos: usize,
     ) -> Result<(Expression<'arena>, Expression<'arena>), ParseError> {
-        let id_str = decl_str[..eq_pos].trim();
-        let init_str = decl_str[eq_pos + 1..].trim();
+        let id_str = decl_str[..eq_pos].trim_matches(is_svelte_ws);
+        let init_str = decl_str[eq_pos + 1..].trim_matches(is_svelte_ws);
 
         let id_offset = decl_offset + subslice_offset(decl_str, id_str);
         let init_offset =
@@ -357,7 +357,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // identifiers). Svelte's `regex_whitespace_with_closing_curly_brace`
         // (`/\s*}/y`); a comment is not whitespace, so `{@debug /* c */}` falls
         // through to the parse below, which rejects (there is no expression).
-        let expr_str = rest.trim();
+        let expr_str = rest.trim_matches(is_svelte_ws);
         if !expr_str.is_empty() {
             let expr_offset = rest_offset + subslice_offset(rest, expr_str);
 

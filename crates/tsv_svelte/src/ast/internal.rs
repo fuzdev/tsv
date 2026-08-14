@@ -184,16 +184,14 @@ pub struct SnippetBlock<'arena> {
     pub expression: Expression<'arena>, // Snippet name (Identifier)
     /// Parsed generic type parameters (`<T extends X = Y>`), routed through
     /// `tsv_ts`'s type-parameter printer for constraint/default/modifier
-    /// handling and width-based wrapping. `None` when absent or when the
-    /// signature parse fell back to raw text (see `type_params_raw`).
+    /// handling and width-based wrapping. `Some` whenever `type_params_raw` is
+    /// — a signature the parser cannot read is a parse error, not a node.
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Raw inner text of the generics (`T extends X` for `<T extends X>`),
     /// always set when generics are present. Feeds the public AST's `typeParams`
-    /// string (matching Svelte's parser) and is the formatter fallback when
-    /// `type_parameters` is `None` (parse failure).
+    /// string, matching Svelte's parser (which stores it raw too).
     pub type_params_raw: Option<&'arena str>,
-    pub parameters: &'arena [Expression<'arena>], // Function parameters (patterns) - may be empty if raw_parameters is set
-    pub raw_parameters: Option<&'arena str>, // Raw parameter string for TypeScript (when type annotations present)
+    pub parameters: &'arena [Expression<'arena>], // Function parameters (patterns)
     /// Source span of the parameter parens: `start` is the `(`, `end` is the `)`
     /// (for leading / dangling / trailing comment lookup when printing parameters).
     /// `None` only if no `(` was found (malformed).

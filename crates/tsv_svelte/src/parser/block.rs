@@ -14,18 +14,6 @@ use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::SvelteParser;
 use super::{match_bracket, subslice_offset};
 
-/// Whether `c` may START a JS identifier (letter, `_`, or `$` — never a digit).
-/// Mirrors the leading-char rule of Svelte's `read_identifier`, used to validate the
-/// `{#each}` index so a comment glyph or numeric literal isn't taken as the index.
-fn is_identifier_start(c: char) -> bool {
-    c.is_alphabetic() || c == '_' || c == '$'
-}
-
-/// Whether `c` may CONTINUE a JS identifier (`is_identifier_start` plus digits).
-fn is_identifier_continue(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '$'
-}
-
 /// Strip a **mid-head keyword separator** — optional leading whitespace, the keyword,
 /// then a *required* whitespace run — returning the value that follows.
 ///
@@ -53,6 +41,38 @@ fn strip_head_keyword<'s>(rest: &'s str, keyword: &str) -> Option<&'s str> {
     let value = after_kw.trim_start_matches(is_svelte_ws);
     (value.len() < after_kw.len()).then_some(value)
 }
+
+/// The two `{#await}` clauses — the phases `{:then}` / `{:catch}` name, and that a
+/// shorthand head (`{#await p then v}`) fills in advance. Each fills at most one
+/// [`AwaitSlot`], which is what [`SvelteParser::parse_await_block`]'s continuation loop
+/// guards.
+#[derive(Clone, Copy)]
+enum AwaitClause {
+    Then,
+    Catch,
+}
+
+impl AwaitClause {
+    /// The keyword as it is spelled in both the head (`{#await p then v}`) and the
+    /// continuation (`{:then v}`) — one spelling drives the scan, the parse and the
+    /// duplicate error.
+    fn keyword(self) -> &'static str {
+        match self {
+            Self::Then => "then",
+            Self::Catch => "catch",
+        }
+    }
+}
+
+/// What ends any `{#await}` body — the pending phase's and each clause's alike. An
+/// unrecognized continuation ends a body regardless (`parse_block_children` breaks on
+/// one), so the list is not per-clause; the continuation loop is what decides whether
+/// the one that ended it is legal there.
+const AWAIT_BODY_STOPS: &[&str] = &["then", "catch", "await"];
+
+/// What one `{#await}` clause holds: its fragment and its binding pattern, kept together
+/// so filling a clause and asking whether it is filled cannot name different slots.
+type AwaitSlot<'arena> = (Option<Fragment<'arena>>, Option<Expression<'arena>>);
 
 /// Find the LAST top-level `as` separator in a string.
 ///
@@ -181,13 +201,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let after_else = expr_content
                 .strip_prefix("else")
                 .unwrap_or(expr_content)
-                .trim_start();
+                .trim_start_matches(is_svelte_ws);
             self.strip_block_keyword(after_else, "if", tag_content_start)?
-                .trim_start()
+                .trim_start_matches(is_svelte_ws)
         } else {
             // {#if expr} - skip "if", whitespace
             self.strip_block_keyword(expr_content, "if", tag_content_start)?
-                .trim_start()
+                .trim_start_matches(is_svelte_ws)
         };
 
         // Parse the test expression (with comments)
@@ -228,8 +248,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             } else if is_else {
                 // {:else} - parse else branch
                 let else_tag_start = self.current_end;
-                let (_, else_content_start) = self.scan_block_tag_content(else_tag_start)?; // consume "else}"
+                let (else_tag_content, else_content_start) =
+                    self.scan_block_tag_content(else_tag_start)?; // consume "else}"
+                // Only whitespace may follow `else` before the `}` — Svelte's
+                // `allow_whitespace` then `eat('}')`. `continuation_keyword_at` cannot
+                // answer this: it stops the run at the first char that is neither
+                // alphabetic nor a SPACE, so a U+0085 (whitespace to Rust, not to JS `\s`)
+                // ended the run at `else` and was then silently dropped.
+                let after_else = &else_tag_content["else".len()..];
+                self.reject_trailing_tag_content(after_else, else_tag_start + "else".len())?;
                 let else_content = self.parse_block_children(&["if"], else_content_start)?;
+                self.reject_duplicate_else()?;
                 Some(else_content)
             } else {
                 None
@@ -290,7 +319,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // before re-parsing the same region — see its `truncate`; `expr_offset` is where BOTH
         // parses of the iterable start, so it is derived once rather than twice.
         let comments_before_expr = self.expression_comments.len();
-        let expr_str = content.trim_start();
+        let expr_str = content.trim_start_matches(is_svelte_ws);
         let expr_offset = content_offset + (content.len() - expr_str.len());
         let (expression, expr_end_pos) = self.parse_ts_expression_partial(expr_str, expr_offset)?;
 
@@ -328,7 +357,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                         self.expression_comments.truncate(comments_before_expr);
                         let full_expr_str = &content[..expr_consumed + as_len + last_as_pos];
                         (
-                            self.parse_ts_expression(full_expr_str.trim(), expr_offset)?,
+                            self.parse_ts_expression(
+                                full_expr_str.trim_matches(is_svelte_ws),
+                                expr_offset,
+                            )?,
                             &binding_str[real_binding_start..],
                             binding_offset + real_binding_start,
                         )
@@ -378,7 +410,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         {
             let else_tag_start = self.current_end;
             let (_, else_content_start) = self.scan_block_tag_content(else_tag_start)?; // consume "else}"
-            Some(self.parse_block_children(&["each"], else_content_start)?)
+            let fallback_content = self.parse_block_children(&["each"], else_content_start)?;
+            self.reject_duplicate_else()?;
+            Some(fallback_content)
         } else {
             None
         };
@@ -420,8 +454,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         binding_offset: usize,
     ) -> Result<EachBindingResult<'arena>, ParseError> {
         // Calculate leading whitespace and adjust offset accordingly
-        let leading_ws = binding.len() - binding.trim_start().len();
-        let trimmed = binding.trim();
+        let leading_ws = binding.len() - binding.trim_start_matches(is_svelte_ws).len();
+        let trimmed = binding.trim_matches(is_svelte_ws);
         let adjusted_offset = binding_offset + leading_ws;
 
         // Parse context as a PATTERN (like Svelte does), not as expression
@@ -459,28 +493,29 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         input: &str,
         offset: usize,
     ) -> Result<(Expression<'arena>, usize), ParseError> {
-        let trimmed = input.trim_start();
+        let trimmed = input.trim_start_matches(is_svelte_ws);
         let ws_len = input.len() - trimmed.len();
         let adjusted = offset + ws_len;
 
         // The pattern's extent, bounded so the annotation (and any `, index` /
         // `(key)` tail) stays out of the expression parse.
+        // This split IS canonical's: `read_pattern` (`1-parse/read/context.js`) opens with
+        // `parser.read_identifier()` and only falls to acorn when that reads nothing — i.e.
+        // on the `{`/`[` destructuring branch. So the identifier arm goes through the same
+        // reader (reserved-word rule included) and the bracket arm keeps the deferral.
         let end = if trimmed.starts_with('{') || trimmed.starts_with('[') {
             self.find_matching_bracket(trimmed)?
         } else {
-            let end = trimmed
-                .find(|c: char| !is_identifier_continue(c))
-                .unwrap_or(trimmed.len());
-            if end == 0 {
+            let Some(name) = self.read_identifier(trimmed, adjusted)? else {
                 return Err(self.error_expected_at("identifier or pattern", offset));
-            }
-            end
+            };
+            name.len()
         };
         // `parse_ts_pattern` yields ObjectPattern/ArrayPattern (not the Object/Array
         // *Expression* the plain expression parser would).
         let mut expr = self.parse_ts_pattern(&trimmed[..end], adjusted)?;
 
-        let after_pattern = trimmed[end..].trim_start();
+        let after_pattern = trimmed[end..].trim_start_matches(is_svelte_ws);
         if !after_pattern.starts_with(':') {
             return Ok((expr, adjusted + end));
         }
@@ -530,7 +565,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         remaining: &str,
         remaining_offset: usize,
     ) -> Result<IndexAndKeyResult<'arena>, ParseError> {
-        let trimmed = remaining.trim_start();
+        let trimmed = remaining.trim_start_matches(is_svelte_ws);
         let ws_len = remaining.len() - trimmed.len();
         let offset = remaining_offset + ws_len;
 
@@ -544,25 +579,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Check for ", index" — the index is a bare identifier (Svelte's `read_identifier`).
         if let Some(after_comma) = rest.strip_prefix(',') {
-            let after_comma_trimmed = after_comma.trim_start();
+            let after_comma_trimmed = after_comma.trim_start_matches(is_svelte_ws);
             let comma_ws = after_comma.len() - after_comma_trimmed.len();
 
-            // An identifier must start with a letter / `_` / `$` (never a digit, comment
-            // glyph, or other char). A non-start leaves the index unread and the comma
-            // unconsumed, so the caller's trailing check rejects — matching Svelte, which
-            // emits "Expected an identifier" for `{#each x as y, /* c */ i}` and `, 5`.
-            let idx_end = if after_comma_trimmed.starts_with(|c: char| is_identifier_start(c)) {
-                after_comma_trimmed
-                    .find(|c: char| !is_identifier_continue(c))
-                    .unwrap_or(after_comma_trimmed.len())
-            } else {
-                0
-            };
-
-            if idx_end > 0 {
-                index = Some(self.alloc_str_in(&after_comma_trimmed[..idx_end]));
-                rest = &after_comma_trimmed[idx_end..];
-                rest_offset = offset + 1 + comma_ws + idx_end;
+            // The index is a bare identifier read the way Svelte reads it — so a reserved
+            // word (`{#each x as y, if}`) is rejected here rather than stored. A non-start
+            // (`, /* c */ i`, `, 5`) leaves the index unread and the comma unconsumed, so
+            // the caller's trailing check reports it, matching Svelte's "Expected an
+            // identifier".
+            let idx_offset = offset + 1 + comma_ws;
+            if let Some(name) = self.read_identifier(after_comma_trimmed, idx_offset)? {
+                index = Some(self.alloc_str_in(name));
+                rest = &after_comma_trimmed[name.len()..];
+                rest_offset = idx_offset + name.len();
                 consumed_end = rest_offset;
             }
         }
@@ -570,7 +599,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Check for "(key)" — match the `)` with the trivia-aware bracket scanner so a
         // `)` inside a string/comment in the key can't end it early, and any trailing
         // junk after the real `)` is left for the caller's trailing check (not swallowed).
-        let rest_trimmed = rest.trim_start();
+        let rest_trimmed = rest.trim_start_matches(is_svelte_ws);
         let (key, key_span) = if rest_trimmed.starts_with('(') {
             let key_ws = rest.len() - rest_trimmed.len();
             let paren_start = rest_offset + key_ws; // absolute offset of '('
@@ -586,8 +615,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let key_str = &rest_trimmed[1..close];
             let key_offset = paren_start + 1; // after '('
             let key_expr = self.parse_ts_expression(
-                key_str.trim(),
-                key_offset + (key_str.len() - key_str.trim_start().len()),
+                key_str.trim_matches(is_svelte_ws),
+                key_offset + (key_str.len() - key_str.trim_start_matches(is_svelte_ws).len()),
             )?;
             // Span includes the parentheses: from '(' to after ')'.
             let span_start = paren_start as u32;
@@ -618,7 +647,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Use partial parsing for the promise expression
         // This correctly handles cases like `fetch(" then ")` where " then " is inside a string
-        let expr_str = content.trim_start();
+        let expr_str = content.trim_start_matches(is_svelte_ws);
         let (expression, expr_end_pos) = self.parse_ts_expression_partial(
             expr_str,
             content_offset + (content.len() - expr_str.len()),
@@ -653,119 +682,83 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let shorthand_then = shorthand("then");
         let shorthand_catch = shorthand("catch");
 
+        // Which clause the HEAD fills, and with what binding text. The block form fills
+        // none — its first body is the pending phase — while each shorthand fills its
+        // own, which is exactly the state canonical's `next` guards the continuations
+        // against. Naming it here is what lets all three forms share one continuation
+        // loop below: the shorthand arms used to carry their own copy of it, and a
+        // duplicate-clause guard added to one copy would silently not apply to the
+        // others.
+        let head_clause = match (shorthand_then, shorthand_catch) {
+            (Some(value_str), _) => Some((AwaitClause::Then, value_str)),
+            (_, Some(error_str)) => Some((AwaitClause::Catch, error_str)),
+            (None, None) => {
+                // No `then`/`catch` shorthand matched, so the opening tag must end
+                // right after the promise expression. Reject trailing content like
+                // `{#await p garbage}` or a shorthand jammed against the expression
+                // (`{#await p then(v)}`) — the canonical parser rejects both.
+                self.reject_trailing_tag_content(after_expr, expr_end_pos)?;
+                None
+            }
+        };
+
         // The block form (`{#await x}…{/await}`) always carries a pending Fragment —
         // empty or not — unlike the inline `then`/`catch` shorthand (no pending
         // phase); the writer emits `{Fragment, []}` vs `null` from this.
-        let pending_block = shorthand_then.is_none() && shorthand_catch.is_none();
-        let (pending, then_fragment, catch_fragment, value, error, end) = if let Some(value_str) =
-            shorthand_then
-        {
-            // Shorthand then syntax: {#await promise then value}...{/await}
-            let value = if !value_str.is_empty() {
-                // `value_str` starts right after "expression then "; the pattern parser
-                // trims its own leading whitespace, so pass the raw slice + that offset.
-                let then_keyword_end = expr_end_pos + (after_expr.len() - value_str.len());
-                Some(self.parse_await_value_pattern(value_str, then_keyword_end)?)
-            } else {
-                None
-            };
+        let pending_block = head_clause.is_none();
 
-            let then_content = self.parse_block_children(&["catch", "await"], content_start)?;
-
-            // Check for optional {:catch} continuation after then-shorthand
-            let (catch_fragment, error) = if self.check_await_continuation("catch") {
-                self.parse_await_continuation("catch", &["await"])?
-            } else {
-                (None, None)
-            };
-
-            let block_end = self.expect_block_close_keyword("await", start)?;
-
-            (
-                None,
-                Some(then_content),
-                catch_fragment,
-                value,
-                error,
-                block_end,
-            )
-        } else if let Some(error_str) = shorthand_catch {
-            // Shorthand catch syntax: {#await promise catch error}...{/await}
-            let error = if !error_str.is_empty() {
-                // `error_str` starts right after "expression catch "; the pattern parser
-                // trims its own leading whitespace, so pass the raw slice + that offset.
-                let catch_keyword_end = expr_end_pos + (after_expr.len() - error_str.len());
-                Some(self.parse_await_value_pattern(error_str, catch_keyword_end)?)
-            } else {
-                None
-            };
-
-            let catch_content = self.parse_block_children(&["then", "await"], content_start)?;
-
-            // Check for optional {:then} continuation after catch-shorthand
-            let (then_fragment, value) = if self.check_await_continuation("then") {
-                self.parse_await_continuation("then", &["await"])?
-            } else {
-                (None, None)
-            };
-
-            let block_end = self.expect_block_close_keyword("await", start)?;
-
-            (
-                None,
-                then_fragment,
-                Some(catch_content),
-                value,
-                error,
-                block_end,
-            )
-        } else {
-            // No `then`/`catch` shorthand matched, so the opening tag must end
-            // right after the promise expression. Reject trailing content like
-            // `{#await p garbage}` or a shorthand jammed against the expression
-            // (`{#await p then(v)}`) — the canonical parser rejects both.
-            self.reject_trailing_tag_content(after_expr, expr_end_pos)?;
-
-            // Full syntax with pending block
-            let pending_content =
-                self.parse_block_children(&["then", "catch", "await"], content_start)?;
-            let pending = if !pending_content.nodes.is_empty() {
-                Some(pending_content)
-            } else {
-                None
-            };
-
-            let mut then_fragment = None;
-            let mut catch_fragment = None;
-            let mut value = None;
-            let mut error = None;
-
-            // Parse :then and :catch blocks
-            loop {
-                if self.check_await_continuation("then") {
-                    let (frag, val) = self.parse_await_continuation("then", &["catch", "await"])?;
-                    then_fragment = frag;
-                    value = val;
-                } else if self.check_await_continuation("catch") {
-                    let (frag, err) = self.parse_await_continuation("catch", &["await"])?;
-                    catch_fragment = frag;
-                    error = err;
-                } else {
-                    break;
-                }
+        // The head's binding, if it carries one. The text starts right after
+        // "expression <keyword> "; the pattern parser trims its own leading whitespace,
+        // so pass the raw slice plus that offset. The valueless form (`{#await p then}`)
+        // yields an empty slice and no binding.
+        let head_binding = match head_clause {
+            Some((_, s)) if !s.is_empty() => {
+                let keyword_end = expr_end_pos + (after_expr.len() - s.len());
+                Some(self.parse_await_value_pattern(s, keyword_end)?)
             }
-
-            let block_end = self.expect_block_close_keyword("await", start)?;
-
-            (
-                pending,
-                then_fragment,
-                catch_fragment,
-                value,
-                error,
-                block_end,
-            )
+            _ => None,
         };
+
+        // One `(fragment, binding)` pair per clause, so the fill and the filled-check
+        // always name the same slot. Keeping them as four independent locals is what let
+        // the guard be added to one arm and not the other.
+        let mut then_slot: AwaitSlot<'arena> = (None, None);
+        let mut catch_slot: AwaitSlot<'arena> = (None, None);
+        let mut pending = None;
+
+        // The first body belongs to whichever clause the head named.
+        let first_body = self.parse_block_children(AWAIT_BODY_STOPS, content_start)?;
+        match head_clause {
+            Some((AwaitClause::Then, _)) => then_slot = (Some(first_body), head_binding),
+            Some((AwaitClause::Catch, _)) => catch_slot = (Some(first_body), head_binding),
+            None => pending = (!first_body.nodes.is_empty()).then_some(first_body),
+        }
+
+        // Read `{:then}` / `{:catch}` continuations in either order. A slot may be
+        // filled once — canonical's `next` guards each arm with `if (block.then)` /
+        // `if (block.catch)` and raises `block_duplicate_clause`. Without the guard the
+        // assignment OVERWRITES, and the discarded fragment's markup is gone from the
+        // AST: a formatter reprinting it would silently delete a branch of the document.
+        loop {
+            let Some(clause) = [AwaitClause::Then, AwaitClause::Catch]
+                .into_iter()
+                .find(|c| self.check_await_continuation(c.keyword()))
+            else {
+                break;
+            };
+            let slot = match clause {
+                AwaitClause::Then => &mut then_slot,
+                AwaitClause::Catch => &mut catch_slot,
+            };
+            if slot.0.is_some() {
+                return Err(self.error_duplicate_clause(clause.keyword()));
+            }
+            *slot = self.parse_await_continuation(clause.keyword(), AWAIT_BODY_STOPS)?;
+        }
+
+        let (then_fragment, value) = then_slot;
+        let (catch_fragment, error) = catch_slot;
+        let end = self.expect_block_close_keyword("await", start)?;
 
         Ok(FragmentNode::AwaitBlock(AwaitBlock {
             expression,
@@ -781,6 +774,43 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             },
             opening_tag_span,
         }))
+    }
+
+    /// Reject a second `{:else}` / `{:else if}` once the block's alternate is taken.
+    ///
+    /// Canonical's `next` (`1-parse/state/tag.js`) writes `block.alternate` /
+    /// `block.fallback` **unguarded**, so a repeat continuation replaces the fragment
+    /// and the first branch's markup is gone from the AST — unlike its own `{#await}`
+    /// arm, which raises `block_duplicate_clause` for exactly this. tsv applies the
+    /// `{#await}` rule to all three continuations: reproducing the overwrite means a
+    /// formatter that silently deletes a branch of the author's document.
+    ///
+    /// A deliberate over-rejection, cataloged in `docs/conformance_svelte.md`
+    /// §Block Continuation Corrections. Called where the alternate has just been
+    /// parsed, so the current token — the stray `{:` — carries the error's position.
+    /// Any other continuation keyword (`{:catch}` after an `{:else}`) is left alone:
+    /// canonical rejects those too, so the verdict already matches.
+    ///
+    /// The two spellings take different messages because only one of them is a
+    /// **repeat**: a second `{:else}` is a duplicate, while an `{:else if}` after an
+    /// `{:else}` is the block's *first* `{:else if}` landing on an alternate the
+    /// `{:else}` already took. Calling that a duplicate names a clause the author
+    /// never wrote twice.
+    fn reject_duplicate_else(&self) -> Result<(), ParseError> {
+        if !self.check(TokenKind::BlockContinue) {
+            return Ok(());
+        }
+        let mut words = self
+            .continuation_keyword_at(self.current_end)
+            .split_whitespace();
+        if words.next() != Some("else") {
+            return Ok(());
+        }
+        Err(if words.next() == Some("if") {
+            self.error_clause_after("else if", "else")
+        } else {
+            self.error_duplicate_clause("else")
+        })
     }
 
     /// Check if the next token is a BlockContinue with the given keyword (e.g., "catch", "then").
@@ -804,7 +834,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
         let binding_str = self
             .strip_keyword_value(tag_content, keyword, tag_start)?
-            .trim();
+            .trim_matches(is_svelte_ws);
 
         let binding = if !binding_str.is_empty() {
             let offset = tag_start + subslice_offset(tag_content, binding_str);
@@ -839,6 +869,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let end = remaining
             .find(|c: char| !c.is_alphabetic() && c != ' ')
             .unwrap_or(remaining.len());
+        // `str::trim` rather than the [`is_svelte_ws`] the rest of this file uses, and the
+        // one place that is right: the run was cut at the first char that is neither
+        // alphabetic nor a SPACE, so the only trimmable member either class can see here is
+        // that space. The two predicates cannot disagree on a slice they both reduce to.
         remaining[..end].trim()
     }
 
@@ -892,7 +926,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         region: &str,
         region_start: usize,
     ) -> Result<(), ParseError> {
-        let trailing = region.trim_start();
+        let trailing = region.trim_start_matches(is_svelte_ws);
         if !trailing.is_empty() {
             let trailing_start = region_start + (region.len() - trailing.len());
             return Err(self.error_expected_at("'}'", trailing_start));
@@ -915,9 +949,20 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         region: &str,
         region_offset: usize,
     ) -> Result<Expression<'arena>, ParseError> {
-        let lead = region.len() - region.trim_start().len();
+        let lead = region.len() - region.trim_start_matches(is_svelte_ws).len();
         let value_start = region_offset + lead;
-        let trimmed = region.trim();
+        let trimmed = region.trim_matches(is_svelte_ws);
+        // `{:then p}` / `{:catch p}` are `read_pattern` positions like `{#each … as p}`, so
+        // a PLAIN-IDENTIFIER binding takes the reserved-word rule here too — canonical's
+        // `read_pattern` reads it with `parser.read_identifier()` before any acorn call.
+        // Asked BEFORE `parse_ts_pattern` rather than of the parsed node because a reserved
+        // word must not reach the TypeScript parser at all: it defers exactly this as a
+        // strict-mode early error, so the shape would come back as a valid binding. The
+        // reader's own answer is discarded — the annotation (`{:then v: T}`) means the
+        // pattern's extent is the TS parser's to find, not this reader's.
+        if !trimmed.starts_with(['{', '[']) {
+            self.read_identifier(trimmed, value_start)?;
+        }
         let pattern = self.parse_ts_pattern(trimmed, value_start)?;
         let span = pattern.span();
         // Leading comment: the pattern would start past `value_start`.
@@ -928,7 +973,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // be a `: type` annotation (kept), so we reject only when it *starts* with a comment —
         // a comment INSIDE the type (`value: /* c */ number`) leaves `:` first and is allowed.
         let after = span.end as usize - value_start; // index into `trimmed`
-        let tail = trimmed[after..].trim_start();
+        let tail = trimmed[after..].trim_start_matches(is_svelte_ws);
         if tail.starts_with("/*") || tail.starts_with("//") {
             return Err(
                 self.error_expected_at("identifier or destructure pattern", span.end as usize)
@@ -985,7 +1030,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse: "key expression" — Svelte requires whitespace after the keyword.
         let expr_str = self
             .strip_block_keyword(tag_content, "key", tag_content_start)?
-            .trim();
+            .trim_matches(is_svelte_ws);
 
         let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
@@ -1026,7 +1071,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // requires whitespace after the keyword.
         let content = self
             .strip_block_keyword(tag_content, "snippet", tag_content_start)?
-            .trim();
+            .trim_matches(is_svelte_ws);
         let content_bytes = content.as_bytes();
         // Absolute offset of `content[0]` (the name's first byte) in the source, the
         // base for every span and error position below.
@@ -1040,21 +1085,26 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `>`) in a snippet generic is invalid Svelte, so corrupting it on format would be
         // worse than a parse error. See `find_matching_angle_bracket`.
 
-        // Name: the leading identifier run, like Svelte's `read_identifier`. `content` is
-        // trimmed, so it starts at the name.
-        let name_len = content
-            .find(|c: char| !is_identifier_continue(c))
-            .unwrap_or(content.len());
-        if name_len == 0 {
+        // Name: the leading identifier run, read the way Svelte's `read_identifier` reads
+        // it. `content` is trimmed, so it starts at the name.
+        let Some(name_str) = self.read_identifier(content, content_offset)? else {
+            return Err(self.error_expected_at("snippet name", content_offset));
+        };
+        let name_len = name_str.len();
+        let expression = self.parse_ts_expression(name_str, content_offset)?;
+        // The reserved-word filter above is what makes this an `Identifier` rather than
+        // whatever `this` / `null` / `true` / `super` would have parsed to — a
+        // `ThisExpression`, a `Literal`, a `Super`, none of which the wire's
+        // `SnippetBlock.expression` may hold. Stated rather than assumed, so the filter and
+        // the node shape can never drift apart silently.
+        if !matches!(expression, Expression::Identifier(_)) {
             return Err(self.error_expected_at("snippet name", content_offset));
         }
-        let name_str = &content[..name_len];
-        let expression = self.parse_ts_expression(name_str, content_offset)?;
 
         // Optional `<…>` generic. `head_start` is the `<` (or, with no generic, the `(`)
         // where the parseable signature head begins — the wrapper slice below spans from
         // there through the matching `)`.
-        let after_name = content[name_len..].trim_start();
+        let after_name = content[name_len..].trim_start_matches(is_svelte_ws);
         let head_start = content.len() - after_name.len();
         let (after_generic, type_params_raw): (usize, Option<&'arena str>) =
             if after_name.starts_with('<') {
@@ -1073,8 +1123,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `eat('(', true)`. Crucially this skips whitespace but NOT comments, so
         // `<T> /* c */ (…)` is rejected exactly as Svelte rejects it.
         let after_generic_str = &content[after_generic..];
-        let paren_pos =
-            after_generic + (after_generic_str.len() - after_generic_str.trim_start().len());
+        let paren_pos = after_generic
+            + (after_generic_str.len() - after_generic_str.trim_start_matches(is_svelte_ws).len());
         if !content[paren_pos..].starts_with('(') {
             return Err(self.error_expected_at("'('", content_offset + paren_pos));
         }
@@ -1119,12 +1169,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // comment-collecting parser. Wrapping a *contiguous* source slice (from the `<` or
         // `(` through the matching `)`) keeps the single `base` offset valid across both
         // `<…>` and `(…)`. Collected comments merge into the root buffer (the printer
-        // locates them by position). Falls back to raw text on parse failure (e.g. a form
-        // acorn-typescript rejects); the generics are already captured in `type_params_raw`.
+        // locates them by position).
+        //
+        // A parse failure REJECTS the component, in lockstep with Svelte: its own reader
+        // hands the same slice to `parse_expression_at` as `(PARAMS) => {}` and lets the
+        // throw out (`1-parse/state/tag.js`). Swallowing it here instead — keeping the raw
+        // text — accepted every malformed head (`fn(a b)`, `fn(,,)`, `fn<T extends>()`) and
+        // was lossy twice over: the wire emits no parameters at all, and the printer
+        // reflowed the kept text.
         let mut type_parameters: Option<tsv_ts::TSTypeParameterDeclaration<'arena>> = None;
         let mut parameters: &'arena [Expression<'arena>] = &[];
-        let mut raw_parameters: Option<&'arena str> = None;
-        if type_params_raw.is_some() || !params_str.trim().is_empty() {
+        if type_params_raw.is_some() || !params_str.trim_matches(is_svelte_ws).is_empty() {
             // The head runs from where the signature begins (`<` or `(`) through the `)`.
             let head_slice = &content[head_start..=close_paren];
             const WRAPPER_PREFIX: &str = "function f";
@@ -1133,22 +1188,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Snippet parameters preserve grouping parens (acorn's `preserveParens`,
             // without Svelte's `remove_parens`), so a default like `c = (2, 3)` keeps
             // its `ParenthesizedExpression` — matching Svelte's snippet-param AST.
-            match tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena) {
-                Ok(program) => {
-                    self.expression_comments.extend_from_slice(program.comments);
-                    if let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first()
-                    {
-                        type_parameters.clone_from(&func.type_parameters);
-                        parameters = func.params;
-                    }
-                }
-                // Keep the raw parameter text so nothing is dropped.
-                Err(_) => {
-                    if !params_str.trim().is_empty() {
-                        raw_parameters = Some(self.alloc_str_in(params_str.trim()));
-                    }
-                }
-            }
+            let program = tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena)?;
+            self.expression_comments.extend_from_slice(program.comments);
+            // The wrapper is literally a `function` declaration, so the match holds by
+            // construction — stated as an error rather than an `if let` so a head whose
+            // pieces went nowhere can never reach the printer as a silently empty
+            // signature (the shape the raw-text fallback used to produce).
+            let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first() else {
+                return Err(
+                    self.error_expected_at("snippet signature", content_offset + head_start)
+                );
+            };
+            type_parameters.clone_from(&func.type_parameters);
+            parameters = func.params;
         }
 
         // Parse body
@@ -1162,7 +1214,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             type_parameters,
             type_params_raw,
             parameters,
-            raw_parameters,
             params_paren,
             body,
             span: Span {

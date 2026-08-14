@@ -1,0 +1,125 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 79,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "EachBlock",
+				"start": 0,
+				"end": 78,
+				"expression": {
+					"type": "Identifier",
+					"start": 7,
+					"end": 12,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 7
+						},
+						"end": {
+							"line": 1,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 21,
+							"end": 33,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 22,
+									"character": 22
+								},
+								"end": {
+									"line": 1,
+									"column": 23,
+									"character": 23
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 24,
+										"end": 29,
+										"raw": "text1",
+										"data": "text1"
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 16,
+					"end": 20,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 16,
+							"character": 16
+						},
+						"end": {
+							"line": 1,
+							"column": 20,
+							"character": 20
+						}
+					}
+				},
+				"fallback": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 59,
+							"end": 71,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 60,
+									"character": 60
+								},
+								"end": {
+									"line": 1,
+									"column": 61,
+									"character": 61
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 62,
+										"end": 67,
+										"raw": "text3",
+										"data": "text3"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

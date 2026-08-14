@@ -20,7 +20,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 /// `XID_Start` check is widened by `is_id_start_not_xid`. `_` is in
 /// `XID_Continue` but not `XID_Start`, so it's checked explicitly.
 #[inline]
-pub(crate) fn is_id_start(ch: char) -> bool {
+pub fn is_id_start(ch: char) -> bool {
     is_xid_start(ch) || ch == '_' || ch == '$' || is_id_start_not_xid(ch)
 }
 
@@ -32,7 +32,7 @@ pub(crate) fn is_id_start(ch: char) -> bool {
 /// already in `XID_Continue` (U+0E33, U+0EB3, U+FF9E, U+FF9F) just short-circuit
 /// on the `is_xid_continue` check.
 #[inline]
-pub(crate) fn is_id_continue(ch: char) -> bool {
+pub fn is_id_continue(ch: char) -> bool {
     is_xid_continue(ch) || ch == '$' || is_id_start_not_xid(ch)
 }
 
