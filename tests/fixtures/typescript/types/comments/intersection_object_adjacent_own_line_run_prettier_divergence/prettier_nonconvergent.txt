@@ -1,0 +1,11 @@
+Prettier never reaches a fixed point on this input. An own-line comment run leading
+an OBJECT-ADJACENT intersection member re-binds on every pass: pass 1 pulls the run
+onto the `&`'s line and drops the member to a shallower indent
+(`{ x: 1 } & /* c1 */⏎{ y: 2 }`), pass 2 carries the run back ACROSS the operator to
+trail the previous member and collapses the boundary
+(`{ x: 1 } /* c1 */ & { y: 2 }`). `printIntersectionType`'s first arm hugs a
+both-objects boundary before `hasLeadingOwnLineComment` is ever asked, so the
+comment's own-line-ness cannot hold the break that its position depends on. No
+prettier-anchored claim file (output_prettier.*, audit_signature.txt, variants) is
+expressible. The validator live-verifies this claim (rule F5). See README.md and
+docs/conformance_prettier_ts_comments.md §Comment relocation.
