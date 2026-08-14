@@ -110,6 +110,45 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Where a union member gap's comment run splits between the part printed
+    /// **before** the `| ` separator (own-line) and the part printed **after** it
+    /// (glued to the member) — the index of the first inline comment, `run.len()`
+    /// when the whole run goes own-line.
+    ///
+    /// ⚠️ **The split is a PREFIX/SUFFIX partition, never a per-comment filter.** The
+    /// two sides land on opposite sides of the `|`, so a filter that lets an inline
+    /// comment follow an own-line one REORDERS the run:
+    /// `| /* c1 */ /* c2 */⏎b` came out `/* c2 */⏎| /* c1 */ b`, printing the author's
+    /// second comment first. Reordering is content-relation loss, and it is invisible
+    /// to every self-oracle gate (the result is stable, reparses, and loses no bytes).
+    ///
+    /// The inline side is therefore the maximal suffix whose comments are each glued
+    /// forward with nothing else on their line — a run that reaches the member glued
+    /// (`| /* c1 */ /* c2 */ b`). Two consequences, both prettier's answer:
+    ///
+    /// - a run whose LAST comment breaks to the member goes own-line whole, however
+    ///   many of its heads are glued (`/* c1 */ /* c2 */⏎| b`);
+    /// - the split never falls inside an author-glued chain. When the comment before
+    ///   the suffix is glued to it the pair would straddle the `|`, so the whole run
+    ///   takes the own-line side instead (`| /* c1 */⏎/* c2 */ /* c3 */ b` →
+    ///   `/* c1 */⏎/* c2 */ /* c3 */⏎| b`) — an own-line comment cannot move to the
+    ///   inline side, so keeping the pair together is the only order-preserving answer.
+    ///
+    /// `hugs_glued` is the per-comment predicate: forward glue AND its own placement,
+    /// since an own-line-authored block glued forward to the member stays own-line
+    /// (see the call site's oscillation note).
+    fn union_gap_inline_run_start(&self, run: &CommentVec<'_>) -> usize {
+        let hugs_glued = |c: &Comment| self.comment_hugs_next(c) && !self.is_own_line_comment(c);
+        let mut start = run.len();
+        while start > 0 && hugs_glued(run[start - 1]) {
+            start -= 1;
+        }
+        if start > 0 && self.comment_hugs_next(run[start - 1]) {
+            return run.len();
+        }
+        start
+    }
+
     /// Emit the leading block comments in `[start, end)` before the FIRST union
     /// member, choosing the separator after each comment per Prettier's
     /// `printLeadingComment`: a `line` when the source has a newline after the
@@ -741,13 +780,14 @@ impl<'a> Printer<'a> {
                     // a 2-pass oscillation (the `|⟨⟩␣` blank-audit shape; prettier's
                     // fixed point keeps it own-line, and that form is stable here).
                     // A comment glued on BOTH sides still takes the post-`| ` path.
+                    //
+                    // ⚠️ The two sides bracket the `| `, so the split is a PREFIX/SUFFIX
+                    // partition of the run — see [`Self::union_gap_inline_run_start`].
                     let after_pipe = pipe_pos + 1;
-                    let hugs_glued =
-                        |c: &Comment| self.comment_hugs_next(c) && !self.is_own_line_comment(c);
-                    let own_line: CommentVec<'_> =
-                        comments_to_emit_in_range(self.comments, after_pipe, type_start)
-                            .filter(|c| !hugs_glued(c))
-                            .collect();
+                    let run: CommentVec<'_> =
+                        comments_to_emit_in_range(self.comments, after_pipe, type_start).collect();
+                    let inline_start = self.union_gap_inline_run_start(&run);
+                    let (own_line, inline) = run.split_at(inline_start);
                     // A blank line the author left *before* the first own-line comment
                     // (`A |⏎⏎/* c */⏎B`) and *between* two own-line comments is preserved,
                     // matching prettier — but NOT one after the last comment before the
@@ -779,12 +819,13 @@ impl<'a> Printer<'a> {
                     for (j, comment) in own_line.iter().enumerate() {
                         parts.push(self.build_comment_doc(comment));
                         let Some(next) = own_line.get(j + 1) else {
-                            // The last comment always breaks: the filter above routed
-                            // every NON-own-line member-hugging block onto the post-`| `
-                            // path, and an own-line one deliberately breaks here (its
-                            // own-line placement outranks the forward glue). No blank
-                            // line is emitted toward the member (see the blank-line
-                            // note above).
+                            // The last comment always breaks — the `| ` below opens the
+                            // member's line, so this side of the split cannot end inline.
+                            // It may still be glued forward in SOURCE (to the member, or
+                            // to a comment the chain rule kept on this side); the split
+                            // already decided that, and re-asking here would put the `|`
+                            // on the comment's line. No blank line is emitted toward the
+                            // member (see the blank-line note above).
                             parts.push(d.hardline());
                             continue;
                         };
@@ -803,12 +844,9 @@ impl<'a> Printer<'a> {
                     }
                     self.push_own_line_comment_run(&mut parts, &stripped_paren_leading);
                     parts.push(d.text("| "));
-                    for comment in comments_to_emit_in_range(self.comments, after_pipe, type_start)
-                    {
-                        if hugs_glued(comment) {
-                            parts.push(self.build_comment_doc(comment));
-                            parts.push(d.text(" "));
-                        }
+                    for comment in inline {
+                        parts.push(self.build_comment_doc(comment));
+                        parts.push(d.text(" "));
                     }
                 } else {
                     // No pipe found, just add separator
@@ -1751,9 +1789,18 @@ impl<'a> Printer<'a> {
 
             let amp = find_separator_position(self.source, prev_end, cur_start, b'&');
 
-            // After-`&` comments on their own line lead the member — Prettier's
-            // `hasLeadingOwnLineComment`, which forces the boundary to break. (Same-line
-            // ones trail the `&` inline and are emitted below.)
+            // The after-`&` comments the author did NOT put on the operator's line: they
+            // lead the member, and are emitted by the shared leading-run emitter below.
+            // (Same-line ones trail the `&` inline and are emitted further down; the split
+            // is by LINE, which is monotonic in source position, so the two emissions can
+            // never reorder the gap the way a glue-keyed one can —
+            // see [`Self::union_gap_inline_run_start`] for the sibling that could.)
+            //
+            // ⚠️ This is a newline BEFORE the comment, which is **not** prettier's
+            // `hasLeadingOwnLineComment` (a newline AFTER) though it was once labelled so —
+            // and the second arm of the chain below was gated on it under that label, which
+            // was a live divergence. This collection now decides only WHICH comments lead
+            // the member; whether they force the boundary open is `leading_run_ends_line`.
             let own_line_leading: CommentVec<'_> = match amp {
                 Some(amp_pos) => comments_to_emit_in_range(self.comments, amp_pos + 1, cur_start)
                     .filter(|c| !self.is_same_line(amp_pos, c.span.start))
@@ -1761,16 +1808,33 @@ impl<'a> Printer<'a> {
                 None => smallvec![],
             };
 
+            // Prettier's `hasLeadingOwnLineComment`: does any comment in the member's
+            // leading run carry a newline AFTER its `*/`, so that the run ENDS A LINE?
+            // Asked in two places below, so it is resolved once.
+            //
+            // ⚠️ **Not `!own_line_leading.is_empty()`**, which was what the second arm used
+            // and is the newline BEFORE — whether the author started a fresh line for the
+            // comment. The two part on a comment glued FORWARD to its member from a line of
+            // its own (`&⏎/* c */ cc`): tsv broke the boundary, prettier hugs, and since
+            // the glued spelling on the operator's line already hugged in both, tsv held
+            // two fixed points for one program keyed on a newline that stops meaning
+            // anything once the comment is glued to what follows it.
+            let leading_run_ends_line = own_line_leading.iter().any(|c| !self.comment_hugs_next(c));
+
             // Per Prettier's `printIntersectionType` per-boundary branch, on the raw
             // members' `isObjectType` (matching the no-comment loop):
             // - both objects → space-hug, indent only once `was_indented` is latched;
             // - neither object, or a leading own-line comment → break + indent;
             // - object↔non-object transition → space-hug, indent (and latch) past index 1.
+            //
+            // ⚠️ The order matters beyond which arm prints: only the THIRD arm latches
+            // `was_indented`, so moving the own-line-comment test out of the second arm
+            // would change every later boundary. It stays where prettier asks it.
             let prev_obj = is_huggable_type(prev);
             let cur_obj = is_huggable_type(cur);
             let (mut should_break, mut indent_member) = if prev_obj && cur_obj {
                 (false, was_indented)
-            } else if (!prev_obj && !cur_obj) || !own_line_leading.is_empty() {
+            } else if (!prev_obj && !cur_obj) || leading_run_ends_line {
                 (true, true)
             } else {
                 let ind = i > 1;
@@ -1790,10 +1854,30 @@ impl<'a> Printer<'a> {
             // only at the boundaries a hug arm chose (`i == 1`, or object-adjacency before
             // `was_indented` latches); one member later the same shape indents, which is
             // what made it look like an object-member quirk rather than this pairing.
+            //
+            // ⚠️ **A leading run that ENDS A LINE cannot ride the FIRST arm either**, which
+            // the arm chain cannot express: prettier's own chain answers a both-objects
+            // boundary before `hasLeadingOwnLineComment` is ever asked, so the same
+            // predicate has to be re-applied to whatever the chain hugged.
+            //
+            // A run whose last comment carries a newline (or a blank) after its `*/` makes
+            // [`Printer::push_leading_comment_run`] end the line, and a hug arm that keeps
+            // the member on the operator's line then reads its OWN output back as a
+            // same-line-after-`&` run on pass 2 — where the separator is an unconditional
+            // space, so the break (and any author blank inside it) is eaten. Two passes,
+            // two forms. The isolation guard above cannot answer it: a run's second half
+            // has a comment before it on its line, so it is not isolated, yet the run still
+            // ends the line.
+            //
+            // ⚠️ Prettier reaches the OPPOSITE answer here and does not converge on it —
+            // its first arm hugs a both-objects boundary before this question is asked, so
+            // the run re-binds across the `&` on the next pass. tsv's break is the stable
+            // form, pinned by `intersection_object_adjacent_own_line_run_prettier_divergence`.
             if !should_break
-                && self
-                    .comments_on_page_between(prev_end, cur_start)
-                    .any(|c| self.comment_isolated_on_its_line(c))
+                && (leading_run_ends_line
+                    || self
+                        .comments_on_page_between(prev_end, cur_start)
+                        .any(|c| self.comment_isolated_on_its_line(c)))
             {
                 should_break = true;
                 indent_member = true;
@@ -1910,18 +1994,31 @@ impl<'a> Printer<'a> {
                     scan_from = comment.span.end;
                 }
             }
-            if should_break {
-                unit.push(d.hardline());
-                self.push_leading_comment_run(
-                    &mut unit,
-                    own_line_leading.iter().copied(),
-                    cur_start,
-                    LeadingGlue::Adjacent,
-                    d.empty(),
-                );
+            // ⚠️ **The leading run is emitted OUTSIDE the break/hug choice**, because it
+            // is a comment question and the choice above is a layout one. Prettier's arm
+            // chain (`intersection-type.js`) asks `hasLeadingOwnLineComment` only in its
+            // second arm, so an object-adjacent boundary HUGS past a leading comment —
+            // and its `print()` still carries that comment, since the arms pick the
+            // separator, never whether the member's own comments exist. tsv's hug arm had
+            // the run inside the `else`, so every comment in it was DROPPED
+            // (`{ x: 1 } &⏎/* c */ { y: 2 }` printed `{ x: 1 } & { y: 2 }`) — hazard 4,
+            // an alternate-layout arm that emits only the member. The isolation guard
+            // above masked the common spellings: a comment on a line of its own forces
+            // the break and so reaches the other arm, leaving exactly the run GLUED
+            // forward to the member to fall through — the one shape a line comment
+            // cannot take, so no `//` repro exists and the ledger stayed green.
+            unit.push(if should_break {
+                d.hardline()
             } else {
-                unit.push(d.text(" "));
-            }
+                d.text(" ")
+            });
+            self.push_leading_comment_run(
+                &mut unit,
+                own_line_leading.iter().copied(),
+                cur_start,
+                LeadingGlue::Adjacent,
+                d.empty(),
+            );
             // Rule A between-members freeze: an own-line directive in this member's gap
             // freezes the member (paren-transparent). The directive is emitted by the
             // separator / leading-comment machinery above; only the member DOC is
