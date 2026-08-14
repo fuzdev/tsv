@@ -20,8 +20,10 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
 
 /// The treatment of an inline child doc's LEADING boundary, decided at the unit's head — the
-/// argument to [`Printer::push_inline_child_doc`]. Three mutually exclusive cases, and the
-/// exclusivity is structural: a previous text that trimmed a boundary space cannot also be glued
+/// argument to [`Printer::push_inline_child_doc`]. Four mutually exclusive cases. The two SPACED
+/// ones are one boundary told apart by the FOLLOWER — whether it owns a fill for the separator to
+/// be measured against — while a spaced boundary and a glued one exclude each other structurally: a
+/// previous text that trimmed a boundary space cannot also be glued
 /// ([`Printer::text_glued_after`] fails on a whitespace tail), so no caller ever holds two at once.
 #[derive(Clone, Copy)]
 pub(super) enum LeadBoundary {
@@ -29,6 +31,19 @@ pub(super) enum LeadBoundary {
     /// (prettier's `handleWhitespaceOfPrevTextNode`): lead with a collapsible `line` inside a
     /// group — a space when the fill fits, a break when it wraps.
     Spaced,
+    /// The same deferred boundary in front of a sibling that ENDS the inline run — a comment, a
+    /// `{@debug}`: a **bare** collapsible `line`, a space while the parent group is flat and a
+    /// newline once it breaks. The block arm spells its own answer the same way
+    /// ([`Printer::handle_block_child`]'s `sep()`), and so does the separator site itself for a
+    /// tag follower ([`Printer::handle_text_child`]'s `next_is_tag` case).
+    ///
+    /// ⚠️ **Not [`Self::Spaced`]** — the group form decides the separator on its OWN width,
+    /// independently of whether the parent broke, and these followers own no fill to be measured
+    /// with. A run whose content line still fits then keeps the sibling on it while prettier (and
+    /// tsv's own multiline arm, reading the emitted break back) drops it to the next line: pass 2
+    /// re-splits what pass 1 packed, an F1 break. The wrap's own site states the same rule from the
+    /// other side — see the `next_is_tag` comment in `fragment_text_doc.rs`.
+    SpacedBare,
     /// Byte-glued to the sibling before it: there is no boundary space to honor, and the doc is
     /// instead **marked** as the continuation of a welded run (`glued_lead` + `glued_atom`). The
     /// mark is inert at render — a `DocContext` is consumed only by a `Fill`, and this wraps an
@@ -235,9 +250,16 @@ impl<'a> Printer<'a> {
             // Consume the "previous text trimmed a boundary space" signal once per iteration:
             // snapshot it and clear the field, so no dispatch arm can leak a stale flag by
             // forgetting to reset — the class of bug this whole path has repeatedly hit. Only
-            // `handle_text_child` re-arms the field (for the *next* sibling); the block and inline
-            // arms are the two readers and take the snapshot by value. The early `continue` paths
-            // above run before this and intentionally carry the flag forward untouched.
+            // `handle_text_child` re-arms the field (for the *next* sibling); the block, inline and
+            // other-node arms are its three readers and take the snapshot by value. The early
+            // `continue` paths above run before this and intentionally carry the flag forward
+            // untouched.
+            //
+            // ⚠️ **Every arm that can receive an armed flag must read it**, which is why the third
+            // reader exists: a follower whose arm ignored the snapshot silently DELETED the space,
+            // and for a comment / `{@debug}` that deletion is render-visible. Adding a dispatch arm
+            // means deciding what its boundary looks like ([`LeadBoundary`]), never letting the
+            // snapshot fall through.
             let prev_text_ws = std::mem::take(&mut handle_whitespace_of_prev_text);
 
             if matches!(node, FragmentNode::Text(_)) {
@@ -391,10 +413,15 @@ impl<'a> Printer<'a> {
                 // The two dispatch guards are the caller's state, which is why they stay here rather
                 // than inside the builder: `!format_ignore_next` so a directive still routes to the
                 // raw path, and `!prev_text_ws` so a trimmed boundary space from the previous text
-                // is never dropped — that space wants the `group([line, …])` wrap
-                // `push_inline_child_doc` applies, which a fused prefix has nowhere to carry, so the
-                // ordinary per-node path handles it (`glued_lead` then guards the boundary as
-                // before).
+                // is never dropped — a fused prefix has nowhere to carry that space, so the comments
+                // take the ordinary per-node path below, where the final arm emits it
+                // ([`LeadBoundary::SpacedBare`]) and `glued_lead` guards the text's own boundary as
+                // before.
+                //
+                // ⚠️ The space is a **bare** `line` there, NOT the `group([line, …])` wrap this
+                // comment used to name: the comment run ends the inline run, so its separator is the
+                // parent group's to resolve. Naming the wrap here is what made the first fix attempt
+                // reach for `Spaced` and break F1 — see the variant's own note.
                 pending_glued_prefix = Some((prefix, i));
                 glued_run_consumed_until = text_idx;
             } else {
@@ -402,10 +429,26 @@ impl<'a> Printer<'a> {
                 // `has_preceding_breakable` (tracked above) affects whether block conditions use
                 // remove_lines(): with preceding breakable content, content breaks first so it
                 // respects print_width; without, allow wrapping.
+                //
+                // This arm honors `prev_text_ws` exactly as the inline and block arms do, which is
+                // what makes the flag's consumer TOTAL: `handle_text_child` arms it for every
+                // follower it does not emit the separator for itself, so a follower that lands
+                // here — a comment, a `{@debug}` — carries the trimmed boundary space in the only
+                // place left to carry it. Pushing bare instead DELETED that space, and the deletion
+                // is render-visible: both node kinds render nothing, so the separator beside them is
+                // the only thing holding the two runs apart (`inline_adjacent_comment_space`).
+                //
+                // `SpacedBare`, not `Spaced`: these followers end the inline run, so the boundary is
+                // the parent group's to resolve rather than its own — see the variant's own note.
                 if let Some(node_doc) = self
                     .build_fragment_node_doc_with_preceding_context(node, has_preceding_breakable)
                 {
-                    child_docs.push(node_doc);
+                    let lead = if prev_text_ws {
+                        LeadBoundary::SpacedBare
+                    } else {
+                        LeadBoundary::Plain
+                    };
+                    self.push_inline_child_doc(&mut child_docs, node_doc, lead);
                 }
             }
         }
@@ -563,6 +606,10 @@ impl<'a> Printer<'a> {
                 // the named constructor keeps the two in lockstep — a shape drift here would silently
                 // return `None` there and reintroduce the stray-space non-idempotency.
                 child_docs.push(self.d().inline_sibling_line_group(node_doc));
+            }
+            LeadBoundary::SpacedBare => {
+                child_docs.push(self.d().line());
+                child_docs.push(node_doc);
             }
             LeadBoundary::Glued => {
                 child_docs.push(
