@@ -1477,8 +1477,23 @@ impl<'a> Printer<'a> {
     /// `block_after` moves a **same-line block** past the separator (deferred), and
     /// `preserve_blank` keeps a single blank line before a deferred **own-line** comment
     /// (`literalline`). A same-line line comment always uses `line_suffix` (zero width,
-    /// floats past the separator); an own-line comment is always deferred on its own
+    /// floats past the separator); an own-line comment is deferred on its own
     /// `hardline`. `prev` tracks the content/prior-comment end for blank detection.
+    ///
+    /// ⚠️ **"Own-line" is per comment, so the deferred run asks the glue question**
+    /// ([`Self::trailing_run_hugs_previous`]) like every other trailing run — a bare
+    /// `hardline` between two comments the author wrote on ONE line splits the pair
+    /// (`docs/comments.md` §Trailing and dangling runs: the separator is one question
+    /// wherever a run is emitted). This gap is a run at five constructs at once — a
+    /// statement's own `;`, a class member's, a type member's, a `for` head's, a
+    /// declarator's — so the drift was five divergences from one line. The site keeps
+    /// its own non-glue arm because its blank rule is the caller's (`preserve_blank`),
+    /// which is the sanctioned shape for asking the predicate directly.
+    ///
+    /// The hug can only ever bind two comments the anchor-line split already put on the
+    /// same side: a deferred comment sharing a source line with an anchor-line one is
+    /// impossible, since [`Self::gap_anchor_line_end`] follows that line (a multi-line
+    /// block included) to its end.
     fn push_gap_comments(
         &self,
         parts: &mut DocBuf,
@@ -1501,6 +1516,7 @@ impl<'a> Printer<'a> {
         } else {
             start
         };
+        let mut prev_comment: Option<&internal::Comment> = None;
         for comment in gap {
             if comment.span.start < anchor_line_end {
                 if block_after && comment.is_block {
@@ -1509,13 +1525,20 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_trailing_comment_doc(comment));
                 }
             } else {
-                if preserve_blank && self.has_blank_line_between(prev, comment.span.start) {
-                    deferred.push(d.literalline());
+                // The separator, BEFORE the comment — a space where the author glued the
+                // pair, otherwise this site's own break (the caller owns the blank rule).
+                if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
+                    deferred.push(d.text(" "));
+                } else {
+                    if preserve_blank && self.has_blank_line_between(prev, comment.span.start) {
+                        deferred.push(d.literalline());
+                    }
+                    deferred.push(d.hardline());
                 }
-                deferred.push(d.hardline());
                 deferred.push(self.build_comment_doc(comment));
             }
             prev = comment.span.end;
+            prev_comment = Some(comment);
         }
         deferred
     }
