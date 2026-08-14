@@ -7,7 +7,7 @@ pub mod validation;
 mod variants;
 
 pub use audit_signature::{
-    AUDIT_SIGNATURE_FILENAME, AuditSignature, ChainAnchor, SingleFormPins,
+    AUDIT_SIGNATURE_FILENAME, AuditSignature, ChainAnchor, ChainWalk, SingleFormPins,
     audit_signature_variant_filename, audit_signature_variant_suffix,
 };
 pub use discovery::{find_input_file, walk_fixtures};

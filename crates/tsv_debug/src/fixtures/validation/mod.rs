@@ -98,8 +98,10 @@ pub struct UndocumentedPrettierOutput {
     pub source_file: String,
     /// The variant file that would pin this output (`prettier_variant_hug.svelte`, …),
     /// when prettier holds the output stable and our formatter gives it a marker. `None`
-    /// when no single form applies — prettier not idempotent on it, or tsv not idempotent
-    /// on `ours(V)` — where the chain, not a file, is the question.
+    /// for the two no-pin-appropriate cases that stay informational: tsv not idempotent
+    /// on `ours(V)` (a tsv bug a pin would paper over), or prettier erroring on its own
+    /// first pass (a truncated chain no pin can represent). A chain that CONTINUES is not
+    /// reported here at all — that case blocks as `UnpinnedPrettierChain` (N10).
     ///
     /// Resolved at the N10 site rather than left to `fixtures:audit`: the bytes and the
     /// input extension are both in hand there, so sending the reader to a second, slower
