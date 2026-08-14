@@ -1,0 +1,1330 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 965,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A blank the author left after a leading comment is theirs; the comment still",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leads the source argument.",
+			"start": 101,
+			"end": 130,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 152,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same with a line comment.",
+			"start": 176,
+			"end": 208,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 230,
+			"end": 235,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank between two leading comments.",
+			"start": 251,
+			"end": 291,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 313,
+			"end": 318,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 322,
+			"end": 327,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An options argument does not change the leading gap's rule.",
+			"start": 342,
+			"end": 404,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 426,
+			"end": 434,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run the author glued stays glued, and glue alone opens no parens.",
+			"start": 480,
+			"end": 550,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 569,
+			"end": 577,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 18
+				},
+				"end": {
+					"line": 34,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 578,
+			"end": 586,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 27
+				},
+				"end": {
+					"line": 34,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A glued run whose line comment ends the line keeps the pair on one line.",
+			"start": 597,
+			"end": 672,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 694,
+			"end": 702,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 703,
+			"end": 708,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 11
+				},
+				"end": {
+					"line": 38,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank after a glued run is the author's too.",
+			"start": 723,
+			"end": 772,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 794,
+			"end": 803,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 2
+				},
+				"end": {
+					"line": 44,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c11 ",
+			"start": 804,
+			"end": 813,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 12
+				},
+				"end": {
+					"line": 44,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A TS import type shares the leading-gap emitter, so it takes the same rule.",
+			"start": 829,
+			"end": 907,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 1
+				},
+				"end": {
+					"line": 49,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 928,
+			"end": 937,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 2
+				},
+				"end": {
+					"line": 51,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 964,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 955,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 55,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 132,
+					"end": 173,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 138,
+							"end": 172,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 138,
+								"end": 139,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 142,
+								"end": 172,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 164,
+									"end": 169,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 152,
+											"end": 160
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank the author left after a leading comment is theirs; the comment still",
+							"start": 20,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " leads the source argument.",
+							"start": 101,
+							"end": 130
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 210,
+					"end": 248,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 216,
+							"end": 247,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 216,
+								"end": 217,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 220,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 239,
+									"end": 244,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 230,
+											"end": 235
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same with a line comment.",
+							"start": 176,
+							"end": 208
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 293,
+					"end": 339,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 299,
+							"end": 338,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 299,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 303,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 23,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 330,
+									"end": 335,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 313,
+											"end": 318
+										},
+										{
+											"type": "Line",
+											"value": " c4",
+											"start": 322,
+											"end": 327
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank between two leading comments.",
+							"start": 251,
+							"end": 291
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 406,
+					"end": 477,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 412,
+							"end": 476,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 7
+								},
+								"end": {
+									"line": 31,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 412,
+								"end": 413,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 7
+									},
+									"end": {
+										"line": 26,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 416,
+								"end": 476,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 11
+									},
+									"end": {
+										"line": 31,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 438,
+									"end": 443,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c5 ",
+											"start": 426,
+											"end": 434
+										}
+									]
+								},
+								"arguments": [
+									{
+										"type": "ObjectExpression",
+										"start": 447,
+										"end": 473,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 2
+											},
+											"end": {
+												"line": 30,
+												"column": 28
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 449,
+												"end": 471,
+												"loc": {
+													"start": {
+														"line": 30,
+														"column": 4
+													},
+													"end": {
+														"line": 30,
+														"column": 26
+													}
+												},
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 449,
+													"end": 453,
+													"loc": {
+														"start": {
+															"line": 30,
+															"column": 4
+														},
+														"end": {
+															"line": 30,
+															"column": 8
+														}
+													},
+													"name": "with"
+												},
+												"value": {
+													"type": "ObjectExpression",
+													"start": 455,
+													"end": 471,
+													"loc": {
+														"start": {
+															"line": 30,
+															"column": 10
+														},
+														"end": {
+															"line": 30,
+															"column": 26
+														}
+													},
+													"properties": [
+														{
+															"type": "Property",
+															"start": 457,
+															"end": 469,
+															"loc": {
+																"start": {
+																	"line": 30,
+																	"column": 12
+																},
+																"end": {
+																	"line": 30,
+																	"column": 24
+																}
+															},
+															"method": false,
+															"shorthand": false,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 457,
+																"end": 461,
+																"loc": {
+																	"start": {
+																		"line": 30,
+																		"column": 12
+																	},
+																	"end": {
+																		"line": 30,
+																		"column": 16
+																	}
+																},
+																"name": "type"
+															},
+															"value": {
+																"type": "Literal",
+																"start": 463,
+																"end": 469,
+																"loc": {
+																	"start": {
+																		"line": 30,
+																		"column": 18
+																	},
+																	"end": {
+																		"line": 30,
+																		"column": 24
+																	}
+																},
+																"value": "json",
+																"raw": "'json'"
+															},
+															"kind": "init"
+														}
+													]
+												},
+												"kind": "init"
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An options argument does not change the leading gap's rule.",
+							"start": 342,
+							"end": 404
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 552,
+					"end": 594,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 43
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 558,
+							"end": 593,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 42
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 558,
+								"end": 559,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 7
+									},
+									"end": {
+										"line": 34,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 562,
+								"end": 593,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 11
+									},
+									"end": {
+										"line": 34,
+										"column": 42
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 587,
+									"end": 592,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 36
+										},
+										"end": {
+											"line": 34,
+											"column": 41
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c6 ",
+											"start": 569,
+											"end": 577
+										},
+										{
+											"type": "Block",
+											"value": " c7 ",
+											"start": 578,
+											"end": 586
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author glued stays glued, and glue alone opens no parens.",
+							"start": 480,
+							"end": 550
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 674,
+					"end": 720,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 680,
+							"end": 719,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 7
+								},
+								"end": {
+									"line": 40,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 680,
+								"end": 681,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 7
+									},
+									"end": {
+										"line": 37,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 684,
+								"end": 719,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 11
+									},
+									"end": {
+										"line": 40,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 711,
+									"end": 716,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 2
+										},
+										"end": {
+											"line": 39,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c8 ",
+											"start": 694,
+											"end": 702
+										},
+										{
+											"type": "Line",
+											"value": " c9",
+											"start": 703,
+											"end": 708
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued run whose line comment ends the line keeps the pair on one line.",
+							"start": 597,
+							"end": 672
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 774,
+					"end": 826,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 1
+						},
+						"end": {
+							"line": 47,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 780,
+							"end": 825,
+							"loc": {
+								"start": {
+									"line": 43,
+									"column": 7
+								},
+								"end": {
+									"line": 47,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 780,
+								"end": 781,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 7
+									},
+									"end": {
+										"line": 43,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 784,
+								"end": 825,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 11
+									},
+									"end": {
+										"line": 47,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 817,
+									"end": 822,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 2
+										},
+										"end": {
+											"line": 46,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c10 ",
+											"start": 794,
+											"end": 803
+										},
+										{
+											"type": "Block",
+											"value": " c11 ",
+											"start": 804,
+											"end": 813
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank after a glued run is the author's too.",
+							"start": 723,
+							"end": 772
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 909,
+					"end": 954,
+					"loc": {
+						"start": {
+							"line": 50,
+							"column": 1
+						},
+						"end": {
+							"line": 54,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 914,
+						"end": 915,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 6
+							},
+							"end": {
+								"line": 50,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 918,
+						"end": 953,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 10
+							},
+							"end": {
+								"line": 54,
+								"column": 6
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 941,
+							"end": 946,
+							"loc": {
+								"start": {
+									"line": 53,
+									"column": 2
+								},
+								"end": {
+									"line": 53,
+									"column": 7
+								}
+							},
+							"value": "./a",
+							"raw": "'./a'",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c12 ",
+									"start": 928,
+									"end": 937
+								}
+							]
+						},
+						"qualifier": {
+							"type": "Identifier",
+							"start": 950,
+							"end": 953,
+							"loc": {
+								"start": {
+									"line": 54,
+									"column": 3
+								},
+								"end": {
+									"line": 54,
+									"column": 6
+								}
+							},
+							"name": "Foo"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A TS import type shares the leading-gap emitter, so it takes the same rule.",
+							"start": 829,
+							"end": 907
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
