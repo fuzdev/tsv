@@ -149,18 +149,14 @@ impl<'a> Printer<'a> {
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
             return;
         };
-        let raw: &str = text.raw(self.source);
-
         // Sibling-kind facts, derived from the node's position in `trimmed_nodes`.
         //
-        // "First"/"last" is asked of the nodes the whitespace rules actually see, so a HOISTED
-        // sibling (`{@const}` / `{const}` / `{let}` / `{@debug}` / `{#snippet}` / `<title>`) does not stand
-        // between this text and the fragment edge: `clean_nodes` lifts those out before it trims,
-        // making this text the real last node and its trailing run a render-free edge run
-        // ([`FragmentNode::is_hoisted_from_fragment`]). The bounds are computed once per fragment
-        // by the caller rather than scanned here — see [`TextChildContext::content_bounds`].
-        let is_first = i <= content_bounds.0;
-        let is_last = i >= content_bounds.1;
+        // ⚠️ Only the facts the WHITESPACE-ONLY arm reads are computed here; the rest are
+        // computed past that arm's `return`, where the content-text path begins. A separator is
+        // the commonest node in a fragment, so the split keeps its per-node cost to the handful
+        // of predicates it actually asks — and it is the whole reason the two groups are apart.
+        // Everything in both groups is a pure function of `trimmed_nodes` and `i`, so where it
+        // sits is a cost question only.
         let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
         let next_node = trimmed_nodes.get(i + 1);
         // A declaration tag on either side owns its own line ([`Self::is_own_line_declaration`]),
@@ -174,23 +170,7 @@ impl<'a> Printer<'a> {
             .is_some_and(|j| self.is_own_line_declaration(trimmed_nodes, j));
         let next_owns_line =
             i + 1 < trimmed_nodes.len() && self.is_own_line_declaration(trimmed_nodes, i + 1);
-        let prev_is_inline = prev_node.is_some_and(is_inline_content);
-        let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
-        // A byte-glued HTML-comment run (`<!--c--><a…>`) between this text and an inline element
-        // makes the comment the element's glued prefix: the break-before coupling must treat the
-        // effective next node as that element (skip the comments), so the whole run travels to a
-        // fresh line together rather than dangling the opening tag after a space. The comment run
-        // is then built + printed with the element as one concat by the main loop's
-        // `try_build_glued_comment_prefixed_element` arm — see [`Self::glued_comment_run_element`].
-        let comment_glued_next_flow = self
-            .glued_comment_run_element(trimmed_nodes, i + 1)
-            .is_some();
-        let next_is_inline = next_node.is_some_and(is_inline_content) || comment_glued_next_flow;
         let next_is_tag = next_node.is_some_and(Self::is_tag_node);
-        // Whether the next sibling is a control-flow block — consulted ONLY by the spaced half
-        // of `break_before_wide_flow` below (never folded into `next_is_flow_or_tag`, whose
-        // other readers key the leading-side arms and the inline-sibling wrap on the flow set).
-        let next_is_rendering_block = next_node.is_some_and(is_control_flow_block);
         // Whether the next sibling is an HTML *inline* element vs a *block* element —
         // the two kinds prettier-plugin-svelte trims boundary whitespace *into* (the
         // trimmed text emits nothing; the element's own group([line, …]) /
@@ -205,38 +185,15 @@ impl<'a> Printer<'a> {
         // [`Self::next_is_component`].
         let next_is_component = self.next_is_component(trimmed_nodes, i);
         let next_is_block_el = next_node.is_some_and(|n| self.is_block_element_node(n));
-        // Whether the next sibling is a flowing inline element OR component (the
-        // Fill-idempotency boundary). Text before such a node ends its fill with a trailing
-        // `line` so the boundary breaks per width inside the fill (keeping the run idempotent),
-        // rather than a `group([line, node])` whose all-or-nothing break flip-flops across
-        // passes.
-        let next_is_flow =
-            next_node.is_some_and(|n| self.is_inline_el_or_comp(n)) || comment_glued_next_flow;
-        // The two flow-follower kinds answer every boundary question below identically — the
-        // trailing-`line` decision and both halves of `break_before_wide_flow` — so the union is
-        // named once. Which member of a welded unit crosses the width cannot matter, and how far
-        // the measured unit extends past the follower is the RENDER walk's question alone
-        // (`flow_lookahead`), so a build-side split between the two would be a distinction the
-        // walk cannot see.
-        let next_is_flow_or_tag = next_is_flow || next_is_tag;
         // Whether the *previous* sibling is a block element — prettier trims a boundary
         // whitespace adjacent to a block but does NOT then wrap the next inline element in
         // `group([line, el])` (`handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`),
         // because the block's own `handle_block_child` already supplies the break; wrapping
         // would add a stray leading space after that break.
         let prev_is_block_el = prev_node.is_some_and(|n| self.is_block_element_node(n));
-        let position = SiblingPosition::new(is_first, is_last, prev_is_inline, next_is_inline);
 
         let d = self.d();
         *handle_whitespace_of_prev_text = false;
-
-        // Collapsible whitespace class `[ \t\n\r]` (`is_collapsible_ws_char` —
-        // deliberately narrower than prettier-plugin-svelte's `[\t\n\f\r ]`: a form
-        // feed is content). A leading/trailing non-breaking space or form feed is
-        // content, so a node made only of those is not whitespace-only and is
-        // preserved verbatim.
-        let has_leading_ws = !Self::text_glued_before(raw);
-        let has_trailing_ws = !Self::text_glued_after(raw);
 
         if text.is_collapsible_ws_only {
             // Whitespace-only text node (never at a fragment boundary — those are skipped
@@ -419,6 +376,57 @@ impl<'a> Printer<'a> {
             }
             return;
         }
+
+        // The content-text half's own sibling-kind facts — the second group described at the top
+        // of this function, reached only past the whitespace-only arm's `return`.
+        //
+        // "First"/"last" is asked of the nodes the whitespace rules actually see, so a HOISTED
+        // sibling (`{@const}` / `{const}` / `{let}` / `{@debug}` / `{#snippet}` / `<title>`) does not stand
+        // between this text and the fragment edge: `clean_nodes` lifts those out before it trims,
+        // making this text the real last node and its trailing run a render-free edge run
+        // ([`FragmentNode::is_hoisted_from_fragment`]). The bounds are computed once per fragment
+        // by the caller rather than scanned here — see [`TextChildContext::content_bounds`].
+        let raw: &str = text.raw(self.source);
+        let is_first = i <= content_bounds.0;
+        let is_last = i >= content_bounds.1;
+        let prev_is_inline = prev_node.is_some_and(is_inline_content);
+        let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
+        // A byte-glued HTML-comment run (`<!--c--><a…>`) between this text and an inline element
+        // makes the comment the element's glued prefix: the break-before coupling must treat the
+        // effective next node as that element (skip the comments), so the whole run travels to a
+        // fresh line together rather than dangling the opening tag after a space. The comment run
+        // is then built + printed with the element as one concat by the main loop's
+        // `try_build_glued_comment_prefixed_element` arm — see [`Self::glued_comment_run_element`].
+        let comment_glued_next_flow = self
+            .glued_comment_run_element(trimmed_nodes, i + 1)
+            .is_some();
+        let next_is_inline = next_node.is_some_and(is_inline_content) || comment_glued_next_flow;
+        // Whether the next sibling is a control-flow block — consulted ONLY by the spaced half
+        // of `break_before_wide_flow` below (never folded into `next_is_flow_or_tag`, whose
+        // other readers key the leading-side arms and the inline-sibling wrap on the flow set).
+        let next_is_rendering_block = next_node.is_some_and(is_control_flow_block);
+        // Whether the next sibling is a flowing inline element OR component (the
+        // Fill-idempotency boundary). Text before such a node ends its fill with a trailing
+        // `line` so the boundary breaks per width inside the fill (keeping the run idempotent),
+        // rather than a `group([line, node])` whose all-or-nothing break flip-flops across
+        // passes.
+        let next_is_flow =
+            next_node.is_some_and(|n| self.is_inline_el_or_comp(n)) || comment_glued_next_flow;
+        // The two flow-follower kinds answer every boundary question below identically — the
+        // trailing-`line` decision and both halves of `break_before_wide_flow` — so the union is
+        // named once. Which member of a welded unit crosses the width cannot matter, and how far
+        // the measured unit extends past the follower is the RENDER walk's question alone
+        // (`flow_lookahead`), so a build-side split between the two would be a distinction the
+        // walk cannot see.
+        let next_is_flow_or_tag = next_is_flow || next_is_tag;
+        let position = SiblingPosition::new(is_first, is_last, prev_is_inline, next_is_inline);
+        // Collapsible whitespace class `[ \t\n\r]` (`is_collapsible_ws_char` —
+        // deliberately narrower than prettier-plugin-svelte's `[\t\n\f\r ]`: a form
+        // feed is content). A leading/trailing non-breaking space or form feed is
+        // content, so a node made only of those is not whitespace-only and is
+        // preserved verbatim.
+        let has_leading_ws = !Self::text_glued_before(raw);
+        let has_trailing_ws = !Self::text_glued_after(raw);
 
         // A first/last node's boundary run is always trimmed (render-free); interior
         // trimming decisions are made per-sibling below.
