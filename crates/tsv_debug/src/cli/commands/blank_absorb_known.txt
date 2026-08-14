@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 531
+# shapes: 525
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -443,7 +443,6 @@
 (TSImportType, argument→qualifier)
 (TSImportType, options→$)
 (TSImportType, options→qualifier)
-(TSImportType, qualifier→typeArguments)
 (TSIndexSignature, ^→parameters)
 (TSIndexSignature, parameters→$)
 (TSIndexSignature, parameters→typeAnnotation)
@@ -456,7 +455,6 @@
 (TSInterfaceBody, ^→$)
 (TSInterfaceBody, ^→body)
 (TSInterfaceBody, body→$)
-(TSInterfaceDeclaration, ^→id)
 (TSInterfaceDeclaration, extends→body)
 (TSInterfaceDeclaration, extends→extends)
 (TSInterfaceDeclaration, id→body)
@@ -487,7 +485,6 @@
 (TSModuleBlock, ^→$)
 (TSModuleBlock, ^→body)
 (TSModuleBlock, body→$)
-(TSModuleDeclaration, ^→id)
 (TSModuleDeclaration, id→$)
 (TSModuleDeclaration, id→body)
 (TSNamedTupleMember, label→elementType)
@@ -509,7 +506,6 @@
 (TSTupleType, ^→elementTypes)
 (TSTupleType, elementTypes→$)
 (TSTupleType, elementTypes→elementTypes)
-(TSTypeAliasDeclaration, ^→id)
 (TSTypeAliasDeclaration, id→typeAnnotation)
 (TSTypeAliasDeclaration, id→typeParameters)
 (TSTypeAliasDeclaration, typeAnnotation→$)
@@ -523,7 +519,6 @@
 (TSTypeLiteral, members→$)
 (TSTypeLiteral, members→members)
 (TSTypeOperator, ^→typeAnnotation)
-(TSTypeParameter, ^→$)
 (TSTypeParameter, ^→constraint)
 (TSTypeParameter, ^→default)
 (TSTypeParameter, constraint→default)
@@ -533,7 +528,6 @@
 (TSTypeParameterInstantiation, ^→params)
 (TSTypeParameterInstantiation, params→$)
 (TSTypeParameterInstantiation, params→params)
-(TSTypePredicate, ^→parameterName)
 (TSTypePredicate, parameterName→typeAnnotation)
 (TSTypeQuery, ^→exprName)
 (TSUnionType, ^→types)

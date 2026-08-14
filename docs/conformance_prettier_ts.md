@@ -207,6 +207,32 @@ but a change to the productions themselves, and it would leak past TypeScript
 entirely: `declare` is an ordinary identifier in plain JS, so the same leniency would
 make tsv accept `declare foo` unseparated in a `.js` file.
 
+**`export default interface` split from its name** — `export default interface⏎A {}`.
+Prettier welds the two lines into one same-line interface declaration, deleting the
+line terminator; tsv rejects —
+[exports/default_interface](../tests/fixtures/typescript/modules/exports/default_interface/),
+whose `input.svelte` pins the accepted same-line form.
+
+`interface` is a contextual keyword, and TypeScript's own rule is that it heads a
+declaration only when its name follows on the same line (`isDeclaration` →
+`nextTokenIsIdentifierOnSameLine`). tsc applies that rule at every sibling gap —
+bare `interface⏎A {}` is TS1434, `export interface⏎A {}` is TS1128, `declare
+interface⏎A {}` is TS1434 — and skips it at exactly one, the `export default`
+route, which reads `parseInterfaceDeclaration` directly with no lookahead. Prettier
+is again not an independent witness: its `typescript` parser *is* tsc's, so the two
+are one engine. A rule spelled at three gaps and dropped at the fourth, with nothing
+to distinguish them, is an oracle slip rather than a judgement — the same call made
+for the `await`→`using` gap in
+[conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections).
+**acorn rejects too**, so the `input_invalid_*` form pins the rejection on both
+parsers.
+
+Unlike the `declare` entry above, there is no reading to fall back on: `interface`
+as the default-exported expression leaves `A {}`, where no line terminator separates
+`A` from the `{`, so ASI cannot split it either. The choice is reject or weld, and
+welding is the one thing the whole `[no LineTerminator here]` family exists to
+prevent.
+
 The rule generalizes past `declare`'s own gap to the heads that carry one of their
 own, and there tsv, tsc, prettier and acorn all agree, so those are ordinary
 `input_invalid_*` pins rather than divergences: a `declare namespace`/`module` name

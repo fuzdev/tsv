@@ -553,10 +553,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// member key, before any type parameters: `m?<T>()`, `prop?: T`, `prop!: T`.
     /// The two are mutually exclusive (same syntactic slot). Shared by the method
     /// and property branches of `parse_class_member` (concrete and ambient alike).
+    ///
+    /// ⚠️ The two markers differ on line breaks, and deliberately so. `!` carries a
+    /// same-line requirement — tsc's `parsePropertyDeclaration` takes it under
+    /// `!scanner.hasPrecedingLineBreak()` — so `a⏎!: T` is the bodiless field `a` (ASI)
+    /// followed by a `!` that can head no member (TS1068; prettier rejects with it).
+    /// tsv declines the marker there, which is the guard its **variable** sibling
+    /// already spells (`let x⏎!: T`, `statement/variable.rs`). `?` carries no such rule
+    /// in tsc, so `a⏎?: T` stays valid in every parser and is left alone. acorn welds
+    /// both; on `!` that discards a line terminator tsc treats as fatal, so tsv follows
+    /// tsc over the shape target. Per ecma262 §sec-comments a block comment holding a
+    /// line terminator IS one, so `a /*⏎*/ !: T` declines on the same rule.
     pub(in crate::parser) fn parse_property_modifier(&mut self) -> PropertyModifier {
         if self.eat(TokenKind::Question) {
             PropertyModifier::Optional
-        } else if self.eat(TokenKind::Bang) {
+        } else if !self.had_line_terminator && self.eat(TokenKind::Bang) {
             PropertyModifier::Definite
         } else {
             PropertyModifier::None

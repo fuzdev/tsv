@@ -231,6 +231,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         // - export type * as ns from "..." - type-only namespace re-export
                         // - export type X = T - type alias declaration
                         let type_start = self.current_pos().0;
+                        // Asked BEFORE `type` is consumed — the predicate reads the token
+                        // after `current`, and only the alias arm below consults it.
+                        let name_on_same_line = self.peek_is_same_line_declaration_name();
                         self.advance()?; // consume 'type'
 
                         if matches!(self.current_kind(), TokenKind::BraceOpen) {
@@ -240,13 +243,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // export type * from "..." or export type * as ns from "..."
                             self.parse_export_all_declaration(start as u32, ExportKind::Type)
                         } else {
-                            // export type X = T - type alias declaration
+                            // export type X = T - type alias declaration. The name must
+                            // be on the SAME line; see `require_same_line_declaration_name`.
+                            // Only this arm asks — the `{` and `*` re-export forms above
+                            // take the break in every oracle, which is exactly the pair
+                            // tsc's own `canFollowExportModifier` exempts.
+                            if !name_on_same_line {
+                                return Err(self.same_line_declaration_name_error("type alias"));
+                            }
                             let decl = self.parse_type_alias_declaration_inner(type_start)?;
                             Ok(self.export_named(start, decl, ExportKind::Type))
                         }
                     }
                     // export interface X { }
                     "interface" => {
+                        self.require_same_line_declaration_name("interface")?;
                         let decl = self.parse_interface_declaration()?;
                         Ok(self.export_named(start, decl, ExportKind::Type))
                     }
@@ -262,6 +273,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                     // export namespace/module
                     "namespace" | "module" => {
+                        self.require_same_line_declaration_name(value)?;
                         let decl = self.parse_module_declaration()?;
                         Ok(self.export_named(start, decl, ExportKind::Value))
                     }

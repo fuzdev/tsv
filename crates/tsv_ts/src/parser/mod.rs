@@ -1305,6 +1305,56 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.peek_kind().is_binding_name_word() && !self.peek_preceded_by_line_terminator()
     }
 
+    /// Demand a same-line name for a contextual declaration head already committed to
+    /// — `interface` / `type` / `namespace` / `module` behind `declare` or `export`.
+    ///
+    /// The statement path asks [`Self::peek_is_same_line_name_word`] one token earlier,
+    /// where failing it DEMOTES the head to a plain identifier and ASI splits the
+    /// statement. Behind a modifier there is no demotion to fall back on — the modifier
+    /// would be left with nothing to attach to — so the same question becomes an error
+    /// rather than a fork, and every oracle agrees there is no reading: tsc rejects
+    /// (TS1434, or TS1142 "Line break not permitted here" for `declare type`), as do
+    /// acorn and prettier. Without it the two lines welded into ONE declaration and the
+    /// line terminator simply vanished, tsv alone.
+    ///
+    /// `head` names the construct for the message ONLY — the string-name allowance is
+    /// read off the token, never off this word, so a reworded message cannot change
+    /// what parses. One helper for all four heads so they cannot drift apart — they
+    /// had, which is how `declare interface` and `declare type` kept welding while
+    /// `declare namespace` did not.
+    pub(super) fn require_same_line_declaration_name(
+        &mut self,
+        head: &str,
+    ) -> Result<(), ParseError> {
+        if self.peek_is_same_line_declaration_name() {
+            Ok(())
+        } else {
+            Err(self.same_line_declaration_name_error(head))
+        }
+    }
+
+    /// The question [`Self::require_same_line_declaration_name`] asks, split out for the
+    /// one caller that must ask it *before* consuming the head keyword: `export type`
+    /// decides between the alias and the `{`/`*` re-export forms only after the advance,
+    /// and those two forms take the break in every oracle (tsc's
+    /// `canFollowExportModifier` exempts exactly `*` and `{`).
+    ///
+    /// Asked while `current` is still the head keyword, which is what lets it read the
+    /// string-name allowance from the token: only `module` takes one
+    /// (`declare module 'x' {}`).
+    pub(super) fn peek_is_same_line_declaration_name(&mut self) -> bool {
+        self.peek_is_same_line_name_word()
+            || (self.current_value() == "module"
+                && self.peek_kind() == TokenKind::String
+                && !self.peek_preceded_by_line_terminator())
+    }
+
+    /// The error [`Self::require_same_line_declaration_name`] raises, so the split
+    /// caller above reports it in the same words.
+    pub(super) fn same_line_declaration_name_error(&self, head: &str) -> ParseError {
+        self.error_msg(&format!("{head} name must be on the same line"))
+    }
+
     /// Whether a statement-initial `let` heads a `LexicalDeclaration` rather than an
     /// `ExpressionStatement` — tsc's `isLetDeclaration`
     /// (`nextTokenIsBindingIdentifierOrStartOfDestructuring`): a binding name, `{`,
@@ -1817,10 +1867,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// keyword follows (`asserts extends …`), the prefix commits and the caller
     /// then rejects it as a missing parameter name — matching tsc, which parses
     /// the keyword as the asserted identifier and errors.
+    /// The asserted name must also be on the SAME line: tsc gates the whole reading on
+    /// `lookAhead(nextTokenIsIdentifierOrKeywordOnSameLine)`, so across a break `asserts`
+    /// is the ordinary type reference of that name and what follows begins nothing valid
+    /// (TS1434; prettier rejects with it). acorn instead welds into the very
+    /// `TSTypePredicate` it builds for the same-line spelling, discarding the line
+    /// terminator — the shape target is not the validity oracle, so tsv follows tsc.
+    /// Per ecma262 §sec-comments a block comment holding a line terminator IS one, so
+    /// `asserts /*⏎*/ a` declines on the same rule.
     pub(super) fn eat_type_predicate_asserts(&mut self) -> bool {
         matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "asserts"
             && self.peek_is_identifier_or_keyword()
+            && !self.peek_preceded_by_line_terminator()
             && self.try_advance()
     }
 

@@ -347,29 +347,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Identifier
                 if self.current_value() == "namespace" || self.current_value() == "module" =>
             {
-                // declare namespace/module. The name must be on the SAME line (tsc
-                // `nextTokenIsIdentifierOrStringLiteralOnSameLine`) — the rule the
-                // statement path spells one level up, where failing it DEMOTES the word
-                // to an identifier. Under `declare` there is no demotion to fall back on,
-                // and a break has no valid reading in any oracle: tsc rejects
-                // `declare namespace⏎N {}` with TS1434, as do acorn and prettier. Without
-                // this the two lines welded into ONE module declaration — tsv alone.
-                // Only `module` also takes a string-literal name (`declare module 'x' {}`).
-                let named_on_same_line = self.peek_is_same_line_name_word()
-                    || (self.current_value() == "module"
-                        && self.peek_kind() == TokenKind::String
-                        && !self.peek_preceded_by_line_terminator());
-                if !named_on_same_line {
-                    return Err(self.error_msg("namespace name must be on the same line"));
-                }
+                // declare namespace/module — the name must be on the SAME line; see
+                // `require_same_line_declaration_name`, which the `interface`/`type` arm
+                // below shares so the four contextual heads cannot drift apart.
+                self.require_same_line_declaration_name(self.current_value())?;
                 self.parse_module_declaration_with_start(true, start)
             }
             TokenKind::Identifier if self.current_value() == "interface" => {
-                // declare interface
+                // declare interface — the same rule the `namespace`/`module` arm above
+                // asks, for another of the four contextual heads.
+                self.require_same_line_declaration_name("interface")?;
                 self.parse_interface_declaration_with_start(start)
             }
             TokenKind::Identifier if self.current_value() == "type" => {
-                // declare type
+                // declare type — see the `interface` arm above.
+                self.require_same_line_declaration_name("type alias")?;
                 self.parse_type_alias_declaration_with_start(start)
             }
             TokenKind::Identifier if self.current_value() == "global" => {

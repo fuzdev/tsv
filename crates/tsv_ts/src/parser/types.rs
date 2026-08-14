@@ -656,8 +656,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             None
         };
 
-        // Optional type arguments: <T, U>
-        let type_arguments = self.parse_optional_type_arguments()?;
+        // Optional type arguments: <T, U>. A line break before `<` ends the type at the
+        // qualifier — an import type is one of the sites tsc's
+        // `parseTypeArgumentsOfTypeReference` guard covers, so `import('./a').B` ⏎
+        // `<string>` is the type `import('./a').B` followed by a separate `<string>`
+        // (TS1109; prettier rejects with it). This site read its arguments directly and
+        // so welded where every sibling type-argument site already split, tsv alone —
+        // acorn welds too, and is the shape target rather than the validity oracle. The
+        // `typeof import(…)` spelling composes through here, so it is covered by the
+        // same gate rather than by `parse_type_query`'s own (which runs too late to see
+        // a `<` this body already consumed).
+        let type_arguments = self.parse_optional_type_arguments_same_line()?;
 
         let end = type_arguments
             .as_ref()
@@ -789,10 +798,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a `<T, U>` type-argument list when the next token opens one (`<`),
     /// else `None` — the optional-type-arguments guard shared by
-    /// expression-with-type-arguments, `import(...)` types, and `extends`-clause
-    /// heritage, which consume type arguments *across* a line break (matching
-    /// acorn). Callers that must instead stop at a line break — type references
-    /// and `typeof` queries — use `parse_optional_type_arguments_same_line`.
+    /// expression-with-type-arguments and `extends`-clause heritage, which consume
+    /// type arguments *across* a line break (matching acorn, and tsc, which reads
+    /// them through `parseExpressionWithTypeArguments`). Callers in **type**
+    /// position must instead stop at a line break — type references, `typeof`
+    /// queries and `import(...)` types — and use
+    /// `parse_optional_type_arguments_same_line`.
     pub(in crate::parser) fn parse_optional_type_arguments(
         &mut self,
     ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
@@ -810,7 +821,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// is the type `B` followed by a separate `<T>`, not `B<T>` — in a type-member
     /// list this ASI-splits `a: B` ⏎ `<T>(): C` into two members. This mirrors the
     /// `!had_line_terminator` guard the postfix-`[]`, tuple-optional-`?` and `extends`
-    /// sites also apply.
+    /// sites also apply. The three type-position callers are the plain type
+    /// reference, the `typeof` query, and the `import(...)` type — the last of which
+    /// read its arguments directly until the shared rule was extended to it.
     pub(in crate::parser) fn parse_optional_type_arguments_same_line(
         &mut self,
     ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
@@ -1800,15 +1813,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 _ => break,
             };
-            // A modifier keyword is only a MODIFIER when a name can still follow it
-            // (tsc's `nextTokenCanFollowModifier`) — otherwise it IS the name, since
-            // `out` is contextual and names a parameter as freely as `T` does
-            // (`<out>`, `<out, T>`, `<out = string>`, `<in out>`). The test is the
-            // token's *shape*, not its validity as a name: `extends` is a keyword, so
+            // A modifier keyword is only a MODIFIER when a name can still follow it on
+            // the SAME line (tsc's `nextTokenCanFollowModifier`, whose default arm is
+            // `nextTokenIsOnSameLineAndCanFollowModifier` — `nextToken()`, then bail on
+            // `hasPrecedingLineBreak()`) — otherwise it IS the name, since `out` is
+            // contextual and names a parameter as freely as `T` does (`<out>`,
+            // `<out, T>`, `<out = string>`, `<in out>`). The test is the token's
+            // *shape*, not its validity as a name: `extends` is a keyword, so
             // `<out extends string>` keeps `out` a modifier and then fails for want of
             // a name — which is what tsc, prettier and acorn all do. Reserved `in` /
             // `const` reach the name read and reject there, as before.
-            if !self.peek_is_identifier_or_keyword() {
+            //
+            // The same-line half is what makes a break demote rather than weld: after
+            // it, `<const⏎T>` reads `const` as the NAME and rejects because `const` is
+            // reserved (tsc's TS1359, verbatim), and `<out⏎T>` makes `out` the name and
+            // then trips on `T` (TS1005). Without it all three modifiers welded across
+            // the break, tsv alone — acorn and prettier reject every spelling. Per
+            // ecma262 §sec-comments a block comment holding a line terminator IS one,
+            // so `<const /*⏎*/ T>` rejects on the same rule. The Svelte `{#snippet}`
+            // generic list shares this parser, so it is one gate for both entry points.
+            if !self.peek_is_identifier_or_keyword() || self.peek_preceded_by_line_terminator() {
                 break;
             }
             // A REPEAT is rejected HERE, at the offending keyword, rather than left to
