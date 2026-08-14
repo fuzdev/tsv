@@ -1,0 +1,740 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 616,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A pair the author glued inside the operand's stripped parens keeps its line.",
+			"start": 35,
+			"end": 114,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 128,
+			"end": 136,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 137,
+			"end": 145,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 11
+				},
+				"end": {
+					"line": 5,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two own-line line comments keep two lines - gluing them would make the second",
+			"start": 149,
+			"end": 229,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " one text inside the first.",
+			"start": 232,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 275,
+			"end": 280,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 283,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line block and the line comment glued to it keep one line.",
+			"start": 292,
+			"end": 360,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 374,
+			"end": 382,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 383,
+			"end": 388,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 11
+				},
+				"end": {
+					"line": 15,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Author blank lines above the run and inside it survive the float past the `;`.",
+			"start": 392,
+			"end": 473,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 488,
+			"end": 496,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 500,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same run at a `yield` operand.",
+			"start": 534,
+			"end": 571,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 585,
+			"end": 593,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 594,
+			"end": 602,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 11
+				},
+				"end": {
+					"line": 28,
+					"column": 19
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 615,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 606,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 511,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 28,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 19
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 31,
+						"end": 511,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 22
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 117,
+								"end": 125,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 117,
+									"end": 124,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 9
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 123,
+										"end": 124,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 8
+											},
+											"end": {
+												"line": 4,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A pair the author glued inside the operand's stripped parens keeps its line.",
+										"start": 35,
+										"end": 114
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 264,
+								"end": 272,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 264,
+									"end": 271,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 9
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 270,
+										"end": 271,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 8
+											},
+											"end": {
+												"line": 9,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 128,
+										"end": 136
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 137,
+										"end": 145
+									},
+									{
+										"type": "Line",
+										"value": " Two own-line line comments keep two lines - gluing them would make the second",
+										"start": 149,
+										"end": 229
+									},
+									{
+										"type": "Line",
+										"value": " one text inside the first.",
+										"start": 232,
+										"end": 261
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 363,
+								"end": 371,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 363,
+									"end": 370,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 9
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 369,
+										"end": 370,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 8
+											},
+											"end": {
+												"line": 14,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 275,
+										"end": 280
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 283,
+										"end": 288
+									},
+									{
+										"type": "Line",
+										"value": " An own-line block and the line comment glued to it keep one line.",
+										"start": 292,
+										"end": 360
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 476,
+								"end": 484,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 476,
+									"end": 483,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 9
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 482,
+										"end": 483,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 8
+											},
+											"end": {
+												"line": 18,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 374,
+										"end": 382
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 383,
+										"end": 388
+									},
+									{
+										"type": "Line",
+										"value": " Author blank lines above the run and inside it survive the float past the `;`.",
+										"start": 392,
+										"end": 473
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 488,
+										"end": 496
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 500,
+										"end": 508
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 514,
+					"end": 605,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 524,
+						"end": 527,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 11
+							},
+							"end": {
+								"line": 25,
+								"column": 14
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 530,
+						"end": 605,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 17
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 574,
+								"end": 582,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 574,
+									"end": 581,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 27,
+											"column": 9
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 580,
+										"end": 581,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 8
+											},
+											"end": {
+												"line": 27,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The same run at a `yield` operand.",
+										"start": 534,
+										"end": 571
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 585,
+										"end": 593
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 594,
+										"end": 602
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
