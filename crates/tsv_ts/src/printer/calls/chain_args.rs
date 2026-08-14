@@ -235,7 +235,7 @@ fn build_call_args_doc_for_chain_impl(
 
     // Prettier's `anyArgEmptyLine` — the shared predicate, so a member chain's arguments
     // answer the blank question exactly as a plain call's do.
-    let has_blank_lines = any_arg_empty_line(call.arguments, printer);
+    let any_arg_empty_line = any_arg_empty_line(call.arguments, printer);
 
     // Multiple arrow function arguments: always expand to multiple lines
     // Prettier always expands 2+ arrow function arguments, regardless of source formatting.
@@ -306,7 +306,7 @@ fn build_call_args_doc_for_chain_impl(
     // Function composition: call arg contains a callback → expand all args
     // e.g., x.y(arr.map((e) => e[0]), ['foo']) — matches Prettier's isFunctionCompositionArgs
     let force_expand = force_expand
-        || has_blank_lines
+        || any_arg_empty_line
         || comments_force_expansion
         || all_args_are_arrows
         || is_function_composition_args(call.arguments);

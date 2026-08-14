@@ -121,7 +121,7 @@ impl<'a> Printer<'a> {
                         | internal::Expression::ObjectExpression(_)
                 )
             });
-            let has_blank_lines_between_args = any_arg_empty_line(call.arguments, self);
+            let any_arg_empty_line = any_arg_empty_line(call.arguments, self);
             let paren_open = call.callee.span().end;
             // Whole-call comment-presence gate (one binary search over the argument
             // window); short-circuits the comment predicates below and threads into
@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
             let call_has_comments = self.has_comments_on_page_between(paren_open, call.span.end);
             if call.arguments.len() >= 2
                 && call.arguments.last().is_some_and(is_block_function)
-                && !has_blank_lines_between_args
+                && !any_arg_empty_line
                 && !(call_has_comments && any_comment_forces_expansion(call, self, paren_open))
                 && !(call_has_comments
                     && last_arg_has_comments(call.arguments, self, call.span.end, paren_open))

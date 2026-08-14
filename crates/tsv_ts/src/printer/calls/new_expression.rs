@@ -358,13 +358,30 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // Prettier's POSITION for `anyArgEmptyLine` — above every specialized layout, the
+        // plain call's twin (see `call_formatting.rs` for the full argument). ONE site rather
+        // than a conjunct per arm; the arms above are all inside the single-argument block, so
+        // the question is vacuous there and lifting the gate over them changes nothing.
+        //
+        // Unlike the plain call, no comment path preempts this builder, so both edge gaps are
+        // live here: it puts a `(`-line run on the `(` line and the last argument's trailing
+        // comments after that argument.
+        if any_arg_empty_line {
+            return build_call_args_with_blank_lines(
+                self,
+                callee_with_types,
+                new_expr.arguments,
+                paren_open,
+                new_expr.span.end,
+            );
+        }
+
         // Function composition pattern: when any argument is a call containing a callback
         // OR when there are multiple function arguments
         // e.g., new Cls(arr.map((x) => x), b) → new Cls(\n\t...,\n)
         // e.g., new Cls(() => a, () => b) → new Cls(\n\t...,\n)
         // Skip this path if there are trailing comments - let the comment handling paths handle it
         if is_function_composition_args(new_expr.arguments)
-            && !any_arg_empty_line
             && !(new_has_comments
                 && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self))
         {
@@ -397,9 +414,7 @@ impl<'a> Printer<'a> {
                 .iter()
                 .any(|arg| has_multiline_content(arg, self.source));
 
-        // `build_call_args_expanded` is the forced-expansion layout, not the blank-preserving
-        // one — `build_call_args_with_blank_lines` below is — so an author blank declines it.
-        if has_multiline && !any_arg_empty_line {
+        if has_multiline {
             // Force expansion with hardlines for multiline content
             return build_call_args_expanded(
                 self,
@@ -411,34 +426,17 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // The blank-line layout — `anyArgEmptyLine`'s `allArgsBrokenOut()`, on the predicate
-        // hoisted above, which every layout between there and here declines on.
-        if any_arg_empty_line {
-            // Unlike the plain call's twin, no comment path preempts this one, so both
-            // edge gaps are live here: the builder puts a `(`-line run on the `(` line
-            // and the last argument's trailing comments after that argument.
-            return build_call_args_with_blank_lines(
-                self,
-                callee_with_types,
-                new_expr.arguments,
-                paren_open,
-                new_expr.span.end,
-            );
-        }
-
         // "Expand first arg" pattern: callback first, short/empty container last
         // e.g., new Proxy((x) => { ... }, {}) - callback hugs, empty obj stays inline.
         // Block for comments the inline tail can't carry (matching the plain-call path):
         // a line comment anywhere in the args, or any comment on the first arg — those
         // break all args instead (a before-comma trailing block, a leading first-arg
         // comment). An after-comma inline block leading the second arg is carried below.
-        // Named once, like the plain call's twin: three inline negations trip
-        // `clippy::nonminimal_bool`, and the list reads better as a name anyway.
-        let expand_first_blocked = any_arg_empty_line
-            || (new_has_comments
-                && has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self))
-            || (new_has_comments
-                && first_arg_has_any_comments(new_expr.arguments, self, paren_open));
+        // Named once, like the plain call's twin — and factored on `new_has_comments`, the
+        // cascade's zero-comment fast gate, so a comment-free `new` asks neither predicate.
+        let expand_first_blocked = new_has_comments
+            && (has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self)
+                || first_arg_has_any_comments(new_expr.arguments, self, paren_open));
         if should_expand_first_arg(self, new_expr.arguments) && !expand_first_blocked {
             let first_arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
             let second_arg_doc = self.build_expression_doc(&new_expr.arguments[1]);
