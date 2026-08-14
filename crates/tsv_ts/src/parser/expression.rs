@@ -2181,13 +2181,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (start, yield_end) = self.current_pos();
         self.advance()?; // consume 'yield'
 
-        // Check for delegate: yield*
-        let delegate = if matches!(self.current_kind(), TokenKind::Star) {
-            self.advance()?; // consume '*'
-            true
-        } else {
-            false
-        };
+        // Check for delegate: `yield*`. The `*` binds only on `yield`'s own line —
+        // `YieldExpression : yield [no LineTerminator here] * AssignmentExpression`
+        // (ecma262 §15.5), the same restriction the argument-bearing production carries
+        // and which `can_insert_semicolon` below already enforces for it. Without this
+        // guard the two lines welded into ONE delegating yield, which no oracle endorses:
+        // a bare `*` cannot start a statement, so tsc (TS1109 `Expression expected`),
+        // acorn and prettier all reject `yield⏎* x`, while tsv silently deleted the line
+        // terminator and reprinted `yield* x`.
+        //
+        // A break falls through to the argument-less reading, so `yield` ends here and
+        // the stray `*` fails at statement level — tsc's own recovery, and the graceful
+        // demotion the non-delegate half already performs (`yield⏎x` is `yield;` then
+        // `x;`). Per ecma262 §sec-comments a block comment holding a line terminator IS
+        // one, so `yield /*⏎*/ * x` rejects on the same rule.
+        let delegate =
+            if matches!(self.current_kind(), TokenKind::Star) && !self.had_line_terminator {
+                self.advance()?; // consume '*'
+                true
+            } else {
+                false
+            };
 
         // Check if there's an argument
         // yield has very low precedence, so we need to be careful about what follows
