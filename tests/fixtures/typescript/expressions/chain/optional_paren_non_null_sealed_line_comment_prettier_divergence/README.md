@@ -7,6 +7,9 @@ chain: a `new` callee and a template tag (the parens there are required — the
 bare `new a?.b!()` / `` a?.b!`tpl` `` are syntax errors, see
 [optional_paren_non_null_new_callee](../optional_paren_non_null_new_callee/) and
 [optional_paren_non_null_tag_boundary](../optional_paren_non_null_tag_boundary/)).
+The member-access position reaches the same gap through the chain printer (the
+sealed parenthesized base); the assignment hugs the shell (`const m = (`), whose
+break is the comment's, not the operator's.
 
 - **tsv**: keeps the comment inside the parens where the author wrote it,
   forcing the multiline paren layout — the same shape the chain path already

@@ -733,9 +733,10 @@ impl<'a> Printer<'a> {
     /// thing behind a comment is another comment, so the separator's own glue test
     /// answers it. A loop that re-asks the anchor per comment reads the second half of a
     /// pair the author glued *across the first* and splits it — the bug this shape
-    /// exists to prevent, which is why the three gaps that share it (a binary chain's
+    /// exists to prevent, which is why the four gaps that share it (a binary chain's
     /// operand→operator and operator→operand gaps, a unary operand's stripped-paren
-    /// trailing gap) call this rather than each carrying the loop.
+    /// trailing gap, a retained non-null paren shell's operand→`)!` gap) call this
+    /// rather than each carrying the loop.
     ///
     /// For a gap that may still collapse — where the run has to DEFER past a closer
     /// instead of taking real breaks — the emitter is

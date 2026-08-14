@@ -305,15 +305,6 @@ impl<'a> ClassifiedComments<'a> {
         result
     }
 
-    /// Check if all buckets are empty (no comments in range).
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.trailing_block.is_empty()
-            && self.trailing_line.is_empty()
-            && self.leading_block.is_empty()
-            && self.leading_line.is_empty()
-    }
-
     /// Whether a **line** comment sits anywhere in the range, trailing or leading.
     ///
     /// The break-forcing question a `//` alone answers: it runs to end of line, so
