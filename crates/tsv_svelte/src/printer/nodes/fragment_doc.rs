@@ -1064,6 +1064,27 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether the node at `trimmed_nodes[i + 1]` is a **non-block component** — the follower
+    /// [`Self::next_is_inline_element`] excludes, named from the other side so the exclusion can
+    /// be acted on rather than merely fallen through.
+    ///
+    /// A space-separated component sibling breaks to its own line once its container does, so it
+    /// is the one flowing follower that must NOT take the inline-sibling wrap
+    /// (`group([line, element])`, whose per-width break packs it onto the preceding sibling's
+    /// line). Its separator still *flows* — a bare `line` renders as the space it replaced while
+    /// the fragment fits, so a one-line `<p>text1 <span>x</span> <Comp /></p>` is untouched; what
+    /// the component declines is deciding that boundary on its own width, independently of
+    /// whether the container broke. `handle_text_child`'s
+    /// whitespace-only-separator site asks this in BOTH of its arms — the multiline arm reaches
+    /// the same answer by falling past `trim_to_collapsible` to a bare `line`, and the
+    /// non-multiline arm asks here — because a run's interior may not depend on why its container
+    /// went multiline. A **block** component is excluded for the same reason
+    /// `next_is_inline_element` excludes block elements: it owns its own line already.
+    pub(super) fn next_is_component(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        matches!(trimmed_nodes.get(i + 1), Some(FragmentNode::Element(el))
+            if el.kind == internal::ElementKind::Component && !self.is_block_element(el))
+    }
+
     /// Whether a node is a flowing inline element or **component** — the set that participates
     /// in a text↔element fill boundary on *either* side (the preceding-element fold trigger and
     /// the following-element flow boundary). Any non-block `Element`/`SpecialElement`; block
@@ -1071,6 +1092,13 @@ impl<'a> Printer<'a> {
     /// (a sibling-only predicate that *excludes* components, because a space-separated component
     /// sibling breaks to its own line), this includes components: a wide `<Comp>` adjacent to
     /// flowing text is the case the Fill-idempotency fix targets.
+    ///
+    /// Over a follower, this set is today exactly [`Self::next_is_inline_element`] ∪
+    /// [`Self::next_is_component`] — the two halves prettier's `isInlineElement` splits. That is
+    /// an observation, deliberately **not** a definition: this predicate answers a *fill* question
+    /// and those two answer a *prettier-parity* one, so narrowing one of them must not silently
+    /// narrow this. Keep the three definitions independent, and when one moves, ask whether the
+    /// identity still holds.
     pub(super) fn is_inline_el_or_comp(&self, node: &FragmentNode<'_>) -> bool {
         matches!(
             node,
