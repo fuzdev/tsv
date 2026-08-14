@@ -1,0 +1,212 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 69,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 68,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 20,
+					"end": 58,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 29,
+						"end": 31,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 10
+							},
+							"end": {
+								"line": 2,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 32,
+							"end": 42,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 13
+								},
+								"end": {
+									"line": 2,
+									"column": 23
+								}
+							},
+							"name": "a",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 33,
+								"end": 42,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 14
+									},
+									"end": {
+										"line": 2,
+										"column": 23
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnknownKeyword",
+									"start": 35,
+									"end": 42,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 16
+										},
+										"end": {
+											"line": 2,
+											"column": 23
+										}
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 43,
+						"end": 55,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 24
+							},
+							"end": {
+								"line": 3,
+								"column": 2
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 45,
+							"end": 55,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 26
+								},
+								"end": {
+									"line": 3,
+									"column": 2
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 54,
+								"end": 55,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 1
+									},
+									"end": {
+										"line": 3,
+										"column": 2
+									}
+								},
+								"name": "a"
+							},
+							"asserts": true,
+							"typeAnnotation": null
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 56,
+						"end": 58,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 3
+							},
+							"end": {
+								"line": 3,
+								"column": 5
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

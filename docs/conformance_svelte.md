@@ -536,10 +536,18 @@ expression-statement. tsv rejects (`Expected expression, found ';'`), matching
 tsc/prettier and diverging from acorn's recovery. Since acorn accepts, that half
 can't be an `input_invalid_*` fixture, so it is pinned by the
 [type_args/line_break](../tests/fixtures/typescript/types/type_args/line_break_svelte_divergence/)
-`tsv_rejects.txt` fixture. This is deliberate tsc-over-acorn strictness, the same
-reverse direction as the reserved-keyword-qualified-head and arrow-as-operand
-entries. **Upstream candidate**: acorn-typescript — `tsParseTypeReference`
-consumes type arguments across a line break (no `hasPrecedingLineBreak` guard).
+`tsv_rejects.txt` fixture. A **`TSImportType`'s qualifier** is one more site the
+same guard covers (`import('./a').B` ⏎ `<string>`) — it read its arguments
+directly rather than through the shared rule, so it welded where every sibling
+split; pinned by
+[type_args/import_type_line_break](../tests/fixtures/typescript/types/type_args/import_type_line_break_svelte_divergence/).
+The **expression** type-argument sites carry no such rule and stay accepted
+(`f` ⏎ `<T>()`, `new C` ⏎ `<T>()`, and a heritage `extends B` ⏎ `<T>`, which tsc
+reads through `parseExpressionWithTypeArguments`). This is deliberate
+tsc-over-acorn strictness, the same reverse direction as the
+reserved-keyword-qualified-head and arrow-as-operand entries. **Upstream
+candidate**: acorn-typescript — `tsParseTypeReference` and `tsParseImportType`
+consume type arguments across a line break (no `hasPrecedingLineBreak` guard).
 
 **Line break before a tuple element's `?` (`[T` ⏎ `?]`, rejected)**: the postfix
 optional `?` of a tuple element is a `[no LineTerminator here]` position. tsc runs
@@ -567,6 +575,43 @@ divergence to record). This is deliberate tsc-over-acorn strictness, the same
 reverse direction as the two entries above. **Upstream candidate**:
 acorn-typescript — `tsParseTupleElementType` omits the `hasPrecedingLineBreak`
 guard on the optional `?`.
+
+**`asserts` split from the asserted name (`asserts` ⏎ `a`, rejected)**: `asserts`
+is a contextual keyword, so it heads a `TSTypePredicate` only when the asserted
+name follows on the same line — tsc gates the whole reading on
+`lookAhead(nextTokenIsIdentifierOrKeywordOnSameLine)`. Across a break `asserts` is
+the ordinary type reference of that name and what follows begins nothing valid:
+tsc rejects with TS1434, and prettier with it. acorn-typescript accepts, welding
+into the very `TSTypePredicate` it builds for the same-line spelling
+(`parameterName: a`, `asserts: true`), so the line terminator vanishes. tsv
+follows tsc and rejects (`Expected ';'`). Per
+[ecma262 §sec-comments](https://tc39.es/ecma262/#sec-comments) a block comment
+holding a line terminator *is* one, so `asserts /*` ⏎ `*/ a` rejects on the same
+rule. The `is` clause one position over already carries the guard in tsv
+(`a` ⏎ `is T` rejects), and `asserts` with no name at all stays an ordinary type
+reference (`declare function fn(): asserts;`). Since acorn accepts, this is pinned
+by the
+[return_types/asserts_line_break](../tests/fixtures/typescript/typescript_specific/return_types/asserts_line_break_svelte_divergence/)
+`tsv_rejects.txt` fixture. **Upstream candidate**: acorn-typescript — the
+`asserts` prefix omits the same-line lookahead tsc applies.
+
+**Class property definite `!` after a line break (`a` ⏎ `!: T`, rejected)**: a
+definite-assignment `!` binds to the name it follows only when no line terminator
+intervenes — tsc's `parsePropertyDeclaration` takes the token under
+`!scanner.hasPrecedingLineBreak()`, so the member ends at `a` (ASI) and the stray
+`!` can head no class member (TS1068); prettier rejects too. acorn-typescript
+accepts, welding into one `PropertyDefinition` with `definite: true`. tsv follows
+tsc and rejects (`Expected class member name`) — the guard it already applies to
+the **variable** spelling of the same marker, where acorn agrees and the rejection
+is an ordinary `input_invalid_*`
+([declarations/variable/definite_newline_invalid](../tests/fixtures/typescript/declarations/variable/definite_newline_invalid/)).
+Only `!` is restricted: the **optional** `?` in the same syntactic slot takes the
+break in every parser (`a` ⏎ `?: T` stays valid), since tsc reads it without the
+guard. Since acorn accepts, the class half is pinned by the
+[statements/class/property_definite_line_break](../tests/fixtures/typescript/statements/class/property_definite_line_break_svelte_divergence/)
+`tsv_rejects.txt` fixture. **Upstream candidate**: acorn-typescript — the class
+property path omits the `hasPrecedingLineBreak` guard its variable-declarator
+path spells.
 
 **Arrow function as an operand (rejected)**: an `ArrowFunction` is a complete
 `AssignmentExpression` — a top-level alternative of that production
