@@ -147,19 +147,21 @@ enum OpenParenLineComments {
     /// comment to its own line, `if (/* c */ x` keeps it on the condition's. Every
     /// construct but do-while.
     Normalize,
-    /// The comment stays on the `(` line, and a space the author left after the `(` is
-    /// kept — the do-while sanction
+    /// The comment stays on the `(` line — the do-while sanction
     /// ([`open_paren_comment_prettier_divergence`](../../../../../../tests/fixtures/typescript/statements/do_while/open_paren_comment_prettier_divergence/)),
-    /// where prettier moves the comment out of the parens entirely (past the `;` for the
-    /// `//` that fixture pins, ahead of the `while` for a block comment).
+    /// where prettier moves the comment out of the parens entirely: past the `;` for a
+    /// `//`, ahead of the `while` for a block comment.
     ///
-    /// ⚠️ The sanction is about the comment's **position**, and stops there. Prettier
-    /// keeps a block comment inside the parens whenever the condition follows it on the
-    /// `(` line, so that shape has a spacing oracle and tsv matches it: exactly one space
-    /// per gap between two comments, however the author wrote that gap
+    /// ⚠️ The sanction is about the comment's **position**, and stops there — the author's
+    /// SPACING is normalized in both arms, never preserved. Prettier keeps a block comment
+    /// inside the parens whenever the condition follows it on the `(` line, so that shape is
+    /// a live spacing oracle and tsv matches it whole: nothing after the `(`, one space per
+    /// gap between two comments
     /// ([`open_paren_comment_run`](../../../../../../tests/fixtures/typescript/statements/do_while/open_paren_comment_run/)).
-    /// The space after `(` is the one place tsv answers for itself, and only because the
-    /// shapes prettier relocates leave no oracle for it.
+    /// Where the run holds the `(` line open prettier relocates it out and leaves no oracle,
+    /// so tsv writes the space it writes at every other opening delimiter it keeps a comment
+    /// on — `fn( // c`, `new Foo( /* paren */`. See
+    /// [`Printer::push_paren_line_comment_bucket`] for the table.
     Preserve,
 }
 
@@ -831,18 +833,33 @@ impl<'a> Printer<'a> {
         matches!(inner, Expression::BinaryExpression(b) if b.operator.is_logical())
     }
 
-    /// Build the condition doc for `if` / `while`, honoring the negation-inline rule.
+    /// Build the condition doc for `if` / `while` / do-while, honoring the
+    /// negation-inline rule.
     ///
     /// Mirrors Prettier's `printIfOrWhileConditionOrWithStatementObject`: when
     /// `condition_should_inline_negation` holds (and the parens carry no comments) the
     /// test doc is emitted bare so `!(…)` hugs `(`; otherwise the standard condition
-    /// group wraps it. `switch` and the do-while comment-preservation path build their
-    /// condition group directly and are deliberately excluded.
+    /// group wraps it. Prettier re-exports that one function under three names —
+    /// `printIfStatementCondition`, `printWhileStatementCondition` and
+    /// `printDoWhileStatementCondition` — so all three constructs share this entry point
+    /// too, parting only on `open_paren_line` ([`OpenParenLineComments`]). `switch`
+    /// builds its condition group directly and is deliberately excluded.
+    ///
+    /// ⚠️ **The group is not optional for the do-while, it is what makes its condition
+    /// breakable.** The statement's own doc is a bare `concat` (prettier's
+    /// `printDoWhileStatement` is too), so a condition emitted through
+    /// [`Self::build_expression_doc`] had no enclosing group to open its parens and the
+    /// operands wrapped at the *statement's* indent, reading as though they were
+    /// statements. The fix is not to keep the self-grouping expression doc but to keep
+    /// the condition group: [`Self::build_condition_group`] IS the group the ungrouped
+    /// binary chain needs, so the chain breaks with the parens rather than stranded
+    /// beside them.
     fn build_statement_condition_doc(
         &self,
         test: &Expression<'_>,
         open_paren: Option<u32>,
         close_paren: Option<u32>,
+        open_paren_line: OpenParenLineComments,
     ) -> DocId {
         if self.condition_should_inline_negation(test) {
             let no_comments = match (open_paren, close_paren) {
@@ -853,13 +870,30 @@ impl<'a> Printer<'a> {
                 return self.build_condition_doc(test);
             }
         }
+        self.build_condition_group_for_parens(test, open_paren, close_paren, open_paren_line)
+    }
+
+    /// The condition group for a paren-headed head: the comment-aware builder where both
+    /// paren positions were found, the plain [`Self::build_condition_group`] where the scan
+    /// came up empty.
+    ///
+    /// Split out of [`Self::build_statement_condition_doc`] because `switch` needs exactly
+    /// this and deliberately **not** the layer above it — prettier reaches
+    /// `shouldInlineCondition` only from `printIfOrWhileConditionOrWithStatementObject`, so
+    /// `switch (!(a || b))` does not hug its `(` the way `if` / `while` / do-while do.
+    /// Naming the shared half is what keeps that a one-line difference rather than a second
+    /// spelling of the dispatch for switch to drift from.
+    fn build_condition_group_for_parens(
+        &self,
+        test: &Expression<'_>,
+        open_paren: Option<u32>,
+        close_paren: Option<u32>,
+        open_paren_line: OpenParenLineComments,
+    ) -> DocId {
         match (open_paren, close_paren) {
-            (Some(open), Some(close)) => self.build_condition_group_with_comments(
-                test,
-                open,
-                close,
-                OpenParenLineComments::Normalize,
-            ),
+            (Some(open), Some(close)) => {
+                self.build_condition_group_with_comments(test, open, close, open_paren_line)
+            }
             _ => self.build_condition_group(test),
         }
     }
@@ -893,25 +927,41 @@ impl<'a> Printer<'a> {
     /// bucket is a split POSITION, not a pair of filters the two emitters could drift
     /// apart on (the same statement `element_gap_split` makes for the element-comma seam).
     ///
-    /// ⚠️ **One separator per GAP.** Only the gap ahead of the FIRST comment is the
-    /// author's — a comment glued to the `(` stays glued, and a space there is kept (the
-    /// sanction's own carve-out, since prettier relocates these and leaves no oracle).
-    /// Every later gap is prettier's `printLeadingComment` space, which normalizes
-    /// whatever the author wrote to exactly one, an author-glued pair included.
+    /// ⚠️ **Every separator here is the PRINTER's, never the author's** — the whole gap is
+    /// normalized, and `paren_line_breaks` (does the run hold the `(` line open?) is the one
+    /// question that decides all three:
     ///
-    /// Asking the `(` for every comment instead reads a gap the PREVIOUS iteration already
-    /// separated as "not glued" and emits a second space (`while (/* c1 */  /* c2 */ x)`),
-    /// which no gate can see: it is a fixed point, so F1, the ledger, the census and the
-    /// injection audits are all blind to it, and the width ratchet grades a column, not a
-    /// run. Only a prettier `compare` finds it —
+    /// | gap | run holds the `(` line | test follows on the `(` line |
+    /// | --- | --- | --- |
+    /// | `(`→first comment | `" "` | nothing |
+    /// | comment→comment | `" "` | `" "` |
+    /// | last comment→test | the caller's `hardline` | `" "` |
+    ///
+    /// The comment→comment gap is prettier's `printLeadingComment` space, which normalizes
+    /// whatever the author wrote to exactly one, an author-glued pair included. The
+    /// `(`→run gap splits because only one of its two arms has an oracle: where the test
+    /// follows on the line prettier keeps the run in the parens and writes it glued to the
+    /// `(` (`while (/* c1 */ /* c2 */ x)`), so tsv matches; where the run holds the line
+    /// prettier relocates it out of the parens entirely and says nothing, so tsv's own
+    /// convention governs — and everywhere else it keeps a comment on an opening
+    /// delimiter's line it writes `fn( // c` / `new Foo( /* paren */`, a space, whatever the
+    /// author wrote (`expressions/calls/open_paren_comment_prettier_divergence`).
+    ///
+    /// ⚠️ That is why the space is keyed on `paren_line_breaks` and the INDEX, never on the
+    /// source. Reading the author's spacing gave the two arms one answer each authoring
+    /// rather than one answer each SHAPE; and a per-comment "is this one glued to what
+    /// precedes it" test reads a gap the previous iteration already separated and emits a
+    /// second space (`while (/* c1 */  /* c2 */ x)`). No gate can see either: both are fixed
+    /// points, so F1, the ledger, the census and the injection audits are blind, and the
+    /// width ratchet grades a column, not a run. Only a prettier `compare` finds them —
     /// [`open_paren_comment_run`](../../../../../../tests/fixtures/typescript/statements/do_while/open_paren_comment_run/)
-    /// is that comparison, pinned.
+    /// is that comparison for the oracle arm, and
+    /// [`open_paren_comment`](../../../../../../tests/fixtures/typescript/statements/do_while/open_paren_comment_prettier_divergence/)
+    /// pins the other.
     ///
-    /// The separator AFTER the bucket is the LAST comment's own fact, asked once: every
-    /// bucket comment starts on the `(` line, so only the last can end off it and the
-    /// answer is the same for all of them. A comment the test does not follow on its line
-    /// holds the `(` line, so the condition can never pull up beside it — the returned
-    /// flag, which hardens the caller's opening separator.
+    /// The returned flag is that same question, handed up: a run holding the `(` line means
+    /// the condition can never pull up beside it, so it hardens the caller's opening
+    /// separator to a `hardline`.
     fn push_paren_line_comment_bucket<'c>(
         &self,
         parts: &mut DocBuf,
@@ -928,22 +978,23 @@ impl<'a> Printer<'a> {
         };
         let (bucket, run_comments) = leading_comments.split_at(bucket_len);
 
+        // Does the run HOLD the `(` line open? Every bucket comment starts on that line,
+        // so only the last can end off it — one question, asked once, deciding both
+        // separators below and the caller's opening one.
+        let paren_line_breaks = bucket
+            .last()
+            .is_some_and(|last| !self.is_same_line(last.span.end, test_start));
+
         for (index, comment) in bucket.iter().enumerate() {
-            let glued_to_open_paren = index == 0 && open_paren_pos + 1 == comment.span.start;
-            if !glued_to_open_paren {
+            if index > 0 || paren_line_breaks {
                 parts.push(d.text(" "));
             }
             parts.push(self.build_comment_doc(comment));
         }
-
-        let mut paren_line_breaks = false;
-        if let Some(last) = bucket.last() {
-            if self.is_same_line(last.span.end, test_start) {
-                parts.push(d.text(" "));
-            } else {
-                paren_line_breaks = true;
-            }
+        if !bucket.is_empty() && !paren_line_breaks {
+            parts.push(d.text(" "));
         }
+
         (run_comments, paren_line_breaks)
     }
 
@@ -951,13 +1002,17 @@ impl<'a> Printer<'a> {
     /// expression inside the `(`, or trailing it before the `)`.
     ///
     /// The question [`Self::build_condition_group_with_comments`] answers to fall back to
-    /// the plain [`Self::build_condition_group`], named once because two of its callers
-    /// must ask it *themselves*: do-while and `catch` fall back to a doc of their own
-    /// (the clarity-paren condition, the bare parameter) rather than to the plain group,
-    /// so they branch before calling. Their branch and the builder's early return are one
-    /// decision, and two spellings of one decision is how they come to disagree — the
-    /// builder's fallback is harmless where it is reached in agreement and a silent
-    /// change of shape where it is not.
+    /// the plain [`Self::build_condition_group`], named once because one of its callers
+    /// must ask it *itself*: `catch` falls back to a doc of its own (the bare parameter)
+    /// rather than to the plain group, so it branches before calling. Its branch and the
+    /// builder's early return are one decision, and two spellings of one decision is how
+    /// they come to disagree — the builder's fallback is harmless where it is reached in
+    /// agreement and a silent change of shape where it is not.
+    ///
+    /// The do-while used to be the second such caller, falling back to the plain
+    /// expression doc; that fallback was the reason its condition parens never opened,
+    /// and it now routes through [`Self::build_statement_condition_doc`] like `if` and
+    /// `while`, asking nothing itself.
     ///
     /// Deliberately **not** the whole `(`…`)` range: a comment *inside* the expression is
     /// that expression's own business and no reason for this layout. The negation-inline
@@ -1167,14 +1222,17 @@ impl<'a> Printer<'a> {
     /// The clarity parens a **statement test** puts around an assignment (`while ((x = y))`),
     /// applied to a doc the caller has already built.
     ///
-    /// One question, one spelling. The three sites that ask it build their inner doc
+    /// One question, one spelling. The two sites that ask it build their inner doc
     /// differently and can't share more than this: [`Self::build_condition_doc`] (if / while /
-    /// for) takes the ungrouped binary form so the enclosing condition group drives the break,
-    /// the do-while takes the plain self-grouping one (it has no enclosing group, so the
-    /// ungrouped form would strand a broken `&&` chain), and a `case` test is emitted behind a
-    /// comment gap of its own. The predicate is
-    /// [`ParenContext::StatementTest`](super::ParenContext::StatementTest) in all three.
-    pub(in crate::printer) fn wrap_statement_test_parens(
+    /// do-while / for) takes the ungrouped binary form so the enclosing condition group drives
+    /// the break, and a `case` test is emitted behind a comment gap of its own. The predicate is
+    /// [`ParenContext::StatementTest`](super::ParenContext::StatementTest) in both.
+    ///
+    /// The do-while was a third site, passing the plain self-grouping expression doc on the
+    /// reading that it has no enclosing group for the ungrouped form to break with. It has
+    /// one — [`Self::build_condition_group`], which it now takes like every other paren-headed
+    /// construct.
+    pub(in crate::printer::statements::control_flow) fn wrap_statement_test_parens(
         &self,
         expr: &Expression<'_>,
         doc: DocId,

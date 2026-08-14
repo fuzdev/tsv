@@ -5,6 +5,7 @@
 // - Meta properties: `import.meta`, `new.target`
 
 use super::super::Printer;
+use super::super::comments::ParenLeadingValue;
 use super::arg_comments::{PartitionedComments, should_force_expansion_for_comments};
 use super::arg_predicates::is_expandable_object;
 use crate::ast::internal;
@@ -76,18 +77,37 @@ fn build_import_open_doc(
     (d.concat(&[head, d.text("(")]), head_end)
 }
 
-/// Wrap import args in a breakable group: `<open>` + softline-indented `inner` +
-/// softline + `)`. Stays inline when it fits, breaks each side onto its own line
-/// otherwise. The shared shell for every block-comment / no-line-comment layout.
-fn wrap_import_group(d: &DocArena, open: DocId, inner: DocId) -> DocId {
-    d.group(d.concat(&[open, d.indent_softline(inner), d.softline(), d.text(")")]))
-}
-
-/// Wrap import args in a forced-multiline layout: `<open>` + hardline-indented
-/// `inner` + hardline + `)`. Used whenever a line comment (which runs to EOL) or an
-/// own-line comment forces the parens open.
-fn wrap_import_hardline(d: &DocArena, open: DocId, inner: DocId) -> DocId {
-    d.concat(&[open, d.indent_hardline(inner), d.hardline(), d.text(")")])
+/// The import-argument shell, in whichever of its two shapes the layout calls for: the
+/// forced-multiline one (`<open>` + the `(`-line run + hardline-indented `inner` +
+/// hardline + `)`) whenever a line comment, an own-line comment or an author blank forces
+/// the parens open, else the breakable group (`<open>` + softline-indented `inner` +
+/// softline + `)`) that stays inline when it fits.
+///
+/// One function rather than two because the shape and the `(`-line run are the same fact:
+/// a run pulled onto the `(` line can only be emitted where the shell is already committed
+/// to breaking ([`Printer::build_paren_leading_value_doc`] reports the pull *as* a forced
+/// break), and a `//` in it would swallow the arguments anywhere else. Stating that as
+/// `force_break || !paren_line.is_empty()` **enforces** it; the two-function form could
+/// only assert it, and a `debug_assert` that elides in release turns a broken invariant
+/// into a silently DROPPED comment.
+fn wrap_import_args(
+    d: &DocArena,
+    open: DocId,
+    paren_line: &[DocId],
+    inner: DocId,
+    force_break: bool,
+) -> DocId {
+    if force_break || !paren_line.is_empty() {
+        d.concat(&[
+            open,
+            d.concat(paren_line),
+            d.indent_hardline(inner),
+            d.hardline(),
+            d.text(")"),
+        ])
+    } else {
+        d.group(d.concat(&[open, d.indent_softline(inner), d.softline(), d.text(")")]))
+    }
 }
 
 /// An import call's **options** argument — its already-built doc plus the source bounds
@@ -127,13 +147,20 @@ pub(in crate::printer) struct ImportOptionsArg {
 pub(in crate::printer) fn build_import_args_comment_layout(
     printer: &Printer<'_>,
     open: DocId,
-    source_doc: DocId,
+    source: &ParenLeadingValue,
     source_end: u32,
     options: Option<ImportOptionsArg>,
     paren_close: u32,
-    leading_forces_break: bool,
 ) -> Option<DocId> {
     let d = printer.d();
+    // The `(`→specifier gap's three answers travel together — the run the `(` line keeps,
+    // the specifier with the rest of its leading run, and the break that run reports —
+    // because one call produced all three and no caller can supply them separately.
+    let (paren_line, source_doc, leading_forces_break) = (
+        source.paren_line.as_slice(),
+        source.value,
+        source.forces_break,
+    );
 
     let Some(options) = options else {
         // Sole argument: everything between it and `)` is its trailing region.
@@ -156,16 +183,19 @@ pub(in crate::printer) fn build_import_args_comment_layout(
             // comment before the source forces the multiline layout; a lone same-line
             // block stays inline and breaks only on width. (variable.rs special-cases
             // the assignment break.)
-            return Some(if pc.forces_closer_break() || leading_forces_break {
-                wrap_import_hardline(d, open, inner)
-            } else {
-                wrap_import_group(d, open, inner)
-            });
+            return Some(wrap_import_args(
+                d,
+                open,
+                paren_line,
+                inner,
+                pc.forces_closer_break() || leading_forces_break,
+            ));
         }
 
         // Own-line leading comment: force hardline layout to preserve comment position.
         // Prettier's printLeadingComment() keeps own-line comments on their own line.
-        return leading_forces_break.then(|| wrap_import_hardline(d, open, source_doc));
+        return leading_forces_break
+            .then(|| wrap_import_args(d, open, paren_line, source_doc, true));
     };
 
     let has_inter_comments = printer.has_comments_on_page_between(source_end, options.start);
@@ -236,11 +266,7 @@ pub(in crate::printer) fn build_import_args_comment_layout(
     };
 
     let body = d.concat(&[d.concat(&head), sep, d.concat(&tail)]);
-    Some(if force_break {
-        wrap_import_hardline(d, open, body)
-    } else {
-        wrap_import_group(d, open, body)
-    })
+    Some(wrap_import_args(d, open, paren_line, body, force_break))
 }
 
 /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
@@ -281,8 +307,11 @@ pub(super) fn build_import_expression_doc(
         },
         |frozen| printer.build_frozen_arg_doc(import_expr.source, frozen),
     );
-    let (source_doc, leading_forces_break) =
+    // The `(`→specifier gap splits three ways: the run the `(` line keeps, the run that
+    // leads the specifier, and whether the parens must open.
+    let leading =
         printer.build_paren_leading_value_doc(leading_scan_start, source_start, raw_source_doc);
+    let source_doc = leading.value;
 
     let source_end = import_expr.source.span().end;
     let paren_close = import_expr.span.end;
@@ -307,11 +336,10 @@ pub(super) fn build_import_expression_doc(
     if let Some(doc) = build_import_args_comment_layout(
         printer,
         open,
-        source_doc,
+        &leading,
         source_end,
         options_arg,
         paren_close,
-        leading_forces_break,
     ) {
         return doc;
     }
@@ -328,7 +356,7 @@ pub(super) fn build_import_expression_doc(
         // line exceeds print width, matching Prettier's call-arg expansion. Without
         // this, only the inner arg's groups can break (e.g., `import(fn(\n  'long',\n))`
         // instead of the correct `import(\n  fn('long')\n)`).
-        return wrap_import_group(d, open, source_doc);
+        return wrap_import_args(d, open, &[], source_doc, false);
     };
 
     if is_expandable_object(options) {
@@ -359,7 +387,7 @@ pub(super) fn build_import_expression_doc(
     } else {
         // Standard group wrapping for non-expandable options
         let arg_parts = d.join_doc([source_doc, options_doc], d.comma_line());
-        wrap_import_group(d, open, arg_parts)
+        wrap_import_args(d, open, &[], arg_parts, false)
     }
 }
 
