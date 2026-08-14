@@ -105,9 +105,17 @@ conformance/publish cadence.
 ## Update ritual
 
 Same as the artifact size bounds: the failure message prints expected vs got —
-update the constant and say why in the **commit message**. That is where a pin
-move's history belongs; do NOT narrate it as an in-file comment — the `X→Y (date):
-…` running changelogs were swept out, and `gate_counts.ts` docstrings stay semantic.
+update the constant, and record **what moved and why** beside it as an `X → Y:` note
+in the neighbours' style: which file entered or left, in which direction, whether it
+left by getting better or worse, and what the A/B over the full corpus showed. A bare
+number is unauditable — the next re-pin cannot tell a recorded win from an absorbed
+regression — so the attribution is the constant's semantics, not its history.
+
+⚠️ **Attribution, not a changelog.** Dates, PR numbers and commit SHAs stay out (the
+`X→Y (date): …` entries were swept out for that reason, and the repo-wide rule against
+process notes in docs and comments applies here); the change's own narrative belongs in
+the **commit message**. What stays in-file is the sentence a reader needs to know what
+the number counts.
 
 When a checkout moves, re-record its **commit** in `GATE_CHECKOUT_COMMITS` in the
 same change (`git -C ../<repo> rev-parse --short HEAD`) — that struct is the single

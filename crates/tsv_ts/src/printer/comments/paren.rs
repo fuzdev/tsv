@@ -14,12 +14,41 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
+/// How [`Printer::build_paren_leading_value_doc`] splits a `(`→value gap: the run the
+/// `(` line keeps, the value with the rest of the run prepended, and whether the caller
+/// must open its parens.
+///
+/// A struct rather than a tuple because the three travel together to two callers (the
+/// dynamic-import EXPRESSION and the TS import TYPE) and two of them are trivially
+/// swappable at a call site.
+pub(crate) struct ParenLeadingValue {
+    /// Emitted by the caller directly after its `(`, before any break. Empty unless a
+    /// comment the author left on the `(` line was pulled onto it.
+    pub paren_line: DocBuf,
+    /// `value_doc` with the leading run that does *not* ride the `(` line prepended.
+    pub value: DocId,
+    /// Whether the gap ends a line unconditionally.
+    pub forces_break: bool,
+}
+
 impl<'a> Printer<'a> {
-    /// Build the leading-comment doc for comments between an opening `(` and the
-    /// value that follows, concatenated with `value_doc`. Returns the combined doc
-    /// plus whether the run ends a line unconditionally, which the caller answers by
-    /// opening its parens ([`Printer::push_leading_comment_run`]'s own report — tsv
+    /// Split the comments between an opening `(` and the value that follows into the run
+    /// the `(` LINE keeps and the run that LEADS the value, and report whether the caller
+    /// must open its parens ([`Printer::push_leading_comment_run`]'s own report — tsv
     /// has no `propagateBreaks`, so a hardline in here is invisible to the group).
+    ///
+    /// ⚠️ **The `(`-line share is the call family's, and `import(…)` is a call shape.**
+    /// A `//` the author parked after the `(` stays there in every other spelling —
+    /// `fn( // c`, `new Foo( // c`, `obj.fn( // c`, `require( // c`, a cataloged
+    /// divergence from prettier, which relocates it to the argument's leading line — and
+    /// both `import(…)` spellings used to be the family's lone dissenters, relocating it
+    /// and matching prettier instead. Nothing pinned either, so it was an unconsidered
+    /// difference rather than a decision. Routing the share through
+    /// [`Printer::delimiter_line_comment_prefix`] is what makes it one rule: the same
+    /// pull, the same "only when the shell breaks anyway" gate, and the same
+    /// pulled-comment exclusion. Pinned by
+    /// `expressions/calls/import_open_paren_comment_prettier_divergence`, which carries
+    /// both spellings because they share this seam.
     ///
     /// The gap is a call-argument leading run — `import(…)`'s first argument, for both
     /// the dynamic-import EXPRESSION and the TS import TYPE — so it takes the argument
@@ -38,15 +67,59 @@ impl<'a> Printer<'a> {
         open_paren_end: u32,
         value_start: u32,
         value_doc: DocId,
-    ) -> (DocId, bool) {
-        let Some((run, force_break)) = self.build_leading_comment_run_with_break(
+    ) -> ParenLeadingValue {
+        // The `(`-LINE share, on the shared delimiter-line rule: pull a comment the author
+        // left on the `(` line onto that line only when the shell is breaking anyway, so a
+        // call that would have fit still fits (`docs/comments.md` §The delimiter-line
+        // question). `pull_pos` is the exclusion every consumer of that prefix owes.
+        let (paren_line, pull_pos) = match self.paren_line_share_anchor(open_paren_end, value_start)
+        {
+            Some(paren) => self.delimiter_line_comment_prefix(paren, value_start),
+            None => (DocBuf::new(), None),
+        };
+        let run = self.build_leading_comment_run_with_break(
             open_paren_end,
             value_start,
             LeadingGlue::AdjacentStrippedParen,
-        ) else {
-            return (value_doc, false);
+            pull_pos,
+        );
+        let (value, run_breaks) = match run {
+            Some((run, force_break)) => (self.d().concat(&[run, value_doc]), force_break),
+            None => (value_doc, false),
         };
-        (self.d().concat(&[run, value_doc]), force_break)
+        ParenLeadingValue {
+            // A pull is only ever made on the break path, so it reports the break itself —
+            // the pulled run is no longer in `value` for the run's own report to see.
+            forces_break: run_breaks || pull_pos.is_some(),
+            paren_line,
+            value,
+        }
+    }
+
+    /// The `(` a `(`-line share would be claimed against, or `None` when this gap has no
+    /// share to claim.
+    ///
+    /// ⚠️ **The share is what the author wrote AFTER the `(`, so the anchor is the paren
+    /// and not the gap's start.** The gap deliberately spans the `(` — one slot, one
+    /// emitter, which is what keeps `import /* c */ ('m')` from being dropped — but a
+    /// comment written *before* the paren belongs to the head, and the claim has to stay a
+    /// **PREFIX** of the gap's comments (`docs/comments.md` §The element-comma seam):
+    /// claiming only the after-`(` tail would render it AHEAD of the head comment it was
+    /// written under. So a run that begins before the `(` is not split — it stays whole in
+    /// the leading position, which is where both formatters already put it
+    /// (`import /* pre */ ( // post`, the null control in
+    /// `expressions/calls/import_open_paren_comment_prettier_divergence`).
+    fn paren_line_share_anchor(&self, gap_start: u32, value_start: u32) -> Option<u32> {
+        let paren = find_char_skipping_comments(
+            self.source.as_bytes(),
+            gap_start as usize,
+            value_start as usize,
+            b'(',
+        )? as u32;
+        comments_to_emit_in_range(self.comments, gap_start, value_start)
+            .next()
+            .is_some_and(|first| first.span.start > paren)
+            .then_some(paren)
     }
 
     /// Append the trailing comments in an operand's closing gap to a parts vec.

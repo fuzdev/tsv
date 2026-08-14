@@ -44,6 +44,7 @@ pub(super) use element_comma::{block_is_before_comma, run_defers_line};
 pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
 pub(crate) use member_body::{MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam};
 pub(crate) use owned::OwnedCommentEffect;
+pub(crate) use paren::ParenLeadingValue;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};
@@ -1713,7 +1714,7 @@ impl<'a> Printer<'a> {
         end: u32,
         glue: LeadingGlue,
     ) -> Option<DocId> {
-        self.build_leading_comment_run_with_break(start, end, glue)
+        self.build_leading_comment_run_with_break(start, end, glue, None)
             .map(|(doc, _)| doc)
     }
 
@@ -1727,16 +1728,22 @@ impl<'a> Printer<'a> {
     /// spelled a second time, and a *range*-shaped approximation of it is the bug the
     /// import gap had. Callers with no shell take the `_opt` form and the report is
     /// dropped here rather than at each of them.
+    /// `skip_delim` drops the comments an opening delimiter already pulled onto its own
+    /// line ([`Printer::comment_on_delimiter_line`]) — the exclusion every consumer of
+    /// [`Printer::delimiter_line_comment_prefix`] owes, without which the pulled run
+    /// prints twice.
     fn build_leading_comment_run_with_break(
         &self,
         start: u32,
         end: u32,
         glue: LeadingGlue,
+        skip_delim: Option<u32>,
     ) -> Option<(DocId, bool)> {
         let mut parts = DocBuf::new();
         let forces_break = self.push_leading_comment_run(
             &mut parts,
-            comments_to_emit_in_range(self.comments, start, end),
+            comments_to_emit_in_range(self.comments, start, end)
+                .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c))),
             end,
             glue,
             self.d().empty(),

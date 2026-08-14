@@ -698,6 +698,8 @@ phase to both static and dynamic imports:
 - `import source x from 'mod'` / `import.source('mod')` — phase `'source'` — [source_phase](../tests/fixtures/typescript/modules/imports/source_phase_svelte_prettier_divergence/), which pins BOTH oracles failing in one fixture: `expected_svelte.json` for acorn's rejection, `prettier_rejects.txt` for prettier's throw (`'=' expected.` — it reads `source` as an ordinary default binding)
 - `import defer * as ns from 'mod'` / `import.defer('mod')` — phase `'defer'`
 
+The **dynamic** (expression) spelling of both phases is pinned separately by [import_phase_open_paren_comment](../tests/fixtures/typescript/expressions/calls/import_phase_open_paren_comment_svelte_prettier_divergence/), where the two oracles part: acorn still rejects `import.source(…)` (so the parser claim is `expected_ours.json` + a parse-failure `expected_svelte.json`), while prettier *parses* it and only relocates its `(`-line comment — so that half has a live oracle and an `output_prettier.svelte`.
+
 acorn-typescript implements neither (`import source x` → `Unexpected token`,
 `import.source(…)` → `The only valid meta property for import is 'import.meta'`),
 so accepting them is a deliberate, forward-looking divergence from the

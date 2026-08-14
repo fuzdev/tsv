@@ -37,14 +37,18 @@ use crate::fixtures::{
 ///      (prettier throws, so no prettier-anchored claim is expressible), AND it is
 ///      mutually exclusive with `prettier_nonconvergent.txt`
 /// S20: `tsv_rejects.txt` (tsv over-rejects, canonical accepts) requires the
-///      `_svelte_divergence` suffix + README + `expected_svelte.json` (the canonical
-///      AST), forbids `expected.json`/`expected_ours.json` (tsv emits no AST), and is
+///      `_svelte_divergence` suffix + `expected_svelte.json` (the canonical AST),
+///      forbids `expected.json`/`expected_ours.json` (tsv emits no AST), and is
 ///      mutually exclusive with every format-claim file, `input_invalid_*`, and the
 ///      prettier no-oracle markers — handled entirely by `validate_tsv_rejects_structure`
+///      (its README is D1's, below)
 /// S21: `audit_signature_<suffix>.txt` requires its same-suffix
 ///      `unformatted_ours_<suffix>` source — the chain it pins is anchored there,
 ///      so an orphan pins nothing
-/// D1:  README.md required for divergences
+///
+/// D1 — README.md required for divergences — is deliberately **not** here: it is the
+/// one rule that says nothing about the file set, so it must not short-circuit the
+/// claim phases. See [`validate_divergence_readme`].
 pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Result<(), String> {
     let fixture_dir = &fixture.path;
 
@@ -651,90 +655,99 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         }
     }
 
-    // Check if README.md should exist (D1 validation)
-    let has_parser_divergence = has_expected_ours && has_expected_svelte;
-    let has_formatter_divergence = output_prettier_path.exists();
-    let has_prettier_variants = !files.prettier_variant.is_empty();
-    let has_variants = !files.variant.is_empty();
-    let has_divergent_variant = !files.divergent_variant.is_empty();
-    let has_prettier_intermediate = !files.prettier_intermediate.is_empty();
-    let has_prettier_intermediate_to_variant = !files.prettier_intermediate_to_variant.is_empty();
-    let has_prettier_intermediate_to_divergent_variant =
-        !files.prettier_intermediate_to_divergent_variant.is_empty();
+    Ok(())
+}
 
-    let needs_readme = has_parser_divergence
-        || has_formatter_divergence
-        || has_prettier_variants
-        || has_variants
-        || has_divergent_variant
-        || has_prettier_intermediate
-        || has_prettier_intermediate_to_variant
-        || has_prettier_intermediate_to_divergent_variant
-        || files.prettier_nonconvergent
-        || files.prettier_rejects;
+/// D1: the README every divergence owes its reader — reported **without**
+/// short-circuiting the claim phases.
+///
+/// Split out of [`validate_fixture_structure`] deliberately. It is the one rule in the
+/// S/D set that says nothing about the fixture's FILE SET, so it cannot make a
+/// downstream phase unreadable — and the structure gate is fail-fast, returning before
+/// any claim is checked. Left inside it, a missing README **suppressed the claim
+/// validation of the very files that made the README necessary**: a
+/// `prettier_variant_*` whose N2 claim was false (tsv holds the form stable, so it is a
+/// dual-stable `variant_*`) reported only "README.md required", and the wrong marker —
+/// a divergence that is not the one that exists — stayed invisible until someone added
+/// the README and ran again. The gate still fails on a missing README; what changed is
+/// that it no longer hides what else is wrong.
+///
+/// Both spellings of the rule live here, so the tsv_rejects branch cannot drift: that
+/// fixture's whole claim is two live checks ([`super::phases::validate_tsv_rejects`] and
+/// its canonical sibling), which the same early return was hiding.
+pub fn validate_divergence_readme(fixture: &Fixture, files: &FixtureFiles) -> Option<String> {
+    if fixture.path.join("README.md").exists() {
+        return None;
+    }
 
-    if needs_readme && !has_readme {
-        let mut reasons = Vec::new();
-        if has_parser_divergence {
-            reasons.push(
-                "- Parser divergence (expected_ours.json + expected_svelte.json)".to_string(),
-            );
-        }
-        if has_formatter_divergence {
-            reasons.push(format!(
-                "- Formatter divergence ({output_prettier_filename})"
-            ));
-        }
-        if has_prettier_variants {
-            reasons.push(format!(
-                "- Prettier variants (prettier_variant_*{input_ext})"
-            ));
-        }
-        if has_variants {
-            reasons.push(format!("- Prettier stable variants (variant_*{input_ext})"));
-        }
-        if has_divergent_variant {
-            reasons.push(format!(
-                "- Divergent-variant forms (divergent_variant_*{input_ext})"
-            ));
-        }
-        if has_prettier_intermediate {
-            reasons.push(format!(
-                "- Prettier intermediate (prettier_intermediate_*{input_ext})"
-            ));
-        }
-        if has_prettier_intermediate_to_variant {
-            reasons.push(format!(
-                "- Prettier intermediate to variant (prettier_intermediate_to_variant_*{input_ext})"
-            ));
-        }
-        if has_prettier_intermediate_to_divergent_variant {
-            reasons.push(format!(
-                "- Prettier intermediate to divergent variant (prettier_intermediate_to_divergent_variant_*{input_ext})"
-            ));
-        }
-        if files.prettier_nonconvergent {
-            reasons.push(format!(
-                "- Prettier non-convergence ({PRETTIER_NONCONVERGENT_FILENAME})"
-            ));
-        }
-        if files.prettier_rejects {
-            reasons.push(format!(
-                "- Prettier rejection ({PRETTIER_REJECTS_FILENAME})"
-            ));
-        }
-
-        return Err(format!(
-            "README.md required when quirks/divergences exist.\n\
-            This fixture has:\n\
-            {}\n\
-            README.md should document WHY we differ and provide context.\n\
-            See docs/fixture_overview.md for README requirements.",
-            reasons.join("\n")
+    // A tsv_rejects fixture is always a divergence, and its README carries the
+    // conformance back-link the audit enforces.
+    if files.tsv_rejects {
+        return Some(format!(
+            "{TSV_REJECTS_FILENAME} fixture requires a README.md documenting the divergence\n\
+            (why tsv rejects while the canonical parser accepts), with a back-link to\n\
+            docs/conformance_svelte.md."
         ));
     }
 
-    Ok(())
+    let input_ext = fixture.input_type().extension();
+    let output_prettier_filename = fixture.output_prettier_filename();
+
+    // Each divergence kind is listed ONCE — the gate is "did any of them fire", i.e.
+    // `!reasons.is_empty()`, so the condition and the line naming it cannot drift apart.
+    // Stated as two lists (a disjunction, then a matching `if` per arm) they could, and
+    // the way that fails is silent both ways round: a kind added to the disjunction but
+    // not the message reports "This fixture has:" and lists nothing, and one added to the
+    // message but not the disjunction never reports at all. `bool::then` keeps the arms
+    // lazy, so the common no-README, no-divergence fixture formats none of them.
+    let reasons: Vec<String> = [
+        (fixture.expected_ours_path().exists() && fixture.expected_svelte_path().exists())
+            .then(|| "- Parser divergence (expected_ours.json + expected_svelte.json)".to_string()),
+        fixture
+            .output_prettier_path()
+            .exists()
+            .then(|| format!("- Formatter divergence ({output_prettier_filename})")),
+        (!files.prettier_variant.is_empty())
+            .then(|| format!("- Prettier variants (prettier_variant_*{input_ext})")),
+        (!files.variant.is_empty())
+            .then(|| format!("- Prettier stable variants (variant_*{input_ext})")),
+        (!files.divergent_variant.is_empty())
+            .then(|| format!("- Divergent-variant forms (divergent_variant_*{input_ext})")),
+        (!files.prettier_intermediate.is_empty())
+            .then(|| format!("- Prettier intermediate (prettier_intermediate_*{input_ext})")),
+        (!files.prettier_intermediate_to_variant.is_empty()).then(|| {
+            format!(
+                "- Prettier intermediate to variant (prettier_intermediate_to_variant_*{input_ext})"
+            )
+        }),
+        (!files.prettier_intermediate_to_divergent_variant.is_empty()).then(|| {
+            format!(
+                "- Prettier intermediate to divergent variant (prettier_intermediate_to_divergent_variant_*{input_ext})"
+            )
+        }),
+        files
+            .prettier_nonconvergent
+            .then(|| format!("- Prettier non-convergence ({PRETTIER_NONCONVERGENT_FILENAME})")),
+        files
+            .prettier_rejects
+            .then(|| format!("- Prettier rejection ({PRETTIER_REJECTS_FILENAME})")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    if reasons.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "README.md required when quirks/divergences exist.\n\
+        This fixture has:\n\
+        {}\n\
+        README.md should document WHY we differ and provide context.\n\
+        See docs/fixture_overview.md for README requirements.",
+        reasons.join("\n")
+    ))
 }
 
 /// S20: structure rules for a `tsv_rejects.txt` fixture — tsv over-rejects an
@@ -792,14 +805,8 @@ fn validate_tsv_rejects_structure(
         ));
     }
 
-    // README required (D1 + the conformance back-link the audit enforces).
-    if !fixture.path.join("README.md").exists() {
-        return Err(format!(
-            "{TSV_REJECTS_FILENAME} fixture requires a README.md documenting the divergence\n\
-            (why tsv rejects while the canonical parser accepts), with a back-link to\n\
-            docs/conformance_svelte.md."
-        ));
-    }
+    // The README this fixture also owes (D1) is checked by
+    // `validate_divergence_readme`, outside this fail-fast gate.
 
     // Mutually exclusive with the prettier no-oracle markers.
     if files.prettier_rejects || files.prettier_nonconvergent {
