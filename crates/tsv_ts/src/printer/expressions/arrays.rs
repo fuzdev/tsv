@@ -110,10 +110,13 @@ impl<'a> Printer<'a> {
             return false;
         };
         let elem_end = elem.span().end;
+        // The next real element's start, or the closing `]`. It bounds the SEPARATOR
+        // search, which runs past `upper`: the comma may sit below slot `i + 1`'s leading
+        // comment, and `upper` stops at that comment's start
+        // ([`Printer::has_blank_line_after_comma`]).
+        let next_real = self.next_element_boundary(arr, i);
         let upper = upper_override.unwrap_or_else(|| {
-            // The next real element's start, or the closing `]` — slot `i + 1`'s own
-            // boundary unless a hole sits in front of it.
-            let next_real = self.next_element_boundary(arr, i);
+            // Slot `i + 1`'s own boundary unless a hole sits in front of it.
             if matches!(arr.elements.get(i + 1), Some(None)) {
                 // A hole terminates at its own comma: the second past this element, the
                 // first being this element's own separator.
@@ -131,7 +134,7 @@ impl<'a> Printer<'a> {
                 .filter(|&p| p > elem_end && p < next_real)
                 .unwrap_or(next_real)
         });
-        self.has_blank_line_after_comma(elem_end, upper)
+        self.has_blank_line_after_comma(elem_end, upper, next_real)
     }
 
     /// Format a block comment for inline use (with appropriate spacing)

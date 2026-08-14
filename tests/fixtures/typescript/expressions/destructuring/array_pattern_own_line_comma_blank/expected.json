@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 419,
+	"end": 607,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,72 @@
 					"column": 7
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a comment between the blank and the comma does not hide the comma from the scan:",
+			"start": 411,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the blank is still before the separator, so it is layout too",
+			"start": 496,
+			"end": 559,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 577,
+			"end": 582,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 418,
+		"end": 606,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 409,
+			"end": 597,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 18,
+					"line": 26,
 					"column": 9
 				}
 			},
@@ -364,6 +412,126 @@
 							"value": " a line break around the comma with no blank after it is layout, not authorship",
 							"start": 290,
 							"end": 371
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 561,
+					"end": 596,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 567,
+							"end": 595,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 567,
+								"end": 590,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 571,
+										"end": 573,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 4
+											}
+										},
+										"name": "a3"
+									},
+									{
+										"type": "Identifier",
+										"start": 585,
+										"end": 587,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 4
+											}
+										},
+										"name": "b3",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c3",
+												"start": 577,
+												"end": 582
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 593,
+								"end": 595,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 5
+									},
+									"end": {
+										"line": 25,
+										"column": 7
+									}
+								},
+								"name": "x3"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment between the blank and the comma does not hide the comma from the scan:",
+							"start": 411,
+							"end": 494
+						},
+						{
+							"type": "Line",
+							"value": " the blank is still before the separator, so it is layout too",
+							"start": 496,
+							"end": 559
 						}
 					]
 				}

@@ -64,8 +64,8 @@ impl<'a> Printer<'a> {
         last
     }
 
-    /// Check for a blank line after the first comma in `(prev_end, upper)`,
-    /// accounting for stripped grouping parens.
+    /// Check for a blank line after the separator comma, accounting for stripped grouping
+    /// parens.
     ///
     /// The **array/tuple** blank rule — prettier's `isLineAfterElementEmpty`, which advances
     /// to the comma before measuring. Its counterpart for params, call arguments, and object
@@ -73,17 +73,54 @@ impl<'a> Printer<'a> {
     /// that doc for the table of where the two disagree, and
     /// [`BlankRule`](super::BlankRule) for the enum that makes a list name which one it takes.
     ///
-    /// If no comma is found before `upper`, the check starts at `prev_end`.
-    /// Callers must pass `prev_end <= upper`.
-    pub(crate) fn has_blank_line_after_comma(&self, prev_end: u32, upper: u32) -> bool {
-        let after_comma = self
-            .find_comma_in_range(prev_end, upper)
-            .map_or(prev_end, |c| c + 1);
+    /// ⚠️ **The comma search and the blank scan take DIFFERENT upper bounds, and that is the
+    /// rule rather than a redundancy.** `upper` is where the next slot's printed *content*
+    /// begins — pulled back to a leading comment when the slot has one — and it bounds the
+    /// **blank scan**, which is what keeps a comment run out of the measured range
+    /// (`'a', // x⏎⏎/* c */ 'b'` measures the blank *between* them). `comma_bound` is the
+    /// next element's own start and bounds the **comma search**, because the separator may
+    /// sit *past* that content: an author who puts the comma below a comment
+    /// (`[a⏎// c⏎, b]`) leaves it between the comment and the next element. Bounding the
+    /// search at `upper` made that comma invisible, and the fallback then measured from the
+    /// element's end — silently answering this list with the **object family's** rule, which
+    /// is the one thing prettier's two helpers say an array must not do. It cost two bugs at
+    /// once: a blank the author wrote ahead of such a comment was kept where prettier drops
+    /// it, and — since the fallback range starts inside a stripped paren shell — the shell's
+    /// own `)` line was read as an author blank and one was FABRICATED
+    /// (`[(⏎x⏎)⏎// c⏎, y]`). Both forms are stable under both formatters, so only a prettier
+    /// `compare` finds them.
+    ///
+    /// If no comma is found at all the gap has no separator, and the check falls back to the
+    /// element's end. Callers must pass `prev_end <= upper <= comma_bound`.
+    ///
+    /// The scan stays the **table-only** count rather than the strict intervening-line one,
+    /// and that is sound *here* rather than generally: once the separator is found the range
+    /// opens at `comma + 1`, where the only re-emitted delimiter that can follow is the next
+    /// element's own stripped `(` — which [`skip_stripped_open_paren`](super::calls::skip_stripped_open_paren)
+    /// already caps the range at. A `)` cannot appear after a separator comma, so the reading
+    /// that fabricates elsewhere has nothing to fabricate from.
+    pub(crate) fn has_blank_line_after_comma(
+        &self,
+        prev_end: u32,
+        upper: u32,
+        comma_bound: u32,
+    ) -> bool {
+        // Past the comma the next printed content is whatever follows *it*, so a comma the
+        // author pushed below the slot's leading comment re-derives its own bound rather
+        // than measuring backwards into a range that ends before it.
+        let (after_comma, blank_upper) = match self.find_comma_in_range(prev_end, comma_bound) {
+            Some(comma) if comma >= upper => {
+                (comma + 1, self.blank_scan_end(comma + 1, comma_bound))
+            }
+            Some(comma) => (comma + 1, upper),
+            None => (prev_end, upper),
+        };
         // The scan counts raw newlines, so it must not span a comment's bytes — including
         // one this caller does not emit (an owned annotation leading the next element).
         // See `blank_scan_start`.
-        let check_start = self.blank_scan_start(after_comma, upper);
-        let check_end = super::calls::skip_stripped_open_paren(self.source, check_start, upper);
+        let check_start = self.blank_scan_start(after_comma, blank_upper);
+        let check_end =
+            super::calls::skip_stripped_open_paren(self.source, check_start, blank_upper);
         self.has_blank_line_between(check_start, check_end)
     }
 

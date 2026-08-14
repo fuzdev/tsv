@@ -15,4 +15,11 @@
 	b2
 	// c2
 	] = x2;
+
+	// a comment between the blank and the comma does not hide the comma from the scan:
+	// the blank is still before the separator, so it is layout too
+	const [a3
+
+	// c3
+	, b3] = x3;
 </script>

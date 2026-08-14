@@ -27,7 +27,10 @@
 		: c;
 
 	// block comment with no blank stays inline (both formatters)
-	const t4 = a ? /* c */ b : c;
+	const t4 = a
+		? /* c */
+			b
+		: c;
 
 	// two comments with a blank between: the blank is preserved and the second
 	// comment (now on its own line) drops the consequent below it
@@ -39,4 +42,10 @@
 			/* b */
 			b
 		: c;
+
+	// the alternate gap's inline form, the mirror of t4
+	const t6 = a
+		? b
+		: /* c */
+			c;
 </script>
