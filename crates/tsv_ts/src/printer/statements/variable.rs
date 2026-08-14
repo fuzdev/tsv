@@ -485,6 +485,28 @@ impl<'a> Printer<'a> {
                     }
                 };
 
+                // A block run the author broke AFTER, before an init that actually
+                // breaks (`const y = /* c */⏎{ …multiline… }`): prettier's
+                // break-after-operator (`chooseLayout`'s `hasLeadingOwnLineComment`
+                // arm) — `=`, then the run and the init below it in the indent, the
+                // run's newline-after `line` materialized by the init's break
+                // ([`Printer::break_after_operator_run_doc`]). An init that
+                // FITS collapses to the glued form in both formatters, so that case
+                // falls through to the layouts below unchanged; a line comment in the
+                // gap declines inside the gate (its mandatory-break path owns it).
+                if rhs_block_comment_doc.is_some()
+                    && let Some((run, value_doc)) = self.breaking_value_leading_run(
+                        rhs_comments_start,
+                        init_start,
+                        init_value_doc,
+                    )
+                {
+                    push_lhs(&mut parts, id_doc);
+                    parts.push(d.text(" ="));
+                    parts.push(self.break_after_operator_run_doc(&run, init_start, value_doc));
+                    continue;
+                }
+
                 // Check if RHS is a multiline string (line continuations)
                 let is_multiline_string = is_multiline_string_literal(init, self.source);
 

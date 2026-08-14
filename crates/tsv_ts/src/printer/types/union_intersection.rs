@@ -353,10 +353,124 @@ impl<'a> Printer<'a> {
     /// (`Printer::type_member_separator_follows`), so the LAST member — whose line
     /// ends only at the statement's tail — retains its shell instead.
     pub(in crate::printer) fn build_union_type_doc(&self, union: &TSUnionType<'_>) -> DocId {
+        self.build_union_type_doc_inner(union, None)
+    }
+
+    /// [`Self::build_union_type_doc`] with a glued leading block run handed in from
+    /// OUTSIDE `union.span` — the value-seam analog of the intersection's
+    /// [`LeadingGap`] claim, for the value positions a union can occupy (alias RHS,
+    /// annotation, return type). With no authored leading `|` the union's span
+    /// starts at its first member, so a run between the operator (`=`/`:`) and the
+    /// member is invisible to the in-span first-member gap — printed by the caller,
+    /// it lands AHEAD of the `|` the broken layout synthesizes (`/* c */ | A`), a
+    /// position prettier never produces (it binds the comment to the first member:
+    /// `| /* c */ A`), while the same program with the `|` authored already prints
+    /// prettier's form — two fixed points keyed on pure layout. Handed in, the
+    /// first-member arm places the run after its `if_break` pipe: the flat render
+    /// keeps the caller's bytes (`/* c */ A | B`), the broken one matches prettier.
+    /// The paths that never synthesize a first `| ` on a fresh line (hug,
+    /// single-member collapse, the line-comment layout) emit the run glued ahead of
+    /// the union — the caller's legacy position, byte-identical.
+    ///
+    /// `run_start` is where the run's first comment begins; the run ends at the
+    /// first member. Gate with [`Self::union_external_leading_run_start`] — exactly
+    /// one of caller and union must print the run (docs/comments.md hazard 3).
+    fn build_union_type_doc_with_leading_run(
+        &self,
+        union: &TSUnionType<'_>,
+        run_start: u32,
+    ) -> DocId {
+        self.build_union_type_doc_inner(union, Some(run_start))
+    }
+
+    /// Build a union VALUE doc for an operator seam (`=` / `:` at `gap_start`),
+    /// handing the gap's glued leading run into the union when
+    /// [`Self::union_external_leading_run_start`] accepts. Returns the doc and
+    /// whether the run was handed in — the caller emits the gap's comments itself
+    /// ONLY when it was not: exactly one of the two prints the run
+    /// (docs/comments.md hazard 3).
+    pub(in crate::printer) fn build_union_value_doc(
+        &self,
+        gap_start: u32,
+        union: &TSUnionType<'_>,
+    ) -> (DocId, bool) {
+        match self.union_external_leading_run_start(gap_start, union) {
+            Some(start) => (
+                self.build_union_type_doc_with_leading_run(union, start),
+                true,
+            ),
+            None => (self.build_union_type_doc(union), false),
+        }
+    }
+
+    /// The caller-side gate for [`Self::build_union_type_doc_with_leading_run`]:
+    /// `Some(run start)` when `[gap_start, first member)` holds a to-emit run the
+    /// union should print instead of the caller. Declines — the caller keeps its
+    /// own seam — when:
+    ///
+    /// - a leading `|` is authored (`union.span.start != first.start`): the gap up
+    ///   to the pipe is the caller's, the gap after it the in-span machinery's;
+    /// - the run holds a line comment (those routes own mandatory-break layouts);
+    /// - the run is not GLUED to what follows it (the member, or an owned comment
+    ///   leading it — the physical next, not the emit-set's view): a broke-after
+    ///   run is the value seam's own break-materialization question, not this
+    ///   binding one;
+    /// - a leading-run freeze is active: the directive's placement belongs to the
+    ///   freeze machinery, and moving it past a synthesized `|` would flip it
+    ///   trailing and lose the freeze on the next pass.
+    fn union_external_leading_run_start(
+        &self,
+        gap_start: u32,
+        union: &TSUnionType<'_>,
+    ) -> Option<u32> {
+        let first_start = union.types.first()?.span().start;
+        if union.span.start != first_start {
+            return None;
+        }
+        let comments: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, gap_start, first_start).collect();
+        let (first, last) = (comments.first()?, comments.last()?);
+        if !comments.iter().all(|c| c.is_block)
+            || !self.is_same_line(
+                last.span.end,
+                self.blank_scan_end(last.span.end, first_start),
+            )
+            || self
+                .composite_leading_run_freeze(union.span.start, union.types)
+                .is_some()
+        {
+            return None;
+        }
+        Some(first.span.start)
+    }
+
+    /// Prepend an external leading run (see
+    /// [`Self::build_union_type_doc_with_leading_run`]) in the caller's legacy
+    /// glued position, for the union paths whose layout has no synthesized-pipe
+    /// seam to bind it to.
+    fn with_union_external_run_prefix(
+        &self,
+        run_start: Option<u32>,
+        first_member_start: u32,
+        doc: DocId,
+    ) -> DocId {
+        let Some(start) = run_start else {
+            return doc;
+        };
+        let (run, _) = self.build_member_leading_block_comments(start, first_member_start);
+        self.d().concat(&[run, doc])
+    }
+
+    fn build_union_type_doc_inner(
+        &self,
+        union: &TSUnionType<'_>,
+        external_run_start: Option<u32>,
+    ) -> DocId {
         let d = self.d();
         if union.types.is_empty() {
             return d.empty();
         }
+        let first_member_start = union.types[0].span().start;
 
         // Format-ignore leading run (Rule A): an alone-on-line directive in the
         // out-of-span region before the union freezes its first member. Gated on the
@@ -452,7 +566,11 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_type_doc_maybe_parens(t, member_parens));
                 }
             }
-            return d.concat(&parts);
+            return self.with_union_external_run_prefix(
+                external_run_start,
+                first_member_start,
+                d.concat(&parts),
+            );
         }
 
         // Check for line comments that force the multiline layout:
@@ -479,7 +597,11 @@ impl<'a> Printer<'a> {
                 || self.union_has_own_line_member_comment(union)
                 || has_paren_inner_leading_line_comments
             {
-                return self.build_union_type_doc_with_line_comments(union);
+                return self.with_union_external_run_prefix(
+                    external_run_start,
+                    first_member_start,
+                    self.build_union_type_doc_with_line_comments(union),
+                );
             }
         }
 
@@ -503,14 +625,22 @@ impl<'a> Printer<'a> {
             // builds normally so its OWN leading-run walk applies Rule A inside — the
             // transparency doctrine.
             if !has_comments {
-                return self.build_type_doc_maybe_parens(member, member_parens);
+                return self.with_union_external_run_prefix(
+                    external_run_start,
+                    first_member_start,
+                    self.build_type_doc_maybe_parens(member, member_parens),
+                );
             }
             // The union's own group decides the run's `line`, so the break flag is the
             // caller's only where no group is guaranteed (the intersection's boundaries).
             let (leading, _) =
                 self.build_member_leading_block_comments(union.span.start, member.span().start);
             let member_doc = self.build_type_doc_maybe_parens(member, member_parens);
-            return d.concat(&[leading, member_doc]);
+            return self.with_union_external_run_prefix(
+                external_run_start,
+                first_member_start,
+                d.concat(&[leading, member_doc]),
+            );
         }
 
         // Build parts: each type prefixed conditionally with `| ` or nothing
@@ -591,6 +721,17 @@ impl<'a> Printer<'a> {
                 if has_comments && !frozen {
                     let (run, _) =
                         self.build_member_leading_block_comments(union.span.start, type_start);
+                    parts.push(d.align(2, run));
+                }
+
+                // An EXTERNAL glued run handed in from the value seam takes the same
+                // position — after the `if_break` pipe, bound to the member it leads
+                // (`| /* c */ A` when broken, `/* c */ A | B` flat). Mutually
+                // exclusive with the in-span run above by construction: the seam only
+                // hands a run in when no leading `|` is authored, which is exactly
+                // when the in-span gap `[span.start, first.start)` is empty.
+                if let Some(start) = external_run_start {
+                    let (run, _) = self.build_member_leading_block_comments(start, type_start);
                     parts.push(d.align(2, run));
                 }
             }
@@ -823,22 +964,19 @@ impl<'a> Printer<'a> {
                     // intersection printers preserve blanks in opposite member-gap
                     // positions.
                     //
-                    // ⚠️ **The scan starts past every comment already in the gap, not at
-                    // the member.** `own_line` is collected from AFTER the pipe, so a
-                    // comment the author wrote BEFORE it (`A⏎// x⏎| // c⏎B`) sits inside
-                    // `[prev_type_end, first.span.start)` — and this printer emits it there
-                    // too. Measuring across it counted the newline that merely separates
-                    // the two comments as a second one and FABRICATED a blank the author
-                    // never wrote. `blank_scan_start` is the in-source reading of "where
-                    // does the whitespace before this comment actually begin"
-                    // ([comments.md](../../../../docs/comments.md) — a blank-line scan is
-                    // an in-source question). The fabricated blank was idempotent, so F1
-                    // held it stable and only the prettier differential disagreed.
+                    // ⚠️ **The question is prettier's `isPreviousLineEmpty`, asked OF THE
+                    // COMMENT: is the line directly above it blank?** A gap-wide scan
+                    // anchored at the previous member's end read every intervening line
+                    // break as the author's blank — a `|` the author gave a line of its
+                    // own (`A⏎|⏎// c⏎B`) fabricated a blank prettier doesn't write, the
+                    // comma-on-its-own-line failure `previous_line_is_empty`'s own doc
+                    // names. Asking the comment's own neighbour also covers the
+                    // earlier-comment shape (`A⏎// x⏎| // c⏎B`) the old scan needed a
+                    // `blank_scan_start` compensation for: the line above the run's first
+                    // comment holds that comment (or the pipe), so it is non-empty and
+                    // nothing is measured across it.
                     if let Some(first) = own_line.first()
-                        && self.has_blank_line_between(
-                            self.blank_scan_start(prev_type_end, first.span.start),
-                            first.span.start,
-                        )
+                        && self.previous_line_is_empty(prev_type_end, first.span.start)
                     {
                         parts.push(d.literalline());
                     }
