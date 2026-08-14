@@ -87,12 +87,10 @@ impl<'a> Printer<'a> {
 
             // Preserve comments between catch keyword and ( in place:
             //   catch/* comment */(e) → catch /* comment */ (e)
-            if let Some(kc) = self.build_keyword_paren_comments(catch_keyword_end, open_paren) {
-                parts.push(kc);
-                parts.push(d.text("("));
-            } else {
-                parts.push(d.text(" ("));
-            }
+            // The keyword itself was emitted by `append_clause_head` (possibly as a
+            // frozen span), so this takes the opener's `(` half.
+            let keyword_comments = self.build_keyword_paren_comments(catch_keyword_end, open_paren);
+            self.push_open_paren_after_keyword(parts, keyword_comments);
 
             // Check for comments in catch parameter
             if let (Some(open), Some(close)) = (open_paren, close_paren)

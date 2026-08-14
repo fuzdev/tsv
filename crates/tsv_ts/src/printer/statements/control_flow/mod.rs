@@ -391,17 +391,32 @@ impl<'a> Printer<'a> {
 
     /// Push a control-flow head opener — `keyword`, any `keyword`→`(` comment
     /// (`keyword_comments`, which already carries its own trailing space/break), then
-    /// `(`. With no comment it emits a plain `keyword (`. Shared by `if`/`while`/
-    /// `switch`/`catch` and the plain-`for` header so the `keyword`→`(` line-comment
-    /// break is uniform (`if // c⏎(a)`) rather than swallowing the `(`.
+    /// `(`. With no comment it emits a plain `keyword (`. Used by `if`/`while`/`switch`,
+    /// whose keyword is this emitter's to write.
     fn push_keyword_open_paren(
         &self,
         parts: &mut DocBuf,
         keyword: &'static str,
         kc: Option<DocId>,
     ) {
+        parts.push(self.d().text(keyword));
+        self.push_open_paren_after_keyword(parts, kc);
+    }
+
+    /// The half of [`Self::push_keyword_open_paren`] past the keyword: the `keyword`→`(`
+    /// comment (`kc`, which carries its own trailing space or break), then a bare `(` —
+    /// or a plain ` (` where there is none.
+    ///
+    /// Split out for the two constructs that write their keyword **themselves** and so
+    /// cannot take the whole opener: the do-while, whose `while` follows the `}`→keyword
+    /// gap emitter, and `catch`, whose keyword may come out as a frozen span
+    /// ([`Self::append_clause_head`]). Both hand-rolled this, which is how the rule it
+    /// carries — a `//` after the keyword breaks, so it cannot swallow the `(`
+    /// (`catch // c⏎(e)`) — comes to be spelled three times and fixed in one of them.
+    /// The plain-`for` header is a fourth reading of the same shape, kept apart only
+    /// because it wants a single `DocId` and its no-comment case is one text node.
+    fn push_open_paren_after_keyword(&self, parts: &mut DocBuf, kc: Option<DocId>) {
         let d = self.d();
-        parts.push(d.text(keyword));
         if let Some(kc) = kc {
             parts.push(kc);
             parts.push(d.text("("));
