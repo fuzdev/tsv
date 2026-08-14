@@ -916,6 +916,18 @@ deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
 # ../test-svelte-prettier-whitespace/whitespace-safety-check.mjs.
 ```
 
+**What it is blind to: a shape the corpus does not contain.** It grades the files that exist, so
+it proves only that formatting preserved the render *of real code* — a render-visible deletion in
+a shape no corpus file happens to carry is invisible here, and stays invisible however far the
+corpus grows. Measured, not hypothesized: the boundary space before a **run-ending sibling**
+(`<p>text1 <span>x</span> <!-- c -->text2</p>`, and its `{@debug}` twin) was deleted for every
+container kind, yet a pre/post format diff over **14,318 real `.svelte` files** moved **zero** of
+them — the shape occurs in none of them. The mangled form is also its own fixed point, so F1,
+fuzz and round-trip are blind by construction, and the comment instruments (ledger, census,
+swallow) count *comments*, never the whitespace beside them. Nothing but a fixture reaches this
+class, which is why a render-visible finding earns one even when every corpus gate is green
+([inline_adjacent_comment_space](../tests/fixtures/svelte/elements/inline_adjacent_comment_space/)).
+
 ## Layout-Neutrality Audit (`neutrality_audit`)
 
 ```bash

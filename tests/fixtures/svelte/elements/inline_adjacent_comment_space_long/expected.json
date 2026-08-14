@@ -1,0 +1,319 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 976,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 425,
+				"data": "\n\tThe deferred separator in front of a run-ending sibling is a BARE collapsible break, resolved\n\tby the container's own group: a space while the whole element fits, a newline the moment it\n\tdoes not. The 101-char cases are the discriminator — their content line is only 97 wide, so a\n\tseparator measured on its OWN width would keep the sibling on it, and the next pass, reading\n\tthat break back, would move it anyway.\n"
+			},
+			{
+				"type": "Text",
+				"start": 425,
+				"end": 427,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 427,
+				"end": 503,
+				"data": " exactly 100 chars — inline, and the separator is the rendered space "
+			},
+			{
+				"type": "Text",
+				"start": 503,
+				"end": 504,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 504,
+				"end": 604,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 505
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 506
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 507,
+							"end": 576,
+							"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 ",
+							"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 "
+						},
+						{
+							"type": "Component",
+							"start": 576,
+							"end": 584,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 73,
+									"character": 577
+								},
+								"end": {
+									"line": 10,
+									"column": 77,
+									"character": 581
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 584,
+							"end": 585,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "Comment",
+							"start": 585,
+							"end": 595,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 595,
+							"end": 600,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 604,
+				"end": 606,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 606,
+				"end": 679,
+				"data": " 101 chars — the element breaks, and the separator breaks with it "
+			},
+			{
+				"type": "Text",
+				"start": 679,
+				"end": 680,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 680,
+				"end": 785,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 681
+					},
+					"end": {
+						"line": 13,
+						"column": 2,
+						"character": 682
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 683,
+							"end": 755,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 ",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 "
+						},
+						{
+							"type": "Component",
+							"start": 755,
+							"end": 763,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 72,
+									"character": 756
+								},
+								"end": {
+									"line": 14,
+									"column": 76,
+									"character": 760
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 763,
+							"end": 765,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 765,
+							"end": 775,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 775,
+							"end": 781,
+							"raw": "text2\n",
+							"data": "text2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 785,
+				"end": 787,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 787,
+				"end": 869,
+				"data": " the `{@debug}` follower is the same run-ending kind, at the same boundary "
+			},
+			{
+				"type": "Text",
+				"start": 869,
+				"end": 870,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 870,
+				"end": 975,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 871
+					},
+					"end": {
+						"line": 19,
+						"column": 2,
+						"character": 872
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 873,
+							"end": 945,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 ",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 "
+						},
+						{
+							"type": "Component",
+							"start": 945,
+							"end": 953,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 72,
+									"character": 946
+								},
+								"end": {
+									"line": 20,
+									"column": 76,
+									"character": 950
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 953,
+							"end": 955,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "DebugTag",
+							"start": 955,
+							"end": 965,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 963,
+									"end": 964,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 9
+										},
+										"end": {
+											"line": 21,
+											"column": 10
+										}
+									},
+									"name": "a"
+								}
+							]
+						},
+						{
+							"type": "Text",
+							"start": 965,
+							"end": 971,
+							"raw": "text2\n",
+							"data": "text2\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

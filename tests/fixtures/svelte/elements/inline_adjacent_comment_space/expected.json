@@ -1,0 +1,555 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1201,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 362,
+				"data": "\n\tA whitespace-only separator between a non-text sibling and a COMMENT is render content: the\n\tcomment itself renders nothing, so that space is the only thing holding the two runs apart.\n\tIt survives at every predecessor kind, and `{@debug}` is the same follower — it renders\n\tnothing and ends the inline run the same way, so it takes the same separator.\n"
+			},
+			{
+				"type": "Text",
+				"start": 362,
+				"end": 363,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 363,
+				"end": 406,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 364
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 365
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 366,
+							"end": 372,
+							"raw": "text1 ",
+							"data": "text1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 372,
+							"end": 386,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 10,
+									"character": 373
+								},
+								"end": {
+									"line": 7,
+									"column": 14,
+									"character": 377
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 378,
+										"end": 379,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 386,
+							"end": 387,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "Comment",
+							"start": 387,
+							"end": 397,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 397,
+							"end": 402,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 406,
+				"end": 408,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 408,
+				"end": 502,
+				"data": " a TAG predecessor: what carries the space is the separator, not the element before it "
+			},
+			{
+				"type": "Text",
+				"start": 502,
+				"end": 503,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 503,
+				"end": 538,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 504
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 505
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 506,
+							"end": 512,
+							"raw": "text1 ",
+							"data": "text1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 512,
+							"end": 518,
+							"expression": {
+								"type": "Identifier",
+								"start": 513,
+								"end": 517,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 10
+									},
+									"end": {
+										"line": 10,
+										"column": 14
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 518,
+							"end": 519,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "Comment",
+							"start": 519,
+							"end": 529,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 529,
+							"end": 534,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 538,
+				"end": 540,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 540,
+				"end": 599,
+				"data": " the `{@debug}` follower, in the identical position "
+			},
+			{
+				"type": "Text",
+				"start": 599,
+				"end": 600,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 600,
+				"end": 643,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 601
+					},
+					"end": {
+						"line": 13,
+						"column": 2,
+						"character": 602
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 603,
+							"end": 609,
+							"raw": "text1 ",
+							"data": "text1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 609,
+							"end": 623,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 13,
+									"column": 10,
+									"character": 610
+								},
+								"end": {
+									"line": 13,
+									"column": 14,
+									"character": 614
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 615,
+										"end": 616,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 623,
+							"end": 624,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "DebugTag",
+							"start": 624,
+							"end": 634,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 632,
+									"end": 633,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 32
+										},
+										"end": {
+											"line": 13,
+											"column": 33
+										}
+									},
+									"name": "a"
+								}
+							]
+						},
+						{
+							"type": "Text",
+							"start": 634,
+							"end": 639,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 643,
+				"end": 645,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 645,
+				"end": 926,
+				"data": "\n\tnull control: NO separator was authored, so none is emitted — the glued form stays glued.\n\tIt varies the same dimension (is there a separator at this boundary?), so an implementation\n\tthat always emitted a space before a comment would pass every case above and fail here.\n"
+			},
+			{
+				"type": "Text",
+				"start": 926,
+				"end": 927,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 927,
+				"end": 969,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 928
+					},
+					"end": {
+						"line": 20,
+						"column": 2,
+						"character": 929
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 930,
+							"end": 936,
+							"raw": "text1 ",
+							"data": "text1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 936,
+							"end": 950,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 10,
+									"character": 937
+								},
+								"end": {
+									"line": 20,
+									"column": 14,
+									"character": 941
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 942,
+										"end": 943,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Comment",
+							"start": 950,
+							"end": 960,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 960,
+							"end": 965,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 969,
+				"end": 971,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 971,
+				"end": 1129,
+				"data": "\n\tcontrol: multiline STRUCTURALLY (a block child), where the separator becomes a break rather\n\tthan a space — the same boundary, held by the other arm\n"
+			},
+			{
+				"type": "Text",
+				"start": 1129,
+				"end": 1130,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1130,
+				"end": 1200,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 26,
+						"column": 1,
+						"character": 1131
+					},
+					"end": {
+						"line": 26,
+						"column": 4,
+						"character": 1134
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1135,
+							"end": 1143,
+							"raw": "\n\ttext1 ",
+							"data": "\n\ttext1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1143,
+							"end": 1157,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 27,
+									"column": 8,
+									"character": 1144
+								},
+								"end": {
+									"line": 27,
+									"column": 12,
+									"character": 1148
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1149,
+										"end": 1150,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1157,
+							"end": 1159,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 1159,
+							"end": 1169,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 1169,
+							"end": 1176,
+							"raw": "text2\n\t",
+							"data": "text2\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1176,
+							"end": 1193,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 29,
+									"column": 2,
+									"character": 1177
+								},
+								"end": {
+									"line": 29,
+									"column": 5,
+									"character": 1180
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1181,
+										"end": 1187,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1193,
+							"end": 1194,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
