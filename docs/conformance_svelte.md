@@ -52,10 +52,15 @@ catalog entry.
 
 ### CSS Parser Corrections (corpus-enforced)
 
-Corrections where the divergent input is not prettier-stable, so no fixture can
-exist (the Core Invariant requires prettier-formatted inputs) — the corpus AST
+Corrections where the divergent input is not a **format fixed point**, so no
+fixture can exist (the Core Invariant requires an input both formatters leave
+alone — and the one that normalizes the trigger away is as often tsv as prettier:
+`color/* c */: blue` is prettier-stable, but tsv respaces it) — the corpus AST
 differential (`deno task corpus:compare:parse`) is the regression oracle, via
-the `DOCUMENTED_MATCHERS` named below.
+the `DOCUMENTED_MATCHERS` named below. What bytes cannot pin, a Rust test can:
+`tests/css_property_gap_comment_wire.rs` holds the property-gap reading as a
+_relation_ between parses (the two spellings agree for tsv and disagree for
+`parseCss`), which is also the live gate on the oracle claims below.
 
 - **BOM offset shift** (matcher `bom_offset`; corpus oracle
   `prettier/tests/format/css/bom/bom.css`). Svelte's `parseCss` and `parse` call
@@ -77,14 +82,28 @@ the `DOCUMENTED_MATCHERS` named below.
   the first whitespace — which sits _inside_ the comment (tsv tokenizes the
   comment; the comment-between-property-and-colon _quirk_ with whitespace,
   `color /* c */ :`, is still replicated — see
-  `split_declaration_svelte_compat`). The second case also moves the
+  `split_declaration_svelte_compat`). **The line between correcting and
+  replicating is information LOSS, not the slip's severity**: both readings come
+  from the same comment-blindness in `read_declaration` (the corrected one from
+  `read_until`, the replicated one from the `parser.allow_whitespace()` sitting
+  where the file's own `allow_comment_or_whitespace` would go, which is why
+  `eat(':')` fails and the colon lands in the value). But the leaked colon keeps
+  every byte — the comment is still captured, the `:` is still in the value
+  string — so a consumer can undo it, while the garbage property **destroys** the
+  comment (it appears in no `comments` entry at all) and cannot be undone without
+  re-lexing the source. The comment case also moves the
   stylesheet's flat `comments` array: a comment swallowed into a property token
   is never captured on the canonical side, so tsv emits it plus every later
   comment at a shifted index, carrying its `value` and `position` along. That
   is the same divergence read through the newer field, not a second one, so the
   matcher absorbs the root `comments` array of any document holding a garbage
   declaration — one insertion renumbers the whole tail, which no per-index
-  scope could follow.
+  scope could follow. The insertion direction is pinned at the **array** (ours
+  must be the longer side, and a `comments` array missing on tsv's side stays
+  undocumented), never per entry: `position` is a `CSSComment`'s one optional
+  field — Svelte sets it only on a comment captured by `read_value` — so a shifted
+  pair reports it as a value mismatch, an extra, _or_ a missing field depending
+  on which side's comment carries it.
 
 ### CSS Parser Scope & Error Model
 
