@@ -1,7 +1,6 @@
 // Type alias, function, and class declaration writers.
 
 use super::super::super::internal;
-use super::super::Schema;
 use super::expressions::{
     ChainState, ExprFlags, write_expression, write_expression_inner, write_expressions,
 };
@@ -270,12 +269,9 @@ fn write_class_body(w: &mut JsonWriter, body: &internal::ClassBody<'_>, ctx: &Ct
             write_property_definition(w, prop, ctx);
         }
         internal::ClassMember::StaticBlock(block) => {
-            // Always TypeScript class context.
             node_header(w, "StaticBlock", block.span, ctx);
             w.raw(",\"body\":");
-            write_array(w, block.body, |w, s| {
-                write_statement(w, s, ctx, Schema::Acorn);
-            });
+            write_array(w, block.body, |w, s| write_statement(w, s, ctx));
             close_node(w, "StaticBlock", block.span, ctx);
         }
         internal::ClassMember::IndexSignature(sig) => {

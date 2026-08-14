@@ -1,7 +1,6 @@
 // Import and export specifier writers.
 
 use super::super::super::internal;
-use super::super::Schema;
 use super::declarations::{write_class_declaration, write_function_declaration};
 use super::expressions::write_expression;
 use super::types::{write_declare_function, write_interface_declaration};
@@ -15,7 +14,6 @@ pub(super) fn write_import_specifier(
     w: &mut JsonWriter,
     spec: &internal::ImportSpecifier<'_>,
     ctx: &Ctx<'_>,
-    schema: Schema,
 ) {
     match spec {
         internal::ImportSpecifier::Default(default_spec) => {
@@ -27,7 +25,7 @@ pub(super) fn write_import_specifier(
         internal::ImportSpecifier::Named(named_spec) => {
             let import_kind = kind_token(
                 matches!(named_spec.import_kind, internal::ImportKind::Type),
-                schema,
+                ctx,
             );
             node_header(w, "ImportSpecifier", named_spec.span, ctx);
             w.raw(",\"imported\":");
@@ -72,12 +70,8 @@ pub(super) fn write_export_specifier(
     w: &mut JsonWriter,
     spec: &internal::ExportSpecifier<'_>,
     ctx: &Ctx<'_>,
-    schema: Schema,
 ) {
-    let export_kind = kind_token(
-        matches!(spec.export_kind, internal::ExportKind::Type),
-        schema,
-    );
+    let export_kind = kind_token(matches!(spec.export_kind, internal::ExportKind::Type), ctx);
     node_header(w, "ExportSpecifier", spec.span, ctx);
     w.raw(",\"local\":");
     write_module_export_name(w, &spec.local, ctx);

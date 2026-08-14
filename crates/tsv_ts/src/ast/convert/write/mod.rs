@@ -68,11 +68,9 @@ pub fn write_program_json(
     schema: Schema,
     locations: bool,
 ) -> Vec<u8> {
-    let mut ctx = Ctx::new(source, loc);
-    ctx.vanilla_acorn = schema.is_svelte_script();
-    ctx.emit_loc = locations;
+    let ctx = Ctx::new(source, loc, schema, CommentMode::Off, locations);
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
-    write_program(&mut w, program, &ctx, schema);
+    write_program(&mut w, program, &ctx);
     w.into_bytes()
 }
 
@@ -223,15 +221,10 @@ pub fn write_pattern_embedded(
 }
 
 /// Emit the `Program` node.
-fn write_program(
-    w: &mut JsonWriter,
-    program: &internal::Program<'_>,
-    ctx: &Ctx<'_>,
-    schema: Schema,
-) {
+fn write_program(w: &mut JsonWriter, program: &internal::Program<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Program", program.span, ctx);
     w.raw(",\"body\":");
-    write_array(w, program.body, |w, s| write_statement(w, s, ctx, schema));
+    write_array(w, program.body, |w, s| write_statement(w, s, ctx));
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
     close_node(w, "Program", program.span, ctx);
@@ -261,10 +254,13 @@ pub fn write_program_embedded(
     program_loc: ProgramLoc,
     comments: CommentMode<'_>,
 ) {
-    let mut ctx = Ctx::new(source, loc);
-    ctx.vanilla_acorn = schema.is_svelte_script();
-    ctx.comments = comments;
-    ctx.emit_loc = matches!(program_loc, ProgramLoc::Emit(..));
+    let ctx = Ctx::new(
+        source,
+        loc,
+        schema,
+        comments,
+        matches!(program_loc, ProgramLoc::Emit(..)),
+    );
     record_open("Program", program.span, &ctx);
     w.raw("{\"type\":\"Program\",\"start\":");
     w.u32(loc.pos(program.span.start));
@@ -282,7 +278,7 @@ pub fn write_program_embedded(
         w.raw("}}");
     }
     w.raw(",\"body\":");
-    write_array(w, program.body, |w, s| write_statement(w, s, &ctx, schema));
+    write_array(w, program.body, |w, s| write_statement(w, s, &ctx));
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
     close_node(w, "Program", program.span, &ctx);
@@ -323,10 +319,11 @@ pub enum ProgramLoc {
 /// (`write_expression_embedded`, `write_pattern_embedded`,
 /// `write_variable_declaration_embedded`,
 /// `write_identifier_expression_with_character`) — the source text, offset
-/// mapper, comment role, and `loc`-emission flag each one funnels into a `Ctx`.
+/// mapper, comment role, `loc`-emission flag, and parser variant each one
+/// funnels into a `Ctx`.
 ///
 /// Bundled into one `Copy` value (all fields are `Copy` — two references, an
-/// enum, a bool) so the call sites stop re-threading the same four arguments.
+/// enum, two bools) so the call sites stop re-threading the same arguments.
 /// It is an entry-boundary convenience only: each writer destructures it into a
 /// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx` exactly
 /// as before — the fused char-space emission never sees it, so this is output-
@@ -338,6 +335,10 @@ pub struct EmbedWriter<'a> {
     pub loc: LocationMapper<'a>,
     pub comments: CommentMode<'a>,
     pub emit_loc: bool,
+    /// The canonical parser for this document — see `Ctx::vanilla_acorn`. It is
+    /// component-global, so an island carries the same variant as the
+    /// component's `<script>` blocks.
+    pub vanilla_acorn: bool,
 }
 
 /// The per-document environment every writer function shares (`source` and the
@@ -376,11 +377,17 @@ pub(super) struct Ctx<'a> {
     pub(super) comments: CommentMode<'a>,
     /// The canonical parser for this document is **vanilla acorn** (a Svelte
     /// non-`lang="ts"` component), not acorn-typescript. Drives the
-    /// vanilla-only wire quirks: `,"options":null` on every `ImportExpression`
-    /// (vanilla acorn always emits it; acorn-typescript omits it), and
-    /// `value`-before-`kind` on get/set `Property` nodes (acorn-typescript's
-    /// get/set path assigns `kind` first). `false` for standalone TS and every
-    /// `lang="ts"` component.
+    /// vanilla-only wire quirks: `options` rather than `arguments` for an
+    /// `ImportExpression`'s second argument (vanilla acorn always emits the
+    /// field, `null` when absent; acorn-typescript emits a skip-if-empty
+    /// `arguments` array instead), and `value`-before-`kind` on get/set
+    /// `Property` nodes (acorn-typescript's get/set path assigns `kind` first).
+    /// `false` for standalone TS and every `lang="ts"` component.
+    ///
+    /// The fact is **component-global** (Svelte's single `this.ts`), so it is
+    /// not `<script>`-scoped: every expression island — `{expr}`, an attribute
+    /// or directive value, `{@const}`, a `{#snippet}` body — carries the same
+    /// variant, and reaches this field through `EmbedWriter`.
     pub(super) vanilla_acorn: bool,
     /// Whether to emit the per-node `loc` object (line/column). `true` for the
     /// default acorn/svelte drop-in wire; `false` for the opt-in `no-locations`
@@ -392,24 +399,37 @@ pub(super) struct Ctx<'a> {
 }
 
 impl<'a> Ctx<'a> {
-    /// The base per-document context (no pattern quirks active).
+    /// The per-document context for a whole-`Program` writer (no pattern quirks
+    /// active), and the one place `Schema` becomes the `vanilla_acorn` fact.
+    ///
+    /// Every per-document field is set in the initializer, like `from_embed`:
+    /// a field that a caller must remember to overwrite afterwards is a default
+    /// waiting to be inherited by the next caller, which is exactly how the
+    /// embedded path shipped `vanilla_acorn: false` to every expression island.
     #[inline]
-    fn new(source: &'a str, loc: LocationMapper<'a>) -> Self {
+    fn new(
+        source: &'a str,
+        loc: LocationMapper<'a>,
+        schema: Schema,
+        comments: CommentMode<'a>,
+        emit_loc: bool,
+    ) -> Self {
         Ctx {
             source,
             loc,
             pattern_line: 0,
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
-            comments: CommentMode::Off,
-            vanilla_acorn: false,
-            emit_loc: true,
+            comments,
+            vanilla_acorn: schema.is_svelte_script(),
+            emit_loc,
         }
     }
 
     /// The per-document context for an embedded writer: the shared `EmbedWriter`
-    /// inputs plus the inert pattern-quirk defaults. Sets `comments`/`emit_loc`
-    /// in the initializer (no post-construction re-assignment), so with the
-    /// entry writers inlined the `EmbedWriter` aggregate scalar-replaces away.
+    /// inputs plus the inert pattern-quirk defaults. Sets every per-document
+    /// field in the initializer (no post-construction re-assignment), so with
+    /// the entry writers inlined the `EmbedWriter` aggregate scalar-replaces
+    /// away.
     #[inline]
     fn from_embed(env: EmbedWriter<'a>) -> Self {
         Ctx {
@@ -418,7 +438,7 @@ impl<'a> Ctx<'a> {
             pattern_line: 0,
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments: env.comments,
-            vanilla_acorn: false,
+            vanilla_acorn: env.vanilla_acorn,
             emit_loc: env.emit_loc,
         }
     }
@@ -672,13 +692,13 @@ pub(super) fn write_return_type_field(
     }
 }
 
-/// The `importKind`/`exportKind` value under the schema: `"value"` is omitted
-/// in Svelte non-`lang="ts"` context, always present under acorn.
+/// The `importKind`/`exportKind` value under the parser variant: `"value"` is
+/// omitted in Svelte non-`lang="ts"` context, always present under acorn.
 #[inline]
-pub(super) fn kind_token(is_type: bool, schema: Schema) -> Option<&'static str> {
+pub(super) fn kind_token(is_type: bool, ctx: &Ctx<'_>) -> Option<&'static str> {
     if is_type {
         Some("type")
-    } else if schema.is_svelte_script() {
+    } else if ctx.vanilla_acorn {
         None
     } else {
         Some("value")
