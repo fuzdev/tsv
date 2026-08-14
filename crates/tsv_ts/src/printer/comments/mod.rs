@@ -1608,12 +1608,15 @@ impl<'a> Printer<'a> {
     /// patterns), and — for all but its last comment —
     /// [`push_orphaned_comment_run`](Self::push_orphaned_comment_run).
     ///
-    /// Three loops still emit a leading run themselves, because their surrounding
+    /// Four loops still emit a leading run themselves, because their surrounding
     /// separator policy genuinely differs — the import/export specifier list, the
-    /// for-clause leading gap, and the union's inter-member run (which brackets the
-    /// `| ` separator and preserves blanks in different positions). Each calls
-    /// [`comment_hugs_next`](Self::comment_hugs_next) rather than re-deriving the rule,
-    /// so what differs there is the loop, never the decision.
+    /// for-clause leading gap, the union's inter-member run (which brackets the
+    /// `| ` separator and preserves blanks in different positions), and the
+    /// control-flow gap builder's `GapCommentRun::Leading` arm
+    /// (`Printer::build_comments_between_parts`, the header→body gaps — a between-parts
+    /// shape whose separators go BEFORE each comment and whose caller owns the tail).
+    /// Each calls [`comment_hugs_next`](Self::comment_hugs_next) rather than re-deriving
+    /// the rule, so what differs there is the loop, never the decision.
     pub(crate) fn push_leading_comment_run<'c>(
         &self,
         parts: &mut DocBuf,

@@ -90,6 +90,12 @@ impl GapCommentRun {
     /// The position an author blank *above the run's first comment* is measured from, or
     /// `None` where that blank is dropped. One value rather than a policy flag plus a
     /// position that could contradict it.
+    ///
+    /// The same Trailing-vs-Leading fact [`crate::printer::RunLeadingBlank`] states for
+    /// the anchored-run emitter — one concept, two shapes, deliberately not unified:
+    /// that emitter's runs all start at a printed anchor so it needs only the policy,
+    /// while this builder's gaps each floor the scan at their own seed, and the variant
+    /// carries it so the two cannot disagree.
     fn blank_seed(self) -> Option<u32> {
         match self {
             Self::Leading => None,
@@ -125,6 +131,36 @@ impl GapCommentRun {
     fn reads_backward_from_comment(self) -> bool {
         matches!(self, Self::Trailing { .. })
     }
+}
+
+/// What happens to a comment the author wrote on the condition's `(` line — the one
+/// axis the paren-headed constructs part on in
+/// [`Printer::build_condition_group_with_comments`]. Both values are pinned, so
+/// neither can absorb the other.
+#[derive(Clone, Copy)]
+enum OpenParenLineComments {
+    /// The comment joins the shared leading run below the opening separator, which
+    /// places it by the run's own glue rule rather than on a line of its own —
+    /// prettier's placement, pinned by
+    /// [`condition_comment`](../../../../../../tests/fixtures/typescript/statements/if/condition_comment/)'s
+    /// `unformatted_compact`, whose two arms are the whole rule: `if (// c` drops the
+    /// comment to its own line, `if (/* c */ x` keeps it on the condition's. Every
+    /// construct but do-while.
+    Normalize,
+    /// The comment stays on the `(` line, and a space the author left after the `(` is
+    /// kept — the do-while sanction
+    /// ([`open_paren_comment_prettier_divergence`](../../../../../../tests/fixtures/typescript/statements/do_while/open_paren_comment_prettier_divergence/)),
+    /// where prettier moves the comment out of the parens entirely (past the `;` for the
+    /// `//` that fixture pins, ahead of the `while` for a block comment).
+    ///
+    /// ⚠️ The sanction is about the comment's **position**, and stops there. Prettier
+    /// keeps a block comment inside the parens whenever the condition follows it on the
+    /// `(` line, so that shape has a spacing oracle and tsv matches it: exactly one space
+    /// per gap between two comments, however the author wrote that gap
+    /// ([`open_paren_comment_run`](../../../../../../tests/fixtures/typescript/statements/do_while/open_paren_comment_run/)).
+    /// The space after `(` is the one place tsv answers for itself, and only because the
+    /// shapes prettier relocates leave no oracle for it.
+    Preserve,
 }
 
 impl<'a> Printer<'a> {
@@ -818,9 +854,12 @@ impl<'a> Printer<'a> {
             }
         }
         match (open_paren, close_paren) {
-            (Some(open), Some(close)) => {
-                self.build_condition_group_with_comments(test, open, close)
-            }
+            (Some(open), Some(close)) => self.build_condition_group_with_comments(
+                test,
+                open,
+                close,
+                OpenParenLineComments::Normalize,
+            ),
             _ => self.build_condition_group(test),
         }
     }
@@ -840,9 +879,108 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[d.indent_softline(test_doc), d.softline()]))
     }
 
-    /// Build a condition group with comment support for if/while/do-while/switch statements
+    /// Emit do-while's `(`-line bucket and return what is left for the shared leading run,
+    /// plus whether the bucket holds the `(` line open.
     ///
-    /// Handles comments inside condition/discriminant parens:
+    /// The whole of [`OpenParenLineComments::Preserve`]: a comment the author wrote on the
+    /// `(` line stays there, ahead of the opening separator, rather than joining the run
+    /// below it. [`OpenParenLineComments::Normalize`] — every other construct — leaves the
+    /// bucket empty and hands the whole gap to the run, so this is the one place the five
+    /// constructs' shared layout is not shared, and it lives apart from that layout for
+    /// exactly that reason.
+    ///
+    /// The gap's comments are in source order, so the `(`-line ones are a PREFIX and the
+    /// bucket is a split POSITION, not a pair of filters the two emitters could drift
+    /// apart on (the same statement `element_gap_split` makes for the element-comma seam).
+    ///
+    /// ⚠️ **One separator per GAP.** Only the gap ahead of the FIRST comment is the
+    /// author's — a comment glued to the `(` stays glued, and a space there is kept (the
+    /// sanction's own carve-out, since prettier relocates these and leaves no oracle).
+    /// Every later gap is prettier's `printLeadingComment` space, which normalizes
+    /// whatever the author wrote to exactly one, an author-glued pair included.
+    ///
+    /// Asking the `(` for every comment instead reads a gap the PREVIOUS iteration already
+    /// separated as "not glued" and emits a second space (`while (/* c1 */  /* c2 */ x)`),
+    /// which no gate can see: it is a fixed point, so F1, the ledger, the census and the
+    /// injection audits are all blind to it, and the width ratchet grades a column, not a
+    /// run. Only a prettier `compare` finds it —
+    /// [`open_paren_comment_run`](../../../../../../tests/fixtures/typescript/statements/do_while/open_paren_comment_run/)
+    /// is that comparison, pinned.
+    ///
+    /// The separator AFTER the bucket is the LAST comment's own fact, asked once: every
+    /// bucket comment starts on the `(` line, so only the last can end off it and the
+    /// answer is the same for all of them. A comment the test does not follow on its line
+    /// holds the `(` line, so the condition can never pull up beside it — the returned
+    /// flag, which hardens the caller's opening separator.
+    fn push_paren_line_comment_bucket<'c>(
+        &self,
+        parts: &mut DocBuf,
+        leading_comments: &'c [&'c Comment],
+        open_paren_pos: u32,
+        test_start: u32,
+        open_paren_line: OpenParenLineComments,
+    ) -> (&'c [&'c Comment], bool) {
+        let d = self.d();
+        let bucket_len = match open_paren_line {
+            OpenParenLineComments::Normalize => 0,
+            OpenParenLineComments::Preserve => leading_comments
+                .partition_point(|c| self.is_same_line(open_paren_pos, c.span.start)),
+        };
+        let (bucket, run_comments) = leading_comments.split_at(bucket_len);
+
+        for (index, comment) in bucket.iter().enumerate() {
+            let glued_to_open_paren = index == 0 && open_paren_pos + 1 == comment.span.start;
+            if !glued_to_open_paren {
+                parts.push(d.text(" "));
+            }
+            parts.push(self.build_comment_doc(comment));
+        }
+
+        let mut paren_line_breaks = false;
+        if let Some(last) = bucket.last() {
+            if self.is_same_line(last.span.end, test_start) {
+                parts.push(d.text(" "));
+            } else {
+                paren_line_breaks = true;
+            }
+        }
+        (run_comments, paren_line_breaks)
+    }
+
+    /// Whether the header parens hold a comment this layout must emit — one leading the
+    /// expression inside the `(`, or trailing it before the `)`.
+    ///
+    /// The question [`Self::build_condition_group_with_comments`] answers to fall back to
+    /// the plain [`Self::build_condition_group`], named once because two of its callers
+    /// must ask it *themselves*: do-while and `catch` fall back to a doc of their own
+    /// (the clarity-paren condition, the bare parameter) rather than to the plain group,
+    /// so they branch before calling. Their branch and the builder's early return are one
+    /// decision, and two spellings of one decision is how they come to disagree — the
+    /// builder's fallback is harmless where it is reached in agreement and a silent
+    /// change of shape where it is not.
+    ///
+    /// Deliberately **not** the whole `(`…`)` range: a comment *inside* the expression is
+    /// that expression's own business and no reason for this layout. The negation-inline
+    /// gate in [`Self::build_statement_condition_doc`] does ask the wide range, and means
+    /// to — a comment anywhere in the parens disables the `!(…)` hug.
+    fn header_parens_hold_comments(
+        &self,
+        open_paren_pos: u32,
+        close_paren_pos: u32,
+        inner: &Expression<'_>,
+    ) -> bool {
+        self.has_comments_to_emit_between(open_paren_pos + 1, inner.span().start)
+            || self.has_comments_to_emit_between(inner.span().end, close_paren_pos)
+    }
+
+    /// The comment-aware condition group
+    /// (`group([indent([opening separator, leading run, test, trailing run]), closing separator])`),
+    /// for the five constructs whose header parens hold one expression — `if` / `while` /
+    /// do-while / `switch` / `catch`. A `for` header holds parens too and does **not**
+    /// come here: its clauses are a list, and their leading gap is
+    /// [`Self::push_for_clause_leading_section`] (the ⚠️ below is the same bug read one
+    /// construct over).
+    ///
     /// ```js
     /// if (
     ///     // before condition
@@ -850,54 +988,38 @@ impl<'a> Printer<'a> {
     ///     // trailing after condition
     /// ) {
     /// ```
+    ///
+    /// The `(`→test gap is prettier's **leading** run of the test
+    /// (`handleIfStatementComments` attaches those comments to the condition), and it is
+    /// emitted by the shared leading emitter ([`Printer::push_leading_comment_run`]) —
+    /// deliberately NOT by [`Self::build_comments_between_parts`] with
+    /// [`GapCommentRun::Leading`], though the two name the same run and share the same
+    /// primitives ([`Printer::comment_hugs_next`],
+    /// [`Printer::push_blank_preserving_hardline`]). That builder is the *between-parts*
+    /// shape: separators go BEFORE each comment, the caller owns whatever follows the
+    /// last one, and every separator is hard, since its gaps live in already-broken
+    /// statement contexts. This gap needs the leading run's own three-way
+    /// AFTER-separator — the soft `line` that lets `if (/* c */⏎x)` collapse to
+    /// `if (/* c */ x)` — and the run's forced-break report for the closing separator
+    /// below. Routing it through the between-parts builder would re-spell that three-way
+    /// rule caller-side, the duplication `push_leading_comment_run`'s doc exists to
+    /// prevent; what legitimately differs per site is the loop around the run, never the
+    /// rule (the sanctioned split that doc names).
+    ///
+    /// `open_paren_line` is the one axis the constructs part on
+    /// ([`OpenParenLineComments`], both values pinned).
     fn build_condition_group_with_comments(
         &self,
         test_expr: &Expression<'_>,
         open_paren_pos: u32,
         close_paren_pos: u32,
-    ) -> DocId {
-        self.build_condition_group_with_comments_impl(
-            test_expr,
-            open_paren_pos,
-            close_paren_pos,
-            false, // normalize inline comments to own line
-        )
-    }
-
-    /// Build condition group preserving inline comments after open paren
-    ///
-    /// Used for do-while where we intentionally differ from Prettier's behavior
-    /// of moving comments outside the parens.
-    fn build_condition_group_preserve_inline(
-        &self,
-        test_expr: &Expression<'_>,
-        open_paren_pos: u32,
-        close_paren_pos: u32,
-    ) -> DocId {
-        self.build_condition_group_with_comments_impl(
-            test_expr,
-            open_paren_pos,
-            close_paren_pos,
-            true, // preserve inline comments
-        )
-    }
-
-    fn build_condition_group_with_comments_impl(
-        &self,
-        test_expr: &Expression<'_>,
-        open_paren_pos: u32,
-        close_paren_pos: u32,
-        preserve_inline: bool,
+        open_paren_line: OpenParenLineComments,
     ) -> DocId {
         let d = self.d();
         let test_start = test_expr.span().start;
         let test_end = test_expr.span().end;
 
-        // Check for comments before and after the condition
-        let has_leading = self.has_comments_to_emit_between(open_paren_pos + 1, test_start);
-        let has_trailing = self.has_comments_to_emit_between(test_end, close_paren_pos);
-
-        if !has_leading && !has_trailing {
+        if !self.header_parens_hold_comments(open_paren_pos, close_paren_pos, test_expr) {
             // No comments - use the standard condition group
             return self.build_condition_group(test_expr);
         }
@@ -918,98 +1040,48 @@ impl<'a> Printer<'a> {
         };
         let mut inner_parts = DocBuf::new();
 
-        // Collect leading comments
-        // Classification based on position relative to open paren AND condition:
-        // - "inline with open paren" = comment STARTS on same line as open paren
-        // - "own line" = comment does NOT start on same line as open paren
-        let leading_comments: CommentVec<'_> = if has_leading {
-            comments_to_emit_in_range(self.comments, open_paren_pos + 1, test_start).collect()
+        let leading_comments: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, open_paren_pos + 1, test_start).collect();
+
+        let (run_comments, paren_line_breaks) = self.push_paren_line_comment_bucket(
+            &mut inner_parts,
+            &leading_comments,
+            open_paren_pos,
+            test_start,
+            open_paren_line,
+        );
+
+        // The shared leading run — prettier's `printLeadingComment`, which picks the
+        // separator after each comment from the source right after *that* comment's
+        // `*/`: a space when the author glued the next one to it, a soft `line` when
+        // a newline follows but none precedes, a blank-preserving `hardline` for an
+        // own-line block or any line comment.
+        //
+        // ⚠️ **The opening separator is a `softline` whatever the run holds, and the
+        // shell's break is the run's REPORT, not a re-derivation.** This gap used to
+        // push a `hardline` per comment off `is_same_line(open_paren, c.start)` and
+        // open the parens off a range-shaped "any comment off the `(` line" — the same
+        // reading `push_for_clause_leading_section`'s ⚠️ names, one construct over: in
+        // `(⏎/* c1 */ /* c2 */⏎x)` only `c1` has a newline before it and only `c2`
+        // has one after, so neither owns a line, yet both got a break and the parens
+        // were forced open on a condition prettier keeps flat. Everything that must
+        // break still does — through the run's own `hardline` and
+        // `DocArena::will_break`, which breaks this `softline` with it. The bucket's
+        // `hardline` is the one exception, and it is the bucket's per-comment fact,
+        // not a range reading.
+        inner_parts.push(if paren_line_breaks {
+            d.hardline()
         } else {
-            SmallVec::new()
-        };
-
-        // Check if there are own-line leading comments (not on same line as open paren)
-        let has_own_line_leading = leading_comments
-            .iter()
-            .any(|c| !self.is_same_line(open_paren_pos, c.span.start));
-
-        // Whether the leading section forced a break — the run's own report, which the
-        // closing separator below reads rather than re-deriving (see the `else` arm).
-        let leading_run_breaks;
-
-        if preserve_inline {
-            // Preserve inline comments after open paren (used for do-while divergence)
-            let mut has_inline_comment_followed_by_newline = false;
-
-            // Leading inline comments (on same line as open paren)
-            for comment in &leading_comments {
-                if self.is_same_line(open_paren_pos, comment.span.start) {
-                    // Only add space if source has whitespace between ( and comment
-                    let space_between =
-                        &self.source[(open_paren_pos + 1) as usize..comment.span.start as usize];
-                    if !space_between.is_empty() {
-                        inner_parts.push(d.text(" "));
-                    }
-                    inner_parts.push(self.build_comment_doc(comment));
-                    if !self.is_same_line(comment.span.end, test_start) {
-                        has_inline_comment_followed_by_newline = true;
-                    } else {
-                        inner_parts.push(d.text(" "));
-                    }
-                }
-            }
-
-            if has_inline_comment_followed_by_newline {
-                inner_parts.push(d.hardline());
-            }
-
-            // Everything below the `(` line: the shared leading run (see the `else` arm).
-            // Only the comments ON that line are this arm's business — the run itself
-            // answers identically in both.
-            if has_own_line_leading && !has_inline_comment_followed_by_newline {
-                inner_parts.push(d.softline());
-            }
-            leading_run_breaks = has_inline_comment_followed_by_newline
-                | self.push_leading_comment_run(
-                    &mut inner_parts,
-                    leading_comments
-                        .iter()
-                        .copied()
-                        .filter(|c| !self.is_same_line(open_paren_pos, c.span.start)),
-                    test_start,
-                    LeadingGlue::Adjacent,
-                    d.empty(),
-                );
-
-            if !has_inline_comment_followed_by_newline && !has_own_line_leading {
-                inner_parts.push(d.softline());
-            }
-        } else {
-            // The shared leading run — prettier's `printLeadingComment`, which picks the
-            // separator after each comment from the source right after *that* comment's
-            // `*/`: a space when the author glued the next one to it, a soft `line` when
-            // a newline follows but none precedes, a blank-preserving `hardline` for an
-            // own-line block or any line comment.
-            //
-            // ⚠️ **The opening separator is a `softline` whatever the run holds, and the
-            // shell's break is the run's REPORT, not a re-derivation.** This gap used to
-            // push a `hardline` per comment off `is_same_line(open_paren, c.start)` and
-            // open the parens off `has_own_line_leading` — the same range-shaped reading
-            // `push_for_clause_leading_section`'s ⚠️ names, one construct over: in
-            // `(⏎/* c1 */ /* c2 */⏎x)` only `c1` has a newline before it and only `c2`
-            // has one after, so neither owns a line, yet both got a break and the parens
-            // were forced open on a condition prettier keeps flat. Everything that must
-            // break still does — through the run's own `hardline` and
-            // `DocArena::will_break`, which breaks this `softline` with it.
-            inner_parts.push(d.softline());
-            leading_run_breaks = self.push_leading_comment_run(
+            d.softline()
+        });
+        let leading_run_breaks = paren_line_breaks
+            | self.push_leading_comment_run(
                 &mut inner_parts,
-                leading_comments.iter().copied(),
+                run_comments.iter().copied(),
                 test_start,
                 LeadingGlue::Adjacent,
                 d.empty(),
             );
-        }
 
         // The condition itself
         inner_parts.push(test_doc);

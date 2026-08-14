@@ -1,0 +1,264 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 125,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multiline block glued to the parameter",
+			"start": 10,
+			"end": 53,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n\t   c1b ",
+			"start": 81,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 124,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TryStatement",
+					"start": 55,
+					"end": 114,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 59,
+						"end": 70,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 5
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 63,
+								"end": 67,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 63,
+									"end": 66,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 63,
+										"end": 64,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 71,
+						"end": 114,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 3
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 98,
+							"end": 99,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 11
+								},
+								"end": {
+									"line": 7,
+									"column": 12
+								}
+							},
+							"name": "e",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1\n\t   c1b ",
+									"start": 81,
+									"end": 97
+								}
+							]
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 103,
+							"end": 114,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 3
+								},
+								"end": {
+									"line": 10,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ExpressionStatement",
+									"start": 107,
+									"end": 111,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 107,
+										"end": 110,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 5
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 107,
+											"end": 108,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 2
+												},
+												"end": {
+													"line": 9,
+													"column": 3
+												}
+											},
+											"name": "b"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							]
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multiline block glued to the parameter",
+							"start": 10,
+							"end": 53
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
