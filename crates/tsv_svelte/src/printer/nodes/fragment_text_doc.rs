@@ -279,7 +279,12 @@ impl<'a> Printer<'a> {
                 if (next_is_tag && !separator_flows) || next_is_component {
                     child_docs.push(d.line());
                 } else {
-                    // Signal the next inline element to lead with a line.
+                    // Defer the separator to the next sibling, which leads with it. NOT only "the
+                    // next inline element": every follower this arm does not emit for reads the
+                    // flag, and each answers with the [`LeadBoundary`] its own kind calls for — the
+                    // wrap for an inline element or component that owns a fill, a bare `line` for a
+                    // run-ending comment / `{@debug}`. A follower whose arm ignored the flag simply
+                    // deleted the space, which is why the reader set has to stay total.
                     *handle_whitespace_of_prev_text = true;
                 }
                 return;
