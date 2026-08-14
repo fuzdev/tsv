@@ -898,6 +898,44 @@ fn render_doc_core<P: RenderPolicy>(
                             let last = states.len() - 1;
                             let mut chosen = (Mode::Break, states[last]);
                             for &state in &states[..last] {
+                                // A `GatedState` carries a never-fits admission
+                                // probe: the state stands for a layout that is
+                                // correct only because its probe CANNOT be laid
+                                // flat on the fallback's continuation line (one
+                                // indent level deeper, completed by the same
+                                // rest commands). Measure that line first; if
+                                // the probe fits there, skip the state — the
+                                // fallback layout is the settled form. See
+                                // `DocNode::GatedState`.
+                                let state = if let DocNode::GatedState { probe, contents } =
+                                    &nodes[state.index()]
+                                {
+                                    let fresh_pos =
+                                        line_start_column(cmd.indent.indented(), render, embed);
+                                    // `has_line_suffix: false`, unlike the state fits
+                                    // just below: that one measures from the CURRENT
+                                    // column, where a pending deferred run is still
+                                    // pending, while the probe measures a line the
+                                    // fallback reaches only past a hardline — which
+                                    // flushes the run first. Passing the live flag here
+                                    // would charge the probe for a suffix that cannot
+                                    // still be pending on the line it stands for.
+                                    let probe_fits = arena_fits_with_lookahead(
+                                        arena,
+                                        *probe,
+                                        Mode::Flat,
+                                        commands,
+                                        remaining_width(fresh_pos, render, embed),
+                                        false,
+                                        source,
+                                    );
+                                    if probe_fits {
+                                        continue;
+                                    }
+                                    *contents
+                                } else {
+                                    state
+                                };
                                 let state_fits = arena_fits_with_lookahead(
                                     arena,
                                     state,
@@ -1088,6 +1126,15 @@ fn render_doc_core<P: RenderPolicy>(
                 // Close the innermost flow probe: record whether the probed subtree —
                 // whose commands all popped before this sentinel — emitted a newline.
                 arena.flow_probe_finish(output);
+            }
+
+            DocNode::GatedState { contents, .. } => {
+                // Transparent outside conditional-group state selection (the
+                // states loop unwraps it before pushing, so this arm is a
+                // defensive pass-through); the probe is measure-only.
+                let contents = *contents;
+                cmd = cmd.with_doc(contents);
+                continue;
             }
         }
 

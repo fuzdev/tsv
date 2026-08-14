@@ -440,8 +440,54 @@ fn build_chain_args_force_expand(
         && let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && matches!(&**body_expr, Expression::ArrayExpression(_))
+        // The reassembly is blind to the body-end→arrow-end gap (an
+        // author-parenthesized body's stripped `)` region): a comment there
+        // reaches no emitter in this layout, so decline — the generic loop
+        // below prints the argument through the comment-aware path. On-page,
+        // not to-emit: an owned comment still rides that region.
+        && !printer.has_comments_on_page_between(body_expr.span().end, call.arguments[0].span().end)
     {
         let body_doc = printer.build_arg_expression_doc_expanded(body_expr);
+        let body_doc =
+            prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+        let sig_doc = build_arrow_sig_doc(printer, arrow);
+        let sig_doc = prepend_leading(d, leading_comment_doc, sig_doc);
+
+        parts.push(d.text(prefix));
+        parts.push(sig_doc);
+        parts.push(d.text(" => "));
+        parts.push(body_doc);
+        parts.push(d.text(")"));
+        return d.concat(&parts);
+    }
+
+    // Special case: single arrow arg with parenthesized object body — the object expands
+    // internally behind its grammar-required parens, the signature hugging the call
+    // paren: `(sig => ({\n  props\n}))`. The object-body sibling of the array arm above
+    // (prettier's couldExpandArg hug), so fits() measures only `chain.map((sig) => ({`
+    // and truncates at the object's hardline. Skipped under standard expansion —
+    // prettier's all-broken fallback prints the argument normally (`(\n  sig => ({ … })
+    // \n)`), the object breaking by width alone — and when a break forced inside the
+    // signature invalidates the hug (`arrow_signature_has_breaking_comments`).
+    if !standard_expansion
+        && !last_arg_commented
+        && !comments_force_expansion
+        && call.arguments.len() == 1
+        && let Expression::ArrowFunctionExpression(arrow) = &call.arguments[0]
+        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+        && matches!(&**body_expr, Expression::ObjectExpression(_))
+        && !arrow_signature_has_breaking_comments(printer, arrow)
+        // The reassembly is blind to the body-end→arrow-end gap (the object
+        // body's grammar-required parens are synthesized here, so the source
+        // `}`→`)` region reaches no emitter): a comment there declines the hug
+        // — the generic loop below prints the argument through the
+        // comment-aware path, which is also prettier's settled form for the
+        // commented shape. On-page, not to-emit: an owned comment still rides
+        // that region.
+        && !printer.has_comments_on_page_between(body_expr.span().end, call.arguments[0].span().end)
+    {
+        let body_doc = printer.build_arg_expression_doc_expanded(body_expr);
+        let body_doc = d.parens(body_doc);
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
         let sig_doc = build_arrow_sig_doc(printer, arrow);

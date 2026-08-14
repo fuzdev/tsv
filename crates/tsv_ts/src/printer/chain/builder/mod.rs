@@ -33,7 +33,7 @@ use super::printing::{
     print_group_expanded, print_group_standard_expanded, print_node_inner,
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
-use crate::ast::internal::Expression;
+use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression};
 use crate::printer::Printer;
 use smallvec::SmallVec;
 use smallvec::smallvec;
@@ -63,10 +63,7 @@ fn build_groups_flat_docs<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) 
 }
 
 /// Check if a single-arg call has an object/array that will break
-fn call_has_breaking_single_arg(
-    call: &crate::ast::internal::CallExpression<'_>,
-    printer: &Printer<'_>,
-) -> bool {
+fn call_has_breaking_single_arg(call: &CallExpression<'_>, printer: &Printer<'_>) -> bool {
     if call.arguments.len() != 1 {
         return false;
     }
@@ -661,10 +658,30 @@ fn build_long_chain_doc<'a>(
     let force_expand_from_breaking =
         any_non_last_breaks && !(chain_ends_with_member && rest_call_count == 1);
 
+    // Prettier's fourth force-expand condition
+    // (`lastGroupWillBreakAndOtherCallsHaveFunctionArguments`, member-chain.js): the
+    // LAST group is a call that breaks, and some EARLIER call takes a function/arrow
+    // argument. Prettier then prints `group(expanded)` — no `conditionalGroup` at all —
+    // so the expanded chain is its settled form and stays that way across passes.
+    //
+    // It has to be here, beside its three siblings, and not inside one of the
+    // hug-state builders below: the hug those shapes would otherwise take comes from
+    // the `on_line` state, whose fits truncates at the argument's forced break and so
+    // never consults them. Wired into a builder instead, the refusal is inert — the
+    // flat authoring settles on the expanded chain while the broken authoring settles
+    // on the hug, two tsv fixed points for one document where prettier has one.
+    let last_group_breaking_call = groups
+        .last()
+        .and_then(|g| g.nodes.last())
+        .is_some_and(ChainNode::is_call)
+        && on_line.last().is_some_and(|&doc| d.will_break(doc));
+    let force_expand_from_refusal =
+        last_group_breaking_call && other_calls_have_function_arguments(first_groups, rest_groups);
+
     // Build expanded variant
     let expanded = build_expanded_doc(groups, should_merge, printer);
 
-    if force_expand || force_expand_from_breaking {
+    if force_expand || force_expand_from_breaking || force_expand_from_refusal {
         return expanded;
     }
 
@@ -687,6 +704,21 @@ fn build_long_chain_doc<'a>(
         build_breaking_object_chain_doc(first_groups, rest_groups, printer)
     {
         return d.conditional_group(&[on_line_doc, args_expanded_doc, expanded]);
+    }
+
+    // The flat-authored hug window (the member-chain hug convergence): the last
+    // call's single argument is object-rooted, authored FLAT, and too wide for
+    // any chain line — prettier settles on the flat chain with the argument
+    // hugging, but only on its SECOND pass. tsv prints that settled form in one
+    // pass via a never-fits-gated state; outside the window (the argument fits
+    // flat on the expanded chain's continuation line) the gate keeps the broken
+    // chain, which is the shared stable form there. See
+    // `build_flat_object_hug_state`.
+    if let Some(&probe) = on_line.last()
+        && let Some(hug_state) =
+            build_flat_object_hug_state(first_groups, rest_groups, probe, printer)
+    {
+        return d.conditional_group(&[on_line_doc, hug_state, expanded]);
     }
 
     // Default: two-state conditional group
@@ -741,10 +773,21 @@ fn build_breaking_object_chain_doc<'a>(
 ) -> Option<DocId> {
     let d = printer.arena();
     // The last call's single argument breaks and is one prettier keeps on the flat
-    // chain: a direct object/array literal, OR a `new`/call expression wrapping one
-    // (e.g. `new Response(body, {…})`). Callbacks (function/arrow args) are excluded —
-    // for those, prettier expands the chain when other calls also take function args
-    // (member-chain.js `lastGroupWillBreakAndOtherCallsHaveFunctionArguments`).
+    // chain: a direct object/array literal, a `new`/call expression wrapping one
+    // (e.g. `new Response(body, {…})`), or an arrow whose grammar-parenthesized
+    // expression body is an object literal. Prettier's own refusal for these shapes
+    // (`lastGroupWillBreakAndOtherCallsHaveFunctionArguments`) is not spelled here —
+    // it force-expands the whole chain upstream in `build_long_chain_doc`, before any
+    // state is built, which is the only place it can act: the hug these shapes would
+    // otherwise take comes from the `on_line` state, not from this one.
+    //
+    // The arrow must be in this kind set and not only in the flat-authored gate: a
+    // forced break DEEP in the argument (an authored blank between properties, a
+    // forced method body) is one prettier's propagateBreaks lifts to the object's own
+    // group, so its one-line measurement truncates at the `{` — while tsv's flat walk
+    // would accumulate the properties' width and overflow before ever reaching the
+    // break. This state's `group_break`-wrapped last group restores exactly that
+    // truncation. Other callbacks (block bodies, non-object bodies) stay excluded.
     let last_group_will_break_object = rest_groups.last().is_some_and(|g| {
         g.nodes
             .iter()
@@ -752,13 +795,13 @@ fn build_breaking_object_chain_doc<'a>(
             .find_map(ChainNode::as_call_expression)
             .is_some_and(|call| {
                 call.arguments.len() == 1
-                    && matches!(
+                    && (matches!(
                         &call.arguments[0],
                         Expression::ObjectExpression(_)
                             | Expression::ArrayExpression(_)
                             | Expression::NewExpression(_)
                             | Expression::CallExpression(_)
-                    )
+                    ) || is_arrow_with_paren_object_body(&call.arguments[0]))
                     && {
                         let arg_doc = printer.build_expression_doc(&call.arguments[0]);
                         d.will_break(arg_doc)
@@ -777,17 +820,159 @@ fn build_breaking_object_chain_doc<'a>(
     // makes fits() inherit Break mode into the prefix's inner call-arg groups and
     // early-return at their softlines, wrongly selecting this state (and breaking an
     // earlier call's args) even when the prefix doesn't fit.
+    Some(build_prefix_flat_last_expanded_doc(
+        first_groups,
+        rest_groups,
+        printer,
+    ))
+}
+
+/// The shared hug-state construction: chain prefix flat, last group force-broken.
+///
+/// Only the last group is force-broken: when this state is selected in Flat
+/// mode, its expanded call args still render in Break mode (so nested groups,
+/// e.g. arrow sigs, evaluate fits() against Break-mode rest commands) — and the
+/// forced break is what makes the conditional group's measurement truncate at
+/// it, seeing only the chain head.
+fn build_prefix_flat_last_expanded_doc<'a>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    printer: &Printer<'_>,
+) -> DocId {
+    let d = printer.arena();
     let rest_len = rest_groups.len();
     let mut all_parts = build_groups_flat_docs(first_groups, printer);
     for (i, g) in rest_groups.iter().enumerate() {
         if i == rest_len - 1 {
-            // Only the last group is force-broken: when this state is selected in
-            // Flat mode, its expanded call args still render in Break mode (so nested
-            // groups, e.g. arrow sigs, evaluate fits() against Break-mode rest commands).
             all_parts.push(d.group_break(print_group_expanded(g, printer)));
         } else {
             all_parts.push(print_group(g, printer));
         }
     }
-    Some(d.concat(&all_parts))
+    d.concat(&all_parts)
+}
+
+/// Build the never-fits-gated hug state for a FLAT-authored, object-rooted last
+/// argument — the member-chain hug convergence window (see the caller's comment
+/// and `docs/conformance_prettier_ts.md` §Member-chain wide-last-argument hug
+/// convergence).
+///
+/// Prettier reaches its fixed point here in two passes: pass 1's flat argument
+/// carries no forced break, so `fits(oneLine)` reads the whole flat content,
+/// overflows, and the chain expands — the argument, unfittable on the expanded
+/// continuation line too, breaks inside it. Pass 2 re-reads that object as
+/// authored-expanded (printObject's newline-after-`{` rule), truncates its fit
+/// measurement at the forced break, and collapses back to the flat chain with
+/// the argument hugging. This state IS that settled form, admitted in pass 1 via
+/// `DocArena::gated_state`: eligible only while the last group's flat form
+/// (the probe) cannot fit on the expanded chain's continuation line — otherwise
+/// the broken chain keeping the argument flat is the shared fixed point and the
+/// expanded fallback must win.
+///
+/// The window is deliberately object-rooted — a bare object literal, or an
+/// arrow whose grammar-parenthesized expression body is one:
+/// - an ARRAY carries no authored-multiline re-read rule, so a flat-authored
+///   array is stable at the broken chain in prettier (probed) — admitting a hug
+///   would diverge;
+/// - a `new`/call wrapper reaches the settled form in two passes only when an
+///   object INSIDE it breaks, a deeper discriminator this gate cannot express —
+///   a known residual, left to the expanded fallback, which is prettier's own
+///   pass-1 output there (so tsv and prettier agree at every pass, and share the
+///   two-pass convergence). The settled form both keep is pinned by the
+///   `calls/chained/last_arg_wrapped_object` fixture.
+///
+/// A `will_break` last group is outside the window — the same question prettier's
+/// `lastGroupWillBreakAndOtherCallsHaveFunctionArguments` asks
+/// (`willBreak(printedGroups.at(-1))`), asked of the same doc. Its forced break
+/// re-reads as authored-expanded and the `on_line` state's truncated measurement
+/// already lands the hug (the pass-2 path, live today); the chain-level refusal in
+/// `build_long_chain_doc` is what holds it back when an earlier call takes a
+/// function argument. The refusal is repeated here because that one requires the
+/// break and this window is defined by its absence: the flat authoring prettier
+/// starts from carries no break at all, so nothing upstream has fired yet.
+fn build_flat_object_hug_state<'a>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+    probe: DocId,
+    printer: &Printer<'_>,
+) -> Option<DocId> {
+    let d = printer.arena();
+    // The probe IS the last group's flat doc, so its `will_break` answers the
+    // authored-flat question without rebuilding the argument subtree that
+    // `build_breaking_object_chain_doc` already built and discarded.
+    if d.will_break(probe) {
+        return None;
+    }
+    let last_call = rest_groups
+        .last()?
+        .nodes
+        .iter()
+        .rev()
+        .find_map(ChainNode::as_call_expression)?;
+    if last_call.arguments.len() != 1 {
+        return None;
+    }
+    let arg = &last_call.arguments[0];
+    // TODO: widen to a `new`/call wrapper whose own last argument is an object —
+    // the settled form there is the args-expanded shape, not this hug state, so it
+    // needs a second state rather than a wider kind test (`last_arg_wrapped_object`).
+    let object_rooted =
+        matches!(arg, Expression::ObjectExpression(_)) || is_arrow_with_paren_object_body(arg);
+    if !object_rooted {
+        return None;
+    }
+    if other_calls_have_function_arguments(first_groups, rest_groups) {
+        return None;
+    }
+    let contents = build_prefix_flat_last_expanded_doc(first_groups, rest_groups, printer);
+    Some(d.gated_state(probe, contents))
+}
+
+/// An arrow whose grammar-parenthesized expression body is an object literal —
+/// the `.map((item) => ({ … }))` shape, the arrow spelling of the object-rooted
+/// kind set.
+fn is_arrow_with_paren_object_body(arg: &Expression<'_>) -> bool {
+    matches!(
+        arg,
+        Expression::ArrowFunctionExpression(arrow) if matches!(
+            &arrow.body,
+            ArrowFunctionBody::Expression(body)
+                if matches!(&**body, Expression::ObjectExpression(_))
+        )
+    )
+}
+
+/// Prettier's `lastGroupWillBreakAndOtherCallsHaveFunctionArguments` operand:
+/// does any call BEFORE the chain's last one take a function/arrow argument?
+///
+/// The last call is dropped by holding each one back a step rather than by
+/// collecting and popping: the answer needs no storage, and this walk sits on the
+/// chain's hot path — the same reason `should_force_chain_expand` iterates its call
+/// nodes in place.
+fn other_calls_have_function_arguments<'a>(
+    first_groups: &[ChainGroup<'a>],
+    rest_groups: &[ChainGroup<'a>],
+) -> bool {
+    let takes_function_argument = |call: &CallExpression<'_>| {
+        call.arguments.iter().any(|a| {
+            matches!(
+                a,
+                Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)
+            )
+        })
+    };
+    let mut pending: Option<&CallExpression<'_>> = None;
+    for call in first_groups
+        .iter()
+        .chain(rest_groups.iter())
+        .flat_map(|g| g.nodes.iter())
+        .filter_map(ChainNode::as_call_expression)
+    {
+        if let Some(prev) = pending.replace(call)
+            && takes_function_argument(prev)
+        {
+            return true;
+        }
+    }
+    false
 }

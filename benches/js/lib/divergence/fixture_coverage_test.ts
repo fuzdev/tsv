@@ -292,6 +292,11 @@ const KNOWN_PARTIAL: Record<string, string> = {
 	'svelte/syntax/comments/expr_leading_line_prettier_divergence': '7 hunks',
 	// comment_position claims the comment hunk, not the reflow tail it sits in
 	'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence': '2 hunks',
+	// member_chain_hug_convergence claims each case's reflow hunk; the diff pairs one
+	// closer line across two adjacent cases, shearing off a closers-only tail hunk the
+	// local join-reflow proof cannot see
+	'typescript/expressions/calls/chained/last_arg_hug_convergence_long_prettier_divergence':
+		'1 hunk',
 	'typescript/statements/switch/case_block_comment_prettier_divergence': '1 hunk',
 	'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence': '1 hunk'
 };

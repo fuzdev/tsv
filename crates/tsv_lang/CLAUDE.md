@@ -54,7 +54,7 @@ All methods take `&self` (interior mutability via `RefCell`):
 - Text — `text()`, `text_pooled(&str)` (dynamic text, copied into the pool), `multiline_text(&str)`, `pool_writer()` (streaming pooled-text assembly: a `PoolTextWriter` owning an arena-parked scratch buffer — no transient `String`, no pool borrow held open, so interleaved arena calls stay correct; consume-on-finish `finish_text()` / `finish_multiline_text()`; implements `fmt::Write`), `source_span()` / `source_span_ident()` (newline-free, width-deferred — identifier / element / attribute names) / `line_comment_source_span()` (verbatim source slice, no allocation) / `verbatim_source_span()` (format-ignored frozen slice — `will_break`-opaque), `empty()`
 - Lines — `line()`, `softline()`, `hardline()`, `literalline()`
 - Structure — `group()`, `group_break()`, `indent()`, `dedent()`, `align_root()` (absolute tab level — template-literal root reset), `align()` (sub-tab `align(n)` — literal spaces under useTabs, tab-width-independent alignment)
-- Conditionals — `if_break()`, `indent_if_break()`, `conditional_group()`
+- Conditionals — `if_break()`, `indent_if_break()`, `conditional_group()`, `gated_state()` (a conditional-group state admitted only while its probe *cannot* fit flat one indent level deeper — the caller owes that geometry; see [`DocNode::GatedState`](src/doc/arena.rs))
 - Sequences — `concat()`, `fill()`, `join()`, `join_doc()`
 - Buffer pooling — `pooled_docbuf()` (RAII `PooledDocBuf`, releases on drop) / `acquire_docbuf()` / `release_docbuf()` — reusable `DocBuf` assembly buffers for wide-list builders
 - Context — `with_context()`
