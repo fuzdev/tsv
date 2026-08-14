@@ -2,6 +2,7 @@
 //
 // Switch head, case labels, and case-body layout with comment handling.
 
+use super::OpenParenLineComments;
 use crate::ast::internal::{self, Statement};
 use crate::printer::expressions::blocks::StatementBlankScan;
 use crate::printer::{
@@ -41,7 +42,12 @@ impl<'a> Printer<'a> {
             .and_then(|close| self.find_char_outside_comments(close + 1, stmt.span.end, b'{'));
         // Build condition group (handles breaking within discriminant and comments)
         let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
-            self.build_condition_group_with_comments(&stmt.discriminant, open, close)
+            self.build_condition_group_with_comments(
+                &stmt.discriminant,
+                open,
+                close,
+                OpenParenLineComments::Normalize,
+            )
         } else {
             self.build_condition_group(&stmt.discriminant)
         };

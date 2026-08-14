@@ -3,6 +3,7 @@
 // Condition-group layout and body handling for while/do-while, including the
 // do-while comment-preservation divergence from Prettier.
 
+use super::super::OpenParenLineComments;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
@@ -162,14 +163,18 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" ("));
         }
 
-        // Check for comments in the condition and use preserve_inline if present
-        // Use preserve_inline for do-while to intentionally differ from Prettier
-        // Prettier moves comments after `while (` to outside the parens - we keep them in place
+        // A commented condition takes the comment-aware group with the do-while
+        // `(`-line policy: a comment after `while (` stays in place, where prettier
+        // relocates it outside the parens (`OpenParenLineComments::Preserve`).
         if let (Some(open), Some(close)) = (open_paren, close_paren)
-            && (self.has_comments_to_emit_between(open + 1, stmt.test.span().start)
-                || self.has_comments_to_emit_between(stmt.test.span().end, close))
+            && self.header_parens_hold_comments(open, close, &stmt.test)
         {
-            parts.push(self.build_condition_group_preserve_inline(&stmt.test, open, close));
+            parts.push(self.build_condition_group_with_comments(
+                &stmt.test,
+                open,
+                close,
+                OpenParenLineComments::Preserve,
+            ));
         } else {
             // Double-parens an assignment for clarity (`do {} while ((x = y))`),
             // matching if/while/for. Unlike those, keep the plain (self-grouping)
