@@ -14,4 +14,10 @@
 		/* c */
 		| iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
 		| jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj;
+
+	// exactly 101 chars inline (case D's width) — with the run on its own line the
+	// `=` breaks and the union renders flat below it, a second stable form at this width
+	type E =
+		/* c */
+		kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk | llllllllllllllllllllllllllllllllllllll;
 </script>

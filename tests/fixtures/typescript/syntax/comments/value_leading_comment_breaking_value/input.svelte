@@ -16,6 +16,15 @@
 			b: 2
 		};
 
+	// expression-statement assignment: same rule as the declarator
+	let w;
+	w =
+		/* c */
+		{
+			a: 1,
+			b: 2
+		};
+
 	// variable type annotation: the run stays on the head line, the value opens on the next
 	let x: /* c */
 	{
