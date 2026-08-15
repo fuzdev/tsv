@@ -12,7 +12,7 @@ use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{TriviaProfile, find_char_skipping_comments, skip_trivia};
 
 /// How [`Printer::build_paren_leading_value_doc`] splits a `(`→value gap: the run the
 /// `(` line keeps, the value with the rest of the run prepended, and whether the caller
@@ -200,9 +200,13 @@ impl<'a> Printer<'a> {
     /// the way prettier 3.9 does, returning the docs to emit **after** the `;`.
     ///
     /// A same-line **block** comment trails *after* the `;` (`return x; /* c */`) —
-    /// *unless* it is still enclosed by a stripped grouping paren around the operand
-    /// (`return (x /* c */);`), in which case it stays inline before the `;` (it is
-    /// attached to the operand, not the statement). Line comments (`line_suffix`) and
+    /// *unless* it is still enclosed by a grouping paren around the operand that this
+    /// caller PRINTS (`return (a = b /* c */);`), in which case it stays inline before
+    /// the `;` (it is attached to the operand, not the statement). `operand_parens_printed`
+    /// is that caller fact, and it must be a fact about the OUTPUT, never about the source:
+    /// a shell the caller strips leaves a `)` in the source and none in the output, so a
+    /// source-keyed carve-out has no fixed point — the next pass sees no shell, reads the
+    /// same comment as statement-trailing, and moves it. Line comments (`line_suffix`) and
     /// own-line block comments also trail after the `;`. The inline (operand-attached)
     /// comments are pushed into `parts`; the rest are returned.
     ///
@@ -227,13 +231,14 @@ impl<'a> Printer<'a> {
         argument_end: u32,
         span_end: u32,
         keep_operand_line_inline: bool,
+        operand_parens_printed: bool,
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
         for comment in comments_to_emit_in_range(self.comments, argument_end, span_end) {
             let same_line = !self.has_newline_between(argument_end, comment.span.start);
             if comment.is_block && same_line {
-                if self.gap_has_close_paren(comment.span.end, span_end) {
+                if operand_parens_printed && self.gap_has_close_paren(comment.span.end, span_end) {
                     // Operand-attached (inside stripped parens): `return (x /* c */);`.
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
@@ -798,8 +803,51 @@ impl<'a> Printer<'a> {
 
         let d = self.d();
         let inner = self.build_expression_doc(expr);
+
+        // Every comment left here is a same-line block. Where the shell is the last
+        // thing before a statement `;`, that block defers past the terminator — the same
+        // answer the statement's own value-to-`;` gap gives once the shell is gone
+        // ([`Printer::split_separator_gap_comments`] and its terminator sibling), which is
+        // what makes one pass enough. Keying the choice on the stripped `)` instead cannot
+        // reach a fixed point: this output erases that `)`, so the next pass reads the
+        // comment as statement-trailing and moves it (`(x /* t */);` → `x /* t */;` →
+        // `x; /* t */`). A shell that is NOT terminator-adjacent — a ternary branch, an
+        // object value, a non-last declarator, a nested assignment — keeps the block
+        // inline, where it is already its own fixed point.
+        if self.shell_meets_statement_terminator(boundary_end) {
+            let mut parts: DocBuf = smallvec![inner];
+            for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
+                let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
+                parts.push(d.line_suffix(suffix));
+            }
+            return d.concat(&parts);
+        }
+
         let comments = self.build_comments_between(expr_end, boundary_end, CommentSpacing::Leading);
         d.concat(&[inner, comments])
+    }
+
+    /// True when the next significant byte at or after `boundary_end` — the end of a
+    /// stripped grouping shell — is the statement's `;`.
+    ///
+    /// The question a deferred trailing block must ask: is this gap the statement's
+    /// terminator gap? Asking it of the SOURCE (not of the stripped `)`, which the
+    /// output deletes) is what makes the answer survive the strip, so pass 2 — which
+    /// sees the same `;` and no shell — agrees.
+    fn shell_meets_statement_terminator(&self, boundary_end: u32) -> bool {
+        let bytes = self.source.as_bytes();
+        let end = bytes.len();
+        let mut i = boundary_end as usize;
+        while i < end {
+            if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+                i = next;
+            } else if bytes[i].is_ascii_whitespace() {
+                i += 1;
+            } else {
+                return bytes[i] == b';';
+            }
+        }
+        false
     }
 
     /// The comments between an expression's end and a following `)`, as ready-to-append

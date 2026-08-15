@@ -3,6 +3,10 @@
 	// prettier relocates it inside the brackets before the key (see output_prettier.svelte).
 	const o = {
 		*[/* c1 */ a]() {},
-		async *[/* c2 */ b]() {}
+		async *[/* c2 */ b]() {},
+		*[// c3
+		c]() {},
+		async *[// c4
+		d]() {}
 	};
 </script>
