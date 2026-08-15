@@ -228,30 +228,26 @@ impl<'a> Printer<'a> {
             && !matches!(assign.left, Expression::ObjectPattern(_))
             && !rhs_is_assignment
         {
-            // A block run the author broke AFTER, before a value that actually
-            // breaks (`w = /* c */⏎{ …multiline… }`): prettier's
-            // break-after-operator (`chooseLayout`'s `hasLeadingOwnLineComment`
-            // arm) — the declarator's early branch
-            // (`build_variable_declaration_doc`), applied to the expression
-            // statement's operator. A value that FITS collapses to the glued form
-            // via the pull-up (`build_rhs_comments_glued_opt`), and a line comment
-            // declines inside the gate — both keep the layout below. A frozen RHS
-            // keeps it too: its bypass owns the directive's placement. Object
-            // property values and class fields deliberately do NOT take this rule —
-            // prettier relocates there and tsv preserves the authored position
-            // (conformance_prettier_ts_comments.md §Comment normalization, the
-            // `value_block_comment_break` family).
+            // A block run the author broke AFTER (`w = /* c */⏎<value>`): the shared
+            // `=` broke-after arm ([`Printer::broke_after_operator_rhs_doc`] — the
+            // two-half rule, its declines, and what falls through live there),
+            // applied to the expression statement's operator. Site-specific gates:
+            // a frozen RHS keeps the layout below (its bypass owns the directive's
+            // placement), and object property values / class fields deliberately do
+            // NOT take this rule — prettier relocates there and tsv preserves the
+            // authored position (conformance_prettier_ts_comments.md §Comment
+            // normalization, the `value_block_comment_break` family).
             if rhs_frozen.is_none()
                 && rhs_comments.is_some()
-                && let Some((run, value_doc)) =
-                    self.breaking_value_leading_run(effective_rhs_start, rhs_comment_end, || {
+                && let Some(rhs_doc) =
+                    self.broke_after_operator_rhs_doc(effective_rhs_start, rhs_comment_end, || {
                         self.build_expression_doc_with_paren_comments(assign.right, assign.span.end)
                     })
             {
                 return d.concat(&[
                     left_doc,
                     d.text(assign.operator.as_str_with_leading_space()),
-                    self.break_after_operator_run_doc(&run, rhs_comment_end, value_doc),
+                    rhs_doc,
                 ]);
             }
             return self.build_assignment_layout(

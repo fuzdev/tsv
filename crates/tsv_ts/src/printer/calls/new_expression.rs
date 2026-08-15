@@ -19,8 +19,7 @@ use crate::printer::calls::{
     ArgItem, ArgsJoin, PartitionedComments, build_args_joined_with_comments, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_call_args_expanded, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    build_printed_argument_doc, could_expand_arrow_chain, emit_first_arg_leading_comments,
-    emit_last_arg_trailing_comments, has_inter_argument_comments_slice,
+    build_printed_argument_doc, could_expand_arrow_chain, has_inter_argument_comments_slice,
     has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
     prebuild_expand_last_break_body, prepend_arrow_body_comments,
     should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
@@ -141,37 +140,43 @@ impl<'a> Printer<'a> {
             && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self);
 
         // A comment in the `(`→argument gap that this expression would have to EMIT
-        // disqualifies the three hug arms below (object / array / function expression):
-        // they emit the argument's doc alone, with no gap emitter, so the comment would be
-        // DROPPED (the hazard-4 shape in docs/comments.md). Such a call falls through to
-        // the comment-aware paths and expands, matching prettier.
+        // disqualifies the whole single-argument block below: none of its arms has a
+        // gap emitter, so the comment would be DROPPED (the hazard-4 shape in
+        // docs/comments.md). Such a call falls through to the comment-aware paths
+        // and expands, matching prettier.
         //
-        // **To-emit axis**, deliberately: a GLUED block comment is owned by the argument
-        // and rides inside its doc, so the hug does print it — and hugging there matches
-        // prettier (`new A(/* c */ { a: 1 })`). The question is exactly "would a comment be
-        // dropped?". The arrow arm asks the wider ON-PAGE question for its own reason (an
-        // owned comment must still defeat the hug, per prettier's `couldExpandArg`), which
-        // is why the gate sits on the three arms rather than on the outer guard.
+        // The three plain hug arms (object / array / function expression) decline on
+        // the wider ON-PAGE question inside the match, like the arrow arm: an OWNED
+        // glued comment rides inside the argument's doc — the hug does print it —
+        // but it still defeats the hug, exactly as prettier's `couldExpandArg`
+        // refuses to hug an argument whose leading comment sits before it
+        // (prettier shares one `printCallArguments` for Call and New, and the plain
+        // call already expands `fn(/* c */ { breaking })`). A to-emit gate went
+        // blind to it and kept the hug, which collapsed prettier's expanded form
+        // back to `new A(/* c */ {` on every pass. The declined argument falls to
+        // the default soft-wrapped join at the bottom: flat when it fits — the
+        // same bytes the hug rendered — expanded when the argument breaks.
         let single_arg_leading_emit_comment = new_expr.arguments.len() == 1
             && new_has_comments
             && self.has_comments_to_emit_between(paren_open, new_expr.arguments[0].span().start);
+        let single_arg_leading_on_page_comment = new_expr.arguments.len() == 1
+            && new_has_comments
+            && self.has_comments_on_page_between(paren_open, new_expr.arguments[0].span().start);
 
         if new_expr.arguments.len() == 1
             && !single_arg_has_trailing_comment
             && !single_arg_leading_emit_comment
         {
             match &new_expr.arguments[0] {
-                // Object literal: hug it
-                internal::Expression::ObjectExpression(_) => {
-                    return d.concat(&[
-                        callee_with_types,
-                        d.text("("),
-                        self.build_expression_doc(&new_expr.arguments[0]),
-                        d.text(")"),
-                    ]);
-                }
-                // Array literal: hug it
-                internal::Expression::ArrayExpression(_) => {
+                // Object / array / function-expression argument: hug it — the
+                // argument's own doc expands internally. An on-page leading
+                // comment declines the hug (see the guard's comment above);
+                // prettier expands all three the same way.
+                internal::Expression::ObjectExpression(_)
+                | internal::Expression::ArrayExpression(_)
+                | internal::Expression::FunctionExpression(_)
+                    if !single_arg_leading_on_page_comment =>
+                {
                     return d.concat(&[
                         callee_with_types,
                         d.text("("),
@@ -250,15 +255,6 @@ impl<'a> Printer<'a> {
                             d.softline(),
                             d.text(")"),
                         ]),
-                    ]);
-                }
-                // Function expression: hug it
-                internal::Expression::FunctionExpression(_) => {
-                    return d.concat(&[
-                        callee_with_types,
-                        d.text("("),
-                        self.build_expression_doc(&new_expr.arguments[0]),
-                        d.text(")"),
                     ]);
                 }
                 // Expression-body arrow: break at => not at (
@@ -469,55 +465,25 @@ impl<'a> Printer<'a> {
         if new_has_comments
             && has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self)
         {
-            let mut arg_parts = DocBuf::new();
+            // The shared joined-argument builder owns every gap in the list — the
+            // `(`→first-argument run (into `paren_line`), each inter-argument gap,
+            // and the last argument's trailing region. Hardline-joined throughout,
+            // so each gap's `forces_expansion` obligation is already met. The
+            // hand-rolled loop this replaced re-spelled the builder's Hardline join
+            // exactly (its unguarded `open_inter_arg_gap` on a comment-free gap
+            // emits just the comma the builder's guarded arm bakes into
+            // `comma_hardline`), and a copied loop is where the last-arg and
+            // inter-arg emitters have drifted before.
             let mut paren_line = DocBuf::new();
-
-            for (i, arg) in new_expr.arguments.iter().enumerate() {
-                // Leading comments before the first argument (e.g. `new Foo(/* c */ a, // t)`).
-                // The inter-argument loop below only emits leading comments for args 1..n
-                // (via the previous arg's gap), so the first arg's leading comment must be
-                // emitted here or it's dropped.
-                if i == 0 {
-                    emit_first_arg_leading_comments(
-                        self,
-                        &mut paren_line,
-                        &mut arg_parts,
-                        paren_open,
-                        arg.span().start,
-                    );
-                }
-
-                // Build the argument with the argument-context builder so a binary/
-                // logical chain (or conditional) keeps its continuation indent in this
-                // trailing-line-comment path — matching the no-comment path (the
-                // call/member-chain comment paths do the same). An own-line directive in
-                // this argument's gap freezes it verbatim (Rule A).
-                arg_parts.push(ArgItem::ArgContext.build(self, paren_open, new_expr.arguments, i));
-
-                // Check for comments after this argument
-                if i < new_expr.arguments.len() - 1 {
-                    let next_arg_start = new_expr.arguments[i + 1].span().start;
-
-                    // Hardline-joined throughout, so the gap's `forces_expansion`
-                    // obligation is already met and nothing reads it.
-                    let pc = self
-                        .open_inter_arg_gap(&mut arg_parts, arg, next_arg_start)
-                        .comments;
-                    arg_parts.push(d.hardline());
-                    // hugging after-comma + own-line comments lead the next arg (`C`).
-                    pc.emit_leading_comments_inline_aware(&mut arg_parts, self);
-                } else {
-                    // Last argument: the parent's share of a spread's stripped-paren
-                    // interior, then the same-line trailing comments (a block that sat
-                    // after the source comma just trails past where the comma was,
-                    // `b /* c */` — the tsv divergence; a line comment follows via
-                    // `line_suffix`), then own-line dangling comments. No trailing comma
-                    // (trailingComma: 'none'). Matches the call/member-chain last-arg paths.
-                    emit_last_arg_trailing_comments(self, &mut arg_parts, arg, new_expr.span.end);
-                }
-            }
-
-            let arg_doc = d.concat(&arg_parts);
+            let arg_doc = build_args_joined_with_comments(
+                self,
+                new_expr.arguments,
+                paren_open,
+                new_expr.span.end,
+                ArgsJoin::Hardline,
+                ArgItem::ArgContext,
+                &mut paren_line,
+            );
             return wrap_call_with_hard_breaks_paren_line(
                 d,
                 callee_with_types,
