@@ -8,7 +8,7 @@
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, IdentName};
 use crate::printer::{ParenContext, Printer, needs_parens};
-use tsv_lang::TAB_WIDTH;
+use tsv_lang::{Comment, TAB_WIDTH, has_line_comments_in_range};
 
 //
 // Linearization
@@ -31,16 +31,19 @@ use tsv_lang::TAB_WIDTH;
 fn linearize_chain<'a>(expr: &'a Expression<'_>) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_recursive(expr, &mut nodes, &mut paren_gaps);
+    linearize_recursive(expr, &[], &mut nodes, &mut paren_gaps);
     finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
 
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
-pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression<'_>) -> ChainNodeVec<'a> {
+pub fn linearize_chain_from_call<'a>(
+    call: &'a internal::CallExpression<'_>,
+    comments: &[Comment],
+) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_call_callee(call, &mut nodes, &mut paren_gaps);
+    linearize_call_callee(call, comments, &mut nodes, &mut paren_gaps);
     if call.optional {
         nodes.push(ChainNode::call_optional(call));
     } else {
@@ -53,22 +56,30 @@ pub fn linearize_chain_from_call<'a>(call: &'a internal::CallExpression<'_>) -> 
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
 pub fn linearize_chain_from_member<'a>(
     member: &'a internal::MemberExpression<'_>,
+    comments: &[Comment],
 ) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_member_object(member, &mut nodes, &mut paren_gaps);
+    linearize_member_object(member, comments, &mut nodes, &mut paren_gaps);
     linearize_member_node(member, &mut nodes, &mut paren_gaps);
     finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
 
 /// Linearize starting from a TSNonNullExpression (avoids cloning to wrap in Expression)
+///
+/// The terminal `NonNull` push takes no comment gate: the OUTERMOST operand→`!`
+/// gap's comments are handled by `build_ts_non_null_doc` before this entry is
+/// reached (a `//` there makes `needs_parens` true, a block comment takes its
+/// trailing-comment branch), so only the comment-free case arrives here. Nested
+/// non-nulls go through `linearize_recursive`'s own arm, which does gate.
 pub fn linearize_chain_from_non_null<'a>(
     non_null: &'a internal::TSNonNullExpression<'_>,
+    comments: &[Comment],
 ) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_recursive(non_null.expression, &mut nodes, &mut paren_gaps);
+    linearize_recursive(non_null.expression, comments, &mut nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null(non_null));
     finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
@@ -184,13 +195,14 @@ fn push_sealed_chain_base<'a>(child: &'a Expression<'_>, nodes: &mut ChainNodeVe
 
 fn linearize_recursive<'a>(
     expr: &'a Expression<'_>,
+    comments: &[Comment],
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     match expr {
         // CallExpression: recurse into callee, then add Call node
         Expression::CallExpression(call) => {
-            linearize_call_callee(call, nodes, paren_gaps);
+            linearize_call_callee(call, comments, nodes, paren_gaps);
             if call.optional {
                 nodes.push(ChainNode::call_optional(call));
             } else {
@@ -200,7 +212,7 @@ fn linearize_recursive<'a>(
 
         // MemberExpression: recurse into object, then add Member node
         Expression::MemberExpression(member) => {
-            linearize_member_object(member, nodes, paren_gaps);
+            linearize_member_object(member, comments, nodes, paren_gaps);
             linearize_member_node(member, nodes, paren_gaps);
         }
 
@@ -211,16 +223,30 @@ fn linearize_recursive<'a>(
         // linearize_member_object. Untested because prettier's parser rejects the
         // syntax, so there's no canonical source for a fixture.
         Expression::TSNonNullExpression(non_null) => {
-            // A parenthesized optional chain sealed inside the non-null assertion
-            // (`(a?.b)!.c`) must keep its parens — the trailing access reached via this
-            // node's parent must not be absorbed. Emit the bare chain as a
-            // parenthesized base + `!` so it renders `(a?.b)!.c`, not `a?.b!.c`.
+            // Two authorings keep the whole operand a parenthesized base + `!` instead
+            // of flattening it into the chain:
+            // - a sealed parenthesized optional chain (`(a?.b)!.c`): the trailing
+            //   access reached via this node's parent must not be absorbed, so it
+            //   renders `(a?.b)!.c`, not `a?.b!.c`;
+            // - a `//` in the operand→`!` gap (`(aaa // c⏎)!.bbb`), which can only come
+            //   from a grouping shell — written bare, the `//` would swallow the `!`
+            //   (`[no LineTerminator here]`). The shell is RETAINED for the comment's
+            //   sake, emitted inside the parens (`build_non_null_paren_operand_doc`'s
+            //   line-comment layout), the same answer the standalone non-null gives
+            //   this gap. Flattening instead hands the region to `NonNullGap::Bang`,
+            //   whose emitter is block-only — the `//` would be dropped, with nothing
+            //   left to parenthesize at print time.
             let inner = &non_null.expression;
-            if non_null.seals_optional_chain() {
-                nodes.push(ChainNode::base_with_paren_comment(inner, non_null.span.end));
+            if non_null.seals_optional_chain()
+                || has_line_comments_in_range(comments, inner.span().end, non_null.span.end)
+            {
+                nodes.push(ChainNode::paren_base_before_non_null(
+                    inner,
+                    non_null.span.end,
+                ));
                 nodes.push(ChainNode::non_null_after_paren_operand());
             } else {
-                linearize_recursive(inner, nodes, paren_gaps);
+                linearize_recursive(inner, comments, nodes, paren_gaps);
                 // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
                 // lives between the operand and the `!`. When the operand is a
                 // parenthesized base, keep the comment INSIDE the parens, where the
@@ -247,7 +273,7 @@ fn linearize_recursive<'a>(
         // objects (`(A<T>).x`) take the `linearize_member_object` path instead,
         // which keeps the type args and parens.
         Expression::TSInstantiationExpression(inst) => {
-            linearize_recursive(inst.expression, nodes, paren_gaps);
+            linearize_recursive(inst.expression, comments, nodes, paren_gaps);
         }
 
         // Base case: expression that's not part of the chain structure
@@ -276,6 +302,7 @@ fn linearize_recursive<'a>(
 /// All other objects recurse normally.
 fn linearize_member_object<'a>(
     member: &'a internal::MemberExpression<'_>,
+    comments: &[Comment],
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
@@ -285,7 +312,7 @@ fn linearize_member_object<'a>(
     } else if matches!(object, Expression::TSInstantiationExpression(_)) {
         nodes.push(ChainNode::base(object, true));
     } else {
-        linearize_recursive(object, nodes, paren_gaps);
+        linearize_recursive(object, comments, nodes, paren_gaps);
     }
 }
 
@@ -296,13 +323,14 @@ fn linearize_member_object<'a>(
 /// other callees recurse normally.
 fn linearize_call_callee<'a>(
     call: &'a internal::CallExpression<'_>,
+    comments: &[Comment],
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     if child_stops_optional_chain(call.span.start, call.optional, call.callee) {
         push_sealed_chain_base(call.callee, nodes);
     } else {
-        linearize_recursive(call.callee, nodes, paren_gaps);
+        linearize_recursive(call.callee, comments, nodes, paren_gaps);
     }
 }
 

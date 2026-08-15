@@ -1118,15 +1118,13 @@ impl<'a> Printer<'a> {
             // non-null seal canonicalization (`(p?.q)!` → `p?.q!`); prettier keeps them
             // when the source had them.
             //
-            // ⚠️ This branch stays ahead of the chain one for the **line** spelling only.
-            // `ChainNode::NonNull` prints the same gap now, so a block comment would come
-            // out identically there — but its emitter is block-only, because an
-            // unparenthesized operand can hold nothing else (`[no LineTerminator here]`
-            // before the `!`). A *stripped* shell breaks that premise: the gap spans the
-            // erased `)`, so `(x // c⏎)!` puts a `//` in it, and routing that to the chain
-            // DROPS it. Preserving it there means retaining the shell (the multiline
-            // operand layout the required-paren case uses) — a divergence decision, not a
-            // refactor, so the two paths stay split until it is taken.
+            // Only a block comment reaches this branch — a `//` in the gap makes
+            // `needs_parens` true above. `ChainNode::NonNull` prints the same gap now,
+            // so a block comment would come out identically there; a `//` in a MID-chain
+            // spelling of this gap (`(x // c⏎)!.foo`) is the linearizer's to catch — it
+            // retains the shell as a parenthesized base (the same multiline operand
+            // layout the required-paren case above uses) rather than flattening the
+            // operand into a region whose emitter is block-only.
             let argument_end = non_null_expr.expression.span().end;
             let inner_doc = self.build_expression_doc(non_null_expr.expression);
             let mut parts: DocBuf = smallvec![inner_doc];
@@ -1137,7 +1135,7 @@ impl<'a> Printer<'a> {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included
             // in the linearized chain for proper segment grouping.
-            let nodes = chain::linearize_chain_from_non_null(non_null_expr);
+            let nodes = chain::linearize_chain_from_non_null(non_null_expr, self.comments);
             let groups = chain::group_chain_nodes(&nodes);
             chain::build_chain_doc(&groups, non_null_expr.span, self)
         } else {
