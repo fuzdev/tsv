@@ -15,8 +15,8 @@ use tsv_svelte::ast::internal::{
     FragmentNode, IfBlock, KeyBlock, SnippetBlock, SpecialElement,
 };
 use tsv_ts::ast::internal::{
-    BinaryOperator, BlockStatement, Expression, ExpressionStatement, ForInit, ForStatement,
-    IfStatement, ObjectExpression, ObjectProperty, Statement, UpdateOperator, VariableDeclaration,
+    BinaryOperator, BlockStatement, Expression, ForInit, ForStatement, IfStatement,
+    ObjectExpression, ObjectProperty, Statement, UpdateOperator, VariableDeclaration,
     VariableDeclarationKind, VariableDeclarator,
 };
 
@@ -179,13 +179,7 @@ pub(crate) fn emit_svelte_head<'arena>(
     args.push(Expression::Identifier(env.b.ident("$$renderer")));
     args.push(arrow);
     let call = env.b.member_call("$", "head", args.into_bump_slice());
-    let span = call.span();
-    let stmt = Statement::ExpressionStatement(ExpressionStatement {
-        expression: call,
-        span,
-        is_directive: false,
-    });
-    out.push_statement(&mut env.b, arena, stmt);
+    out.push_expression_statement(&mut env.b, arena, call);
     Ok(())
 }
 
@@ -344,16 +338,7 @@ pub(crate) fn emit_boundary<'arena>(
     let call = env
         .b
         .member_call("$$renderer", "boundary", args.into_bump_slice());
-    let span = call.span();
-    out.push_statement(
-        &mut env.b,
-        arena,
-        Statement::ExpressionStatement(ExpressionStatement {
-            expression: call,
-            span,
-            is_directive: false,
-        }),
-    );
+    out.push_expression_statement(&mut env.b, arena, call);
     Ok(())
 }
 
@@ -960,13 +945,7 @@ pub(crate) fn emit_await_block<'arena>(
     args.push(pending_arrow);
     args.push(then_arrow);
     let call = env.b.member_call("$", "await", args.into_bump_slice());
-    let span = call.span();
-    let stmt = Statement::ExpressionStatement(ExpressionStatement {
-        expression: call,
-        span,
-        is_directive: false,
-    });
-    out.push_statement(&mut env.b, arena, stmt);
+    out.push_expression_statement(&mut env.b, arena, call);
     out.push_text("<!--]-->");
     Ok(())
 }

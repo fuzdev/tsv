@@ -220,22 +220,12 @@ pub(crate) fn expand_destructured_derived<'arena>(
         value
     };
 
-    let mut extractor = Extractor {
-        b,
-        source,
-        refusal,
-        mode: Lowering::Derived,
-        inserts: Vec::new(),
-        paths: Vec::new(),
-    };
-    extractor.extract(&declarator.id, rhs, names)?;
-    for decl in extractor.inserts {
-        declarations.push(decl);
-    }
-    for decl in extractor.paths {
-        declarations.push(decl);
-    }
-    Ok(())
+    Extractor::new(b, source, refusal, Lowering::Derived).extract_onto(
+        &declarator.id,
+        rhs,
+        names,
+        declarations,
+    )
 }
 
 /// Lower a destructured `$state` / `$state.raw` / `$state.snapshot` declarator into
@@ -311,22 +301,12 @@ pub(crate) fn expand_destructured_state<'arena>(
     // Every leaf projects from a fresh `tmp` read (a plain `const`, so no `()`).
     let rhs: &'arena Expression<'arena> = b.ident_expr(&tmp_name);
 
-    let mut extractor = Extractor {
-        b,
-        source,
-        refusal,
-        mode: Lowering::State,
-        inserts: Vec::new(),
-        paths: Vec::new(),
-    };
-    extractor.extract(&declarator.id, rhs, names)?;
-    for decl in extractor.inserts {
-        declarations.push(decl);
-    }
-    for decl in extractor.paths {
-        declarations.push(decl);
-    }
-    Ok(())
+    Extractor::new(b, source, refusal, Lowering::State).extract_onto(
+        &declarator.id,
+        rhs,
+        names,
+        declarations,
+    )
 }
 
 /// `$.derived(<argument>)` — the intermediate/insert wrapper (comment-free, so a
@@ -351,6 +331,39 @@ struct Extractor<'b, 'arena> {
     mode: Lowering,
     inserts: Vec<VariableDeclarator<'arena>>,
     paths: Vec<VariableDeclarator<'arena>>,
+}
+
+impl<'b, 'arena> Extractor<'b, 'arena> {
+    fn new(b: &'b mut Builder<'arena>, source: &'b str, refusal: Refusal, mode: Lowering) -> Self {
+        Self {
+            b,
+            source,
+            refusal,
+            mode,
+            inserts: Vec::new(),
+            paths: Vec::new(),
+        }
+    }
+
+    /// Extract `param` against `expr`, then drain the products onto
+    /// `declarations`: **inserts before paths**, the oracle's order.
+    ///
+    /// Both rune families end on this, so the order lives in one place — a site
+    /// that drained them the other way round would reorder the emitted
+    /// declarators against the oracle's, which is a MISMATCH rather than a
+    /// cosmetic difference.
+    fn extract_onto(
+        mut self,
+        param: &Expression<'arena>,
+        expr: &'arena Expression<'arena>,
+        names: &mut GeneratedNames<'_>,
+        declarations: &mut BumpVec<'arena, VariableDeclarator<'arena>>,
+    ) -> Result<(), CompileError> {
+        self.extract(param, expr, names)?;
+        declarations.extend(self.inserts);
+        declarations.extend(self.paths);
+        Ok(())
+    }
 }
 
 impl<'arena> Extractor<'_, 'arena> {

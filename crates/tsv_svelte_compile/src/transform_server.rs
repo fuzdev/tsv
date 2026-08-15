@@ -1109,6 +1109,11 @@ pub(crate) fn compile_server<'arena>(
         // the trailing window inside the appendix, where no host comment lives.
         // The arrow's block is then the sole owner — the oracle's placement,
         // inside the wrapper.
+        //
+        // So this is the one expression statement built explicitly rather than
+        // through `Builder::expression_statement`: that helper takes the span
+        // from the expression, which is exactly the span this site must NOT
+        // have.
         outer.push(Statement::ExpressionStatement(ExpressionStatement {
             expression: call,
             span: Span::new(0, env.b.buffer.len() as u32),
@@ -1301,12 +1306,7 @@ fn build_bind_props_stmt<'arena>(
     args.push(props_ident);
     args.push(object);
     let call = b.member_call("$", "bind_props", args.into_bump_slice());
-    let span = call.span();
-    Statement::ExpressionStatement(ExpressionStatement {
-        expression: call,
-        span,
-        is_directive: false,
-    })
+    b.expression_statement(call)
 }
 
 /// The `{ key: local, … }` object literal of a `$.bind_props(…)` call. Every

@@ -423,6 +423,29 @@ fn build_mixed_attr_value<'arena>(
     ))
 }
 
+/// [`build_mixed_attr_value`] as the oracle's bare `build_attribute_value` result:
+/// the folded value as a JS string literal — **not** HTML-escaped, since the
+/// runtime escapes an object/prop value (unlike the static-attribute full-fold
+/// path in [`emit_mixed_attribute`]) — else the assembled template literal.
+///
+/// The seam the element spread object-builder ([`build_attribute_value_expr`]) and
+/// the component prop builder (`component::build_prop_value`) share. Both want the
+/// same bare value, so neither may re-derive the fold decision: whether a mixed
+/// attribute emits as static text or as a `$.stringify` template is exactly what a
+/// drifting second copy of the loop would change.
+pub(crate) fn build_mixed_value_expr<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    trim_whitespace: bool,
+    values: &'arena [AttributeValue<'arena>],
+) -> Result<Expression<'arena>, CompileError> {
+    Ok(
+        match build_mixed_attr_value(env, trim_whitespace, values)? {
+            MixedAttrValue::Folded(raw) => env.b.string_literal_expr(&raw),
+            MixedAttrValue::Template(template) => template,
+        },
+    )
+}
+
 /// A mixed text+expression attribute value: `title="t {a} u"` — an attribute
 /// template literal with `$.stringify(expr)` interpolations (omitted when the
 /// oracle's evaluator proves a defined string), folded where known.
@@ -532,14 +555,7 @@ fn build_attribute_value_expr<'arena>(
                 Ok(wrapped)
             }
         }
-        _ => Ok(
-            match build_mixed_attr_value(env, trim_whitespace, values)? {
-                // The object value is a JS string literal the runtime escapes — no
-                // HTML escaping here (unlike the static-attribute full-fold path).
-                MixedAttrValue::Folded(raw) => env.b.string_literal_expr(&raw),
-                MixedAttrValue::Template(template) => template,
-            },
-        ),
+        _ => build_mixed_value_expr(env, trim_whitespace, values),
     }
 }
 

@@ -248,6 +248,53 @@ fn register_destructured_leaves<'arena>(
     Ok(())
 }
 
+/// Register a rune declarator's binding(s): a plain identifier target inserts the
+/// one binding, a destructured target lowers to one per pattern leaf
+/// ([`register_destructured_leaves`]). Both arms take the rune's computed
+/// `initial`, which is what makes a destructured leaf fold exactly like an
+/// identifier target.
+///
+/// A `Derived` kind records every name in `derived_names` on **both** arms — the
+/// set is what makes a bare read lower to `name()`, so an identifier target that
+/// skipped it would emit a bare `d` where the oracle emits `d()`. Keying that off
+/// `kind` here (as [`register_destructured_leaves`] already does) is what keeps the
+/// two arms from drifting apart per rune.
+fn register_rune_binding<'arena>(
+    declarator: &'arena VariableDeclarator<'arena>,
+    source: &str,
+    bindings: &mut Bindings<'arena>,
+    derived_names: &mut NameSet,
+    kind: BindingKind,
+    initial: Initial<'arena>,
+    unnameable: Refusal,
+) -> Result<(), CompileError> {
+    match identifier_binding_name(&declarator.id, source) {
+        Some(name) => {
+            if kind == BindingKind::Derived {
+                derived_names.insert(name.clone());
+            }
+            bindings.insert(
+                name,
+                Binding {
+                    kind,
+                    initial,
+                    updated: false,
+                },
+            );
+        }
+        None => register_destructured_leaves(
+            &declarator.id,
+            source,
+            bindings,
+            derived_names,
+            kind,
+            initial,
+            unnameable,
+        )?,
+    }
+    Ok(())
+}
+
 /// Classify one top-level declarator into the binding table.
 fn analyze_declarator<'arena>(
     declarator: &'arena VariableDeclarator<'arena>,
@@ -316,26 +363,15 @@ fn analyze_declarator<'arena>(
             // `create_state_declarators` (the transform's `expand_destructured_state`);
             // every leaf takes this same initial.
             let initial = arg.map_or(Initial::Undefined, Initial::Expr);
-            match identifier_binding_name(&declarator.id, source) {
-                Some(name) => bindings.insert(
-                    name,
-                    Binding {
-                        kind: BindingKind::Normal,
-                        initial,
-                        updated: false,
-                    },
-                ),
-                None => register_destructured_leaves(
-                    &declarator.id,
-                    source,
-                    bindings,
-                    derived_names,
-                    BindingKind::Normal,
-                    initial,
-                    Refusal::DestructuringState,
-                )?,
-            }
-            Ok(())
+            register_rune_binding(
+                declarator,
+                source,
+                bindings,
+                derived_names,
+                BindingKind::Normal,
+                initial,
+                Refusal::DestructuringState,
+            )
         }
         Some(RuneInit::StateSnapshot(_)) => {
             // `const s = $state.snapshot(x)` unwraps to `const s = x` for EMISSION,
@@ -348,26 +384,15 @@ fn analyze_declarator<'arena>(
             // a plain `let` argument does not fold either. Every destructured leaf
             // inherits that `Initial::None` (a snapshot leaf never folds), so a
             // destructured target lowers exactly like `$state` MINUS the fold.
-            match identifier_binding_name(&declarator.id, source) {
-                Some(name) => bindings.insert(
-                    name,
-                    Binding {
-                        kind: BindingKind::Normal,
-                        initial: Initial::None,
-                        updated: false,
-                    },
-                ),
-                None => register_destructured_leaves(
-                    &declarator.id,
-                    source,
-                    bindings,
-                    derived_names,
-                    BindingKind::Normal,
-                    Initial::None,
-                    Refusal::DestructuringStateSnapshot,
-                )?,
-            }
-            Ok(())
+            register_rune_binding(
+                declarator,
+                source,
+                bindings,
+                derived_names,
+                BindingKind::Normal,
+                Initial::None,
+                Refusal::DestructuringStateSnapshot,
+            )
         }
         Some(RuneInit::Derived(expr)) => {
             // `$derived(expr)`: a leaf folds through the argument. The oracle's
@@ -378,29 +403,15 @@ fn analyze_declarator<'arena>(
             // (`expand_destructured_derived`) still lowers each leaf to its own
             // `$.derived(() => path)`; the initial only governs the fold.
             let initial = Initial::Expr(expr);
-            match identifier_binding_name(&declarator.id, source) {
-                Some(name) => {
-                    derived_names.insert(name.clone());
-                    bindings.insert(
-                        name,
-                        Binding {
-                            kind: BindingKind::Derived,
-                            initial,
-                            updated: false,
-                        },
-                    );
-                }
-                None => register_destructured_leaves(
-                    &declarator.id,
-                    source,
-                    bindings,
-                    derived_names,
-                    BindingKind::Derived,
-                    initial,
-                    Refusal::DestructuringDerived,
-                )?,
-            }
-            Ok(())
+            register_rune_binding(
+                declarator,
+                source,
+                bindings,
+                derived_names,
+                BindingKind::Derived,
+                initial,
+                Refusal::DestructuringDerived,
+            )
         }
         Some(RuneInit::DerivedBy(f)) => {
             // `$derived.by(fn)`: the oracle evaluates through an expression-bodied
@@ -414,29 +425,15 @@ fn analyze_declarator<'arena>(
                 },
                 _ => Initial::None,
             };
-            match identifier_binding_name(&declarator.id, source) {
-                Some(name) => {
-                    derived_names.insert(name.clone());
-                    bindings.insert(
-                        name,
-                        Binding {
-                            kind: BindingKind::Derived,
-                            initial,
-                            updated: false,
-                        },
-                    );
-                }
-                None => register_destructured_leaves(
-                    &declarator.id,
-                    source,
-                    bindings,
-                    derived_names,
-                    BindingKind::Derived,
-                    initial,
-                    Refusal::DestructuringDerivedBy,
-                )?,
-            }
-            Ok(())
+            register_rune_binding(
+                declarator,
+                source,
+                bindings,
+                derived_names,
+                BindingKind::Derived,
+                initial,
+                Refusal::DestructuringDerivedBy,
+            )
         }
         None => {
             // Plain declarator: an Identifier id gets its init as the

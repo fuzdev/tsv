@@ -28,7 +28,7 @@ use tsv_svelte::ast::internal::{
     SpecialThis, StyleDirective,
 };
 use tsv_ts::ast::internal::{
-    Expression, ExpressionStatement, ObjectExpression, ObjectProperty, SpreadElement, Statement,
+    Expression, ObjectExpression, ObjectProperty, SpreadElement, Statement,
 };
 
 use crate::attribute::{build_spread_object_property, emit_attribute, is_load_error_element};
@@ -860,16 +860,7 @@ pub(crate) fn emit_svelte_element<'arena>(
         (None, None) => {}
     }
     let call = env.b.member_call("$", "element", args.into_bump_slice());
-    let span = call.span();
-    out.push_statement(
-        &mut env.b,
-        arena,
-        Statement::ExpressionStatement(ExpressionStatement {
-            expression: call,
-            span,
-            is_directive: false,
-        }),
-    );
+    out.push_expression_statement(&mut env.b, arena, call);
     Ok(())
 }
 

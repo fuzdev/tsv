@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::internal::{RenderTag, SnippetBlock};
-use tsv_ts::ast::internal::{CallExpression, Expression, ExpressionStatement, Statement};
+use tsv_ts::ast::internal::{CallExpression, Expression, Statement};
 
 use crate::analyze::{ScopeEntry, pattern_binding_names};
 use crate::body_builder::BodyBuilder;
@@ -231,13 +231,7 @@ pub(crate) fn emit_render_tag<'arena>(
     let render_call = env
         .b
         .call_of(call.callee, args.into_bump_slice(), call.optional);
-    let span = render_call.span();
-    let stmt = Statement::ExpressionStatement(ExpressionStatement {
-        expression: render_call,
-        span,
-        is_directive: false,
-    });
-    out.push_statement(&mut env.b, arena, stmt);
+    out.push_expression_statement(&mut env.b, arena, render_call);
     // A dynamic or non-sole render keeps the anchor so its output doesn't glue to
     // the surrounding fragment (the oracle's `empty_comment` push).
     if !is_standalone {

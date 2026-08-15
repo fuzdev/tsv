@@ -271,6 +271,15 @@ struct ClassHead<'a, 'arena> {
     implements: &'a [tsv_ts::ast::internal::TSInterfaceHeritage<'arena>],
 }
 
+/// What a class erasure produces, once resolved against the original — the
+/// `ClassHead` sibling for the parts a class form must rebuild with. Reached only
+/// when something WAS erased, so both fields are final values, not
+/// `None`-means-unchanged options.
+struct ClassParts<'arena> {
+    super_class: Option<&'arena Expression<'arena>>,
+    body: ClassBody<'arena>,
+}
+
 struct Eraser<'arena, 'src> {
     arena: &'arena bumpalo::Bump,
     source: &'src str,
@@ -1121,12 +1130,46 @@ impl<'arena> Eraser<'arena, '_> {
         }))
     }
 
+    /// Erase a class's decorators, header, `extends` expression and body — the
+    /// whole walk both class forms share, which differ only in the node type they
+    /// rebuild. Returns `None` when nothing was erased (the pass's
+    /// unchanged-means-share contract), else the resolved `extends`/body to
+    /// rebuild with.
+    ///
+    /// The `ClassHead` literal stays at each call site on purpose: it is a
+    /// mechanical field copy, and a struct literal must be exhaustive, so a new
+    /// [`ClassHead`] field fails to compile at BOTH sites. This walk has no such
+    /// guard — a rule added to one copy and not the other would just silently
+    /// erase differently in expression position — which is why it, and not the
+    /// literal, is the half worth sharing.
+    fn class_parts(
+        &mut self,
+        head: &ClassHead<'_, 'arena>,
+        decorators: Option<&'arena [tsv_ts::ast::internal::Decorator<'arena>]>,
+        super_class: Option<&'arena Expression<'arena>>,
+        body: &ClassBody<'arena>,
+    ) -> Result<Option<ClassParts<'arena>>, CompileError> {
+        self.refuse_decorators(decorators)?;
+        let erased_head = self.class_head(head);
+        let new_super_class = match super_class {
+            Some(expr) => self.expr_ref(expr)?.map(Some),
+            None => None,
+        };
+        let new_body = self.class_body(body)?;
+        if !erased_head && new_super_class.is_none() && new_body.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(ClassParts {
+            super_class: new_super_class.unwrap_or(super_class),
+            body: new_body.unwrap_or_else(|| body.clone()),
+        }))
+    }
+
     fn class_declaration(
         &mut self,
         class: &ClassDeclaration<'arena>,
     ) -> Result<Option<ClassDeclaration<'arena>>, CompileError> {
-        self.refuse_decorators(class.decorators)?;
-        let erased_head = self.class_head(&ClassHead {
+        let head = ClassHead {
             span: class.span,
             r#abstract: class.r#abstract,
             id_end: class.id.as_ref().map(|id| id.span.end),
@@ -1134,22 +1177,19 @@ impl<'arena> Eraser<'arena, '_> {
             super_class_end: class.super_class.map(|s| s.span().end),
             super_type_parameters: class.super_type_parameters.as_ref().map(|tp| tp.span),
             implements: class.implements,
-        });
-        let super_class = match class.super_class {
-            Some(expr) => self.expr_ref(expr)?.map(Some),
-            None => None,
         };
-        let body = self.class_body(&class.body)?;
-        if !erased_head && super_class.is_none() && body.is_none() {
+        let Some(parts) =
+            self.class_parts(&head, class.decorators, class.super_class, &class.body)?
+        else {
             return Ok(None);
-        }
+        };
         Ok(Some(ClassDeclaration {
             r#abstract: false,
             implements: &[],
             type_parameters: None,
             super_type_parameters: None,
-            super_class: super_class.unwrap_or(class.super_class),
-            body: body.unwrap_or_else(|| class.body.clone()),
+            super_class: parts.super_class,
+            body: parts.body,
             ..class.clone()
         }))
     }
@@ -1158,8 +1198,7 @@ impl<'arena> Eraser<'arena, '_> {
         &mut self,
         class: &ClassExpression<'arena>,
     ) -> Result<Option<ClassExpression<'arena>>, CompileError> {
-        self.refuse_decorators(class.decorators)?;
-        let erased_head = self.class_head(&ClassHead {
+        let head = ClassHead {
             span: class.span,
             r#abstract: class.r#abstract,
             id_end: class.id.as_ref().map(|id| id.span.end),
@@ -1167,22 +1206,19 @@ impl<'arena> Eraser<'arena, '_> {
             super_class_end: class.super_class.map(|s| s.span().end),
             super_type_parameters: class.super_type_parameters.as_ref().map(|tp| tp.span),
             implements: class.implements,
-        });
-        let super_class = match class.super_class {
-            Some(expr) => self.expr_ref(expr)?.map(Some),
-            None => None,
         };
-        let body = self.class_body(&class.body)?;
-        if !erased_head && super_class.is_none() && body.is_none() {
+        let Some(parts) =
+            self.class_parts(&head, class.decorators, class.super_class, &class.body)?
+        else {
             return Ok(None);
-        }
+        };
         Ok(Some(ClassExpression {
             r#abstract: false,
             implements: &[],
             type_parameters: None,
             super_type_parameters: None,
-            super_class: super_class.unwrap_or(class.super_class),
-            body: body.unwrap_or_else(|| class.body.clone()),
+            super_class: parts.super_class,
+            body: parts.body,
             ..class.clone()
         }))
     }
