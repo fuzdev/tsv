@@ -1,0 +1,741 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 458,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The chain's argument printer shares the first-argument rule: a run glued to",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `(` that the author broke after takes its own line when the argument breaks.",
+			"start": 100,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 196,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The broken chain's argument printer too.",
+			"start": 236,
+			"end": 279,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 405,
+			"end": 413,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 3
+				},
+				"end": {
+					"line": 17,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 457,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 448,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 181,
+					"end": 233,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 181,
+						"end": 232,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 181,
+							"end": 192,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 12
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 181,
+								"end": 189,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 1
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 181,
+									"end": 187,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 1
+										},
+										"end": {
+											"line": 4,
+											"column": 7
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 181,
+										"end": 184,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 1
+											},
+											"end": {
+												"line": 4,
+												"column": 4
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 185,
+										"end": 187,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 5
+											},
+											"end": {
+												"line": 4,
+												"column": 7
+											}
+										},
+										"name": "m1"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 190,
+								"end": 192,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 10
+									},
+									"end": {
+										"line": 4,
+										"column": 12
+									}
+								},
+								"name": "m2"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ObjectExpression",
+								"start": 207,
+								"end": 229,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 212,
+										"end": 216,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 3
+											},
+											"end": {
+												"line": 7,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 212,
+											"end": 213,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 3
+												},
+												"end": {
+													"line": 7,
+													"column": 4
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 215,
+											"end": 216,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 6
+												},
+												"end": {
+													"line": 7,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 221,
+										"end": 225,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 221,
+											"end": 222,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 3
+												},
+												"end": {
+													"line": 8,
+													"column": 4
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 224,
+											"end": 225,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 6
+												},
+												"end": {
+													"line": 8,
+													"column": 7
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 196,
+										"end": 204
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The chain's argument printer shares the first-argument rule: a run glued to",
+							"start": 20,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " `(` that the author broke after takes its own line when the argument breaks.",
+							"start": 100,
+							"end": 179
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 281,
+					"end": 447,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 281,
+						"end": 446,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 281,
+							"end": 400,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 16,
+									"column": 36
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 281,
+								"end": 363,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 1
+									},
+									"end": {
+										"line": 15,
+										"column": 38
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 281,
+									"end": 361,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 1
+										},
+										"end": {
+											"line": 15,
+											"column": 36
+										}
+									},
+									"object": {
+										"type": "CallExpression",
+										"start": 281,
+										"end": 324,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 1
+											},
+											"end": {
+												"line": 14,
+												"column": 38
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 281,
+											"end": 322,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 1
+												},
+												"end": {
+													"line": 14,
+													"column": 36
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 281,
+												"end": 285,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 1
+													},
+													"end": {
+														"line": 13,
+														"column": 5
+													}
+												},
+												"name": "obj2"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 289,
+												"end": 322,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 3
+													},
+													"end": {
+														"line": 14,
+														"column": 36
+													}
+												},
+												"name": "m3aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 328,
+										"end": 361,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 36
+											}
+										},
+										"name": "m4bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 367,
+								"end": 400,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 3
+									},
+									"end": {
+										"line": 16,
+										"column": 36
+									}
+								},
+								"name": "m5ccccccccccccccccccccccccccccccc"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ObjectExpression",
+								"start": 417,
+								"end": 442,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 3
+									},
+									"end": {
+										"line": 21,
+										"column": 4
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 423,
+										"end": 427,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 4
+											},
+											"end": {
+												"line": 19,
+												"column": 8
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 423,
+											"end": 424,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 4
+												},
+												"end": {
+													"line": 19,
+													"column": 5
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 426,
+											"end": 427,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 7
+												},
+												"end": {
+													"line": 19,
+													"column": 8
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 433,
+										"end": 437,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 4
+											},
+											"end": {
+												"line": 20,
+												"column": 8
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 433,
+											"end": 434,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 4
+												},
+												"end": {
+													"line": 20,
+													"column": 5
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 436,
+											"end": 437,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 7
+												},
+												"end": {
+													"line": 20,
+													"column": 8
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 405,
+										"end": 413
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The broken chain's argument printer too.",
+							"start": 236,
+							"end": 279
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

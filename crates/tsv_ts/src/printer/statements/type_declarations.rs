@@ -476,11 +476,7 @@ impl<'a> Printer<'a> {
             // (Own-line runs never reach this branch: `force_break` above owns them.)
             if let Some(run) = self.broke_after_value_leading_run(eq_pos + 1, type_start) {
                 let type_doc = build_value();
-                if d.will_break(type_doc) {
-                    parts.push(self.break_after_operator_run_doc(&run, type_start, type_doc));
-                } else {
-                    parts.push(self.hang_after_operator_run_doc(&run, type_doc));
-                }
+                parts.push(self.break_or_hang_after_operator_run_doc(&run, type_start, type_doc));
             } else if let TSType::Union(u) = value_type {
                 // A glued block run between `=` and a union with no authored leading
                 // `|` is handed INTO the union, which binds it to the first member —

@@ -1814,6 +1814,115 @@ impl<'a> Printer<'a> {
         layout::hang_after_operator(d, d.concat(&content))
     }
 
+    /// Push a broke-after run and its newline-after soft `line` — the
+    /// group-riding form of the same rule
+    /// ([`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
+    /// is the hard-break form, [`hang_after_operator_run_doc`](Self::hang_after_operator_run_doc)
+    /// the seam-grouped one). The caller places the run inside an existing group
+    /// (an argument list's wrap), so the `line` materializes exactly when that
+    /// group breaks — the value's own hard break, a sibling's, or width — and
+    /// collapses to the glued bytes when it stays flat. That is prettier's
+    /// `printLeadingComment` `line` riding the argument group, which its
+    /// `propagateBreaks` marks broken for any of those reasons.
+    pub(crate) fn push_leading_run_with_soft_line(&self, parts: &mut DocBuf, run: &[&'a Comment]) {
+        if self.push_breaking_value_run_body(parts, run).is_some() {
+            parts.push(self.d().line());
+        }
+    }
+
+    /// [`Self::broke_after_value_leading_run`] restricted to a run that TRAILS its
+    /// opening delimiter — every comment on the `(`'s own line. The call-argument
+    /// seams need the narrower question: an own-line-authored leading run keeps its
+    /// break unconditionally there (`calls/leading_arg_block_comment_newline`'s
+    /// second case), so only the run the author glued to the opener and broke
+    /// after may ride a collapsible soft `line`. The keyword seams (spread dots,
+    /// `await`) deliberately take the wider gate — their target pulls an own-line
+    /// run up onto the keyword's line.
+    pub(crate) fn opener_trailing_broke_after_run(
+        &self,
+        opener: u32,
+        value_start: u32,
+    ) -> Option<CommentVec<'a>> {
+        let run = self.broke_after_value_leading_run(opener, value_start)?;
+        self.run_takes_soft_separator(opener, value_start, &run)
+            .then_some(run)
+    }
+
+    /// May this broke-after run ride a SOFT separator (the hang / argument-group
+    /// `line`)? Only when it TRAILS its opener — every comment on the opener's
+    /// line; an own-line-authored run keeps its break unconditionally at these
+    /// seams — AND no author blank separates it from the value. A soft `line`
+    /// cannot carry a blank (only the hard half's blank-preserving hardline can),
+    /// so emitting anyway DROPS the blank, and the own-line form that leaves
+    /// behind re-reads as a different authoring on the next pass — a 2-cycle the
+    /// blanks:audit catches as NON-IDEMPOTENT. A blank declines to the caller's
+    /// blank-aware layouts instead. Asked by
+    /// [`Self::opener_trailing_broke_after_run`] and, after the shared geometry
+    /// gate has already run, by the declarator / assignment `=` seams (whose HARD
+    /// half takes an own-line-authored or blank-separated run too) and the
+    /// arrow's soft arms.
+    pub(crate) fn run_takes_soft_separator(
+        &self,
+        opener: u32,
+        value_start: u32,
+        run: &[&'a Comment],
+    ) -> bool {
+        run.iter().all(|c| self.is_same_line(opener, c.span.start))
+            && run
+                .last()
+                .is_none_or(|last| !self.has_blank_line_between(last.span.end, value_start))
+    }
+
+    /// [`Self::break_after_operator_run_doc`] or
+    /// [`Self::hang_after_operator_run_doc`], chosen by the value's own hard
+    /// break — the two-half dispatch the operator seams share (the type-alias,
+    /// declarator, and assignment `=`). The arrow's hug arm asks the hard half
+    /// alone: its glued hug already renders the width case.
+    pub(crate) fn break_or_hang_after_operator_run_doc(
+        &self,
+        run: &[&'a Comment],
+        value_start: u32,
+        value_doc: DocId,
+    ) -> DocId {
+        if self.d().will_break(value_doc) {
+            self.break_after_operator_run_doc(run, value_start, value_doc)
+        } else {
+            self.hang_after_operator_run_doc(run, value_doc)
+        }
+    }
+
+    /// The whole declarator / assignment-expression `=` broke-after arm —
+    /// prettier's break-after-operator (`chooseLayout`'s `hasLeadingOwnLineComment`
+    /// arm) in the type-alias seam's two-half form: the geometry gate
+    /// ([`Self::broke_after_value_leading_run`]), the value built through the
+    /// caller's own builder, then `Some(rhs_doc)` when either half applies —
+    /// a value carrying a hard break takes the blank-preserving hardline emitter
+    /// (any run authoring: the own-line emission is the preserved own-line shape),
+    /// anything else one hang group whose soft `line` breaks exactly when the
+    /// operator seam does, restricted to a run that may ride a soft separator
+    /// ([`Self::run_takes_soft_separator`]: trails the operator, no author blank).
+    /// A value that FITS collapses to the glued bytes in both formatters; a
+    /// width-broken one holds the run on its own line with the value re-fitting
+    /// below instead of stranding it mid-line (`⏎\t/* c */ aaa +`, a form
+    /// prettier never emits). Declines — a line comment (its mandatory-break path
+    /// owns it), an own-line-authored or blank-separated run before a fitting
+    /// value — keep the caller's layouts, which preserve those breaks; the value
+    /// doc built for a declined probe is discarded, as the combined gate's is.
+    /// The returned doc begins after the operator; the caller emits the LHS and
+    /// the operator text before it.
+    pub(crate) fn broke_after_operator_rhs_doc(
+        &self,
+        gap_start: u32,
+        value_start: u32,
+        build_value: impl FnOnce() -> DocId,
+    ) -> Option<DocId> {
+        let run = self.broke_after_value_leading_run(gap_start, value_start)?;
+        let value_doc = build_value();
+        (self.d().will_break(value_doc)
+            || self.run_takes_soft_separator(gap_start, value_start, &run))
+        .then(|| self.break_or_hang_after_operator_run_doc(&run, value_start, value_doc))
+    }
+
     /// The geometry half of the broke-after value gate: `Some(run)` when the
     /// `[gap_start, value_start)` gap holds a block-only leading run whose last
     /// comment the author broke after. Anything else — an empty gap, a line
@@ -1857,9 +1966,14 @@ impl<'a> Printer<'a> {
     /// caller's builder) **will break** — the gate for
     /// [`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
     /// at the seams whose remaining layouts already render the width-driven case
-    /// (the declarator and assignment-expression `=`, the simple `:` annotation,
-    /// the spread's dots→argument gap, the `await` keyword→argument gap). A value
-    /// that fits declines, and the caller keeps its glued path.
+    /// (the simple `:` annotation, the spread's dots→argument gap, the `await`
+    /// keyword→argument gap, the arrow's hug arm). A value that fits declines,
+    /// and the caller keeps its glued path. The declarator and
+    /// assignment-expression `=` instead split the gate — geometry here, the two
+    /// break halves via
+    /// [`break_or_hang_after_operator_run_doc`](Self::break_or_hang_after_operator_run_doc)
+    /// — because their width half is real but restricted to a run that trails
+    /// the operator with no blank after it ([`Self::run_takes_soft_separator`]).
     pub(crate) fn breaking_value_leading_run(
         &self,
         gap_start: u32,
