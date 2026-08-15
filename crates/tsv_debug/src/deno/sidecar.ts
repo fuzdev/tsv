@@ -86,8 +86,12 @@ const ParserWithTS = acorn.Parser.extend(tsPlugin() as any);
 // `{x} {z}` (the compiled bytes differ by a real rendered space), and `a{@render f()}b` keyed
 // equal to `a {@render f()} b`. With a sentinel the hole is content: whitespace beside it is
 // preserved by the collapse and compared, while whitespace-only differences the compiler
-// erases never reach the key at all (the compiled bytes are equal first). U+0001 never
-// appears in compiled template text.
+// erases never reach the key at all (the compiled bytes are equal first). A literal U+0001
+// in the source would collide with the sentinel (the compiler passes it through), but every
+// consumer compares a source against its own formatted self or two related authorings, and
+// the formatter never swaps an expression for a control character — so the collision is
+// unreachable today; escape literal `\x01` in the chunks before substitution if the key ever
+// grades adversarial pairs.
 const HOLE = '\x01';
 
 function bakedSkeleton(code: string): string {
