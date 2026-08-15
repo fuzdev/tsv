@@ -3,7 +3,6 @@
 // for-loop header layout (init/test/update clauses with comment placement),
 // for-in/for-of left/right printing.
 
-use super::super::HeaderBodyBlank;
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
@@ -1548,12 +1547,7 @@ impl<'a> Printer<'a> {
                     // `)` is already inside the header doc. Given this branch's guard, the
                     // gap's separator is the hardline that drops the block to the next line.
                     let mut tail = DocBuf::new();
-                    self.push_header_to_body_gap(
-                        &mut tail,
-                        header_end,
-                        body_start,
-                        HeaderBodyBlank::Drop,
-                    );
+                    self.push_header_to_body_gap(&mut tail, header_end, body_start);
                     tail.push(body_doc);
                     (d.concat(&tail), false)
                 } else {

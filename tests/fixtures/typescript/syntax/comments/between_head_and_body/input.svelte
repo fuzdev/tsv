@@ -154,4 +154,59 @@
 	{
 		fn();
 	} while (a);
+
+	// If - blank between a comment trailing the anchor and an own-line one, block body
+	if (a) // c1
+
+	// c2
+	{
+	}
+
+	// While - the same after the header `)`
+	while (a) // c1
+
+	// c2
+	{
+		fn();
+	}
+
+	// For - the same
+	for (;;) // c1
+
+	// c2
+	{
+		fn();
+	}
+
+	// For-in - the same
+	for (a in b) // c1
+
+	// c2
+	{
+		fn();
+	}
+
+	// For-of - the same
+	for (a of b) // c1
+
+	// c2
+	{
+		fn();
+	}
+
+	// Else - the same across the else keyword
+	if (a) {
+	} else // c1
+
+	// c2
+	{
+	}
+
+	// Do - the same after the do keyword
+	do // c1
+
+	// c2
+	{
+		fn();
+	} while (a);
 </script>

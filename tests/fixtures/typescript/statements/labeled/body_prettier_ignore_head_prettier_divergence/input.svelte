@@ -21,4 +21,11 @@
 		fn(  ddd  );
 		break nnn;
 	}
+
+	// an author blank below the directive survives — a brace-less body opens no `{`
+	// for it to sit above
+	ooo:
+	// prettier-ignore
+
+	fn(  eee  );
 </script>
