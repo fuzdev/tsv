@@ -68,10 +68,23 @@ pub struct Lexer<'a> {
     current: Option<char>,
     pub inside_tag: bool,    // Track if we're inside <...>
     initial_position: usize, // Position after BOM skip (0 or 3)
+    /// Byte offset of `source` within the document this lexer's ERRORS are rendered
+    /// against — zero for a whole component, `pos` for the slice the parser rebuilds this
+    /// lexer over after a jumped scan (`SvelteParser::advance_to_position`). Token
+    /// positions are unaffected (the parser shifts those by its own `base_offset`).
+    /// See [`Lexer::host_err`].
+    base_offset: usize,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(source: &'a str) -> Self {
+    /// A lexer over `source`, which sits at `base_offset` in the document its errors will
+    /// be rendered against.
+    ///
+    /// The offset is a required argument rather than a `new(source)` default because a
+    /// silent zero is the failure mode: the parser rebuilds this lexer over `source[pos..]`
+    /// whenever it jumps the cursor, so after any such jump a zero-offset lexer reports
+    /// every error in the coordinates of that slice rather than the component's.
+    pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
         let mut chars = source.chars();
         let mut current = chars.next();
         let mut position = 0;
@@ -91,7 +104,19 @@ impl<'a> Lexer<'a> {
             current,
             inside_tag: false,
             initial_position: position,
+            base_offset,
         }
+    }
+
+    /// Lift an error this lexer produced into the coordinates of the document it will be
+    /// rendered against (`ParseError::shift_position`).
+    ///
+    /// Applied once, at [`Lexer::next_token`] — this lexer's only fallible entry point,
+    /// and so its only producer.
+    #[cold]
+    #[inline(never)]
+    fn host_err(&self, err: ParseError) -> ParseError {
+        err.shift_position(self.base_offset)
     }
 
     /// Returns the initial position after BOM skip (0 if no BOM, 3 if BOM was skipped).
@@ -178,7 +203,15 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// The lexer's one fallible entry point — so the error path is lifted into host
+    /// coordinates here ([`Lexer::host_err`]); the scan itself reports in the lexer's own.
+    #[inline]
     pub fn next_token(&mut self) -> Result<Token, ParseError> {
+        self.next_token_local().map_err(|err| self.host_err(err))
+    }
+
+    /// [`Lexer::next_token`]'s scan, reporting an error at its position in `self.source`.
+    fn next_token_local(&mut self) -> Result<Token, ParseError> {
         // Template mode (outside tags): skip text content, only tokenize special chars
         // Tag mode (inside <...>): tokenize everything including identifiers
         if self.inside_tag {

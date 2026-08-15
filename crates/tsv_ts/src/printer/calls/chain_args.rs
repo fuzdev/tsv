@@ -315,15 +315,6 @@ fn build_call_args_doc_for_chain_impl(
     // answer the blank question exactly as a plain call's do.
     let any_arg_empty_line = any_arg_empty_line(call.arguments, printer);
 
-    // Multiple arrow function arguments: always expand to multiple lines
-    // Prettier always expands 2+ arrow function arguments, regardless of source formatting.
-    // This matches Prettier's behavior: fn(() => x, () => y) → fn(\n  () => x,\n  () => y,\n)
-    let all_args_are_arrows = call.arguments.len() >= 2
-        && call
-            .arguments
-            .iter()
-            .all(|arg| matches!(arg, Expression::ArrowFunctionExpression(_)));
-
     // Get paren_open position (after type args if present, otherwise after callee)
     let paren_open = type_args.map_or_else(|| call.callee.span().end, |ta| ta.span.end);
 
@@ -382,11 +373,13 @@ fn build_call_args_doc_for_chain_impl(
         has_any_comments && any_comment_forces_expansion(call, printer, paren_open);
 
     // Function composition: call arg contains a callback → expand all args
-    // e.g., x.y(arr.map((e) => e[0]), ['foo']) — matches Prettier's isFunctionCompositionArgs
+    // e.g., x.y(arr.map((e) => e[0]), ['foo']) — matches Prettier's isFunctionCompositionArgs.
+    // That predicate also subsumes the all-arrows case (2+ arguments that are all arrows means
+    // `function_count > 1`, which it short-circuits `true` on), so there is no separate
+    // arrow-only disjunct here — the twin in `call_formatting.rs` states the same.
     let force_expand = force_expand
         || any_arg_empty_line
         || comments_force_expansion
-        || all_args_are_arrows
         || is_function_composition_args(call.arguments);
 
     // `?.` precedes explicit type arguments (`a.fn?.<T>(b)`), so it only fuses

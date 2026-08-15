@@ -28,19 +28,15 @@ pub struct CanonicalParseCommand {
 
 impl CanonicalParseCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let input_args = InputArgs {
-            content: self.content,
-            stdin: self.stdin,
-            parser: self.parser,
-            file: self.file,
-        };
-        let (input, parser_type) = match input_args.resolve() {
-            Ok(pair) => pair,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+        let (input, parser_type) = super::resolve_input_or_fail(
+            InputArgs {
+                content: self.content,
+                stdin: self.stdin,
+                parser: self.parser,
+                file: self.file,
+            },
+            CliError::Failed,
+        )?;
 
         let rt = super::create_runtime();
         match rt.block_on(run(&input, parser_type)) {

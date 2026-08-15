@@ -47,39 +47,26 @@ impl AstDiffCommand {
         }
 
         // Resolve the primary input
-        let (input1, parser_type) = if has_content_or_stdin {
-            let input_args = InputArgs {
+        let primary = if has_content_or_stdin {
+            InputArgs {
                 content: self.content,
                 stdin: self.stdin,
                 parser: self.parser,
                 file: None,
-            };
-            match input_args.resolve() {
-                Ok(pair) => pair,
-                Err(e) => {
-                    eprintln!("Error: {e}");
-                    return Err(CliError::Failed);
-                }
             }
         } else {
             let Some(first) = self.files.first().cloned() else {
                 eprintln!("Error: No input provided. Use a file path, --content, or --stdin");
                 return Err(CliError::Failed);
             };
-            let input_args = InputArgs {
+            InputArgs {
                 content: None,
                 stdin: false,
                 parser: self.parser,
                 file: Some(first),
-            };
-            match input_args.resolve() {
-                Ok(pair) => pair,
-                Err(e) => {
-                    eprintln!("Error: {e}");
-                    return Err(CliError::Failed);
-                }
             }
         };
+        let (input1, parser_type) = super::resolve_input_or_fail(primary, CliError::Failed)?;
 
         // Optional second file for direct comparison mode
         let input2 = if self.files.len() == 2 {

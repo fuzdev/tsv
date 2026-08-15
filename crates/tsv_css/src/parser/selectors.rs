@@ -552,7 +552,10 @@ fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseE
 /// the multi-comment generalization of a single `peek_kind` — one lookahead can't
 /// see past a *second* glued comment. Non-destructive.
 fn compound_continues_across_comments(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
-    let mut lexer = Lexer::new(&parser.source()[parser.current_end..]);
+    let mut lexer = Lexer::at_offset(
+        &parser.source()[parser.current_end..],
+        parser.base_offset() + parser.current_end,
+    );
     loop {
         match lexer.next_token()?.kind {
             TokenKind::Comment => continue,

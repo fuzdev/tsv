@@ -218,6 +218,37 @@ impl ParseError {
         ParseError::new(ParseErrorKind::FileTooLarge { size, max })
     }
 
+    /// Lift a position out of a lexer's own coordinates into the document's.
+    ///
+    /// A [`lex_err`] position indexes the lexer's `source`, which is routinely a **slice**
+    /// of the document the error is finally rendered against: a Svelte `<script>` /
+    /// `<style>` island, the CSS declaration-value scan (`source[from..]`), the Svelte
+    /// parser's own reseek after a jumped scan. [`ParseError::with_context`] is handed the
+    /// whole document, so a slice-local position points at the wrong construct — an error
+    /// on line 4 of a component rendered against line 1, out in the markup.
+    ///
+    /// Each lexer applies this **once**, at the entry point that PRODUCES the error; a
+    /// wrapper that delegates to such an entry point must not re-apply it. A double shift
+    /// runs the position past the end of the source, where `ErrorContext::from_source`
+    /// returns `None` and the caret disappears entirely.
+    ///
+    /// The parser side needs none of this: its positions are already host coordinates
+    /// (each parser's `current_pos` adds the same `base_offset`), which is why parser
+    /// errors were always right and only lexer errors drifted.
+    #[cold]
+    #[inline(never)]
+    pub fn shift_position(mut self, base_offset: usize) -> Self {
+        match &mut *self.0 {
+            ParseErrorKind::UnexpectedToken { position, .. }
+            | ParseErrorKind::UnexpectedEof { position, .. }
+            | ParseErrorKind::InvalidSyntax { position, .. }
+            | ParseErrorKind::InvalidExpression { position, .. } => *position += base_offset,
+            // No position to shift.
+            ParseErrorKind::FileTooLarge { .. } => {}
+        }
+        self
+    }
+
     /// Add source context to an error
     ///
     /// Call this to enrich errors with source snippets for better debugging.

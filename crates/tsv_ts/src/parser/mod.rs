@@ -310,7 +310,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         goal: Goal,
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
-        let mut lexer = Lexer::new(source);
+        // The lexer scans `source` (the island) but reports errors against the document
+        // it sits in, so it carries the same `base_offset` the spans below are shifted by.
+        let mut lexer = Lexer::at_offset(source, base_offset);
         let mut current = lexer.next_token()?;
         let mut decoded = lexer
             .decoded_str()
