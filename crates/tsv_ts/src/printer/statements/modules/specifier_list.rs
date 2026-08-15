@@ -22,6 +22,14 @@ pub(super) struct SpecifierListSpans {
     pub(super) header_start: u32,
     /// End of the keyword header, where the forward `{` search starts.
     pub(super) kw_end: u32,
+    /// Start of the gap before `{` that this list claims and preserves in place —
+    /// `kw_end` when the `{` follows the header directly, and the split point past a
+    /// leading binding's separating `,` otherwise (see
+    /// [`Printer::binding_separator_split`]). The two spellings are the same gap
+    /// question one token apart, so both route through the one continuation helper
+    /// and a `//` in either indents the whole `{ … }` — including the list's own
+    /// breaks, which an emitter outside the braces doc cannot reach.
+    pub(super) gap_start: u32,
     /// Upper bound for every scan past the specifiers — the closing `}`, and the
     /// `from` that ends the lone-specifier comment window (source-literal start,
     /// or the declaration end for a local `export {…};`).
@@ -304,14 +312,11 @@ impl<'a> Printer<'a> {
     ///
     /// `brace_follows_header` states that the `{` directly follows the header —
     /// always so for exports, and for imports only without a preceding
-    /// default/namespace binding (prettier's `standaloneSpecifiers`). Two rules read
-    /// that one fact: a comment in the keyword→`{` gap (`import /* c */ {a}`,
-    /// `export type /* c */ {a}`) is preserved in place only when it holds (prettier
-    /// relocates such a comment into the braces as the first specifier's leading
-    /// comment — a comment-position divergence; with a binding the caller already
-    /// emits that gap's comments as it builds `x, {…}`, so capturing here would
-    /// double-emit them), and a lone specifier is unbreakable only when it holds
-    /// (see `can_break` below).
+    /// default/namespace binding (prettier's `standaloneSpecifiers`). One rule reads
+    /// it: a lone specifier is unbreakable only when it holds (see `can_break`
+    /// below). Which gap before `{` this list claims is `spans.gap_start`'s to say,
+    /// not this flag's — with a binding the claim simply opens one token later, past
+    /// the separating `,`.
     pub(super) fn push_braced_specifier_list<T>(
         &self,
         parts: &mut DocBuf,
@@ -383,17 +388,16 @@ impl<'a> Printer<'a> {
             }
         };
 
-        // The keyword→`{` gap comment (`import /* c */ {a}`, `import type // c\n{a}`,
-        // and the export forms) is preserved before the brace; prettier relocates it
-        // into the braces. A line comment forces `{…}` onto a new line, which the
-        // shared helper indents one level (statement continuation) — the leading
-        // space comes from the caller's `import `/`export `/`type ` token. Captured
-        // only when the `{` directly follows the header (see `brace_follows_header`).
-        if brace_follows_header {
-            parts.push(self.gap_comment_continuation_tail(spans.kw_end, brace_start, braces_doc));
-        } else {
-            parts.push(braces_doc);
-        }
+        // The gap comment before the brace is preserved in place; prettier relocates
+        // it into the braces. A line comment forces `{…}` onto a new line, which the
+        // shared helper indents one level (statement continuation) — the leading space
+        // comes from the caller's `import `/`export `/`type ` token, or from the `, `
+        // it emits after a leading binding. `gap_start` names which gap that is: the
+        // keyword→`{` one (`import /* c */ {a}`, `import type // c\n{a}`, and the
+        // export forms), or the separator gap past a default/namespace binding's `,`
+        // (`import a, // c\n{b}`). Emitting the latter outside the braces doc instead
+        // let a `//` swallow the `{`, the specifiers, `from`, the source and the `;`.
+        parts.push(self.gap_comment_continuation_tail(spans.gap_start, brace_start, braces_doc));
         after_brace
     }
 

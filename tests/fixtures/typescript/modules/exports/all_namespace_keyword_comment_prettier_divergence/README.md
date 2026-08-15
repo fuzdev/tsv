@@ -34,3 +34,13 @@ Comment Position Philosophy. Sibling of the export-all
 after `from`).
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
+
+`c7`/`c8` pin both gaps at once: the `export`→`*` header gap and the `*`→`as` gap together keep the
+whole header at **one** indent level, never a staircase — the same rule
+[export_as_namespace_line_comment](../export_as_namespace_line_comment_prettier_divergence/) states
+for the three-word keyword, and the reason the `as` binding is emitted *outside* the header gap's
+continuation rather than folded into it (`Printer::push_namespace_star_binding`, the one emitter
+this shares with the import forms, whose
+[separator_line_comment](../../imports/separator_line_comment_prettier_divergence/) twin pins the
+same shape). Single-gap output is byte-identical either way, so this is the only shape that can
+catch a nested-indent regression.

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 615,
+	"end": 747,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -201,24 +201,72 @@
 					"column": 18
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " both gaps at once — the whole header stays at ONE indent level, never a staircase",
+			"start": 607,
+			"end": 691,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 700,
+			"end": 705,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 8
+				},
+				"end": {
+					"line": 23,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 713,
+			"end": 718,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 7
+				},
+				"end": {
+					"line": 24,
+					"column": 12
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 614,
+		"end": 746,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 605,
+			"end": 737,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 21,
+					"line": 26,
 					"column": 9
 				}
 			},
@@ -610,6 +658,77 @@
 							"value": " line comment between as and binding — tsv indents the binding, prettier flattens it",
 							"start": 481,
 							"end": 567
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 693,
+					"end": 736,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 17
+						}
+					},
+					"exportKind": "value",
+					"exported": {
+						"type": "Identifier",
+						"start": 721,
+						"end": 724,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 2
+							},
+							"end": {
+								"line": 25,
+								"column": 5
+							}
+						},
+						"name": "ns7",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c7",
+								"start": 700,
+								"end": 705
+							},
+							{
+								"type": "Line",
+								"value": " c8",
+								"start": 713,
+								"end": 718
+							}
+						]
+					},
+					"source": {
+						"type": "Literal",
+						"start": 730,
+						"end": 735,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 11
+							},
+							"end": {
+								"line": 25,
+								"column": 16
+							}
+						},
+						"value": "./g",
+						"raw": "'./g'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " both gaps at once — the whole header stays at ONE indent level, never a staircase",
+							"start": 607,
+							"end": 691
 						}
 					]
 				}

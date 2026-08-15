@@ -5,6 +5,7 @@
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::comments::CommentSpacing;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -42,29 +43,78 @@ pub(super) fn is_only_whitespace_and_comments(text: &str) -> bool {
 }
 
 impl<'a> Printer<'a> {
-    /// Emit the ` as <binding>` tail of a namespace binding (`* as ns`), starting
-    /// just past the `*`. `star_end` is the position just past `*`; `binding` is the
-    /// namespace name (`exported` for a re-export — which may be a string,
-    /// `export * as 'str' from` — or `local` for an import, always an identifier).
+    /// Where the gap between a leading binding and the clause after it splits around
+    /// their separating `,`: comments before the returned offset are emitted **before**
+    /// the comma, comments at or after it **past** it.
     ///
-    /// Delegates to the shared [`Self::build_as_binding_continuation`]: a *line*
-    /// comment in the `*`→`as` gap or the `as`→binding gap stays in place and indents
-    /// its continuation one level, and a block comment trails inline. In the `*`→`as`
-    /// gap that matches prettier's freedom (it relocates the comment after `as`); in
+    /// The comma separating a default/namespace binding from what follows
+    /// (`import a, {b}` / `import a, * as ns`) is a **pure separator**, so neither side
+    /// of it carries authorship signal and a *line* comment authored on either side
+    /// trails past it — the carve-out the braced specifier list already takes between
+    /// its own elements (`a // c⏎, b` → `a, // c`), which is what makes the two
+    /// authorings reach one fixed point. A `//` has no representable position before
+    /// the comma anyway: emitting it there runs it over the comma and everything after
+    /// (the clause, `from`, the source, the `;`) — lost CODE whose output does not
+    /// reparse, which is what this split replaced.
+    ///
+    /// `scan_end` carries the caller's *block* policy, which is the one thing the two
+    /// arms do not share: prettier hoists a block **before** the comma for a named list
+    /// (`import a, /* c */ {b}` → `import a /* c */, {b}`) but leaves it on its
+    /// authored side for a namespace (`import a, /* c */ * as ns` stays), and tsv
+    /// matches both. So the named-list caller scans to the `{` — every block is then
+    /// ahead of the split and hoists — while the namespace caller scans only to the
+    /// comma, leaving the blocks past it where the author wrote them. A block ahead of
+    /// the `//` keeps its place in the run either way rather than reordering across it,
+    /// which is why this is a split point and not a per-comment filter.
+    pub(super) fn binding_separator_split(&self, binding_end: u32, scan_end: u32) -> u32 {
+        comments_to_emit_in_range(self.comments, binding_end, scan_end)
+            .find(|c| !c.is_block)
+            .map_or(scan_end, |c| c.span.start)
+    }
+
+    /// Emit a namespace `* [as <binding>]` clause preceded by the gap comments in
+    /// `[gap_start, star_pos)` — the one emitter for every namespace star in the module
+    /// statements: the import forms (`import * as ns`, and `import a, * as ns`, whose
+    /// gap opens past the separating `,` instead of at the header) and the export-all
+    /// forms (`export * from`, `export * as ns from`, with or without `type`), which
+    /// differ only in where that gap starts and whether a binding follows.
+    ///
+    /// ⚠️ **Only the `*` rides [`Self::gap_comment_continuation_tail`]; the binding
+    /// follows OUTSIDE it.** A line comment in the gap carries the `*` onto the
+    /// indented continuation line and the binding lands on that same line, so a second
+    /// comment one gap further in (`* as // c⏎ns`) takes the same ONE level — the
+    /// module headers' "never a staircase" rule. Folding the binding into the
+    /// continuation argument instead reads as the obvious simplification and is a bug:
+    /// [`Self::build_as_binding_continuation`] is *itself* an `indent`, so nesting it
+    /// composes the two levels. Single-gap output is byte-identical either way, which
+    /// is why the whole fixture suite is blind to it — hence one emitter rather than a
+    /// rule restated per site. See conformance_prettier.md §Uniform Forced-Continuation
+    /// Indent.
+    ///
+    /// `binding` is the namespace name — `exported` for a re-export (which may be a
+    /// string, `export * as 'str' from`) or `local` for an import (always an
+    /// identifier) — and `None` for a bare `export * from`. Its own `*`→`as` and
+    /// `as`→binding gaps are the shared continuation helper's; in the `*`→`as` gap
+    /// preserving matches prettier's freedom (it relocates the comment after `as`), in
     /// the `as`→binding gap it is a deliberate indent-only divergence (prettier keeps
     /// the comment in place but flattens the binding, `* as // c\nns`). See
     /// conformance_prettier_ts_comments.md §Comment relocation.
-    pub(super) fn append_namespace_as_binding(
+    pub(super) fn push_namespace_star_binding(
         &self,
         parts: &mut DocBuf,
-        star_end: u32,
-        binding: &internal::ModuleExportName<'_>,
+        gap_start: u32,
+        star_pos: u32,
+        binding: Option<&internal::ModuleExportName<'_>>,
     ) {
-        parts.push(self.build_as_binding_continuation(star_end, binding));
+        let d = self.d();
+        parts.push(self.gap_comment_continuation_tail(gap_start, star_pos, d.text("*")));
+        if let Some(binding) = binding {
+            parts.push(self.build_as_binding_continuation(star_pos + 1, binding));
+        }
     }
 
     /// Build the ` as <binding>` continuation shared by the namespace `*`→`as` binding
-    /// ([`Self::append_namespace_as_binding`]) and the renamed named-specifier `a as b`
+    /// ([`Self::push_namespace_star_binding`]) and the renamed named-specifier `a as b`
     /// rename ([`Self::build_renamed_specifier_doc`]) — the two differ only in what
     /// precedes `as` (a `*`, or the `imported`/`local` name), so both route their
     /// `as`-gap comments here. Starting just past `left_end`, locate `as`, then build
