@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 544,
+	"end": 613,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -156,9 +156,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " A call in the chain: a comment inside the brackets stays inside them.",
+			"value": " A call in the chain: a comment inside the brackets stays inside them, and the",
 			"start": 422,
-			"end": 494,
+			"end": 502,
 			"loc": {
 				"start": {
 					"line": 18,
@@ -166,23 +166,39 @@
 				},
 				"end": {
 					"line": 18,
-					"column": 73
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " brackets breaking internally keeps the chain on the `=` line.",
+			"start": 504,
+			"end": 568,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 65
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c5",
-			"start": 518,
-			"end": 523,
+			"start": 589,
+			"end": 594,
 			"loc": {
 				"start": {
 					"line": 21,
-					"column": 3
+					"column": 2
 				},
 				"end": {
 					"line": 21,
-					"column": 8
+					"column": 7
 				}
 			}
 		}
@@ -190,12 +206,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 543,
+		"end": 612,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 534,
+			"end": 603,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -604,44 +620,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 496,
-					"end": 533,
+					"start": 570,
+					"end": 602,
 					"loc": {
 						"start": {
-							"line": 19,
+							"line": 20,
 							"column": 1
 						},
 						"end": {
 							"line": 23,
-							"column": 4
+							"column": 3
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 502,
-							"end": 532,
+							"start": 576,
+							"end": 601,
 							"loc": {
 								"start": {
-									"line": 19,
+									"line": 20,
 									"column": 7
 								},
 								"end": {
 									"line": 23,
-									"column": 3
+									"column": 2
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 502,
-								"end": 503,
+								"start": 576,
+								"end": 577,
 								"loc": {
 									"start": {
-										"line": 19,
+										"line": 20,
 										"column": 7
 									},
 									"end": {
-										"line": 19,
+										"line": 20,
 										"column": 8
 									}
 								},
@@ -649,44 +665,44 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 508,
-								"end": 532,
+								"start": 580,
+								"end": 601,
 								"loc": {
 									"start": {
 										"line": 20,
-										"column": 2
+										"column": 11
 									},
 									"end": {
 										"line": 23,
-										"column": 3
+										"column": 2
 									}
 								},
 								"object": {
 									"type": "CallExpression",
-									"start": 508,
-									"end": 513,
+									"start": 580,
+									"end": 585,
 									"loc": {
 										"start": {
 											"line": 20,
-											"column": 2
+											"column": 11
 										},
 										"end": {
 											"line": 20,
-											"column": 7
+											"column": 16
 										}
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 508,
-										"end": 511,
+										"start": 580,
+										"end": 583,
 										"loc": {
 											"start": {
 												"line": 20,
-												"column": 2
+												"column": 11
 											},
 											"end": {
 												"line": 20,
-												"column": 5
+												"column": 14
 											}
 										},
 										"name": "foo"
@@ -696,16 +712,16 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 527,
-									"end": 528,
+									"start": 597,
+									"end": 598,
 									"loc": {
 										"start": {
 											"line": 22,
-											"column": 3
+											"column": 2
 										},
 										"end": {
 											"line": 22,
-											"column": 4
+											"column": 3
 										}
 									},
 									"name": "i",
@@ -713,8 +729,8 @@
 										{
 											"type": "Line",
 											"value": " c5",
-											"start": 518,
-											"end": 523
+											"start": 589,
+											"end": 594
 										}
 									]
 								},
@@ -727,9 +743,15 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " A call in the chain: a comment inside the brackets stays inside them.",
+							"value": " A call in the chain: a comment inside the brackets stays inside them, and the",
 							"start": 422,
-							"end": 494
+							"end": 502
+						},
+						{
+							"type": "Line",
+							"value": " brackets breaking internally keeps the chain on the `=` line.",
+							"start": 504,
+							"end": 568
 						}
 					]
 				}

@@ -1,0 +1,800 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 509,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a lone same-line comment after the call collapses, trailing past the member",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 110,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line comment before the trailing member breaks the chain and keeps its line",
+			"start": 118,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 212,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a same-line comment then an own-line one: the chain breaks, each comment in place",
+			"start": 228,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 319,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 6
+				},
+				"end": {
+					"line": 11,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 327,
+			"end": 332,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same rule through an optional member",
+			"start": 343,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 395,
+			"end": 400,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " and past a non-null on the call, in an initializer",
+			"start": 412,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 485,
+			"end": 490,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 508,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 100,
+					"end": 109,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 100,
+						"end": 108,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 9
+							}
+						},
+						"object": {
+							"type": "CallExpression",
+							"start": 100,
+							"end": 104,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 5
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 100,
+								"end": 102,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 1
+									},
+									"end": {
+										"line": 3,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 105,
+							"end": 108,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 6
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"name": "bar"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a lone same-line comment after the call collapses, trailing past the member",
+							"start": 20,
+							"end": 98
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 110,
+							"end": 115
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 205,
+					"end": 225,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 205,
+						"end": 224,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 6
+							}
+						},
+						"object": {
+							"type": "CallExpression",
+							"start": 205,
+							"end": 209,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 5
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 205,
+								"end": 207,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 1
+									},
+									"end": {
+										"line": 6,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 221,
+							"end": 224,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 3
+								},
+								"end": {
+									"line": 8,
+									"column": 6
+								}
+							},
+							"name": "bar",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 212,
+									"end": 217
+								}
+							]
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line comment before the trailing member breaks the chain and keeps its line",
+							"start": 118,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 314,
+					"end": 340,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 314,
+						"end": 339,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 6
+							}
+						},
+						"object": {
+							"type": "CallExpression",
+							"start": 314,
+							"end": 318,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 5
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 314,
+								"end": 316,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 1
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false,
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 319,
+									"end": 324
+								}
+							]
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 336,
+							"end": 339,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 3
+								},
+								"end": {
+									"line": 13,
+									"column": 6
+								}
+							},
+							"name": "bar",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 327,
+									"end": 332
+								}
+							]
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a same-line comment then an own-line one: the chain breaks, each comment in place",
+							"start": 228,
+							"end": 312
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 388,
+					"end": 409,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 388,
+						"end": 408,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "MemberExpression",
+							"start": 388,
+							"end": 408,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 1
+								},
+								"end": {
+									"line": 18,
+									"column": 7
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 388,
+								"end": 392,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 1
+									},
+									"end": {
+										"line": 16,
+										"column": 5
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 388,
+									"end": 390,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 1
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 405,
+								"end": 408,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 4
+									},
+									"end": {
+										"line": 18,
+										"column": 7
+									}
+								},
+								"name": "bar",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c5",
+										"start": 395,
+										"end": 400
+									}
+								]
+							},
+							"computed": false,
+							"optional": true
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same rule through an optional member",
+							"start": 343,
+							"end": 386
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 467,
+					"end": 498,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 473,
+							"end": 497,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 473,
+								"end": 474,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 477,
+								"end": 497,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 23,
+										"column": 6
+									}
+								},
+								"object": {
+									"type": "TSNonNullExpression",
+									"start": 477,
+									"end": 482,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 16
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 477,
+										"end": 481,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 11
+											},
+											"end": {
+												"line": 21,
+												"column": 15
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 477,
+											"end": 479,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 11
+												},
+												"end": {
+													"line": 21,
+													"column": 13
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 494,
+									"end": 497,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 3
+										},
+										"end": {
+											"line": 23,
+											"column": 6
+										}
+									},
+									"name": "bar",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c6",
+											"start": 485,
+											"end": 490
+										}
+									]
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " and past a non-null on the call, in an initializer",
+							"start": 412,
+							"end": 465
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -215,11 +215,11 @@ impl<'a> Printer<'a> {
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 // The object's share of a spread's stripped-paren interior: the own-line
-                // blocks the spread's own doc leaves behind, each a sibling line the
+                // comments the spread's own doc leaves behind, each a sibling line the
                 // object cannot stay collapsed around. Emitted past the comma, like the
                 // array element loop and the argument-list gaps.
                 if let Some(s) = spread {
-                    self.push_spread_element_own_line_block_comments(&mut parts, s);
+                    self.push_spread_element_own_line_comments(&mut parts, s);
                 }
 
                 prev_end = trailing.end_pos;

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 409,
+	"end": 490,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -153,24 +153,56 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A line comment takes the same slide",
+			"start": 401,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 467,
+			"end": 471,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 2
+				},
+				"end": {
+					"line": 41,
+					"column": 6
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 408,
+		"end": 489,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 399,
+			"end": 480,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 36,
+					"line": 44,
 					"column": 9
 				}
 			},
@@ -715,6 +747,136 @@
 							"value": " The spread need not be the first element",
 							"start": 307,
 							"end": 350
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 441,
+					"end": 479,
+					"loc": {
+						"start": {
+							"line": 38,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 447,
+							"end": 478,
+							"loc": {
+								"start": {
+									"line": 38,
+									"column": 7
+								},
+								"end": {
+									"line": 43,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 447,
+								"end": 448,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 7
+									},
+									"end": {
+										"line": 38,
+										"column": 8
+									}
+								},
+								"name": "o"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 451,
+								"end": 478,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 11
+									},
+									"end": {
+										"line": 43,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 455,
+										"end": 459,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 2
+											},
+											"end": {
+												"line": 39,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 458,
+											"end": 459,
+											"loc": {
+												"start": {
+													"line": 39,
+													"column": 5
+												},
+												"end": {
+													"line": 39,
+													"column": 6
+												}
+											},
+											"name": "p"
+										}
+									},
+									null,
+									{
+										"type": "Identifier",
+										"start": 474,
+										"end": 475,
+										"loc": {
+											"start": {
+												"line": 42,
+												"column": 2
+											},
+											"end": {
+												"line": 42,
+												"column": 3
+											}
+										},
+										"name": "q",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 467,
+												"end": 471
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment takes the same slide",
+							"start": 401,
+							"end": 439
 						}
 					]
 				}
