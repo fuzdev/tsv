@@ -8,6 +8,7 @@
 
 use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
+use crate::printer::expressions::operators::SeqLayout;
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -709,7 +710,11 @@ impl<'a> Printer<'a> {
             return None;
         }
         if matches!(expr, internal::Expression::SequenceExpression(_)) {
-            return Some(self.build_expression_doc_keep_paren_comments(expr, boundary_end));
+            return Some(self.build_expression_doc_keep_paren_comments(
+                expr,
+                boundary_end,
+                SeqLayout::Aligned,
+            ));
         }
 
         let d = self.d();
@@ -790,7 +795,10 @@ impl<'a> Printer<'a> {
                 b')',
             )
             .map_or(boundary_end, |p| p as u32);
-            return self.build_sequence_doc_value(seq, grouping_close);
+            // Every position this serves — variable init, assignment RHS, ternary branch —
+            // is prettier's default layout arm; the two that hang (a `return`/`throw`
+            // argument, an arrow body) claim their sequence before reaching here.
+            return self.build_sequence_doc_value(seq, grouping_close, SeqLayout::Aligned);
         }
 
         // Line / own-line comments need the paren wrapping (a bare line comment
@@ -798,7 +806,11 @@ impl<'a> Printer<'a> {
         let has_multiline = comments_to_emit_in_range(self.comments, expr_end, boundary_end)
             .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
         if has_multiline {
-            return self.build_expression_doc_keep_paren_comments(expr, boundary_end);
+            return self.build_expression_doc_keep_paren_comments(
+                expr,
+                boundary_end,
+                SeqLayout::Aligned,
+            );
         }
 
         let d = self.d();
@@ -913,10 +925,11 @@ impl<'a> Printer<'a> {
     /// comment where the user wrote it. (Sequence operands take the dedicated
     /// `build_sequence_doc_value` path, which keeps the comment inside the sequence's
     /// own parens instead of adding a second pair.)
-    pub(crate) fn build_expression_doc_keep_paren_comments(
+    pub(in crate::printer) fn build_expression_doc_keep_paren_comments(
         &self,
         expr: &internal::Expression<'_>,
         boundary_end: u32,
+        layout: SeqLayout,
     ) -> DocId {
         let d = self.d();
         let expr_end = expr.span().end;
@@ -926,7 +939,8 @@ impl<'a> Printer<'a> {
         // paren (`() => ((1, 2, 3) /* c */)`) — the same rule and path as
         // `build_expression_doc_with_paren_comments`. `build_expression_doc` would
         // self-parenthesize the sequence and then this method would re-wrap it. The
-        // grouping `)` sits outside `seq.span`, so scan to it.
+        // grouping `)` sits outside `seq.span`, so scan to it. `layout` is the caller's —
+        // an arrow body hangs its operands, the ASI-shell operands align.
         if let internal::Expression::SequenceExpression(seq) = expr {
             let grouping_close = find_char_skipping_comments(
                 self.source.as_bytes(),
@@ -935,7 +949,7 @@ impl<'a> Printer<'a> {
                 b')',
             )
             .map_or(boundary_end, |p| p as u32);
-            return self.build_sequence_doc_value(seq, grouping_close);
+            return self.build_sequence_doc_value(seq, grouping_close, layout);
         }
 
         let Some((comment_parts, needs_break)) =
