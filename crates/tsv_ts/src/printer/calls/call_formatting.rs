@@ -21,10 +21,11 @@ use super::arg_wrapping::{
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
     build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    build_printed_argument_doc, could_expand_arrow_chain, last_two_args_same_type,
+    build_own_line_post_arrow_state, build_printed_argument_doc, could_expand_arrow_chain,
+    last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
-    prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
-    wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
+    prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
+    try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::call_paren_open;
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
@@ -34,8 +35,8 @@ use super::test_patterns::{
 use crate::ast::internal;
 use crate::printer::CommentVec;
 use crate::printer::expressions::functions::{
-    arrow_signature_has_breaking_comments, arrow_token_end,
-    callback_signature_has_breaking_comments, function_signature_has_breaking_comments,
+    arrow_signature_has_breaking_comments, callback_signature_has_breaking_comments,
+    function_signature_has_breaking_comments,
 };
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
@@ -210,6 +211,20 @@ pub(super) fn build_call_doc_with_wrapping(
     // Counts owned comments: this asks whether the argument window puts any comment text on
     // the page (a *layout* question), not who emits it — see `has_comments_on_page_between`.
     let call_has_comments = printer.has_comments_on_page_between(paren_open, call.span.end);
+
+    // Prettier's React-hook deps-array layout — the FIRST thing `printCallArguments` asks,
+    // above `anyArgEmptyLine` and every specialized layout, so an author blank between the
+    // callback and the deps array collapses here rather than forcing the arguments out.
+    if let Some(doc) = try_hook_deps_args_doc(
+        printer,
+        call.arguments,
+        paren_open,
+        call.span.end,
+        call_has_comments,
+        d.concat(&[callee, d.text("(")]),
+    ) {
+        return doc;
+    }
 
     // A trailing LINE comment on an argument (`fn(a, // c⏎ b)`) rules out every layout
     // below that would have to place the arguments itself: each joins them with `", "` or
@@ -922,6 +937,17 @@ fn build_block_arrow_hug_states(
         ]);
     }
 
+    // An own-line comment between `=>` and the body keeps the arrow start on the `callee(`
+    // line and breaks the closing paren onto its own. Above the body-kind arms below,
+    // because the rule is the gap's and not the body's — see
+    // [`last_arg_has_own_line_post_arrow_comment`].
+    if last_arg_has_own_line_post_arrow_comment(printer, arg) {
+        return d.concat(&[
+            callee,
+            build_own_line_post_arrow_state(d, d.text("("), &[], arrow_doc),
+        ]);
+    }
+
     // For expression-body arrows with obj/array bodies:
     // use 3-state conditional_group matching prettier's shouldExpandLastArg.
     // State 1 forces the arrow to break, causing the body to expand
@@ -933,26 +959,6 @@ fn build_block_arrow_hug_states(
             internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
         )
     {
-        // When the arrow has own-line comments between => and body,
-        // keep the arrow start on the same line as callee(, and break the
-        // closing paren to its own line (no trailing comma; trailingComma:
-        // 'none'). Matches Prettier's expandLastArg behavior where the arrow
-        // is reprinted with a softline appended.
-        let body_start = body_expr.span().start;
-        if printer.has_own_line_post_arrow_comment(arrow_token_end(arrow), body_start) {
-            // group_break forces the arrow to break. The softline after it
-            // causes `\n)` when the group breaks.
-            let inner = d.concat(&[
-                d.text("("),
-                d.group_break(arrow_doc),
-                d.softline(),
-                d.text(")"),
-            ]);
-            // The group wrapping the call args breaks because of
-            // group_break, causing softline → newline.
-            return d.concat(&[callee, d.group_break(inner)]);
-        }
-
         let state_hug = d.concat(&[callee, d.text("("), arrow_doc, d.text(")")]);
         let state_arrow_break =
             d.concat(&[callee, d.text("("), d.group_break(arrow_doc), d.text(")")]);
@@ -1119,6 +1125,19 @@ fn try_expand_last_function_arg(
         // the hug/inline states won't work — fall through to expand-all.
         if head_parts.iter().any(|&id| d.will_break(id)) {
             return Some(build_expand_all_args(d, callee, all_args_broken));
+        }
+
+        // The multi-argument twin of the arm in `build_block_arrow_hug_states`: an own-line
+        // comment after `=>` drops the closing paren to its own line, asked above every
+        // body-kind arm for the reason [`last_arg_has_own_line_post_arrow_comment`] gives.
+        if call_has_comments
+            && let Some(last) = call.arguments.last()
+            && last_arg_has_own_line_post_arrow_comment(printer, last)
+        {
+            return Some(d.concat(&[
+                callee,
+                build_own_line_post_arrow_state(d, d.text("("), &head_parts, last_arg_doc),
+            ]));
         }
 
         // Special case: expression arrow with call/conditional expression body

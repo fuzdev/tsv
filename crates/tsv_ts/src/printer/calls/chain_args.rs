@@ -17,10 +17,11 @@ use super::arg_predicates::{
 };
 use super::arg_wrapping::{
     ArgItem, ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
-    build_chain_expand_all_args, build_printed_argument_doc, classify_chain_arg,
-    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
-    prepend_arrow_body_comments, should_expand_first_arg, wrap_args_with_soft_breaks,
-    wrap_huggable_arg,
+    build_chain_expand_all_args, build_own_line_post_arrow_state, build_printed_argument_doc,
+    classify_chain_arg, last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
+    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
+    wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
 use crate::printer::expressions::functions::{
@@ -432,6 +433,22 @@ fn build_call_args_doc_for_chain_impl(
         leading_comment_doc,
     };
 
+    // Prettier's React-hook deps-array layout — the FIRST thing `printCallArguments` asks,
+    // above `anyArgEmptyLine` and every specialized layout, and above the chain's own
+    // forced expansion (prettier's member-chain printer reprints the group's arguments
+    // through the same function, so the shape wins there too).
+    if let Some(doc) = try_hook_deps_args_doc(
+        printer,
+        call.arguments,
+        paren_open,
+        call.span.end,
+        call_has_comments,
+        printer.d().text(prefix),
+    ) {
+        parts.push(doc);
+        return printer.d().concat(&parts);
+    }
+
     if call.arguments.is_empty() {
         build_chain_args_empty(printer, call, ctx, parts)
     } else if force_expand {
@@ -754,6 +771,28 @@ fn build_chain_args_single(
     } = ctx;
 
     let arg = &call.arguments[0];
+
+    // An own-line comment between `=>` and the body forces the closing paren onto its own
+    // line. Above every body-kind arm below, because the rule is the gap's and not the
+    // body's — see [`last_arg_has_own_line_post_arrow_comment`]. The argument doc is built
+    // here rather than reused from an arm because the arms below never run for this shape;
+    // asking the cheap comment question first keeps that build off every other path.
+    if has_any_comment_text
+        && !last_arg_commented
+        && last_arg_has_own_line_post_arrow_comment(printer, arg)
+    {
+        printer.expand_last_arg_flat_params.set(true);
+        let arrow_doc = printer.build_arg_expression_doc(arg);
+        printer.expand_last_arg_flat_params.set(false);
+        let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
+        parts.push(build_own_line_post_arrow_state(
+            d,
+            d.text(prefix),
+            &[],
+            arrow_doc,
+        ));
+        return d.concat(&parts);
+    }
 
     // Special case: arrow function with call expression body
     // Prettier keeps `(sig =>` hugged, breaking after `=>` to the body.
@@ -1135,6 +1174,33 @@ fn build_chain_args_multi(
         comments_force_expansion,
         ..
     } = ctx;
+
+    // An own-line comment between the last argument's `=>` and its body forces the closing
+    // paren onto its own line. Above every body-kind arm below, because the rule is the
+    // gap's and not the body's — see [`last_arg_has_own_line_post_arrow_comment`]. The
+    // cheap comment question gates the split-last build, so no other path pays for it.
+    if call.arguments.len() >= 2
+        && has_any_comment_text
+        && !comments_force_expansion
+        && !last_arg_commented
+        && let Some(last) = call.arguments.last()
+        && last_arg_has_own_line_post_arrow_comment(printer, last)
+    {
+        let (head_parts, last_arg_doc, all_args_broken) =
+            build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
+        // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+        if head_parts.iter().any(|&id| d.will_break(id)) {
+            parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
+        } else {
+            parts.push(build_own_line_post_arrow_state(
+                d,
+                d.text(prefix),
+                &head_parts,
+                last_arg_doc,
+            ));
+        }
+        return d.concat(&parts);
+    }
 
     // Multiple arguments with block-body callback:
     // Use conditional_group to try inline first, then expand-all.

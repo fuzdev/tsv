@@ -21,4 +21,13 @@
 		// lead
 		arg
 	);
+
+	// line comment trailing `(` — a last argument the expand-last layout would hug:
+	// the comment still stays on the `(` line
+	obj.a().method( // c3
+		a,
+		() => {
+			b();
+		}
+	);
 </script>
