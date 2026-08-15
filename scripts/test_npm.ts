@@ -37,6 +37,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 
@@ -63,8 +64,13 @@ const PKG_NAMES = {
 
 const node_entry = await import(`../${pkg_dir}/index.js`);
 
-/** Repo root — `PKG_DIR` is repo-relative, and this file lives in `scripts/`. */
-const repo_root = dirname(import.meta.dirname);
+/**
+ * Repo root — `PKG_DIR` is repo-relative, and this file lives in `scripts/`.
+ * Derived from `import.meta.url` rather than `import.meta.dirname`: the latter is
+ * `string | undefined` (undefined for a non-file module), so it does not typecheck
+ * without an assertion that would claim more than the runtime guarantees.
+ */
+const repo_root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /** Structural equality for plain wire JSON (no cycles, no undefined-vs-missing nuance). */
 const deep_equal_json = (a: unknown, b: unknown): boolean =>
@@ -591,7 +597,7 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 // CLI (`tsv` bin, `all` variant only) — subprocess tests against the contract
 // the JS CLI mirrors from the native tsv_cli: flags, exit codes, output streams.
 describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
-	const cli_path = new URL(`../${pkg_dir}/cli.js`, import.meta.url).pathname;
+	const cli_path = fileURLToPath(new URL(`../${pkg_dir}/cli.js`, import.meta.url));
 	const run_cli = (args: Array<string>, stdin?: string, cwd?: string) =>
 		spawnSync(process.execPath, [cli_path, ...args], {
 			encoding: 'utf-8',
@@ -1123,6 +1129,6 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 // one shipping cli.js.
 register_discovery_parity_suite(
 	`discovery parity (cli.js): ${pkg_dir}`,
-	new URL(`../${pkg_dir}/cli.js`, import.meta.url).pathname,
+	fileURLToPath(new URL(`../${pkg_dir}/cli.js`, import.meta.url)),
 	{ skip: variant !== 'all' }
 );

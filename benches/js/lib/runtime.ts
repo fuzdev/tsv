@@ -75,6 +75,21 @@ export function native_library_filename(crate_name: string): string {
 }
 
 /**
+ * The wasm-pack target directory this runtime's bundle lives under — `deno` under
+ * Deno, `nodejs` under Node and Bun (which reuses the Node artifacts). Names a
+ * path segment: `crates/tsv_wasm/pkg/<variant>/<target>/`.
+ *
+ * The sibling of `native_library_filename` above, and here for the same reason:
+ * the LOADER (`wasm.ts`) and the freshness GUARD (`check_artifact_freshness.ts`)
+ * each resolve a path under this segment, and a run that guards one bundle while
+ * measuring another is the exact failure the guard exists to prevent — which a
+ * second spelling of the conditional is all it would take.
+ */
+export function wasm_target(): 'deno' | 'nodejs' {
+	return current_runtime() === 'deno' ? 'deno' : 'nodejs';
+}
+
+/**
  * The machine that produced a report — the stable hardware identity plus the
  * runtime's own version. The bench's throughput numbers are machine-relative,
  * so this travels with them (a top-level `machine` on every

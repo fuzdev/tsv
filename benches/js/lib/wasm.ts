@@ -14,7 +14,7 @@
 import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { current_runtime } from './runtime.ts';
+import { wasm_target } from './runtime.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
 /** The `{locations?, goal?}` options bag the parse exports take (`goal` is
@@ -91,7 +91,10 @@ export class WasmImplementation extends BaseImplementation {
 	}
 
 	async init(): Promise<void> {
-		const target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
+		// Same segment the freshness guard resolves (`check_artifact_freshness.ts`
+		// `wasm_artifact_path`) — one derivation, so the bundle guarded is the bundle
+		// loaded.
+		const target = wasm_target();
 		const wasm_path = fileURLToPath(
 			new URL(`../../../crates/tsv_wasm/pkg/all/${target}/tsv_wasm.js`, import.meta.url)
 		);

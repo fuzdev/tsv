@@ -6,13 +6,13 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-08-13T20:15:33.197Z — tsv 0.2.0 (1ce605a3)
+**Date:** 2026-08-15T18:43:31.524Z — tsv 0.2.0 (a2f101d6)
 
 **Corpus:** 4556 Svelte (1.1 MB), 52321 TypeScript (69.0 MB), 22641 CSS (7.7 MB) — 79518 files, 77.8 MB total
 
 **Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (793), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4472), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113), benches/js/.cache/ts_repo_files.json (8097)
 
-**Versions:** svelte@5.56.9, acorn@8.16.0, acorn-typescript@1.0.13, prettier@3.9.6, prettier-plugin-svelte@4.1.1, oxc-parser@0.140.0, oxfmt@0.60.0, yuku-parser@0.8.1, @biomejs/wasm-bundler@2.5.4, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, postcss@8.5.26, @rsvelte/fmt@0.7.4, @rsvelte/vite-plugin-svelte-native@0.3.4 (targets svelte@5.56.8), @swc/core@1.15.47
+**Versions:** svelte@5.56.9, acorn@8.16.0, acorn-typescript@1.0.13, prettier@3.9.6, prettier-plugin-svelte@4.1.1, oxc-parser@0.142.0, oxfmt@0.63.0, yuku-parser@0.8.7, @biomejs/wasm-bundler@2.5.8, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, postcss@8.5.26, @rsvelte/fmt@0.7.11, @rsvelte/vite-plugin-svelte-native@0.3.7 (targets svelte@5.56.9), @swc/core@1.16.0
 
 **Excluded here:** yuku-parser (N-API) — its native binding faults the host process on this corpus (test262 escaped-identifier fixtures), so it cannot be measured against it. The WASM binding runs the same engine and carries the row; both are measured on the perf corpus.
 
@@ -63,21 +63,25 @@
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv_wasm | 2.4 MB | 873.2 KB | — | — |
-| biome (wasm) | 38.6 MB | 9.3 MB | 16.0x | 10.6x |
+| tsv_format_wasm | 2.2 MB | 801.3 KB | 0.9x | 0.9x |
+| tsv_parse_wasm | 926.7 KB | 363.4 KB | 0.4x | 0.4x |
+| tsv_wasm | 2.4 MB | 892.7 KB | — | — |
+| biome (wasm) | 44.6 MB | 11.1 MB | 18.4x | 12.4x |
 | dprint (wasm) | 4.2 MB | 1.2 MB | 1.7x | 1.3x |
-| oxc-parser (wasm) | 1.5 MB | 495.2 KB | 0.6x | 0.6x |
-| yuku-parser (wasm) | 674.6 KB | 200.3 KB | 0.3x | 0.2x |
+| oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.6x | 0.5x |
+| yuku-parser (wasm) | 673.9 KB | 200.3 KB | 0.3x | 0.2x |
 | malva (wasm) | 1.5 MB | 414.0 KB | 0.6x | 0.5x |
 | tsv (ffi) | 3.4 MB | 1.5 MB | 0.9x | 0.9x |
-| tsv (napi) | 3.7 MB | 1.6 MB | — | — |
-| oxc-parser+oxfmt (napi) | 11.2 MB | 4.5 MB | 3.0x | 2.8x |
-| oxc-parser (napi) | 2.4 MB | 954.8 KB | 0.6x | 0.6x |
-| oxfmt (napi) | 8.8 MB | 3.6 MB | 2.4x | 2.2x |
-| yuku-parser (napi) | 741.3 KB | 311.3 KB | 0.2x | 0.2x |
-| rsvelte-fmt (binary) | 7.9 MB | 3.2 MB | 2.1x | 2.0x |
-| rsvelte compiler (napi) | 14.2 MB | 5.9 MB | 3.8x | 3.7x |
-| swc (napi) | 31.6 MB | 11.9 MB | 8.5x | 7.4x |
+| tsv format (ffi) | 3.1 MB | 1.4 MB | 0.8x | 0.8x |
+| tsv parse (ffi) | 1.5 MB | 663.7 KB | 0.4x | 0.4x |
+| tsv (napi) | 3.8 MB | 1.6 MB | — | — |
+| oxc-parser+oxfmt (napi) | 11.2 MB | 4.6 MB | 3.0x | 2.8x |
+| oxc-parser (napi) | 2.1 MB | 885.7 KB | 0.6x | 0.5x |
+| oxfmt (napi) | 9.0 MB | 3.7 MB | 2.4x | 2.3x |
+| yuku-parser (napi) | 741.1 KB | 310.4 KB | 0.2x | 0.2x |
+| rsvelte-fmt (binary) | 8.3 MB | 3.3 MB | 2.2x | 2.0x |
+| rsvelte compiler (napi) | 14.5 MB | 6.0 MB | 3.9x | 3.7x |
+| swc (napi) | 31.9 MB | 11.9 MB | 8.5x | 7.4x |
 
 _Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
 

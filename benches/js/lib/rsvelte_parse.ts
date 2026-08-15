@@ -40,12 +40,12 @@
  * it reduces strictly less. Two different reductions — read the pair as "each
  * tool's own lighter wire", never as one payload measured twice.
  *
- * ⚠ `ParseOptions.skipCssAst` is documented upstream but is a **no-op** in 0.3.4
- * (byte-identical payload on every styled component tried, and `css` still
- * carries the full `StyleSheet` AST rather than the documented stub), so it
- * gets no row — it would silently duplicate the plain one. `parseEnvelope` (the
- * raw-transfer binary path) gets none either: it **drops `leadingComments`**
- * relative to `parse()`, so it is a lossier product, not a faster equal.
+ * ⚠ `ParseOptions.skipCssAst` gets no row: `parse()` **rejects** it outright
+ * (`skipCssAst is only supported by parseEnvelope`), and the one path that does
+ * honour it — `parseEnvelope`, the raw-transfer binary path — is a lossier
+ * product rather than a faster equal, because it **drops `leadingComments`**
+ * relative to `parse()`. So the option's only working form is unavailable on the
+ * comparable path and unusable on the one it exists for.
  */
 
 import { createRequire } from 'node:module';
@@ -104,21 +104,23 @@ export class RsvelteParseImplementation extends BaseImplementation {
 			throw new Error('@rsvelte/vite-plugin-svelte-native exposes no parse()');
 		}
 
-		// Assert `skipExpressionLoc` still REDUCES. This addon already ships one
-		// documented option that silently does nothing (`skipCssAst` — see the module
-		// doc), and an inert `skipExpressionLoc` would be invisible in exactly the
-		// wrong way: the reduced row would keep parsing every file at a plausible
-		// speed, and the report would publish two rows as if they measured different
-		// wires. The probe needs an embedded expression with a type annotation, since
-		// that is the only thing the option drops.
+		// Assert `skipExpressionLoc` still REDUCES. This addon's documented option
+		// surface has already been caught disagreeing with the binding once
+		// (`skipCssAst` is documented on `parse()` and rejected by it — see the module
+		// doc), so an option is not taken to do what it says; and where that one fails
+		// loudly, an inert `skipExpressionLoc` would fail in exactly the wrong way: the
+		// reduced row would keep parsing every file at a plausible speed, and the
+		// report would publish two rows as if they measured different wires. The probe
+		// needs an embedded expression with a type annotation, since that is the only
+		// thing the option drops.
 		const probe = '<script lang="ts">let n: number = 1;</script><p>{n + 1}</p>';
 		const full = native.parse(probe);
 		const reduced = native.parse(probe, { skipExpressionLoc: true });
 		if (reduced.length >= full.length) {
 			throw new Error(
 				`rsvelte's skipExpressionLoc no longer reduces the payload (${full.length} → ` +
-					`${reduced.length} bytes) — it has gone inert like skipCssAst, so the reduced row ` +
-					`would silently duplicate the plain one`
+					`${reduced.length} bytes) — it has gone inert, so the reduced row would ` +
+					`silently duplicate the plain one`
 			);
 		}
 

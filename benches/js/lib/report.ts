@@ -74,6 +74,12 @@ const DISPLAY_ORDER = [
 	'tsv_wasm-json-no-locations',
 	'tsv',
 	'tsv_wasm',
+	// Opt-in diagnostic (`BENCH_FORCED_ASYNC=1`), so it reaches no committed report
+	// — but the completeness guard asks about every row the surface DEFINES, not
+	// every row a default run renders, so leaving it out fired a ⚠ on each
+	// forced-async run about a row that is deliberately unpublished. Listed for the
+	// same reason `tsc` below is: the order is kept COMPLETE.
+	'tsv-forced-async',
 	// Internal variants (shown separately)
 	'tsv-internal',
 	'tsv_wasm-internal',
@@ -89,9 +95,37 @@ const DISPLAY_ORDER = [
 	'rsvelte-parse',
 	'rsvelte-parse-skip-expr-loc',
 	'swc',
+	// Conformance-only, so it reaches no table this order sorts (the timed
+	// summaries are perf-surface). Listed for the same reason the canonical rows
+	// above are: an unlisted name sorts silently to the end, so the list is kept
+	// COMPLETE rather than kept to what today's surfaces happen to render.
+	'tsc',
 	'yuku-parser',
 	'yuku-parser-wasm'
 ];
+
+/**
+ * The names in `names` this order doesn't list.
+ *
+ * An unlisted name is not an error — `sort_by_display_order` below sends it to the
+ * END, silently — which is exactly how a row joins a surface and sorts last
+ * indefinitely, since nothing about the output looks broken. Asking the task
+ * REGISTRY this question turns a hand-maintained list into a checked one, the same
+ * way `SURFACE_DISCLOSURES` (bench.ts) checks its claims against the registry.
+ *
+ * One direction only. A LISTED name absent from `names` is NOT drift: each surface
+ * registers its own subset (`tsc` rides the conformance surface alone), so the
+ * reverse check would fire on every run of the other surface — while this direction
+ * is answerable per surface and self-completes across the two.
+ *
+ * The caller asks it of the rows a surface DEFINES (`get_defined_rows`), not of the
+ * rows a machine could run, so the answer is a property of the code rather than of
+ * the box — and an opt-in row (`tsv-forced-async`, `BENCH_FORCED_ASYNC=1`) is asked
+ * about too, which is why the order lists it.
+ */
+export function rows_missing_from_display_order(names: Iterable<string>): string[] {
+	return [...names].filter((name) => !DISPLAY_ORDER.includes(name));
+}
 
 /** Sort results by stable display order */
 function sort_by_display_order(results: BenchmarkResult[]): BenchmarkResult[] {

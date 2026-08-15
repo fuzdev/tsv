@@ -10,21 +10,14 @@
  * Exit codes: 0 = all pass, 1 = any failure.
  */
 
-import { env, exit } from 'node:process';
-import {
-	check_artifact_freshness,
-	WASM_CRATES,
-	wasm_artifact_path
-} from './lib/check_artifact_freshness.ts';
+import { exit } from 'node:process';
+import { check_executed_artifacts } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
-import { get_library_path } from './lib/ffi.ts';
-import { get_napi_library_path } from './lib/napi.ts';
 import {
 	type BenchmarkTask,
 	get_benchmark_tasks,
 	init_implementations
 } from './lib/implementations.ts';
-import { current_runtime } from './lib/runtime.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 
 /**
@@ -60,34 +53,10 @@ function record_fail(f: Failure): void {
 }
 
 // Refuse to smoke stale binaries (smoke skips the rebuild for speed, same as the
-// bench/corpus :run tasks). See lib/check_artifact_freshness.ts; override with
-// BENCH_STALE_OK=1. The native + WASM artifacts are runtime-specific: Deno runs
-// the FFI library + the `deno`-target WASM bundle; Node/Bun run the N-API addon +
-// the `nodejs` target (`wasm_artifact_path` resolves the runtime's own bundle).
-const wasm_target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
-const native_check =
-	current_runtime() === 'deno'
-		? {
-				label: `FFI (${env.TSV_FFI_PROFILE ?? 'release'})`,
-				path: get_library_path(),
-				binding_crates: ['tsv_ffi'],
-				rebuild: 'deno task build:ffi'
-			}
-		: {
-				label: 'N-API',
-				path: get_napi_library_path(),
-				binding_crates: ['tsv_napi'],
-				rebuild: 'deno task build:napi'
-			};
-await check_artifact_freshness([
-	native_check,
-	{
-		label: `WASM (all/${wasm_target})`,
-		path: wasm_artifact_path('all'),
-		binding_crates: WASM_CRATES,
-		rebuild: `deno task build:wasm:all:${wasm_target}`
-	}
-]);
+// bench/corpus :run tasks). Which artifacts this runtime executes — FFI or N-API,
+// plus that runtime's WASM target — is `check_executed_artifacts`'s subject;
+// override with BENCH_STALE_OK=1.
+await check_executed_artifacts();
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
 // from the harness node_modules; without it, init fails opaquely. Missing or
@@ -95,6 +64,20 @@ await check_artifact_freshness([
 await check_node_modules();
 
 const impls = await init_implementations({ logger: () => {} });
+
+// The init chatter is silenced above (the per-impl ✓ lines would drown the check
+// table), so the ⚠ lines go with it — which would leave an impl that stopped
+// LOADING invisible here. That is the one failure this file exists to catch and the
+// one its check table structurally cannot show: a task list built from `impls` has
+// no row for an impl that isn't there, so the run reports a smaller `passed` count
+// against no baseline and calls itself green. Name them instead.
+if (impls.unavailable.length > 0) {
+	console.log(`Unavailable (${impls.unavailable.length}) — no rows to check:`);
+	for (const u of impls.unavailable) {
+		console.log(`  ⚠ ${u.impl.padEnd(20)} ${u.reason.slice(0, 90)}`);
+	}
+	console.log();
+}
 
 /**
  * Every task for one operation+language, across BOTH corpus surfaces.
@@ -237,8 +220,15 @@ for (const lang of LANGUAGES) {
 //
 
 console.log();
+// A count with no denominator reads as green at any size, so qualify it whenever
+// impls are missing — `All 42 checks passed` on a machine that should run 46 is the
+// exact sentence this file must not say without saying why.
+const shortfall =
+	impls.unavailable.length > 0
+		? ` (${impls.unavailable.length} impl(s) unavailable: ${impls.unavailable.map((u) => u.impl).join(', ')})`
+		: '';
 if (failures.length === 0) {
-	console.log(`All ${passed} checks passed.`);
+	console.log(`All ${passed} checks passed.${shortfall}`);
 	exit(0);
 } else {
 	console.log(`${failures.length} failure(s), ${passed} passed:`);

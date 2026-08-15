@@ -26,7 +26,7 @@
 
 import { probe_node_modules } from '../benches/js/lib/check_node_modules.ts';
 import { native_library_filename } from '../benches/js/lib/runtime.ts';
-import { load_all_versions } from '../benches/js/lib/versions.ts';
+import { type AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
 
 let warnings = 0;
 let errors = 0;
@@ -145,34 +145,60 @@ else fail(pins_out.split('\n').join('\n    '));
 // --- Harness deps ---------------------------------------------------------------
 
 section('Harness deps (benches/js/node_modules)');
-const nm = await probe_node_modules();
-if (nm.status === 'ok') ok('installed + fresh (npm install stamp is newer than package.json)');
-else if (nm.status === 'missing') warn(nm.message);
-else fail(`${nm.message} — reports would label OLD installed versions with the new pins`);
+// Both this probe and `load_all_versions` below THROW when `benches/js/package.json`
+// can't be read or parsed — the right posture for a run that would otherwise measure
+// under placeholder labels, and the wrong one HERE: doctor's whole job is to report a
+// broken setup, so a broken pins file must be a `✗` line, not an unhandled rejection
+// that kills the remaining sections and the verdict. Same guard as the corpus probe.
+try {
+	const nm = await probe_node_modules();
+	if (nm.status === 'ok') {
+		ok('installed, and every exact pin (plus the oxc wasi binding) matches the installed version');
+	} else if (nm.status === 'missing') warn(nm.message);
+	else fail(`${nm.message} — reports would label OLD installed versions with the new pins`);
+} catch (e) {
+	fail(
+		`cannot read benches/js/package.json (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+			'the pins are unreadable, so nothing downstream can be graded against them'
+	);
+}
 
 // --- Oracle checkouts -----------------------------------------------------------
 
 section('Oracle checkouts (conformance gates / publish Step 3b)');
-const versions = await load_all_versions();
+// Guarded for the same reason as the probe above: this throws on an unreadable pins
+// file, which is a state to REPORT here rather than to die on. `null` then — the
+// checkouts are still worth listing, but no skew can be graded against a pin nothing
+// could read, so the per-checkout lines say that instead of claiming a match.
+let versions: AllVersions | null = null;
+try {
+	versions = await load_all_versions();
+} catch (e) {
+	fail(
+		`cannot read the oracle pins (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+			'checkout-vs-pin skew is ungraded below'
+	);
+}
+const pin_suffix = versions ? ', matches the pin' : '; pin unreadable';
 
 if (exists('../svelte/packages/svelte/tests')) {
 	const v = read_pkg_version('../svelte/packages/svelte/package.json');
-	if (v !== null && v !== versions.canonical.svelte) {
+	if (versions && v !== null && v !== versions.canonical.svelte) {
 		warn(
 			`../svelte checkout is v${v} but the svelte oracle is pinned v${versions.canonical.svelte} — ` +
 				'suite inputs and the grading parser disagree (align the checkout or bump the pins deliberately)'
 		);
-	} else ok(`../svelte checkout (v${v ?? '?'}, matches the pin)`);
+	} else ok(`../svelte checkout (v${v ?? '?'}${pin_suffix})`);
 } else warn('../svelte checkout missing — conformance:svelte-fixtures + the corpus suites need it');
 
 if (exists('../acorn-typescript/test')) {
 	const v = read_pkg_version('../acorn-typescript/package.json');
-	if (v !== null && v !== versions.canonical['@sveltejs/acorn-typescript']) {
+	if (versions && v !== null && v !== versions.canonical['@sveltejs/acorn-typescript']) {
 		warn(
 			`../acorn-typescript checkout is v${v} but the oracle is pinned ` +
 				`v${versions.canonical['@sveltejs/acorn-typescript']} — suite inputs and the grading parser disagree`
 		);
-	} else ok(`../acorn-typescript checkout (v${v ?? '?'}, matches the pin)`);
+	} else ok(`../acorn-typescript checkout (v${v ?? '?'}${pin_suffix})`);
 } else warn('../acorn-typescript checkout missing — conformance:ts-fixtures needs it');
 
 if (exists('../typescript/tests/baselines/reference')) {
@@ -188,7 +214,7 @@ if (exists('../typescript/tests/baselines/reference')) {
 // computed live per file, and it legitimately rides `-dev` versions.
 if (exists('../prettier')) {
 	const v = read_pkg_version('../prettier/package.json');
-	if (v !== null && v.replace(/-dev$/, '') !== versions.canonical.prettier) {
+	if (versions && v !== null && v.replace(/-dev$/, '') !== versions.canonical.prettier) {
 		warn(
 			`../prettier checkout is v${v} vs pinned prettier v${versions.canonical.prettier} — its fixture ` +
 				'suites (corpus inputs) come from a different version than the live oracle (informational)'
