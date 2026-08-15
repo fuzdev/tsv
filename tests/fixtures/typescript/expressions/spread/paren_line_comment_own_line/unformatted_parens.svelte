@@ -27,4 +27,11 @@
 	const o1 = { ...(x5
 	// c
 	/* i */), b5: 1 };
+
+	// call: an outside block written after the `)` — a share ending in a line comment can
+	// have nothing glued behind it, so the block lands on the argument's line ahead of it
+	fn(a, ...(x6
+	/* i */
+	// c
+	) /* t */);
 </script>

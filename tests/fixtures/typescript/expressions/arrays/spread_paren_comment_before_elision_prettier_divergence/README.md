@@ -3,7 +3,7 @@
 A **normalization-path** divergence: the fixed point is shared, and only the number of passes
 it takes differs. `input.svelte` is idempotent under both formatters.
 
-An own-line block comment inside a spread's redundant grouping parens (`...(b⏎/* c */⏎)`) has no
+An own-line comment inside a spread's redundant grouping parens (`...(b⏎/* c */⏎)`, or a `//`) has no
 line of its own once the parens are erased, so the array prints it as a sibling — the parent's
 share of a stripped-paren interior
 ([docs/comments.md §A stripped-paren interior is a partition too](../../../../../../docs/comments.md)).

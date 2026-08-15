@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 720,
+	"end": 944,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -281,24 +281,104 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " call: an outside block written after the `)` — a share ending in a line comment can",
+			"start": 712,
+			"end": 798,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 1
+				},
+				"end": {
+					"line": 45,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " have nothing glued behind it, so the block lands on the argument's line ahead of it",
+			"start": 800,
+			"end": 886,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 1
+				},
+				"end": {
+					"line": 46,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 905,
+			"end": 912,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 8
+				},
+				"end": {
+					"line": 49,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 915,
+			"end": 922,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 2
+				},
+				"end": {
+					"line": 50,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 925,
+			"end": 929,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 2
+				},
+				"end": {
+					"line": 51,
+					"column": 6
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 719,
+		"end": 943,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 710,
+			"end": 934,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 44,
+					"line": 53,
 					"column": 9
 				}
 			},
@@ -1003,6 +1083,138 @@
 							"value": " object literal: with an interior own-line block",
 							"start": 607,
 							"end": 657
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 888,
+					"end": 933,
+					"loc": {
+						"start": {
+							"line": 47,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 888,
+						"end": 932,
+						"loc": {
+							"start": {
+								"line": 47,
+								"column": 1
+							},
+							"end": {
+								"line": 52,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 888,
+							"end": 890,
+							"loc": {
+								"start": {
+									"line": 47,
+									"column": 1
+								},
+								"end": {
+									"line": 47,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 894,
+								"end": 895,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 2
+									},
+									"end": {
+										"line": 48,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "SpreadElement",
+								"start": 899,
+								"end": 904,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 2
+									},
+									"end": {
+										"line": 49,
+										"column": 7
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 902,
+									"end": 904,
+									"loc": {
+										"start": {
+											"line": 49,
+											"column": 5
+										},
+										"end": {
+											"line": 49,
+											"column": 7
+										}
+									},
+									"name": "x6"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 905,
+										"end": 912
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " call: an outside block written after the `)` — a share ending in a line comment can",
+							"start": 712,
+							"end": 798
+						},
+						{
+							"type": "Line",
+							"value": " have nothing glued behind it, so the block lands on the argument's line ahead of it",
+							"start": 800,
+							"end": 886
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 915,
+							"end": 922
+						},
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 925,
+							"end": 929
 						}
 					]
 				}
