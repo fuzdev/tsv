@@ -25,13 +25,14 @@ use tsv_svelte::ast::internal::{
     SpecialElement, SpecialElementKind,
 };
 use tsv_ts::ast::internal::{
-    ArrayExpression, BlockStatement, Expression, ExpressionStatement, ObjectExpression,
-    ObjectProperty, Property, Statement,
+    ArrayExpression, BlockStatement, Expression, ObjectExpression, ObjectProperty, Property,
+    Statement,
 };
 
-use crate::analyze::{BindingKind, evaluate, stringify_value};
+use crate::analyze::BindingKind;
+use crate::attribute::build_mixed_value_expr;
 use crate::body_builder::BodyBuilder;
-use crate::build::{escape_template_text, init_property};
+use crate::build::init_property;
 use crate::fragment::emit_child_body;
 use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::script_decls::plain_identifier_name;
@@ -286,12 +287,7 @@ pub(crate) fn emit_component<'arena>(
     args.push(Expression::Identifier(env.b.ident("$$renderer")));
     args.push(props_expr);
     let call = env.b.call_of(callee, args.into_bump_slice(), false);
-    let span = call.span();
-    let call_stmt = Statement::ExpressionStatement(ExpressionStatement {
-        expression: call,
-        span,
-        is_directive: false,
-    });
+    let call_stmt = env.b.expression_statement(call);
 
     // Named-snippet children hoist their `function` declarations into a bare block
     // wrapping the call, so the snippet props resolve (the oracle's
@@ -616,67 +612,10 @@ fn build_prop_value<'arena>(
             let wrapped = wrap_value_expr(env, expr)?;
             Ok(wrapped[0].clone())
         }
-        _ => build_component_mixed_value(env, values),
+        // A mixed text+expression value. Unlike the element mixed-attribute path
+        // there is no whitespace trim (hence `false`), no HTML escaping, and no
+        // `$.attr*` wrapper — the oracle's component `build_attribute_value`
+        // returns the bare value.
+        _ => build_mixed_value_expr(env, false, values),
     }
-}
-
-/// Build a mixed text+expression component attribute value. Unlike the element
-/// mixed-attribute path there is no whitespace trim, no HTML escaping, and no
-/// `$.attr*` wrapper — the oracle's component `build_attribute_value` returns the
-/// bare value: a folded string literal when every part is statically known, else
-/// a template literal with `$.stringify(expr)` interpolations (omitted when the
-/// evaluator proves a defined string).
-fn build_component_mixed_value<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
-    values: &'arena [AttributeValue<'arena>],
-) -> Result<Expression<'arena>, CompileError> {
-    let mut texts: Vec<String> = vec![String::new()];
-    // The unescaped folded value in parallel — consumed only when every part folds.
-    let mut raw = String::new();
-    let mut exprs: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
-    for value in values {
-        match value {
-            AttributeValue::Text(text) => {
-                let decoded = text.data(env.source);
-                raw.push_str(&decoded);
-                #[allow(clippy::unwrap_used)]
-                texts
-                    .last_mut()
-                    .unwrap()
-                    .push_str(&escape_template_text(&decoded));
-            }
-            AttributeValue::ExpressionTag(tag) => {
-                // The template borrow point: erase once, then guard AND fold the
-                // erased node (the fold gate is the silent-divergence trap).
-                let expr = env.erase(&tag.expression)?;
-                // Guard first — never fold an oracle-invalid expression.
-                let wrapped = wrap_value_expr(env, expr)?;
-                let evaluated = evaluate(expr, &env.value_scope(), env.source, 0)
-                    .map_err(|g| unsupported(Refusal::StaticEvalNotPortable(g.0)))?;
-                if let Some(value) = evaluated.known_value() {
-                    let text = stringify_value(value)
-                        .map_err(|g| unsupported(Refusal::StaticFoldNotPortable(g.0)))?;
-                    raw.push_str(&text);
-                    #[allow(clippy::unwrap_used)]
-                    texts
-                        .last_mut()
-                        .unwrap()
-                        .push_str(&escape_template_text(&text));
-                    continue;
-                }
-                let piece = if evaluated.is_defined_string() {
-                    wrapped[0].clone()
-                } else {
-                    env.b.member_call("$", "stringify", wrapped)
-                };
-                exprs.push(piece);
-                texts.push(String::new());
-            }
-        }
-    }
-
-    if exprs.is_empty() {
-        return Ok(env.b.string_literal_expr(&raw));
-    }
-    Ok(env.b.template_literal(&texts, exprs.into_bump_slice()))
 }

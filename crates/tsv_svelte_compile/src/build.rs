@@ -489,6 +489,28 @@ impl<'arena> Builder<'arena> {
         })
     }
 
+    /// `<expr>;` — an expression in statement position, spanning exactly its
+    /// expression.
+    ///
+    /// The span is the statement's only degree of freedom (`is_directive` is
+    /// false for everything the generator emits — a directive is a string
+    /// literal the parser flags, never a synthesized call), and taking it from
+    /// the expression is the right default for a *synthetic* statement: the
+    /// printer reads a statement's span as the endpoints of the comment windows
+    /// around it, so a statement coextensive with its expression inherits
+    /// exactly the expression's own windows and can sweep nothing the
+    /// expression wouldn't. A statement wrapping a *fictional* span is
+    /// deliberately steering those windows and builds its own node instead
+    /// (`transform_server`'s `$$renderer.component` wrapper).
+    pub fn expression_statement(&self, expression: Expression<'arena>) -> Statement<'arena> {
+        let span = expression.span();
+        Statement::ExpressionStatement(ExpressionStatement {
+            expression,
+            span,
+            is_directive: false,
+        })
+    }
+
     /// `$$renderer.push('<text>')` — a block anchor push with a *string-literal*
     /// argument (single-quoted after canonicalization), distinct from the
     /// template-literal pushes the `BodyBuilder` flushes. `text` is a hydration
@@ -497,12 +519,7 @@ impl<'arena> Builder<'arena> {
         let arg = self.string_literal_expr(text);
         let arg_alloc = self.arena.alloc(arg);
         let call = self.member_call("$$renderer", "push", std::slice::from_ref(arg_alloc));
-        let span = call.span();
-        Statement::ExpressionStatement(ExpressionStatement {
-            expression: call,
-            span,
-            is_directive: false,
-        })
+        self.expression_statement(call)
     }
 
     /// `void 0` — the oracle's spelling of an absent rune argument.
@@ -662,13 +679,7 @@ impl<'arena> Builder<'arena> {
         let subs_arg = self.ident_expr("$$store_subs");
         let call = self.member_call("$", "unsubscribe_stores", std::slice::from_ref(subs_arg));
         let call_span = call.span();
-        let consequent = self
-            .arena
-            .alloc(Statement::ExpressionStatement(ExpressionStatement {
-                expression: call,
-                span: call_span,
-                is_directive: false,
-            }));
+        let consequent = self.arena.alloc(self.expression_statement(call));
         Statement::IfStatement(IfStatement {
             test,
             consequent,
