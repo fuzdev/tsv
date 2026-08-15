@@ -1608,7 +1608,8 @@ impl<'a> Printer<'a> {
     /// element runs, the body/member runs via
     /// [`push_leading_comments_before`](Self::push_leading_comments_before) (class,
     /// interface and enum members, statement lists, type literals, expanded object
-    /// patterns), and — for all but its last comment —
+    /// patterns), the broken for-in/for-of header's `(`→binding gap, and — for all but
+    /// its last comment —
     /// [`push_orphaned_comment_run`](Self::push_orphaned_comment_run).
     ///
     /// Four loops still emit a leading run themselves, because their surrounding

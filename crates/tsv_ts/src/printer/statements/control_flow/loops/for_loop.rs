@@ -5,14 +5,16 @@
 
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
-use crate::printer::{CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer};
+use crate::printer::{
+    CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer, RunLeadingBlank,
+};
 use smallvec::smallvec;
 use tsv_lang::Comment;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::{TriviaProfile, find_char, skip_comment};
+use tsv_lang::source_scan::{TriviaProfile, find_char};
 
 /// Span positions for a for loop header
 ///
@@ -170,7 +172,7 @@ impl<'a> Printer<'a> {
                 parts.push(body_doc);
             } else {
                 // Mirror Prettier's `adjustClause`: `indent([line, body])`. The
-                // enclosing for-in/for-of group (see `build_for_in/of_statement_with_body_doc`)
+                // enclosing for-in/for-of group (see `build_for_in_of_statement_with_body_doc`)
                 // breaks on overflow, dropping the body to its own indented line;
                 // when it fits, `line` is a space → `for (x of y) stmt;`.
                 parts.push(d.indent_line(body_doc));
@@ -1039,7 +1041,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a complete for-in statement doc including the body
-    fn build_for_in_statement_with_body_doc(&self, stmt: &internal::ForInStatement<'_>) -> DocId {
+    pub(in crate::printer::statements) fn build_for_in_statement_doc(
+        &self,
+        stmt: &internal::ForInStatement<'_>,
+    ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
             &stmt.left,
             &stmt.right,
@@ -1050,48 +1055,11 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Find a keyword position between two spans, skipping over comments
-    ///
-    /// Searches for the keyword with possible surrounding whitespace or comments.
-    /// Returns the position where the keyword starts.
-    fn find_keyword_position(&self, start: u32, end: u32, keyword: &str) -> Option<u32> {
-        let search_range = &self.source[start as usize..end as usize];
-
-        // First try to find " keyword " (with spaces) - outside of comments
-        // We need to search manually to avoid matching inside comment content
-        let keyword_bytes = keyword.as_bytes();
-        let bytes = search_range.as_bytes();
-        let len = bytes.len();
-        let kw_len = keyword.len();
-        let mut i = 0;
-
-        while i + kw_len <= len {
-            // Skip over comments
-            if let Some(new_i) = skip_comment(bytes, i, len) {
-                i = new_i;
-                continue;
-            }
-
-            // Check if we found the keyword
-            if &bytes[i..i + kw_len] == keyword_bytes {
-                // Check it's not part of an identifier
-                let before_ok =
-                    i == 0 || !bytes[i - 1].is_ascii_alphanumeric() && bytes[i - 1] != b'_';
-                let after_ok = i + kw_len >= len
-                    || !bytes[i + kw_len].is_ascii_alphanumeric() && bytes[i + kw_len] != b'_';
-
-                if before_ok && after_ok {
-                    return Some(start + i as u32);
-                }
-            }
-            i += 1;
-        }
-
-        None
-    }
-
     /// Build a complete for-of statement doc including the body
-    fn build_for_of_statement_with_body_doc(&self, stmt: &internal::ForOfStatement<'_>) -> DocId {
+    pub(in crate::printer::statements) fn build_for_of_statement_doc(
+        &self,
+        stmt: &internal::ForOfStatement<'_>,
+    ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
             &stmt.left,
             &stmt.right,
@@ -1104,8 +1072,8 @@ impl<'a> Printer<'a> {
 
     /// Build a complete for-in/for-of statement doc including the body.
     ///
-    /// Shared by `build_for_in_statement_with_body_doc` and
-    /// `build_for_of_statement_with_body_doc`: the two differ only in the
+    /// Shared by [`Self::build_for_in_statement_doc`] and
+    /// [`Self::build_for_of_statement_doc`]: the two differ only in the
     /// `"in"`/`"of"` keyword and for-of's `for await` handling, which collapses
     /// to a no-op when `is_await` is false (for-in has no `await` form). The
     /// `for (` opening is built in split form (`" "` + `"("`) so the optional
@@ -1117,19 +1085,15 @@ impl<'a> Printer<'a> {
         right: &Expression<'_>,
         body: &Statement<'_>,
         stmt_start: u32,
-        keyword: &str,  // "in" or "of"
-        is_await: bool, // for-of `for await`; always false for for-in
+        keyword: &'static str, // `"in"` or `"of"` — a literal, so it doubles as the emitted token
+        is_await: bool,        // for-of `for await`; always false for for-in
     ) -> DocId {
         let d = self.d();
         let spans = self.for_in_of_spans(left, right, keyword, stmt_start);
 
-        // The keyword as a static literal (`d.text` needs `&'static str`), with
-        // and without the leading space.
-        let (kw, kw_spaced) = if keyword == "of" {
-            ("of", " of")
-        } else {
-            ("in", " in")
-        };
+        // The keyword as a static literal (`d.text` needs `&'static str`), carrying the
+        // separator that precedes it — the inline layout's gap emitter writes none.
+        let kw_spaced = if keyword == "of" { " of" } else { " in" };
 
         // Preserve comments between keywords and `(`
         // for await: two gaps — for-to-await and await-to-paren
@@ -1197,27 +1161,18 @@ impl<'a> Printer<'a> {
         parts.push(self.build_for_in_of_left_doc(left, async_lhs_paren, &spans));
 
         // Comments after left, before the keyword
-        let has_left_comment =
-            self.append_for_in_of_block_comments(&mut parts, spans.left_end, spans.keyword_pos);
-
-        if has_left_comment {
-            parts.push(d.text(kw));
-        } else {
-            parts.push(d.text(kw_spaced));
-        }
+        self.append_for_in_of_block_comments(&mut parts, spans.left_end, spans.keyword_pos);
+        parts.push(d.text(kw_spaced));
 
         // Comments after the keyword, before right
-        let has_comment =
-            self.append_for_in_of_block_comments(&mut parts, spans.keyword_end, spans.right_start);
-        if !has_comment {
-            parts.push(d.text(" "));
-        }
+        self.append_for_in_of_block_comments(&mut parts, spans.keyword_end, spans.right_start);
+        parts.push(d.text(" "));
 
         parts.push(self.build_expression_doc(right));
 
-        // Comments after right, before close paren (no trailing space needed)
+        // Comments after right, before close paren — the `)` follows with no separator
         if let Some(close) = spans.close_paren {
-            self.append_for_in_of_trailing_comments(&mut parts, spans.right_end, close);
+            self.append_for_in_of_block_comments(&mut parts, spans.right_end, close);
         }
 
         // `)` + comments + body (shared with the breaking layout)
@@ -1242,9 +1197,12 @@ impl<'a> Printer<'a> {
     ) -> ForInOfSpans {
         let left_end = self.get_for_in_of_left_end(left);
         let right_start = right.span().start;
-        // Find the keyword position (search with or without spaces).
+        // The `in`/`of` keyword, through the shared trivia-aware scan the rest of the
+        // printer uses (`tsv_lang::source_scan::find_keyword`) rather than a raw
+        // substring walk of this file's own — same whole-word rule, and it skips strings
+        // and templates as well as comments.
         let keyword_pos = self
-            .find_keyword_position(left_end, right_start, keyword)
+            .find_keyword_in_range(left_end, right_start, keyword)
             .unwrap_or(left_end);
         let open_paren = self.find_open_paren_after(stmt_start);
         ForInOfSpans {
@@ -1315,11 +1273,28 @@ impl<'a> Printer<'a> {
     ///
     /// This is our divergence from Prettier - we preserve line comments where
     /// the user wrote them rather than relocating them.
+    ///
+    /// ⚠️ The three gaps that follow a token — binding→keyword, keyword→iterable,
+    /// iterable→`)` — are **runs**, and each routes through the shared
+    /// [`Printer::push_anchored_trailing_run`], which puts one separator BEFORE each
+    /// comment. A per-comment `" "` instead emitted the whole run on the anchor's line,
+    /// so a `//` anywhere but last swallowed every comment behind it (`x // c1 /* c2 */`,
+    /// the second comment becoming the first's text) and a following multiline block
+    /// produced output that does not reparse — `docs/comments.md` §Trailing and dangling
+    /// runs, the rule that a run's separator asks each comment's own neighbours.
+    ///
+    /// The fourth gap, `(`→binding, is a **leading** run and goes to
+    /// [`Printer::push_leading_comment_run`] the way its C-style twin
+    /// ([`Self::push_for_clause_leading_section`]) does — the `(`'s own `hardline` leads
+    /// it and the emitter owns every break inside it and the one before the binding. A
+    /// hand-rolled `hardline` per comment there split a run the author glued and erased
+    /// an author blank between two own-line comments, which is that twin's rustdoc
+    /// verbatim.
     fn build_for_in_of_with_line_comments(
         &self,
         right: &Expression<'_>,
         body: &Statement<'_>,
-        keyword: &str, // "in" or "of"
+        keyword: &'static str, // `"in"` or `"of"`, emitted directly
         // Resolved header positions, computed once by the caller (see
         // `for_in_of_spans`) — shared with the structural-comment check and the
         // inline layout.
@@ -1338,50 +1313,68 @@ impl<'a> Printer<'a> {
         // Inner content with hardline breaks
         let mut inner = DocBuf::new();
 
-        // Comments before left (after open paren)
-        if let Some(open) = spans.open_paren {
-            for comment in comments_to_emit_in_range(self.comments, open + 1, spans.left_start) {
-                inner.push(d.hardline());
-                inner.push(self.build_comment_doc(comment));
-            }
-        }
+        // Comments between `(` and the binding: a LEADING run, so it splits at the
+        // binding the way `push_for_clause_leading_section` splits at its clause — the
+        // glued suffix leads the binding inline, the rest go to the shared
+        // `push_leading_comment_run`. The `(`'s own `hardline` leads the run and the
+        // emitter supplies every break inside it and the one before the binding, so no
+        // separator here is this site's. See the header-gap note above this function.
+        let (leading_run, leading_glued) = spans
+            .open_paren
+            .map(|open| {
+                self.split_glued_comments(comments_to_emit_in_range(
+                    self.comments,
+                    open + 1,
+                    spans.left_start,
+                ))
+            })
+            .unwrap_or_default();
+
+        inner.push(d.hardline());
+        self.push_leading_comment_run(
+            &mut inner,
+            leading_run.iter().copied(),
+            spans.left_start,
+            LeadingGlue::Adjacent,
+            d.empty(),
+        );
+        self.push_glued_comment_run(&mut inner, &leading_glued);
 
         // Left side (const y)
-        inner.push(d.hardline());
         inner.push(left_doc);
 
-        // Comments after left, before keyword — emit all (own-line comments normalize to inline)
-        for comment in comments_to_emit_in_range(self.comments, spans.left_end, spans.keyword_pos) {
-            inner.push(d.text(" "));
-            inner.push(self.build_comment_doc(comment));
-        }
+        // Comments after left, before the keyword. The shared anchored-run emitter, one
+        // separator BEFORE each comment — see the header-gap note above this function.
+        self.push_anchored_trailing_run(
+            &mut inner,
+            spans.left_end,
+            spans.keyword_pos,
+            RunLeadingBlank::Keep,
+        );
 
         // Keyword with extra indent (hardline is INSIDE the indent so keyword gets extra indent)
-        let keyword_doc = match keyword {
-            "in" => d.text("in"),
-            "of" => d.text("of"),
-            _ => d.text("of"), // fallback
-        };
-        let mut keyword_parts: DocBuf = smallvec![d.hardline(), keyword_doc];
+        let mut keyword_parts: DocBuf = smallvec![d.hardline(), d.text(keyword)];
 
-        // Comments after keyword, before right — emit all (own-line comments normalize to inline)
-        for comment in
-            comments_to_emit_in_range(self.comments, spans.keyword_end, spans.right_start)
-        {
-            keyword_parts.push(d.text(" "));
-            keyword_parts.push(self.build_comment_doc(comment));
-        }
+        // Comments after the keyword, before the iterable — the same run rule.
+        self.push_anchored_trailing_run(
+            &mut keyword_parts,
+            spans.keyword_end,
+            spans.right_start,
+            RunLeadingBlank::Keep,
+        );
 
         // Right side (items)
         keyword_parts.push(d.hardline());
         keyword_parts.push(self.build_expression_doc(right));
 
-        // Comments after right, before close paren
+        // Comments after the iterable, before the `)` — the same run rule.
         if let Some(close) = spans.close_paren {
-            for comment in comments_to_emit_in_range(self.comments, spans.right_end, close) {
-                keyword_parts.push(d.text(" "));
-                keyword_parts.push(self.build_comment_doc(comment));
-            }
+            self.push_anchored_trailing_run(
+                &mut keyword_parts,
+                spans.right_end,
+                close,
+                RunLeadingBlank::Keep,
+            );
         }
 
         inner.push(d.indent(d.concat(&keyword_parts)));
@@ -1497,30 +1490,21 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Append inline block comments for for-in/for-of statements.
-    /// Emits ` comment` for each block comment, plus trailing ` ` if any were added.
-    /// Own-line comments normalize to inline. Line comments are skipped (handled by
-    /// the breaking layout path).
-    /// Returns true if any comments were added.
-    fn append_for_in_of_block_comments(&self, parts: &mut DocBuf, start: u32, end: u32) -> bool {
-        let d = self.d();
-        let mut added = false;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
-            if comment.is_block {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-                added = true;
-            }
-        }
-        if added {
-            parts.push(d.text(" "));
-        }
-        added
-    }
-
-    /// Append trailing block comments for for-in/for-of statements.
-    /// Own-line comments normalize to inline. No trailing space.
-    fn append_for_in_of_trailing_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
+    /// Append one for-in/for-of header gap's comments in the INLINE layout: ` comment`
+    /// per block comment, and nothing else — **the separator toward whatever follows is
+    /// the caller's**, so the three gaps that use this (binding→keyword,
+    /// keyword→iterable, iterable→`)`) differ only in what they push next, never in how
+    /// the run is written.
+    ///
+    /// A trailing space of its own, plus a `bool` saying whether it wrote one, was the
+    /// same separator said twice: each caller then chose a spaced or bare next token
+    /// from the flag, which is `" " + tok` either way.
+    ///
+    /// Line comments are skipped because they cannot reach here —
+    /// [`Self::for_in_of_header_gap_comment_forces_break`] routes a `//` in any of
+    /// these gaps to [`Self::build_for_in_of_with_line_comments`], which is the only
+    /// layout that can give one a line to end.
+    fn append_for_in_of_block_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
         let d = self.d();
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             if comment.is_block {
@@ -1876,22 +1860,6 @@ impl<'a> Printer<'a> {
         };
         self.in_for_init.set(saved_in_for_init);
         result
-    }
-
-    pub(in crate::printer::statements) fn build_for_in_statement_doc(
-        &self,
-        stmt: &internal::ForInStatement<'_>,
-    ) -> DocId {
-        // Delegate to the sophisticated version that handles empty block expansion
-        self.build_for_in_statement_with_body_doc(stmt)
-    }
-
-    pub(in crate::printer::statements) fn build_for_of_statement_doc(
-        &self,
-        stmt: &internal::ForOfStatement<'_>,
-    ) -> DocId {
-        // Delegate to the sophisticated version that handles empty block expansion
-        self.build_for_of_statement_with_body_doc(stmt)
     }
 
     /// The for-in/for-of header's LEFT clause.
