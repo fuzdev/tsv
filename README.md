@@ -149,7 +149,7 @@ and package READMEs for the full API and CLI flags:
   - the parser can also emit optimized JSON that drops the per-node `loc` and
     Svelte `name_loc` objects, mirroring acorn's `locations: false` for improved performance
     (`parse --no-locations`, or the JS API's `{locations: false}` option — the published
-    `@fuzdev/tsv` takes the same options bag; only the raw C-FFI / N-API addons keep
+    `@fuzdev/tsv` takes the same options; only the raw C-FFI / N-API addons keep
     flat `*_no_locations` exports)
 - compatible with Prettier, with generic rethought APIs
   - formatting is similar Prettier and prettier-plugin-svelte for the common case,
@@ -266,7 +266,7 @@ tsv/
 │   ├── tsv_ts/        # TypeScript parser/formatter (standalone)
 │   ├── tsv_css/       # CSS parser/formatter (standalone)
 │   ├── tsv_svelte/    # Svelte parser/formatter (uses tsv_ts + tsv_css)
-│   ├── tsv_svelte_compile/ # experimental Svelte→JS compiler + JS canonicalizer (consumed only by tsv_debug)
+│   ├── tsv_svelte_compile/ # experimental Svelte→JS compiler + JS canonicalizer (may never ship; not in any shipped artifact)
 │   ├── tsv_check/     # experimental TypeScript binder/checker (may never ship; not in any shipped artifact)
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
 │   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
