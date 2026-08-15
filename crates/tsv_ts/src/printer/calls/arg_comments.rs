@@ -24,8 +24,8 @@ impl<'a> Printer<'a> {
     /// after `prev_arg` has **two** sources and they must partition it exactly once
     /// (`docs/comments.md` §The element-comma seam, §A stripped-paren interior is a
     /// partition too): the ordinary gap `[prev_arg.end, next_arg_start)` above, and the
-    /// parent's share of `prev_arg`'s own stripped-paren interior — the own-line blocks a
-    /// spread's doc deliberately leaves behind ([`Printer::push_spread_own_line_block_comments`]),
+    /// parent's share of `prev_arg`'s own stripped-paren interior — the own-line comments a
+    /// spread's doc deliberately leaves behind ([`Printer::push_spread_own_line_comments`]),
     /// emitted past the comma because the comma is what gives an outside block a home on
     /// the argument's line. That share lies BEFORE `prev_arg`'s end, so a caller guarding
     /// this call on a plain gap scan must ask [`Printer::inter_arg_gap_has_comments`]
@@ -53,7 +53,7 @@ impl<'a> Printer<'a> {
         let prev_defers_line = self.defers_trailing_line_comment(prev_arg);
         pc.demote_trailing_line_after_deferred(prev_defers_line);
         pc.emit_trailing_comments_around_comma(parts, self);
-        let own_line_interior = self.push_spread_own_line_block_comments(parts, prev_arg);
+        let own_line_interior = self.push_spread_own_line_comments(parts, prev_arg);
         InterArgGap {
             // An own-line interior block is a sibling line, and an interior `//` the
             // spread defers must flush INSIDE the list — on a collapsed one the buffer
@@ -726,12 +726,14 @@ pub(crate) fn emit_first_arg_leading_comments(
 /// A loop whose gap lookup is guarded by `i < len - 1` has no emitter for this region at
 /// all, so everything an author parked after the last argument is DROPPED.
 ///
-/// Two regions, in source order, and they must **partition**: the parent's share of the
-/// last argument's own stripped-paren interior
-/// ([`Printer::push_spread_own_line_block_comments`] — the own-line blocks a spread's
-/// doc deliberately leaves for its parent), then the ordinary gap between the argument's
-/// end and `)`. The second keeps the plain `arg.span().end` anchor: widening it to reach
-/// the interior is what claims the spread's own share a second time.
+/// Two regions, and they must **partition**: the parent's share of the last argument's
+/// own stripped-paren interior ([`Printer::push_spread_own_line_comments`] — the
+/// own-line comments a spread's doc deliberately leaves for its parent), and the
+/// ordinary gap between the argument's end and `)`. The share goes first (source
+/// order) — except when it ends in a `//`, which nothing can glue after (see the
+/// ordering note in the body). The gap keeps the plain `arg.span().end` anchor:
+/// widening it to reach the interior is what claims the spread's own share a second
+/// time.
 ///
 /// The gap is partitioned with [`PartitionedComments::for_closer_gap`], not
 /// [`PartitionedComments::new`]: it holds the list's own **comma**, which under
@@ -746,18 +748,24 @@ pub(crate) fn emit_last_arg_trailing_comments(
     last_arg: &internal::Expression<'_>,
     paren_close: u32,
 ) {
-    printer.push_spread_own_line_block_comments(parts, last_arg);
+    // The share/gap emit order — see the predicate's doc for the rule it encodes.
+    let share_ends_in_line = printer.spread_share_ends_in_line_comment(last_arg);
+    if !share_ends_in_line {
+        printer.push_spread_own_line_comments(parts, last_arg);
+    }
     let arg_end = last_arg.span().end;
     // Every argument list reaching these builders pays this call, comments or not, so
     // skip the partition on the common empty gap (same guard as
     // `emit_first_arg_leading_comments`). Both emits `PartitionedComments` would run
     // walk only its own buckets, so an empty range is already a no-op.
-    if !printer.has_comments_to_emit_between(arg_end, paren_close) {
-        return;
+    if printer.has_comments_to_emit_between(arg_end, paren_close) {
+        let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
+        pc.demote_trailing_line_after_deferred(printer.defers_trailing_line_comment(last_arg));
+        pc.emit_last_arg_comments(parts, printer);
     }
-    let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
-    pc.demote_trailing_line_after_deferred(printer.defers_trailing_line_comment(last_arg));
-    pc.emit_last_arg_comments(parts, printer);
+    if share_ends_in_line {
+        printer.push_spread_own_line_comments(parts, last_arg);
+    }
 }
 
 /// Check if there are trailing comments (line OR block) on any arguments

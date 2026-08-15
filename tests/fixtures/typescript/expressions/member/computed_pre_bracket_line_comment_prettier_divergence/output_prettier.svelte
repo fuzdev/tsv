@@ -19,7 +19,8 @@
 		] // c4
 		[j];
 
-	// A call in the chain: a comment inside the brackets stays inside them.
+	// A call in the chain: a comment inside the brackets stays inside them, and the
+	// brackets breaking internally keeps the chain on the `=` line.
 	const d =
 		// c5
 		foo()[i];

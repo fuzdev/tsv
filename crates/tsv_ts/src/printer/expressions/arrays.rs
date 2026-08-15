@@ -424,7 +424,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Where an end-of-array scan starts: the last REAL element's end — or, when that
-    /// element is a spread whose stripped parens hold own-line blocks, the spread
+    /// element is a spread whose stripped parens hold own-line comments, the spread
     /// ARGUMENT's end, so the scan reaches into that interior to re-parent them.
     ///
     /// The one spelling of that reach, shared by [`Self::build_array_group_doc`]'s
@@ -439,11 +439,7 @@ impl<'a> Printer<'a> {
     fn end_scan_start(&self, arr: &internal::ArrayExpression<'_>) -> Option<u32> {
         let (_, elem) = self.prev_real_slot(arr, arr.elements.len())?;
         Some(match elem.as_spread() {
-            Some(spread)
-                if !self
-                    .spread_element_own_line_block_comments(spread)
-                    .is_empty() =>
-            {
+            Some(spread) if !self.spread_element_own_line_comments(spread).is_empty() => {
                 spread.argument.span().end
             }
             _ => elem.span().end,
@@ -694,7 +690,7 @@ impl<'a> Printer<'a> {
                 // spread slot fills this, and a real slot always drains it first, so the
                 // assignment never overwrites a live run.
                 if let Some(expr) = elem {
-                    pending_spread_comments = self.spread_own_line_block_comments(expr);
+                    pending_spread_comments = self.spread_own_line_comments(expr);
                 }
                 if !matches!(arr.elements.get(i + 1), Some(None)) {
                     for comment in &pending_spread_comments {
@@ -1065,7 +1061,7 @@ impl<'a> Printer<'a> {
             }
 
             // The array's share of a spread's stripped-paren interior, past the comma —
-            // the own-line blocks the spread's own doc leaves behind. The LAST element has
+            // the own-line comments the spread's own doc leaves behind. The LAST element has
             // no comma to emit against, so its share is the final scan's second anchor
             // instead (see `end_scan_emits_comment` and `final_scan_start` below).
             //
@@ -1086,7 +1082,7 @@ impl<'a> Printer<'a> {
             if !matches!(arr.elements.get(i + 1), Some(None))
                 && let Some(e) = pending_spread_share.take()
             {
-                self.push_spread_own_line_block_comments_with_blanks(&mut parts, e, elem.is_some());
+                self.push_spread_own_line_comments_with_blanks(&mut parts, e, elem.is_some());
             }
 
             // Trailing-hole iter: emit collected trailing-on-array comments inline

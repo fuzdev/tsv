@@ -557,8 +557,7 @@ impl<'a> Printer<'a> {
                 // internally at the comment location, so keep the chain with `=`
                 // (otherwise it breaks after `=` too → double indent). E.g.
                 // `const a = items // comment\n  .foo()` and `const b = foo.bar // c\n  .baz`.
-                let has_line_comments_in_chain = (matches!(init, Expression::CallExpression(_))
-                    && self.has_line_comments_in_call_chain(init))
+                let has_line_comments_in_chain = self.has_line_comments_in_call_chain(init)
                     || self.has_line_comments_in_member_chain(init);
 
                 // Combined flag for expressions with trailing comments that expand internally
