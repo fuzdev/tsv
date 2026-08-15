@@ -81,10 +81,24 @@ pub struct Lexer<'a> {
     /// stale contents are inert.
     decode_scratch: String,
     has_decoded: bool,
+    /// Byte offset of `source` within the document this lexer's ERRORS are rendered
+    /// against — zero when that document *is* `source`, the island start for a Svelte
+    /// `<style>`, the slice start for the parser's declaration-value scanners. Token
+    /// positions are unaffected (the parser shifts those itself when it builds spans).
+    /// See [`Lexer::host_err`].
+    base_offset: usize,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(source: &'a str) -> Self {
+    /// A lexer over `source`, which sits at `base_offset` in the document its errors will
+    /// be rendered against.
+    ///
+    /// The offset is a required argument rather than a `new(source)` default because a
+    /// silent zero is the failure mode, and this crate lexes short slices routinely
+    /// (`source[from..]` for the declaration-value scan): a lexer reporting its own
+    /// coordinates there puts the caret near the top of the file for an error in the
+    /// middle of a stylesheet.
+    pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
         // Position starts after BOM so token spans reflect actual file bytes.
@@ -99,7 +113,19 @@ impl<'a> Lexer<'a> {
             pos,
             decode_scratch: String::new(),
             has_decoded: false,
+            base_offset,
         }
+    }
+
+    /// Lift an error this lexer produced into the coordinates of the document it will be
+    /// rendered against (`ParseError::shift_position`).
+    ///
+    /// Applied once, at [`Lexer::next_token`] — this lexer's only fallible entry point,
+    /// and so its only producer.
+    #[cold]
+    #[inline(never)]
+    fn host_err(&self, err: ParseError) -> ParseError {
+        err.shift_position(self.base_offset)
     }
 
     /// The decoded value of the most recently produced token, if it required escape
@@ -280,7 +306,15 @@ impl<'a> Lexer<'a> {
         })
     }
 
+    /// The lexer's one fallible entry point — so the error path is lifted into host
+    /// coordinates here ([`Lexer::host_err`]); the scan itself reports in the lexer's own.
+    #[inline]
     pub fn next_token(&mut self) -> Result<Token, ParseError> {
+        self.next_token_local().map_err(|err| self.host_err(err))
+    }
+
+    /// [`Lexer::next_token`]'s scan, reporting an error at its position in `self.source`.
+    fn next_token_local(&mut self) -> Result<Token, ParseError> {
         // Start each token with a clean decoded flag. Callers copy the prior token's
         // decode out (`advance`/`new` at once, `peek` via its matching
         // `advance`-from-cache), so a stale decode never leaks onto a later token.

@@ -61,19 +61,15 @@ impl CompileCompareCommand {
         let target = self.target;
 
         // Compile is Svelte-only, so force the parser (matching `canonical_compile`).
-        let input_args = InputArgs {
-            content: self.content,
-            stdin: self.stdin,
-            parser: Some(ParserType::Svelte),
-            file: self.file,
-        };
-        let input = match input_args.resolve() {
-            Ok((input, _parser)) => input,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Errored);
-            }
-        };
+        let (input, _parser) = super::resolve_input_or_fail(
+            InputArgs {
+                content: self.content,
+                stdin: self.stdin,
+                parser: Some(ParserType::Svelte),
+                file: self.file,
+            },
+            CliError::Errored,
+        )?;
         let source = input.content();
 
         // Oracle side: compile with the canonical compiler, then canonicalize.
