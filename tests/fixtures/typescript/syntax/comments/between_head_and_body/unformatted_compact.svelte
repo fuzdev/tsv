@@ -132,4 +132,21 @@
 	// c2
 	{fn();}while(a);
 
+	// If - blank between a comment trailing the anchor and an own-line one, block body
+	if(a)// c1
+
+	// c2
+	{}
+
+	// Else - the same across the else keyword
+	if(a){}else// c1
+
+	// c2
+	{}
+
+	// Do - the same after the do keyword
+	do// c1
+
+	// c2
+	{fn();}while(a);
 </script>

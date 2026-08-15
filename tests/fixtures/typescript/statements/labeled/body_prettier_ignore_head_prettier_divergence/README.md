@@ -25,6 +25,13 @@ placement an ordinary comment takes here): a head-trailing directive is inert un
 placement floor, so the relocated form would lose the freeze on the second pass. **Both
 spellings** behave alike — placement keys the freeze, not the comment's spelling.
 
+An author **blank** between the directive and the body survives when the frozen body
+opens no `{` (the `ooo:` case) — not an ignore rule at all, but the header→body gap's
+brace rule, which this gap is the only reachable brace-less caller of. Both formatters
+keep it, so that case is a control rather than part of the divergence; the drop it
+replaced was a `{`-shaped licence applied to a body that has no `{`. See
+[conformance_prettier_ts_comments.md §"No blank above a body block's `{`"](../../../../../../docs/conformance_prettier_ts_comments.md).
+
 ## Reason
 
 Rule A binds a directive to the node that follows it, which at this gap is the body, not

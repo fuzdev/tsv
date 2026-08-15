@@ -1,6 +1,6 @@
 // try/catch/finally, throw, break/continue, and labeled statement printing
 
-use super::{HeaderBodyBlank, OpenParenLineComments};
+use super::OpenParenLineComments;
 use crate::ast::internal::{self, Statement};
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
@@ -21,7 +21,7 @@ impl<'a> Printer<'a> {
     /// `if`/`while` `)`→`{` siblings never do.
     fn append_keyword_to_body_comments(&self, parts: &mut DocBuf, token_end: u32, body_start: u32) {
         if self.has_comments_to_emit_between(token_end, body_start) {
-            self.push_header_to_body_gap(parts, token_end, body_start, HeaderBodyBlank::Drop);
+            self.push_header_to_body_gap(parts, token_end, body_start);
         } else {
             parts.push(self.d().text(" "));
         }
@@ -276,12 +276,7 @@ impl<'a> Printer<'a> {
             // the own-line-preserving header→body emitter instead — the declaration-header
             // rule of `conformance_prettier_ignore.md` §On module and declarator lists.
             tail_parts.push(d.text(":"));
-            self.push_header_to_body_gap(
-                &mut tail_parts,
-                colon_end,
-                body_start,
-                HeaderBodyBlank::Drop,
-            );
+            self.push_header_to_body_gap(&mut tail_parts, colon_end, body_start);
             tail_parts.push(self.build_frozen_node_doc(frozen));
         } else if self.has_comments_to_emit_between(colon_end, body_start) {
             // The run is pinned to the `:` line (prettier hoists it above the whole labeled
