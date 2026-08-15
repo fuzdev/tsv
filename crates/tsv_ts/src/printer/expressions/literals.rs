@@ -447,15 +447,44 @@ impl<'a> Printer<'a> {
         // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)
         let dots_end = spread.span.start + "...".len() as u32;
         let arg_start = spread.argument.span().start;
-        // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before).
-        // A single-line block glued to `...` hugs the argument even across a source
-        // newline (`.../* c */⏎arg` → `.../* c */ arg`), matching prettier.
-        let comment_doc = self.build_rhs_comments_glued_opt(dots_end, arg_start);
 
         // Check for trailing comments from stripped grouping parens: `...(x /* c */)`
         let argument_end = spread.argument.span().end;
         let has_trailing_comments =
             self.has_comments_to_emit_between(argument_end, spread.span.end);
+
+        // A block run the author broke AFTER, before an argument that WILL BREAK,
+        // keeps its break — prettier's `printLeadingComment` newline-after `line`,
+        // materialized by the argument's own break (`.../*#__PURE__*/⏎fn({…})` stays
+        // broken, the argument opening un-indented at the `...`'s level). The gate is
+        // the shared `breaking_value_leading_run` (geometry + `will_break` + the
+        // owned-comment decline); an argument that FITS declines into the glued path
+        // below, whose flat render is the same bytes prettier's collapsed `line`
+        // produces. A synthesized paren shell keeps the glued path too — the compound
+        // is unprobed, and the hug is that path's existing answer there.
+        if !needs_parens
+            && let Some((run, arg_doc)) =
+                self.breaking_value_leading_run(dots_end, arg_start, || arg_doc)
+        {
+            let mut parts = smallvec![d.text("...")];
+            self.push_leading_run_before_breaking_value(&mut parts, &run, arg_start);
+            parts.push(arg_doc);
+            if has_trailing_comments {
+                self.append_spread_trailing_paren_comments(
+                    &mut parts,
+                    argument_end,
+                    spread.span.end,
+                );
+            }
+            return d.concat(&parts);
+        }
+
+        // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before).
+        // A single-line block glued to `...` hugs the argument even across a source
+        // newline (`.../* c */⏎arg` → `.../* c */ arg`), matching prettier — the
+        // argument that would BREAK took the gate above; only the fits case reaches
+        // this hug.
+        let comment_doc = self.build_rhs_comments_glued_opt(dots_end, arg_start);
 
         let prefix = if needs_parens { "...(" } else { "..." };
         let mut parts = smallvec![d.text(prefix)];
