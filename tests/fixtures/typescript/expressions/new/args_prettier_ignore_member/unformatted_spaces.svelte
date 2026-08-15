@@ -62,9 +62,10 @@
 	);
 
 	// an ordinary comment leading the same run keeps the directive on its own line, so
-	// the freeze survives the next pass; the variant authors that comment on the `(` line
-	new A( // c
-		// prettier-ignore
+	// the freeze survives the next pass
+		new A(
+		// c
+			// prettier-ignore
 		{ a:   1 },
 			{ b: 2 }
 	);

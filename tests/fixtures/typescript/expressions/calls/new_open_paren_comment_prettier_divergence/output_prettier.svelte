@@ -40,4 +40,21 @@
 
 		b
 	);
+
+	// line comment trailing `(` — a last argument the expand-last layout would hug:
+	// the comment still stays on the `(` line
+	new Foo(
+		// c6
+		a,
+		() => {
+			b();
+		}
+	);
+
+	// the same with a collection last argument
+	new Foo(
+		// c7
+		a,
+		{ b: 2 }
+	);
 </script>
