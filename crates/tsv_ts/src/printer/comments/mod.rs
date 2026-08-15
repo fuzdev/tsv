@@ -1857,9 +1857,9 @@ impl<'a> Printer<'a> {
     /// caller's builder) **will break** — the gate for
     /// [`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
     /// at the seams whose remaining layouts already render the width-driven case
-    /// (the declarator and assignment-expression `=`, the simple `:`
-    /// annotation). A value that fits declines, and the caller keeps its glued
-    /// path.
+    /// (the declarator and assignment-expression `=`, the simple `:` annotation,
+    /// the spread's dots→argument gap, the `await` keyword→argument gap). A value
+    /// that fits declines, and the caller keeps its glued path.
     pub(crate) fn breaking_value_leading_run(
         &self,
         gap_start: u32,

@@ -1079,11 +1079,32 @@ impl<'a> Printer<'a> {
         self.mark_ternary_extra_indent(await_expr.argument);
         let argument_start = await_expr.argument.span().start;
         let argument_end = await_expr.argument.span().end;
-        let comments_opt = self.build_keyword_operand_comments_opt(keyword_end, argument_start);
-
         // Trailing comments from stripped grouping parens: `await (x /* c */)` → `await x /* c */`
         let has_trailing_comments =
             self.has_comments_to_emit_between(argument_end, await_expr.span.end);
+
+        // A block run the author broke AFTER, before an argument that WILL BREAK,
+        // keeps its break — prettier's `printLeadingComment` newline-after `line`,
+        // materialized by the argument's own break (`await /* c */⏎fn({…})` stays
+        // broken, the argument opening un-indented on the next line; `await` is not a
+        // restricted production, so the break is layout, not ASI — contrast `yield`).
+        // The gate is the shared `breaking_value_leading_run`; an argument that FITS
+        // declines into the glued pull-up below. Mirrors `build_spread_doc`; a
+        // parenthesized argument keeps the glued path (the compound is unprobed).
+        if !self.needs_parens(await_expr.argument, ParenContext::AwaitArgument)
+            && let Some((run, arg_doc)) =
+                self.breaking_value_leading_run(keyword_end, argument_start, || {
+                    self.build_expression_doc(await_expr.argument)
+                })
+        {
+            let mut parts: DocBuf = smallvec![d.text("await ")];
+            self.push_leading_run_before_breaking_value(&mut parts, &run, argument_start);
+            parts.push(arg_doc);
+            self.append_trailing_paren_comments(&mut parts, argument_end, await_expr.span.end);
+            return d.concat(&parts);
+        }
+
+        let comments_opt = self.build_keyword_operand_comments_opt(keyword_end, argument_start);
 
         let argument_doc = if comments_opt.is_some() || has_trailing_comments {
             // The grouping parens are required when the operand needs them (`await`
