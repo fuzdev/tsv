@@ -586,10 +586,14 @@ const TASK_OPTIONS = { forced_async: BENCH_FORCED_ASYNC, corpus_kind: CORPUS_MOD
  * contradicts it (an absent row leaves no trace, which is the whole reason the
  * disclosure exists).
  *
- * One absence is NOT drift and does not throw: an `added` row whose impl failed to
- * initialize. That is this machine coming up short, recorded as `unavailable` and
- * warned about here — while the disclosure's prose, which explains why the row is
- * on this surface, is dropped rather than printed over a row that isn't there.
+ * An `added` row asks TWO questions, of two different sources, because `registered`
+ * is availability-independent and so can only answer the first: does this surface
+ * DEFINE the row (policy — a `no` is drift, and throws), and did its impl come up
+ * on this MACHINE (a `no` is a shortfall, already in `unavailable` — the run warns
+ * and drops the prose rather than explaining a row the report doesn't carry).
+ * Collapsing them into one `!present` test loses whichever question the registry
+ * isn't answering: against the live set a stale claim can never throw on a machine
+ * missing the impl, and against the defined set the shortfall goes unnoticed.
  */
 function surface_disclosure_lines(registered: Set<string>): {
 	lines: string[];
@@ -606,7 +610,21 @@ function surface_disclosure_lines(registered: Set<string>): {
 					`match the registration in lib/implementations.ts.`
 			);
 		}
-		if (d.direction === 'added' && !present) {
+		if (d.direction === 'added') {
+			// Two independent questions, each asked of the source that can answer it.
+			// POLICY: does this surface define the row at all? `registered` is the
+			// availability-independent set, so a `false` here is a decision in
+			// `lib/implementations.ts` and nothing else — the stale-claim case.
+			if (!present) {
+				throw new Error(
+					`report disclosure is stale: it says '${d.row}' is added on the conformance surface, ` +
+						`but this surface does not register it. Update SURFACE_DISCLOSURES in bench.ts to ` +
+						`match the registration in lib/implementations.ts.`
+				);
+			}
+			// MACHINE: the surface defines the row, but did the impl behind it come
+			// up here? If not, the prose would explain a row this report doesn't
+			// carry. Asked separately because `registered` deliberately cannot see it.
 			if (!d.initialized()) {
 				warnings.push(
 					`⚠ '${d.row}' did not initialize, so its "Added here" disclosure is omitted from ` +
@@ -614,11 +632,6 @@ function surface_disclosure_lines(registered: Set<string>): {
 				);
 				continue;
 			}
-			throw new Error(
-				`report disclosure is stale: it says '${d.row}' is added on the conformance surface, ` +
-					`but this surface does not register it. Update SURFACE_DISCLOSURES in bench.ts to ` +
-					`match the registration in lib/implementations.ts.`
-			);
 		}
 		lines.push(d.prose);
 	}

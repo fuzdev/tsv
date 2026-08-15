@@ -135,7 +135,10 @@ export interface CollectedBinarySizes {
 	 * built only what it measures; the full `deno task bench` builds them all. A
 	 * **third-party** label is absent although its impl initialized, which means
 	 * the package shipped no artifact where this module looks — a stale path here,
-	 * or an upstream layout change.
+	 * or an upstream layout change. The one third-party label with a benign
+	 * reading is `oxc-parser (wasm)`: its binding lives in no manifest
+	 * (`OXC_WASI_BINDING`, force-fetched by `deno task bench:install`), so a plain
+	 * `npm install` leaves it absent with nothing else wrong.
 	 */
 	absent: string[];
 }
@@ -250,9 +253,10 @@ export async function collect_binary_sizes(
 	// labels reached-for but absent (see `SizeStaging`).
 	const staged: SizeStaging = { found: [], absent: [] };
 
-	// tsv native (FFI shared library)
+	// tsv native (FFI shared library) — `native`/`wasm` are required impls, so these
+	// blocks are unconditional; an absent BUILD still shows up as `absent` below.
 	const ffi_lib = native_library_filename('tsv_ffi');
-	if (impls.native) {
+	{
 		await push_size(staged, LABELS.tsv_ffi, 'native', `${project_root}/target/release/${ffi_lib}`);
 		// tsv format-only native — the native mirror of @fuzdev/tsv_format_wasm:
 		// dropping the convert/JSON layer (and the parse exports) leaves a
@@ -295,7 +299,7 @@ export async function collect_binary_sizes(
 	// pkg/format/deno (format-only, @fuzdev/tsv_format_wasm), pkg/parse/deno
 	// (parse-only, @fuzdev/tsv_parse_wasm), and pkg/all/deno (both,
 	// @fuzdev/tsv_wasm — the bundle the bench executes).
-	if (impls.wasm) {
+	{
 		await push_size(
 			staged,
 			LABELS.tsv_format_wasm,

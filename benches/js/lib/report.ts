@@ -74,6 +74,12 @@ const DISPLAY_ORDER = [
 	'tsv_wasm-json-no-locations',
 	'tsv',
 	'tsv_wasm',
+	// Opt-in diagnostic (`BENCH_FORCED_ASYNC=1`), so it reaches no committed report
+	// — but the completeness guard asks about every row the surface DEFINES, not
+	// every row a default run renders, so leaving it out fired a ⚠ on each
+	// forced-async run about a row that is deliberately unpublished. Listed for the
+	// same reason `tsc` below is: the order is kept COMPLETE.
+	'tsv-forced-async',
 	// Internal variants (shown separately)
 	'tsv-internal',
 	'tsv_wasm-internal',
@@ -111,6 +117,11 @@ const DISPLAY_ORDER = [
  * registers its own subset (`tsc` rides the conformance surface alone), so the
  * reverse check would fire on every run of the other surface — while this direction
  * is answerable per surface and self-completes across the two.
+ *
+ * The caller asks it of the rows a surface DEFINES (`get_defined_rows`), not of the
+ * rows a machine could run, so the answer is a property of the code rather than of
+ * the box — and an opt-in row (`tsv-forced-async`, `BENCH_FORCED_ASYNC=1`) is asked
+ * about too, which is why the order lists it.
  */
 export function rows_missing_from_display_order(names: Iterable<string>): string[] {
 	return [...names].filter((name) => !DISPLAY_ORDER.includes(name));

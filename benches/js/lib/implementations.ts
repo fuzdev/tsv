@@ -92,12 +92,21 @@ export interface UnavailableImpl {
 export interface ImplementationSet {
 	/** All package versions */
 	versions: AllVersions;
-	/** Canonical implementation (prettier + svelte/compiler) - always available */
+	/**
+	 * The three REQUIRED impls, and the only ones whose type is not `| undefined`:
+	 * the oracle every comparison is against, and tsv's own two bindings — the
+	 * subject of every tool that calls `init_implementations`.
+	 *
+	 * A load failure here is a broken tree, not a diminished machine, so it throws
+	 * rather than joining `unavailable` (see `init_required`). That distinction is
+	 * what makes the types honest: an optional impl really can be absent at run
+	 * time, and these three cannot.
+	 */
 	canonical: CanonicalImplementation;
-	/** Native implementation — FFI under Deno, N-API under Node/Bun; undefined if not built */
-	native: NativeImplementation | NapiImplementation | undefined;
-	/** WASM implementation - undefined if not built */
-	wasm: WasmImplementation | undefined;
+	/** Native implementation — FFI under Deno, N-API under Node/Bun. */
+	native: NativeImplementation | NapiImplementation;
+	/** WASM implementation (the runtime's own wasm-pack target bundle). */
+	wasm: WasmImplementation;
 	/** OXC implementation (oxc-parser + oxfmt) - undefined if not available */
 	oxc: OxcImplementation | undefined;
 	/** OXC WASM implementation (oxc-parser via wasm32-wasi) - undefined if not available */
@@ -204,6 +213,41 @@ export interface InitOptions {
  * `key` rides along for that record — the failure has to be joinable back to the
  * rows it cost, and the display label can't do it (see `UnavailableImpl`).
  */
+/**
+ * Initialize one REQUIRED implementation, rethrowing when it can't load.
+ *
+ * Three impls take this path: `canonical` (the oracle every comparison is
+ * against) and tsv's own `native` + `wasm` (the subject every caller of
+ * `init_implementations` exists to measure or compare). A failure in any of them
+ * is a broken tree — an unbuilt artifact, a corrupt bundle — not a machine coming
+ * up short, so it must stop the run rather than join `unavailable`.
+ *
+ * Being fatal is also what lets their slots be non-`undefined` in
+ * `ImplementationSet`. That was worth more than the tolerance it replaces: the
+ * bench published tsv's OWN rows missing from every table behind a single ⚠ line,
+ * and five diagnostics each hand-rolled their own `if (!impls.native) throw`,
+ * every one of them a separate chance to word the requirement differently or
+ * forget it. The expected-`unavailable` set is never tsv on any runtime (under Bun
+ * it is biome + oxc-parser-wasm), so nothing legitimate is lost by refusing.
+ *
+ * Note the asymmetry with the freshness guard, which is what leaves a gap for this
+ * to close: `check_artifact_freshness` makes a MISSING artifact fatal, but a
+ * present-yet-unloadable one only surfaces here.
+ */
+async function init_required<T extends { init: () => Promise<void> }>(
+	impl: T,
+	label: string,
+	logger: Logger
+): Promise<void> {
+	try {
+		await impl.init();
+		logger(`  ✓ ${label}`);
+	} catch (e) {
+		logger(`  ✗ ${label}: ${e}`);
+		throw e;
+	}
+}
+
 async function init_optional<T extends { init: () => Promise<void> }>(
 	impl: T,
 	key: ImplKey,
@@ -260,16 +304,11 @@ export async function init_implementations(
 
 	logger('Initializing implementations...');
 
-	// Canonical is the one REQUIRED impl — it is the oracle every comparison is
-	// against, so a run without it measures nothing. Rethrows rather than joining
-	// `unavailable` below: that list records a diminished run, and this is not one.
-	try {
-		await canonical.init();
-		logger('  ✓ Canonical (prettier + svelte/compiler)');
-	} catch (e) {
-		logger(`  ✗ Canonical: ${e}`);
-		throw e;
-	}
+	// The three REQUIRED impls, in one posture — see `init_required`. Everything
+	// below is optional; these are the oracle and the subject.
+	await init_required(canonical, 'Canonical (prettier + svelte/compiler)', logger);
+	await init_required(native, native_label, logger);
+	await init_required(wasm, 'WASM', logger);
 
 	// Every impl below is optional and shares one failure posture — see `init_optional`.
 	const unavailable: InitFailure[] = [];
@@ -301,8 +340,6 @@ export async function init_implementations(
 	const swc = new SwcImplementation(versions.swc);
 	const postcss = new PostcssImplementation(versions.postcss);
 
-	const native_impl = await optional(native, 'native', native_label);
-	const wasm_impl = await optional(wasm, 'wasm', 'WASM');
 	const oxc_impl = await optional(oxc, 'oxc', 'OXC (oxc-parser + oxfmt)', 'OXC');
 	const oxc_wasm_impl = await optional(oxc_wasm, 'oxc_wasm', 'OXC WASM (oxc-parser)', 'OXC WASM');
 	const tsc_impl = await optional(tsc, 'tsc', `tsc ${versions.tsc.typescript} (parse-only)`, 'tsc');
@@ -351,8 +388,8 @@ export async function init_implementations(
 	return {
 		versions,
 		canonical,
-		native: native_impl,
-		wasm: wasm_impl,
+		native,
+		wasm,
 		oxc: oxc_impl,
 		oxc_wasm: oxc_wasm_impl,
 		tsc: tsc_impl,
@@ -529,11 +566,11 @@ export function get_benchmark_tasks(
 		);
 
 		// Native + WASM parsers (with JSON serialization)
-		add('native', impls.native, 'tsv-json', 'native', (source, _language, goal) =>
-			impls.native!.parse(source, language, goal)
+		add('native', true, 'tsv-json', 'native', (source, _language, goal) =>
+			impls.native.parse(source, language, goal)
 		);
-		add('wasm', impls.wasm, 'tsv_wasm-json', 'wasm', (source, _language, goal) =>
-			impls.wasm!.parse(source, language, goal)
+		add('wasm', true, 'tsv_wasm-json', 'wasm', (source, _language, goal) =>
+			impls.wasm.parse(source, language, goal)
 		);
 
 		// The no-locations wire (span-only: no per-node `loc`) — the payload-matched
@@ -543,33 +580,25 @@ export function get_benchmark_tasks(
 		// emits no `loc`, so a CSS no-locations row would duplicate `tsv-json`.
 		add(
 			'native',
-			impls.native?.parse_no_locations && language !== 'css',
+			language !== 'css',
 			'tsv-json-no-locations',
 			'native-no-locations',
-			(source, _language, goal) => impls.native!.parse_no_locations!(source, language, goal)
+			(source, _language, goal) => impls.native.parse_no_locations(source, language, goal)
 		);
 		add(
 			'wasm',
-			impls.wasm?.parse_no_locations && language !== 'css',
+			language !== 'css',
 			'tsv_wasm-json-no-locations',
 			'wasm-no-locations',
-			(source, _language, goal) => impls.wasm!.parse_no_locations!(source, language, goal)
+			(source, _language, goal) => impls.wasm.parse_no_locations(source, language, goal)
 		);
 
 		// Internal parsing variants (no JSON serialization) - shows JSON overhead
-		add(
-			'native',
-			impls.native?.parse_internal,
-			'tsv-internal',
-			'native-internal',
-			(source, _language, goal) => impls.native!.parse_internal!(source, language, goal)
+		add('native', true, 'tsv-internal', 'native-internal', (source, _language, goal) =>
+			impls.native.parse_internal(source, language, goal)
 		);
-		add(
-			'wasm',
-			impls.wasm?.parse_internal,
-			'tsv_wasm-internal',
-			'wasm-internal',
-			(source, _language, goal) => impls.wasm!.parse_internal!(source, language, goal)
+		add('wasm', true, 'tsv_wasm-internal', 'wasm-internal', (source, _language, goal) =>
+			impls.wasm.parse_internal(source, language, goal)
 		);
 
 		// OXC parser (TypeScript/JS only) — default mode: serializes to JSON in Rust
@@ -702,12 +731,8 @@ export function get_benchmark_tasks(
 		);
 
 		// Native + WASM formatters
-		add('native', impls.native?.format, 'tsv', 'native', (source) =>
-			impls.native!.format!(source, language)
-		);
-		add('wasm', impls.wasm?.format, 'tsv_wasm', 'wasm', (source) =>
-			impls.wasm!.format!(source, language)
-		);
+		add('native', true, 'tsv', 'native', (source) => impls.native.format(source, language));
+		add('wasm', true, 'tsv_wasm', 'wasm', (source) => impls.wasm.format(source, language));
 
 		// Forced-async control (opt-in). Same native engine as `tsv`, routed through
 		// the awaited async path so the `tsv` vs `tsv-forced-async` delta measures the
@@ -716,10 +741,10 @@ export function get_benchmark_tasks(
 		// `BenchmarkTaskOptions.forced_async`.
 		add_async(
 			'native',
-			options.forced_async && impls.native?.format,
+			options.forced_async,
 			'tsv-forced-async',
 			'native-forced-async',
-			(source, language) => Promise.resolve(impls.native!.format!(source, language))
+			(source, language) => Promise.resolve(impls.native.format(source, language))
 		);
 
 		// OXC formatter (TypeScript/JS/CSS only) - async

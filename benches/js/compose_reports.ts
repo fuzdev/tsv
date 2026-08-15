@@ -169,6 +169,13 @@ const sources = present.map((r) => ({
  * cost this surface no row contributes nothing here — correctly, since no table has
  * a gap to explain.
  *
+ * A sibling from the brief `version` 10–11 window recorded failures WITHOUT rows;
+ * those contribute nothing here too, and unlike the cases above that is a shortfall
+ * of the data rather than a claim about it. Neither version was ever a released
+ * sibling — the field and its rows landed in one change — so the state is only
+ * reachable from a local run made mid-change, and it clears on the next full
+ * `bench:perf`. Their `reason`s survive in `sources[].unavailable` either way.
+ *
  * Not narrowed to the rows missing on SOME runtimes: a row absent on all of them is
  * still a shortfall of the machine that produced these reports, and the fold has no
  * row for it either way. The md line below is worded to cover both.

@@ -1,9 +1,9 @@
 {
-	"version": 11,
+	"version": 12,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-08-15T15:54:13.464Z",
-	"git_commit": "79ab41d8",
+	"timestamp": "2026-08-15T18:43:31.524Z",
+	"git_commit": "a2f101d6",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -143,6 +143,12 @@
 				"svelte": 0,
 				"typescript": 8097,
 				"css": 0
+			},
+			"repo": {
+				"url": "https://github.com/microsoft/TypeScript",
+				"slug": "microsoft/TypeScript",
+				"commit": "",
+				"subpath": ""
 			}
 		}
 	],

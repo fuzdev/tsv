@@ -24,8 +24,6 @@ const [files, impls] = await Promise.all([
 	init_implementations({ logger: (m) => console.error(m) })
 ]);
 const ts = group_by_language(files).typescript;
-if (!impls.native) throw new Error('native FFI not built');
-if (!impls.wasm) throw new Error('wasm not built');
 const native = impls.native;
 const wasm = impls.wasm;
 

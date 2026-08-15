@@ -182,8 +182,6 @@ const [files, impls] = await Promise.all([
 	init_implementations({ logger: (m) => console.error(m) })
 ]);
 const by_language = group_by_language(files);
-if (!impls.native) throw new Error('native FFI not built');
-
 const langs: Language[] = ['svelte', 'typescript', 'css'];
 
 interface Entry {
@@ -220,7 +218,7 @@ for (const lang of langs) {
 			// parse_internal suffices: only throw/no-throw is read, and it skips
 			// the full JSON materialization (Rust to_string + FFI copy + JS
 			// JSON.parse) — same $lang::parse + error surface in tsv_ffi
-			impls.native!.parse_internal(f.content, lang);
+			impls.native.parse_internal(f.content, lang);
 		} catch (e) {
 			tsv_err = String(e instanceof Error ? e.message : e).split('\n')[0];
 		}

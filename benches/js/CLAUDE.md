@@ -686,6 +686,18 @@ NOT THERE — and the last is the one a table can't ask, since an impl that stop
 loading takes its column out of every table and the ⚠ init line lives only in the
 run's output.
 
+**Three impls can never appear there, because they are REQUIRED**: `canonical`
+(the oracle) and tsv's own `native` + `wasm`. A load failure in any of them throws
+out of `init_implementations` (`init_required`) instead of joining `unavailable`,
+and their slots are correspondingly non-`undefined` in `ImplementationSet` — a
+broken tree, not a machine coming up short. Before that, a wasm bundle that was
+present but wouldn't load published a report with every `tsv_wasm-*` row silently
+gone behind one ⚠ line, and five diagnostics each hand-rolled their own
+`if (!impls.native) throw`. Note the division of labour with the freshness guard:
+`check_artifact_freshness` makes a MISSING artifact fatal, a present-yet-unloadable
+one surfaces only here. The expected-`unavailable` set is never tsv on any runtime
+(under Bun it is biome + oxc-parser-wasm), so nothing legitimate is refused.
+
 **`rows` is the joinable half, and the reason it exists.** Every other identity the
 report publishes is a row name (`entries[].name`, `variant_parity.impl`/`.sibling`,
 `report.ts`'s `DISPLAY_ORDER`), so a consumer asking "is this blank cell a load

@@ -228,7 +228,6 @@ function walk(
 }
 
 const impls = await init_implementations({ logger: (m) => console.error(m) });
-if (!impls.native) throw new Error('native FFI not built — run deno task build:ffi');
 const native = impls.native;
 
 const files = await new DevReposLoader('gates').load((m) => console.error(m));
