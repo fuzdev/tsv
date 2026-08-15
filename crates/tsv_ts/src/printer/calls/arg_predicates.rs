@@ -519,4 +519,44 @@ mod tests {
         // Two non-function args ⇒ not composition.
         assert!(!is_function_composition_args(args_of(&arena, "f(a, b)")));
     }
+
+    #[test]
+    fn react_hook_deps_array_shape() {
+        let arena = Bump::new();
+        // The gap-comment conjunct is the caller's; these cases isolate the shape.
+        let shape = |src: &str| is_react_hook_call_with_deps_array(args_of(&arena, src), || false);
+
+        // Two-argument form: zero-parameter block arrow, then an array literal.
+        assert!(shape("useEffect(() => {}, [a, b])"));
+        // The callee name is never read — any call written in the shape takes the layout.
+        assert!(shape("fn(() => {}, [a])"));
+        // An empty deps array still counts; so does an `async` callback.
+        assert!(shape("fn(() => {}, [])"));
+        assert!(shape("fn(async () => {}, [a])"));
+
+        // A parameter on the callback disqualifies it…
+        assert!(!shape("fn((x) => {}, [a])"));
+        // …as does an expression body, or a non-array second argument.
+        assert!(!shape("fn(() => a, [b])"));
+        assert!(!shape("fn(() => {}, {})"));
+        assert!(!shape("fn(() => {}, a)"));
+        // A spread is not the callback.
+        assert!(!shape("fn(...[() => {}], [a])"));
+
+        // Three-argument form: a plain IDENTIFIER first, then the same pair.
+        assert!(shape("useImperativeHandle(ref, () => {}, [a])"));
+        // Any other first argument refuses it — prettier tests `type === "Identifier"`.
+        assert!(!shape("useImperativeHandle(o.p, () => {}, [a])"));
+        assert!(!shape("useImperativeHandle(1, () => {}, [a])"));
+
+        // One or four arguments are not the shape at all.
+        assert!(!shape("fn(() => {})"));
+        assert!(!shape("fn(() => {}, [a], b)"));
+
+        // A comment attached to an argument refuses it, whatever the shape says.
+        assert!(!is_react_hook_call_with_deps_array(
+            args_of(&arena, "fn(() => {}, [a])"),
+            || true
+        ));
+    }
 }
