@@ -105,14 +105,14 @@ pub enum NonNullGap {
     /// itself: `aaa /* c */!.bbb`. `operand_end` is where the operand expression
     /// ends; `bang_end` is just past the `!`.
     ///
-    /// ⚠️ Where the operand is written bare, only a single-line block comment can
-    /// sit here — the `!` binds under `[no LineTerminator here]`, so a `//` (or a
-    /// block comment spanning lines) is a parse error. That premise fails the
-    /// moment a grouping shell is **stripped**: the region then spans the erased
-    /// `)`, and `(aaa // c⏎)!.bbb` puts a `//` in it, which this arm's block-only
-    /// emitter DROPS. Preserving it means retaining the shell (the multiline
-    /// operand layout `build_non_null_paren_operand_doc` gives the required-paren
-    /// case) — a divergence decision, still open.
+    /// The emitter is block-only, and that bound is sound because a `//` can never
+    /// reach this arm: written bare, the `!` binds under `[no LineTerminator
+    /// here]`, so only a single-line block comment can sit in the region — and the
+    /// one authoring that puts a `//` there, a grouping shell (`(aaa // c⏎)!.bbb`),
+    /// is caught by the linearizer's line-comment gate, which RETAINS the shell as
+    /// a parenthesized base (this node then takes [`Self::InsideOperandParens`])
+    /// rather than flattening the operand into a region with nothing left to
+    /// parenthesize.
     Bang { operand_end: u32, bang_end: u32 },
     /// A parenthesized operand keeps the region *inside* its own parens, where the
     /// author wrote it (`(x + y /* c */)!.foo`), so the `!` prints nothing. Set by
@@ -143,11 +143,14 @@ impl<'a> ChainNode<'a> {
         }
     }
 
-    /// Create a parenthesized base node that preserves a trailing comment from the
-    /// stripped grouping parens, emitted inside them before `)`. `paren_comment_end`
-    /// bounds the region to scan for that comment (e.g. the non-null assertion's
-    /// span end).
-    pub fn base_with_paren_comment(
+    /// Create a parenthesized base node whose `!` follows as the next node —
+    /// the linearizer's non-null arm builds both its authorings this way: a sealed
+    /// optional chain (`(a?.b)!.c`, parens required) and a shell retained for a
+    /// `//` in the operand→`!` gap (`(aaa // c⏎)!.bbb`). `paren_comment_end`
+    /// bounds the region to scan for a trailing comment from the parens, emitted
+    /// inside them before `)` — the scan may find nothing (a comment-free sealed
+    /// chain), in which case the printer renders bare parens.
+    pub fn paren_base_before_non_null(
         expr: &'a internal::Expression<'a>,
         paren_comment_end: u32,
     ) -> Self {

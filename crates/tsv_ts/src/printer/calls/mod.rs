@@ -189,7 +189,7 @@ impl<'a> Printer<'a> {
 
         if is_true_chain || callee_is_memberish {
             // Use chain wrapping for chains (nested calls) or memberish callees
-            let nodes = chain::linearize_chain_from_call(call);
+            let nodes = chain::linearize_chain_from_call(call, self.comments);
             let base_start = get_chain_base_comment_start(&nodes, call.callee);
             let groups = chain::group_chain_nodes(&nodes);
             let chain_doc = chain::build_chain_doc(&groups, call.span, self);
@@ -217,7 +217,7 @@ impl<'a> Printer<'a> {
         }
 
         // Use chain-based implementation
-        let nodes = chain::linearize_chain_from_member(member);
+        let nodes = chain::linearize_chain_from_member(member, self.comments);
         let base_start = get_chain_base_comment_start(&nodes, member.object);
         let groups = chain::group_chain_nodes(&nodes);
         let chain_doc = chain::build_chain_doc(&groups, member.span, self);
