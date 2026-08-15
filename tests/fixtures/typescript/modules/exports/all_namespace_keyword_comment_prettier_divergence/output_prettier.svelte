@@ -18,4 +18,9 @@
 	// line comment between as and binding — tsv indents the binding, prettier flattens it
 	export * as // c6
 	ns6 from './f';
+
+	// both gaps at once — the whole header stays at ONE indent level, never a staircase
+	export * as // c7
+	// c8
+	ns7 from './g';
 </script>

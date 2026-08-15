@@ -209,6 +209,7 @@ impl<'a> Printer<'a> {
                     SpecifierListSpans {
                         header_start: decl.span.start,
                         kw_end,
+                        gap_start: kw_end,
                         bound,
                     },
                     true,
@@ -559,25 +560,26 @@ impl<'a> Printer<'a> {
         // continuation); the `*` is emitted via the tail helper so an `export`→`*`
         // or `type`→`*` line comment carries it onto the indented line.
         let mut parts = smallvec![d.text("export ")];
-        if is_type {
-            // `export`→`type` gap, then `type`→`*` gap.
+        // Which gap precedes the `*` — `export`→`*`, or `type`→`*` past an emitted
+        // `type ` — is all the two branches decide; the star and its binding are the
+        // shared emitter's.
+        let star_gap_start = if is_type {
             let type_start = self
                 .find_keyword_in_range(export_end, star_pos, "type")
                 .unwrap_or(export_end);
             parts.push(self.gap_comment_continuation_tail(export_end, type_start, d.text("type ")));
-            let type_end = self
-                .find_keyword_end("type", export_end, star_pos)
-                .unwrap_or(export_end);
-            parts.push(self.gap_comment_continuation_tail(type_end, star_pos, d.text("*")));
+            self.find_keyword_end("type", export_end, star_pos)
+                .unwrap_or(export_end)
         } else {
-            // `export`→`*` gap.
-            parts.push(self.gap_comment_continuation_tail(export_end, star_pos, d.text("*")));
-        }
+            export_end
+        };
+        self.push_namespace_star_binding(
+            &mut parts,
+            star_gap_start,
+            star_pos,
+            decl.exported.as_ref(),
+        );
         let star_end = star_pos + 1; // position just past `*`
-
-        if let Some(exported) = &decl.exported {
-            self.append_namespace_as_binding(&mut parts, star_end, exported);
-        }
 
         // Comment between `*` (or `as ns`) and `from`, preserved in place — a same-line
         // block comment trails inline (`* /* c */ from`), a line comment indents the
@@ -724,42 +726,40 @@ impl<'a> Printer<'a> {
             } else {
                 self.gap_frozen_span(header_end, ns_spec.span)
             };
-            if has_default {
-                // Comments between default specifier and comma → emit before comma
-                // Comments between comma and `*` → emit after comma
-                let comma_pos = self.comma_between(default_spec_end, ns_spec.span.start);
-                parts.push(self.build_inline_comments_between_doc(default_spec_end, comma_pos));
-                parts.push(d.text(", "));
-                parts.push(self.build_inline_comments_between_doc_trailing_space(
-                    comma_pos + 1,
-                    ns_spec.span.start,
-                ));
-                parts.push(d.text("*"));
-            } else if let Some(frozen) = frozen_binding {
+            if let Some(frozen) = frozen_binding {
                 parts.push(self.gap_comment_continuation_tail(
                     header_end,
                     ns_spec.span.start,
                     self.build_frozen_node_doc(frozen),
                 ));
             } else {
-                // keyword(s)→namespace-`*` gap, preserved in place. A line comment
-                // indents the `* as ns` continuation (indent-only divergence — prettier
-                // keeps it flat in place); the `*` rides the helper so the line comment
-                // carries it onto the indented line.
-                parts.push(self.gap_comment_continuation_tail(
-                    header_end,
-                    ns_spec.span.start,
-                    d.text("*"),
-                ));
-            }
-            if frozen_binding.is_none() {
-                // `* as ns` binding; preserves the `*`→`as` comment in place (mirrors the
-                // export-all side).
-                let star_end = ns_spec.span.start + 1;
+                // The gap before the `*`, preserved in place. Which gap that is — the
+                // keyword(s)→`*` one, or the separator gap past a default binding's `,`
+                // — is the only difference between the two arms; both indent their
+                // continuation one level (an indent-only divergence: prettier keeps the
+                // comment in place and flat). The separator gap splits by the shared
+                // pure-separator rule — a `//` trails past the comma, a block keeps its
+                // authored side, hence the scan bounded at the comma (the named-list arm
+                // below scans past it, since prettier hoists a block there instead).
+                let gap_start = if has_default {
+                    let comma_pos = self.comma_between(default_spec_end, ns_spec.span.start);
+                    let split = self.binding_separator_split(default_spec_end, comma_pos);
+                    parts.push(self.build_inline_comments_between_doc(default_spec_end, split));
+                    parts.push(d.text(", "));
+                    split
+                } else {
+                    header_end
+                };
                 // An import namespace binding is always an identifier; wrap it to share
-                // the `ModuleExportName`-based renderer with the export-all side.
+                // the `ModuleExportName`-based renderer — and the whole star emitter —
+                // with the export-all side.
                 let binding = internal::ModuleExportName::Identifier(ns_spec.local.clone());
-                self.append_namespace_as_binding(&mut parts, star_end, &binding);
+                self.push_namespace_star_binding(
+                    &mut parts,
+                    gap_start,
+                    ns_spec.span.start,
+                    Some(&binding),
+                );
             }
             from_content_end = Some(ns_spec.span.end);
         }
@@ -777,20 +777,6 @@ impl<'a> Printer<'a> {
         let drop_empty_after_binding = has_empty_braces && named_specs.is_empty() && has_binding;
 
         if !named_specs.is_empty() || (has_empty_braces && !drop_empty_after_binding) {
-            if has_binding {
-                // For named imports after default: prettier moves all comments between
-                // default end and `{` to before the comma: `import x /* c */, {a}`.
-                // The `{` is found outside comments so a `{` glyph in a comment isn't
-                // mistaken for it. (Empty braces after a binding were dropped above,
-                // so `named_specs` is non-empty here.)
-                let prev_end = namespace_spec.map_or(default_spec_end, |ns| ns.span.end);
-                let brace_pos = self
-                    .find_char_outside_comments(prev_end, named_specs[0].span.start, b'{')
-                    .unwrap_or(named_specs[0].span.start);
-                parts.push(self.build_inline_comments_between_doc(prev_end, brace_pos));
-                parts.push(d.text(", "));
-            }
-
             if named_specs.is_empty() {
                 // Bare empty braces: `import {} from 'x'` (no binding — the binding
                 // case was dropped above). Preserve the keyword→`{` (or `type`→`{`)
@@ -811,16 +797,37 @@ impl<'a> Printer<'a> {
                 // is the offset past `}`, for the `}`→`from` gap comment scan.
                 let kw_end = self.import_header_end(decl, named_specs[0].span.start);
                 // A default/namespace binding sits between the header and the `{`
-                // (prettier's `standaloneSpecifiers`), which both suppresses the
-                // keyword→`{` comment capture — those comments are emitted above, as
-                // the line builds `x, {…}` — and lets a lone specifier break.
+                // (prettier's `standaloneSpecifiers`), which lets a lone specifier
+                // break. (Empty braces after a binding were dropped above, so
+                // `named_specs` is non-empty here.)
                 let brace_follows_header = !has_binding;
+                // Where the list's own gap claim opens. Without a binding that is the
+                // header (`import /* c */ {a}`); with one, the separator gap past the
+                // binding's `,`, split by the shared pure-separator rule — a block
+                // keeps its authored side (prettier agrees, `import x /* c */, {a}`),
+                // a `//` trails past the comma and is emitted by the list, which
+                // indents the whole `{ … }` under it.
+                let mut brace_gap_start = kw_end;
+                if has_binding {
+                    let prev_end = namespace_spec.map_or(default_spec_end, |ns| ns.span.end);
+                    // The gap ends at the `{`, not at the first specifier: a comment
+                    // *inside* the braces is the list's, and the `{` is found outside
+                    // comments so a `{` glyph in one isn't mistaken for it.
+                    let brace_pos = self
+                        .find_char_outside_comments(prev_end, named_specs[0].span.start, b'{')
+                        .unwrap_or(named_specs[0].span.start);
+                    let split = self.binding_separator_split(prev_end, brace_pos);
+                    parts.push(self.build_inline_comments_between_doc(prev_end, split));
+                    parts.push(d.text(", "));
+                    brace_gap_start = split;
+                }
                 from_content_end = Some(self.push_braced_specifier_list(
                     &mut parts,
                     &named_specs,
                     SpecifierListSpans {
                         header_start: decl.span.start,
                         kw_end,
+                        gap_start: brace_gap_start,
                         bound: decl.source.span.start,
                     },
                     brace_follows_header,
