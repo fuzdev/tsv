@@ -298,7 +298,13 @@ const KNOWN_PARTIAL: Record<string, string> = {
 	'typescript/expressions/calls/chained/last_arg_hug_convergence_long_prettier_divergence':
 		'1 hunk',
 	'typescript/statements/switch/case_block_comment_prettier_divergence': '1 hunk',
-	'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence': '1 hunk'
+	'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence': '1 hunk',
+	// the label hoist splits across an unchanged comment line: `label: /* c */` → `/* c */`
+	// and `fn();` → `label: fn();` are two hunks with the run's second comment as context
+	// between them, so neither carries both halves of the one relocation. The single-comment
+	// case in the same fixture IS claimed, since there the hoist and the labeled statement
+	// land in one hunk.
+	'typescript/statements/labeled/comment_prettier_divergence': '2 hunks'
 };
 
 /**

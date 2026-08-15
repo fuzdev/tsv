@@ -1,0 +1,387 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 419,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment before else selects the other if printer; the consequent still takes",
+			"start": 10,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " adjustClause, so it stays inline at 100 and drops to its own line at 101",
+			"start": 93,
+			"end": 168,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 270,
+			"end": 275,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 392,
+			"end": 397,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 418,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 409,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 170,
+					"end": 286,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 10
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 174,
+						"end": 214,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 5
+							},
+							"end": {
+								"line": 4,
+								"column": 45
+							}
+						},
+						"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 216,
+						"end": 268,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 47
+							},
+							"end": {
+								"line": 4,
+								"column": 99
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 216,
+							"end": 267,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 47
+								},
+								"end": {
+									"line": 4,
+									"column": 98
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 216,
+								"end": 265,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 47
+									},
+									"end": {
+										"line": 4,
+										"column": 96
+									}
+								},
+								"name": "fnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 282,
+						"end": 286,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 282,
+							"end": 285,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 6
+								},
+								"end": {
+									"line": 6,
+									"column": 9
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 282,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 6
+									},
+									"end": {
+										"line": 6,
+										"column": 7
+									}
+								},
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 270,
+								"end": 275
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment before else selects the other if printer; the consequent still takes",
+							"start": 10,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " adjustClause, so it stays inline at 100 and drops to its own line at 101",
+							"start": 93,
+							"end": 168
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 289,
+					"end": 408,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 10
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 293,
+						"end": 334,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 5
+							},
+							"end": {
+								"line": 8,
+								"column": 46
+							}
+						},
+						"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 338,
+						"end": 390,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 2
+							},
+							"end": {
+								"line": 9,
+								"column": 54
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 338,
+							"end": 389,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 53
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 338,
+								"end": 387,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 51
+									}
+								},
+								"name": "fnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 404,
+						"end": 408,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 6
+							},
+							"end": {
+								"line": 11,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 404,
+							"end": 407,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 6
+								},
+								"end": {
+									"line": 11,
+									"column": 9
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 404,
+								"end": 405,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 6
+									},
+									"end": {
+										"line": 11,
+										"column": 7
+									}
+								},
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 392,
+								"end": 397
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

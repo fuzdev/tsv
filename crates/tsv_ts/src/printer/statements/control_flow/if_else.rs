@@ -3,7 +3,7 @@
 // Entry point (`build_if_statement_doc`) plus the wrapping and
 // comment-handling variants, and else-clause layout helpers.
 
-use super::OpenParenLineComments;
+use super::{HeaderBodyBlank, OpenParenLineComments};
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
@@ -119,7 +119,7 @@ impl<'a> Printer<'a> {
         parts.push(d.text(if leading_space { " else" } else { "else" }));
         let body_doc = self.build_branch_body_doc(else_end, alternate);
         if flush_with_else {
-            self.push_header_to_body_gap(parts, else_end, alt_start);
+            self.push_header_to_body_gap(parts, else_end, alt_start, HeaderBodyBlank::Drop);
             parts.push(body_doc);
         } else {
             self.push_indented_else_to_body_gap(parts, else_end, alt_start, body_doc);
@@ -374,37 +374,29 @@ impl<'a> Printer<'a> {
             let empty_start = stmt.consequent.span().start;
             self.append_close_paren_empty_stmt_with_comments(&mut parts, paren_end, empty_start);
         } else {
-            // Non-block consequent: handle head-body comments between ) and body
+            // Non-block consequent: the SAME adjustClause the plain printer uses.
+            //
+            // This branch used to re-decide the whole thing — its own weaker gap gate
+            // (`has_line_comments_between`, which relocated an own-line block UP onto the
+            // `)` line), its own inline arm, and `is_inline_consequent` + a bare `") "`
+            // where adjustClause has `indent([line, body])`. That last one had no way to
+            // drop the body at all, so an overflowing statement broke the CONDITION PARENS
+            // open instead (`if (⏎cond⏎) body;`) — a form neither prettier nor the plain
+            // printer produces. One statement, two printers, two layouts; the only real
+            // difference between them is the `}`→`else` gap that SELECTS them, so the
+            // consequent must not be decided twice.
+            //
+            // `parts` holds exactly the head (`if (` + condition) at this point, which is
+            // what adjustClause groups with the body.
             let body_start = stmt.consequent.span().start;
             let consequent_doc = self.build_branch_body_doc(paren_end, stmt.consequent);
-
-            if self.has_comments_to_emit_between(paren_end, body_start) {
-                let has_line = self.has_line_comments_between(paren_end, body_start);
-                parts.push(d.text(")"));
-                if has_line {
-                    // Line comment forces break: if (cond)\n\t// comment\n\tbody;
-                    self.push_indented_header_to_body_gap(
-                        &mut parts,
-                        paren_end,
-                        body_start,
-                        consequent_doc,
-                    );
-                } else {
-                    // Block comment stays inline: if (cond) /* c */ body;
-                    let comment_doc = self
-                        .build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
-                    parts.push(d.text(" "));
-                    parts.push(comment_doc);
-                    parts.push(d.text(" "));
-                    parts.push(consequent_doc);
-                }
-            } else if is_inline_consequent(stmt.consequent) {
-                parts.push(d.text(") "));
-                parts.push(consequent_doc);
-            } else {
-                parts.push(d.text(")"));
-                parts.push(d.indent_hardline(consequent_doc));
-            }
+            let head = std::mem::take(&mut parts);
+            parts.push(self.build_adjust_clause_with_comments(
+                &head,
+                paren_end,
+                body_start,
+                consequent_doc,
+            ));
         }
 
         // Handle else with comments
@@ -427,23 +419,19 @@ impl<'a> Printer<'a> {
 
             // Comments between "else" and alternate body
             if matches!(alternate, Statement::EmptyStatement(_)) {
-                // Empty alternate: `else;`, `else /* c */ ;`, or `else // c\n;`
-                if let Some(else_e) = else_end
-                    && self.has_comments_to_emit_between(else_e, alternate_start)
-                {
-                    let has_line = self.has_line_comments_between(else_e, alternate_start);
-                    parts.push(d.text("else"));
-                    parts.push(self.build_inline_comments_between_doc(else_e, alternate_start));
-                    if has_line {
-                        // Line comment: `else // c\n;`
-                        parts.push(d.hardline());
-                        parts.push(d.text(";"));
-                    } else {
-                        // Block comment: `else /* c */ ;`
-                        parts.push(d.text(" ;"));
+                // Empty alternate: `else;`, `else /* c */ ;`, or `else // c\n;` — the same
+                // gap `build_head_body_else_clause` emits, so it shares that emitter. This
+                // printer used to hand-roll it, and the copy drifted: the shared one moved
+                // to the leading-run separators and this one kept the old
+                // `has_line_comments_between` tail, gluing a `/* c1 */⏎// c2` pair the run
+                // rule breaks. `else_end` is `None` only when the keyword scan failed,
+                // which leaves no gap to emit.
+                match else_end {
+                    Some(else_e) => {
+                        parts.push(d.text("else"));
+                        self.push_empty_statement_gap(&mut parts, else_e, alternate_start);
                     }
-                } else {
-                    parts.push(d.text("else;"));
+                    None => parts.push(d.text("else;")),
                 }
             } else if let Some(else_e) = else_end
                 && self.has_comments_to_emit_between(else_e, alternate_start)

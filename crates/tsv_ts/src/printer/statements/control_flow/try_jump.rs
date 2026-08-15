@@ -1,8 +1,8 @@
 // try/catch/finally, throw, break/continue, and labeled statement printing
 
-use super::OpenParenLineComments;
+use super::{HeaderBodyBlank, OpenParenLineComments};
 use crate::ast::internal::{self, Statement};
-use crate::printer::{CommentVec, Printer};
+use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -21,7 +21,7 @@ impl<'a> Printer<'a> {
     /// `if`/`while` `)`→`{` siblings never do.
     fn append_keyword_to_body_comments(&self, parts: &mut DocBuf, token_end: u32, body_start: u32) {
         if self.has_comments_to_emit_between(token_end, body_start) {
-            self.push_header_to_body_gap(parts, token_end, body_start);
+            self.push_header_to_body_gap(parts, token_end, body_start, HeaderBodyBlank::Drop);
         } else {
             parts.push(self.d().text(" "));
         }
@@ -276,17 +276,40 @@ impl<'a> Printer<'a> {
             // the own-line-preserving header→body emitter instead — the declaration-header
             // rule of `conformance_prettier_ignore.md` §On module and declarator lists.
             tail_parts.push(d.text(":"));
-            self.push_header_to_body_gap(&mut tail_parts, colon_end, body_start);
+            self.push_header_to_body_gap(
+                &mut tail_parts,
+                colon_end,
+                body_start,
+                HeaderBodyBlank::Drop,
+            );
             tail_parts.push(self.build_frozen_node_doc(frozen));
         } else if self.has_comments_to_emit_between(colon_end, body_start) {
-            let has_line_comment = self.has_line_comments_between(colon_end, body_start);
+            // The run is pinned to the `:` line (prettier hoists it above the whole labeled
+            // statement instead — the sanctioned position divergence), but its INTERNAL
+            // shape is not part of that licence: the lines the author gave the run survive,
+            // as they do in every other run. Emitting it with one separator keyed on
+            // `has_line_comments_between` WELDED them (`l: /* c1 */⏎// c2` → one line), a
+            // divergence riding inside the cataloged one and matching neither formatter —
+            // prettier keeps those breaks in its own position.
+            //
+            // `AdjacentAnchorLine` for the same reason the empty-body gap uses it: the run's
+            // first comment shares the `:` line by construction, so reading its authored
+            // newline-before would force a break the next pass removes.
+            //
+            // The group holds the run ALONE, not the body: with no oracle here (prettier is
+            // somewhere else entirely), the body's width must not decide where a comment
+            // separator breaks. The run's own hardline still opens it.
             tail_parts.push(d.text(":"));
-            tail_parts.push(self.build_inline_comments_between_doc(colon_end, body_start));
-            tail_parts.push(if has_line_comment {
-                d.hardline()
-            } else {
-                d.text(" ")
-            });
+            tail_parts.push(d.text(" "));
+            let mut run = DocBuf::new();
+            self.push_leading_comment_run(
+                &mut run,
+                comments_to_emit_in_range(self.comments, colon_end, body_start),
+                body_start,
+                LeadingGlue::AdjacentAnchorLine,
+                d.empty(),
+            );
+            tail_parts.push(d.group(d.concat(&run)));
             tail_parts.push(self.build_statement_doc(stmt.body, false));
         } else {
             // No space before empty statement: `label:;` not `label: ;`
