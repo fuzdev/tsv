@@ -20,12 +20,12 @@ use crate::printer::calls::arg_predicates::{
 use crate::printer::calls::{
     ArgItem, ArgsJoin, PartitionedComments, build_args_joined_with_comments, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
-    build_call_args_expanded, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    build_printed_argument_doc, could_expand_arrow_chain, has_inter_argument_comments_slice,
-    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
-    prebuild_expand_last_break_body, prepend_arrow_body_comments,
-    should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
-    wrap_call_with_will_break_guard,
+    build_call_args_expanded, build_expand_all_args, build_inline_args,
+    build_inline_hug_or_expand_all, build_inline_or_expand_all, build_printed_argument_doc,
+    could_expand_arrow_chain, has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice, last_two_args_same_type, prebuild_expand_last_break_body,
+    prepend_arrow_body_comments, should_force_expansion_for_comments,
+    wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
 };
 use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
 use crate::printer::{
@@ -783,24 +783,19 @@ impl<'a> Printer<'a> {
                     );
                 }
 
-                // Different types: 3-state (inline → hug → expand all), exactly as
-                // call_formatting.rs's twin does. Prettier's printCallArguments is shared
+                // Different types: the 3-state ladder (inline → hug → expand all), the same
+                // helper the plain-call twin uses. Prettier's printCallArguments is shared
                 // by `new` (its header comment lists NewExpression), and for a breaking
                 // last arg it keeps the hug: `[breakParent, conditionalGroup([hug,
                 // allArgsBrokenOut])]` — there is no forced-break → inline-or-expand-all
-                // form. A last arg carrying its own forced break falls out of state 0 and
-                // lands on the hug, the same layout for both break kinds.
-                let state_inline =
-                    build_inline_args(d, callee_with_types, &head_parts, last_arg_doc);
-                let state_hug = d.concat(&[
+                // form.
+                return build_inline_hug_or_expand_all(
+                    d,
                     callee_with_types,
-                    d.text("("),
-                    d.concat(&head_parts),
-                    d.group_break(last_arg_doc),
-                    d.text(")"),
-                ]);
-                let state_expand_all = build_expand_all_args(d, callee_with_types, all_args_broken);
-                return d.conditional_group(&[state_inline, state_hug, state_expand_all]);
+                    &head_parts,
+                    last_arg_doc,
+                    all_args_broken,
+                );
             }
         }
 

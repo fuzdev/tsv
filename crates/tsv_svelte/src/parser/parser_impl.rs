@@ -141,7 +141,7 @@ fn is_reserved_word(name: &str) -> bool {
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, ParseError> {
-        let mut lexer = Lexer::new(source);
+        let mut lexer = Lexer::at_offset(source, 0);
         // Extract token data immediately to avoid keeping token alive
         let (kind, start, end) = {
             let token = lexer.next_token()?;
@@ -298,9 +298,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Save the inside_tag state before creating new lexer
         let was_inside_tag = self.lexer.inside_tag;
 
-        // Reset the lexer to start from the new position. Positions are reported
-        // relative to the slice; the parser shifts them by base_offset.
-        self.lexer = Lexer::new(&self.source[pos..]);
+        // Reset the lexer to start from the new position. Token positions are reported
+        // relative to the slice; the parser shifts them by base_offset, and the lexer
+        // carries the same offset so its ERRORS are reported against the whole document.
+        self.lexer = Lexer::at_offset(&self.source[pos..], pos);
         self.base_offset = pos;
         self.peek = None;
 

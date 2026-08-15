@@ -20,9 +20,9 @@ use super::arg_wrapping::{
     ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    build_own_line_post_arrow_state, build_printed_argument_doc, could_expand_arrow_chain,
-    last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
+    build_expand_all_args, build_inline_args, build_inline_hug_or_expand_all,
+    build_inline_or_expand_all, build_own_line_post_arrow_state, build_printed_argument_doc,
+    could_expand_arrow_chain, last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
@@ -451,26 +451,11 @@ pub(super) fn build_call_doc_with_wrapping(
         ]);
     }
 
-    // Multiple arrow function arguments: always expand to multiple lines
-    // Prettier always expands 2+ arrow function arguments, regardless of source formatting.
-    // This matches Prettier's behavior: fn(() => x, () => y) → fn(\n  () => x,\n  () => y,\n)
-    let all_args_are_arrows = call.arguments.len() >= 2
-        && call
-            .arguments
-            .iter()
-            .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
-
-    if all_args_are_arrows && !arg_trailing_line_comment {
-        return build_call_args_expanded(
-            printer,
-            callee,
-            call.arguments,
-            paren_open,
-            call.span.end,
-            ArgItem::Plain,
-        );
-    }
-
+    // No all-arrows arm here: `is_function_composition_args` above already covers it.
+    // 2+ arguments that are ALL arrows means `function_count > 1`, which that predicate
+    // short-circuits `true` on, and both arms decline on the same
+    // `arg_trailing_line_comment` — so an arrow-only arm below it can never be reached.
+    //
     // Expand-last pattern for function/arrow last arguments. Returns `None` when
     // there are fewer than 2 args, the guard fails, or the last arg is a
     // non-expandable expression-body arrow (which falls through to the default path).
@@ -1343,33 +1328,14 @@ fn try_expand_last_array_object_arg(
             return Some(build_expand_all_args(d, callee, all_args_broken));
         }
 
-        // Build the 3-state conditional_group. A last arg carrying its own forced
-        // break (a hardline from an interior comment, a source-multiline
-        // group_break) falls out of state 0 and lands on the hug — the same layout
-        // for both break kinds, so no pre-check screens for them.
-        // State 0: inline - fn('x', [a, b])
-        // State 1: hug - fn('x', [\n  a,\n  b,\n]) - head inline, last expands
-        // State 2: expand all - fn(\n  'x',\n  [\n    a,\n  ],\n)
-        //
-        // This ensures:
-        // - Short total: stays inline
-        // - Long last arg content: head stays inline, last expands internally
-        // - Long total due to many/long head args: expand all
-        //
-        // Key: In state_hug, wrap last_arg_doc in group_break() to force the array/object
-        // to break. This makes fits() return true when it hits the first line inside,
-        // allowing the hug state to be selected when head args + opening bracket fit.
-        // Matches Prettier: group(lastArg, { shouldBreak: true })
-        let state_inline = build_inline_args(d, callee, &head_parts, last_arg_doc);
-        let state_hug = d.concat(&[
+        // The 3-state ladder (inline → hug → expand all), shared with the `new` twin.
+        return Some(build_inline_hug_or_expand_all(
+            d,
             callee,
-            d.text("("),
-            d.concat(&head_parts),
-            d.group_break(last_arg_doc),
-            d.text(")"),
-        ]);
-        let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
-        return Some(d.conditional_group(&[state_inline, state_hug, state_expand_all]));
+            &head_parts,
+            last_arg_doc,
+            all_args_broken,
+        ));
     }
 
     None

@@ -877,7 +877,7 @@ pub fn debug_token_stream(source: &str) -> String {
     use crate::lexer::{Lexer, TokenKind};
     use std::fmt::Write as _;
 
-    let mut lexer = Lexer::new(source);
+    let mut lexer = Lexer::at_offset(source, 0);
     let mut out = String::new();
     loop {
         match lexer.next_token() {

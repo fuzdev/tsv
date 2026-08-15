@@ -61,7 +61,9 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         base_offset: usize,
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
-        let mut lexer = Lexer::new(source);
+        // The lexer scans `source` (the island) but reports errors against the document
+        // it sits in, so it carries the same `base_offset` the spans below are shifted by.
+        let mut lexer = Lexer::at_offset(source, base_offset);
         let token = lexer.next_token()?;
         let decoded = lexer
             .decoded_str()
@@ -208,7 +210,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
         #[cfg(debug_assertions)]
         {
-            let mut probe = Lexer::new(self.source());
+            let mut probe = Lexer::at_offset(self.source(), self.base_offset);
             probe.seek(terminator);
             let relexed = probe.next_token();
             assert!(
@@ -249,7 +251,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     pub(crate) fn peek_past_whitespace(&self) -> Result<TokenKind, ParseError> {
         // Create a temporary lexer from current position
         let remaining = &self.source()[self.current_end..];
-        let mut temp_lexer = Lexer::new(remaining);
+        let mut temp_lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end);
 
         // Skip whitespace and comments
         loop {
