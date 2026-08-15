@@ -309,8 +309,8 @@ pub(crate) fn print_node_inner<'a>(
         // the way it takes a member's gap, since a `!` may never start a line
         // (`[no LineTerminator here]`). Prettier keeps it here too, in the same slot the
         // non-chain arm of `build_ts_non_null_doc` already emits (`p?.q /* c */!`).
-        // Block-only, and a stripped shell is where that bound is wrong — see
-        // `NonNullGap::Bang`.
+        // Block-only, which is sound because the linearizer routes a `//` in this gap
+        // to the retained-shell base instead — see `NonNullGap::Bang`.
         ChainNode::NonNull {
             gap:
                 NonNullGap::Bang {
