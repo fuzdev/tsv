@@ -94,8 +94,16 @@ interface CompareResult {
 	safety_violations?: SafetyViolation[];
 }
 
-/** Format bytes as human-readable string */
-function format_bytes(bytes: number): string {
+/**
+ * Format a source file's size, binary units (`B`/`KB`, 1024-based) — corpus files
+ * are KB-scale, so this never reaches MB.
+ *
+ * NOT `binary_sizes.ts`'s `format_bytes`, which is decimal (1000-based)
+ * and MB-first because it sizes shipped artifacts. Two conventions, deliberately:
+ * the name here says which one, so a reader doesn't carry the other module's
+ * answer over.
+ */
+function format_source_size(bytes: number): string {
 	if (bytes < 1024) return `${bytes}B`;
 	const kb = bytes / 1024;
 	if (kb < 10) return `${kb.toFixed(1)}KB`;
@@ -837,7 +845,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		if (all_unknown.length > 0) {
 			console.log(`\nUnknown Differences (${all_unknown.length} files, needs investigation):`);
 			for (const r of all_unknown.slice(0, 10)) {
-				const size_str = format_bytes(r.bytes);
+				const size_str = format_source_size(r.bytes);
 				const diff_summary = get_diff_summary(r.prettier!, r.ours!);
 				console.log(`  ${rel_path(r.path, base_path)} (${size_str})`);
 				console.log(`    ${diff_summary}`);
@@ -886,7 +894,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 				const diff = diff_lines(r.prettier!, r.ours!);
 				const removals = diff.filter((d) => d.type === 'remove').length;
 				const additions = diff.filter((d) => d.type === 'add').length;
-				console.log(`\n  ${rel_path(r.path, base_path)} (${format_bytes(r.bytes)}):`);
+				console.log(`\n  ${rel_path(r.path, base_path)} (${format_source_size(r.bytes)}):`);
 				console.log(
 					`    \x1b[31m-${removals} prettier-only\x1b[0m, \x1b[32m+${additions} ours-only\x1b[0m`
 				);
@@ -916,7 +924,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	if (all_errors.length > 0) {
 		console.log(`\nErrors (${all_errors.length} files):`);
 		for (const r of all_errors.slice(0, 3)) {
-			const size_str = format_bytes(r.bytes);
+			const size_str = format_source_size(r.bytes);
 			console.log(`  ${rel_path(r.path, base_path)} (${size_str}): ${r.error?.slice(0, 80)}`);
 		}
 		if (all_errors.length > 3) {

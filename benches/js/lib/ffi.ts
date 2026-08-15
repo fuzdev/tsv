@@ -4,6 +4,7 @@
  * Uses Deno.dlopen to call the Rust library directly for maximum performance.
  */
 
+import { fileURLToPath } from 'node:url';
 import { native_library_filename } from './runtime.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
@@ -117,7 +118,7 @@ type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
  */
 export function get_library_path(): string {
 	const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
-	const target_dir = new URL('../../../target', import.meta.url).pathname;
+	const target_dir = fileURLToPath(new URL('../../../target', import.meta.url));
 	return `${target_dir}/${profile}/${native_library_filename('tsv_ffi')}`;
 }
 

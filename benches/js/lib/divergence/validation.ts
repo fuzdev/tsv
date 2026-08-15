@@ -25,6 +25,7 @@
  * A listing gap is now reported as bookkeeping, not as a coverage hole.
  */
 
+import { fileURLToPath } from 'node:url';
 import { detect_divergences, PATTERNS } from './patterns.ts';
 import { build_cases, build_context, fixture_dir_exists } from './fixture_cases.ts';
 
@@ -282,7 +283,7 @@ function split_table_row(row: string): string[] {
  * declared list, which is where the family is asserted; here it is only discovered.
  */
 async function conformance_prettier_docs(): Promise<string[]> {
-	const docs_dir = new URL('../../../../docs/', import.meta.url).pathname;
+	const docs_dir = fileURLToPath(new URL('../../../../docs/', import.meta.url));
 	const names: string[] = [];
 	for await (const entry of Deno.readDir(docs_dir)) {
 		if (
@@ -301,7 +302,7 @@ async function conformance_prettier_docs(): Promise<string[]> {
  * Load and parse the `conformance_prettier*.md` family from the repo.
  */
 export async function load_documented_divergences(): Promise<DocumentedDivergence[]> {
-	const docs_dir = new URL('../../../../docs/', import.meta.url).pathname;
+	const docs_dir = fileURLToPath(new URL('../../../../docs/', import.meta.url));
 	const divergences: DocumentedDivergence[] = [];
 	for (const doc of await conformance_prettier_docs()) {
 		const content = await Deno.readTextFile(`${docs_dir}${doc}`);

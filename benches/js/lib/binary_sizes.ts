@@ -20,7 +20,8 @@ import { execFile } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import type { InitializedImplementations } from './implementations.ts';
+import { OXC_WASI_BINDING } from './check_node_modules.ts';
+import type { ImplementationSet } from './implementations.ts';
 import { current_arch, current_os, current_runtime, native_library_filename } from './runtime.ts';
 import { rsvelte_binary_path } from './rsvelte.ts';
 
@@ -121,18 +122,55 @@ async function gzip_size(path: string): Promise<number | null> {
 	}
 }
 
+/** What `collect_binary_sizes` measured, and what it reached for and didn't find. */
+export interface CollectedBinarySizes {
+	/** One row per artifact present on disk. */
+	sizes: BinarySize[];
+	/**
+	 * Labels reached for but absent — the table's composition disclosure.
+	 *
+	 * Two different facts share this list, told apart by the label. A **tsv**
+	 * variant (`tsv format (ffi)`, `tsv_parse_wasm`, …) is absent whenever its
+	 * optional build task hasn't been run, which is routine on a machine that
+	 * built only what it measures; the full `deno task bench` builds them all. A
+	 * **third-party** label is absent although its impl initialized, which means
+	 * the package shipped no artifact where this module looks — a stale path here,
+	 * or an upstream layout change. The one third-party label with a benign
+	 * reading is `oxc-parser (wasm)`: its binding lives in no manifest
+	 * (`OXC_WASI_BINDING`, force-fetched by `deno task bench:install`), so a plain
+	 * `npm install` leaves it absent with nothing else wrong.
+	 */
+	absent: string[];
+}
+
 /** A pre-gzip staged entry: known label/bytes/kind plus the path to compress. */
 type StagedEntry = { entry: Omit<BinarySize, 'gzip_bytes'>; path: string };
 
-/** Add an entry to `out` for `path` if the file exists; defer gzip to the caller. */
+/**
+ * Staging state: the rows found, and the labels reached-for but absent.
+ *
+ * The absent list exists because this table is the one part of the report whose
+ * COMPOSITION varies by machine — a row is emitted only if its file is on disk, so
+ * an unbuilt artifact used to leave no trace at all, and a committed report's row
+ * set silently described the producer's build state rather than the release. The
+ * ratios read the same either way (`biome is 18.4x tsv`), which is what makes the
+ * omission easy to miss.
+ */
+interface SizeStaging {
+	found: StagedEntry[];
+	absent: string[];
+}
+
+/** Add an entry for `path` if the file exists, else record the label as absent. */
 async function push_size(
-	out: StagedEntry[],
+	out: SizeStaging,
 	label: string,
 	kind: BinaryKind,
 	path: string
 ): Promise<void> {
 	const bytes = await file_size(path);
-	if (bytes !== null) out.push({ entry: { label, bytes, kind }, path });
+	if (bytes !== null) out.found.push({ entry: { label, bytes, kind }, path });
+	else out.absent.push(label);
 }
 
 /** Resolve the first existing file (by extension) under any of the candidate dirs. */
@@ -158,14 +196,18 @@ async function resolve_first(
 
 /** Stage an entry resolved by scanning `dirs` for the first file ending in `ext`. */
 async function push_resolved(
-	out: StagedEntry[],
+	out: SizeStaging,
 	label: string,
 	kind: BinaryKind,
 	dirs: string[],
 	ext: string
 ): Promise<void> {
 	const found = await resolve_first(dirs, ext);
-	if (found !== null) out.push({ entry: { label, bytes: found.bytes, kind }, path: found.path });
+	if (found !== null) {
+		out.found.push({ entry: { label, bytes: found.bytes, kind }, path: found.path });
+	} else {
+		out.absent.push(label);
+	}
 }
 
 /**
@@ -202,17 +244,19 @@ function napi_binding_dirs(
  * directly means an impl exists in exactly one place.
  */
 export async function collect_binary_sizes(
-	impls: InitializedImplementations
-): Promise<BinarySize[]> {
+	impls: ImplementationSet
+): Promise<CollectedBinarySizes> {
 	const project_root = fileURLToPath(new URL('../../..', import.meta.url));
 	const node_modules = node_modules_dir();
 
-	// Stage 1: collect (label, kind, path) for everything that exists.
-	const staged: StagedEntry[] = [];
+	// Stage 1: collect (label, kind, path) for everything that exists, and the
+	// labels reached-for but absent (see `SizeStaging`).
+	const staged: SizeStaging = { found: [], absent: [] };
 
-	// tsv native (FFI shared library)
+	// tsv native (FFI shared library) — `native`/`wasm` are required impls, so these
+	// blocks are unconditional; an absent BUILD still shows up as `absent` below.
 	const ffi_lib = native_library_filename('tsv_ffi');
-	if (impls.native) {
+	{
 		await push_size(staged, LABELS.tsv_ffi, 'native', `${project_root}/target/release/${ffi_lib}`);
 		// tsv format-only native — the native mirror of @fuzdev/tsv_format_wasm:
 		// dropping the convert/JSON layer (and the parse exports) leaves a
@@ -255,7 +299,7 @@ export async function collect_binary_sizes(
 	// pkg/format/deno (format-only, @fuzdev/tsv_format_wasm), pkg/parse/deno
 	// (parse-only, @fuzdev/tsv_parse_wasm), and pkg/all/deno (both,
 	// @fuzdev/tsv_wasm — the bundle the bench executes).
-	if (impls.wasm) {
+	{
 		await push_size(
 			staged,
 			LABELS.tsv_format_wasm,
@@ -320,12 +364,13 @@ export async function collect_binary_sizes(
 			'.node'
 		);
 
-		// oxc-parser WASM binding (@oxc-parser/binding-wasm32-wasi)
+		// oxc-parser WASM binding — named from the shared constant, so this lookup
+		// tracks whatever `install_deps.ts` fetched and `check_node_modules.ts` graded.
 		await push_resolved(
 			staged,
 			LABELS.oxc_parser_wasm,
 			'wasm',
-			[`${node_modules}/@oxc-parser/binding-wasm32-wasi`],
+			[`${node_modules}/${OXC_WASI_BINDING}`],
 			'.wasm'
 		);
 	}
@@ -367,10 +412,15 @@ export async function collect_binary_sizes(
 	// Listed anyway because omitting the only other Rust Svelte formatter from a
 	// size table that lists every other alternative would read as an oversight;
 	// read it as "what that tool ships", not as an engine-size comparison.
+	// The platform-binary lookup is the only path here that can come up empty
+	// BEFORE a file test, so it records the absence itself — every other reach is
+	// a path handed to `push_size`/`push_resolved`, which record their own.
 	if (impls.rsvelte) {
 		const rsvelte_bin = rsvelte_binary_path();
 		if (rsvelte_bin !== null) {
 			await push_size(staged, LABELS.rsvelte_fmt_native, 'native', rsvelte_bin);
+		} else {
+			staged.absent.push(LABELS.rsvelte_fmt_native);
 		}
 	}
 
@@ -418,13 +468,26 @@ export async function collect_binary_sizes(
 	}
 
 	// Stage 2: gzip every collected file in parallel.
-	const gzipped = await Promise.all(staged.map((s) => gzip_size(s.path)));
+	const gzipped = await Promise.all(staged.found.map((s) => gzip_size(s.path)));
 
-	return staged.map(({ entry }, i) => ({ ...entry, gzip_bytes: gzipped[i] }));
+	return {
+		sizes: staged.found.map(({ entry }, i) => ({ ...entry, gzip_bytes: gzipped[i] })),
+		absent: staged.absent
+	};
 }
 
-/** Format bytes as human-readable size */
-export function format_bytes(bytes: number): string {
+/**
+ * Format an ARTIFACT size, decimal units (`B`/`KB`/`MB`, 1000-based).
+ *
+ * Module-local, and the counterpart to the harness's two SOURCE-size formatters —
+ * `corpus_compare_format.ts`'s `format_source_size` and
+ * `diagnostics/corpus_stats.ts`'s `format_corpus_size`, both binary (1024-based).
+ * Three formatters over two conventions, each named for the thing it sizes, so a
+ * reader doesn't carry one module's answer over to another. Those two were named
+ * `format_bytes` too until the collision made that carry-over easy; this one is
+ * unexported so a fourth can't reintroduce it by importing.
+ */
+function format_bytes(bytes: number): string {
 	if (bytes >= 1_000_000) {
 		return `${(bytes / 1_000_000).toFixed(1)} MB`;
 	} else if (bytes >= 1_000) {

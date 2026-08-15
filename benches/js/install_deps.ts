@@ -15,6 +15,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { OXC_WASI_BINDING } from './lib/check_node_modules.ts';
+
 const here = dirname(fileURLToPath(import.meta.url));
 
 function npm(args: Array<string>): void {
@@ -30,16 +32,18 @@ npm(['install']);
 //    gate skips it. `--force` bypasses the gate; `--no-save` keeps it out of
 //    package.json/lock (where an optionalDependency entry would make a later
 //    forced reinstall no-op as "up to date"). oxc ships every binding at the
-//    oxc-parser version, so that pin is the single source of truth.
+//    oxc-parser version, so that pin is the single source of truth. The package
+//    NAME is imported rather than spelled again — `check_node_modules.ts` grades
+//    what this line installs, so the two must name the same package by
+//    construction.
 const pkg = JSON.parse(readFileSync(join(here, 'package.json'), 'utf8')) as {
 	dependencies?: Record<string, string>;
 };
 const oxc_version = pkg.dependencies?.['oxc-parser'];
-const wasi = '@oxc-parser/binding-wasm32-wasi';
 if (oxc_version) {
-	npm(['install', `${wasi}@${oxc_version}`, '--force', '--no-save']);
+	npm(['install', `${OXC_WASI_BINDING}@${oxc_version}`, '--force', '--no-save']);
 } else {
 	console.error(
-		`warning: oxc-parser not pinned in dependencies; ${wasi} (oxc-parser-wasm row) will be unavailable`
+		`warning: oxc-parser not pinned in dependencies; ${OXC_WASI_BINDING} (oxc-parser-wasm row) will be unavailable`
 	);
 }

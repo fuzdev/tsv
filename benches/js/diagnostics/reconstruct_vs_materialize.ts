@@ -72,9 +72,7 @@ function bench(fn: () => void, samples = 21, block_ms = 10): number {
 }
 
 const impls = await init_implementations({ logger: (m) => console.error(m) });
-if (!impls.native) throw new Error('native FFI not built — run deno task build:ffi');
 const native = impls.native;
-if (!native.parse_no_locations) throw new Error('native.parse_no_locations unavailable');
 
 const files = await new DevReposLoader('perf').load((m) => console.error(m));
 const by_lang = group_by_language(files);
@@ -121,10 +119,10 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 			native.parse(src, language);
 		});
 		const t_b = bench(() => {
-			locator.reconstruct(native.parse_no_locations!(src, language));
+			locator.reconstruct(native.parse_no_locations(src, language));
 		});
 		const t_bp = bench(() => {
-			native.parse_no_locations!(src, language);
+			native.parse_no_locations(src, language);
 		});
 		t.a += t_a;
 		t.b += t_b;

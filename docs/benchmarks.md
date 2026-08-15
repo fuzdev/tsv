@@ -575,6 +575,19 @@ on-disk size** plus **gzipped size** (≈ npm-tarball wire size), grouped by kin
 (WASM vs native) with ratios relative to `tsv` for both. Implementation:
 `lib/binary_sizes.ts`; JSON output carries a per-entry `gzip_bytes: number | null`.
 
+**A row exists only for an artifact on disk**, which makes this the one report
+section whose *composition* varies by machine — and the ratios read the same either
+way (`biome is 18.4x tsv`), so an omission is easy to miss. The top-level
+`binary_sizes_absent` is the disclosure: every label the collector reached for and
+did not find. Two different facts share that list, told apart by the label. A **tsv**
+variant (`tsv format (ffi)`, `tsv_parse_wasm`, …) is absent whenever its optional
+build task hasn't run, routine on a machine that built only what it measures. A
+**third-party** label is absent although its impl initialized, which means the
+package shipped nothing where this module looked — a stale path here, or an upstream
+layout change. The one third-party label with a benign reading is `oxc-parser
+(wasm)`: its binding lives in no manifest, so a plain `npm install` leaves it absent
+with nothing else wrong.
+
 - **`tsv`**: native FFI (`.so`/`.dylib`/`.dll`), N-API addon (`.node`), and WASM.
   The FFI side ships three rows from one `tsv_ffi` crate via its `format`/`parse`
   features (matching the three WASM rows): full `libtsv_ffi` (`target/release`,
@@ -643,15 +656,16 @@ cd benches/js && npm outdated   # current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
 deno task smoke           # confirm every impl still loads + formats (the run prints its check count)
-deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts benches/js/lib/yuku.ts benches/js/lib/malva.ts benches/js/lib/swc.ts benches/js/lib/postcss.ts benches/js/lib/rsvelte_parse.ts benches/js/lib/tsc.ts
+deno task typecheck:js    # the wrapper types still line up with the new .d.ts
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
 
 These packages are free to bump independently — they're measured against, not baked
 into fixtures. A **major** bump (e.g. `@biomejs/js-api` 4→6) can change a package's
-*type* surface without breaking the runtime path smoke exercises, so the `deno
-check` step is the guard for those.
+*type* surface without breaking the runtime path smoke exercises, so the
+`typecheck:js` step is the guard for those — it covers the whole harness, so a
+wrapper for a newly-added impl is included without anyone remembering to list it.
 
 ⚠ **The oxc wasm binding is not a regular dep.** It's pure-wasm but its metadata
 declares `cpu: wasm32`, so it lives in neither `dependencies` nor
@@ -659,6 +673,44 @@ declares `cpu: wasm32`, so it lives in neither `dependencies` nor
 it at the `oxc-parser` version (oxc ships all bindings in lockstep), so bumping
 `oxc-parser` carries it automatically. `binary_sizes.ts` reads it from
 `node_modules` (flat, no version dir).
+
+⚠ **That lockstep also CAPS the `oxc-parser` pin.** The binding is a separate
+artifact with its own load path, and an upstream version whose binding fails to
+load takes the `oxc-parser-wasm` row off both surfaces — an unloadable impl is
+ABSENT, not fatal, so nothing fails and the published TABLES carry no trace: the
+row is simply gone. Only the report's `unavailable` list records the cause, in
+JSON, which nobody reads unless they already suspect a loss. The
+break is real, not hypothetical: `benches/js/package.json`'s `//oxc-wasi` note
+names the version it starts at, the `@emnapi/core` hoisting mismatch behind it, and
+the workaround that was deliberately declined. So an `oxc-parser` bump is the one
+routine bump with a re-probe attached.
+
+**Probe the CANDIDATE, not the installed binding.** A bare
+`import('@oxc-parser/binding-wasm32-wasi')` resolves whatever is in `node_modules`
+— still the old version until the pin moves — so run as a pre-check it always
+passes and proves nothing. Fetch the candidate explicitly first (`--no-save`, so a
+failed probe leaves `package.json` untouched):
+
+```bash
+cd benches/js
+npm install @oxc-parser/binding-wasm32-wasi@<candidate> --force --no-save
+node -e "import('@oxc-parser/binding-wasm32-wasi').then(() => console.log('wasi binding loads'), (e) => { console.error(e.message); process.exit(1) })"
+```
+
+The rejection handler is the point: without it a load failure surfaces as an
+unhandled rejection rather than the one line naming the cause. Raise the
+`oxc-parser` pin only once that exits 0, then `deno task bench:install` to put the
+tree back in agreement with `package.json`.
+
+The `deno task smoke` step above is the backstop: it names every impl that failed
+to load (`Unavailable (N) — no rows to check`) and qualifies its pass count with
+the shortfall, so a silently-dropped row shows up there instead of as a smaller
+table nobody diffed. It smokes the **Deno** loader only, though, and each runtime
+loads its own binding (`smoke:node`, `smoke:bun`, once `deno task bench` below has
+built their artifacts) — a break confined to one of the others surfaces a step
+later instead, as an `unavailable` entry in that runtime's report plus the ⚠ the
+bench prints when it publishes one short of an impl. The oxc wasi break above is
+not one of those: it fails under Deno and Node alike, so the Deno smoke sees it.
 
 ### Canonical baseline is coupled
 

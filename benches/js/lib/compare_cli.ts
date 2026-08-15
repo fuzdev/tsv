@@ -20,8 +20,8 @@ import { z } from 'zod';
 import { DevReposLoader, DirectoryLoader } from './corpus.ts';
 import { CanonicalImplementation } from './canonical.ts';
 import { is_native_panic_error } from './divergence/panic_errors.ts';
-import { get_library_path, NativeImplementation } from './ffi.ts';
-import { check_artifact_freshness } from './check_artifact_freshness.ts';
+import { NativeImplementation } from './ffi.ts';
+import { check_artifact_freshness, native_artifact_check } from './check_artifact_freshness.ts';
 import { check_node_modules } from './check_node_modules.ts';
 import { type Language, LANGUAGES } from './types.ts';
 import { load_all_versions } from './versions.ts';
@@ -121,17 +121,12 @@ export async function init_compare_implementations(): Promise<CompareImplementat
 	await check_node_modules();
 
 	// Refuse to measure a stale binary (the `:run` task variants skip the
-	// rebuild). See lib/check_artifact_freshness.ts; override with BENCH_STALE_OK=1.
-	const ffi_profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
-	const rebuild = ffi_profile === 'corpus' ? 'deno task build:ffi:corpus' : 'deno task build:ffi';
-	await check_artifact_freshness([
-		{
-			label: `FFI (${ffi_profile})`,
-			path: get_library_path(),
-			binding_crates: ['tsv_ffi'],
-			rebuild
-		}
-	]);
+	// rebuild). Only the native library: these tools run no WASM, so the bundle's
+	// freshness is not their business. Override with BENCH_STALE_OK=1. Held in a
+	// const because the init failure below quotes the same rebuild hint — one
+	// answer to "how do I rebuild this artifact", whether it was stale or unloadable.
+	const native_check = native_artifact_check();
+	await check_artifact_freshness([native_check]);
 
 	const versions = await load_all_versions();
 	const canonical = new CanonicalImplementation(versions.canonical);
@@ -148,7 +143,7 @@ export async function init_compare_implementations(): Promise<CompareImplementat
 		await native.init();
 	} catch (e) {
 		console.error(`Failed to initialize native implementation: ${e}`);
-		console.error(`Run: ${rebuild}`);
+		console.error(`Run: ${native_check.rebuild}`);
 		Deno.exit(1);
 	}
 

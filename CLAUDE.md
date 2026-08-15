@@ -143,6 +143,8 @@ cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # forma
 deno task check          # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
 deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, node_modules freshness, oracle checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes them) — except the explicitly optional experimental-typechecker tier, informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
+deno task typecheck:js   # deno check over the bench harness, scripts/ + the tsv_debug sidecar (the JS/TS cargo can't see).
+#                          NOT in `check` — needs `deno task bench:install`, and CI installs no node_modules
 deno task test           # cargo test
 deno task lint           # cargo clippy
 cargo fmt                # format Rust code
