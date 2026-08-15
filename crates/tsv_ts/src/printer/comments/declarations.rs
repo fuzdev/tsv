@@ -1457,21 +1457,34 @@ impl<'a> Printer<'a> {
         // Comments before the `*` lead it, at the author's position. A generator
         // always has a real `*`; if (defensively) none is found, treat the whole
         // gap as "before" so no comment is ever dropped.
-        for comment in
-            comments_to_emit_in_range(self.comments, search_start, star.unwrap_or(key_start))
-        {
-            parts.push(self.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
+        //
+        // Both runs go through the single leading-comment emitter rather than a
+        // separator of their own (`docs/comments.md` §Leading comments): what each
+        // run leads happens to be a token rather than a node, but the question —
+        // does this comment stay glued to what follows? — is the same one, and its
+        // line-comment answer is load-bearing here. A `//` runs to end of line, so
+        // an inline separator swallows the `*`, the key and the whole method body
+        // into it, output that does not reparse.
+        let star_pos = star.unwrap_or(key_start);
+        self.push_leading_comment_run(
+            parts,
+            comments_to_emit_in_range(self.comments, search_start, star_pos),
+            star_pos,
+            LeadingGlue::Adjacent,
+            d.empty(),
+        );
         parts.push(d.text("*"));
         // Comments between the `*` and the key trail it (bounded at `[` for a
         // computed key, whose in-bracket comments the bracket builder owns).
         if let Some(star) = star {
             let name_bound = self.computed_key_name_bound(star + 1, key_start, computed);
-            for comment in comments_to_emit_in_range(self.comments, star + 1, name_bound) {
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.text(" "));
-            }
+            self.push_leading_comment_run(
+                parts,
+                comments_to_emit_in_range(self.comments, star + 1, name_bound),
+                name_bound,
+                LeadingGlue::Adjacent,
+                d.empty(),
+            );
         }
     }
 

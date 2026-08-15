@@ -115,7 +115,13 @@ impl<'a> Printer<'a> {
             // (`throw (a = b) /* c */;`).
             if keyword == "return" {
                 let after = if has_trailing_comments {
-                    self.split_terminator_gap_comments(&mut parts, argument_end, span_end, false)
+                    self.split_terminator_gap_comments(
+                        &mut parts,
+                        argument_end,
+                        span_end,
+                        false,
+                        true,
+                    )
                 } else {
                     DocBuf::new()
                 };
@@ -158,7 +164,7 @@ impl<'a> Printer<'a> {
             // the in-paren comment is already inside `seq_doc`.
             let after_start = grouping_close.saturating_add(1).min(span_end);
             let after = if self.has_comments_to_emit_between(after_start, span_end) {
-                self.split_terminator_gap_comments(&mut parts, after_start, span_end, false)
+                self.split_terminator_gap_comments(&mut parts, after_start, span_end, false, true)
             } else {
                 DocBuf::new()
             };
@@ -187,7 +193,13 @@ impl<'a> Printer<'a> {
 
         let mut result_parts = smallvec![d.text(keyword), d.text(" "), rhs_doc];
         let after = if has_trailing_comments {
-            self.split_terminator_gap_comments(&mut result_parts, argument_end, span_end, false)
+            self.split_terminator_gap_comments(
+                &mut result_parts,
+                argument_end,
+                span_end,
+                false,
+                false,
+            )
         } else {
             DocBuf::new()
         };
@@ -371,7 +383,7 @@ impl<'a> Printer<'a> {
             self.build_restricted_production_paren_doc(keyword, keyword_end, arg, span_end);
         let mut parts: DocBuf = smallvec![hanging];
         let after = if self.has_comments_to_emit_between(boundary, span_end) {
-            self.split_terminator_gap_comments(&mut parts, boundary, span_end, false)
+            self.split_terminator_gap_comments(&mut parts, boundary, span_end, false, true)
         } else {
             DocBuf::new()
         };
@@ -501,8 +513,13 @@ impl<'a> Printer<'a> {
             comments_to_emit_in_range(self.comments, expr_end, semicolon_pos)
                 .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
         let mut inline_trailing = DocBuf::new();
-        let after_semi =
-            self.split_terminator_gap_comments(&mut inline_trailing, expr_end, semicolon_pos, true);
+        let after_semi = self.split_terminator_gap_comments(
+            &mut inline_trailing,
+            expr_end,
+            semicolon_pos,
+            true,
+            true,
+        );
         let trailing_comments_doc = d.concat(&inline_trailing);
 
         // When the expression contains hardlines (e.g., multi-line callback in a

@@ -442,18 +442,33 @@ impl<'a> Printer<'a> {
             self.has_trailing_paren_comments(body_end, arrow.span.end);
 
         if has_trailing_paren_comments {
-            parts.push(d.text(" "));
-            // Leading comments between `=>` and body (if any):
-            // `() => /* lead */ (x /* trail */)` — emit inline leading,
-            // then paren-wrapped body with trailing.
             let body_start = expr.span().start;
-            if self.has_comments_to_emit_between(arrow_end, body_start) {
-                for comment in comments_to_emit_in_range(self.comments, arrow_end, body_start) {
-                    parts.push(self.build_comment_doc(comment));
-                    parts.push(d.text(" "));
+            let body_doc = self.build_expression_doc_keep_paren_comments(expr, arrow.span.end);
+            // This arm reassembles the body — it wraps the retained parens itself — so it
+            // must answer the `=>`→body gap on its own, exactly as the cascade below does.
+            // Emitting the run inline unconditionally is the blind-twin bug that costs a
+            // `//` its line end: `() => // c⏎(x /* t */)` printed
+            // `() => // c (x /* t */);`, the whole body swallowed into the comment.
+            if self.has_own_line_post_arrow_comment(arrow_end, body_start) {
+                let with_leading = prepend_leading(
+                    d,
+                    self.arrow_gap_leading_run(arrow_end, body_start),
+                    body_doc,
+                );
+                parts.push(hang_after_operator(d, with_leading));
+            } else {
+                // Leading comments between `=>` and body (if any):
+                // `() => /* lead */ (x /* trail */)` — emit inline leading,
+                // then paren-wrapped body with trailing. Only glued blocks reach
+                // here; the arm above took every comment that must end its line.
+                // The run is the hug arm's own (`gap_run` below, defined past this
+                // early return), so the two agree on the gap by construction.
+                parts.push(d.text(" "));
+                if let Some(run) = self.build_rhs_comments_glued_opt(arrow_end, body_start) {
+                    parts.push(run);
                 }
+                parts.push(body_doc);
             }
-            parts.push(self.build_expression_doc_keep_paren_comments(expr, arrow.span.end));
             // Skip normal body handling — paren wrapping covers all cases
             return;
         }

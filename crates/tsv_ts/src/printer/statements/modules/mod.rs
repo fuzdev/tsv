@@ -403,7 +403,8 @@ impl<'a> Printer<'a> {
                 // (parentheses/needs-parentheses.js). Decorated class expressions are
                 // handled by the decorated forms; the FunctionDeclaration/ClassDeclaration
                 // arms cover bare `export default function/class …`.
-                if export_default_needs_parens(expr) {
+                let operand_parens_printed = export_default_needs_parens(expr);
+                if operand_parens_printed {
                     expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
                 }
                 let argument_end = value_span.end;
@@ -416,6 +417,7 @@ impl<'a> Printer<'a> {
                     argument_end,
                     decl.span.end,
                     false,
+                    operand_parens_printed,
                 );
                 parts.push(d.text(";"));
                 parts.extend(after);

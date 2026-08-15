@@ -34,6 +34,16 @@
 	// ternary body, leading + trailing — the retained parens keep the leading comment outside
 	const k = () => (/* lead */ cond ? a : b /* trail */);
 
+	// leading line comment — the run drops to its own line, the retained parens below it
+	const l = () =>
+		// lead
+		x; /* trail */
+
+	// leading block then line — the run stays together above the body
+	const m = () =>
+		/* lead1 */ // lead2
+		x; /* trail */
+
 	// same-line comment group after a body break — block + line stay together
 	const i = () => x;
 	/* i1 */ // i2

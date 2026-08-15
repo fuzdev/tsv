@@ -27,6 +27,13 @@ A few cases go further:
   layout paren, which vanishes as soon as the body breaks; there tsv converges with
   prettier and puts the comment inside
   ([arrow/body_stripped_paren_comment_long](../../arrow/body_stripped_paren_comment_long/)).
+- A **leading** run that cannot end on the `=>` line — a `//`, or an own-line
+  block — drops below the `=>` with the retained parens under it, the same
+  hang the uncommented arm gives. Only a glued block still hugs `=>`. That gap
+  is answered here rather than by the main body cascade, since this arm
+  reassembles the body around the retained parens; answering it inline for
+  every kind is what once swallowed the whole body into a `//`
+  (`() => // c (x /* trail */);`).
 - For an object-literal body the parens are **required** (object/block
   disambiguation), not redundant grouping parens. tsv keeps the comment inside
   (`({ k: 1 } /* c */)`); prettier moves it outside the required paren
