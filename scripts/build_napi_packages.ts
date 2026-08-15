@@ -2,7 +2,7 @@
  * Stage the publishable N-API npm packages into `crates/tsv_napi/pkg/`:
  *
  * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (index.js + index.d.ts +
- *   tsv_ast.d.ts + the shared `locations.js`/`.d.ts` helper + the shared
+ *   platform.js (triple detection) + tsv_ast.d.ts + the shared `locations.js`/`.d.ts` helper + the shared
  *   `cli.js` + the `bin.js` dispatcher wired as the `tsv` bin + README +
  *   LICENSE + generated package.json with the exact-pinned platform
  *   `optionalDependencies`).

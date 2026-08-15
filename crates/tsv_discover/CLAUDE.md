@@ -157,18 +157,21 @@ crates (the open-convention stance):
   `npm/cli.js` calls the per-directory `classify_dir` (it does a real walk) and
   the per-argument `unsupported_extension_error` (through a throwaway stack — the
   receiver is unused, an argument check running before any matcher exists), and
-  keeps no policy of its own: the extension list never appears in JS.
+  keeps no policy *decision* of its own (the literal extension list does appear in its help/error text, hand-mirrored from the native CLI — the decision stays here).
 - **VS Code extension** (`vscode_extension_tsv_format`) — assembles an
   `IgnoreStack` per open document and calls `is_ignored(rel, false) ||
   is_path_pruned(rel)`. It has no directory walk, so `is_path_pruned` is its entry
   to the shared prune policy; it no longer reconstructs the heuristic walk in TS.
+- **`tsv_debug`** — reuses `FORMATTABLE_EXTENSIONS`, `is_safety_net`, and
+  `HEURISTIC_DIRS` in its audit seed resolution and corpus walkers
+  (`profile.rs`), so the audits scan exactly the file set the formatter would.
 
 ## Behavior is pinned, not asserted
 
 This crate is a **behavior-preserving extraction** of the decision that lived
 inline in `discover.rs` / `cli.js`. The shared discovery-parity table
-(`tests/discovery/scenarios.json`) runs through every walker
-(`tests/discovery_parity.rs` native; `scripts/discovery_parity_suite.ts` drives
+(`../../tests/discovery/scenarios.json`) runs through every walker
+(`../../tests/discovery_parity.rs` native; `scripts/discovery_parity_suite.ts` drives
 cli.js over the WASM and N-API bindings for `test_npm.ts` /
 `test_napi_npm.ts`), the matcher is
 pinned against real `git check-ignore` (`tsv_ignore`'s `git_oracle`), and the

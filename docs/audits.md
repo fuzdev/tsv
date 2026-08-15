@@ -382,8 +382,8 @@ cargo run --profile corpus -p tsv_debug --features audits ignore_audit ~/dev/zzz
 `deno task ignore:audit:update` regenerates the snapshot after adding a printer opt-in (a now-honored position goes stale → drop its line) or fixing a misbinding, over-freeze, or relocation transient; it refuses a narrowed run.
 
 ⚠️ **Blind spot: this audit injects a DIRECTIVE, `gaps:audit` injects a COMMENT, and
-neither injects the pair — so a bug that needs both is invisible to both.** Live case
-(found + fixed 2026-08-10): an object property under `prettier-ignore` whose value carried
+neither injects the pair — so a bug that needs both is invisible to both.** Live case,
+since fixed: an object property under `prettier-ignore` whose value carried
 a comment inside a *stripped* paren shell (`a: (b /* x */)`) had that comment printed by
 the frozen slice AND re-claimed by the trailing-comma seam, so the run **grew by one copy
 on every pass** — unbounded duplication, and non-idempotent. Both ratchets stayed green: an
@@ -546,7 +546,7 @@ backticks in exactly the build that matters.
 for day-to-day work (IDE, a bare `cargo doc`) along with the rationale. The task re-states
 them as `RUSTDOCFLAGS` because `tsv_ffi` and `tsv_napi` define their own `[lints.clippy]`
 tables, which Cargo cannot merge with `[lints] workspace = true` — so they do not inherit,
-and only the task's flags cover all fourteen crates.
+and only the task's flags cover every workspace crate.
 
 **Blind spots.** It checks that a link *resolves*, never that the surrounding prose is
 true. A doc that describes behavior the code no longer has passes cleanly; so does a

@@ -186,6 +186,8 @@
   `CheckOptions { allow_unreachable_code, allow_unused_labels,
   preserve_const_enums }`, threaded into `check_bound`. Default everywhere
   outside the conformance harness.
+- `span_scan.rs` — the bracket-inclusive computed-key scan the binder and check
+  pass share, so their spans agree by construction (see `lib.rs`'s module note).
 - Hashing has no module here — the tables use `tsv_lang`'s `FxHashMap` (the
   workspace's one dep-free multiply-xor hasher, shared with the printers and the
   wire writer). The address map, symbol tables and flow-label scratch are

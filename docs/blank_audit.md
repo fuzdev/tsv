@@ -46,8 +46,8 @@ The six invariants are deliberately policy-free, and invariant 2 lets pass 1 kee
 injected blank — so a formatter that silently EATS a blank at some gap passes all of them forever.
 The dropped-blank output is its own fixed point, which blinds every other standing gate too (F1,
 fuzz, round-trip, the ledger, the census); only a prettier compare on the authored shape can see
-one. That is the blank-DROP class (the #759 family: an authored blank before a last-child
-declaration, deleted), and the **absorb pin** closes its *silent* half.
+one. That is the blank-DROP class (the after-element-fold family: an authored blank before a
+last-child declaration, deleted), and the **absorb pin** closes its *silent* half.
 
 A second machine-generated snapshot, `blank_absorb_known.txt`, pins every **node-edge class** —
 `(node_type, left_role→right_role)`, the innermost AST node holding the injection offset and the
@@ -63,7 +63,7 @@ to the pristine output, i.e. the blank was silently deleted). Two deliberate des
 - **The key is coarse on purpose.** ~80% of injections absorb, so the bug ratchet's fine token
   shape would pin the fixture tree's whole token-adjacency vocabulary (~5.7k shapes, measured) and
   mint new ones on ordinary fixture PRs — the churn that gets gates turned off. A node-edge class
-  (~530 over `tests/fixtures`) ≈ one emitter decision, the grain a triage verdict actually covers.
+  (~525 over `tests/fixtures`; the snapshot header carries the exact count) ≈ one emitter decision, the grain a triage verdict actually covers.
 
 One absorption is **exempt**: an injection beside an *already-authored* blank reproduces the
 pristine output via the sanctioned 2+→1 run collapse (invariant 6's own requirement), not a drop —
@@ -101,15 +101,15 @@ often leave its line in place, which is correct and must not be "corrected" with
 **`--json` therefore carries the real work-list**: `absorb_variants`, one row per
 `(class, `[site shape](#reading-a-finding)`)` pair rather than per class, each with its own
 reproducer (`class`, `shape`, `path`, `offset`, `snippet`). Over `tests/fixtures` that is ~14.8k
-rows against 530 classes, and the difference is not academic — the first per-class sweep of the
+rows against the ~525 pinned classes, and the difference is not academic — the first per-class sweep of the
 pin graded 10 divergences where the per-shape sweep of the same corpus graded 404. `--report`'s
 per-class rows carry the pair count in a `[N shapes]` column, so a class whose reproducer reads
 ABSORBS still shows how much of it that one reading covered. The pin file itself stays keyed by
 class: the variants are a triage view, never pinned.
 
 **What it still cannot see**: a drop at a gap the site enumeration never injects — the sites come
-from `code_regions` (JS spans), so a Svelte **template-text** gap (where #759 itself lived) is
-never probed; that needs the template-gap substrate extension, and as-authored drops over real
+from `code_regions` (JS spans), so a Svelte **template-text** gap (where the
+after-element-fold drop itself lived) is never probed; that needs the template-gap substrate extension, and as-authored drops over real
 corpora need the blank census. Both are tracked as follow-ups, not covered here.
 
 Every **policy** kind is **pinned** into the ratchet (NON-IDEMPOTENT, DROPPED, DOUBLE-PRINTED,

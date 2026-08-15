@@ -1,7 +1,7 @@
 /**
  * Line/column reconstruction for tsv's `no-locations` parse wire.
  *
- * The `parse_*_no_locations` exports emit a span-only AST: every node keeps its
+ * A `parse_*` call with `{locations: false}` emits a span-only AST: every node keeps its
  * `start`/`end` (UTF-16 code-unit offsets) but drops the per-node `loc`
  * (line/column) object (Svelte also drops the element/attribute/directive
  * `name_loc`). Line/column is a pure function of an offset plus the source, so a
@@ -37,10 +37,11 @@
  * - Destructure patterns in `{#each … as …}` / `{:then}` / `{:catch}` / `{@const}`
  *   carry a `+1` column in Svelte's wire (parsed under a synthetic `(`); the
  *   reconstruction is the true offset, so it reads one column earlier.
- * - Additionally, Svelte's own wire carries `loc` *only* on embedded ECMAScript
- *   nodes (script + template expressions); this walk adds `loc` to the template
- *   nodes (elements, text, blocks) too, so the result is a superset. Everything
- *   outside the two cases above reconstructs exactly.
+ *
+ * Additionally, Svelte's own wire carries `loc` *only* on embedded ECMAScript
+ * nodes (script + template expressions); this walk adds `loc` to the template
+ * nodes (elements, text, blocks) too, so the result is a superset. Everything
+ * outside the two cases above reconstructs exactly.
  *
  * **Svelte `name_loc` is exact.** The name span is a function of the node's own
  * `start`/`end` + type — a tag name is the run after `<`, an attribute name starts
@@ -514,7 +515,7 @@ export function create_locator(source, opts) {
  * Exact for TypeScript; approximate for Svelte; a no-op for CSS — see the module
  * doc for the specifics.
  *
- * @param {any} ast - the span-only AST from `parse_*_no_locations` (untyped: the
+ * @param {any} ast - the span-only AST from a `{locations: false}` parse (untyped: the
  *   no-locations wire has no `.d.ts`).
  * @param {string} source - the exact source `ast` was parsed from.
  * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - line rule

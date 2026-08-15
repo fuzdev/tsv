@@ -54,7 +54,8 @@ rides its own custom section, so consumers `import type` AST nodes directly.
 ## Panic Reporting
 
 A `#[wasm_bindgen(start)]` hook forwards panic messages to `console.error`
-(**measured 468 B**), because under the shipped `panic = "abort"` + `strip` a
+(**measured at under +0.1% raw and gzipped** on `@fuzdev/tsv_format_wasm`, ~1.3 KB
+raw), because under the shipped `panic = "abort"` + `strip` a
 panic reaches the host as a bare `RuntimeError: unreachable`. The why — and why
 the `console.error` binding is hand-rolled rather than a dep — is in the comment
 above the hook in `src/lib.rs`.
@@ -255,8 +256,9 @@ hierarchical), then queries:
   `.gitignore` anchors, so it takes no extra arguments; pair it with
   `is_ignored(rel, false)` for the file-level match. (`classify_dir` stays the
   primitive for `npm/cli.js`, which threads `heuristic_active` down a real walk.)
-- `heuristic_shadow_warning(dir) -> string` — the one warning template (a method,
-  not a free function, so it rides the class re-export; single source of truth
+- `heuristic_shadow_warning(dir) -> string`, `prettierignore_outside_repo_warning`,
+  and `prettierignore_shadowed_warning` — the three warning templates (methods,
+  not free functions, so they ride the class re-export; single source of truth
   with the native CLI, never re-templated in JS).
 - `unsupported_extension_error(path) -> string | undefined` — the argument error
   for an explicitly named **file** tsv doesn't format, `undefined` when the
@@ -334,9 +336,10 @@ the `all` builds use the default features (both).
 | ------ | ------------------ | ----------------- | --------------- | ------------------------------------------------------------------- |
 | deno   | `pkg/format/deno/` | `pkg/parse/deno/` | `pkg/all/deno/` | `build:wasm:deno` / `build:wasm:parse:deno` / `build:wasm:all:deno` |
 | npm    | `pkg/format/npm/`  | `pkg/parse/npm/`  | `pkg/all/npm/`  | `build:npm:format` / `build:npm:parse` / `build:npm:all`            |
+| nodejs | —                  | —                 | `pkg/all/nodejs/` | — / — / `build:wasm:all:nodejs` (bench-only)                      |
 
 The `pkg/all/deno` build feeds the benches and sidecar (it has every
-export); the subset deno builds are size-tracked by `binary_sizes.ts`. The
+export); the deno builds — subsets and `all` — are size-tracked by `binary_sizes.ts`. The
 `npm` builds are the published artifacts: a wasm-pack `web`-target build
 patched by `scripts/patch_npm_package.ts` into the multi-entry package shape
 (Node auto-init entry, guarded browser entry, conditional `exports`,
@@ -347,8 +350,9 @@ e.g. `test:npm:run` — skips the rebuild when the bundle is already fresh, as i
 the publish/CI pipelines), and `deno task validate:artifacts`
 checks tight wasm size bounds plus a Deno runtime smoke of every built
 bundle (both run in the publish pipeline). The npm package itself covers
-Node/browser/bundler consumers, so there are no standalone `web`/`nodejs`
-target builds.
+Node/browser/bundler consumers, so there is no standalone `web`-target
+build beyond the npm artifacts; the `nodejs`-target `pkg/all/nodejs/` build
+exists solely to feed the Node bench runner (`build:bench:node`).
 
 The generated `tsv_wasm_bg.wasm.d.ts` is intentionally excluded from the
 npm `files` list: it types direct `.wasm` ES-module imports, which the
