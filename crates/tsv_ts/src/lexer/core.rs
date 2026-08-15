@@ -161,6 +161,12 @@ pub struct Lexer<'a> {
     /// stale contents are inert.
     decode_scratch: String,
     has_decoded: bool,
+    /// Byte offset of `source` within the document this lexer's ERRORS are rendered
+    /// against — zero for a standalone file, the island start for a Svelte `<script>`.
+    /// Token positions are unaffected (the parser shifts those itself when it builds
+    /// spans); this exists solely so an error position names a place in the document the
+    /// reader is looking at. See [`Lexer::host_err`].
+    base_offset: usize,
 }
 
 /// Returns true if `c` is an ECMAScript **WhiteSpace** code point (ES spec
@@ -189,7 +195,15 @@ const fn is_es_whitespace(c: char) -> bool {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(source: &'a str) -> Self {
+    /// A lexer over `source`, which sits at `base_offset` in the document its errors will
+    /// be rendered against — `0` when that document *is* `source`, the island start for a
+    /// Svelte `<script>`. See [`Lexer::host_err`].
+    ///
+    /// The offset is a required argument rather than a `new(source)` default because a
+    /// silent zero is the failure mode: a slice lexer that reports its own coordinates
+    /// hands the renderer a position it reads as the document's, pointing the caret at an
+    /// unrelated line.
+    pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
         let bytes = source.as_bytes();
         // Skip UTF-8 BOM (EF BB BF / U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
@@ -208,7 +222,22 @@ impl<'a> Lexer<'a> {
             had_line_terminator: false,
             decode_scratch: String::new(),
             has_decoded: false,
+            base_offset,
         }
+    }
+
+    /// Lift an error this lexer produced into the coordinates of the document it will be
+    /// rendered against (`ParseError::shift_position`).
+    ///
+    /// Applied at each entry point that PRODUCES an error — [`Lexer::next_token_into`],
+    /// [`Lexer::read_regex_literal`], [`Lexer::continue_template_from_brace`] — and
+    /// never in a wrapper that delegates to one of them ([`Lexer::next_token`],
+    /// [`Lexer::seek_and_next_token`]), which would shift twice and lose the caret
+    /// altogether.
+    #[cold]
+    #[inline(never)]
+    fn host_err(&self, err: ParseError) -> ParseError {
+        err.shift_position(self.base_offset)
     }
 
     /// The byte at the cursor, or `None` at EOF.
@@ -780,7 +809,18 @@ impl<'a> Lexer<'a> {
     /// write `dst` (or propagate the error) via an early `return`.
     /// [`Lexer::next_token`] is the thin by-value wrapper kept for the
     /// peek/seek/bootstrap callers.
+    ///
+    /// The error path is lifted into host coordinates here, at the producer
+    /// ([`Lexer::host_err`]); the scan itself works in — and reports in — the lexer's own.
+    #[inline]
     pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+        self.next_token_into_local(dst)
+            .map_err(|err| self.host_err(err))
+    }
+
+    /// [`Lexer::next_token_into`]'s scan, reporting an error at its position in
+    /// `self.source` — never called directly, so the lift above is applied exactly once.
+    fn next_token_into_local(&mut self, dst: &mut Token) -> Result<(), ParseError> {
         // Clear the decoded-value flag from the previous token so `decoded_str`
         // reflects only the token produced by this call (set by the escape paths below).
         self.has_decoded = false;
@@ -1280,7 +1320,19 @@ impl<'a> Lexer<'a> {
     /// plus the position of the closing `/` (the pattern/flags boundary), letting
     /// the parser slice `[slash_start+1, close]` and `[close+1, end]` without the
     /// caller ever materializing the strings (`token.decoded` is `None`).
+    ///
+    /// A producer, so it lifts its error into host coordinates ([`Lexer::host_err`]).
+    #[inline]
     pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<(Token, usize), ParseError> {
+        self.read_regex_literal_local(slash_start)
+            .map_err(|err| self.host_err(err))
+    }
+
+    /// [`Lexer::read_regex_literal`]'s scan, reporting at its position in `self.source`.
+    fn read_regex_literal_local(
+        &mut self,
+        slash_start: usize,
+    ) -> Result<(Token, usize), ParseError> {
         // A regex token never carries a decoded value; clear any left from the
         // previous token so the parser's `decoded_str()` after this lex sees `None`.
         self.has_decoded = false;
@@ -1410,7 +1462,20 @@ impl<'a> Lexer<'a> {
     ///
     /// `brace_end` is the position just after the `}` where template content starts.
     /// The lexer will sync to this position and read the rest of the template.
+    ///
+    /// A producer, so it lifts its error into host coordinates ([`Lexer::host_err`]).
+    #[inline]
     pub fn continue_template_from_brace(&mut self, brace_end: usize) -> Result<Token, ParseError> {
+        self.continue_template_from_brace_local(brace_end)
+            .map_err(|err| self.host_err(err))
+    }
+
+    /// [`Lexer::continue_template_from_brace`]'s scan, reporting at its position in
+    /// `self.source`.
+    fn continue_template_from_brace_local(
+        &mut self,
+        brace_end: usize,
+    ) -> Result<Token, ParseError> {
         // Standalone token-producing entry point — clear the out-of-band decoded slot
         // so `decoded_str()` reflects only the segment produced here (set below on escapes).
         self.has_decoded = false;

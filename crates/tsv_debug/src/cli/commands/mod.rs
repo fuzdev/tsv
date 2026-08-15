@@ -63,6 +63,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use tokio::task::JoinError;
+use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Create a tokio runtime for async operations.
 ///
@@ -71,6 +72,29 @@ use tokio::task::JoinError;
 #[allow(clippy::expect_used)]
 pub fn create_runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Runtime::new().expect("Failed to create tokio runtime")
+}
+
+/// Resolve a content-processing command's input — the `--content` / `--stdin` / `<file>`
+/// trio they all share — printing the resolution error. The shared front door for every
+/// such command, so the input contract documented in the root `CLAUDE.md` has one
+/// implementation rather than one per command.
+///
+/// `fail` is the command's own failure variant: [`CliError::Failed`] for most, and
+/// [`CliError::Errored`] for `compile_compare`, whose `0` parity / `1` diff / `2` error
+/// dialect reserves exit 1 for a reported difference.
+///
+/// # Errors
+///
+/// Returns `fail` when the input arguments don't resolve (no input, a conflicting pair, an
+/// unreadable file, a missing `--parser`).
+pub fn resolve_input_or_fail(
+    args: InputArgs,
+    fail: CliError,
+) -> Result<(Input, ParserType), CliError> {
+    args.resolve().map_err(|e| {
+        eprintln!("Error: {e}");
+        fail
+    })
 }
 
 /// Walk `tests/fixtures`, returning [`CliError::Failed`] (after printing a

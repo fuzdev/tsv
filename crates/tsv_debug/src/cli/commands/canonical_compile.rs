@@ -42,19 +42,15 @@ impl CanonicalCompileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         // Compile is Svelte-only, so force the parser: --content/--stdin don't
         // require an explicit --parser, and a file argument's extension is ignored.
-        let input_args = InputArgs {
-            content: self.content,
-            stdin: self.stdin,
-            parser: Some(ParserType::Svelte),
-            file: self.file,
-        };
-        let input = match input_args.resolve() {
-            Ok((input, _parser)) => input,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+        let (input, _parser) = super::resolve_input_or_fail(
+            InputArgs {
+                content: self.content,
+                stdin: self.stdin,
+                parser: Some(ParserType::Svelte),
+                file: self.file,
+            },
+            CliError::Failed,
+        )?;
 
         let rt = super::create_runtime();
         match rt.block_on(deno::svelte_compile(input.content(), self.target, self.dev)) {

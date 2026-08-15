@@ -706,6 +706,45 @@ pub(crate) fn build_inline_or_expand_all(
     ])
 }
 
+/// Build the three-state conditional group for a **different-type** expand-last argument:
+/// inline → hug → expand all.
+///
+/// - State 0: everything inline — `fn('x', [a, b])`
+/// - State 1: hug — head args inline, the last one expands internally
+///   (`fn('x', [⏎\ta,⏎\tb⏎])`)
+/// - State 2: every argument on its own line
+///
+/// The hug wraps `last_arg_doc` in `group_break` (prettier's
+/// `group(lastArg, { shouldBreak: true })`), which is what lets `fits()` answer on the
+/// last argument's *first* line and so select the hug whenever the head plus the opening
+/// bracket fit. A last argument carrying its own forced break — a hardline from an interior
+/// comment, a source-multiline `group_break` — simply falls out of state 0 onto the hug, so
+/// no pre-check screens for one; the *same*-type path, which has no hug state, needs that
+/// check and does it at its own call site.
+///
+/// Shared by the plain-call and `new` argument printers, which answer this identically;
+/// the member-chain twin (`chain_args.rs`) builds the same ladder over a `&'static str`
+/// opener rather than a callee doc, so it keeps its own spelling — see
+/// [`build_chain_expand_all_args`].
+pub(crate) fn build_inline_hug_or_expand_all(
+    d: &DocArena,
+    callee: DocId,
+    head_parts: &[DocId],
+    last_arg_doc: DocId,
+    all_args_broken: DocId,
+) -> DocId {
+    let state_inline = build_inline_args(d, callee, head_parts, last_arg_doc);
+    let state_hug = d.concat(&[
+        callee,
+        d.text("("),
+        d.concat(head_parts),
+        d.group_break(last_arg_doc),
+        d.text(")"),
+    ]);
+    let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
+    d.conditional_group(&[state_inline, state_hug, state_expand_all])
+}
+
 /// Check if the last two arguments have the same outer AST type.
 /// Prettier disables expand-last-arg hug state when `penultimateArg.type === lastArg.type`
 /// (call-arguments.js:258). This covers both arrays, both objects, and also both TSAsExpression,

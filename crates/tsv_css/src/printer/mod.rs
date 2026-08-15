@@ -133,7 +133,8 @@ impl<'a> Printer<'a> {
             return false;
         }
         let decl_source = decl.span.extract(self.source);
-        let value_part = &decl_source[decl.colon_pos() + 1..];
+        let value_start = decl.colon_pos() + 1;
+        let value_part = &decl_source[value_start..];
         // Fast path: no `/*` at all → no block comment possible.
         if !value_part.contains("/*") {
             return false;
@@ -143,7 +144,7 @@ impl<'a> Printer<'a> {
         // (`url(a/*b)`) the `/*` is literal, not a comment start. Lex the value and look
         // for an actual `Comment` token (the lexer consumes String/Url tokens whole), so
         // the naive substring scan can't false-positive there.
-        let mut lexer = Lexer::new(value_part);
+        let mut lexer = Lexer::at_offset(value_part, decl.span.start as usize + value_start);
         loop {
             match lexer.next_token() {
                 Ok(t) if t.kind == TokenKind::Comment => return true,
@@ -189,7 +190,7 @@ impl<'a> Printer<'a> {
             return 0;
         }
         let text = Span::new(start, span.end).extract(self.source);
-        let mut lexer = Lexer::new(text);
+        let mut lexer = Lexer::at_offset(text, start as usize);
         let mut paren_depth: u32 = 0;
         let mut count = 0usize;
         // End of the previous depth-0 token, and whether it was a comment — a token
@@ -247,7 +248,7 @@ impl<'a> Printer<'a> {
     /// free, so the predicate path can ask the question as cheaply as the emit path.
     pub(crate) fn leading_value_comment_run(&self, value_span: Span) -> Option<(Span, u32)> {
         let text = value_span.extract(self.source);
-        let mut lexer = Lexer::new(text);
+        let mut lexer = Lexer::at_offset(text, value_span.start as usize);
         let mut run_end = None;
         loop {
             let token = lexer.next_token().ok()?;

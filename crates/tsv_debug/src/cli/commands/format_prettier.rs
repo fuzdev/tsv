@@ -33,19 +33,15 @@ pub struct FormatPrettierCommand {
 impl FormatPrettierCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let show_line_widths = !self.no_line_widths;
-        let input_args = InputArgs {
-            content: self.content,
-            stdin: self.stdin,
-            parser: self.parser,
-            file: self.file,
-        };
-        let (input, parser_type) = match input_args.resolve() {
-            Ok(pair) => pair,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+        let (input, parser_type) = super::resolve_input_or_fail(
+            InputArgs {
+                content: self.content,
+                stdin: self.stdin,
+                parser: self.parser,
+                file: self.file,
+            },
+            CliError::Failed,
+        )?;
 
         let rt = super::create_runtime();
         rt.block_on(run(&input, parser_type, show_line_widths))

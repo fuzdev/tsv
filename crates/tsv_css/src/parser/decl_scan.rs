@@ -232,14 +232,15 @@ pub(super) fn scan_rule_or_declaration(
             {
                 // An `Err` here fails the assert too, and must: it would mean the byte scan
                 // accepted input the lexer rejects.
-                let expected = scan_rule_or_declaration_tokens(source, from);
+                let expected = scan_rule_or_declaration_tokens(source, parser.base_offset(), from);
                 assert!(
                     expected.as_ref().is_ok_and(|expected| *expected == is_rule),
                     "rule-or-declaration byte scan disagreed with the token walk at {from}: \
                      scan said {is_rule}, walk said {expected:?}"
                 );
                 if let Disambiguation::Declaration { value_start, facts } = &outcome {
-                    let expected_facts = scan_value_tokens(source, *value_start);
+                    let expected_facts =
+                        scan_value_tokens(source, parser.base_offset(), *value_start);
                     assert!(
                         expected_facts
                             .as_ref()
@@ -258,20 +259,24 @@ pub(super) fn scan_rule_or_declaration(
         None => {
             // The byte scan declined; `parse_declaration` re-scans the value itself.
             parser.stash_value_facts(None);
-            scan_rule_or_declaration_tokens(source, from)
+            scan_rule_or_declaration_tokens(source, parser.base_offset(), from)
         }
     }
 }
 
 /// The reference: the disambiguation as a token walk, on its own lexer.
 ///
-/// ⚠️ Lexes a **slice** (`source[from..]`), not the whole source from an offset. The two are
-/// interchangeable for the verdict — this walk reads only token *kinds* — but not for a lexer
-/// **error**, whose position would then be absolute rather than slice-relative. A declaration
-/// whose value holds a stray backtick reports that position, so the slice is load-bearing:
-/// swapping it to a `seek` silently moves the caret in every such error.
-fn scan_rule_or_declaration_tokens(source: &str, from: usize) -> Result<bool, ParseError> {
-    let mut lexer = Lexer::new(&source[from..]);
+/// Lexes a **slice** (`source[from..]`) rather than seeking into the whole source: the two
+/// are interchangeable for the verdict, since this walk reads only token *kinds*, and for a
+/// lexer **error** too — the lexer carries the slice's own offset (`base_offset + from`),
+/// so a declaration whose value holds a stray backtick reports the same document position
+/// from either shape.
+fn scan_rule_or_declaration_tokens(
+    source: &str,
+    base_offset: usize,
+    from: usize,
+) -> Result<bool, ParseError> {
+    let mut lexer = Lexer::at_offset(&source[from..], base_offset + from);
     // `u32` so an unbalanced close saturates at zero — see `scan_value_tokens`.
     let mut paren: u32 = 0;
     loop {
@@ -356,7 +361,7 @@ pub(super) fn scan_value(
             {
                 // An `Err` here fails the assert too, and must: it would mean the byte scan
                 // accepted a value the lexer rejects, silently dropping a parse error.
-                let expected = scan_value_tokens(source, value_start);
+                let expected = scan_value_tokens(source, parser.base_offset(), value_start);
                 assert!(
                     expected.as_ref().is_ok_and(|expected| *expected == facts),
                     "declaration value byte scan disagreed with the token walk at \
@@ -365,7 +370,7 @@ pub(super) fn scan_value(
             }
             Ok(facts)
         }
-        None => scan_value_tokens(source, value_start),
+        None => scan_value_tokens(source, parser.base_offset(), value_start),
     }
 }
 
@@ -681,16 +686,20 @@ fn trim_end(bytes: &[u8], from: usize, to: usize) -> usize {
 /// The reference: the value loop as a token walk, on its own lexer.
 ///
 /// This is the contract `scan_value_bytes` must reproduce, and the path every value the
-/// byte scan declines still takes — so lexer errors (and their exact positions) stay
-/// exactly where they were.
+/// byte scan declines still takes — so a lexer error, and its exact position, is raised
+/// here rather than by the byte scan.
 ///
-/// ⚠️ Seeks into the **whole source**, unlike [`scan_rule_or_declaration_tokens`], which lexes
-/// a slice. The asymmetry is not an oversight: this walk stands in for one the *parser* used
-/// to drive on its own lexer, so its error positions are source-absolute, while the rule walk
-/// stands in for a temp lexer over a slice, whose error positions are slice-relative. Each
-/// must keep the coordinates its caller already reports.
-fn scan_value_tokens(source: &str, value_start: usize) -> Result<ValueFacts, ParseError> {
-    let mut lexer = Lexer::new(source);
+/// Seeks into the **whole source**, unlike [`scan_rule_or_declaration_tokens`], which lexes
+/// a slice. The asymmetry is shape only: this walk stands in for one the *parser* used to
+/// drive on its own lexer, the rule walk for a temp lexer over a slice. Both report a lexer
+/// error at the same document position, since each lexer carries the offset of what it
+/// scans.
+fn scan_value_tokens(
+    source: &str,
+    base_offset: usize,
+    value_start: usize,
+) -> Result<ValueFacts, ParseError> {
+    let mut lexer = Lexer::at_offset(source, base_offset);
     lexer.seek(value_start);
 
     let mut has_comment = false;
