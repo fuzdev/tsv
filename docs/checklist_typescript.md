@@ -255,6 +255,7 @@ written in the flags position) is not a flags production at all and is rejected,
 ### Comma Operator
 
 - Sequence expressions (`a, b, c`)
+- Operand breaking on print width, keyed on the parent position (statement / `for` head indent their continuations, a `return`/`throw` argument and an arrow body hang inside the parens, everything else aligns)
 
 ### Arrow Functions
 

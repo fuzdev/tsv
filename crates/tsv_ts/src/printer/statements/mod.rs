@@ -26,6 +26,7 @@ use super::LeadingGlue;
 use super::ParenContext;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
+use super::expressions::operators::SeqLayout;
 use crate::ast::internal::{self, Expression, Statement};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -210,7 +211,17 @@ impl<'a> Printer<'a> {
                 self.expr_stmt_paren_target.set(nested_paren);
                 self.is_expression_statement.set(true);
                 self.in_top_level_assignment.set(true);
-                let doc = self.build_expression_doc(&stmt.expression);
+                let doc = match &stmt.expression {
+                    // One of prettier's two `printSequenceExpression` parent arms (the `for`
+                    // head is the other): the operands after the first take a continuation
+                    // indent. Claimed here rather than in the expression dispatch because
+                    // that is where the parent is known — a sequence nested deeper inside
+                    // this statement is an ordinary operand and keeps the default layout.
+                    Expression::SequenceExpression(seq) => {
+                        self.build_sequence_doc(seq, SeqLayout::Indented)
+                    }
+                    expr => self.build_expression_doc(expr),
+                };
                 self.in_top_level_assignment.set(false);
                 self.is_expression_statement.set(false);
                 self.expr_stmt_paren_target.set(None);

@@ -23,11 +23,11 @@ mod conditional;
 pub(in crate::printer) mod functions;
 pub(crate) mod literals;
 mod objects;
-mod operators;
+pub(in crate::printer) mod operators;
 mod patterns;
 mod template_literal;
 
-use self::operators::OperatorBuf;
+use self::operators::{OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
 use crate::printer::decorators::DecoratorHost;
@@ -175,6 +175,14 @@ impl<'a> Printer<'a> {
             let doc = self.build_binary_chain_doc_with_continuation_indent(binary);
             return self.prepend_owned_leading_comment(expr, doc);
         }
+        // ⚠️ A SEQUENCE root deliberately does NOT join the binary here, though it is the
+        // same shape of chain: prettier's svelte expression-root wrapper reaches the
+        // continuation indent through the binaryish parent rule, which a sequence's
+        // `group(join([",", line]))` never consults — so prettier breaks `{(a,⏎b)}` flush
+        // and tsv matches it. The `{#if …}` head then inherits the flush form as well,
+        // where tsv breaks and prettier overflows the line: the divergence there is
+        // WHETHER to break, and keeping prettier's geometry is what stops it becoming a
+        // divergence about shape too.
         self.build_expression_doc(expr)
     }
 
@@ -250,7 +258,11 @@ impl<'a> Printer<'a> {
             Expression::TaggedTemplateExpression(tagged) => self.build_tagged_template_doc(tagged),
             Expression::AwaitExpression(await_expr) => self.build_await_doc(await_expr),
             Expression::YieldExpression(yield_expr) => self.build_yield_doc(yield_expr),
-            Expression::SequenceExpression(seq) => self.build_sequence_doc(seq),
+            // Prettier's default layout arm. The three positions that take another
+            // (`ExpressionStatement`, the `for` head, a `return`/`throw` argument or arrow
+            // body) intercept their sequence before this dispatch, since the layout is the
+            // parent's question and this dispatch cannot see one.
+            Expression::SequenceExpression(seq) => self.build_sequence_doc(seq, SeqLayout::Aligned),
             Expression::RegexLiteral(regex) => self.build_regex_doc(regex),
             Expression::ThisExpression(_) => d.text("this"),
             Expression::Super(_) => d.text("super"),

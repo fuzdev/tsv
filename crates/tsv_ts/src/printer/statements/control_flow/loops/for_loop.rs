@@ -937,24 +937,38 @@ impl<'a> Printer<'a> {
     /// inter-operand comma gaps — a same-line block leads the next operand inline
     /// (`, /* c */ b`), a line comment trails the comma and forces the per-operand
     /// break (`a, // c⏎\tb`) — the same gap handling as a multi-declarator init
-    /// clause (`push_for_clause_comma_gap`). The comment-free case stays a flat
-    /// `", "` join. `build_elem` renders one operand: the init clause wraps it in
-    /// `wrap_for_init_in` for the `[~In]` restriction, the update clause does not.
+    /// clause (`push_for_clause_comma_gap`). `build_elem` renders one operand: the init
+    /// clause wraps it in `wrap_for_init_in` for the `[~In]` restriction, the update
+    /// clause does not.
+    ///
+    /// The `for` head is one of prettier's two parent-keyed
+    /// `printSequenceExpression` arms (`ExpressionStatement` is the other): operands
+    /// after the first take a continuation indent when the clause breaks, and no parens
+    /// are added (`needs-parentheses.js` excludes a `ForStatement` parent). The
+    /// separator is the comma gap's own `,` + `line`, so a clause too wide for the
+    /// header breaks per operand instead of running past the print width.
+    ///
+    /// ⚠️ **This is a THIRD sequence printer**, beside `operators.rs`'s
+    /// `build_sequence_doc_inner` and its line-comment twin, and it stays separate on
+    /// purpose: the head's comma gaps take the DECLARATOR's comment rules
+    /// ([`Printer::push_for_clause_comma_gap`], shared with a multi-declarator init) rather
+    /// than the sequence printer's own, and `build_elem` carries the init clause's `[~In]`
+    /// wrap. Only the geometry is common — `SeqLayout::Indented` is the same shape this
+    /// builds by hand — so a change to how a sequence BREAKS belongs in both, while a change
+    /// to how its comments bind does not.
     ///
     /// Before this, both sequence branches emitted a comment-blind `", "` join,
     /// silently dropping every inter-operand comment (`for (a = 1, /* c */ b = 2;
-    /// …)` lost `/* c */`).
+    /// …)` lost `/* c */`). The comment-FREE fast path kept that join until the width
+    /// fix; it was the same doc the loop below builds when every gap is bare
+    /// ([`Printer::push_for_clause_comma_gap`] emits exactly `,` + `line` there), so it
+    /// is gone rather than duplicated.
     fn build_for_sequence_clause_doc(
         &self,
         seq: &internal::SequenceExpression<'_>,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
         let d = self.d();
-        let first = seq.expressions[0].span().start;
-        let last = seq.expressions[seq.expressions.len() - 1].span().end;
-        if !self.has_comments_to_emit_between(first, last) {
-            return d.join(seq.expressions.iter().map(&build_elem), ", ");
-        }
         let mut docs = DocBuf::new();
         for (i, e) in seq.expressions.iter().enumerate() {
             let frozen = if i > 0 {

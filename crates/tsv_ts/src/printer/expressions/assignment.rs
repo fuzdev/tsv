@@ -155,6 +155,15 @@ pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> boo
 ///
 /// Follows prettier's `chooseLayout` logic in assignment.js
 ///
+/// ⚠️ **The declarator has a hand-rolled TWIN of this dispatch** — `variable.rs`'s
+/// `should_break_after_op_rhs` / `needs_break_after_op_layout` / `needs_fluid_for_breakable_lhs`
+/// chain, which answers the same prettier function for `const x = …` and reaches arms this one
+/// does not (a module-path call, a pure property chain, an expandable member call). The two are
+/// not interchangeable, and they DRIFT: the sequence arm below was here from the start and
+/// missing there, so `const a = (a, b)` hung its operands off the `=` column while `x = (a, b)`
+/// broke correctly. Add a `chooseLayout` fact to one and check the other — same standing hazard
+/// as the two call-argument printers.
+///
 /// `is_short_key`: True for property keys shorter than `tabWidth + MIN_OVERLAP_FOR_BREAK`.
 /// Short keys don't benefit from breaking after the colon. For non-property assignments
 /// (e.g., `x = value`), pass `false`.

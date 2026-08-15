@@ -228,7 +228,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// author glued onto one line and tsv split onto two. That run's separator now asks the
 	// source (docs/comments.md §Trailing and dangling runs), so a glued pair keeps its line as
 	// it does in prettier. Both files leave `known` — the count that moves against this one.
-	typescript: 2334,
+	//
+	// 2334 → 2335: `prettier/tests/format/js/sequence-break/break.js`, which leaves `unknown`
+	// by matching once a sequence breaks on width. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`,
+	// which moves the other way in the same step.
+	typescript: 2335,
 	css: 89
 };
 
@@ -333,7 +337,19 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// HEAD-source rebuild over the full corpus: this file is the ONLY move in any bucket —
 	// nothing arrived in `unknown`, and `partial` / `safety` / `errors` / `expected_errors`
 	// are byte-identical.
-	typescript: 109,
+	//
+	// 109 → 108: `js/sequence-break/break.js` LEAVES the bucket by MATCHING (`match` 4356 →
+	// 4357) — prettier's own adversarial test for sequence breaking, whose every case is a
+	// sequence too wide for its line. A `SequenceExpression` now joins its operands with
+	// `,` + `line` under prettier's three parent-keyed layouts rather than a flat `", "` that
+	// could never break (`printSequenceExpression`; `SeqLayout` in
+	// `printer/expressions/operators.rs`). The file's own residue was the `Indented` arm's
+	// indent SCOPE: wrapping the whole run also indents the lines a first operand breaks
+	// ITSELF (`((a = b ? c : fn()), …)`), where prettier indents only the continuations —
+	// which is why the arm splits the run rather than wrapping it. Measured over the full
+	// corpus: this file is the only move in any bucket, and `partial` / `safety` / `errors` /
+	// `expected_errors` are unchanged.
+	typescript: 108,
 	css: 23
 };
 
