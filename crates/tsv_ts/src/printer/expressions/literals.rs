@@ -481,7 +481,9 @@ impl<'a> Printer<'a> {
 
         // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before).
         // A single-line block glued to `...` hugs the argument even across a source
-        // newline (`.../* c */⏎arg` → `.../* c */ arg`), matching prettier.
+        // newline (`.../* c */⏎arg` → `.../* c */ arg`), matching prettier — the
+        // argument that would BREAK took the gate above; only the fits case reaches
+        // this hug.
         let comment_doc = self.build_rhs_comments_glued_opt(dots_end, arg_start);
 
         let prefix = if needs_parens { "...(" } else { "..." };
