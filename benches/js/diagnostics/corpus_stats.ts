@@ -92,7 +92,7 @@ function stats_of(files: SourceFile[]): Stats {
  * Format a corpus size, binary units (`B`/`KB`/`MB`, 1024-based) — every number
  * this tool prints, from one file to the whole corpus.
  *
- * NOT `binary_sizes.ts`'s exported `format_bytes`, which is decimal (1000-based)
+ * NOT `binary_sizes.ts`'s `format_bytes`, which is decimal (1000-based)
  * because it sizes shipped artifacts, and not `corpus_compare_format.ts`'s
  * `format_source_size`, which is binary like this one but unspaced and never
  * reaches MB. Three formats over two conventions, so each name says which — a

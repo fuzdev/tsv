@@ -247,8 +247,10 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 }
 
 /** Path to the executed WASM bundle's compiled `.wasm` for the given variant —
- * the runtime's own wasm-pack target (Deno → `deno`, Node/Bun → `nodejs`). */
-export function wasm_artifact_path(variant: 'format' | 'parse' | 'all'): string {
+ * the runtime's own wasm-pack target (Deno → `deno`, Node/Bun → `nodejs`).
+ * Module-local since `check_executed_artifacts` below became the one caller; the
+ * entry points ask for the CHECK, not for a path to assemble one from. */
+function wasm_artifact_path(variant: 'format' | 'parse' | 'all'): string {
 	return fileURLToPath(
 		new URL(
 			`../../../crates/tsv_wasm/pkg/${variant}/${wasm_target()}/tsv_wasm_bg.wasm`,

@@ -476,8 +476,18 @@ export async function collect_binary_sizes(
 	};
 }
 
-/** Format bytes as human-readable size */
-export function format_bytes(bytes: number): string {
+/**
+ * Format an ARTIFACT size, decimal units (`B`/`KB`/`MB`, 1000-based).
+ *
+ * Module-local, and the counterpart to the harness's two SOURCE-size formatters —
+ * `corpus_compare_format.ts`'s `format_source_size` and
+ * `diagnostics/corpus_stats.ts`'s `format_corpus_size`, both binary (1024-based).
+ * Three formatters over two conventions, each named for the thing it sizes, so a
+ * reader doesn't carry one module's answer over to another. Those two were named
+ * `format_bytes` too until the collision made that carry-over easy; this one is
+ * unexported so a fourth can't reintroduce it by importing.
+ */
+function format_bytes(bytes: number): string {
 	if (bytes >= 1_000_000) {
 		return `${(bytes / 1_000_000).toFixed(1)} MB`;
 	} else if (bytes >= 1_000) {

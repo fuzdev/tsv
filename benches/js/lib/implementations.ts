@@ -190,30 +190,6 @@ export interface InitOptions {
 }
 
 /**
- * Initialize one OPTIONAL implementation, returning it on success and `undefined`
- * when it isn't available on this machine.
- *
- * Every alternative impl is optional in the same way — a missing platform binding,
- * an uninstalled package, a runtime that can't load a given wasm entry — so they
- * all want this exact try/catch. Sharing it is what keeps a new impl from arriving
- * with a subtly different failure posture (swallowing where the others rethrow,
- * say). There is no opt-out: a caller that wants the full set asserts on the
- * returned `unavailable` list, which names what is missing and why — better than a
- * throw that reports only the first absence.
- *
- * `label` is the success line; `missing_label` names the impl in the ⚠ line when it
- * reads differently there (the ✓ lines carry a parenthetical the ⚠ lines don't).
- *
- * Each absence is also pushed to `unavailable`, which reaches the report JSON. The
- * ⚠ line alone lives in the terminal scroll: an impl that stops loading drops its
- * ROW from every table, and a reader diffing the committed report would see the
- * column disappear with nothing saying why. Same disclosure posture as
- * `suppressed_noise` and `variant_parity` in `bench.ts`.
- *
- * `key` rides along for that record — the failure has to be joinable back to the
- * rows it cost, and the display label can't do it (see `UnavailableImpl`).
- */
-/**
  * Initialize one REQUIRED implementation, rethrowing when it can't load.
  *
  * Three impls take this path: `canonical` (the oracle every comparison is
@@ -248,6 +224,30 @@ async function init_required<T extends { init: () => Promise<void> }>(
 	}
 }
 
+/**
+ * Initialize one OPTIONAL implementation, returning it on success and `undefined`
+ * when it isn't available on this machine.
+ *
+ * Every alternative impl is optional in the same way — a missing platform binding,
+ * an uninstalled package, a runtime that can't load a given wasm entry — so they
+ * all want this exact try/catch. Sharing it is what keeps a new impl from arriving
+ * with a subtly different failure posture (swallowing where the others rethrow,
+ * say). There is no opt-out: a caller that wants the full set asserts on the
+ * returned `unavailable` list, which names what is missing and why — better than a
+ * throw that reports only the first absence.
+ *
+ * `label` is the success line; `missing_label` names the impl in the ⚠ line when it
+ * reads differently there (the ✓ lines carry a parenthetical the ⚠ lines don't).
+ *
+ * Each absence is also pushed to `unavailable`, which reaches the report JSON. The
+ * ⚠ line alone lives in the terminal scroll: an impl that stops loading drops its
+ * ROW from every table, and a reader diffing the committed report would see the
+ * column disappear with nothing saying why. Same disclosure posture as
+ * `suppressed_noise` and `variant_parity` in `bench.ts`.
+ *
+ * `key` rides along for that record — the failure has to be joinable back to the
+ * rows it cost, and the display label can't do it (see `UnavailableImpl`).
+ */
 async function init_optional<T extends { init: () => Promise<void> }>(
 	impl: T,
 	key: ImplKey,

@@ -652,7 +652,11 @@ Each runtime saves to `benches/js/results/` as timestamped files plus a committe
 never clobbers the perf reports and is invisible to `bench:compose` (which globs the
 exact perf filenames). To publish to tsv.fuz.dev, run `npm run update-benchmarks` in
 `~/dev/tsv.fuz.dev` — its copy list names these files exactly, so renaming a report
-artifact means updating that script in the same change.
+artifact means updating that script in the same change. Its
+`src/routes/docs/benchmarks/benchmark_data.ts` likewise MIRRORS the JSON shape
+below, field for field and version note for version note, so a new top-level field
+here is a change there too — it declares them optional and degrades on an older
+report, which is what makes the drift silent rather than loud.
 
 The committed JSON (per-runtime `version: 12` — the combined compose report carries its
 own `version: 9`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
@@ -1082,9 +1086,11 @@ and skip counts make it visible without `--verbose`.
   function`: it declares an alpha `@emnapi/core` that npm installs NESTED, while the
   hoisted `@napi-rs/wasm-runtime` it also imports resolves the hoisted 1.x, so the
   two halves disagree). Same shape as the two per-runtime load failures above but on
-  the VERSION axis, and equally silent: an unloadable impl is absent, not fatal, so
-  the row simply leaves both surfaces' tables. Re-probe before raising the pin
-  (../../docs/benchmarks.md §Updating dependencies carries the command); hoisting
+  the VERSION axis, and equally silent in the TABLES: an unloadable impl is absent,
+  not fatal, so the row simply leaves both surfaces — only `unavailable` records the
+  cause. Probe the CANDIDATE binding before raising the pin
+  (../../docs/benchmarks.md §Updating dependencies carries the commands — a bare
+  import resolves the INSTALLED binding and so always passes); hoisting
   the alpha to the tree root works and was deliberately declined.
 - **TypeScript canonical parser**: acorn-typescript fails on some modern syntax
   (files skipped) — and the reverse, files tsv fails that acorn accepts, is a known
@@ -1122,6 +1128,17 @@ command); the table is the index. Some import the canonical parser / oracle
 benches/js/deno.json` to resolve them from `node_modules`; all run from the repo
 root (corpus/artifact paths are CWD-relative). The usual permission set is
 `--allow-ffi --allow-read --allow-env --allow-net --allow-sys`.
+
+**Any diagnostic that calls `init_implementations` needs BOTH tsv artifacts built**
+— the runtime's native binding *and* its `pkg/all/<target>` WASM bundle — because
+those two plus `canonical` are REQUIRED and a load failure in any of them throws
+(§Report files). That includes the ones that measure only the native path
+(`no_locations_parity`, `reconstruct_vs_materialize`, `skip_triage`), where an
+unbuilt bundle otherwise fails a run that would never have touched it, with a WASM
+error naming nothing the script is about: `deno task build:ffi && deno task
+build:wasm:all:deno` first (these three read the `release` FFI, not `corpus`). The
+two with `deno task` entries — `css:over-acceptance` and `ts-repo:over-acceptance`
+— build what they need themselves.
 
 Six live here but are documented above: the parse-conformance gates
 (`svelte_fixtures_compare.ts`, `ts_fixtures_compare.ts`, `ts_repo_compare.ts` →

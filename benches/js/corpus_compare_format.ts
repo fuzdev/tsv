@@ -98,7 +98,7 @@ interface CompareResult {
  * Format a source file's size, binary units (`B`/`KB`, 1024-based) — corpus files
  * are KB-scale, so this never reaches MB.
  *
- * NOT `binary_sizes.ts`'s exported `format_bytes`, which is decimal (1000-based)
+ * NOT `binary_sizes.ts`'s `format_bytes`, which is decimal (1000-based)
  * and MB-first because it sizes shipped artifacts. Two conventions, deliberately:
  * the name here says which one, so a reader doesn't carry the other module's
  * answer over.
