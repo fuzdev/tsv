@@ -11,6 +11,10 @@
 // 2. **Grouping** (analysis.rs): Group nodes by natural break points
 //    - First group: base + calls + non-null + numeric accessors + consecutive members
 //    - Remaining groups: members* + calls*, break at memberish after call
+//    - A member whose gap holds a LINE comment always starts a group (prettier's
+//      trailing-comment group split; the factory merge is refused for one too):
+//      only a group's first member reaches the chain-level gap emitters, a member
+//      printed inside a group can only defer the `//` to the line end
 //
 // 3. **Doc Building** (builder/): Build conditional docs with various break strategies
 //    - Member-only chains: use fill() for greedy packing

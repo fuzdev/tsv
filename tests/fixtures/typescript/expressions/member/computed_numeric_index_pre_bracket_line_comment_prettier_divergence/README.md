@@ -7,14 +7,20 @@ of [computed_pre_bracket_line_comment](../computed_pre_bracket_line_comment_pret
 The index kind is the whole point. Following prettier's member-chain grouping, a
 computed access with a numeric-literal index is **glued into the preceding call's
 group** instead of starting a new one — so, unlike every other member, no chain group
-begins at its `[`, and nothing in the chain builder owns the gap before it. That gap is
-the one place a chain's line comment could still be deferred to end of line.
+would begin at its `[`, and nothing in the chain builder would own the gap before it:
+the one place a chain's line comment could be deferred to end of line. tsv's grouping
+therefore lets a line comment in that gap start a group (prettier's own rule — a node
+with a trailing comment closes its group), and the trailing group's forced pre-bracket
+break then renders inside the chain's indent.
 
 **tsv** breaks the chain and keeps each comment where the author wrote it, exactly as
 it does for a non-numeric index: an own-line comment keeps its own line before the `[`,
 a same-line comment trails the call (case `c`), and two comments in one gap stay
-distinct and in order (case `b`). The compact authoring
-(`unformatted_ours_compact`) converges to `input.svelte` in one pass.
+distinct and in order (case `b`). The rule does not depend on chain length: on a
+**short** chain — a lone call base (`fn()`), an identifier base (`arr`), a same-line
+comment, statement position (cases `d`–`g`) — the comment and the bracket still indent
+one level below the base, exactly as an identifier index (`[i]`) does. The compact
+authoring (`unformatted_ours_compact`) converges to `input.svelte` in one pass.
 
 **Prettier** has no fixed point here at all — see `prettier_nonconvergent.txt`. It
 relocates the comment *inside* the brackets (`foo.bar().baz()[// c1`, with `0];` on the

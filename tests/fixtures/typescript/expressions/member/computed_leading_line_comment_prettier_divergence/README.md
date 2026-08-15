@@ -20,6 +20,17 @@ trailing the `[` — the open-delimiter-trailing rule
 ([conformance_prettier_ts_comments.md §Object/array/block open-delimiter trailing](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)) —
 while prettier relocates it to trail the object (`arr // c⏎[i]`).
 
+The rule holds **inside a call chain** too, on the one accessor kind the chain
+grouping otherwise glues into the preceding group: a numeric index (`arr.foo()[ // c4`).
+A `//` anywhere in that node's gap — the pre-bracket region *or* the bracket interior —
+makes the accessor start its own chain group (`group_chain_nodes`), and the
+open-delimiter-trailing rule then applies unchanged. The pre-bracket half of that gap has
+its own fixture ([computed_numeric_index_pre_bracket_line_comment](../computed_numeric_index_pre_bracket_line_comment_prettier_divergence/));
+this case is the interior half. An **own-line** comment in the brackets of a *chained*
+accessor is left uncovered on purpose — it breaks the chain, and prettier is
+non-idempotent on its own output there, so pinning it means an `audit_signature` chain
+claim that has nothing to do with this fixture's subject.
+
 ## Reason
 
 Per Comment Position Philosophy, tsv keeps the comment where the author wrote it

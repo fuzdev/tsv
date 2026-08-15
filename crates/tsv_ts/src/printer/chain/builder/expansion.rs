@@ -12,7 +12,7 @@ use crate::printer::calls::arg_predicates::is_simple_call_argument;
 use super::super::printing::node_comment_gap;
 use super::super::types::{ChainGroup, ChainNode};
 use crate::printer::Printer;
-use tsv_lang::comments_to_emit_in_range;
+use tsv_lang::comments_on_page_in_range;
 use tsv_lang::printing::{self, has_blank_line_between_fast};
 
 /// Check if there are blank lines BETWEEN methods (not just before the first method)
@@ -47,6 +47,7 @@ pub(super) fn has_blank_lines_between_methods<'a>(
 /// Returns true if comments exist that should force expansion.
 pub(super) fn has_comments_forcing_expansion<'a>(
     groups: &[ChainGroup<'a>],
+    chain_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
     for (group_idx, group) in groups.iter().enumerate() {
@@ -70,10 +71,17 @@ pub(super) fn has_comments_forcing_expansion<'a>(
             //   into ONE comment (`fn().bar; // c3 // c4`), the second `//` becoming
             //   text inside the first. The chain expands and the gap emitters put each
             //   comment in place — the shape every longer chain already takes
-            //   (trailing_member_short_chain_line_comment).
+            //   (trailing_member_short_chain_line_comment). A SAME-LINE `//` joins it
+            //   whenever something else would reach the line its deferral takes — a
+            //   comment behind it in the same gap (`fn()// c⏎/* c1 */⏎.bar`, which the
+            //   flat path would REORDER) or a trailer past the chain
+            //   (`fn()// c⏎.bar; // c1`, which would WELD) — see
+            //   `trailing_member_gap_line_comment`.
             let is_last_node_in_last_group =
                 is_last_group && node_idx == group.nodes.len() - 1 && node.is_member();
-            if is_last_node_in_last_group && !trailing_member_gap_line_comment(node, printer) {
+            if is_last_node_in_last_group
+                && !trailing_member_gap_line_comment(node, chain_end, printer)
+            {
                 continue;
             }
 
@@ -93,25 +101,73 @@ pub(super) fn has_comments_forcing_expansion<'a>(
 /// The bar differs by member kind, because what the flat layout does with the comment
 /// differs:
 ///
-/// - **computed** (`a.b()⏎// c⏎[0]`): ANY line comment forces — the gap is one a chain
-///   builder never owns (a computed member with a numeric-literal index is glued into
-///   the preceding call's group instead of starting one), and `print_node_inner` emits
-///   a forced break for it, since a deferred `//` would swallow the `[i]` printed
-///   after it.
-/// - **plain** (`fn()⏎// c⏎.bar`): only an OWN-LINE line comment forces (own-line
-///   against the gap's start — the object's printed end). A lone same-line `//` stays
-///   on the flat path, whose `line_suffix` deferral past the member is the sanctioned
+/// - **computed** (`a.b()⏎// c⏎[0]`): ANY line comment forces — the trailing group
+///   prints with no chain-level break of its own, so `print_node_inner` emits a
+///   forced break for the gap, since a deferred `//` would swallow the `[i]` printed
+///   after it; the chain must expand around that break (left flat, the hardline
+///   lands in the one-line variant and renders unindented).
+/// - **plain** (`fn()⏎// c⏎.bar`): an OWN-LINE line comment forces (own-line against
+///   the gap's start — the object's printed end). A lone same-line `//` stays on the
+///   flat path, whose `line_suffix` deferral past the member is the sanctioned
 ///   collapse (`fn().bar; // c`); an own-line `//` deferred the same way would lose
 ///   its authored line and weld behind a same-line one.
-fn trailing_member_gap_line_comment<'a>(node: &ChainNode<'a>, printer: &Printer<'_>) -> bool {
+///
+/// The collapse's licence is that the deferral is **lossless**, and it stops exactly
+/// where that stops — so a SAME-LINE `//` forces too, in the two places something else
+/// can reach the line it is about to take:
+///
+/// 1. **another comment in the same gap**, behind it. The flat path emits the follower
+///    *inline* while the `//` is deferred, so the run comes out REORDERED and the
+///    follower loses its authored line (`fn() // c1⏎/* c2 */⏎.bar` →
+///    `fn() /* c2 */.bar; // c1`). Asked on the **on-page** axis: a follower glued to
+///    the property is *owned* by it — printed by the member's own doc rather than by
+///    this gap, which does not spare it from landing ahead of the deferred comment
+///    (trailing_member_gap_comment_run).
+/// 2. **a trailer past the chain**, read from the chain's source end through any
+///    closing punctuation (`fn()// c⏎.bar⏎); // c1` — the expanded layout's own
+///    reprint puts `);` on a later line, so a same-line read would collapse it back on
+///    pass two), in-source axis. Both would flush at one line end, welding
+///    (`fn().bar; // c // c1`, the second `//` becoming text of the first) or
+///    reordering past a block (`fn().bar; /* c1 */ // c`). Conservative by design: a
+///    layout break between the two only makes the expansion unneeded, never wrong
+///    (trailing_member_gap_comment_statement_trailer).
+fn trailing_member_gap_line_comment<'a>(
+    node: &ChainNode<'a>,
+    chain_end: u32,
+    printer: &Printer<'_>,
+) -> bool {
     let Some((start, end)) = node_comment_gap(node, printer) else {
         return false;
     };
     if matches!(node, ChainNode::ComputedMember { .. }) {
         return printer.classify_comments(start, end).has_line_comments();
     }
-    comments_to_emit_in_range(printer.comments, start, end)
-        .any(|c| !c.is_block && printer.has_newline_between(start, c.span.start))
+    // ON-PAGE, not to-emit: the question is what will OCCUPY the line, and an owned
+    // block glued to the property (`fn() // c⏎/* c2 */.bar`) occupies it just as much
+    // as an emitted one — it is merely printed by the member's own doc instead of by
+    // this gap, which does not spare it from landing ahead of the deferred `//`.
+    let mut deferred_line_seen = false;
+    for c in comments_on_page_in_range(printer.comments, start, end) {
+        // Anything at all BEHIND a same-line `//` in this gap: the flat path emits the
+        // follower inline while the `//` is deferred to the line end, so the run comes
+        // out REORDERED and the follower loses its authored line. The line-comment
+        // spelling of this is the own-line arm below; a block falls through to here.
+        if deferred_line_seen {
+            return true;
+        }
+        if c.is_block {
+            continue;
+        }
+        if printer.has_newline_between(start, c.span.start) {
+            return true;
+        }
+        deferred_line_seen = true;
+    }
+    // The trailer read asks about the CHAIN's end, not the comment's, so it is
+    // loop-invariant — and only a same-line `//` that survived the scan has anything to
+    // ask it. Kept out of the loop, it runs at most once per chain build, and never at
+    // all for the authorings the arms above already answer.
+    deferred_line_seen && printer.trailer_follows_through_closers(chain_end)
 }
 
 /// Check if a call node has complex (non-simple) arguments

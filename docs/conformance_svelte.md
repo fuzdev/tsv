@@ -825,6 +825,33 @@ see the
 fixture's variants), and the normalized forms parse identically. **Upstream
 candidate**: acorn-typescript decorator subscript start position.
 
+### TypeScript-mode gating (tracked over-acceptance)
+
+The one `_svelte_divergence` entry that is **not** a correction. Svelte decides
+TypeScript **once per document** — `lang="ts"` on any `<script>` sets `parser.ts` — and
+every reader keys on that flag: a plain `<script>` goes to vanilla acorn, the snippet
+reader matches `<` only under `parser.ts`, the block readers hand a typed binding to
+plain acorn, and the expression readers refuse `as` / `satisfies` / `!` / `<T>x`. tsv's
+Svelte parser does not carry the document flag (`component_is_typescript` lives in the
+wire-JSON convert layer, where it shapes the acorn-vs-acorn-typescript emission but
+cannot gate the parse), so it accepts TypeScript in **every** island of a no-`ts`
+document — the script itself, `{#snippet}` heads (generics and typed params),
+`{#each}` / `{#await}` typed bindings, `{@const}` annotations, casts in expression
+tags, attribute values and directives. Svelte rejects each of them, and prettier
+(prettier-plugin-svelte) inherits that verdict, so the fixture pins both oracles'
+failures at once — [script/no_lang_typescript](../tests/fixtures/svelte/script/no_lang_typescript_svelte_prettier_divergence/).
+
+**Tracked, not sanctioned.** Svelte's verdict is the drop-in target and a document with
+no `ts` flag is JavaScript; the fixture is the ledger entry that keeps the over-acceptance
+visible until the parser threads the document flag, at which point it fails and converts
+to an `input_invalid_*` case. It is the parser-level twin of the over-acceptance
+`tsv_svelte_compile` refuses at the compile level ("TypeScript in a document with no `ts`
+flag"), and one class across every TS-bearing position rather than a snippet bug. On the
+robustness bar it is degraded-but-safe: the accepted document formats to a faithful
+reprint of what the author wrote. Svelte's own suite has no no-`ts` TypeScript input, so
+`conformance:svelte-fixtures`' pinned over-acceptance count cannot see it — this fixture
+is its only gate.
+
 ### Upstream Fix Candidates
 
 All corrections exist because of upstream bugs. If fixed upstream, tsv would remove the `_svelte_divergence` suffix, delete `expected_ours.json`, and rename `expected_svelte.json` → `expected.json`.

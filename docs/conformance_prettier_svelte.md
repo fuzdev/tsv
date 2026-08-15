@@ -369,3 +369,18 @@ Same layout inside an inline element (head wraps + body expands, element hugs th
 
 - `{#each as {}}` empty pattern — [destructure_empty](../tests/fixtures/svelte/blocks/each/destructure_empty_prettier_divergence/)
 
+
+## Svelte: prettier inherits Svelte's parse verdict
+
+**◆design_choice** — and a divergence only by inheritance. prettier-plugin-svelte parses
+with Svelte's own parser, so wherever tsv's Svelte parser accepts a document Svelte rejects,
+prettier throws and no format oracle exists. The tsv side is a *parser* fact — a tracked
+over-acceptance, cataloged in
+[conformance_svelte.md §TypeScript-mode gating](./conformance_svelte.md#typescript-mode-gating-tracked-over-acceptance)
+— not a formatting choice; tsv formats the accepted document as a faithful reprint. The
+fixture pins both oracles' failures at once (`expected_svelte.json` = the parse-failure
+marker, `prettier_rejects.txt` = the plugin's throw, live-verified by rule F6) and retires
+with the parser gap: once tsv honors the document's TypeScript flag it rejects the input too,
+and the case converts to `input_invalid_*`.
+
+- TypeScript in a component with no `lang="ts"` (script annotations, generic/typed snippet heads, typed block bindings, casts in expression tags) — `Expected token (` — [script/no_lang_typescript](../tests/fixtures/svelte/script/no_lang_typescript_svelte_prettier_divergence/)

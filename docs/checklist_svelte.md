@@ -260,6 +260,10 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
   which breaks independently of the parameter list)
 - Typed parameters (`{#snippet fn(a: string, b: number)}`)
 - Typed parameter comments (`{#snippet fn(a: T /* c */, b: U)}`)
+- ⚠️ Accepted **without** `lang="ts"` too — Svelte gates every TypeScript reader on the document's
+  `ts` flag and rejects, tsv's parser carries no such flag. A tracked over-acceptance across every
+  TS-bearing template position, pinned by `script/no_lang_typescript_svelte_prettier_divergence`
+  (see [conformance_svelte.md §TypeScript-mode gating](./conformance_svelte.md#typescript-mode-gating-tracked-over-acceptance))
 
 ### Snippet Scope
 
