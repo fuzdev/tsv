@@ -575,10 +575,24 @@ impl<'a> Printer<'a> {
                 // Matches Prettier's shouldBreakAfterOperator: poorly breakable chains,
                 // string literals, etc. These don't break well internally, so the
                 // assignment breaks at `=` with group(indent([line, rightDoc])).
+                //
+                // ⚠️ **This chain is a hand-rolled twin of `assignment.rs::choose_layout`** —
+                // one prettier function answered twice, once for `const x = …` and once for
+                // every other assignment. It reaches arms `choose_layout` does not (the three
+                // chain shapes below), so the two cannot simply be merged — but they DRIFT, and
+                // the sequence arm is the proof: `choose_layout` has had it from the start while
+                // this list did not, so `const a = (a, b)` hung its operands off the `=` column.
+                // A `chooseLayout` fact added to one belongs in both.
                 let should_break_after_op_rhs = (is_module_path_fluid_call(init, self.source)
                     || is_pure_property_chain(init)
                     || is_poorly_breakable_chain(init, self.source, PRINT_WIDTH, self.comments)
                     || is_string_literal(init)
+                    // A SEQUENCE init breaks after the `=` and lays its operands out under
+                    // one indent, prettier's own `shouldBreakAfterOperator` switch arm —
+                    // the same fact `choose_layout` states for the assignment-RHS twin.
+                    // Without it the sequence's internal break satisfies the fluid layout's
+                    // fits() and the operands hang off the `=` column instead.
+                    || matches!(init, Expression::SequenceExpression(_))
                     || matches!(init, Expression::RegexLiteral(_)))
                     && is_layout_eligible;
 

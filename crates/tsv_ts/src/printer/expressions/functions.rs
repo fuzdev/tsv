@@ -10,6 +10,7 @@ use crate::ast::internal;
 use crate::printer::ArrowChainContext;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
+use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::statements::function::FunctionHeadModifier;
@@ -443,7 +444,14 @@ impl<'a> Printer<'a> {
 
         if has_trailing_paren_comments {
             let body_start = expr.span().start;
-            let body_doc = self.build_expression_doc_keep_paren_comments(expr, arrow.span.end);
+            // A sequence body hangs (prettier's `shouldIndentSequenceExpression`) — the
+            // same answer the comment-free arrow-body path gives; this arm reaches the
+            // sequence through the retained-paren helper, so it names the layout itself.
+            let body_doc = self.build_expression_doc_keep_paren_comments(
+                expr,
+                arrow.span.end,
+                SeqLayout::Hanging,
+            );
             // This arm reassembles the body — it wraps the retained parens itself — so it
             // must answer the `=>`→body gap on its own, exactly as the cascade below does.
             // Emitting the run inline unconditionally is the blind-twin bug that costs a
@@ -510,11 +518,21 @@ impl<'a> Printer<'a> {
                 if self.arrow_trailing_param_comment_forces_break(body_arrow)
         );
 
+        // Prettier's `shouldAlwaysAddParens` — the first disjunct of its
+        // `shouldPutBodyOnSameLine`, and a different question from
+        // `mayBreakAfterShortPrefix` above: a SEQUENCE body hugs the `=>` "so that the
+        // required parentheses end up on their own lines" (arrow-function.js). Its parens
+        // are the sequence's own hanging layout ([`SeqLayout::Hanging`]); breaking after the
+        // `=>` instead would put the `(` on the body's line and lose that shape.
+        let is_sequence_body = matches!(expr, internal::Expression::SequenceExpression(_));
+
         // Inline block comments don't prevent hugging — only own-line comments do.
         // `() => /* comment */ ({...})` hugs (inline block comment)
         // `() =>\n  /* comment */\n  ({...})` breaks (own-line comment)
         let should_hug = !has_own_line_comment
-            && (should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr))
+            && (is_sequence_body
+                || should_hug_arrow_body(expr)
+                || is_template_on_same_line(self.source, expr))
             && !chain_has_return_type
             && !body_arrow_param_comment_forces_break;
 
@@ -1535,6 +1553,14 @@ impl<'a> Printer<'a> {
             }
             // Otherwise, use if_break to check enclosing group
             return d.if_break(with_leading, d.parens(with_leading));
+        }
+
+        // A sequence body is prettier's other `shouldIndentSequenceExpression` position
+        // (with the `return`/`throw` argument): the operands hang inside the parens the
+        // sequence prints for itself, `)` dropping to its own line. Claimed here because
+        // the expression dispatch below has no parent to read the layout from.
+        if let internal::Expression::SequenceExpression(seq) = expr {
+            return prepend(self.build_sequence_doc(seq, SeqLayout::Hanging));
         }
 
         // Standard cases: objects and assignments always need parens

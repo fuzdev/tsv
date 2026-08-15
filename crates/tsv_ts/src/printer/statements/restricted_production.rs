@@ -13,6 +13,7 @@
 
 use super::Printer;
 use crate::ast::internal::{self, Expression};
+use crate::printer::expressions::operators::SeqLayout;
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -154,7 +155,7 @@ impl<'a> Printer<'a> {
                 b')',
             )
             .map_or(argument_end, |p| p as u32);
-            let seq_doc = self.build_sequence_doc_value(seq, grouping_close);
+            let seq_doc = self.build_sequence_doc_value(seq, grouping_close, SeqLayout::Hanging);
             let mut parts: DocBuf = if let Some(comments_doc) = inline_comments {
                 smallvec![d.text(keyword), d.text(" "), comments_doc, seq_doc]
             } else {
@@ -182,6 +183,12 @@ impl<'a> Printer<'a> {
         // grandparent is ReturnStatement/ThrowStatement, shouldNotIndent = false.
         let expr_doc = if let Expression::ConditionalExpression(cond) = arg {
             self.build_conditional_doc_with_binary_test_indent(cond)
+        } else if let Expression::SequenceExpression(seq) = arg {
+            // `throw` — the `return` arm above claimed its own sequence. Prettier's
+            // `shouldIndentSequenceExpression` covers both keywords, so the operands hang
+            // inside the parens; only the trailing-comment side differs, and `throw` floats
+            // it out, which is the default paren mode.
+            self.build_sequence_doc(seq, SeqLayout::Hanging)
         } else {
             self.build_expression_doc(arg)
         };
