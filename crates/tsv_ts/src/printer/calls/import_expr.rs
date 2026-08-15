@@ -7,7 +7,7 @@
 use super::super::Printer;
 use super::super::comments::ParenLeadingValue;
 use super::arg_comments::{PartitionedComments, should_force_expansion_for_comments};
-use super::arg_predicates::is_expandable_object;
+use super::arg_predicates::{is_expandable_object, is_hook_callback_with_deps};
 use crate::ast::internal;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -358,6 +358,16 @@ pub(super) fn build_import_expression_doc(
         // instead of the correct `import(\n  fn('long')\n)`).
         return wrap_import_args(d, open, &[], source_doc, false);
     };
+
+    // Prettier's React-hook deps-array layout, which `ImportExpression` reaches through the
+    // same `printCallArguments` as a call: a zero-parameter block arrow plus an array
+    // literal stays flat. The comment conjunct is asked of the `(`→specifier gap only —
+    // every other gap's comment already routed through the shared comment layout above.
+    if is_hook_callback_with_deps(import_expr.source, options)
+        && !printer.has_comments_on_page_between(leading_scan_start, source_start)
+    {
+        return d.concat(&[open, source_doc, d.text(", "), options_doc, d.text(")")]);
+    }
 
     if is_expandable_object(options) {
         // Three-state conditional group matching Prettier's expand-last-arg:

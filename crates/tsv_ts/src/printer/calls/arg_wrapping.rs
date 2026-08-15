@@ -10,16 +10,16 @@ use super::super::{
     is_curried_arrow_with_return_type, is_multiline_template_expression,
 };
 use super::arg_comments::{
-    emit_first_arg_leading_comments, emit_last_arg_trailing_comments, find_comma_pos,
-    is_inline_block_after_comma, is_inline_block_before_comma, push_empty_args,
+    any_arg_gap_has_comment_on_page, emit_first_arg_leading_comments,
+    emit_last_arg_trailing_comments, push_empty_args, split_gap_inline_blocks,
 };
 use super::arg_predicates::{
-    arrow_body_is_call_through_non_null, is_block_function, is_short_second_arg_for_expand_first,
+    arrow_body_is_call_through_non_null, is_block_function, is_react_hook_call_with_deps_array,
+    is_short_second_arg_for_expand_first,
 };
 use crate::ast::internal;
 use crate::printer::expressions::functions::{arrow_token_end, has_leftmost_object_expression};
-use smallvec::smallvec;
-use tsv_lang::comments_to_emit_in_range;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::has_newline_before_position;
@@ -531,55 +531,33 @@ pub(crate) fn build_args_split_last(
         head_parts.push(lc);
     }
 
+    // Each gap's inline blocks, split around its comma — computed ONCE per gap and read by
+    // both states below, because the two states describing the same gap differently is how
+    // the broken-out one came to drop the after-comma half entirely.
+    // Only the `, ` separator is structural; the gap scan is pure comment placement, so gate it.
+    let gap_blocks: SmallVec<[(DocBuf, DocBuf); 4]> = if has_comments {
+        arguments
+            .windows(2)
+            .map(|pair| split_gap_inline_blocks(printer, pair[0].span().end, pair[1].span().start))
+            .collect()
+    } else {
+        SmallVec::new()
+    };
+
     for (i, doc) in arg_docs.iter().take(arg_docs.len() - 1).enumerate() {
         head_parts.push(*doc);
 
-        // Only the `, ` separator is structural; the comma scan and the two inline
-        // block-comment lookups are pure comment placement, so gate them.
-        if has_comments {
-            let arg_end = arguments[i].span().end;
-            let next_arg_start = arguments[i + 1].span().start;
-            let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
-
-            // Add inline block comments around comma
-            if let Some(cpos) = comma_pos {
-                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
-                {
-                    if is_inline_block_before_comma(
-                        comment,
-                        cpos,
-                        printer.comment_line_breaks,
-                        arg_end,
-                    ) {
-                        head_parts.push(d.text(" "));
-                        head_parts.push(printer.build_comment_doc(comment));
-                    }
-                }
-            }
-
+        if let Some((before, after)) = gap_blocks.get(i) {
+            head_parts.extend(before.iter().copied());
             head_parts.push(d.text(", "));
-
-            if let Some(cpos) = comma_pos {
-                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
-                {
-                    if is_inline_block_after_comma(
-                        comment,
-                        cpos,
-                        printer.comment_line_breaks,
-                        arg_end,
-                    ) {
-                        head_parts.push(printer.build_comment_doc(comment));
-                        head_parts.push(d.text(" "));
-                    }
-                }
-            }
+            head_parts.extend(after.iter().copied());
         } else {
             head_parts.push(d.text(", "));
         }
     }
     let last_arg_doc = arg_docs[arg_docs.len() - 1];
 
-    // Build all_args_broken with inline block comments (same comma-aware logic)
+    // Build all_args_broken with the same comma-aware split.
     let mut all_args_parts = DocBuf::new();
     if let Some(lc) = leading_comment_doc {
         all_args_parts.push(lc);
@@ -588,31 +566,23 @@ pub(crate) fn build_args_split_last(
     for (i, doc) in arg_docs.iter().enumerate() {
         if i > 0 {
             all_args_parts.push(d.comma_line());
+            // ⚠️ The gap is claimed by TWO emitters that must PARTITION it — the
+            // before-comma half trails the previous argument, this one leads the next.
+            // Emitting only the before-comma half here DROPPED every comment the author
+            // wrote after the comma whenever this state was the one selected
+            // (`fn(a, /* c */ (b), {})`), while the head state printed it — the same gap,
+            // two answers, and only the losing one reachable.
+            // `docs/comments.md` §The element-comma seam.
+            if let Some((_, after)) = gap_blocks.get(i - 1) {
+                all_args_parts.extend(after.iter().copied());
+            }
         }
         all_args_parts.push(*doc);
 
-        // Add trailing inline block comments (except after last arg). Pure comment
-        // placement — gated on the whole-call comment flag.
-        if has_comments && i < arguments.len() - 1 {
-            let arg_end = arguments[i].span().end;
-            let next_arg_start = arguments[i + 1].span().start;
-            let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
-
-            // Only add inline block comments that are BEFORE the comma
-            if let Some(cpos) = comma_pos {
-                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
-                {
-                    if is_inline_block_before_comma(
-                        comment,
-                        cpos,
-                        printer.comment_line_breaks,
-                        arg_end,
-                    ) {
-                        all_args_parts.push(d.text(" "));
-                        all_args_parts.push(printer.build_comment_doc(comment));
-                    }
-                }
-            }
+        if i < arg_docs.len() - 1
+            && let Some((before, _)) = gap_blocks.get(i)
+        {
+            all_args_parts.extend(before.iter().copied());
         }
     }
     let all_args_broken = d.concat(&all_args_parts);
@@ -680,6 +650,128 @@ pub(crate) fn build_inline_args(
         last_arg_doc,
         d.text(")"),
     ])
+}
+
+/// Prettier's React-hook deps-array layout when the arguments are that shape, else `None`
+/// — the SHAPE question ([`super::arg_predicates::is_react_hook_call_with_deps_array`]),
+/// its comment conjunct, and the doc, as one seam. Every call-like printer asks it as its
+/// first argument-layout question, since that is where `printCallArguments` asks it: above
+/// `anyArgEmptyLine` and above every specialized layout.
+///
+/// `has_comments` is the caller's whole-argument-window gate, so a comment-free call never
+/// pays the per-gap scan. `opener` carries the callee-and-`(` for a call or `new` and the
+/// chain's own `(` / `?.(`.
+///
+/// `import(…)` cannot use this — its AST carries `source` + `options` rather than a slice —
+/// and asks [`super::arg_predicates::is_hook_callback_with_deps`] with its own two
+/// expressions instead.
+pub(crate) fn try_hook_deps_args_doc(
+    printer: &Printer<'_>,
+    args: &[internal::Expression<'_>],
+    paren_open: u32,
+    call_end: u32,
+    has_comments: bool,
+    opener: DocId,
+) -> Option<DocId> {
+    is_react_hook_call_with_deps_array(args, || {
+        has_comments && any_arg_gap_has_comment_on_page(args, printer, paren_open, call_end)
+    })
+    .then(|| build_hook_deps_args_doc(printer, args, paren_open, opener))
+}
+
+/// The flat layout itself: every argument on the callee's line, joined by `", "`, inside no
+/// group of its own — prettier builds literally `["(", …, ", ", …, ")"]` there. Nothing here
+/// can break, so the callback's block body and the deps array break on their own groups and
+/// the call never wraps around them.
+fn build_hook_deps_args_doc(
+    printer: &Printer<'_>,
+    args: &[internal::Expression<'_>],
+    paren_open: u32,
+    prefix: DocId,
+) -> DocId {
+    let d = printer.d();
+    let mut parts = DocBuf::new();
+    parts.push(prefix);
+    for i in 0..args.len() {
+        if i > 0 {
+            parts.push(d.text(", "));
+        }
+        parts.push(ArgItem::ArgContext.build(printer, paren_open, args, i));
+    }
+    parts.push(d.text(")"));
+    d.concat(&parts)
+}
+
+/// Does the last argument's arrow write an own-line comment between its `=>` and its body?
+///
+/// Prettier decides this inside the arrow printer, above every argument layout:
+/// `shouldPutBodyOnSameLine` opens with `!hasLeadingOwnLineComment(text, functionBody)`, so
+/// such a comment drops the body below `=>` — and the branch that takes it appends
+/// `trailingComma + trailingSpace`, where `trailingSpace` is a **softline under
+/// `expandLastArg`** (`print/arrow-function.js`, `printArrowFunctionBody`). That softline is
+/// the only thing that lands the call's `)` on its own line, and it is appended for **every
+/// body kind** — block, object, array, arrow chain alike — which is why this question is
+/// asked of the gap and not of the body's type.
+///
+/// **The chain walks to the TERMINAL arrow.** `expandLastArg` turns off
+/// `shouldPrintAsChain` (`!args.expandLastArg && body is Arrow`), so a curried argument is
+/// printed as nested arrows and the softline is appended by the innermost one — the gap that
+/// carries the comment in `fn(() => () =>⏎\t// c⏎\t({ a: 1 }))`.
+pub(crate) fn last_arg_has_own_line_post_arrow_comment(
+    printer: &Printer<'_>,
+    last_arg: &internal::Expression<'_>,
+) -> bool {
+    let internal::Expression::ArrowFunctionExpression(arrow) = last_arg else {
+        return false;
+    };
+    let mut arrow = arrow;
+    loop {
+        let body_start = match &arrow.body {
+            internal::ArrowFunctionBody::BlockStatement(block) => block.span.start,
+            internal::ArrowFunctionBody::Expression(expr) => expr.span().start,
+        };
+        if let internal::ArrowFunctionBody::Expression(expr) = &arrow.body
+            && let internal::Expression::ArrowFunctionExpression(inner) = &**expr
+        {
+            arrow = inner;
+            continue;
+        }
+        return printer.has_own_line_post_arrow_comment(arrow_token_end(arrow), body_start);
+    }
+}
+
+/// Assemble the single `expandLastArg` state
+/// [`last_arg_has_own_line_post_arrow_comment`] selects: the head arguments stay inline, the
+/// last one breaks, and the softline drops `)` to its own line
+/// (`fn(a, () =>⏎\t// c⏎\t({ b: 1 })⏎);`). Without it every hug state glues `))` onto the
+/// body line, which prettier never emits.
+///
+/// ⚠️ **The pair must be asked BEFORE the hug states, not selected among them.** The
+/// comment's forced break truncates the `fits()` walk (tsv has no `propagateBreaks`, so a
+/// `conditional_group` measures a state flat to its first hardline), which then reports the
+/// hug as fitting — the wrong state, chosen on a measurement that stopped at the comment.
+/// Split from the predicate so a caller can ask the cheap comment question first and build
+/// the argument doc only on the rare arm that needs it: a second build of an argument
+/// recurses into any call nested in its body, so an eager one costs 2^depth doc nodes.
+///
+/// One rule for all six sites — the single-argument hug and the multi-argument expand-last
+/// of each of the three call-argument printers — because they have drifted apart on exactly
+/// this kind of arm before. `head_parts` is empty at the single-argument sites; `prefix`
+/// carries `(` for a call or `new` (whose callee sits outside the returned group) and the
+/// chain's own `(` / `?.(`.
+pub(crate) fn build_own_line_post_arrow_state(
+    d: &DocArena,
+    prefix: DocId,
+    head_parts: &[DocId],
+    last_arg_doc: DocId,
+) -> DocId {
+    d.group_break(d.concat(&[
+        prefix,
+        d.concat(head_parts),
+        d.group_break(last_arg_doc),
+        d.softline(),
+        d.text(")"),
+    ]))
 }
 
 /// Build a conditional group that tries inline first, then expands all args.
