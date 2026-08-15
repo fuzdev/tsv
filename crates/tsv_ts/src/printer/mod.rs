@@ -74,7 +74,8 @@ use crate::PrinterInputs;
 use crate::ast::internal;
 use std::cell::Cell;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_in_range,
+    EmbedContext, OutputBuffer, Span, TAB_WIDTH, comments_in_source_after,
+    comments_to_emit_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -1072,6 +1073,39 @@ impl<'a> Printer<'a> {
     /// ([`Self::collect_trailing_comments`], `docs/comments.md` §The element-comma seam).
     pub(crate) fn comment_follows_content_on_its_line(&self, comment: &internal::Comment) -> bool {
         !has_newline_before_position(self.source, comment.span.start)
+    }
+
+    /// Whether a **trailer** — a comment following content on its own line — is the
+    /// next thing after `pos` once closing punctuation is stepped over: only whitespace
+    /// and closers (`)` `]` `}` `;` `,`) between `pos` and the comment's start. The
+    /// **in-source** axis (an owned comment counts: it occupies the line all the same),
+    /// read against the real source, so it stays true under [`Self::set_canonical`].
+    ///
+    /// The question a same-line-`//` deferral must ask before taking the line end for
+    /// itself: a construct that closes flat after `pos` carries the trailer onto the
+    /// same output line, where it welds onto the deferred one (`// c // c1`, the second
+    /// `//` becoming text of the first) or is reordered behind it (`/* c1 */ // c`), so
+    /// the deferral is lossless only when this is false. Reading through closers rather
+    /// than only `pos`'s source line is what makes the answer stable across passes: the
+    /// expanded layout's own reprint puts `);` on a line below the member. Conservative
+    /// by design — a break the enclosing layout takes between the two only makes the
+    /// caller's expansion unneeded, never wrong. A trailer behind a further TOKEN is out
+    /// of reach — an operator's right side (`.bar as T; // c1`) and, the commoner
+    /// spelling, a following sibling in a list (`foo(fn() // c⏎.bar, z); // c1`), where
+    /// the scan stops on `z`. Whether such a trailer lands on the deferred comment's line
+    /// is a layout fact no build-time read can see, so the residual weld there is a
+    /// tracked open item, whose structural answer would be a renderer-level flush guard.
+    pub(crate) fn trailer_follows_through_closers(&self, pos: u32) -> bool {
+        comments_in_source_after(self.comments, pos)
+            .next()
+            .is_some_and(|c| {
+                self.comment_follows_content_on_its_line(c)
+                    && self.source.as_bytes()[pos as usize..c.span.start as usize]
+                        .iter()
+                        .all(|b| {
+                            b.is_ascii_whitespace() || matches!(b, b')' | b']' | b'}' | b';' | b',')
+                        })
+            })
     }
 
     /// Whether a single comment occupies its own physical line — a line comment

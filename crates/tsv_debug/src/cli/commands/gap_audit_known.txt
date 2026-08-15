@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 246
+# shapes: 237
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	',⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	']⟨⟩/*	line
@@ -144,8 +144,6 @@ DOUBLE-PRINTED	}{⟨⟩IDENT	line
 DOUBLE-PRINTED	␣⟨⟩//	multiline
 SWALLOW	&⟨⟩␣	line
 SWALLOW	((⟨⟩//	line
-SWALLOW	().⟨⟩IDENT	line
-SWALLOW	()⟨⟩.	line
 SWALLOW	()⟨⟩;	line
 SWALLOW	()⟨⟩;;	line
 SWALLOW	(⟨⟩(	line
@@ -159,7 +157,6 @@ SWALLOW	(⟨⟩␣	line
 SWALLOW	)))⟨⟩␣	line
 SWALLOW	))⟨⟩)	line
 SWALLOW	))⟨⟩␣	line
-SWALLOW	).⟨⟩IDENT	line
 SWALLOW	);}⟨⟩,	line
 SWALLOW	);⟨⟩␣	line
 SWALLOW	)=>⟨⟩(	line
@@ -168,7 +165,6 @@ SWALLOW	)=>⟨⟩({	line
 SWALLOW	)=>⟨⟩/*	line
 SWALLOW	)⟨⟩)	line
 SWALLOW	)⟨⟩))	line
-SWALLOW	)⟨⟩.	line
 SWALLOW	)⟨⟩;	line
 SWALLOW	)⟨⟩␣	line
 SWALLOW	*/(⟨⟩IDENT	line
@@ -193,11 +189,9 @@ SWALLOW	*⟨⟩␣	line
 SWALLOW	,}⟨⟩),)	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	,⟨⟩{	line
 SWALLOW	,⟨⟩␣	line
-SWALLOW	.⟨⟩IDENT	line
 SWALLOW	:(⟨⟩//	line
 SWALLOW	;}*⟨⟩#	line
 SWALLOW	;},⟨⟩␣	line
-SWALLOW	;⟨⟩␣	line
 SWALLOW	=>(⟨⟩(	line
 SWALLOW	=>(⟨⟩IDENT	line
 SWALLOW	=>(⟨⟩{	line
@@ -207,13 +201,11 @@ SWALLOW	>⟨⟩():	line
 SWALLOW	?(⟨⟩//	line
 SWALLOW	IDENT⟨⟩)	line
 SWALLOW	IDENT⟨⟩))	line
-SWALLOW	IDENT⟨⟩).	line
 SWALLOW	IDENT⟨⟩);	line
 SWALLOW	IDENT⟨⟩,	line
 SWALLOW	IDENT⟨⟩,*	line
 SWALLOW	IDENT⟨⟩,/*	line
 SWALLOW	IDENT⟨⟩,{	line
-SWALLOW	IDENT⟨⟩.	line
 SWALLOW	IDENT⟨⟩/*	line
 SWALLOW	IDENT⟨⟩//	line
 SWALLOW	IDENT⟨⟩:(/	line
@@ -247,7 +239,6 @@ SWALLOW	␣⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	␣⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	␣⟨⟩*	line
 SWALLOW	␣⟨⟩,	line
-SWALLOW	␣⟨⟩.	line
 SWALLOW	␣⟨⟩/*	line
 SWALLOW	␣⟨⟩//	line
 SWALLOW	␣⟨⟩:	line

@@ -277,15 +277,17 @@ pub(crate) fn print_node_inner<'a>(
             let pre_bracket = printer.classify_comments(*object_end, bracket_open_pos);
 
             // A LINE comment in this gap must end its line. Reaching here means no chain
-            // builder owned the gap (`skip_comments` would be set): a computed member with
-            // a numeric-literal index is glued into the preceding call's group rather than
-            // starting one (prettier's `printMemberChain` grouping), so it is the one node
-            // kind that can hang mid-group. Emit through the shared forced-break path, the
-            // single definition of how a chain gap renders — the same one the group and
-            // member-only paths use. The `line_suffix` route below (correct for a block
-            // comment, which can sit inline) would instead defer the `//` to end of line:
-            // `a.b()[0]; // c`, relocating it past the brackets AND the `;`, and merging
-            // consecutive ones onto one line where the first `//` swallows the rest.
+            // builder owned the gap (`skip_comments` would be set): the chain's TRAILING
+            // group prints with no chain-level break of its own, and a numeric-literal
+            // index is the one member kind the grouping otherwise glues into the
+            // preceding group — a `//` in its gap makes it start a group
+            // (`group_chain_nodes`), so it arrives here as that trailing group's node.
+            // Emit through the shared forced-break path, the single definition of how a
+            // chain gap renders — the same one the group and member-only paths use. The
+            // `line_suffix` route below (correct for a block comment, which can sit
+            // inline) would instead defer the `//` to end of line: `a.b()[0]; // c`,
+            // relocating it past the brackets AND the `;`, and merging consecutive ones
+            // onto one line where the first `//` swallows the rest.
             if pre_bracket.has_line_comments() {
                 let mut parts = DocBuf::new();
                 push_gap_comments_and_break(&mut parts, printer, *object_end, bracket_open_pos);
@@ -452,14 +454,6 @@ fn computed_lookup_doc(
     d.group(d.concat(&[d.text(open), indented, d.softline(), d.text("]")]))
 }
 
-/// Print a member access (shared logic for Member and PrivateMember)
-///
-/// Emits comments before the member access:
-/// - Block comments inline (e.g., `a /* comment */.b`)
-/// - Line comments via line_suffix (moved to end of line, matching Prettier)
-///
-/// The `skip_comments` flag is used by the expanded path where `add_comments_and_break`
-/// already handles comments for the first member of rest groups.
 /// Source positions for a member-access chain node.
 struct MemberSpans {
     /// Start of the property name (a `#`-private name anchors past the `#`).
@@ -470,6 +464,19 @@ struct MemberSpans {
     property_start: u32,
 }
 
+/// Print a member access (shared logic for Member and PrivateMember)
+///
+/// Emits comments before the member access:
+/// - Block comments inline (e.g., `a /* comment */.b`)
+/// - Line comments via line_suffix (deferred to the end of the line)
+///
+/// The `line_suffix` deferral can only be lossless for ONE `//` with nothing else
+/// reaching its line end, so the layout keeps it reachable in exactly one place: the
+/// chain's TRAILING member (the sanctioned collapse, `fn().bar; // c` —
+/// `has_comments_forcing_expansion` names the exceptions). Every other member with a
+/// `//` in its gap starts a chain group (`group_chain_nodes`) and prints through the
+/// chain-level gap emitters with `skip_comments` set — the expanded path's
+/// `add_comments_and_break` handles the first member of each rest group.
 fn print_member_access(
     printer: &Printer<'_>,
     property: internal::IdentName<'_>,
@@ -508,8 +515,8 @@ fn print_member_access(
     // Trailing block comments: same line as previous element (e.g., `method() /* c */.prop`)
     let trailing_block = printer.build_trailing_block_doc(&classified.trailing_block);
 
-    // Line comments (both trailing and leading) get moved to end of line via line_suffix.
-    // This matches Prettier's behavior of hoisting mid-chain line comments.
+    // Line comments (both trailing and leading) get moved to end of line via line_suffix
+    // — the trailing member's sanctioned deferral (see the doc comment above).
     let trailing_line = printer.build_deferred_line_comments_doc(&classified.trailing_line);
     let leading_line = printer.build_deferred_line_comments_doc(&classified.leading_line);
 

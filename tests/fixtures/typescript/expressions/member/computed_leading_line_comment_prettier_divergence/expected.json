@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 451,
+	"end": 711,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,88 @@
 					"column": 21
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Inside a CHAIN, with a numeric index — the one accessor kind the chain grouping",
+			"start": 443,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " otherwise glues into the preceding group. The `//` makes it start a group",
+			"start": 527,
+			"end": 603,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " instead, and the bracket-interior rule above is unchanged by that.",
+			"start": 605,
+			"end": 674,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 687,
+			"end": 692,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 12
+				},
+				"end": {
+					"line": 24,
+					"column": 17
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 450,
+		"end": 710,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 441,
+			"end": 701,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 20,
+					"line": 27,
 					"column": 9
 				}
 			},
@@ -525,6 +589,149 @@
 							"value": " (the open-delimiter-trailing rule), prettier relocates it.",
 							"start": 349,
 							"end": 410
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 676,
+					"end": 700,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 676,
+						"end": 699,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 1
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"object": {
+							"type": "CallExpression",
+							"start": 676,
+							"end": 685,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 1
+								},
+								"end": {
+									"line": 24,
+									"column": 10
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 676,
+								"end": 683,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 1
+									},
+									"end": {
+										"line": 24,
+										"column": 8
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 676,
+									"end": 679,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 1
+										},
+										"end": {
+											"line": 24,
+											"column": 4
+										}
+									},
+									"name": "arr"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 680,
+									"end": 683,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 5
+										},
+										"end": {
+											"line": 24,
+											"column": 8
+										}
+									},
+									"name": "foo"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"property": {
+							"type": "Literal",
+							"start": 695,
+							"end": 696,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 2
+								},
+								"end": {
+									"line": 25,
+									"column": 3
+								}
+							},
+							"value": 0,
+							"raw": "0",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 687,
+									"end": 692
+								}
+							]
+						},
+						"computed": true,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Inside a CHAIN, with a numeric index — the one accessor kind the chain grouping",
+							"start": 443,
+							"end": 525
+						},
+						{
+							"type": "Line",
+							"value": " otherwise glues into the preceding group. The `//` makes it start a group",
+							"start": 527,
+							"end": 603
+						},
+						{
+							"type": "Line",
+							"value": " instead, and the bracket-interior rule above is unchanged by that.",
+							"start": 605,
+							"end": 674
 						}
 					]
 				}

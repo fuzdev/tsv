@@ -20,4 +20,18 @@
 		.bar()
 		.baz() // c4
 		[0];
+
+	// The same rule on a SHORT chain — a lone call base, an identifier base, a same-line
+	// comment, and statement position: the comment and the bracket indent one level.
+	const d = fn()
+		// c5
+		[0];
+	const e = arr
+		// c6
+		[0];
+	const f = fn() // c7
+		[0];
+	fn()
+		// c8
+		[0];
 </script>
