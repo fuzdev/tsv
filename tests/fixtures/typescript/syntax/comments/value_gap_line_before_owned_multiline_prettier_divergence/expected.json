@@ -1,0 +1,971 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 605,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Declarator - a `//` trailing the `=` above an owned MULTILINE block",
+			"start": 20,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 102,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " owned\n\n",
+			"start": 110,
+			"end": 124,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Declarator - the same with a single-line block; only the block's own line",
+			"start": 130,
+			"end": 206,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " count differs (null control)",
+			"start": 208,
+			"end": 239,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 251,
+			"end": 256,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 11
+				},
+				"end": {
+					"line": 10,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " owned ",
+			"start": 259,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Assignment - the same gap",
+			"start": 276,
+			"end": 304,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 317,
+			"end": 322,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " owned\n\n",
+			"start": 325,
+			"end": 339,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Class property",
+			"start": 345,
+			"end": 362,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 380,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 6
+				},
+				"end": {
+					"line": 22,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " owned\n\n",
+			"start": 389,
+			"end": 404,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 3
+				},
+				"end": {
+					"line": 25,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Enum member",
+			"start": 413,
+			"end": 427,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 444,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 6
+				},
+				"end": {
+					"line": 30,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " owned\n\n",
+			"start": 453,
+			"end": 468,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 3
+				},
+				"end": {
+					"line": 33,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Arrow body - the same authoring, which prettier leaves alone (control)",
+			"start": 476,
+			"end": 549,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 569,
+			"end": 574,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " owned\n\n",
+			"start": 577,
+			"end": 591,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 2
+				},
+				"end": {
+					"line": 41,
+					"column": 4
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 604,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 595,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 42,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 92,
+					"end": 127,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 98,
+							"end": 126,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 98,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 125,
+								"end": 126,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"value": 1,
+								"raw": "1",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 102,
+										"end": 107
+									},
+									{
+										"type": "Block",
+										"value": " owned\n\n",
+										"start": 110,
+										"end": 124
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declarator - a `//` trailing the `=` above an owned MULTILINE block",
+							"start": 20,
+							"end": 90
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 241,
+					"end": 273,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 247,
+							"end": 272,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 247,
+								"end": 248,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 271,
+								"end": 272,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 14
+									},
+									"end": {
+										"line": 11,
+										"column": 15
+									}
+								},
+								"value": 1,
+								"raw": "1",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 251,
+										"end": 256
+									},
+									{
+										"type": "Block",
+										"value": " owned ",
+										"start": 259,
+										"end": 270
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Declarator - the same with a single-line block; only the block's own line",
+							"start": 130,
+							"end": 206
+						},
+						{
+							"type": "Line",
+							"value": " count differs (null control)",
+							"start": 208,
+							"end": 239
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 306,
+					"end": 342,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 306,
+						"end": 341,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 6
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 306,
+							"end": 312,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 7
+								}
+							},
+							"name": "target"
+						},
+						"right": {
+							"type": "Literal",
+							"start": 340,
+							"end": 341,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 5
+								},
+								"end": {
+									"line": 18,
+									"column": 6
+								}
+							},
+							"value": 1,
+							"raw": "1",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 317,
+									"end": 322
+								},
+								{
+									"type": "Block",
+									"value": " owned\n\n",
+									"start": 325,
+									"end": 339
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Assignment - the same gap",
+							"start": 276,
+							"end": 304
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 364,
+					"end": 410,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 370,
+						"end": 371,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 7
+							},
+							"end": {
+								"line": 21,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 372,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 9
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 376,
+								"end": 407,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 376,
+									"end": 377,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 3
+										}
+									},
+									"name": "p"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 405,
+									"end": 406,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 6
+										},
+										"end": {
+											"line": 25,
+											"column": 7
+										}
+									},
+									"value": 1,
+									"raw": "1",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 380,
+											"end": 385
+										},
+										{
+											"type": "Block",
+											"value": " owned\n\n",
+											"start": 389,
+											"end": 404
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Class property",
+							"start": 345,
+							"end": 362
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 429,
+					"end": 473,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 434,
+						"end": 435,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 6
+							},
+							"end": {
+								"line": 29,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 440,
+							"end": 470,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 2
+								},
+								"end": {
+									"line": 33,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 440,
+								"end": 441,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 469,
+								"end": 470,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 6
+									},
+									"end": {
+										"line": 33,
+										"column": 7
+									}
+								},
+								"value": 1,
+								"raw": "1",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 444,
+										"end": 449
+									},
+									{
+										"type": "Block",
+										"value": " owned\n\n",
+										"start": 453,
+										"end": 468
+									}
+								]
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Enum member",
+							"start": 413,
+							"end": 427
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 551,
+					"end": 594,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 557,
+							"end": 593,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 7
+								},
+								"end": {
+									"line": 41,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 557,
+								"end": 558,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 7
+									},
+									"end": {
+										"line": 37,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 561,
+								"end": 593,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 11
+									},
+									"end": {
+										"line": 41,
+										"column": 6
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Literal",
+									"start": 592,
+									"end": 593,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 5
+										},
+										"end": {
+											"line": 41,
+											"column": 6
+										}
+									},
+									"value": 1,
+									"raw": "1",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 569,
+											"end": 574
+										},
+										{
+											"type": "Block",
+											"value": " owned\n\n",
+											"start": 577,
+											"end": 591
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow body - the same authoring, which prettier leaves alone (control)",
+							"start": 476,
+							"end": 549
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

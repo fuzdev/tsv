@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 412,
+	"end": 560,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,72 @@
 					"column": 22
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank below the directive survives — a brace-less body opens no `{`",
+			"start": 404,
+			"end": 484,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " for it to sit above",
+			"start": 486,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 516,
+			"end": 534,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 19
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 411,
+		"end": 559,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 402,
+			"end": 550,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 24,
+					"line": 31,
 					"column": 9
 				}
 			},
@@ -622,6 +670,124 @@
 							"value": " an own-line block comment behaves identically — placement keys the freeze",
 							"start": 250,
 							"end": 326
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 510,
+					"end": 549,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 13
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 537,
+						"end": 549,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 1
+							},
+							"end": {
+								"line": 30,
+								"column": 13
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 537,
+							"end": 548,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 1
+								},
+								"end": {
+									"line": 30,
+									"column": 12
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 537,
+								"end": 539,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 1
+									},
+									"end": {
+										"line": 30,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 542,
+									"end": 545,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 6
+										},
+										"end": {
+											"line": 30,
+											"column": 9
+										}
+									},
+									"name": "eee"
+								}
+							],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 516,
+								"end": 534
+							}
+						]
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 510,
+						"end": 513,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 4
+							}
+						},
+						"name": "ooo"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank below the directive survives — a brace-less body opens no `{`",
+							"start": 404,
+							"end": 484
+						},
+						{
+							"type": "Line",
+							"value": " for it to sit above",
+							"start": 486,
+							"end": 508
 						}
 					]
 				}

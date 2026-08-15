@@ -690,9 +690,19 @@ impl<'a> Printer<'a> {
         // came open). A leading run measures forward from the previous comment
         // (`printLeadingComment`'s `skipNewline` + `hasNewline`), which lands on the `(`
         // and reports no blank — exactly what the strict reading says.
-        let blank_before_value = comments
-            .last()
-            .is_some_and(|c| self.has_blank_line_between_strict(c.span.end, value_start));
+        //
+        // ⚠️ And it takes the in-source CEILING as well as the strict reading, for the
+        // mirror reason: `value_start` is an expression start, so a block comment the
+        // author glued to the branch is OWNED — inside the gap, printed by the branch's
+        // own doc, skipped by the run above — and scanning across it reads its interior
+        // newlines as an author blank. That answer also feeds the break gate below, so the
+        // fabricated blank drops the branch onto its own line too.
+        let blank_before_value = comments.last().is_some_and(|c| {
+            self.has_blank_line_between_strict(
+                c.span.end,
+                self.blank_scan_end(c.span.end, value_start),
+            )
+        });
         TernaryBranchPlacement {
             on_own_line: has_line_comment || last_own_line || blank_before_value,
             blank_before: blank_before_value,

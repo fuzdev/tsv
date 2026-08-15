@@ -1,0 +1,414 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 248,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The continuation keyword hugs a block comment trailing the `}`, whatever line",
+			"start": 10,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the author gave it",
+			"start": 92,
+			"end": 113,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b1 ",
+			"start": 136,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 3
+				},
+				"end": {
+					"line": 6,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same gap, a do-while's `while`",
+			"start": 166,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b2 ",
+			"start": 218,
+			"end": 226,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 247,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 115,
+					"end": 163,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 119,
+						"end": 120,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 5
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 122,
+						"end": 135,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 8
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 126,
+								"end": 132,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 126,
+									"end": 131,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 126,
+										"end": 129,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 5
+											}
+										},
+										"name": "fn1"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " b1 ",
+								"start": 136,
+								"end": 144
+							}
+						]
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 150,
+						"end": 163,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 17
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 154,
+								"end": 160,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 154,
+									"end": 159,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 154,
+										"end": 157,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 5
+											}
+										},
+										"name": "fn2"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The continuation keyword hugs a block comment trailing the `}`, whatever line",
+							"start": 10,
+							"end": 90
+						},
+						{
+							"type": "Line",
+							"value": " the author gave it",
+							"start": 92,
+							"end": 113
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 201,
+					"end": 237,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 22
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 204,
+						"end": 217,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 4
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 208,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 208,
+									"end": 213,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 208,
+										"end": 211,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 5
+											}
+										},
+										"name": "fn1"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " b2 ",
+								"start": 218,
+								"end": 226
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 234,
+						"end": 235,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 19
+							},
+							"end": {
+								"line": 13,
+								"column": 20
+							}
+						},
+						"name": "a"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same gap, a do-while's `while`",
+							"start": 166,
+							"end": 199
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

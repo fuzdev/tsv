@@ -3,11 +3,10 @@
 // Condition-group layout and body handling for while/do-while, including the
 // do-while comment-preservation divergence from Prettier.
 
-use super::super::{HeaderBodyBlank, OpenParenLineComments};
+use super::super::OpenParenLineComments;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
-use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -20,32 +19,15 @@ impl<'a> Printer<'a> {
         stmt: &internal::WhileStatement<'_>,
     ) -> DocId {
         let d = self.d();
-        // Find paren positions for comment handling
-        let open_paren = self.find_open_paren_after(stmt.span.start);
-        let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
-
-        // Preserve comments between `while` keyword and `(` in place:
-        //   while/* c */(a){} → while /* c */ (a) {}
-        let while_keyword_end = stmt.span.start + "while".len() as u32;
-        let keyword_comments = self.build_keyword_paren_comments(while_keyword_end, open_paren);
-
-        // Build condition group (handles breaking within condition and comments,
-        // and the `!(logical)` inline-negation hug).
-        let condition_group = self.build_statement_condition_doc(
-            &stmt.test,
-            open_paren,
-            close_paren,
-            OpenParenLineComments::Normalize,
-        );
+        // The head every arm below shares, built once — the same one the `if` printer
+        // takes, so the two paren-headed statements cannot drift apart.
+        let (mut parts, paren_end) =
+            self.build_paren_condition_head("while", stmt.span.start, &stmt.test);
 
         if let Statement::BlockStatement(block) = stmt.body {
             // Block body: while (cond) { ... }
             // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
             // block comments stay inline, line comments become trailing.
-            let mut parts: DocBuf = DocBuf::new();
-            self.push_keyword_open_paren(&mut parts, "while", keyword_comments);
-            parts.push(condition_group);
-            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
             parts.push(self.build_statement_head_doc(paren_end, block.span, || {
                 self.build_block_statement_doc(block)
@@ -53,33 +35,18 @@ impl<'a> Printer<'a> {
             d.group(d.concat(&parts))
         } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // Empty statement: `while (cond);` or `while (cond) /* comment */ ;`
-            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let empty_start = stmt.body.span().start;
-
-            let mut empty_parts: DocBuf = DocBuf::new();
-            self.push_keyword_open_paren(&mut empty_parts, "while", keyword_comments);
-            empty_parts.push(condition_group);
-            self.append_close_paren_empty_stmt_with_comments(
-                &mut empty_parts,
-                paren_end,
-                empty_start,
-            );
-
-            d.group(d.concat(&empty_parts))
+            self.append_close_paren_empty_stmt_with_comments(&mut parts, paren_end, empty_start);
+            d.group(d.concat(&parts))
         } else {
             // Non-block body: use adjustClause equivalent
             // - When flat: line becomes space -> `while (cond) a;`
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
-            let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.body.span().start;
             let body_doc = self.build_statement_head_doc(paren_end, stmt.body.span(), || {
                 self.build_statement_doc(stmt.body, false)
             });
-
-            let mut head_parts: DocBuf = DocBuf::new();
-            self.push_keyword_open_paren(&mut head_parts, "while", keyword_comments);
-            head_parts.push(condition_group);
-            self.build_adjust_clause_with_comments(&head_parts, paren_end, body_start, body_doc)
+            self.build_adjust_clause_with_comments(&parts, paren_end, body_start, body_doc)
         }
     }
 
@@ -119,7 +86,7 @@ impl<'a> Printer<'a> {
                 // `" "` + run + `" "` is exactly what this emitter emits when
                 // `header_to_body_gap_breaks` is false, so it was a second spelling of
                 // this gap's own no-break case rather than a case this one lacks.
-                self.push_header_to_body_gap(&mut p, do_end, body_start, HeaderBodyBlank::Drop);
+                self.push_header_to_body_gap(&mut p, do_end, body_start);
                 p.push(body_doc);
             }
             p
