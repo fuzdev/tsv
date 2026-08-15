@@ -88,7 +88,17 @@ function stats_of(files: SourceFile[]): Stats {
 	};
 }
 
-function fmt_bytes(n: number): string {
+/**
+ * Format a corpus size, binary units (`B`/`KB`/`MB`, 1024-based) — every number
+ * this tool prints, from one file to the whole corpus.
+ *
+ * NOT `binary_sizes.ts`'s exported `format_bytes`, which is decimal (1000-based)
+ * because it sizes shipped artifacts, and not `corpus_compare_format.ts`'s
+ * `format_source_size`, which is binary like this one but unspaced and never
+ * reaches MB. Three formats over two conventions, so each name says which — a
+ * reader carrying another module's answer over is the failure this prevents.
+ */
+function format_corpus_size(n: number): string {
 	if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(2)} MB`;
 	if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
 	return `${n} B`;
@@ -274,11 +284,11 @@ function main(): void {
 		}
 
 		log(`\nCorpus stats — ${title}`);
-		log(`\nOverall: ${overall.files} files, ${fmt_bytes(overall.bytes)}`);
+		log(`\nOverall: ${overall.files} files, ${format_corpus_size(overall.bytes)}`);
 		for (const { language, stats } of per_lang) {
 			log(
-				`  ${language.padEnd(11)} ${String(stats.files).padStart(5)} files  ${fmt_bytes(stats.bytes).padStart(9)}` +
-					`   median ${fmt_bytes(stats.median)}  p90 ${fmt_bytes(stats.p90)}  p99 ${fmt_bytes(stats.p99)}  max ${fmt_bytes(stats.max)}`
+				`  ${language.padEnd(11)} ${String(stats.files).padStart(5)} files  ${format_corpus_size(stats.bytes).padStart(9)}` +
+					`   median ${format_corpus_size(stats.median)}  p90 ${format_corpus_size(stats.p90)}  p99 ${format_corpus_size(stats.p99)}  max ${format_corpus_size(stats.max)}`
 			);
 		}
 
@@ -286,8 +296,8 @@ function main(): void {
 			log(`\nPer entry (${groups.length}):`);
 			for (const g of groups) {
 				log(
-					`  ${g.label.padEnd(42)} ${String(g.stats.files).padStart(4)}f  ${fmt_bytes(g.stats.bytes).padStart(9)}` +
-						`  [${lang_mix(g.stats.by_language)}]  med ${fmt_bytes(g.stats.median)}  p99 ${fmt_bytes(g.stats.p99)}`
+					`  ${g.label.padEnd(42)} ${String(g.stats.files).padStart(4)}f  ${format_corpus_size(g.stats.bytes).padStart(9)}` +
+						`  [${lang_mix(g.stats.by_language)}]  med ${format_corpus_size(g.stats.median)}  p99 ${format_corpus_size(g.stats.p99)}`
 				);
 			}
 		}
@@ -295,7 +305,7 @@ function main(): void {
 			log(`\nSubtree concentration (files beneath each dir):`);
 			for (const c of conc) {
 				log(
-					`  ${String(c.files).padStart(4)}f  ${fmt_bytes(c.bytes).padStart(9)}  ${c.dir || '.'}`
+					`  ${String(c.files).padStart(4)}f  ${format_corpus_size(c.bytes).padStart(9)}  ${c.dir || '.'}`
 				);
 			}
 		}
@@ -303,15 +313,15 @@ function main(): void {
 		log(`\nLargest ${largest.length} files:`);
 		for (const f of largest) {
 			log(
-				`  ${fmt_bytes(f.bytes).padStart(9)}  ${f.language.padEnd(10)} ${relative(root, f.path)}`
+				`  ${format_corpus_size(f.bytes).padStart(9)}  ${f.language.padEnd(10)} ${relative(root, f.path)}`
 			);
 		}
 
 		log(`\nFlags:`);
 		log(
 			big_files.length > 0
-				? `  ⚠ ${big_files.length} file(s) > ${fmt_bytes(big)} (largest ${fmt_bytes(big_files[0].bytes)} — ${relative(root, big_files[0].path)})`
-				: `  ✓ no files > ${fmt_bytes(big)}`
+				? `  ⚠ ${big_files.length} file(s) > ${format_corpus_size(big)} (largest ${format_corpus_size(big_files[0].bytes)} — ${relative(root, big_files[0].path)})`
+				: `  ✓ no files > ${format_corpus_size(big)}`
 		);
 		log(
 			`  small files (< ${SMALL_FILE_BYTES} B): ${small_files} (${((small_files / overall.files) * 100).toFixed(0)}%)`
@@ -319,7 +329,7 @@ function main(): void {
 		if (watch.length > 0) {
 			for (const w of watch) {
 				log(
-					`  ⚠ '${w.segment}/' subtree present: ${w.files} files, ${fmt_bytes(w.bytes)} — likely non-representative; consider excluding`
+					`  ⚠ '${w.segment}/' subtree present: ${w.files} files, ${format_corpus_size(w.bytes)} — likely non-representative; consider excluding`
 				);
 			}
 		} else {

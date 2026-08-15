@@ -89,9 +89,32 @@ const DISPLAY_ORDER = [
 	'rsvelte-parse',
 	'rsvelte-parse-skip-expr-loc',
 	'swc',
+	// Conformance-only, so it reaches no table this order sorts (the timed
+	// summaries are perf-surface). Listed for the same reason the canonical rows
+	// above are: an unlisted name sorts silently to the end, so the list is kept
+	// COMPLETE rather than kept to what today's surfaces happen to render.
+	'tsc',
 	'yuku-parser',
 	'yuku-parser-wasm'
 ];
+
+/**
+ * The names in `names` this order doesn't list.
+ *
+ * An unlisted name is not an error — `sort_by_display_order` below sends it to the
+ * END, silently — which is exactly how a row joins a surface and sorts last
+ * indefinitely, since nothing about the output looks broken. Asking the task
+ * REGISTRY this question turns a hand-maintained list into a checked one, the same
+ * way `SURFACE_DISCLOSURES` (bench.ts) checks its claims against the registry.
+ *
+ * One direction only. A LISTED name absent from `names` is NOT drift: each surface
+ * registers its own subset (`tsc` rides the conformance surface alone), so the
+ * reverse check would fire on every run of the other surface — while this direction
+ * is answerable per surface and self-completes across the two.
+ */
+export function rows_missing_from_display_order(names: Iterable<string>): string[] {
+	return [...names].filter((name) => !DISPLAY_ORDER.includes(name));
+}
 
 /** Sort results by stable display order */
 function sort_by_display_order(results: BenchmarkResult[]): BenchmarkResult[] {

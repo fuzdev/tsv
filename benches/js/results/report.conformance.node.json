@@ -1,9 +1,9 @@
 {
-	"version": 9,
+	"version": 11,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-08-13T20:15:33.197Z",
-	"git_commit": "1ce605a3",
+	"timestamp": "2026-08-15T15:54:13.464Z",
+	"git_commit": "79ab41d8",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -653,43 +653,67 @@
 		"acorn_ts": "1.0.13",
 		"prettier": "3.9.6",
 		"prettier_svelte": "4.1.1",
-		"oxc_parser": "0.140.0",
-		"oxfmt": "0.60.0",
-		"yuku_parser": "0.8.1",
-		"yuku_parser_wasm": "0.8.1",
-		"biome": "2.5.4",
+		"oxc_parser": "0.142.0",
+		"oxfmt": "0.63.0",
+		"yuku_parser": "0.8.7",
+		"yuku_parser_wasm": "0.8.7",
+		"biome": "2.5.8",
 		"dprint": "0.96.1",
 		"malva": "0.16.0",
 		"postcss": "8.5.26",
-		"rsvelte_fmt": "0.7.4",
-		"rsvelte_parse": "0.3.4",
-		"rsvelte_parse_svelte_target": "5.56.8",
-		"swc": "1.15.47"
+		"rsvelte_fmt": "0.7.11",
+		"rsvelte_parse": "0.3.7",
+		"rsvelte_parse_svelte_target": "5.56.9",
+		"swc": "1.16.0"
 	},
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3382912,
+			"bytes": 3437328,
 			"kind": "native",
-			"gzip_bytes": 1455195
+			"gzip_bytes": 1490124
+		},
+		{
+			"label": "tsv format (ffi)",
+			"bytes": 3143264,
+			"kind": "native",
+			"gzip_bytes": 1360396
+		},
+		{
+			"label": "tsv parse (ffi)",
+			"bytes": 1529744,
+			"kind": "native",
+			"gzip_bytes": 663669
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3738064,
+			"bytes": 3758464,
 			"kind": "native",
-			"gzip_bytes": 1603283
+			"gzip_bytes": 1614573
+		},
+		{
+			"label": "tsv_format_wasm",
+			"bytes": 2170436,
+			"kind": "wasm",
+			"gzip_bytes": 801265
+		},
+		{
+			"label": "tsv_parse_wasm",
+			"bytes": 926719,
+			"kind": "wasm",
+			"gzip_bytes": 363414
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2405193,
+			"bytes": 2422474,
 			"kind": "wasm",
-			"gzip_bytes": 873208
+			"gzip_bytes": 892683
 		},
 		{
 			"label": "biome (wasm)",
-			"bytes": 38584187,
+			"bytes": 44601353,
 			"kind": "wasm",
-			"gzip_bytes": 9281487
+			"gzip_bytes": 11087699
 		},
 		{
 			"label": "dprint (wasm)",
@@ -699,39 +723,39 @@
 		},
 		{
 			"label": "oxc-parser (napi)",
-			"bytes": 2354904,
+			"bytes": 2145768,
 			"kind": "native",
-			"gzip_bytes": 954754
+			"gzip_bytes": 885666
 		},
 		{
 			"label": "oxfmt (napi)",
-			"bytes": 8844056,
+			"bytes": 9048936,
 			"kind": "native",
-			"gzip_bytes": 3575335
+			"gzip_bytes": 3669088
 		},
 		{
 			"label": "oxc-parser (wasm)",
-			"bytes": 1531455,
+			"bytes": 1486624,
 			"kind": "wasm",
-			"gzip_bytes": 495227
+			"gzip_bytes": 481382
 		},
 		{
 			"label": "yuku-parser (napi)",
-			"bytes": 741256,
+			"bytes": 741128,
 			"kind": "native",
-			"gzip_bytes": 311269
+			"gzip_bytes": 310369
 		},
 		{
 			"label": "yuku-parser (wasm)",
-			"bytes": 674578,
+			"bytes": 673905,
 			"kind": "wasm",
-			"gzip_bytes": 200315
+			"gzip_bytes": 200268
 		},
 		{
 			"label": "rsvelte-fmt (binary)",
-			"bytes": 7890648,
+			"bytes": 8338072,
 			"kind": "native",
-			"gzip_bytes": 3155906
+			"gzip_bytes": 3288148
 		},
 		{
 			"label": "malva (wasm)",
@@ -741,17 +765,18 @@
 		},
 		{
 			"label": "rsvelte compiler (napi)",
-			"bytes": 14246656,
+			"bytes": 14524864,
 			"kind": "native",
-			"gzip_bytes": 5910800
+			"gzip_bytes": 6034856
 		},
 		{
 			"label": "swc (napi)",
-			"bytes": 31601920,
+			"bytes": 31941888,
 			"kind": "native",
-			"gzip_bytes": 11851540
+			"gzip_bytes": 11886133
 		}
 	],
+	"binary_sizes_absent": [],
 	"entries": [
 		{
 			"name": "svelte/compiler",
@@ -1295,5 +1320,6 @@
 		}
 	],
 	"suppressed_noise": {},
-	"variant_parity": []
+	"variant_parity": [],
+	"unavailable": []
 }

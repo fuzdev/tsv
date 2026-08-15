@@ -135,10 +135,20 @@ under `deno check`.
 installer force-fetches back (why: ../../docs/benchmarks.md §Updating
 dependencies). Re-run after a dep bump or a stray `npm install`. Every harness
 entry point preflights `node_modules` via `lib/check_node_modules.ts`: missing is
-fatal with the installer hint, and **stale** — `package.json` newer than npm's
-`.package-lock.json` install stamp, i.e. pins bumped without a reinstall — is fatal
-too (`BENCH_STALE_OK=1` downgrades stale to a warning), so a run can't silently
-measure old installed versions under new labels.
+fatal with the installer hint, and **stale** — any exactly-pinned dep whose
+installed `version` differs from the pin (or is absent) — is fatal too, listing
+each mismatch as `name: pinned X, installed Y` (`BENCH_STALE_OK=1` downgrades stale
+to a warning), so a run can't silently measure old installed versions under new
+labels. The comparison is against the installed **versions**, not against
+`package.json`'s mtime: a mtime proxy tripped on any edit to the file (a comment, a
+branch switch restamping it) and missed an install that ran without taking. Range
+pins (`^4.4.3`) are skipped — a range constrains rather than fixes, so any
+satisfying version is legitimate. One package is graded off-list, because
+`dependencies` is not where it lives: the wasi binding above, whose installed
+version must equal the `oxc-parser` pin it was force-fetched at (the reports label
+its row with that pin, so a version skew there is exactly the mislabeling this check
+prevents). Its **absence** is not graded — nothing is measured then, so nothing is
+mislabeled, and the report's `unavailable` carries the missing row's cause.
 
 **Per-runtime impl availability.** `oxc-parser-wasm` runs under Deno and Node — its
 binding ships a fetch-based browser entry (`parser.wasi-browser.js`) that Deno needs
@@ -494,6 +504,13 @@ deno task test:deno
 # single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`, and the `.js` →
 # babel / `.ts` → typescript parser routing holds.
 deno task test:deno:canonical
+
+# Typechecks the JS/TS the repo owns — this harness, `scripts/`, and the tsv_debug
+# Deno sidecar — which `deno task typecheck` (cargo) does not see. Takes DIRECTORIES,
+# so a new subdirectory is covered the day it appears. NOT gated, for the same reason
+# as the line above: the harness imports npm by bare specifier, and CI's `check` job
+# installs no node_modules. Run it after a harness, scripts, or sidecar change.
+deno task typecheck:js
 ```
 
 "Documented" = every `*_prettier_divergence`-suffixed fixture linked from the
@@ -637,8 +654,8 @@ exact perf filenames). To publish to tsv.fuz.dev, run `npm run update-benchmarks
 `~/dev/tsv.fuz.dev` — its copy list names these files exactly, so renaming a report
 artifact means updating that script in the same change.
 
-The committed JSON (per-runtime `version: 9` — the combined compose report keeps its
-own `version: 7`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
+The committed JSON (per-runtime `version: 11` — the combined compose report carries its
+own `version: 8`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
 `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
 numbers are machine-relative, so this travels with them; excludes hostname and
 volatile fields so it doesn't churn); `corpus_kind` (`perf` | `conformance`);
@@ -657,9 +674,36 @@ skip a row with null `ops_per_second`, not treat it as a zero. Top-level
 count}`; top-level `variant_parity` records any same-engine pair (two bindings, or one
 binding under two options) whose
 pre-flight accept sets disagreed (`[]` when healthy — a non-empty list in a
-committed report is a binding-boundary bug surfacing in the diff).
+committed report is a binding-boundary bug surfacing in the diff); top-level
+`unavailable` records each optional impl that failed to init, as `{impl, reason}`
+with the load error's first line (`[]` on a full machine; under Bun oxc-parser-wasm
+and biome land there — the two known per-runtime load failures, §Cross-Runtime). The
+three answer escalating
+questions about the same surface — noise silenced, a row behaving wrongly, a row
+NOT THERE — and the last is the one a table can't ask, since an impl that stops
+loading takes its column out of every table and the ⚠ init line lives only in the
+run's output.
+Top-level `binary_sizes_absent` names the artifacts the size table reached for and
+did not find — that table is the one section whose COMPOSITION varies by machine
+(a row exists only for a built artifact), so a tsv variant listed there usually
+just means its optional build task wasn't run, while a third-party label means its
+package shipped nothing where `binary_sizes.ts` looked.
 `report.<runtime>.md` renders coverage/iterated as prose; the per-entry numbers,
-`suppressed_noise`, and `variant_parity` are JSON-only.
+`suppressed_noise`, `variant_parity`, `unavailable`, and `binary_sizes_absent` are
+JSON-only.
+
+The conformance report's **Excluded here:** / **Added here:** disclosures are
+authored prose whose CLAIM is checked: `surface_disclosure_lines` (bench.ts) throws
+if the table says a row is excluded and this surface registers it, or vice versa.
+The policy itself lives at the `corpus_kind` conditions in `lib/implementations.ts`,
+so the check is what keeps the published sentence from outliving the code —
+re-enabling yuku's N-API row after an upstream fix fails the run until the
+disclosure is updated. It asks the task REGISTRY (`get_benchmark_tasks`), not the
+rows a run measured, and asks it at init: a corpus filter can empty a whole group,
+and grading that as policy drift failed partial runs at report time, after their
+work and with nothing written. One absence is exempt — an **added** row whose impl
+never initialized is this machine coming up short (already in `unavailable`), so the
+run warns and drops that line instead of failing.
 
 ## Artifact Freshness Guard
 
@@ -669,7 +713,9 @@ harness without paying the wasm-pack cost — at the risk of silently measuring 
 binary older than current source (a CSS run once reported `146/183` against a stale
 `.so` that should have been `155/183`). `lib/check_artifact_freshness.ts` guards
 this: before a run touches the executed artifacts (the runtime's native binding +
-WASM bundle — Deno: FFI + `pkg/all/deno`; Node: N-API + `pkg/all/nodejs`), it
+WASM bundle — Deno: FFI + `pkg/all/deno`; Node: N-API + `pkg/all/nodejs`, the pair
+`check_executed_artifacts` composes for bench and smoke alike; the corpus tools run
+no WASM, so they guard `native_artifact_check()` alone), it
 compares their mtimes against the crate sources feeding them (plus the workspace
 `Cargo.lock`, so dependency bumps trip it too) and **aborts (exit 1)** if any is
 stale or missing. The build-first tasks rebuild first, so they pass for free.
@@ -847,7 +893,7 @@ benches/js/
     ├── biome.ts           # Biome WASM wrapper (Svelte, TypeScript, CSS)
     ├── canonical.ts       # Prettier + Svelte parser wrappers
     ├── check_artifact_freshness.ts # Native/WASM artifact staleness guard (§Artifact Freshness Guard)
-    ├── check_node_modules.ts # node_modules preflight: exists + not stale vs package.json
+    ├── check_node_modules.ts # node_modules preflight: exists + every exact pin (and the oxc wasi binding) matches installed
     ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
     ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
     ├── corpus_repos.ts    # Per-source repo origin + commit, DETECTED from each checkout, so the
@@ -971,8 +1017,12 @@ and skip counts make it visible without `--verbose`.
   on an 18th that had survived it), so the screen is neither cacheable nor
   reproducible. Hence the row — not the files — is dropped on that surface
   (`get_benchmark_tasks`, keyed on `BenchmarkTaskOptions.corpus_kind`), disclosed in
-  the conformance report's `**Excluded here:**` line. Revisit on a yuku bump: re-add
-  the row and run `deno task bench:conformance`.
+  the conformance report's `**Excluded here:**` line — a disclosure whose claim is
+  CHECKED against the registry (§Report files), so re-adding the row without
+  updating the table fails the run. Revisit on a yuku bump: re-add the row and run
+  `deno task bench:conformance`. The fault survives at the pinned version — the
+  `repeat(74)`/`repeat(75)` boundary above reproduces exactly as written — so the
+  exclusion still earns its place; re-probe rather than assume on the next bump.
 - **The oxc WASI binding's `errors` getter is CONSUME-ONCE.** On
   `@oxc-parser/binding-wasm32-wasi`, the first access to `result.errors` returns the
   real error array; every later access returns `[]` (the native `oxc-parser` package
@@ -989,6 +1039,17 @@ and skip counts make it visible without `--verbose`.
   rsvelte-parse↔rsvelte-parse-skip-expr-loc) are compared file-for-file and
   any accept-set divergence prints a `⚠ variant parity` warning (same engine ⇒ a
   divergence is a binding-boundary bug, not an engine difference).
+- **The oxc WASI binding also CAPS the `oxc-parser` pin.** It is force-fetched in
+  lockstep with `oxc-parser` (§Cross-Runtime), so the pin decides which binding
+  installs — and past the version named in `package.json`'s `//oxc-wasi` note the
+  binding fails to load under both Deno and Node (`this.bridge.setLastError is not a
+  function`: it declares an alpha `@emnapi/core` that npm installs NESTED, while the
+  hoisted `@napi-rs/wasm-runtime` it also imports resolves the hoisted 1.x, so the
+  two halves disagree). Same shape as the two per-runtime load failures above but on
+  the VERSION axis, and equally silent: an unloadable impl is absent, not fatal, so
+  the row simply leaves both surfaces' tables. Re-probe before raising the pin
+  (../../docs/benchmarks.md §Updating dependencies carries the command); hoisting
+  the alpha to the tree root works and was deliberately declined.
 - **TypeScript canonical parser**: acorn-typescript fails on some modern syntax
   (files skipped) — and the reverse, files tsv fails that acorn accepts, is a known
   parse gap.

@@ -5,6 +5,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 /** Canonical implementation versions */
 export interface CanonicalVersions {
@@ -103,115 +104,109 @@ export interface AllVersions {
 	postcss: PostcssVersions;
 }
 
-/** Default versions when loading fails */
-const DEFAULT_VERSIONS: AllVersions = {
-	canonical: {
-		prettier: 'unknown',
-		'prettier-plugin-svelte': 'unknown',
-		svelte: 'unknown',
-		acorn: 'unknown',
-		'@sveltejs/acorn-typescript': 'unknown'
-	},
-	oxc: {
-		'oxc-parser': 'unknown',
-		oxfmt: 'unknown'
-	},
-	tsc: {
-		typescript: 'unknown'
-	},
-	yuku: {
-		parser: 'unknown',
-		wasm: 'unknown'
-	},
-	biome: {
-		js_api: 'unknown',
-		wasm: 'unknown'
-	},
-	dprint: {
-		formatter: 'unknown',
-		typescript: 'unknown'
-	},
-	rsvelte: {
-		fmt: 'unknown'
-	},
-	rsvelte_parse: {
-		native: 'unknown'
-	},
-	swc: {
-		core: 'unknown'
-	},
-	malva: {
-		malva: 'unknown'
-	},
-	postcss: {
-		postcss: 'unknown'
+/**
+ * The bare `x.y.z` of `name`'s `dependencies` entry, with any semver range marker
+ * (`^`/`~`/`>=`/etc.) stripped — `'^4.4.3' -> '4.4.3'`.
+ *
+ * THROWS when the entry is absent or carries no version. Every name read here is a
+ * hard `dependencies` entry, so a miss is always a bug — a renamed or dropped
+ * package, or a typo in the key. Degrading to a literal `'unknown'` instead would
+ * publish that bug: the version lands in the report header, in the prettier cache
+ * key, and in the fixtures gates' oracle-skew check, all of which then compare
+ * against a string that describes nothing.
+ */
+function dep_version(deps: Record<string, string>, name: string): string {
+	const spec = deps[name];
+	if (!spec) {
+		throw new Error(
+			`benches/js/package.json has no \`dependencies\` entry for '${name}' — the harness reads ` +
+				`it by name, so a rename or removal must update lib/versions.ts in the same change`
+		);
 	}
-};
-
-/** Strip a leading semver range marker (`^`/`~`/`>=`/etc.) from a package.json
- * version spec, leaving the bare `x.y.z`. `'^4.4.3' -> '4.4.3'`. */
-function clean_version(spec: string | undefined): string {
-	if (!spec) return 'unknown';
 	const m = spec.match(/(\d+\.\d+\.\d+)/);
-	return m ? m[1] : 'unknown';
+	if (!m) {
+		throw new Error(`benches/js/package.json '${name}' version '${spec}' has no x.y.z to read`);
+	}
+	return m[1];
+}
+
+/**
+ * The raw `dependencies` map from `benches/js/package.json` — SPECS as authored
+ * (`'^4.4.3'`, `'3.9.6'`), not versions.
+ *
+ * The pins file has three readers asking three different questions — what version
+ * labels a report (below), does the install match the pin
+ * (`check_node_modules.ts`), and what version to force-fetch the oxc wasi binding
+ * at (`install_deps.ts`) — and each one previously spelled out the path, the read
+ * and the cast for itself. One spelling here means the file's LOCATION and SHAPE
+ * are stated once; each caller still owns its own question and its own failure
+ * posture.
+ *
+ * THROWS if the file can't be read or parsed. A missing `dependencies` key yields
+ * `{}` rather than throwing — that is a well-formed manifest making a claim (no
+ * deps), and the callers each have a better answer for it than a shared one could.
+ */
+export async function read_dependency_pins(): Promise<Record<string, string>> {
+	const pkg_json_path = fileURLToPath(new URL('../package.json', import.meta.url));
+	const content = await readFile(pkg_json_path, 'utf8');
+	return (JSON.parse(content) as { dependencies?: Record<string, string> }).dependencies ?? {};
 }
 
 /**
  * Load all package versions from `package.json` — the single source of truth for
  * the npm deps the bench measures against (both runtimes resolve from it; see
  * benches/js/package.json). Reads `benches/js/package.json` `dependencies`.
+ *
+ * THROWS if that file can't be read or parsed, or if any name below is missing
+ * from `dependencies` (see `dep_version`). There is no defaulted result: these
+ * versions label a committed report, key the prettier cache, and back the fixtures
+ * gates' oracle-skew check, so a run that can't read them must stop rather than
+ * proceed under placeholder labels.
  */
 export async function load_all_versions(): Promise<AllVersions> {
-	try {
-		const pkg_json_path = new URL('../package.json', import.meta.url).pathname;
-		const content = await readFile(pkg_json_path, 'utf8');
-		const config = JSON.parse(content) as { dependencies?: Record<string, string> };
-		const deps = config.dependencies ?? {};
+	const deps = await read_dependency_pins();
 
-		return {
-			canonical: {
-				prettier: clean_version(deps['prettier']),
-				'prettier-plugin-svelte': clean_version(deps['prettier-plugin-svelte']),
-				svelte: clean_version(deps['svelte']),
-				acorn: clean_version(deps['acorn']),
-				'@sveltejs/acorn-typescript': clean_version(deps['@sveltejs/acorn-typescript'])
-			},
-			oxc: {
-				'oxc-parser': clean_version(deps['oxc-parser']),
-				oxfmt: clean_version(deps['oxfmt'])
-			},
-			tsc: {
-				typescript: clean_version(deps['typescript'])
-			},
-			yuku: {
-				parser: clean_version(deps['yuku-parser']),
-				wasm: clean_version(deps['@yuku-parser/wasm'])
-			},
-			biome: {
-				js_api: clean_version(deps['@biomejs/js-api']),
-				wasm: clean_version(deps['@biomejs/wasm-bundler'])
-			},
-			dprint: {
-				formatter: clean_version(deps['@dprint/formatter']),
-				typescript: clean_version(deps['@dprint/typescript'])
-			},
-			rsvelte: {
-				fmt: clean_version(deps['@rsvelte/fmt'])
-			},
-			rsvelte_parse: {
-				native: clean_version(deps['@rsvelte/vite-plugin-svelte-native'])
-			},
-			swc: {
-				core: clean_version(deps['@swc/core'])
-			},
-			malva: {
-				malva: clean_version(deps['dprint-plugin-malva'])
-			},
-			postcss: {
-				postcss: clean_version(deps['postcss'])
-			}
-		};
-	} catch {
-		return DEFAULT_VERSIONS;
-	}
+	return {
+		canonical: {
+			prettier: dep_version(deps, 'prettier'),
+			'prettier-plugin-svelte': dep_version(deps, 'prettier-plugin-svelte'),
+			svelte: dep_version(deps, 'svelte'),
+			acorn: dep_version(deps, 'acorn'),
+			'@sveltejs/acorn-typescript': dep_version(deps, '@sveltejs/acorn-typescript')
+		},
+		oxc: {
+			'oxc-parser': dep_version(deps, 'oxc-parser'),
+			oxfmt: dep_version(deps, 'oxfmt')
+		},
+		tsc: {
+			typescript: dep_version(deps, 'typescript')
+		},
+		yuku: {
+			parser: dep_version(deps, 'yuku-parser'),
+			wasm: dep_version(deps, '@yuku-parser/wasm')
+		},
+		biome: {
+			js_api: dep_version(deps, '@biomejs/js-api'),
+			wasm: dep_version(deps, '@biomejs/wasm-bundler')
+		},
+		dprint: {
+			formatter: dep_version(deps, '@dprint/formatter'),
+			typescript: dep_version(deps, '@dprint/typescript')
+		},
+		rsvelte: {
+			fmt: dep_version(deps, '@rsvelte/fmt')
+		},
+		rsvelte_parse: {
+			native: dep_version(deps, '@rsvelte/vite-plugin-svelte-native')
+		},
+		swc: {
+			core: dep_version(deps, '@swc/core')
+		},
+		malva: {
+			malva: dep_version(deps, 'dprint-plugin-malva')
+		},
+		postcss: {
+			postcss: dep_version(deps, 'postcss')
+		}
+	};
 }

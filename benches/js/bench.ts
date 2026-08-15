@@ -81,7 +81,8 @@ import {
 	canonical_parser_label,
 	get_alternative_versions,
 	get_benchmark_tasks,
-	init_implementations
+	init_implementations,
+	type UnavailableImpl
 } from './lib/implementations.ts';
 import {
 	type CoverageBySource,
@@ -103,25 +104,21 @@ import {
 	generate_summary_report,
 	generate_versions_info,
 	type GroupResults,
+	rows_missing_from_display_order,
 	type SourceCoverageCell,
 	alternative_version_parts,
 	type ReportVersions
 } from './lib/report.ts';
 import {
 	type BinarySize,
+	type CollectedBinarySizes,
 	collect_binary_sizes,
 	generate_binary_size_markdown,
 	generate_binary_size_report
 } from './lib/binary_sizes.ts';
 import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
-import {
-	check_artifact_freshness,
-	WASM_CRATES,
-	wasm_artifact_path
-} from './lib/check_artifact_freshness.ts';
+import { check_executed_artifacts } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
-import { get_library_path } from './lib/ffi.ts';
-import { get_napi_library_path } from './lib/napi.ts';
 import { current_machine, current_runtime, type Machine, type Runtime } from './lib/runtime.ts';
 
 /** The JS runtime executing this bench — labels the report siblings
@@ -450,71 +447,222 @@ function format_throughput(bytes_per_sec: number): string {
 	return `${(bytes_per_sec / 1_000_000).toFixed(1)} MB/s`;
 }
 
+/**
+ * Format bytes as MB with one decimal — corpus sizes, in the terminal summary and
+ * in the markdown report's `**Corpus:**` line alike. Same always-MB convention as
+ * `format_throughput` above, for the same reason, and ONE function because the two
+ * surfaces report the same numbers: as a pair they were free to drift into
+ * disagreeing about the corpus's size.
+ */
+function format_mb(bytes: number): string {
+	return `${(bytes / 1_000_000).toFixed(1)} MB`;
+}
+
 // Compact corpus summary: file counts + MB per language + total. When
 // limited, each line reads `N of M files` so the subset is obvious.
 const total_files = svelte_files.length + ts_files.length + css_files.length;
 const total_bytes = bytes_by_language.svelte + bytes_by_language.typescript + bytes_by_language.css;
 const fmt_count = (n: number, total: number) =>
 	is_limited && n !== total ? `${n} of ${total}` : `${n}`;
-const fmt_bytes = (b: number) => `${(b / 1_000_000).toFixed(1)} MB`;
 log(`Corpus (${CORPUS_MODE} view):`);
 log(
-	`  Svelte:      ${fmt_count(svelte_files.length, total_file_counts.svelte).padEnd(11)} files (${fmt_bytes(
+	`  Svelte:      ${fmt_count(svelte_files.length, total_file_counts.svelte).padEnd(11)} files (${format_mb(
 		bytes_by_language.svelte
 	)})`
 );
 log(
-	`  TypeScript:  ${fmt_count(ts_files.length, total_file_counts.typescript).padEnd(11)} files (${fmt_bytes(
+	`  TypeScript:  ${fmt_count(ts_files.length, total_file_counts.typescript).padEnd(11)} files (${format_mb(
 		bytes_by_language.typescript
 	)})`
 );
 log(
-	`  CSS:         ${fmt_count(css_files.length, total_file_counts.css).padEnd(11)} files (${fmt_bytes(
+	`  CSS:         ${fmt_count(css_files.length, total_file_counts.css).padEnd(11)} files (${format_mb(
 		bytes_by_language.css
 	)})`
 );
-log(`  Total:       ${String(total_files).padEnd(11)} files (${fmt_bytes(total_bytes)})`);
+log(`  Total:       ${String(total_files).padEnd(11)} files (${format_mb(total_bytes)})`);
 log();
 
-// Refuse to measure stale binaries (the `:run` tasks skip the rebuild). See
-// lib/check_artifact_freshness.ts; override with BENCH_STALE_OK=1. The native +
-// WASM artifacts are runtime-specific: Deno executes the FFI library + the
-// `deno`-target WASM bundle; Node/Bun execute the N-API addon + the `nodejs`
-// target. `wasm_artifact_path` resolves the runtime's bundle itself.
-const native_check =
-	RUNTIME === 'deno'
-		? {
-				label: `FFI (${env.TSV_FFI_PROFILE ?? 'release'})`,
-				path: get_library_path(),
-				binding_crates: ['tsv_ffi'],
-				rebuild: 'deno task build:ffi'
-			}
-		: {
-				label: 'N-API',
-				path: get_napi_library_path(),
-				binding_crates: ['tsv_napi'],
-				rebuild: 'deno task build:napi'
-			};
-const wasm_target = RUNTIME === 'deno' ? 'deno' : 'nodejs';
-await check_artifact_freshness([
-	native_check,
-	{
-		label: `WASM (all/${wasm_target})`,
-		path: wasm_artifact_path('all'),
-		binding_crates: WASM_CRATES,
-		rebuild: `deno task build:wasm:all:${wasm_target}`
-	}
-]);
+// Refuse to measure stale binaries (the `:run` tasks skip the rebuild). Which
+// artifacts this runtime executes — FFI or N-API, plus that runtime's WASM target
+// — is `check_executed_artifacts`'s subject; override with BENCH_STALE_OK=1.
+await check_executed_artifacts();
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
 // from the harness `node_modules`; without it, init fails with an opaque
-// module-resolution error. Missing is fatal with the installer hint; stale
-// (package.json newer than npm's install stamp) is fatal too, with
-// BENCH_STALE_OK=1 as the escape — see lib/check_node_modules.ts.
+// module-resolution error. Missing is fatal with the installer hint; stale (an
+// exactly-pinned dep whose installed version isn't the pinned one) is fatal too,
+// with BENCH_STALE_OK=1 as the escape — see lib/check_node_modules.ts.
 await check_node_modules();
 
 // Initialize implementations
 const impls = await init_implementations({ logger: log });
+
+/**
+ * One row-composition claim about this surface, discriminated by which way it
+ * points. `row` is the name `get_benchmark_tasks` registers, in both arms — that is
+ * what makes the claim checkable rather than merely authored.
+ */
+type SurfaceDisclosure =
+	/** Must NOT be registered on this surface. */
+	| { row: string; direction: 'excluded'; prose: string }
+	/**
+	 * Must BE registered here — carrying `initialized`, which answers whether the
+	 * impl behind the row came up on this machine. A row absent because its package
+	 * didn't load is a machine shortfall (already recorded in `unavailable`), not a
+	 * policy change, and this predicate is what draws that line. Only the `added`
+	 * direction has that question to ask: an `excluded` row is absent by policy
+	 * whether or not its impl loaded, so the shape doesn't carry a predicate nothing
+	 * would read.
+	 */
+	| { row: string; direction: 'added'; initialized: () => boolean; prose: string };
+
+/**
+ * The conformance surface's row-composition disclosures: a row this surface drops,
+ * or carries alone, with the reasoning a reader needs.
+ *
+ * The PROSE is authored (a rationale is not derivable), but the CLAIM is not: each
+ * entry names the row it is about, and `surface_disclosure_lines` checks that claim
+ * against the rows this surface's task REGISTRY produces before printing it. The
+ * policy itself lives at the registration sites in `lib/implementations.ts`
+ * (conditions on `corpus_kind`), so without that check this table is a second,
+ * unlinked source of truth — and the one that gets stale, since re-enabling a row is
+ * a change made there while a published report goes on claiming the row was
+ * excluded. That is not hypothetical for the entry below: `benches/js/CLAUDE.md`
+ * §Known Issues says to revisit yuku's exclusion on an upstream bump.
+ *
+ * The claim is checked against the REGISTRY rather than against the rows a run
+ * measured, because those answer different questions: a corpus filter (`BENCH_LIMIT`
+ * / `BENCH_FILTER`) can empty a whole group, and reading that as "the policy
+ * changed" failed a partial run at report time — after its work, with nothing
+ * written. A filter can only remove rows, never add one, so the registry is the
+ * filter-proof form of the same question, and it can be asked before the run
+ * measures anything.
+ *
+ * Mirrors the presence-gated disclosure notes in `lib/report.ts`
+ * (`has('tsv', 'oxc-parser')`), which derive the same way.
+ */
+const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
+	{
+		row: 'yuku-parser',
+		direction: 'excluded',
+		prose:
+			'**Excluded here:** yuku-parser (N-API) — its native binding faults the host process on ' +
+			'this corpus (test262 escaped-identifier fixtures), so it cannot be measured against it. ' +
+			'The WASM binding runs the same engine and carries the row; both are measured on the perf ' +
+			'corpus.\n'
+	},
+	{
+		// The mirror-image disclosure: a row present ONLY here needs saying as much
+		// as one absent, and `tsc`'s reading changes by corpus source — it is the
+		// oracle on the corpus it filtered, an independent parser everywhere else.
+		row: 'tsc',
+		direction: 'added',
+		initialized: () => impls.tsc !== undefined,
+		prose:
+			'**Added here:** tsc — the TypeScript compiler’s own parser, a verdict rather than a ' +
+			'speed, so it carries no row on the throughput surface. Its parser is error-recovering ' +
+			'(`createSourceFile` never throws), so an accept means zero `parseDiagnostics`. On the ' +
+			'tsc corpus it is the ORACLE that selected those files — 100% by construction, like ' +
+			'svelte/compiler on the Svelte set — and an independent parser on every other source, ' +
+			'which is what the per-source tables below are for. Coverage counts accepts and so ' +
+			'cannot show over-acceptance; that axis is `deno task ts-repo:over-acceptance`.\n'
+	}
+];
+
+/**
+ * Every row name this surface's registry produces, over every operation+language
+ * this run covers — the policy question, asked of `get_benchmark_tasks` directly
+ * and independent of what the corpus happens to contain. Pure construction (each
+ * task is a name plus a closure), so building the set costs nothing and runs before
+ * a single file is read.
+ */
+function registered_row_names(): Set<string> {
+	const names = new Set<string>();
+	for (const operation of OPERATIONS) {
+		for (const language of LANGUAGES) {
+			for (const task of get_benchmark_tasks(impls, operation, language, {
+				forced_async: BENCH_FORCED_ASYNC,
+				corpus_kind: CORPUS_MODE
+			})) {
+				names.add(task.name);
+			}
+		}
+	}
+	return names;
+}
+
+/**
+ * Render `SURFACE_DISCLOSURES`, THROWING if a claim disagrees with this surface's
+ * registry. A wrong disclosure is worse than none: it is a published sentence
+ * asserting a policy the code no longer implements, and nothing else in the report
+ * contradicts it (an absent row leaves no trace, which is the whole reason the
+ * disclosure exists).
+ *
+ * One absence is NOT drift and does not throw: an `added` row whose impl failed to
+ * initialize. That is this machine coming up short, recorded as `unavailable` and
+ * warned about here — while the disclosure's prose, which explains why the row is
+ * on this surface, is dropped rather than printed over a row that isn't there.
+ */
+function surface_disclosure_lines(registered: Set<string>): {
+	lines: string[];
+	warnings: string[];
+} {
+	const lines: string[] = [];
+	const warnings: string[] = [];
+	for (const d of SURFACE_DISCLOSURES) {
+		const present = registered.has(d.row);
+		if (d.direction === 'excluded' && present) {
+			throw new Error(
+				`report disclosure is stale: it says '${d.row}' is excluded from the conformance ` +
+					`surface, but this surface registers it. Update SURFACE_DISCLOSURES in bench.ts to ` +
+					`match the registration in lib/implementations.ts.`
+			);
+		}
+		if (d.direction === 'added' && !present) {
+			if (!d.initialized()) {
+				warnings.push(
+					`⚠ '${d.row}' did not initialize, so its "Added here" disclosure is omitted from ` +
+						`this report (see \`unavailable\`).`
+				);
+				continue;
+			}
+			throw new Error(
+				`report disclosure is stale: it says '${d.row}' is added on the conformance surface, ` +
+					`but this surface does not register it. Update SURFACE_DISCLOSURES in bench.ts to ` +
+					`match the registration in lib/implementations.ts.`
+			);
+		}
+		lines.push(d.prose);
+	}
+	return { lines, warnings };
+}
+
+// Resolve the conformance report's row-composition disclosures HERE — before the
+// pre-flight and timed phases — so a stale claim fails immediately, rather than at
+// report time after a full run whose output the throw would then discard.
+// Both checks below ask the same registry, so it is built ONCE — two calls would
+// invite them to answer from different sets after a future edit.
+const REGISTERED_ROWS = registered_row_names();
+const { lines: SURFACE_DISCLOSURE_PROSE, warnings: surface_disclosure_warnings } = IS_CONFORMANCE
+	? surface_disclosure_lines(REGISTERED_ROWS)
+	: { lines: [], warnings: [] };
+for (const warning of surface_disclosure_warnings) log(warning);
+
+// The report's row order is hand-maintained and UNCHECKED in the other direction:
+// an unlisted name doesn't fail, it sorts silently to the end (`report.ts`
+// `rows_missing_from_display_order`). Same drift shape as a stale disclosure, one
+// severity down — a misordered table misleads nobody the way a false sentence does
+// — so this warns where the disclosure check throws. Runs on both surfaces, since
+// each registers rows the other doesn't.
+const unordered_rows = rows_missing_from_display_order(REGISTERED_ROWS);
+if (unordered_rows.length > 0) {
+	log(
+		`⚠ ${unordered_rows.join(', ')} — not in report.ts DISPLAY_ORDER, so ${
+			unordered_rows.length === 1 ? 'it sorts' : 'they sort'
+		} last in every table`
+	);
+}
 
 //
 // Benchmark Helpers
@@ -1192,6 +1340,19 @@ interface Baseline {
 	coverage_by_source?: Record<string, Record<string, Record<string, SourceCoverageCell>>>;
 	versions: BaselineVersions;
 	binary_sizes: BinarySize[];
+	/**
+	 * Labels the size table reached for and did not find (see
+	 * `CollectedBinarySizes.absent`). Empty `[]` when every expected artifact was
+	 * on disk.
+	 *
+	 * The size table is the one section whose COMPOSITION is machine-dependent —
+	 * rows exist only for built artifacts — so without this a report from a
+	 * partially-built tree is indistinguishable from one where an artifact stopped
+	 * being produced. A tsv variant listed here usually just means its optional
+	 * build task wasn't run; a third-party label means its package shipped nothing
+	 * where this module looked.
+	 */
+	binary_sizes_absent: string[];
 	entries: BaselineEntry[];
 	/**
 	 * Counts of stderr noise from third-party impls that the harness silenced
@@ -1209,27 +1370,48 @@ interface Baseline {
 	 * in a committed report is a binding-boundary bug surfacing at review time.
 	 */
 	variant_parity: VariantParityFinding[];
+	/**
+	 * Optional impls that failed to initialize on the machine that produced this
+	 * report, with the first line of each load error (see `init_optional`). Empty
+	 * `[]` on a full machine — the healthy state.
+	 *
+	 * JSON-only, like the two fields above, and here for the same reason one step
+	 * further out: those record a row behaving wrongly, this records a row that is
+	 * NOT THERE. An impl that stops loading takes its column out of every table
+	 * silently as far as the committed report is concerned — the ⚠ init line lives
+	 * only in the terminal scroll — so without this a binding broken by a dep bump
+	 * reads as a report that simply never had that tool.
+	 */
+	unavailable: UnavailableImpl[];
 }
 
 /**
  * Read tsv's own version from the workspace `Cargo.toml` (`[workspace.package]`),
  * the single source of truth every crate inherits via `version.workspace = true`
- * and that the published npm packages move together at. Returns `'unknown'` if it
- * can't be read or parsed.
+ * and that the published npm packages move together at.
+ *
+ * THROWS if the file can't be read or the version can't be found — the same
+ * posture as `lib/versions.ts`, for the same reason. This string labels the
+ * committed report's header and its `versions.tsv` (which `compose_reports.ts`
+ * reads), so a defaulted `'unknown'` would not degrade gracefully: it would
+ * publish a report that names no version, from a file that is always present in
+ * this repo. A miss means the regex stopped matching a reshuffled `Cargo.toml`,
+ * which is a bug to fix rather than a state to label.
  */
 async function get_tsv_version(): Promise<string> {
-	try {
-		const cargo_toml_path = fileURLToPath(new URL('../../Cargo.toml', import.meta.url));
-		const content = await readFile(cargo_toml_path, 'utf8');
-		// Match the line-leading `version = "..."` inside the `[workspace.package]` section.
-		// `^version` (multiline) avoids matching a `rust-version = "..."` MSRV pin; `[^[]*?`
-		// bounds the search to the section by stopping at the next `[` heading.
-		const match = content.match(/\[workspace\.package\][^[]*?^version\s*=\s*"([^"]+)"/m);
-		if (match) return match[1];
-	} catch {
-		// Ignore
+	const cargo_toml_path = fileURLToPath(new URL('../../Cargo.toml', import.meta.url));
+	const content = await readFile(cargo_toml_path, 'utf8');
+	// Match the line-leading `version = "..."` inside the `[workspace.package]` section.
+	// `^version` (multiline) avoids matching a `rust-version = "..."` MSRV pin; `[^[]*?`
+	// bounds the search to the section by stopping at the next `[` heading.
+	const match = content.match(/\[workspace\.package\][^[]*?^version\s*=\s*"([^"]+)"/m);
+	if (!match) {
+		throw new Error(
+			`Cargo.toml has no [workspace.package] version (${cargo_toml_path}) — the report labels ` +
+				`every number with it, so it cannot be defaulted`
+		);
 	}
-	return 'unknown';
+	return match[1];
 }
 
 /** Get current git commit hash */
@@ -1303,7 +1485,11 @@ async function build_results_data(
 	groups: GroupResults[],
 	corpus: { svelte: number; typescript: number; css: number },
 	versions: BaselineVersions,
-	binary_sizes: BinarySize[]
+	// The collector's whole answer, not its two halves re-threaded: sizes and
+	// absences are one measurement of one table, and splitting them at the call
+	// site is what lets a caller pass a `sizes` from one collection beside an
+	// `absent` from another.
+	collected_sizes: CollectedBinarySizes
 ): Promise<Baseline> {
 	const entries: BaselineEntry[] = [];
 	if (COVERAGE_ONLY) {
@@ -1347,14 +1533,19 @@ async function build_results_data(
 	}
 
 	return {
-		// Bumped 8 → 9 for `variant_parity`'s neutral pair keys (`impl`/`sibling` +
-		// their `_only` counts, was `native`/`wasm`): the check now also pairs one
-		// binding under two options, which those names described wrongly. 7 → 8 added
+		// Bumped 10 → 11 for `binary_sizes_absent` (the size table's composition
+		// disclosure — which expected artifacts were not on disk). 9 → 10 for
+		// `unavailable` (the impls that failed to init, so a row
+		// missing from every table has a recorded cause instead of only a ⚠ line in
+		// the run's output). 8 → 9 for `variant_parity`'s neutral pair keys
+		// (`impl`/`sibling` + their `_only` counts, was `native`/`wasm`): the check
+		// now also pairs one binding under two options, which those names described
+		// wrongly. 7 → 8 added
 		// `coverage_by_source` (coverage-only runs; the markdown's per-source tables in
 		// machine-readable form). 6 → 7 added the top-level `machine` block (CPU model,
 		// OS/arch, runtime version); 5 → 6 added `corpus_kind` + `corpus_sources`;
 		// 4 → 5 added the `runtime` field, top-level and per row.
-		version: 9,
+		version: 11,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
 		timestamp: new Date().toISOString(),
@@ -1367,16 +1558,13 @@ async function build_results_data(
 		// (an unlisted per-file failure hard-fails the run instead).
 		coverage_by_source: COVERAGE_ONLY ? serialize_coverage_by_source() : undefined,
 		versions,
-		binary_sizes: binary_sizes,
+		binary_sizes: collected_sizes.sizes,
+		binary_sizes_absent: collected_sizes.absent,
 		entries,
 		suppressed_noise: Object.fromEntries(suppressed_noise),
-		variant_parity: variant_parity_findings
+		variant_parity: variant_parity_findings,
+		unavailable: impls.unavailable
 	};
-}
-
-/** Format bytes as MB with one decimal */
-function format_mb(bytes: number): string {
-	return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
 /** Generate a full markdown report from benchmark data */
@@ -1440,27 +1628,10 @@ function generate_markdown_report(
 	version_parts.push(...alternative_version_parts(versions));
 	lines.push(`**Versions:** ${version_parts.join(', ')}\n`);
 
-	// A row absent from a coverage report reads as "not measured"; say why.
-	if (IS_CONFORMANCE) {
-		lines.push(
-			'**Excluded here:** yuku-parser (N-API) — its native binding faults the host process on ' +
-				'this corpus (test262 escaped-identifier fixtures), so it cannot be measured against it. ' +
-				'The WASM binding runs the same engine and carries the row; both are measured on the perf ' +
-				'corpus.\n'
-		);
-		// The mirror-image disclosure: a row present ONLY here needs saying as much
-		// as one absent, and `tsc`'s reading changes by corpus source — it is the
-		// oracle on the corpus it filtered, an independent parser everywhere else.
-		lines.push(
-			'**Added here:** tsc — the TypeScript compiler’s own parser, a verdict rather than a ' +
-				'speed, so it carries no row on the throughput surface. Its parser is error-recovering ' +
-				'(`createSourceFile` never throws), so an accept means zero `parseDiagnostics`. On the ' +
-				'tsc corpus it is the ORACLE that selected those files — 100% by construction, like ' +
-				'svelte/compiler on the Svelte set — and an independent parser on every other source, ' +
-				'which is what the per-source tables below are for. Coverage counts accepts and so ' +
-				'cannot show over-acceptance; that axis is `deno task ts-repo:over-acceptance`.\n'
-		);
-	}
+	// A row absent from a coverage report reads as "not measured"; say why. Each
+	// claim was CHECKED against this surface's registry back at init, before the
+	// run's work — see `SURFACE_DISCLOSURES`.
+	lines.push(...SURFACE_DISCLOSURE_PROSE);
 
 	lines.push(
 		'**Methodology:** Single-threaded — every implementation formats/parses one file at a time, ' +
@@ -1747,7 +1918,8 @@ async function compare_baseline(current: Baseline): Promise<void> {
 
 // Collect binary sizes once (used by all output paths). Versions no longer
 // thread through — bindings live in node_modules (flat, no version dir).
-const binary_sizes = await collect_binary_sizes(impls);
+const collected_sizes = await collect_binary_sizes(impls);
+const binary_sizes = collected_sizes.sizes;
 
 // Build results data (used by all output paths and always saved)
 const corpus = {
@@ -1766,7 +1938,7 @@ const versions: BaselineVersions = {
 	prettier_svelte: v['prettier-plugin-svelte'],
 	...alt_versions
 };
-const results_data = await build_results_data(all_group_results, corpus, versions, binary_sizes);
+const results_data = await build_results_data(all_group_results, corpus, versions, collected_sizes);
 
 if (args.json) {
 	// JSON output (same structure as saved results)
@@ -1863,6 +2035,24 @@ if (write_report) {
 	log(`Canonical report updated:`);
 	log(`  ${RESULTS_DIR}/report.${REPORT_TAG}.json`);
 	log(`  ${RESULTS_DIR}/report.${REPORT_TAG}.md`);
+	// A limited corpus withholds this file (above); a machine missing an impl does
+	// NOT — and shouldn't, since `unavailable` is non-empty by design on some
+	// runtimes (Bun loads neither biome nor oxc-parser-wasm). But the two are the
+	// same KIND of diminished measurement, and this one leaves no trace in the
+	// table it thins: the row is simply gone, and the ⚠ init lines are far up the
+	// scroll. So name the shortfall at the moment the file is published.
+	if (impls.unavailable.length > 0) {
+		log(
+			`  ⚠ published without ${impls.unavailable.length} impl(s) that failed to load: ` +
+				`${impls.unavailable.map((u) => u.impl).join(', ')} (recorded in \`unavailable\`)`
+		);
+	}
+	if (results_data.binary_sizes_absent.length > 0) {
+		log(
+			`  ⚠ size table missing ${results_data.binary_sizes_absent.length} artifact(s): ` +
+				`${results_data.binary_sizes_absent.join(', ')} (recorded in \`binary_sizes_absent\`)`
+		);
+	}
 } else {
 	log(`Skipped canonical report (limited run — pass --save-report to override)`);
 }

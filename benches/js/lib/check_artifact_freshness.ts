@@ -17,12 +17,18 @@
  * This module stats the crate sources that feed each executed artifact against
  * that artifact's own mtime and aborts the run when any source is newer (or the
  * artifact is missing). It only guards artifacts that are actually *executed*
- * during measurement — the FFI library and the `pkg/all/deno` WASM bundle
- * (the default full build, supplying both the parse and format functions the
- * bench runs). Size-only artifacts like the subset `pkg/format/deno` and
- * `pkg/parse/deno` WASM bundles and the `target/ffi-{format,parse}` FFI builds
- * aren't guarded: `binary_sizes.ts` already degrades gracefully when they're
- * absent.
+ * during measurement, and WHICH those are is a runtime fact this module owns
+ * (`native_artifact_check` / `check_executed_artifacts`): the native binding the
+ * runtime loads — C-FFI under Deno, the N-API addon under Node/Bun — plus that
+ * runtime's `pkg/all/{deno,nodejs}` WASM bundle, the full build supplying both the
+ * parse and format functions the bench runs. The corpus tools execute no WASM, so
+ * they guard the native library alone.
+ *
+ * Size-only artifacts — the subset `pkg/{format,parse}/<target>` bundles and the
+ * `target/ffi-{format,parse}` builds — aren't guarded: nothing runs them, and
+ * `binary_sizes.ts` both degrades gracefully when they're absent and now records
+ * the absence (`binary_sizes_absent`), so a report from a partially-built tree
+ * says so rather than just carrying a shorter table.
  *
  * Escape hatch: set `BENCH_STALE_OK=1` to run anyway. A missing artifact is
  * always fatal (you can't measure what isn't there); `BENCH_STALE_OK=1`
@@ -36,6 +42,8 @@
 import { readdir, stat } from 'node:fs/promises';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { get_library_path } from './ffi.ts';
+import { get_napi_library_path } from './napi.ts';
 import { current_runtime } from './runtime.ts';
 
 /**
@@ -245,4 +253,61 @@ export function wasm_artifact_path(variant: 'format' | 'parse' | 'all'): string 
 	return fileURLToPath(
 		new URL(`../../../crates/tsv_wasm/pkg/${variant}/${target}/tsv_wasm_bg.wasm`, import.meta.url)
 	);
+}
+
+/**
+ * The check for the native binding this runtime EXECUTES: the C-FFI library
+ * under Deno (`Deno.dlopen`), the N-API addon under Node/Bun (`process.dlopen`).
+ * Same engine, different binding boundary — which one is live is a runtime fact,
+ * so it is answered here rather than at each entry point.
+ *
+ * The rebuild hint follows `TSV_FFI_PROFILE`: a `corpus`-profile library is
+ * rebuilt by a different task than the release one, and pointing a reader at
+ * `build:ffi` when their stale artifact is the corpus build is a remedy that
+ * rebuilds the wrong file. That correction lived in `compare_cli.ts` alone while
+ * the two copies of this block went without it.
+ */
+export function native_artifact_check(): ArtifactCheck {
+	if (current_runtime() !== 'deno') {
+		return {
+			label: 'N-API',
+			path: get_napi_library_path(),
+			binding_crates: ['tsv_napi'],
+			rebuild: 'deno task build:napi'
+		};
+	}
+	const profile = env.TSV_FFI_PROFILE ?? 'release';
+	return {
+		label: `FFI (${profile})`,
+		path: get_library_path(),
+		binding_crates: ['tsv_ffi'],
+		rebuild: profile === 'corpus' ? 'deno task build:ffi:corpus' : 'deno task build:ffi'
+	};
+}
+
+/**
+ * Guard every artifact a bench/smoke run executes — the runtime's native binding
+ * plus its `all` WASM bundle.
+ *
+ * `bench.ts` and `smoke.ts` had this block verbatim, twice: the same
+ * runtime-conditional native entry, the same WASM entry, the same target
+ * derivation. That pairing IS this module's subject ("which artifacts does this
+ * runtime execute"), so a third measured binding, or a moved output path, is one
+ * edit here rather than a sweep of the entry points — the failure mode being a
+ * run that guards one artifact and silently measures another.
+ *
+ * The corpus tools guard only the FFI library (they run no WASM), so they call
+ * `native_artifact_check` and pass it themselves.
+ */
+export async function check_executed_artifacts(): Promise<void> {
+	const target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
+	await check_artifact_freshness([
+		native_artifact_check(),
+		{
+			label: `WASM (all/${target})`,
+			path: wasm_artifact_path('all'),
+			binding_crates: WASM_CRATES,
+			rebuild: `deno task build:wasm:all:${target}`
+		}
+	]);
 }

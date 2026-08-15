@@ -31,6 +31,18 @@ import { type AllVersions, load_all_versions } from './versions.ts';
 
 export type { TsvImplementation };
 
+/**
+ * One optional implementation that failed to initialize on this machine — an
+ * uninstalled package, a missing platform binding, a runtime that can't load a
+ * given wasm entry, or a binding broken by an upstream bump.
+ */
+export interface UnavailableImpl {
+	/** The impl as the ⚠ init line names it, so terminal and report agree. */
+	impl: string;
+	/** First line of the load error — why it isn't here. */
+	reason: string;
+}
+
 /** Result of initializing implementations */
 export interface InitializedImplementations {
 	/** All package versions */
@@ -73,16 +85,18 @@ export interface InitializedImplementations {
 	rsvelte_parse: RsvelteParseImplementation | undefined;
 	/** swc (`@swc/core`, N-API) - parse only, TypeScript/JS; undefined if not available */
 	swc: SwcImplementation | undefined;
+	/**
+	 * Every optional impl above that failed to init, in init order — the machine's
+	 * shortfall as data rather than as terminal ⚠ lines. Empty `[]` on a full
+	 * machine. Reaches the report as `unavailable` (see `init_optional`).
+	 */
+	unavailable: UnavailableImpl[];
 }
 
 /** Options for implementation initialization */
 export interface InitOptions {
 	/** Logger for status messages */
 	logger?: Logger;
-	/** Whether to skip missing implementations (default: true) */
-	skip_missing?: boolean;
-	/** Whether canonical is required (default: true) */
-	require_canonical?: boolean;
 }
 
 /**
@@ -93,16 +107,24 @@ export interface InitOptions {
  * an uninstalled package, a runtime that can't load a given wasm entry — so they
  * all want this exact try/catch. Sharing it is what keeps a new impl from arriving
  * with a subtly different failure posture (swallowing where the others rethrow,
- * say). `skip_missing: false` rethrows, which is how a caller demands a full set.
+ * say). There is no opt-out: a caller that wants the full set asserts on the
+ * returned `unavailable` list, which names what is missing and why — better than a
+ * throw that reports only the first absence.
  *
  * `label` is the success line; `missing_label` names the impl in the ⚠ line when it
  * reads differently there (the ✓ lines carry a parenthetical the ⚠ lines don't).
+ *
+ * Each absence is also pushed to `unavailable`, which reaches the report JSON. The
+ * ⚠ line alone lives in the terminal scroll: an impl that stops loading drops its
+ * ROW from every table, and a reader diffing the committed report would see the
+ * column disappear with nothing saying why. Same disclosure posture as
+ * `suppressed_noise` and `variant_parity` in `bench.ts`.
  */
 async function init_optional<T extends { init: () => Promise<void> }>(
 	impl: T,
 	label: string,
 	logger: Logger,
-	skip_missing: boolean,
+	unavailable: UnavailableImpl[],
 	missing_label: string = label
 ): Promise<T | undefined> {
 	try {
@@ -110,8 +132,13 @@ async function init_optional<T extends { init: () => Promise<void> }>(
 		logger(`  ✓ ${label}`);
 		return impl;
 	} catch (e) {
-		if (!skip_missing) throw e;
 		logger(`  ⚠ ${missing_label}: not available`);
+		// First line only, like the native-panic classifier: a load failure's later
+		// lines are a stack trace, machine-specific and worthless in a committed diff.
+		unavailable.push({
+			impl: missing_label,
+			reason: String(e instanceof Error ? e.message : e).split('\n')[0]
+		});
 		return undefined;
 	}
 }
@@ -130,7 +157,7 @@ async function init_optional<T extends { init: () => Promise<void> }>(
 export async function init_implementations(
 	options: InitOptions = {}
 ): Promise<InitializedImplementations> {
-	const { logger = console.log, skip_missing = true, require_canonical = true } = options;
+	const { logger = console.log } = options;
 
 	// Load all versions once from package.json
 	const versions = await load_all_versions();
@@ -147,24 +174,24 @@ export async function init_implementations(
 
 	logger('Initializing implementations...');
 
-	// Initialize canonical (required by default)
+	// Canonical is the one REQUIRED impl — it is the oracle every comparison is
+	// against, so a run without it measures nothing. Rethrows rather than joining
+	// `unavailable` below: that list records a diminished run, and this is not one.
 	try {
 		await canonical.init();
 		logger('  ✓ Canonical (prettier + svelte/compiler)');
 	} catch (e) {
-		if (require_canonical) {
-			logger(`  ✗ Canonical: ${e}`);
-			throw e;
-		}
-		logger(`  ⚠ Canonical: ${e}`);
+		logger(`  ✗ Canonical: ${e}`);
+		throw e;
 	}
 
 	// Every impl below is optional and shares one failure posture — see `init_optional`.
+	const unavailable: UnavailableImpl[] = [];
 	const optional = <T extends { init: () => Promise<void> }>(
 		impl: T,
 		label: string,
 		missing_label?: string
-	) => init_optional(impl, label, logger, skip_missing, missing_label);
+	) => init_optional(impl, label, logger, unavailable, missing_label);
 
 	const native_impl = await optional(native, native_label);
 	const wasm_impl = await optional(wasm, 'WASM');
@@ -261,7 +288,8 @@ export async function init_implementations(
 		postcss: postcss_impl,
 		rsvelte: rsvelte_impl,
 		rsvelte_parse: rsvelte_parse_impl,
-		swc: swc_impl
+		swc: swc_impl,
+		unavailable
 	};
 }
 
