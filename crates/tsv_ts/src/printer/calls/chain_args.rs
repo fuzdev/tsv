@@ -80,6 +80,16 @@ fn build_inline_leading_comments(
     arg_start: u32,
 ) -> Option<DocId> {
     let d = printer.d();
+    // A block-only run glued to `(` that the author broke after takes its
+    // newline-after soft `line` — the same gate the non-chain seams ask
+    // (`emit_first_arg_leading_comments`): own line when the argument layout
+    // breaks, glued bytes when it collapses. An own-line-authored run declines
+    // and keeps the emitters below.
+    if let Some(run) = printer.opener_trailing_broke_after_run(paren_open, arg_start) {
+        let mut parts = DocBuf::new();
+        printer.push_leading_run_with_soft_line(&mut parts, &run);
+        return Some(d.concat(&parts));
+    }
     let pc = PartitionedComments::new(
         printer.comments,
         printer.comment_line_breaks,

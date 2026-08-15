@@ -645,10 +645,15 @@ pub(crate) fn has_trailing_line_comments_slice(
 /// first argument.
 ///
 /// Own-line comments always lead the first argument. A same-line run trailing `(`
-/// goes one of two ways, and the split is the run's *kind*, not each comment's:
+/// goes one of three ways, and the split is the run's *kind*, not each comment's:
 ///
-/// - **Block-only** (`fn(/* c */ a)`) — emitted inline ahead of the first argument, so
-///   a call that fits stays on one line (matching prettier).
+/// - **Block-only, broke after** (`fn(/* c */⏎a)`) — the run takes its newline-after
+///   soft `line` ([`Printer::push_leading_run_with_soft_line`]): its own line when the
+///   argument list breaks, the glued bytes when it collapses (prettier's
+///   `printLeadingComment` `line`). Gated by
+///   [`Printer::opener_trailing_broke_after_run`].
+/// - **Block-only, glued** (`fn(/* c */ a)`) — emitted inline ahead of the first
+///   argument, so a call that fits stays on one line (matching prettier).
 /// - **Any line comment in the run** — the whole run stays on the `(` line, in source
 ///   order. A `//` runs to EOL, so it cannot ride the argument's line; keeping it where
 ///   the author put it is tsv's sanctioned divergence (prettier relocates it to its own
@@ -685,6 +690,15 @@ pub(crate) fn emit_first_arg_leading_comments(
     first_arg_start: u32,
 ) {
     if !printer.has_comments_to_emit_between(paren_open, first_arg_start) {
+        return;
+    }
+    // A block-only run glued to `(` that the author broke after takes its
+    // newline-after soft `line` instead of the glue below — own line when the
+    // argument list breaks (this builder's layouts are the breaking ones), glued
+    // bytes when it collapses. An own-line-authored run declines the gate and
+    // keeps the emitters below (`Printer::opener_trailing_broke_after_run`).
+    if let Some(run) = printer.opener_trailing_broke_after_run(paren_open, first_arg_start) {
+        printer.push_leading_run_with_soft_line(parts, &run);
         return;
     }
     let d = printer.d();

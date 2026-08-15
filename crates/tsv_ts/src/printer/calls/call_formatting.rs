@@ -632,6 +632,24 @@ fn try_single_arg_comment_paths(
     // owned one is `None` here and rides on `arg_doc`.
     if printer.has_comments_on_page_between(paren_open, arg_start) && !has_own_line_trailing_comment
     {
+        // The broke-after half of this gap first: a block-only run glued to `(`
+        // whose last comment the author broke after rides its newline-after soft
+        // `line` inside the same wrap group — own line when the argument breaks
+        // the call open, glued bytes when everything collapses (prettier's
+        // `printLeadingComment` `line`). An own-line-authored run declines the
+        // gate and keeps the glued emitter below, whose glue answers preserve
+        // its breaks; so does an owned comment, which rides the argument's doc.
+        if let Some(run) = printer.opener_trailing_broke_after_run(paren_open, arg_start) {
+            let mut parts: DocBuf = DocBuf::new();
+            printer.push_leading_run_with_soft_line(&mut parts, &run);
+            parts.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0));
+            if let Some(trailing) =
+                printer.build_inline_comments_between_doc_opt(arg_end, paren_close)
+            {
+                parts.push(trailing);
+            }
+            return Some(wrap_call_with_soft_breaks(d, callee, d.concat(&parts)));
+        }
         let inline_comments = printer.build_rhs_comments_glued_opt(paren_open, arg_start);
         // Argument-context builder so a binary/logical chain gets its
         // continuation indent (matches the no-comment path); see the leading
@@ -1432,6 +1450,15 @@ fn build_call_with_arg_comments(
                 // arg. Same shared emitter; it ends with the right separator before
                 // the arg (space after a hug, hardline after an own-line comment).
                 gap_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
+            } else if let Some(run) =
+                printer.opener_trailing_broke_after_run(paren_open, first_arg_start)
+            {
+                // A block-only run glued to `(` that the author broke after: its
+                // newline-after soft `line` rides the argument group — own line
+                // when the list breaks (a breaking first argument, a sibling, or
+                // width), glued bytes when the call collapses. The glue loop
+                // below would weld the run to the argument in both renderings.
+                printer.push_leading_run_with_soft_line(&mut arg_parts, &run);
             } else {
                 // A block trails the `(` but nothing forces expansion. Every comment
                 // in this gap is a block (no line comment reaches here) that is

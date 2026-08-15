@@ -565,11 +565,26 @@ impl<'a> Printer<'a> {
         } else if should_hug {
             // Hugged body (possibly with inline block comments):
             // `() => ({...})` or `() => /* c */ ({...})`
-            parts.push(d.text(" "));
-            if let Some(run) = gap_run() {
-                parts.push(run);
+            //
+            // A block run glued to `=>` that the author broke after, before a body
+            // that WILL break, takes prettier's break-after-operator form instead
+            // of the hug — the run own-line under `=>`, the body below it (the `=`
+            // seams' rule; the shared gate + emitter). A body that fits declines
+            // and keeps the glued hug, whose flat render is the same bytes
+            // prettier's collapsed `line` produces.
+            if let Some((run, body_doc)) =
+                self.breaking_value_leading_run(arrow_end, body_start, || {
+                    self.build_arrow_body_doc(expr)
+                })
+            {
+                parts.push(self.break_after_operator_run_doc(&run, body_start, body_doc));
+            } else {
+                parts.push(d.text(" "));
+                if let Some(run) = gap_run() {
+                    parts.push(run);
+                }
+                parts.push(self.build_arrow_body_doc(expr));
             }
-            parts.push(self.build_arrow_body_doc(expr));
         } else if is_arrow_body && (chain_has_return_type || self.in_curried_typed_arrow.get()) {
             // Curried arrow chain - all arrows break without indent so they align:
             // const f = (x: T): H => (y) => expr   // outer has return type
@@ -643,7 +658,24 @@ impl<'a> Printer<'a> {
             // `build_arrow_body_doc`, so it prepends the run on its own seam — the same
             // side of the parens that helper picks for a ternary, i.e. inside.
             // `will_break` asks about the BODY, so it reads the raw doc.
-            let with_leading = prepend_leading(d, gap_run(), body_doc);
+            //
+            // A run the author broke after takes its newline-after soft `line`
+            // instead of the glued space: inside the parens group it materializes
+            // exactly when the ternary drops to its own (paren-less) line — width
+            // or a hard break in the body — and collapses to the glued bytes flat.
+            // An author blank after the run declines (a soft `line` cannot carry
+            // it — `run_takes_soft_separator`) and keeps the glued path.
+            let with_leading = if let Some(run) = self
+                .broke_after_value_leading_run(arrow_end, body_start)
+                .filter(|run| self.run_takes_soft_separator(arrow_end, body_start, run))
+            {
+                let mut run_parts = DocBuf::new();
+                self.push_leading_run_with_soft_line(&mut run_parts, &run);
+                run_parts.push(body_doc);
+                d.concat(&run_parts)
+            } else {
+                prepend_leading(d, gap_run(), body_doc)
+            };
             if d.will_break(body_doc) {
                 // Body has hardlines (multiline template in ternary, etc.)
                 // Use normal break layout — no parens needed
@@ -667,11 +699,25 @@ impl<'a> Printer<'a> {
             // breaks naturally, enabling chain/call expansion decisions.
             // Inline block comments before a non-huggable body:
             // `() => /* comment */ a + b`
+            //
+            // A run the author broke after rides the hang group's own machinery
+            // (`hang_after_operator_run_doc`): flat renders the glued bytes; a
+            // broken seam — the body's hard break or width — puts the run on its
+            // own line with the body re-fitting below, prettier's
+            // `printLeadingComment` `line`. An author blank after the run
+            // declines (a soft `line` cannot carry it — `run_takes_soft_separator`)
+            // and keeps the glued path.
             let body_doc = self.build_arrow_body_doc(expr);
-            parts.push(hang_after_operator(
-                d,
-                prepend_leading(d, gap_run(), body_doc),
-            ));
+            parts.push(
+                if let Some(run) = self
+                    .broke_after_value_leading_run(arrow_end, body_start)
+                    .filter(|run| self.run_takes_soft_separator(arrow_end, body_start, run))
+                {
+                    self.hang_after_operator_run_doc(&run, body_doc)
+                } else {
+                    hang_after_operator(d, prepend_leading(d, gap_run(), body_doc))
+                },
+            );
         }
     }
 
@@ -1463,10 +1509,16 @@ impl<'a> Printer<'a> {
         if matches!(expr, internal::Expression::ConditionalExpression(_)) {
             let body_doc = self.build_expression_doc(expr);
             // The leading run rides INSIDE these parens, so the paren decision wraps
-            // both — but `will_break` still asks about the BODY alone.
+            // both — `will_break` asks about the body AND the run.
             let with_leading = prepend(body_doc);
-            // If body contains hardlines (will definitely break), no parens
-            if d.will_break(body_doc) {
+            // A forced break in the body OR in the run mandates the no-parens arm.
+            // The run's half is not redundant with the `if_break`: `arena_fits`
+            // stops measuring at the first forced newline, so an own-line run's
+            // hardline reads as "fits" to the enclosing group, the `if_break`
+            // picks its flat arm, and the parens close around content that still
+            // breaks (`=> (/* c */⏎a ? …)`) — a form prettier never prints and a
+            // second pass cannot hold.
+            if d.will_break(body_doc) || leading.is_some_and(|l| d.will_break(l)) {
                 return with_leading;
             }
             // Otherwise, use if_break to check enclosing group

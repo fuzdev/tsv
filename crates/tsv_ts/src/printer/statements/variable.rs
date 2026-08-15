@@ -485,26 +485,40 @@ impl<'a> Printer<'a> {
                     }
                 };
 
-                // A block run the author broke AFTER, before an init that actually
-                // breaks (`const y = /* c */⏎{ …multiline… }`): prettier's
-                // break-after-operator (`chooseLayout`'s `hasLeadingOwnLineComment`
-                // arm) — `=`, then the run and the init below it in the indent, the
-                // run's newline-after `line` materialized by the init's break
-                // ([`Printer::break_after_operator_run_doc`]). An init that
-                // FITS collapses to the glued form in both formatters, so that case
-                // falls through to the layouts below unchanged; a line comment in the
-                // gap declines inside the gate (its mandatory-break path owns it).
+                // A block run the author broke AFTER (`const y = /* c */⏎<value>`):
+                // prettier's break-after-operator (`chooseLayout`'s
+                // `hasLeadingOwnLineComment` arm), in the type-alias seam's two-half
+                // form. An init that already carries a hard break materializes the
+                // run's newline-after `line` as a blank-preserving hardline
+                // ([`Printer::break_after_operator_run_doc`]); anything else rides
+                // one hang group with a soft `line`, which breaks exactly when the
+                // `=` seam does ([`Printer::hang_after_operator_run_doc`]) — an init
+                // that FITS collapses to the glued bytes in both formatters, and a
+                // width-broken one holds the run on its own line with the init
+                // re-fitting below instead of stranding it mid-line
+                // (`⏎\t/* c */ aaa +`, a form prettier never emits). A line comment
+                // in the gap declines inside the gate (its mandatory-break path
+                // owns it).
+                // The width half applies only to a run that TRAILS the `=` — an
+                // own-line-authored run with a fitting init keeps the layouts
+                // below, which preserve its break (`const d =⏎/* c */⏎fn()`; the
+                // hard half's own-line emission is that same preserved shape, so
+                // it takes both authorings).
                 if rhs_block_comment_doc.is_some()
-                    && let Some((run, value_doc)) = self.breaking_value_leading_run(
-                        rhs_comments_start,
-                        init_start,
-                        init_value_doc,
-                    )
+                    && let Some(run) =
+                        self.broke_after_value_leading_run(rhs_comments_start, init_start)
                 {
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(d.text(" ="));
-                    parts.push(self.break_after_operator_run_doc(&run, init_start, value_doc));
-                    continue;
+                    let value_doc = init_value_doc();
+                    if d.will_break(value_doc)
+                        || self.run_takes_soft_separator(rhs_comments_start, init_start, &run)
+                    {
+                        push_lhs(&mut parts, id_doc);
+                        parts.push(d.text(" ="));
+                        parts.push(
+                            self.break_or_hang_after_operator_run_doc(&run, init_start, value_doc),
+                        );
+                        continue;
+                    }
                 }
 
                 // Check if RHS is a multiline string (line continuations)
