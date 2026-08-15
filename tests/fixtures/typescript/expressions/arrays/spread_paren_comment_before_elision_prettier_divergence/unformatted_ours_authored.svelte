@@ -19,4 +19,9 @@
 	const k = [l, ...(m
 /* c */
 ), , n];
+
+	// A line comment takes the same slide
+	const o = [...(p
+// c
+), , q];
 </script>

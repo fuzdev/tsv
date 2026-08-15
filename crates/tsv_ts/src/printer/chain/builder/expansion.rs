@@ -12,6 +12,7 @@ use crate::printer::calls::arg_predicates::is_simple_call_argument;
 use super::super::printing::node_comment_gap;
 use super::super::types::{ChainGroup, ChainNode};
 use crate::printer::Printer;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::printing::{self, has_blank_line_between_fast};
 
 /// Check if there are blank lines BETWEEN methods (not just before the first method)
@@ -53,16 +54,26 @@ pub(super) fn has_comments_forcing_expansion<'a>(
 
         for (node_idx, node) in group.nodes.iter().enumerate() {
             // Skip the last member node in the last group - its comments are
-            // handled inline via line_suffix, not by forcing expansion.
+            // handled inline via line_suffix, not by forcing expansion. That deferral
+            // is the sanctioned collapse for a LONE same-line `//`
+            // (`fn().bar; // c` — trailing_member_after_call_comment), so it must
+            // survive here. Two exceptions, both "a `//` must end its line":
             //
-            // EXCEPT a computed member whose pre-bracket gap holds a LINE comment: a `//`
-            // must end its line, so `print_node_inner` emits a forced break in that gap
-            // rather than deferring it (see its ComputedMember arm). The chain has to
-            // expand around that break — left flat, the hardline lands in the one-line
-            // variant and the whole chain renders unindented.
+            // - a computed member whose pre-bracket gap holds ANY line comment:
+            //   `print_node_inner` emits a forced break in that gap rather than
+            //   deferring (a deferred `//` would swallow the `[i]` printed after it —
+            //   see its ComputedMember arm). The chain has to expand around that
+            //   break — left flat, the hardline lands in the one-line variant and the
+            //   whole chain renders unindented.
+            // - a plain member whose gap holds an OWN-LINE line comment: deferring it
+            //   discards the authored line and, behind a same-line `//`, welds the two
+            //   into ONE comment (`fn().bar; // c3 // c4`), the second `//` becoming
+            //   text inside the first. The chain expands and the gap emitters put each
+            //   comment in place — the shape every longer chain already takes
+            //   (trailing_member_short_chain_line_comment).
             let is_last_node_in_last_group =
                 is_last_group && node_idx == group.nodes.len() - 1 && node.is_member();
-            if is_last_node_in_last_group && !computed_pre_bracket_line_comment(node, printer) {
+            if is_last_node_in_last_group && !trailing_member_gap_line_comment(node, printer) {
                 continue;
             }
 
@@ -76,18 +87,31 @@ pub(super) fn has_comments_forcing_expansion<'a>(
     false
 }
 
-/// Whether a computed member's pre-bracket gap (`a.b()⏎// c⏎[0]`) carries a **line**
-/// comment — the one gap a chain builder never owns, since a computed member with a
-/// numeric-literal index is glued into the preceding call's group instead of starting
-/// one. `print_node_inner` emits a forced break for it, so the chain must expand.
-fn computed_pre_bracket_line_comment<'a>(node: &ChainNode<'a>, printer: &Printer<'_>) -> bool {
-    if !matches!(node, ChainNode::ComputedMember { .. }) {
-        return false;
-    }
+/// Whether a trailing member's gap carries a line comment the chain must EXPAND around
+/// — the exception to the last-member skip in [`has_comments_forcing_expansion`].
+///
+/// The bar differs by member kind, because what the flat layout does with the comment
+/// differs:
+///
+/// - **computed** (`a.b()⏎// c⏎[0]`): ANY line comment forces — the gap is one a chain
+///   builder never owns (a computed member with a numeric-literal index is glued into
+///   the preceding call's group instead of starting one), and `print_node_inner` emits
+///   a forced break for it, since a deferred `//` would swallow the `[i]` printed
+///   after it.
+/// - **plain** (`fn()⏎// c⏎.bar`): only an OWN-LINE line comment forces (own-line
+///   against the gap's start — the object's printed end). A lone same-line `//` stays
+///   on the flat path, whose `line_suffix` deferral past the member is the sanctioned
+///   collapse (`fn().bar; // c`); an own-line `//` deferred the same way would lose
+///   its authored line and weld behind a same-line one.
+fn trailing_member_gap_line_comment<'a>(node: &ChainNode<'a>, printer: &Printer<'_>) -> bool {
     let Some((start, end)) = node_comment_gap(node, printer) else {
         return false;
     };
-    printer.classify_comments(start, end).has_line_comments()
+    if matches!(node, ChainNode::ComputedMember { .. }) {
+        return printer.classify_comments(start, end).has_line_comments();
+    }
+    comments_to_emit_in_range(printer.comments, start, end)
+        .any(|c| !c.is_block && printer.has_newline_between(start, c.span.start))
 }
 
 /// Check if a call node has complex (non-simple) arguments

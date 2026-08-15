@@ -17,6 +17,7 @@ use crate::ast::internal::{self, Expression, JsdocCast};
 use crate::printer::ArrowChainContext;
 use crate::printer::OwnedCommentEffect;
 use crate::printer::Printer;
+use crate::printer::calls::chain_has_calls;
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
@@ -1141,7 +1142,6 @@ impl<'a> Printer<'a> {
         // after the operator, which would double-indent the broken chain.
         if self.has_line_comments_in_member_chain(right_expr)
             || (layout == AssignmentLayout::BreakAfterOperator
-                && matches!(right_expr, Expression::CallExpression(_))
                 && self.has_line_comments_in_call_chain(right_expr))
         {
             layout = AssignmentLayout::NeverBreakAfterOperator;
@@ -1333,13 +1333,17 @@ impl<'a> Printer<'a> {
         self.has_line_comments_in_chain(expr)
     }
 
-    /// Check if an expression is a call chain with line comments.
+    /// Check if an expression is a call-bearing chain with line comments.
     ///
     /// For call chains with line comments (e.g., `items // comment\n.foo()`),
     /// we should NOT use BreakAfterOperator because the chain formatter
-    /// handles breaking at the comment location.
+    /// handles breaking at the comment location. The chain question is
+    /// [`chain_has_calls`] — a call anywhere in the chain, not just at the top:
+    /// a trailing plain member over a call base (`fn()⏎// c⏎.bar`) breaks at the
+    /// comment exactly like its called twin (`.bar()`), and gating on the top
+    /// node is what made only the twin hug the `=`.
     pub(crate) fn has_line_comments_in_call_chain(&self, expr: &Expression<'_>) -> bool {
-        self.has_line_comments_in_chain(expr)
+        chain_has_calls(expr) && self.has_line_comments_in_chain(expr)
     }
 
     /// Check if an expression contains an import expression with trailing comments.
@@ -1388,7 +1392,12 @@ impl<'a> Printer<'a> {
                     || self.has_line_comments_in_chain(call.callee)
             }
             Expression::MemberExpression(member) => {
-                // Check for line comments between object and property
+                // Check for line comments between object and property. For a computed
+                // member this range deliberately includes the bracket INTERIOR: a
+                // comment inside `[...]` makes the brackets break around it, so the
+                // chain still breaks internally and the layout answer is the same —
+                // keep the RHS on the operator line rather than also breaking after
+                // `=` (`const a = obj[ // force⏎…`).
                 let obj_end = member.object.span().end;
                 let prop_start = member.property.span().start;
                 if self.has_line_comments_between(obj_end, prop_start) {

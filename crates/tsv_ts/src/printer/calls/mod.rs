@@ -65,7 +65,7 @@ pub(super) fn call_paren_open(call: &internal::CallExpression<'_>) -> u32 {
 }
 
 /// Check if a chain expression contains any call expressions
-fn chain_has_calls(expr: &internal::Expression<'_>) -> bool {
+pub(in crate::printer) fn chain_has_calls(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::CallExpression(_) => true,
         internal::Expression::MemberExpression(member) => chain_has_calls(member.object),

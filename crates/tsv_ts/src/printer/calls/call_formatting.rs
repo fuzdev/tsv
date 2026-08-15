@@ -1571,13 +1571,19 @@ fn build_call_with_arg_comments(
             // regions that partition it (see `emit_last_arg_trailing_comments`, which
             // states the same split for the builders that need no force-expansion
             // feedback). First the parent's share of a spread's stripped-paren
-            // interior: own-line blocks the spread's own doc deliberately leaves behind,
-            // each a sibling line the call cannot stay collapsed around.
-            // A `//` the spread's own doc defers must flush INSIDE the call: on a
-            // collapsed list the buffer drains past the `)` and the `;`, re-binding
-            // the comment to the statement. Also feeds the demotion below.
+            // interior: own-line comments the spread's own doc deliberately leaves
+            // behind, each a sibling line the call cannot stay collapsed around —
+            // deferred past the ordinary gap when it ends in a `//`
+            // (`spread_share_ends_in_line_comment`, the ordering rule).
+            // A same-line `//` the spread's own doc defers must flush INSIDE the call:
+            // on a collapsed list the buffer drains past the `)` and the `;`,
+            // re-binding the comment to the statement. Also feeds the demotion below.
             let arg_defers_line = printer.defers_trailing_line_comment(arg);
-            if printer.push_spread_own_line_block_comments(&mut arg_parts, arg) || arg_defers_line {
+            if arg_defers_line {
+                force_expansion = true;
+            }
+            let share_ends_in_line = printer.spread_share_ends_in_line_comment(arg);
+            if !share_ends_in_line && printer.push_spread_own_line_comments(&mut arg_parts, arg) {
                 force_expansion = true;
             }
 
@@ -1639,6 +1645,12 @@ fn build_call_with_arg_comments(
             if !pc.leading.is_empty() {
                 force_expansion = true;
                 pc.emit_dangling_comments(&mut arg_parts, printer);
+            }
+
+            // The `//`-ending share, deferred past the ordinary gap (the ordering rule
+            // above).
+            if share_ends_in_line && printer.push_spread_own_line_comments(&mut arg_parts, arg) {
+                force_expansion = true;
             }
         }
     }
