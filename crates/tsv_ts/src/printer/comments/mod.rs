@@ -175,6 +175,23 @@ pub(crate) enum LeadingGlue {
     /// `AdjacentGlued` collapsed both. An author who wants the blank kept writes the
     /// comment on its own line, where the break IS forced and it survives.
     AdjacentValueGap,
+    /// `Adjacent`, but the run's **first** comment is emitted on the anchor's line by
+    /// construction (the caller pushes a bare `" "` ahead of it, never a `line`), so the
+    /// newline the author wrote *before* it is erased by this emitter's own output.
+    /// Reading `is_own_line_comment` there is
+    /// [rule-conditioned-on-what-its-own-output-destroys][docs]: it forces a `hardline`
+    /// for a lone own-line block (`if (a)⏎/* c */⏎;`) that the very next pass collapses,
+    /// because by then the comment sits on the `)` line — **non-idempotent**, and prettier
+    /// needs two passes for exactly that reason. So the first comment answers "own-line"
+    /// as **false** and takes the soft `line`, landing on prettier's fixed point in one
+    /// pass; every later comment keeps the source reading, since the separator that put it
+    /// on its own line reproduces it.
+    ///
+    /// The **empty-statement body** gap's mode (`) ;` / `else ;`), the one site that pins
+    /// its run to the anchor's line.
+    ///
+    /// [docs]: ../../../../../docs/comments.md
+    AdjacentAnchorLine,
 }
 
 impl LeadingGlue {
@@ -182,6 +199,12 @@ impl LeadingGlue {
     /// line (preserving the blank) rather than yielding with the soft `line`.
     fn blank_forces_own_line(self) -> bool {
         !matches!(self, Self::AdjacentValueGap)
+    }
+
+    /// Whether the run's FIRST comment shares the anchor's line in the output, which
+    /// erases the newline the author wrote before it — see [`Self::AdjacentAnchorLine`].
+    fn first_shares_anchor_line(self) -> bool {
+        matches!(self, Self::AdjacentAnchorLine)
     }
 }
 
@@ -1605,20 +1628,36 @@ impl<'a> Printer<'a> {
     /// [`build_leading_comments_multiline`](Self::build_leading_comments_multiline)
     /// (tuples, type params/args, function-type params, the union's first member, the
     /// bracket-break shell, the broken `<T>` cast), the array literal / array pattern
-    /// element runs, the body/member runs via
+    /// element runs, the **non-block** header→body gap across `if` / `while` / the
+    /// C-style `for` / for-in / for-of / `do`
+    /// ([`Printer::push_indented_header_to_body_gap`]), the body/member runs via
     /// [`push_leading_comments_before`](Self::push_leading_comments_before) (class,
     /// interface and enum members, statement lists, type literals, expanded object
     /// patterns), the broken for-in/for-of header's `(`→binding gap, and — for all but
     /// its last comment —
     /// [`push_orphaned_comment_run`](Self::push_orphaned_comment_run).
     ///
-    /// Four loops still emit a leading run themselves, because their surrounding
-    /// separator policy genuinely differs — the import/export specifier list, the
-    /// for-clause leading gap, the union's inter-member run (which brackets the
-    /// `| ` separator and preserves blanks in different positions), and the
-    /// control-flow gap builder's `GapCommentRun::Leading` arm
-    /// (`Printer::build_comments_between_parts`, the header→body gaps — a between-parts
-    /// shape whose separators go BEFORE each comment and whose caller owns the tail).
+    /// ⚠️ **This list is a WORK-LIST, not a summary** — an unlisted loop is a bug report,
+    /// and both halves of that have already been paid here (the for-clause leading gap
+    /// converged onto this emitter and stayed listed as a hand-roller; the labeled
+    /// statement's run was a hand-roller and was never listed). **Four** loops still emit a
+    /// leading run themselves, because their surrounding separator policy genuinely
+    /// differs:
+    ///
+    /// - the **import/export specifier list** (`specifier_list.rs`);
+    /// - the **union's inter-member run** (`types/union_intersection.rs`
+    ///   `push_union_member_leading_run` / `build_member_leading_block_comments`), which
+    ///   brackets the `| ` separator and preserves blanks in different positions;
+    /// - the **control-flow gap builder's** `GapCommentRun::Leading` arm
+    ///   (`Printer::build_comments_between_parts`, the **block**-body header→body gaps and
+    ///   the `else` gap) — a between-parts shape whose separators go BEFORE each comment
+    ///   and whose caller owns the tail. Its **non-block** twin
+    ///   (`Printer::push_indented_header_to_body_gap`) is not among them: that gap is the
+    ///   body's leading run outright and routes here;
+    /// - the **labeled statement's relocated name→`:` run** (`try_jump.rs`
+    ///   `build_labeled_statement_doc`), whose last comment must break whatever the source
+    ///   says — the run has been relocated off the label it would otherwise hug.
+    ///
     /// Each calls [`comment_hugs_next`](Self::comment_hugs_next) rather than re-deriving
     /// the rule, so what differs there is the loop, never the decision.
     pub(crate) fn push_leading_comment_run<'c>(
@@ -1631,8 +1670,13 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let d = self.d();
         let mut forces_break = false;
+        let mut is_first = true;
         let mut comments = comments.peekable();
         while let Some(comment) = comments.next() {
+            // See `LeadingGlue::AdjacentAnchorLine`: only the run's first comment can have
+            // its authored newline-before erased, and only at that one site.
+            let first_shares_anchor_line = is_first && glue.first_shares_anchor_line();
+            is_first = false;
             parts.push(self.build_comment_doc(comment));
             // The next thing after this comment — the following comment, or the
             // terminal (value/member/item/body) for the last one. Anchored on the
@@ -1655,9 +1699,9 @@ impl<'a> Printer<'a> {
                 // rule below, not in the hug test — the soft `line` is the point at a
                 // value gap (it lets a value too long for the comment's line break
                 // below it), so it must not become an unconditional space.
-                LeadingGlue::Adjacent | LeadingGlue::AdjacentValueGap => {
-                    self.comment_hugs_next(comment)
-                }
+                LeadingGlue::Adjacent
+                | LeadingGlue::AdjacentValueGap
+                | LeadingGlue::AdjacentAnchorLine => self.comment_hugs_next(comment),
                 // A glued (not own-line) single-line block hugs across a source
                 // newline; the same-line-as-next case still hugs as in `Adjacent`.
                 LeadingGlue::AdjacentGlued => {
@@ -1678,7 +1722,9 @@ impl<'a> Printer<'a> {
                 // Value (or next comment) shares the `*/` line — keep it glued.
                 parts.push(d.text(" "));
             } else if comment.is_block
-                && !self.is_own_line_comment(comment)
+                // `first_shares_anchor_line ||` reads as "this comment HAS no own line to
+                // keep, so don't ask" — and short-circuits the source scan when so.
+                && (first_shares_anchor_line || !self.is_own_line_comment(comment))
                 && !(glue.blank_forces_own_line()
                     && self.has_blank_line_between_strict(comment.span.end, next))
             {

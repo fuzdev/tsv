@@ -3,7 +3,7 @@
 // Condition-group layout and body handling for while/do-while, including the
 // do-while comment-preservation divergence from Prettier.
 
-use super::super::OpenParenLineComments;
+use super::super::{HeaderBodyBlank, OpenParenLineComments};
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
@@ -119,7 +119,7 @@ impl<'a> Printer<'a> {
                 // `" "` + run + `" "` is exactly what this emitter emits when
                 // `header_to_body_gap_breaks` is false, so it was a second spelling of
                 // this gap's own no-break case rather than a case this one lacks.
-                self.push_header_to_body_gap(&mut p, do_end, body_start);
+                self.push_header_to_body_gap(&mut p, do_end, body_start, HeaderBodyBlank::Drop);
                 p.push(body_doc);
             }
             p

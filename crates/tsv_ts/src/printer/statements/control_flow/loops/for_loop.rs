@@ -3,13 +3,13 @@
 // for-loop header layout (init/test/update clauses with comment placement),
 // for-in/for-of left/right printing.
 
+use super::super::HeaderBodyBlank;
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
     CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer, RunLeadingBlank,
 };
 use smallvec::smallvec;
-use tsv_lang::Comment;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -146,12 +146,17 @@ struct EmptyForCursor {
 }
 
 impl<'a> Printer<'a> {
-    /// Append `)` + comments + non-block body for for-in/for-of statements.
+    /// Append `)` + comments + non-block body for for-in/for-of statements — the
+    /// for-x anchor for the shared header→body emitters, where
+    /// `append_close_paren_with_comments` is the block-body one (a block body needs no
+    /// indent, so the two differ only in that).
     ///
-    /// Unlike `append_close_paren_with_comments` (which handles block bodies where
-    /// indentation isn't needed), this properly indents non-block bodies when line
-    /// comments force a break. Also avoids placing block comments after line comments
-    /// on the same line (which would absorb them into the line comment text).
+    /// The gap's own rules are NOT here: a breaking gap is the body's leading run and
+    /// goes to [`Printer::push_indented_header_to_body_gap`], exactly as `if` / `while` /
+    /// the C-style `for` / `do` reach it. This family hand-rolled that arm until it was
+    /// measured against theirs — it kept the run whole but left it on the `)` line, so a
+    /// bare `for (k of o) // c⏎fn();` stayed up there where every sibling construct (and
+    /// prettier) drops it to the body. Only the two arms below are for-x's own.
     fn append_close_paren_with_non_block_body(
         &self,
         parts: &mut DocBuf,
@@ -180,65 +185,22 @@ impl<'a> Printer<'a> {
             return;
         }
 
-        let (inline_prev, own_line) =
-            self.partition_comments_trailing_vs_own_line(paren_end, body_start);
-
         parts.push(d.text(")"));
 
         if self.header_to_body_gap_breaks(paren_end, body_start) {
-            // Emit trailing comments on the `)` line
-            for comment in &inline_prev {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
-
-            // Everything not trailing the `)` goes indented before the body.
-            //
-            // Separator-BEFORE form: the separator ahead of each comment is keyed on the
-            // PREVIOUS comment, and the one before the body on the last — identical to
-            // keying each separator on the comment it follows, but it leaves a seam for
-            // the blank line an author put between two own-line comments
-            // (`Printer::push_blank_preserving_separator`, the one place that rule lives).
-            //
-            // The separator preserves the authored line: what the author wrote on one
-            // line stays on one line. A line comment is the one override — it must end
-            // its line or the `//` swallows the next comment / the body. That rule
-            // applies both between comments and before the body, so it is written once.
-            let sep_after = |p: &Comment| {
-                if self.comment_hugs_next(p) {
-                    d.text(" ")
-                } else {
-                    d.hardline()
-                }
-            };
-            let mut inner = DocBuf::new();
-            let mut prev: Option<&Comment> = None;
-            for comment in own_line {
-                match prev {
-                    None => inner.push(d.hardline()),
-                    Some(p) => self.push_blank_preserving_separator(
-                        &mut inner,
-                        p.span.end,
-                        comment.span.start,
-                        sep_after(p),
-                    ),
-                }
-                inner.push(self.build_comment_doc(comment));
-                prev = Some(comment);
-            }
-            inner.push(prev.map_or_else(|| d.hardline(), sep_after));
-            inner.push(body_doc);
-            parts.push(d.indent(d.concat(&inner)));
+            self.push_indented_header_to_body_gap(parts, paren_end, body_start, body_doc);
         } else {
-            // Nothing forces a break, so by `header_to_body_gap_breaks` every comment is
-            // a block comment already trailing `)` — `own_line` and `inline_next` are
-            // empty here and iterating them would be dead. adjustClause: `) /* a */ body`
-            // stays flat, but the comment(s) + body drop to their own indented line when
-            // the enclosing for-in/for-of group breaks (overflow). Matches Prettier.
-            let mut inner = DocBuf::new();
-            self.push_glued_comment_run(&mut inner, &inline_prev);
-            inner.push(body_doc);
-            parts.push(d.indent_line(d.concat(&inner)));
+            // Nothing forces a break, so by `header_to_body_gap_breaks` every comment in
+            // the gap is a block already trailing `)` — the partition this arm used to
+            // build had `own_line` provably empty and `inline_prev` provably the whole
+            // range, so it is the range. Spelled exactly like the `if`/`while` twin
+            // (`Printer::build_adjust_clause_with_comments`), which is the same doc:
+            // `indent(line, c1, " ", …, cn, " ", body)`. adjustClause keeps
+            // `) /* a */ body` flat, dropping the comment(s) + body to their own indented
+            // line when the enclosing for-in/for-of group breaks (overflow).
+            let comment_doc =
+                self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
+            parts.push(d.indent_line(d.concat(&[comment_doc, d.text(" "), body_doc])));
         }
     }
 
@@ -1452,6 +1414,12 @@ impl<'a> Printer<'a> {
             parts.push(self.build_statement_head_doc(paren_end, block.span, || {
                 self.build_block_statement_expand_empty_doc(block)
             }));
+        } else if matches!(body, Statement::EmptyStatement(_)) {
+            // An empty body is NOT an `adjustClause` body — prettier returns `";"`
+            // directly, so the gap's run stays trailing `)` and the `;` sits flush
+            // beneath it, never indented. `if` and `while` already routed here; for-x
+            // did not, so its run took the indented non-block path instead.
+            self.append_close_paren_empty_stmt_with_comments(parts, paren_end, body.span().start);
         } else {
             self.append_close_paren_with_non_block_body(parts, paren_end, body);
         }
@@ -1555,7 +1523,16 @@ impl<'a> Printer<'a> {
 
             let gap_breaks = self.header_to_body_gap_breaks(header_end, body_start);
             let (tail, group_it) = if self.has_comments_to_emit_between(header_end, body_start) {
-                if gap_breaks && !is_block_body {
+                if matches!(stmt.body, Statement::EmptyStatement(_)) {
+                    // Asked FIRST: the empty-body arm below is guarded by this branch, so
+                    // a comment in the gap used to route the `;` through `adjustClause`
+                    // and indent it. An empty body has no clause — prettier returns `";"`
+                    // — so the run stays trailing `)` and the `;` sits flush, which is
+                    // what the shared emitter (`if` / `while` / for-x) delivers.
+                    let mut tail = DocBuf::new();
+                    self.push_empty_statement_gap(&mut tail, header_end, body_start);
+                    (d.concat(&tail), false)
+                } else if gap_breaks && !is_block_body {
                     // Non-block body, and something in the gap forces the break: the
                     // shared indented emitter — each own-line comment on its own
                     // indented line, then the body — break-safe so a `//` can't swallow
@@ -1571,7 +1548,12 @@ impl<'a> Printer<'a> {
                     // `)` is already inside the header doc. Given this branch's guard, the
                     // gap's separator is the hardline that drops the block to the next line.
                     let mut tail = DocBuf::new();
-                    self.push_header_to_body_gap(&mut tail, header_end, body_start);
+                    self.push_header_to_body_gap(
+                        &mut tail,
+                        header_end,
+                        body_start,
+                        HeaderBodyBlank::Drop,
+                    );
                     tail.push(body_doc);
                     (d.concat(&tail), false)
                 } else {

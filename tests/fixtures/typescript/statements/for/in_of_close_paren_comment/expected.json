@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 371,
+	"end": 379,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -77,47 +77,47 @@
 		{
 			"type": "Line",
 			"value": " a",
-			"start": 190,
-			"end": 194,
+			"start": 192,
+			"end": 196,
 			"loc": {
 				"start": {
-					"line": 8,
-					"column": 16
+					"line": 9,
+					"column": 2
 				},
 				"end": {
-					"line": 8,
-					"column": 20
+					"line": 9,
+					"column": 6
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " a",
-			"start": 220,
-			"end": 224,
+			"start": 224,
+			"end": 228,
 			"loc": {
 				"start": {
-					"line": 11,
-					"column": 16
+					"line": 13,
+					"column": 2
 				},
 				"end": {
-					"line": 11,
-					"column": 20
+					"line": 13,
+					"column": 6
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Line comment + block comment between ) and body",
-			"start": 235,
-			"end": 285,
+			"start": 239,
+			"end": 289,
 			"loc": {
 				"start": {
-					"line": 14,
+					"line": 16,
 					"column": 1
 				},
 				"end": {
-					"line": 14,
+					"line": 16,
 					"column": 51
 				}
 			}
@@ -125,31 +125,31 @@
 		{
 			"type": "Line",
 			"value": " a",
-			"start": 302,
-			"end": 306,
+			"start": 308,
+			"end": 312,
 			"loc": {
 				"start": {
-					"line": 15,
-					"column": 16
+					"line": 18,
+					"column": 2
 				},
 				"end": {
-					"line": 15,
-					"column": 20
+					"line": 18,
+					"column": 6
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " b ",
-			"start": 309,
-			"end": 316,
+			"start": 315,
+			"end": 322,
 			"loc": {
 				"start": {
-					"line": 16,
+					"line": 19,
 					"column": 2
 				},
 				"end": {
-					"line": 16,
+					"line": 19,
 					"column": 9
 				}
 			}
@@ -157,31 +157,31 @@
 		{
 			"type": "Line",
 			"value": " a",
-			"start": 340,
-			"end": 344,
+			"start": 348,
+			"end": 352,
 			"loc": {
 				"start": {
-					"line": 18,
-					"column": 16
+					"line": 22,
+					"column": 2
 				},
 				"end": {
-					"line": 18,
-					"column": 20
+					"line": 22,
+					"column": 6
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " b ",
-			"start": 347,
-			"end": 354,
+			"start": 355,
+			"end": 362,
 			"loc": {
 				"start": {
-					"line": 19,
+					"line": 23,
 					"column": 2
 				},
 				"end": {
-					"line": 19,
+					"line": 23,
 					"column": 9
 				}
 			}
@@ -190,19 +190,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 370,
+		"end": 378,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 361,
+			"end": 369,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 20,
+					"line": 24,
 					"column": 9
 				}
 			},
@@ -391,14 +391,14 @@
 				{
 					"type": "ForInStatement",
 					"start": 175,
-					"end": 202,
+					"end": 204,
 					"loc": {
 						"start": {
 							"line": 8,
 							"column": 1
 						},
 						"end": {
-							"line": 9,
+							"line": 10,
 							"column": 7
 						}
 					},
@@ -432,46 +432,46 @@
 								"column": 14
 							}
 						},
-						"name": "obj",
-						"trailingComments": [
-							{
-								"type": "Line",
-								"value": " a",
-								"start": 190,
-								"end": 194
-							}
-						]
+						"name": "obj"
 					},
 					"body": {
 						"type": "ExpressionStatement",
-						"start": 197,
-						"end": 202,
+						"start": 199,
+						"end": 204,
 						"loc": {
 							"start": {
-								"line": 9,
+								"line": 10,
 								"column": 2
 							},
 							"end": {
-								"line": 9,
+								"line": 10,
 								"column": 7
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 197,
-							"end": 201,
+							"start": 199,
+							"end": 203,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 10,
 									"column": 2
 								},
 								"end": {
-									"line": 9,
+									"line": 10,
 									"column": 6
 								}
 							},
 							"name": "expr"
-						}
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " a",
+								"start": 192,
+								"end": 196
+							}
+						]
 					},
 					"leadingComments": [
 						{
@@ -484,30 +484,30 @@
 				},
 				{
 					"type": "ForOfStatement",
-					"start": 205,
-					"end": 232,
+					"start": 207,
+					"end": 236,
 					"loc": {
 						"start": {
-							"line": 11,
+							"line": 12,
 							"column": 1
 						},
 						"end": {
-							"line": 12,
+							"line": 14,
 							"column": 7
 						}
 					},
 					"await": false,
 					"left": {
 						"type": "Identifier",
-						"start": 210,
-						"end": 211,
+						"start": 212,
+						"end": 213,
 						"loc": {
 							"start": {
-								"line": 11,
+								"line": 12,
 								"column": 6
 							},
 							"end": {
-								"line": 11,
+								"line": 12,
 								"column": 7
 							}
 						},
@@ -515,169 +515,67 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 215,
-						"end": 218,
-						"loc": {
-							"start": {
-								"line": 11,
-								"column": 11
-							},
-							"end": {
-								"line": 11,
-								"column": 14
-							}
-						},
-						"name": "arr",
-						"trailingComments": [
-							{
-								"type": "Line",
-								"value": " a",
-								"start": 220,
-								"end": 224
-							}
-						]
-					},
-					"body": {
-						"type": "ExpressionStatement",
-						"start": 227,
-						"end": 232,
+						"start": 217,
+						"end": 220,
 						"loc": {
 							"start": {
 								"line": 12,
+								"column": 11
+							},
+							"end": {
+								"line": 12,
+								"column": 14
+							}
+						},
+						"name": "arr"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 231,
+						"end": 236,
+						"loc": {
+							"start": {
+								"line": 14,
 								"column": 2
 							},
 							"end": {
-								"line": 12,
+								"line": 14,
 								"column": 7
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 227,
-							"end": 231,
+							"start": 231,
+							"end": 235,
 							"loc": {
 								"start": {
-									"line": 12,
+									"line": 14,
 									"column": 2
 								},
 								"end": {
-									"line": 12,
+									"line": 14,
 									"column": 6
-								}
-							},
-							"name": "expr"
-						}
-					}
-				},
-				{
-					"type": "ForInStatement",
-					"start": 287,
-					"end": 322,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 16,
-							"column": 15
-						}
-					},
-					"left": {
-						"type": "Identifier",
-						"start": 292,
-						"end": 293,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 6
-							},
-							"end": {
-								"line": 15,
-								"column": 7
-							}
-						},
-						"name": "x"
-					},
-					"right": {
-						"type": "Identifier",
-						"start": 297,
-						"end": 300,
-						"loc": {
-							"start": {
-								"line": 15,
-								"column": 11
-							},
-							"end": {
-								"line": 15,
-								"column": 14
-							}
-						},
-						"name": "obj",
-						"trailingComments": [
-							{
-								"type": "Line",
-								"value": " a",
-								"start": 302,
-								"end": 306
-							}
-						]
-					},
-					"body": {
-						"type": "ExpressionStatement",
-						"start": 317,
-						"end": 322,
-						"loc": {
-							"start": {
-								"line": 16,
-								"column": 10
-							},
-							"end": {
-								"line": 16,
-								"column": 15
-							}
-						},
-						"expression": {
-							"type": "Identifier",
-							"start": 317,
-							"end": 321,
-							"loc": {
-								"start": {
-									"line": 16,
-									"column": 10
-								},
-								"end": {
-									"line": 16,
-									"column": 14
 								}
 							},
 							"name": "expr"
 						},
 						"leadingComments": [
 							{
-								"type": "Block",
-								"value": " b ",
-								"start": 309,
-								"end": 316
+								"type": "Line",
+								"value": " a",
+								"start": 224,
+								"end": 228
 							}
 						]
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " Line comment + block comment between ) and body",
-							"start": 235,
-							"end": 285
-						}
-					]
+					}
 				},
 				{
-					"type": "ForOfStatement",
-					"start": 325,
-					"end": 360,
+					"type": "ForInStatement",
+					"start": 291,
+					"end": 328,
 					"loc": {
 						"start": {
-							"line": 18,
+							"line": 17,
 							"column": 1
 						},
 						"end": {
@@ -685,18 +583,17 @@
 							"column": 15
 						}
 					},
-					"await": false,
 					"left": {
 						"type": "Identifier",
-						"start": 330,
-						"end": 331,
+						"start": 296,
+						"end": 297,
 						"loc": {
 							"start": {
-								"line": 18,
+								"line": 17,
 								"column": 6
 							},
 							"end": {
-								"line": 18,
+								"line": 17,
 								"column": 7
 							}
 						},
@@ -704,32 +601,24 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 335,
-						"end": 338,
+						"start": 301,
+						"end": 304,
 						"loc": {
 							"start": {
-								"line": 18,
+								"line": 17,
 								"column": 11
 							},
 							"end": {
-								"line": 18,
+								"line": 17,
 								"column": 14
 							}
 						},
-						"name": "arr",
-						"trailingComments": [
-							{
-								"type": "Line",
-								"value": " a",
-								"start": 340,
-								"end": 344
-							}
-						]
+						"name": "obj"
 					},
 					"body": {
 						"type": "ExpressionStatement",
-						"start": 355,
-						"end": 360,
+						"start": 323,
+						"end": 328,
 						"loc": {
 							"start": {
 								"line": 19,
@@ -742,8 +631,8 @@
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 355,
-							"end": 359,
+							"start": 323,
+							"end": 327,
 							"loc": {
 								"start": {
 									"line": 19,
@@ -758,10 +647,117 @@
 						},
 						"leadingComments": [
 							{
+								"type": "Line",
+								"value": " a",
+								"start": 308,
+								"end": 312
+							},
+							{
 								"type": "Block",
 								"value": " b ",
-								"start": 347,
-								"end": 354
+								"start": 315,
+								"end": 322
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment + block comment between ) and body",
+							"start": 239,
+							"end": 289
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 331,
+					"end": 368,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 15
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "Identifier",
+						"start": 336,
+						"end": 337,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 7
+							}
+						},
+						"name": "x"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 341,
+						"end": 344,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 11
+							},
+							"end": {
+								"line": 21,
+								"column": 14
+							}
+						},
+						"name": "arr"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 363,
+						"end": 368,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 10
+							},
+							"end": {
+								"line": 23,
+								"column": 15
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 363,
+							"end": 367,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 10
+								},
+								"end": {
+									"line": 23,
+									"column": 14
+								}
+							},
+							"name": "expr"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " a",
+								"start": 348,
+								"end": 352
+							},
+							{
+								"type": "Block",
+								"value": " b ",
+								"start": 355,
+								"end": 362
 							}
 						]
 					}
