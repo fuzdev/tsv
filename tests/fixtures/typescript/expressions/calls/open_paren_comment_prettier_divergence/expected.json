@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 424,
+	"end": 593,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,72 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment trailing `(` — a last argument the expand-last layout would hug:",
+			"start": 416,
+			"end": 496,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the comment still stays on the `(` line",
+			"start": 498,
+			"end": 540,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 546,
+			"end": 551,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 5
+				},
+				"end": {
+					"line": 28,
+					"column": 10
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 423,
+		"end": 592,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 414,
+			"end": 583,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 25,
+					"line": 34,
 					"column": 9
 				}
 			},
@@ -660,6 +708,178 @@
 							"value": " composition): the comment still stays on the `(` line",
 							"start": 317,
 							"end": 373
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 542,
+					"end": 582,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 542,
+						"end": 581,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 33,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 542,
+							"end": 544,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 1
+								},
+								"end": {
+									"line": 28,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 554,
+								"end": 555,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 546,
+										"end": 551
+									}
+								]
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 559,
+								"end": 578,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 565,
+									"end": 578,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 8
+										},
+										"end": {
+											"line": 32,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 570,
+											"end": 574,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 3
+												},
+												"end": {
+													"line": 31,
+													"column": 7
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 570,
+												"end": 573,
+												"loc": {
+													"start": {
+														"line": 31,
+														"column": 3
+													},
+													"end": {
+														"line": 31,
+														"column": 6
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 570,
+													"end": 571,
+													"loc": {
+														"start": {
+															"line": 31,
+															"column": 3
+														},
+														"end": {
+															"line": 31,
+															"column": 4
+														}
+													},
+													"name": "b"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment trailing `(` — a last argument the expand-last layout would hug:",
+							"start": 416,
+							"end": 496
+						},
+						{
+							"type": "Line",
+							"value": " the comment still stays on the `(` line",
+							"start": 498,
+							"end": 540
 						}
 					]
 				}

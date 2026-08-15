@@ -222,6 +222,60 @@ pub(in crate::printer) fn is_block_function(expr: &Expression<'_>) -> bool {
     ) || matches!(expr, Expression::FunctionExpression(_))
 }
 
+/// Prettier's **`isReactHookCallWithDepsArray`** (`print/call-arguments.js`): a
+/// zero-parameter block-body arrow immediately followed by an array literal —
+/// `useEffect(() => {…}, [a, b])`, or the three-argument
+/// `useImperativeHandle(ref, () => {…}, [a, b])` whose first argument is a plain
+/// identifier.
+///
+/// The shape is the whole rule: prettier reads **no callee name**, so any call written this
+/// way takes the layout, `new` and member-chain calls included (one `printCallArguments`
+/// serves them all). It is also the FIRST thing that printer asks, above `anyArgEmptyLine`
+/// and every specialized layout — which is why an author blank line between the callback and
+/// the deps array is collapsed rather than preserved here.
+///
+/// The `!args.some(hasComment)` conjunct asks about comments **attached to an argument**,
+/// not comments anywhere inside one: a comment in the callback's body or between the deps
+/// array's own brackets leaves the layout alone, while one leading or trailing an argument
+/// refuses it. The caller supplies that answer through `arg_gap_has_comment`, which it asks
+/// of the gaps around the arguments — `(`→first, each inter-argument gap, last→`)` — on the
+/// ON-PAGE axis, since an owned annotation glued to an argument is a comment prettier's
+/// `hasComment` sees.
+pub(in crate::printer) fn is_react_hook_call_with_deps_array<F>(
+    args: &[Expression<'_>],
+    arg_gap_has_comment: F,
+) -> bool
+where
+    F: Fn() -> bool,
+{
+    let base = match args.len() {
+        2 => 0,
+        3 if matches!(&args[0], Expression::Identifier(_)) => 1,
+        _ => return false,
+    };
+
+    is_hook_callback_with_deps(&args[base], &args[base + 1]) && !arg_gap_has_comment()
+}
+
+/// The shape half of [`is_react_hook_call_with_deps_array`] — prettier's
+/// `isValidHookCallbackAndDepsFormat` minus its comment conjunct: a zero-parameter
+/// block-body arrow followed by an array literal.
+///
+/// Split out for `import(…)`, whose AST carries `source` + `options` rather than an argument
+/// slice; prettier reaches it through the same `printCallArguments` (`ImportExpression` is in
+/// that printer's header list), so the shape question must have one answer for both.
+pub(in crate::printer) fn is_hook_callback_with_deps(
+    callback: &Expression<'_>,
+    deps: &Expression<'_>,
+) -> bool {
+    matches!(
+        callback,
+        Expression::ArrowFunctionExpression(arrow)
+            if arrow.params.is_empty()
+                && matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
+    ) && matches!(deps, Expression::ArrayExpression(_))
+}
+
 /// Check if an expression is a "simple" call argument (Prettier's `isSimpleCallArgument`)
 ///
 /// Uses depth-limited recursion (typically depth=2) to prevent checking arbitrarily
@@ -464,5 +518,45 @@ mod tests {
         )));
         // Two non-function args ⇒ not composition.
         assert!(!is_function_composition_args(args_of(&arena, "f(a, b)")));
+    }
+
+    #[test]
+    fn react_hook_deps_array_shape() {
+        let arena = Bump::new();
+        // The gap-comment conjunct is the caller's; these cases isolate the shape.
+        let shape = |src: &str| is_react_hook_call_with_deps_array(args_of(&arena, src), || false);
+
+        // Two-argument form: zero-parameter block arrow, then an array literal.
+        assert!(shape("useEffect(() => {}, [a, b])"));
+        // The callee name is never read — any call written in the shape takes the layout.
+        assert!(shape("fn(() => {}, [a])"));
+        // An empty deps array still counts; so does an `async` callback.
+        assert!(shape("fn(() => {}, [])"));
+        assert!(shape("fn(async () => {}, [a])"));
+
+        // A parameter on the callback disqualifies it…
+        assert!(!shape("fn((x) => {}, [a])"));
+        // …as does an expression body, or a non-array second argument.
+        assert!(!shape("fn(() => a, [b])"));
+        assert!(!shape("fn(() => {}, {})"));
+        assert!(!shape("fn(() => {}, a)"));
+        // A spread is not the callback.
+        assert!(!shape("fn(...[() => {}], [a])"));
+
+        // Three-argument form: a plain IDENTIFIER first, then the same pair.
+        assert!(shape("useImperativeHandle(ref, () => {}, [a])"));
+        // Any other first argument refuses it — prettier tests `type === "Identifier"`.
+        assert!(!shape("useImperativeHandle(o.p, () => {}, [a])"));
+        assert!(!shape("useImperativeHandle(1, () => {}, [a])"));
+
+        // One or four arguments are not the shape at all.
+        assert!(!shape("fn(() => {})"));
+        assert!(!shape("fn(() => {}, [a], b)"));
+
+        // A comment attached to an argument refuses it, whatever the shape says.
+        assert!(!is_react_hook_call_with_deps_array(
+            args_of(&arena, "fn(() => {}, [a])"),
+            || true
+        ));
     }
 }

@@ -284,40 +284,54 @@ pub(super) fn build_before_comma_trailing_comments(
     }
 }
 
-/// Check if a comment is an inline block comment before the comma
+/// The inline block comments of one argument gap, split around its comma: what trails the
+/// previous argument, and what leads the next one.
 ///
-/// Returns true if the comment is:
-/// - A block comment (not line comment)
-/// - Positioned before the comma
-/// - On the same line as `ref_pos` (typically the previous arg's end)
-#[inline]
-pub(super) fn is_inline_block_before_comma(
-    comment: &internal::Comment,
-    comma_pos: usize,
-    line_breaks: &[u32],
-    ref_pos: u32,
-) -> bool {
-    comment.is_block
-        && is_comment_before_comma(comment, comma_pos)
-        && tsv_lang::printing::is_same_line_fast(line_breaks, ref_pos, comment.span.start)
-}
+/// ⚠️ **The same-line anchor ADVANCES over each comment emitted** (`docs/comments.md`: a
+/// run's anchor advances over each comment it emits). Re-asking a FIXED anchor — the
+/// previous argument's end — per comment reads the second half of an author-written run
+/// *across* the first: a run whose first comment is multi-line puts the second on a later
+/// line than the argument, the same-line test says no, and nothing else in the gap emits it,
+/// so it is DROPPED (`fn(a /* x⏎y */ /* c */, b, {})`). The anchor is the argument only for
+/// the run's FIRST comment.
+///
+/// One computation for both of [`super::arg_wrapping::build_args_split_last`]'s states —
+/// the inline head and the broken-out one — since the two states describing the same gap
+/// differently is what let the broken-out one drop the after-comma half entirely.
+pub(super) fn split_gap_inline_blocks(
+    printer: &Printer<'_>,
+    arg_end: u32,
+    next_arg_start: u32,
+) -> (DocBuf, DocBuf) {
+    let d = printer.d();
+    let mut before = DocBuf::new();
+    let mut after = DocBuf::new();
+    let Some(comma_pos) = find_comma_pos(printer.source, arg_end, next_arg_start) else {
+        return (before, after);
+    };
 
-/// Check if a comment is an inline block comment after the comma
-///
-/// Returns true if the comment is:
-/// - A block comment (not line comment)
-/// - Positioned after the comma
-/// - On the same line as `ref_pos` (typically the previous arg's end)
-#[inline]
-pub(super) fn is_inline_block_after_comma(
-    comment: &internal::Comment,
-    comma_pos: usize,
-    line_breaks: &[u32],
-    ref_pos: u32,
-) -> bool {
-    comment.is_block
-        && is_comment_after_comma(comment, comma_pos)
-        && tsv_lang::printing::is_same_line_fast(line_breaks, ref_pos, comment.span.start)
+    let mut anchor = arg_end;
+    for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start) {
+        if !comment.is_block
+            || !tsv_lang::printing::is_same_line_fast(
+                printer.comment_line_breaks,
+                anchor,
+                comment.span.start,
+            )
+        {
+            continue;
+        }
+        if is_comment_before_comma(comment, comma_pos) {
+            before.push(d.text(" "));
+            before.push(printer.build_comment_doc(comment));
+        } else {
+            after.push(printer.build_comment_doc(comment));
+            after.push(d.text(" "));
+        }
+        anchor = comment.span.end;
+    }
+
+    (before, after)
 }
 
 //
@@ -459,6 +473,29 @@ pub(crate) fn should_force_expansion_for_comments(
     false
 }
 
+/// Prettier's **`args.some(hasComment)`** for the argument list: does any comment attach to
+/// an argument, i.e. sit in the `(`→first gap, an inter-argument gap, or the last→`)` one?
+///
+/// The gaps are the whole question — a comment strictly INSIDE an argument (in a callback's
+/// body, between an array literal's own brackets) is attached to a node further down and
+/// answers `false` here, which is what prettier's `hasComment(arg)` reports for it too.
+/// **On page**, since an owned annotation glued to an argument is a comment prettier sees.
+pub(super) fn any_arg_gap_has_comment_on_page(
+    arguments: &[internal::Expression<'_>],
+    printer: &Printer<'_>,
+    paren_open: u32,
+    call_end: u32,
+) -> bool {
+    let mut prev_end = paren_open;
+    for arg in arguments {
+        if printer.has_comments_on_page_between(prev_end, arg.span().start) {
+            return true;
+        }
+        prev_end = arg.span().end;
+    }
+    printer.has_comments_on_page_between(prev_end, call_end)
+}
+
 /// Check if any comments in a call's arguments force expansion.
 ///
 /// Returns true for line comments or standalone block comments (on their own line,
@@ -468,12 +505,26 @@ pub(super) fn any_comment_forces_expansion(
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
-    if call.arguments.is_empty() {
+    any_comment_forces_expansion_slice(call.arguments, printer, paren_open, call.span.end)
+}
+
+/// [`any_comment_forces_expansion`] over an argument slice, for the builder that holds a
+/// `NewExpression` rather than a `CallExpression` — prettier prints both through one
+/// `printCallArguments`, so they must ask this question with one predicate. The `new` twin
+/// asked [`has_inter_argument_comments_slice`] instead, which counts a same-line inline
+/// block (`new A(a /* c */, () => {…})`) and so broke out a list prettier keeps hugged.
+pub(super) fn any_comment_forces_expansion_slice(
+    arguments: &[internal::Expression<'_>],
+    printer: &Printer<'_>,
+    paren_open: u32,
+    call_end: u32,
+) -> bool {
+    if arguments.is_empty() {
         return false;
     }
 
     // Check leading comments before first arg
-    let first_arg_start = call.arguments[0].span().start;
+    let first_arg_start = arguments[0].span().start;
     if printer.has_comments_to_emit_between(paren_open, first_arg_start)
         && should_force_expansion_for_comments(printer, paren_open, first_arg_start)
     {
@@ -481,7 +532,7 @@ pub(super) fn any_comment_forces_expansion(
     }
 
     // Check inter-argument and trailing comments
-    for (i, arg) in call.arguments.iter().enumerate() {
+    for (i, arg) in arguments.iter().enumerate() {
         // A comment a spread's stripped grouping parens left behind (`...(x⏎/* c */)`,
         // `...(x // c⏎)`) sits BEFORE the argument's own end, so the gap scan below cannot
         // see it — yet it is exactly what forces the list open, either because it needs a
@@ -493,10 +544,10 @@ pub(super) fn any_comment_forces_expansion(
         }
 
         let arg_end = arg.span().end;
-        let next_boundary = if i < call.arguments.len() - 1 {
-            call.arguments[i + 1].span().start
+        let next_boundary = if i < arguments.len() - 1 {
+            arguments[i + 1].span().start
         } else {
-            call.span.end
+            call_end
         };
 
         if !printer.has_comments_to_emit_between(arg_end, next_boundary) {
@@ -514,7 +565,7 @@ pub(super) fn any_comment_forces_expansion(
         // gap an item DOES follow, and the two must agree with what
         // `emit_last_arg_trailing_comments` trails: a gate that opens the list around a
         // comment the emitter puts back on the argument's line opens it around nothing.
-        let forces = if i < call.arguments.len() - 1 {
+        let forces = if i < arguments.len() - 1 {
             should_force_expansion_for_comments(printer, arg_end, next_boundary)
         } else {
             printer.has_line_comments_between(arg_end, next_boundary)
