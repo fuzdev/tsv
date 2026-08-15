@@ -912,7 +912,18 @@ impl<'a> Printer<'a> {
         // `line_suffix` would swallow it at flush (inside `${…}` this even makes the
         // output unparseable).
         if self.comment_has_newline_between(pos, operand.span.start) {
-            self.push_blank_preserving_hardline(parts, pos, operand.span.start);
+            // ⚠️ The blank scan takes the in-source ceiling: the operand is an EXPRESSION
+            // start, so a block comment the author glued to it is OWNED — physically in
+            // this gap, printed by the operand's own doc, and skipped by the run above.
+            // Scanning across it reads its interior newlines as an author blank, which
+            // this gap already keeps for real (`RunLeadingBlank::Keep`, the sanctioned
+            // `expressions/binary/operator_trailing_comment_blank`) — so the fabrication
+            // wears the sanction's own output and nothing tells them apart.
+            self.push_blank_preserving_hardline(
+                parts,
+                pos,
+                self.blank_scan_end(pos, operand.span.start),
+            );
         } else {
             parts.push(d.text(" "));
         }

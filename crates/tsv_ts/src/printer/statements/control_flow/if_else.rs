@@ -3,7 +3,6 @@
 // Entry point (`build_if_statement_doc`) plus the wrapping and
 // comment-handling variants, and else-clause layout helpers.
 
-use super::OpenParenLineComments;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use tsv_lang::doc::DocBuf;
@@ -149,13 +148,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Append the `else` clause: the keyword, its →body gap's comments, and the alternate
-    /// — the four-way dispatch **both** `if` printers need, over the `else` keyword found
-    /// by scanning past any comments from `consequent_end`.
+    /// — the four-way dispatch **both** `if` printers need.
     ///
     /// `leading_space` prefixes the keyword with a space. It is the *only* thing that
     /// differs between the two callers: the plain printer's `}` sits on the keyword's line
     /// (`} else /* c */ {`), while the comment-bearing one has already emitted the
     /// `}`→`else` gap, which supplies its own separator.
+    ///
+    /// `else_end` is [`Self::find_else_keyword_end_between`]'s answer, passed in rather
+    /// than re-scanned: the caller needs the keyword's START for the `}`→`else` gap it
+    /// emits first, so one scan serves both. `None` is the scan failing, which leaves no
+    /// gap to emit.
     ///
     /// ⚠️ These were two copies of this dispatch, and the copy drifted: the empty-alternate
     /// arm here moved to the leading-run separators while the other kept an older
@@ -165,17 +168,15 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         alternate: &Statement<'_>,
-        consequent_end: u32,
+        else_end: Option<u32>,
         leading_space: bool,
     ) {
         let d = self.d();
         let alt_start = alternate.span().start;
-        let else_end = self.find_else_keyword_end_between(consequent_end, alt_start);
 
         if matches!(alternate, Statement::EmptyStatement(_)) {
             // Empty alternate: `else;`, `else /* c */ ;`, or `else // c\n;` — the same gap
-            // the `)`→`;` one is, so it shares that emitter. `else_end` is `None` only when
-            // the keyword scan failed, which leaves no gap to emit.
+            // the `)`→`;` one is, so it shares that emitter.
             match else_end {
                 Some(else_end) => {
                     parts.push(d.text(if leading_space { " else" } else { "else" }));
@@ -218,8 +219,8 @@ impl<'a> Printer<'a> {
         None
     }
 
-    /// The `if` head (`if (` + any keyword→`(` comments + the condition group) and its
-    /// consequent, as one parts buffer — everything **both** `if` printers build
+    /// The `if` head ([`Self::build_paren_condition_head`], shared with `while`) and its
+    /// consequent, as one parts buffer — everything **both** `if` printers built
     /// identically, so neither can drift from the other again.
     ///
     /// ⚠️ It has drifted twice, and both times the comment-bearing printer was the one
@@ -230,29 +231,15 @@ impl<'a> Printer<'a> {
     /// the other printer produces. The consequent must not be decided twice; the only real
     /// difference between the two printers is the `}`→`else` gap that SELECTS them.
     ///
+    /// The head half of that drift is now unreachable from here at all — it is
+    /// [`Self::build_paren_condition_head`], which `while` takes too. What remains here is
+    /// the CONSEQUENT dispatch, which is `if`'s own (a `while` body has no `else` after it).
+    ///
     /// The caller owns what follows: the `else` clause (which differs) and whether the
     /// whole statement is grouped.
     fn build_if_head_and_consequent(&self, stmt: &internal::IfStatement<'_>) -> DocBuf {
-        // Preserve comments between the `if` keyword and `(` in place:
-        //   if/* c */(a){} → if /* c */ (a) {}
-        let open_paren = self.find_open_paren_after(stmt.span.start);
-        let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
-        let if_keyword_end = stmt.span.start + "if".len() as u32;
-        let keyword_comments = self.build_keyword_paren_comments(if_keyword_end, open_paren);
-        // Handles breaking within the condition, its comments, and the `!(logical)`
-        // inline-negation hug.
-        let condition_group = self.build_statement_condition_doc(
-            &stmt.test,
-            open_paren,
-            close_paren,
-            OpenParenLineComments::Normalize,
-        );
-
-        let mut parts: DocBuf = DocBuf::new();
-        self.push_keyword_open_paren(&mut parts, "if", keyword_comments);
-        parts.push(condition_group);
-
-        let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
+        let (mut parts, paren_end) =
+            self.build_paren_condition_head("if", stmt.span.start, &stmt.test);
         match stmt.consequent {
             // Block consequent: `if (` + condition + `) ` + block.
             Statement::BlockStatement(block) => {
@@ -307,15 +294,14 @@ impl<'a> Printer<'a> {
     /// printer hand-wrote (`" "` after a `}`, a `hardline` otherwise), so the two paths are
     /// the same emission.
     ///
-    /// ⚠️ **One residue of the split survives, in `group_statement`.** The comment-free
-    /// path wrapped a block / empty consequent in an outer group and the comment-bearing
-    /// one never grouped at all, so the condition below carries a `!has_gap_comments`
-    /// conjunct that has no argument — it is "what each path did", preserved so this merge
-    /// is byte-neutral rather than a silent layout change. The group looks inert either way
-    /// (for those two consequent shapes `parts` holds only text, hardlines and
-    /// self-contained groups, so there is no `line` for a group to flatten), but *looks
-    /// inert* is not measured: settling it wants a shape that can see an outer group, which
-    /// is a fixture, not a refactor.
+    /// The outer group is keyed on the CONSEQUENT alone (prettier's `group([…])` around the
+    /// whole statement), never on whether the alternate gap held a comment — the split's
+    /// last residue, since the comment-bearing path grouped nothing. It is inert for those
+    /// two consequent shapes by construction: `parts` holds only text, hardlines and
+    /// self-contained groups, so there is no `line` for a group to flatten. The adversarial
+    /// shape is a non-block alternate wide enough to break
+    /// (`if (a) {…} /* c */ else while (<overflowing>) g();`), and it does not see the
+    /// group either — [`Self::build_else_adjust_clause`] carries its own.
     pub(in crate::printer::statements) fn build_if_statement_doc(
         &self,
         stmt: &internal::IfStatement<'_>,
@@ -323,34 +309,33 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = self.build_if_head_and_consequent(stmt);
 
-        let has_gap_comments = stmt.alternate.as_ref().is_some_and(|alt| {
-            self.has_comments_to_emit_between(stmt.consequent.span().end, alt.span().start)
-        });
-
         if let Some(alternate) = &stmt.alternate {
             let consequent_end = stmt.consequent.span().end;
             let alternate_start = alternate.span().start;
+            // One keyword scan for both halves of the clause: the `}`→`else` gap needs the
+            // keyword's START, the clause itself its END.
+            let else_end = self.find_else_keyword_end_between(consequent_end, alternate_start);
             // The `}`→`else` gap. Its no-comment answer is the separator itself, so the
             // keyword takes no leading space of its own here.
-            let before_else_end = self
-                .find_else_keyword_end_between(consequent_end, alternate_start)
-                .map_or(alternate_start, |e| e - "else".len() as u32);
+            let before_else_end = else_end.map_or(alternate_start, |e| e - "else".len() as u32);
             self.push_block_to_keyword_gap(
                 &mut parts,
                 consequent_end,
                 before_else_end,
                 matches!(stmt.consequent, Statement::BlockStatement(_)),
             );
-            self.append_else_clause(&mut parts, alternate, consequent_end, false);
+            self.append_else_clause(&mut parts, alternate, else_end, false);
         }
 
         let doc = d.concat(&parts);
-        let group_statement = !has_gap_comments
-            && matches!(
-                stmt.consequent,
-                Statement::BlockStatement(_) | Statement::EmptyStatement(_)
-            );
-        if group_statement { d.group(doc) } else { doc }
+        if matches!(
+            stmt.consequent,
+            Statement::BlockStatement(_) | Statement::EmptyStatement(_)
+        ) {
+            d.group(doc)
+        } else {
+            doc
+        }
     }
 }
 

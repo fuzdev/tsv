@@ -162,6 +162,38 @@
 	{
 	}
 
+	// While - the same after the header `)`
+	while (a) // c1
+
+	// c2
+	{
+		fn();
+	}
+
+	// For - the same
+	for (;;) // c1
+
+	// c2
+	{
+		fn();
+	}
+
+	// For-in - the same
+	for (a in b) // c1
+
+	// c2
+	{
+		fn();
+	}
+
+	// For-of - the same
+	for (a of b) // c1
+
+	// c2
+	{
+		fn();
+	}
+
 	// Else - the same across the else keyword
 	if (a) {
 	} else // c1

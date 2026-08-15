@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 474,
+	"end": 634,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -124,9 +124,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Block body - the blank is dropped so the body's { never sits below one",
+			"value": " else-if with the blank straight off the trailing comment - no own-line comment",
 			"start": 349,
-			"end": 422,
+			"end": 430,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -134,6 +134,54 @@
 				},
 				"end": {
 					"line": 23,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " between it and the body",
+			"start": 432,
+			"end": 458,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing2",
+			"start": 479,
+			"end": 491,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 6
+				},
+				"end": {
+					"line": 26,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block body - the blank is dropped so the body's { never sits below one",
+			"start": 509,
+			"end": 582,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
 					"column": 74
 				}
 			}
@@ -141,15 +189,15 @@
 		{
 			"type": "Line",
 			"value": " c3",
-			"start": 444,
-			"end": 449,
+			"start": 604,
+			"end": 609,
 			"loc": {
 				"start": {
-					"line": 26,
+					"line": 33,
 					"column": 1
 				},
 				"end": {
-					"line": 26,
+					"line": 33,
 					"column": 6
 				}
 			}
@@ -158,19 +206,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 473,
+		"end": 633,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 464,
+			"end": 624,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 30,
+					"line": 37,
 					"column": 9
 				}
 			},
@@ -676,29 +724,29 @@
 				},
 				{
 					"type": "IfStatement",
-					"start": 424,
-					"end": 463,
+					"start": 460,
+					"end": 506,
 					"loc": {
 						"start": {
-							"line": 24,
+							"line": 25,
 							"column": 1
 						},
 						"end": {
-							"line": 29,
-							"column": 2
+							"line": 28,
+							"column": 13
 						}
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 428,
-						"end": 429,
+						"start": 464,
+						"end": 465,
 						"loc": {
 							"start": {
-								"line": 24,
+								"line": 25,
 								"column": 5
 							},
 							"end": {
-								"line": 24,
+								"line": 25,
 								"column": 6
 							}
 						},
@@ -706,43 +754,224 @@
 					},
 					"consequent": {
 						"type": "ExpressionStatement",
-						"start": 431,
-						"end": 436,
+						"start": 467,
+						"end": 472,
 						"loc": {
 							"start": {
-								"line": 24,
+								"line": 25,
 								"column": 8
 							},
 							"end": {
-								"line": 24,
+								"line": 25,
 								"column": 13
 							}
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 431,
-							"end": 435,
+							"start": 467,
+							"end": 471,
 							"loc": {
 								"start": {
-									"line": 24,
+									"line": 25,
 									"column": 8
 								},
 								"end": {
-									"line": 24,
+									"line": 25,
 									"column": 12
 								}
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 431,
-								"end": 433,
+								"start": 467,
+								"end": 469,
 								"loc": {
 									"start": {
-										"line": 24,
+										"line": 25,
 										"column": 8
 									},
 									"end": {
-										"line": 24,
+										"line": 25,
+										"column": 10
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "IfStatement",
+						"start": 494,
+						"end": 506,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 13
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 498,
+							"end": 499,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 5
+								},
+								"end": {
+									"line": 28,
+									"column": 6
+								}
+							},
+							"name": "b"
+						},
+						"consequent": {
+							"type": "ExpressionStatement",
+							"start": 501,
+							"end": 506,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 8
+								},
+								"end": {
+									"line": 28,
+									"column": 13
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 501,
+								"end": 505,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 8
+									},
+									"end": {
+										"line": 28,
+										"column": 12
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 501,
+									"end": 503,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 8
+										},
+										"end": {
+											"line": 28,
+											"column": 10
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						"alternate": null,
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " trailing2",
+								"start": 479,
+								"end": 491
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " else-if with the blank straight off the trailing comment - no own-line comment",
+							"start": 349,
+							"end": 430
+						},
+						{
+							"type": "Line",
+							"value": " between it and the body",
+							"start": 432,
+							"end": 458
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 584,
+					"end": 623,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 588,
+						"end": 589,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 5
+							},
+							"end": {
+								"line": 31,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 591,
+						"end": 596,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 8
+							},
+							"end": {
+								"line": 31,
+								"column": 13
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 591,
+							"end": 595,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 8
+								},
+								"end": {
+									"line": 31,
+									"column": 12
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 591,
+								"end": 593,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 8
+									},
+									"end": {
+										"line": 31,
 										"column": 10
 									}
 								},
@@ -754,58 +983,58 @@
 					},
 					"alternate": {
 						"type": "BlockStatement",
-						"start": 451,
-						"end": 463,
+						"start": 611,
+						"end": 623,
 						"loc": {
 							"start": {
-								"line": 27,
+								"line": 34,
 								"column": 1
 							},
 							"end": {
-								"line": 29,
+								"line": 36,
 								"column": 2
 							}
 						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 455,
-								"end": 460,
+								"start": 615,
+								"end": 620,
 								"loc": {
 									"start": {
-										"line": 28,
+										"line": 35,
 										"column": 2
 									},
 									"end": {
-										"line": 28,
+										"line": 35,
 										"column": 7
 									}
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 455,
-									"end": 459,
+									"start": 615,
+									"end": 619,
 									"loc": {
 										"start": {
-											"line": 28,
+											"line": 35,
 											"column": 2
 										},
 										"end": {
-											"line": 28,
+											"line": 35,
 											"column": 6
 										}
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 455,
-										"end": 457,
+										"start": 615,
+										"end": 617,
 										"loc": {
 											"start": {
-												"line": 28,
+												"line": 35,
 												"column": 2
 											},
 											"end": {
-												"line": 28,
+												"line": 35,
 												"column": 4
 											}
 										},
@@ -820,8 +1049,8 @@
 							{
 								"type": "Line",
 								"value": " c3",
-								"start": 444,
-								"end": 449
+								"start": 604,
+								"end": 609
 							}
 						]
 					},
@@ -829,8 +1058,8 @@
 						{
 							"type": "Line",
 							"value": " Block body - the blank is dropped so the body's { never sits below one",
-							"start": 349,
-							"end": 422
+							"start": 509,
+							"end": 582
 						}
 					]
 				}

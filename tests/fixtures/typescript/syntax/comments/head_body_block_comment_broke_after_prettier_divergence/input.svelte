@@ -23,6 +23,20 @@
 		fn();
 	}
 
+	// For-in - the same
+	for (x in y) /* b */
+	{
+		fn();
+	}
+
+	// For-await-of - the same
+	async function f() {
+		for await (const x of y) /* b */
+		{
+			fn();
+		}
+	}
+
 	// Do - the same
 	do /* b */
 	{

@@ -10,14 +10,17 @@ body opens a `{`, which it must not sit below:
 | non-block (`fn();`) | blank kept | blank kept |
 | else-if | blank kept | blank kept |
 | else-if, comment already trailing `else` | blank kept | blank kept |
+| else-if, blank straight off that trailing comment | blank kept | blank kept |
 | **block** (`{ … }`) | **blank dropped** | blank kept |
 
-The third row is the same answer reached through a different layout. A comment
-trailing `else` is a trailing comment of the keyword, printed outside the clause, so
-prettier keeps that run flush with `else` (`if/else_consecutive_comment`) where a
-run owning its own lines takes the continuation indent. Flush or indented, the body
-opens no `{`, so the blank survives either way — the layout and the blank are
-independent questions about the same gap.
+The third and fourth rows are the same answer reached through a different layout. A
+comment trailing `else` is a trailing comment of the keyword, printed outside the
+clause, so prettier keeps that run flush with `else` (`if/else_consecutive_comment`)
+where a run owning its own lines takes the continuation indent. Flush or indented, the
+body opens no `{`, so the blank survives either way — the layout and the blank are
+independent questions about the same gap. The two rows differ in which comment the
+blank is measured from: an own-line one the gap emitted, or the trailing one itself
+when the run holds nothing else.
 
 ## Reason
 

@@ -841,7 +841,7 @@ whole builder is an **on-page** question (an emit-keyed one blinds every layout 
 guards); a **blank-line scan** is an **in-source** question (step over every comment in
 the gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller emits).
 
-⚠️ **Four hazards, all of which have bitten** (full text + war stories in
+⚠️ **Five hazards, all of which have bitten** (full text + war stories in
 ./docs/comments.md): (1) an owned comment nothing prints is a DROPPED comment — a builder
 that *reassembles* a node instead of routing through `build_expression_doc` must claim it
 on its own seam (`prepend_owned_leading_comment_at`); (2) an owned comment travels
@@ -854,13 +854,20 @@ emits only its children's docs runs no gap lookup, so every leading / inter-item
 trailing / empty-container comment is DROPPED — hand a commented container to its
 comment-aware twin (gate BEFORE the empty arm) or share the per-item emission seam;
 ownership masks this one in mirror image (the glued *leading* comment is owned and
-survives, so a leading-comment repro reports the builder healthy). Guards: the
-**print-once ledger** (`comments:audit`) is the structural guard on all four but only sees
-a document AS AUTHORED — a wholly comment-blind builder stays green until some file puts a
+survives, so a leading-comment repro reports the builder healthy); (5) an owned comment a
+blank scan CROSSES **fabricates a blank line** — it is skipped by the emit axis but still
+occupies its bytes, so a scan measuring a distance reads its interior newlines as an author
+blank. The gaps that can hold one are exactly those ending at an EXPRESSION START (a
+brace-less header→body, a binary operator→operand, a ternary `?`→branch), and the fix is
+the in-source ceiling (`blank_scan_end`) at the scan's far end. Guards: the **print-once
+ledger** (`comments:audit`) is the structural guard on the first four but only sees a
+document AS AUTHORED — a wholly comment-blind builder stays green until some file puts a
 comment there; the **injection audits** (`gaps:audit`) are the discovery arm for hazard 4;
 the **census** (`census:audit`) lexes trivia off raw input AND output, so a comment a
 parse path consumed without registering (invisible to the ledger by construction), a
-merge, or an interior rewrite still counts.
+merge, or an interior rewrite still counts. **Hazard 5 no gate reaches at all** — nothing is
+dropped or rewritten and the fabricated line is its own fixed point, so only a prettier
+`compare` finds it.
 
 ⚠️ **Leading comments have one rule and one emitter** — `Printer::push_leading_comment_run`
 (prettier's `printLeadingComment`), with `Printer::comment_hugs_next` as the single glue

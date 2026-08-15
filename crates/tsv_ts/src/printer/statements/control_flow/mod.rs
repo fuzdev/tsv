@@ -358,10 +358,25 @@ impl<'a> Printer<'a> {
     /// is what made this gate normalize `if (a) /* b */⏎{` back up to `if (a) /* b */ {`,
     /// the exact mirror of the own-line relocation [`Self::push_header_to_body_gap`]'s own
     /// ⚠️ records (`if (a)⏎/* b */⏎{` → `if (a) /* b */ {`, since fixed). Prettier
-    /// preserves both authorings at every block-bodied anchor, and tsv's declaration
-    /// head→body gap already keeps this break
-    /// (`syntax/comments/declaration_head_body_multiline_block_break`), so the control-flow
-    /// twin was the outlier.
+    /// preserves both authorings at every block-bodied anchor **it leaves the comment at
+    /// all** — `if` / `while` / `for` / for-in / for-of / for-await-of / `do` / `else`. At
+    /// the other five (`switch`, `try`, `catch (e)`, bare `catch`, `finally`) it relocates
+    /// the comment into the body or into the parens and never answers the question, so
+    /// there is no oracle to be the outlier of; tsv answers all thirteen alike
+    /// (`syntax/comments/head_body_block_comment_broke_after_relocated_prettier_divergence`).
+    ///
+    /// ⚠️ **The declaration head→`{` gap is NOT precedent for this, and deliberately answers
+    /// the same authoring the other way.** It keeps the break only for a **multiline** block
+    /// (`syntax/comments/declaration_head_body_multiline_block_break`); a single-line one
+    /// collapses, a sanctioned divergence resting on
+    /// `conformance_prettier.md` §Authored breaks in value position — an unforced break in
+    /// *value* position is layout, not authoring
+    /// (`syntax/comments/declaration_head_body_own_line_block_break_kept_prettier_divergence`,
+    /// where prettier keeps it and tsv does not). The two gaps look alike and are not: a
+    /// control-flow body is not in value position, so nothing there says the author's break
+    /// is layout, and prettier keeps it — which is why matching prettier at one gap and
+    /// diverging at the other is the consistent reading rather than the inconsistent one.
+    /// Do not "unify" them without retiring that sanction first.
     ///
     /// It is keyed on the **brace** ([`Self::body_opens_brace`]) because a brace-less body
     /// has no line of its own to keep: there the gap is the body's leading run, whose soft
@@ -447,6 +462,50 @@ impl<'a> Printer<'a> {
     ) {
         parts.push(self.d().text(keyword));
         self.push_open_paren_after_keyword(parts, kc);
+    }
+
+    /// The whole `keyword (condition)` head — `keyword`, any `keyword`→`(` comments, the
+    /// condition group — plus the position just past the `)`, which is the anchor of every
+    /// gap that follows it.
+    ///
+    /// The preamble `if` and `while` build **identically**: the same paren scan, the same
+    /// `OpenParenLineComments::Normalize`, the same `)`-or-test-end fallback for the
+    /// anchor. Two printers spelling it twice is the shape this module has already paid
+    /// for once — the `if` printer's own two halves drifted three separate times before
+    /// they were merged ([`Self::build_if_statement_doc`]) — and `while` additionally
+    /// spelled it once per body arm, so a rule added to one arm could miss the other two.
+    ///
+    /// ⚠️ **Not for do-while, `switch`, or `for`**, each of which differs in the head
+    /// itself rather than in what follows it: do-while writes its `while` after the
+    /// `}`→keyword gap ([`Self::push_open_paren_after_keyword`] is its half), `switch`
+    /// takes the inner condition builder deliberately (prettier does not group a
+    /// discriminant the way it groups a test), and the `for` header is three clauses
+    /// rather than one condition.
+    fn build_paren_condition_head(
+        &self,
+        keyword: &'static str,
+        stmt_start: u32,
+        test: &Expression<'_>,
+    ) -> (DocBuf, u32) {
+        let open_paren = self.find_open_paren_after(stmt_start);
+        let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
+        // Preserve comments between the keyword and `(` in place:
+        //   if/* c */(a){} → if /* c */ (a) {}
+        let keyword_end = stmt_start + keyword.len() as u32;
+        let keyword_comments = self.build_keyword_paren_comments(keyword_end, open_paren);
+        // Handles breaking within the condition, its comments, and the `!(logical)`
+        // inline-negation hug.
+        let condition_group = self.build_statement_condition_doc(
+            test,
+            open_paren,
+            close_paren,
+            OpenParenLineComments::Normalize,
+        );
+
+        let mut parts = DocBuf::new();
+        self.push_keyword_open_paren(&mut parts, keyword, keyword_comments);
+        parts.push(condition_group);
+        (parts, close_paren.unwrap_or_else(|| test.span().end) + 1)
     }
 
     /// The half of [`Self::push_keyword_open_paren`] past the keyword: the `keyword`→`(`
@@ -536,9 +595,11 @@ impl<'a> Printer<'a> {
     /// asked of the body itself rather than declared per call site.
     ///
     /// A byte read, not a scan: a `BlockStatement`'s span starts at its `{`, so a gap's
-    /// own end position answers it. Asking the AST instead would need the `Statement` at
-    /// six call sites that hold only the position — including the frozen labeled body,
-    /// whose node is behind a freeze span.
+    /// own end position answers it. Asking the AST instead would mean threading the
+    /// `Statement` down two call chains — [`Self::header_to_body_gap_breaks`]'s five call
+    /// sites and [`Self::push_header_to_body_gap`]'s seven — past the several that hold
+    /// only a position, and past the frozen labeled body, whose node is behind a freeze
+    /// span.
     ///
     /// Two readers, one question: [`Self::header_to_body_gap_breaks`] (a `{` the author
     /// dropped below the run keeps its line) and [`Self::push_header_to_body_gap`] (a `{`
@@ -576,7 +637,7 @@ impl<'a> Printer<'a> {
     /// (`if (a) /* b */⏎{`) keeps its line rather than being pulled back up, which is
     /// [`Self::header_to_body_gap_breaks`]'s third clause. Both authorings are stable and
     /// prettier preserves each, so the gap holds two fixed points by design — pinned by
-    /// `syntax/comments/head_body_block_comment_broke_after`.
+    /// `syntax/comments/head_body_block_comment_broke_after_prettier_divergence`.
     ///
     /// A blank above the first own-line comment is **dropped** (`blank_seed` = `None`),
     /// so a body block's `{` never sits below one. That is consistent with tsv's own
@@ -630,15 +691,28 @@ impl<'a> Printer<'a> {
             // the glued run's first comment when one leads the body inline. An all-glued
             // gap emitted nothing to measure it from, so the `blank_seed` = `None` rule
             // above stands there too.
+            //
+            // ⚠️ The far end takes [`Self::blank_scan_end`], the in-source ceiling
+            // CLAUDE.md §Comment Handling prescribes: a brace-less body's leading position
+            // IS an expression start, so a block comment the author glued to it is OWNED —
+            // physically in this gap, printed by the body's own doc, and invisible to
+            // every bucket above. Scanning across it reads the comment's own interior
+            // newlines as an author blank (`else⏎// c⏎/* owned⏎⏎*/ fn();`), a blank that is
+            // its own fixed point and so invisible to every standing gate. The `{` case
+            // cannot reach it — `{` begins no expression — which is exactly why the
+            // brace-keyed arm is the one that needed the floor.
             let blank_anchor = (!self.body_opens_brace(body_start))
                 .then(|| own_line.last().or_else(|| inline_prev.last()))
                 .flatten();
             match blank_anchor {
-                Some(last) => self.push_blank_preserving_hardline(
-                    parts,
-                    last.span.end,
-                    glued.first().map_or(body_start, |c| c.span.start),
-                ),
+                Some(last) => {
+                    let next = glued.first().map_or(body_start, |c| c.span.start);
+                    self.push_blank_preserving_hardline(
+                        parts,
+                        last.span.end,
+                        self.blank_scan_end(last.span.end, next),
+                    );
+                }
                 None => parts.push(d.hardline()),
             }
         } else {
@@ -754,15 +828,22 @@ impl<'a> Printer<'a> {
     ///
     /// ⚠️ The strict arm is still not the `blank_scan_start`/`blank_scan_end` pair
     /// CLAUDE.md §Comment Handling prescribes for in-source scans — a multiline comment
-    /// *this caller does not emit* would carry its own blank line into it. Sound here
-    /// *only* because **no comment in these gaps can be owned**: both
-    /// `owned_by_node = true` sites live in `parser/expression.rs` and bind to expression
-    /// starts, and none of the three gaps contains one — a `}`→continuation-keyword gap
-    /// is followed by a keyword, a header→body gap by the body's own leading position,
-    /// and a condition→`)` gap by the `)`. So the to-emit set and the in-source set
-    /// coincide. Verified 2026-07-20, re-checked for the condition gap 2026-08-14. If
-    /// ownership ever extends to a token these gaps can hold, this must move to the
-    /// helpers (the adjacent arm already carries its floor).
+    /// *this caller does not emit* would carry its own blank line into it. Sound **in this
+    /// loop** for a reason narrower than "these gaps hold no owned comment", which is
+    /// false: both `owned_by_node = true` sites live in `parser/expression.rs` and bind to
+    /// expression starts, and a header→body gap whose body is **brace-less** ends at an
+    /// expression start, so a block comment glued to it is owned and sits physically in
+    /// the gap. (The other two gaps really do hold none — a `}`→continuation-keyword gap
+    /// ends at a keyword, a condition→`)` gap at the `)`.)
+    ///
+    /// What holds instead is a POSITION claim: an owned comment hugs the token it binds
+    /// to, so the only one this gap can hold is the last thing in it, past every comment
+    /// this loop emits. Each scan here runs between two comments this loop printed, so
+    /// none of them can span it. The scan that CAN is the gap's tail, from the last
+    /// emitted comment to the body — and that one carries the `blank_scan_end` ceiling
+    /// ([`Self::push_header_to_body_gap`]), because without it the owned comment's own
+    /// interior newlines read as an author blank. If ownership ever extends to a token
+    /// that can sit BETWEEN two emitted comments here, this loop needs the floor too.
     fn build_comments_between_parts(
         &self,
         parts: &mut DocBuf,

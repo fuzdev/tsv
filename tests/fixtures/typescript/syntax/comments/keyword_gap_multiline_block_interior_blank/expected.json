@@ -1,0 +1,466 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 412,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multiline block comment's own interior blank is not an author blank between",
+			"start": 10,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " two comments - the `}`->`else` gap measures from the `*/`, not from the `}`",
+			"start": 92,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n\n",
+			"start": 184,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 3
+				},
+				"end": {
+					"line": 7,
+					"column": 3
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 196,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same with a line comment below it",
+			"start": 218,
+			"end": 258,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n\n",
+			"start": 272,
+			"end": 282,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 3
+				},
+				"end": {
+					"line": 16,
+					"column": 3
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 284,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Null control - the same run with no interior blank",
+			"start": 303,
+			"end": 356,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n ",
+			"start": 370,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 3
+				},
+				"end": {
+					"line": 24,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 382,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 411,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 402,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 172,
+					"end": 215,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 176,
+						"end": 177,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 5
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 179,
+						"end": 183,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 8
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [],
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1\n\n",
+								"start": 184,
+								"end": 194
+							}
+						]
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 211,
+						"end": 215,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 196,
+								"end": 204
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multiline block comment's own interior blank is not an author blank between",
+							"start": 10,
+							"end": 90
+						},
+						{
+							"type": "Line",
+							"value": " two comments - the `}`->`else` gap measures from the `*/`, not from the `}`",
+							"start": 92,
+							"end": 170
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 260,
+					"end": 300,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 264,
+						"end": 265,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 5
+							},
+							"end": {
+								"line": 13,
+								"column": 6
+							}
+						},
+						"name": "b"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 267,
+						"end": 271,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 8
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"body": [],
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1\n\n",
+								"start": 272,
+								"end": 282
+							}
+						]
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 296,
+						"end": 300,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 284,
+								"end": 289
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same with a line comment below it",
+							"start": 218,
+							"end": 258
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 358,
+					"end": 401,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 362,
+						"end": 363,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 5
+							},
+							"end": {
+								"line": 22,
+								"column": 6
+							}
+						},
+						"name": "c"
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 365,
+						"end": 369,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 8
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"body": [],
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1\n ",
+								"start": 370,
+								"end": 380
+							}
+						]
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 397,
+						"end": 401,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 382,
+								"end": 390
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Null control - the same run with no interior blank",
+							"start": 303,
+							"end": 356
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
