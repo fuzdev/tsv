@@ -63,7 +63,7 @@ git clone https://github.com/microsoft/typescript-go ../typescript-go   # the co
 git -C ../typescript-go submodule update --init   # _submodules/TypeScript (corpus inputs, for `run`)
 ```
 
-`query` and `roundtrip` run on a bare checkout. `index` and `run` also need the
+`query` and `roundtrip` run on a bare checkout. `index`, `run`, and `check-test` also need the
 materialized `_submodules/TypeScript` corpus, and `run` additionally needs
 `internal/bundled/libs` (the lib `.d.ts` set each variant resolves against).
 
@@ -89,7 +89,7 @@ cargo run -p tsv_debug tsc_conformance index                     # the corpus-IN
 deno task conformance:tsc-roundtrip                              # roundtrip, as a deno task
 deno task conformance:tsc-check                                  # run + writes benches/js/results/report.tsc-conformance.{json,md}
 deno task conformance:tsc-check:update                           # re-pin the count snapshot + refresh the report (full runs only; refuses a red run)
-# Common options: --path <typescript-go> (default ../typescript-go), --json, --verbose.
+# Common options: --path <typescript-go> (default ../typescript-go), --json; --verbose on roundtrip/index only.
 # roundtrip: filter by path substring (skips the pins). run: triage filters --test <substr> /
 #   --code <n> / --variant k=v / --family {dup,flow,all} skip the pins (invariant gates still
 #   hold); --emit-manifest <path>, --report <path> (full-run only), --update (full-run only).

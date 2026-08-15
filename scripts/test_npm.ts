@@ -5,7 +5,9 @@
  * Verifies the wasm-pack web target + patch_npm_package.ts wrapper works
  * correctly when imported as ESM in Node.js: the auto-init node entry
  * (index.js), the guarded browser entry (browser.js), the package.json
- * exports/files wiring, and (for the `all` variant) the `tsv` bin.
+ * exports/files wiring, the bundled `locations.js` helper, the shared
+ * discovery-parity suite over `IgnoreStack`, and (for the `all` variant) the
+ * `tsv` bin.
  *
  * Runs under Node (not Deno) on purpose — it validates the package in the
  * runtime consumers use. Node's native type stripping executes the `.ts`

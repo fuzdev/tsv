@@ -31,6 +31,9 @@ Consumers:
   native `@fuzdev/tsv` carries the identical surface (method for method, down to
   `undefined` rather than `null` for the maybe-a-warning methods) and one JS CLI
   source drives either package.
+- `tsv_discover` — the policy layer over the matcher; the crate's only `tsv_*` dep.
+- `tsv_debug` — `conformance_audit`'s repo walk builds an `IgnoreStack` to honor
+  `.gitignore` while checking Markdown links.
 
 The `#[wasm_bindgen]` wrapper lives in `tsv_wasm`, not here; this crate stays
 binding-agnostic.

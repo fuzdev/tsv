@@ -449,7 +449,7 @@ Each catalog is self-contained and governed by the decision framework above.
 | --- | --- |
 | [conformance_prettier_css.md](./conformance_prettier_css.md) | at-rules, selectors, values, layout, comments, CDO/CDC |
 | [conformance_prettier_svelte.md](./conformance_prettier_svelte.md) | elements, inline content block-style, attributes, blocks, destructuring, form feed |
-| [conformance_prettier_ts.md](./conformance_prettier_ts.md) | expressions, types, modules, template literals, input prettier rejects |
+| [conformance_prettier_ts.md](./conformance_prettier_ts.md) | expressions, types, modules, template literals, prettier rejects, tsv rejects |
 | [conformance_prettier_ts_comments.md](./conformance_prettier_ts_comments.md) | comment relocation, multi-word keywords, JSDoc / paren semantics, normalization |
 | [conformance_prettier_ignore.md](./conformance_prettier_ignore.md) | the `format-ignore` / `prettier-ignore` freeze rule, across all three languages |
 

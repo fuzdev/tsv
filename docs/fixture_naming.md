@@ -352,10 +352,10 @@ Validation: rules N7/N7b/N7c in ./fixture_overview.md.
 **Example:**
 
 ```
-trailing_member_computed_comment_prettier_divergence/
-├── input.svelte                        # const f = items.filter((x) => x)[0]; // comment
-├── unformatted_ours_expanded.svelte    # Comment before [0] on separate line
-├── prettier_intermediate_expanded.svelte  # [// comment\n0] (prettier's unstable form)
+await_new_operand_own_line_block_comment_prettier_divergence/
+├── input.svelte                          # the tsv fixed point
+├── unformatted_ours_own_line.svelte      # authored form: tsv normalizes it to input
+├── prettier_intermediate_own_line.svelte # prettier's unstable first-pass form from that source
 └── README.md
 ```
 

@@ -22,7 +22,7 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 
 **A range does not pin a section's position.** A `<script>` / `<style>` / `<svelte:options>` written *inside* a range is still lifted to the component root and printed at its canonical position, and its bytes are cut out of the frozen slice — leaving them there emits the section twice, which the parser rejects (`Duplicate instance script found`). Prettier does the same, so the plain case needs no divergence ([range_section_hoist](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_hoist/)); a comment sitting beside such a section diverges ([range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)), and the seam the cut leaves behind follows the byte-verbatim rule ([range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)): tsv freezes the whole slice including inter-node whitespace, where prettier freezes node *content* but re-lays out the whitespace between nodes.
 
-The first five are Svelte-embedded; the two standalone entries pin the **standalone**
+All but the two standalone entries are Svelte-embedded; those two pin the **standalone**
 `.ts` / `.css` paths (acorn-typescript / `parseCss` + `tsv_ts` / `tsv_css`
 directly), so the directive is covered in every language outside a Svelte host
 too.

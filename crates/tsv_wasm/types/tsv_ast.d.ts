@@ -7,7 +7,7 @@
  *   - crates/tsv_css/src/ast/convert/write.rs
  *   - crates/tsv_svelte/src/ast/convert/write.rs
  *
- * Bundled inside `@fuzdev/tsv_parse_wasm` and `@fuzdev/tsv_wasm`. Any change
+ * Bundled inside `@fuzdev/tsv_parse_wasm`, `@fuzdev/tsv_wasm`, and `@fuzdev/tsv`. Any change
  * to the JSON a writer emits must be mirrored here — see
  * `crates/tsv_wasm/CLAUDE.md` for the maintenance checklist.
  *
@@ -20,7 +20,7 @@
 // Foundational types (reused across TypeScript, CSS, and Svelte ASTs).
 //
 
-/** Line/column position. `character` is a byte offset that only appears on identifiers Svelte creates directly. */
+/** Line/column position. `character` is a UTF-16 offset (the same space as `start`/`end`), present only on the nodes Svelte's own reader creates — shorthand-attribute identifiers, snippet names, simple-identifier block patterns, and in-tag comments. */
 export interface Position {
 	line: number;
 	column: number;
@@ -1795,7 +1795,7 @@ export interface StyleContent {
 // Svelte AST
 //
 
-/** Span of a name (element, attribute, directive), with byte offsets. */
+/** Span of a name (element, attribute, directive), as `{line, column, character}` endpoints; `character` is a UTF-16 offset. */
 export interface NameLocation {
 	start: NamePosition;
 	end: NamePosition;

@@ -23,8 +23,8 @@
 #
 # `check` needs Rust *and* Deno: the fixture suite drives prettier + svelte
 # through a Deno sidecar (npm: specifiers pinned in
-# crates/tsv_debug/src/deno/sidecar.ts and fetched at runtime — not
-# lockfile-pinned, hence the cache-hash on sidecar.ts below), so
+# crates/tsv_debug/src/deno/sidecar.ts and locked by its sibling deno.lock,
+# frozen at runtime — hence the cache-hash on both below), so
 # `cargo test --workspace` panics without Deno — tests/fixtures_tests.rs
 # health-checks the sidecar first. wasm-pack is not needed by `check`.
 
@@ -50,8 +50,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
 
-    # The fixture suite fetches pinned npm packages at runtime (no frozen
-    # lock), so bound the job to fail fast on a registry stall or hung sidecar
+    # The fixture suite fetches pinned npm packages at runtime (frozen to the
+    # sidecar deno.lock), so bound the job to fail fast on a registry stall or hung sidecar
     # instead of running to the 6h default.
     timeout-minutes: 30
 
@@ -88,9 +88,10 @@ jobs:
           # are the only runtime npm `check` does: `test:deno` runs the
           # dependency-free divergence suite (node: builtins + relative imports, no
           # node_modules — proven by a clean checkout), and the bench's heavy npm
-          # tree (biome/oxc/oxfmt) is never installed here. No deno.lock files exist
-          # (the bench resolves npm from package-lock.json; root has no external deps).
-          cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs') }}
+          # tree (biome/oxc/oxfmt) is never installed here. The only deno.lock is the
+          # sidecar's (crates/tsv_debug/src/deno/deno.lock, embedded + frozen); the
+          # bench resolves npm from package-lock.json and the root has no external deps.
+          cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
 
       - name: Check
         run: deno task check
@@ -219,7 +220,7 @@ jobs:
           # Pinned to match the check job / local. Bump deliberately.
           deno-version: 2.8.0
           cache: true
-          cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs') }}
+          cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
 
       # For test:napi's runner (`node --test` executes the .ts directly via
       # native type stripping, >= 22.18). Pinned to match the artifacts job.
@@ -237,8 +238,9 @@ jobs:
       # The real N-API JS boundary against this OS's napi-profile cdylib
       # (release + unwind, built with the test-only panic probe so the
       # panic-contract test runs; per-OS naming — .dll / .dylib — handled by
-      # benches/js/lib/runtime.ts). This is the only automated build of
-      # tsv_napi anywhere in CI. Runs even when Test fails (independent signal
+      # benches/js/lib/runtime.ts). This is the only tsv_napi build on every PR
+      # (release_napi.yml builds it on tags, dispatch, and a weekly cron).
+      # Runs even when Test fails (independent signal
       # during the burn-down; its own failure still fails the job).
       - name: N-API boundary test
         if: ${{ !cancelled() }}

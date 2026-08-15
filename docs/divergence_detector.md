@@ -21,6 +21,8 @@ benches/js/
 │       ├── safety.ts          # Safety check (differential char-frequency vs prettier)
 │       ├── patterns.ts        # Hunk-aware pattern detectors (PATTERNS), with traceability
 │       ├── expected_errors.ts # Expected-error fixtures (parse-rejection cases)
+│       ├── fixture_cases.ts   # Drives the detectors against committed divergence fixtures
+│       ├── panic_errors.ts    # Panic classification: a caught tsv CRASH vs an ordinary rejection
 │       └── validation.ts      # Audit: cross-ref patterns vs conformance_prettier*.md
 ```
 

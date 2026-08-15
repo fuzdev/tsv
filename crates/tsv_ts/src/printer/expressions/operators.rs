@@ -232,7 +232,7 @@ impl<'a> Printer<'a> {
             } else {
                 inner
             };
-            // Prettier's `printUnaryExpression` shell verbatim
+            // Prettier's `UnaryExpression` shell (inline in `print/estree.js`) verbatim
             // (`print/estree.js`: `group(["(", indent([softline, argumentDoc]), softline,
             // ")"])`), so the two questions stay separate: the GROUP decides flat vs
             // broken on width, and the comment runs inside it decide their own

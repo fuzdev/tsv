@@ -8,7 +8,8 @@
  * Rust `tsv_cli` binary is the fast path for large trees.
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
- * `parse` — 0 ok, 1 error. Argument-parsing errors exit 1 (both commands).
+ * `parse` — 0 ok, 1 error. Flag-parsing errors exit 1 (both commands); `format`'s
+ * post-parse usage/validation errors (an invalid `--goal`, conflicting inputs) exit 2.
  */
 
 import {
@@ -83,9 +84,10 @@ const FORMAT_HELP = `Usage: tsv format [<paths...>] [--check] [--list] [--conten
 Format source code in place (near-Prettier output).
 
 Paths are formatted in place (written only when the output differs) and
-changed paths print to stdout; directories recurse over .ts/.svelte/.css,
-honoring .gitignore (hierarchically, in a git tree) plus hierarchical
-.formatignore / .prettierignore. An explicitly named file skips the ignore
+changed paths print to stdout; directories recurse over
+.ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css, honoring .gitignore
+(hierarchically, in a git tree) plus hierarchical .formatignore /
+.prettierignore. An explicitly named file skips the ignore
 files, but its extension must still be one tsv formats.
 --content/--stdin print formatted source to stdout.
 
@@ -341,10 +343,13 @@ function format_paths(values, positionals) {
 		return;
 	}
 	if (files.length === 0 && traversal_errors.length === 0) {
-		// neutral wording: an empty result can mean "no .ts/.svelte/.css here" *or*
-		// "all of them are ignored" (e.g. a target under a gitignored dir), so don't
-		// imply a wrong-extension cause. `--list` reports the empty set and exits 0.
-		eprint('Error: No files to format — no unignored .ts/.svelte/.css files in scope\n');
+		// neutral wording: an empty result can mean "no
+		// .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css here" *or* "all of them are
+		// ignored" (e.g. a target under a gitignored dir), so don't imply a
+		// wrong-extension cause. `--list` reports the empty set and exits 0.
+		eprint(
+			'Error: No files to format — no unignored .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css files in scope\n'
+		);
 		process.exit(2);
 	}
 

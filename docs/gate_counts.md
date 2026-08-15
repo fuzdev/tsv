@@ -38,10 +38,14 @@ real move in a number is a deliberate, visible edit.
   as-authored audits (`swallow_audit`, `fabrication_audit`, `census_audit`,
   `width_audit`, `comment_audit`) share `FIXTURES_FORMATTED_MIN` in
   `crates/tsv_debug/src/audit/vacuity.rs` — formatted files, closing their
-  vacuous-pass. One const because they walk one corpus under one skip policy; five
-  would drift apart in slack, which is the collapse the pin exists to catch —
-  `comment_audit`'s own `REGISTERED_MIN` had drifted 27% below its live count
-  before it was made to pass the shared pin too. That is the **default-corpus**
+  vacuous-pass. One const because they walk one corpus under one skip policy;
+  separate consts would drift apart in slack, which is the collapse the pin exists
+  to catch — `comment_audit`'s own `REGISTERED_MIN` had drifted 27% below its live
+  count before it was made to pass the shared pin too. (`razor_audit` reuses the
+  const as its floor over a seed list it resolves itself, `.svelte` files only, so
+  it carries structural slack — the `.svelte` subset sits above the corpus-wide
+  pin, and a Svelte-only discovery collapse smaller than that slack would pass; a
+  razor-scoped pin is the tightening if that ever bites.) That is the **default-corpus**
   layer; under it sits `check_graded_nonzero` (same module), which every
   corpus-walking audit calls unconditionally on its own graded count and which
   therefore needs no pin at all.
@@ -115,7 +119,8 @@ regression — so the attribution is the constant's semantics, not its history.
 `X→Y (date): …` entries were swept out for that reason, and the repo-wide rule against
 process notes in docs and comments applies here); the change's own narrative belongs in
 the **commit message**. What stays in-file is the sentence a reader needs to know what
-the number counts.
+the number counts — including a harvest pin's provenance stamp (`Measured <date>:
+../wpt at <commit>`), which is the pin's identity, not its history.
 
 When a checkout moves, re-record its **commit** in `GATE_CHECKOUT_COMMITS` in the
 same change (`git -C ../<repo> rev-parse --short HEAD`) — that struct is the single

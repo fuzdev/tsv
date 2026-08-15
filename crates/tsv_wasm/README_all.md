@@ -17,7 +17,7 @@ npx @fuzdev/tsv_wasm format --list .   # list the in-scope files, format nothing
 npx @fuzdev/tsv_wasm parse file.svelte # JSON AST to stdout (--pretty to indent)
 ```
 
-Installed (`npm i -D @fuzdev/tsv_wasm`), the bin is `tsv`. Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`), `.svelte`, and `.css` with gitignore-aware discovery. **Inside a git repo** it honors `.gitignore`, `.formatignore`, and `.prettierignore` (all hierarchical, like git), scoped to the repo so results are reproducible. **Outside a repo** it honors only `.formatignore`, falling back to skipping hidden directories and `dist`/`build`/`target`. `node_modules` and VCS directories are always skipped; an explicitly named file skips the ignore files, but its extension must still be one tsv formats.
+Installed (`npm i -D @fuzdev/tsv_wasm`), the bin is `tsv`. Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`), `.svelte`, and `.css` with gitignore-aware discovery. **Inside a git repo** it honors `.gitignore`, `.formatignore`, and `.prettierignore` (all hierarchical, like git), scoped to the repo so results are reproducible. **Outside a repo** it honors only `.formatignore`. With no `.gitignore` in scope (in or out of a repo), discovery falls back to skipping hidden directories and `dist`/`build`/`target`. `node_modules` and VCS directories are always skipped; an explicitly named file skips the ignore files, but its extension must still be one tsv formats.
 
 `format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--goal script|module` (default `module`; for `format`, `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier and `import`/`export`/`import.meta` are errors. `parse --no-locations` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`; no-op for CSS). Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 
@@ -41,11 +41,13 @@ To turn a span-only wire back into a loc-bearing one, `reconstruct_locations(ast
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
+For tooling that needs tsv's exact file scoping, the package also exports the `IgnoreStack` class — the hierarchical `.gitignore`/`.formatignore`/`.prettierignore` matcher plus tsv's discovery policy (`classify_dir`, `should_format_file`, `is_path_pruned`, `unsupported_extension_error`, `heuristic_shadow_warning`); [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) documents it with examples.
+
 tsv is non-configurable: formatter settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.
 
 ## Status
 
-v0.1 — pre-release. API may change.
+0.x — pre-release. API may change.
 
 ## License
 

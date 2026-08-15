@@ -116,7 +116,7 @@ Spec: `selectors-4` (core features are REC via CSS2.1)
 - Child combinator (`>`)
 - Adjacent sibling combinator (`+`)
 - General sibling combinator (`~`)
-- Column combinator (`||`) - _at risk in spec_
+- Column combinator (`||`) - _moved to Selectors Level 5 by the CSSWG_
 - Leading combinator (`> .a`, `+ .a`) - accepted in every context; contextual invalidity deferred to diagnostics
 - Consecutive combinators (`> > .a`, `+ ~ .d`) - preserved (parseCss collapses the run); see [conformance_svelte.md §CSS Corrections](conformance_svelte.md#css-corrections)
 
@@ -634,8 +634,8 @@ The constructs tsv rejects outright:
 
 Everything below **parses today** — the generic at-rule, pseudo-class/element, and
 declaration-value paths accept it, format it, and round-trip it. What it lacks is
-*structural* modeling, which is the same footing as `@view-transition`,
-`contrast-color()`, and the [Modern Pseudo-Classes](#modern-pseudo-classes-level-4)
+*structural* modeling, which is the same footing as `@view-transition` and the
+[Modern Pseudo-Classes](#modern-pseudo-classes-level-4)
 already listed under Supported.
 
 For the value-level entries that is the intended end state rather than a gap:

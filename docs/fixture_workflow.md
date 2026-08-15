@@ -223,14 +223,14 @@ cargo run -p tsv_debug canonical_parse tests/fixtures/.../input.svelte | head -8
 0. **Load [conformance_prettier.md](./conformance_prettier.md) + the language's catalog FIRST** — REQUIRED before any divergence. Read §Comment Position Philosophy in the frame and the §Comment relocation catalog in [conformance_prettier_ts_comments.md](./conformance_prettier_ts_comments.md) to (a) confirm the divergence is sanctioned (not a bug you're papering over) and (b) check whether it's already cataloged. If a sibling rule exists, match its shape; if new, add a catalog entry + one-line note there as part of this change. The README and conformance entry must agree.
 1. Create directory with `_prettier_divergence` suffix
 2. Add `README.md` explaining why tsv differs — match the concise style of sibling READMEs (prettier form ↔ tsv form ↔ reason + conformance link)
-3. Document with: `output_prettier.*`, `prettier_variant_*.*`, `variant_*.*`, `divergent_variant_*.*`, `unformatted_ours_*.*`, `prettier_intermediate_*.*`, or `prettier_intermediate_to_variant_*.*` — see [fixture_naming.md](./fixture_naming.md#prettier-divergence-file-naming) for details
+3. Document with: `output_prettier.*`, `prettier_variant_*.*`, `variant_*.*`, `divergent_variant_*.*`, `unformatted_ours_*.*`, `prettier_intermediate_*.*`, `prettier_intermediate_to_variant_*.*`, or `prettier_intermediate_to_divergent_variant_*.*` — see [fixture_naming.md](./fixture_naming.md#prettier-divergence-file-naming) for details
 4. Use `deno task fixtures:audit <pattern>` to investigate novel prettier outputs
 
 `deno task fixtures:update:formatted` may also auto-generate an `audit_signature.txt` next to `output_prettier.*` when prettier requires multiple passes on it. Treat it as a sibling of `output_prettier.*` — never edit by hand; regenerate with the same command. See ./fixture_overview.md (rule F4).
 
 The same command may generate an `audit_signature_<suffix>.txt` next to an `unformatted_ours_<suffix>.*` — the same file format anchored at that source instead, and the **marker of last resort**: it appears only where prettier's output from that source fits no single-form marker (a chain with two or more distinct intermediates, or a stable form tsv cannot format). Also never hand-written; the command decides whether one is warranted, deletes it when it stops being (orphaned intermediates and signatures whose source is gone are swept the same way), and refuses to delete over a chain prettier can no longer complete (an error mid-walk — investigate instead). See ./fixture_overview.md (rule N12).
 
-If prettier **never converges** on the input (each pass keeps changing the output — no fixed point, so no `output_prettier.*` is possible), add a `prettier_nonconvergent.txt` marker + README instead of the claim files above; the validator live-verifies the non-convergence. Rare — one in-tree case. See ./fixture_overview.md (rules F5/S18).
+If prettier **never converges** on the input (each pass keeps changing the output — no fixed point, so no `output_prettier.*` is possible), add a `prettier_nonconvergent.txt` marker + README instead of the claim files above; the validator live-verifies the non-convergence. Rare — a handful of in-tree cases. See ./fixture_overview.md (rules F5/S18).
 
 If prettier **throws** on the input (a parse rejection or a printer crash — also no `output_prettier.*` possible), add a `prettier_rejects.txt` marker + README instead. The marker's trimmed content is the position-stripped expected-error substring; the validator live-verifies that prettier still errors with that message (rules F6/S19). The input must be valid by tsv's parse oracle (Svelte / acorn-typescript) and idempotent under tsv. Hand-author it — `fixture_init` runs prettier, which throws — then `deno task fixtures:update:parsed` for `expected.json`. See ./fixture_overview.md (rules F6/S19) and the catalog of in-tree cases in ./conformance_prettier_ts.md §"Prettier rejects valid input".
 
@@ -436,7 +436,7 @@ cargo run -p tsv_debug line_width FILE --line N
 deno task fixtures:validate [pattern]
 
 # Count fixtures (all input types)
-find tests/fixtures -name "input.svelte" -o -name "input.ts" -o -name "input.css" | wc -l
+find tests/fixtures \( -name "input.svelte" -o -name "input.svelte.ts" -o -name "input.ts" -o -name "input.css" \) | wc -l
 ```
 
 ---

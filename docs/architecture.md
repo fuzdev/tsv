@@ -83,6 +83,7 @@ tsv/
 ├── tsv_ts       # TypeScript parser/formatter (standalone)
 ├── tsv_css      # CSS parser/formatter (standalone)
 ├── tsv_svelte   # Svelte parser/formatter (uses tsv_ts + tsv_css)
+├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css + tsv_html; consumed only by tsv_debug)
 ├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; consumed only by tsv_debug)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses embedded Deno sidecar for JS tools)
@@ -122,8 +123,11 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
             tsv_check  (experimental TypeScript binder/checker, may never ship —
                         depends on tsv_lang + tsv_ts; consumed ONLY by tsv_debug,
                         so no shipped format/parse artifact links it)
+            tsv_svelte_compile  (experimental Svelte→JS compiler + JS canonicalizer —
+                        depends on tsv_lang + tsv_html + tsv_ts + tsv_css + tsv_svelte;
+                        consumed ONLY by tsv_debug, so no shipped artifact links it)
 
-   tsv_cli and tsv_wasm also consume tsv_discover (→ tsv_ignore).
+   tsv_cli, tsv_wasm, and tsv_napi also consume tsv_discover (→ tsv_ignore).
    tsv_ffi, tsv_napi, and tsv_wasm also consume tsv_arena — per-thread
    reusable AST/doc arenas (→ bumpalo; → tsv_lang under `format`).
 ```
@@ -136,7 +140,7 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 **Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (with `convert_ast_json()` a thin `Value` wrapper over the bytes). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
-**Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, and the experimental `tsv_check` typechecker — which may never ship — already done as crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
+**Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, and the experimental `tsv_check` / `tsv_svelte_compile` — which may never ship — all landed as crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
 ### Closed Scope, Open Convention
 
@@ -146,7 +150,7 @@ level**. The shape of a "tsv language" is a social contract, not a Rust
 trait:
 
 ```rust
-pub fn parse(source: &str) -> Result<InternalAst, ParseError>;
+pub fn parse<'a>(source: &str, arena: &'a Bump) -> Result<InternalAst<'a>, ParseError>;
 pub fn format(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
@@ -321,13 +325,14 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 
 ```
 foundation (tsv_lang + tsv_html): ~7% of codebase
-languages (tsv_ts + tsv_css + tsv_svelte): ~82%
-tooling (tsv_cli + tsv_debug + bindings): ~11%
+languages (tsv_ts + tsv_css + tsv_svelte): ~49%
+experimental compiler + checker (tsv_svelte_compile + tsv_check): ~20%
+tooling (tsv_cli + tsv_debug + bindings): ~23%
 
-printer % of language code: ~50%
+printer % of language code: ~61%
 ```
 
-The 7% foundation / 82% language split reflects genuine domain complexity, not missing extraction opportunities. The doc builder already factors out the rendering algorithm (the expensive shared part); what remains language-specific is the _formatting decisions_ themselves — when to break, how to indent, where to attach comments — which differ fundamentally between TypeScript, CSS, and Svelte.
+The 7% foundation / 49% language split (the experimental compiler/checker and dev tooling counted separately) reflects genuine domain complexity, not missing extraction opportunities. The doc builder already factors out the rendering algorithm (the expensive shared part); what remains language-specific is the _formatting decisions_ themselves — when to break, how to indent, where to attach comments — which differ fundamentally between TypeScript, CSS, and Svelte.
 
 ### What Not to Extract
 

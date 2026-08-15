@@ -736,7 +736,7 @@ binding (`import source source from 'mod'`) parses fine.
 pipeline needs acorn to produce `expected.json`, and acorn rejects the syntax." That is
 WRONG, and the belief was load-bearing:** a canonical-parser rejection IS representable —
 `expected_ours.json` + an `expected_svelte.json` holding `{"error": "failed to parse"}`,
-in a `_svelte_divergence` dir (23 fixtures already do this;
+in a `_svelte_divergence` dir (dozens of fixtures already do this;
 [fixture_overview.md](./fixture_overview.md) states it). Because the belief said no
 fixture was possible, none was written, and the prettier-side claim next door
 (`import defer` phase drop) went stale unnoticed for want of an `output_prettier.*` to

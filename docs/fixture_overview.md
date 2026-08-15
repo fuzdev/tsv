@@ -84,8 +84,7 @@ Each input type — canonical parser source — prettier validation:
 ```
 tests/fixtures/typescript/syntax/comments/hashbang/
 ├── input.ts              # #!/usr/bin/env node\nconsole.log("hello");
-├── expected.json         # From acorn+typescript parser
-└── unformatted_*.ts      # Variants use .ts extension
+└── expected.json         # From acorn+typescript parser
 ```
 
 **CSS (`input.css`):**
@@ -96,9 +95,10 @@ tests/fixtures/typescript/syntax/comments/hashbang/
 
 ```
 tests/fixtures/css/tokens/whitespace/bom_prettier_divergence/
-├── input.css             # Standalone CSS source
-├── expected.json         # From Svelte's parseCss
-└── unformatted_ours_*.css  # Variants use .css extension
+├── input.css               # Standalone CSS source
+├── expected.json           # From Svelte's parseCss
+├── prettier_variant_bom.css # Prettier's stable variant (variants use .css extension)
+└── README.md
 ```
 
 **Fixture minimalism**: Consolidate related patterns into one fixture (3-6 cases). One CSS rule for value tests, multiple rules only for selector/cascade interactions. See ./fixture_naming.md for full conventions.
@@ -316,12 +316,13 @@ All fixtures use `input.svelte` as canonical source.
 **Structural validations (S)** - File structure checks:
 
 1. **S1**: Input file exists (`input.svelte`, `input.ts`, `input.css`, or `input.svelte.ts`)
-2. **S2**: Input has correct extension (`.svelte` preferred, `.ts`/`.css` for file-level features, `.svelte.ts` for runes)
-3. **S3**: `expected.json` OR (`expected_ours.json` + `expected_svelte.json`) exists (or, for a `tsv_rejects.txt` fixture, `expected_svelte.json` alone — the canonical AST, tsv having none; S20)
-4. **S4**: `expected.json` cannot coexist with `expected_*.json` files
-5. **S5**: Both `expected_ours.json` + `expected_svelte.json` exist (if either exists) — except a `tsv_rejects.txt` fixture, which carries `expected_svelte.json` *without* `expected_ours.json` (S20)
-6. **S6**: `unformatted_*` has same extension as input file
-7. **S7**: `prettier_variant_*` has same extension as input file
+2. **S2**: `expected.json` OR (`expected_ours.json` + `expected_svelte.json`) exists — the pair travels together, either both or neither (or, for a `tsv_rejects.txt` fixture, `expected_svelte.json` alone — the canonical AST, tsv having none; S20)
+3. **S3**: `expected.json` cannot coexist with `expected_*.json` files
+4. **S4**: `unformatted_*` differs from the input file (the structural ID of C1 below)
+5. **S5**: `prettier_variant_*` differs from the input file (C3 below)
+6. **S6**: `output_prettier.*` differs from the input file (C2 below)
+7. **S7**: `unformatted_ours_*` differs from the input file
+   - (Input and variant extension matching — `.svelte` preferred for inputs, variants sharing the input's extension — is a naming convention, checked nowhere in the validator; see [fixture_naming.md §Extension Matching](./fixture_naming.md#extension-matching))
 8. **S8**: Directory name ends with `_prettier_divergence` when ANY of these exist:
    - `output_prettier.*` (prettier formats input differently), OR
    - `prettier_variant_*.*` files (prettier has quirks), OR
@@ -365,11 +366,11 @@ prettier-svelte for formatting; variants use `.svelte.ts`).
 - **C5**: No duplicate `prettier_variant_*.*` within same fixture
 - **C5b**: No duplicate `variant_*.*` within same fixture
 - **C5c**: No duplicate `divergent_variant_*.*` within same fixture
-- **C6**: No duplicate input files across fixtures (informational)
+- **C6**: No duplicate input files across fixtures (gating; checked only on an unfiltered run)
 
 **Documentation validations (D)**:
 
-- **D1**: README.md required when divergence artifacts exist (`expected_ours.json`+`expected_svelte.json`, `output_prettier.*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`, or `prettier_intermediate_*`); optional extra documentation for other complex fixtures
+- **D1**: README.md required when divergence artifacts exist (`expected_ours.json`+`expected_svelte.json`, `output_prettier.*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`, any `prettier_intermediate_*` kind — including `prettier_intermediate_to_variant_*` / `prettier_intermediate_to_divergent_variant_*` — or a no-oracle marker: `prettier_nonconvergent.txt`, `prettier_rejects.txt`, `tsv_rejects.txt`); optional extra documentation for other complex fixtures
 
 **Parser validations (P)** - Expected ASTs match parser outputs:
 
@@ -680,7 +681,7 @@ diff /tmp/prettier_variant.svelte /tmp/prettier_variant2.svelte
 
 ```bash
 # Quick comparison with prettier
-cargo run -p tsv_debug compare --content '<div><div>text</div><div>text</div></div>'
+cargo run -p tsv_debug compare --content '<div><div>text</div><div>text</div></div>' --parser svelte
 
 # Compare specific fixture
 cargo run -p tsv_debug compare tests/fixtures/svelte/elements/block_siblings/input.svelte
@@ -756,7 +757,7 @@ Key test files:
 - `tests/fixtures_tests.rs` - Unified fixture validation (parser + formatter)
 - `crates/tsv_debug/src/fixtures/` - Fixture data model (`model.rs`), discovery (`discovery.rs`), and variant discovery (`variants.rs`)
 - `crates/tsv_debug/src/fixtures/validation/` - Validation logic: structure rules (`structure.rs`), per-phase checks (`phases/`), typed errors (`errors.rs`), summary printing (`summary.rs`)
-- `crates/tsv_debug/src/cli/commands/fixtures_*.rs` - Fixture generation commands
+- `crates/tsv_debug/src/cli/commands/fixtures_*` - Fixture commands (`fixtures_validate/` is a module directory)
 
 **See [fixture_workflow.md](./fixture_workflow.md#quick-reference) for command reference.**
 
@@ -976,15 +977,17 @@ with at least one divergence artifact — the exact list is rule **S8-rev** in
 ```
 tests/fixtures/css/tokens/comments/in_property_value_after_colon_prettier_divergence/
 ├── input.svelte                     # font-size: /* comment */ 12px;  (1 space after :)
-├── prettier_variant_spaces.svelte     # font-size:  /* comment */ 12px; (2 spaces)
-├── prettier_variant_compact.svelte    # font-size:/* comment */ 12px;   (0 spaces)
-└── unformatted_*.svelte             # Normalization variants
+├── prettier_variant_spaces.svelte   # font-size:  /* comment */ 12px; (2 spaces)
+├── prettier_variant_compact.svelte  # font-size:/* comment */ 12px;   (0 spaces)
+├── prettier_variant_newline.svelte  # a third prettier-stable spacing form
+└── unformatted_ours_*.svelte        # Normalization variants (tsv-only claims)
 
 tests/fixtures/css/tokens/comments/in_property_value_before_colon_prettier_divergence/
 ├── input.svelte                     # color /* comment */ : red;  (1 space before :)
-├── prettier_variant_spaces.svelte     # color /* comment */  : red; (2 spaces)
-├── prettier_variant_compact.svelte    # color /* comment */: red;   (0 spaces)
-└── unformatted_compact.svelte       # color /* comment */:red;    (normalizes)
+├── output_prettier.svelte           # prettier's differing fixed point
+├── prettier_variant_spaces.svelte   # color /* comment */  : red; (2 spaces)
+├── prettier_variant_compact.svelte  # color /* comment */: red;   (0 spaces)
+└── unformatted_ours_*.svelte        # Normalization variants (S9: no plain unformatted_* beside output_prettier)
 ```
 
 Both fixtures test prettier's whitespace preservation quirk around colons.
@@ -1078,7 +1081,7 @@ Every pattern's validations are the rules in
   - Validates all fixtures are up to date
   - Checks structure, file consistency, and idempotency
 
-See implementation in `crates/tsv_debug/src/cli/commands/fixtures_*.rs`
+See implementation in `crates/tsv_debug/src/cli/commands/fixtures_*` (`fixtures_validate/` is a module directory)
 
 ### Related Documentation
 

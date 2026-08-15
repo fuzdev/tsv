@@ -36,7 +36,7 @@ Things the published numbers measure that aren't quite what they look like.
   (`dprint.ts` `setConfig`; `quoteStyle: preferSingle` is the faithful analogue
   of prettier's `singleQuote: true`, which likewise switches quotes to avoid
   escaping, and `trailingCommas: never` fans out to dprint's 12 per-construct
-  keys). Unmatched defaults (biome's width is 80; oxfmt and biome default to
+  keys), malva (`malva.ts`), and rsvelte-fmt (`rsvelte.ts`). Unmatched defaults (biome's width is 80; oxfmt and biome default to
   double quotes) would make rows wrap/rewrite different amounts of code,
   conflating config with engine speed. oxfmt's own width default is already 100 —
   pinned anyway so a default change can't silently skew the rows; the options
@@ -164,10 +164,10 @@ Things the published numbers measure that aren't quite what they look like.
   (c) Task return values are discarded uniformly for all impls; the FFI/WASM/async
   boundaries block dead-code elimination, so no impl's work is optimized away.
 - **`tsv_wasm` is measured on the full build.** The WASM bench loads
-  `pkg/all/deno` (the default both-features artifact, ~2.5 MB — what
+  `pkg/all/deno` (the default both-features artifact, ~2.4 MB — what
   `@fuzdev/tsv_wasm` ships) for _both_ parse and format, while subset consumers
-  ship the smaller `@fuzdev/tsv_format_wasm` (~2.3 MB, no convert layer) or
-  `@fuzdev/tsv_parse_wasm` (~1.1 MB, no printers). Same story natively: the perf
+  ship the smaller `@fuzdev/tsv_format_wasm` (~2.1 MB, no convert layer) or
+  `@fuzdev/tsv_parse_wasm` (~0.9 MB, no printers). Same story natively: the perf
   row loads the full `libtsv_ffi`, while the Binary Sizes table also lists the
   `tsv format (ffi)` / `tsv parse (ffi)` subset builds (no perf rows of their own
   — they exist only to size scope-matched against `oxfmt` and `oxc-parser`).
@@ -550,8 +550,9 @@ in `deno.json`).
 
 - **Main** (`oxc-parser`): JS wrapper with platform detection; contains
   `src-js/wasm.js` for direct WASM usage. `NAPI_RS_FORCE_WASI` forces WASM.
-- **Native bindings** (`@oxc-parser/binding-{platform}`): 20 platform-specific
-  `.node` files, listed as `optionalDependencies` of main.
+- **Native bindings** (`@oxc-parser/binding-{platform}`): 19 platform-specific
+  `.node` files, listed as `optionalDependencies` of main (the 20th
+  optionalDependency is the wasi build below).
 - **WASM binding** (`@oxc-parser/binding-wasm32-wasi`): official WASI build, also
   an optional dependency of main — it ships alongside native, not as a separate
   product. Depends on `@napi-rs/wasm-runtime` → `@emnapi/runtime`, `@emnapi/core`,
@@ -562,7 +563,7 @@ in `deno.json`).
   `@napi-rs/wasm-runtime`) per runtime.
 
 **oxfmt** ships native bindings only: main (`oxfmt`, a JS wrapper bundling Prettier
-internals, depending on `tinypool` for the CLI only) and `@oxfmt/{platform}` (8
+internals, depending on `tinypool` for the CLI only) and `@oxfmt/binding-{platform}` (19
 variants). **No WASM variant exists.** Svelte support is experimental (added in
 v0.49); the bench enables it and lets the per-file try/catch + effective-corpus
 report quantify coverage.
@@ -641,8 +642,8 @@ binding — re-run `bench:install`.
 cd benches/js && npm outdated   # current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (40 checks)
-deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts benches/js/lib/yuku.ts
+deno task smoke           # confirm every impl still loads + formats (the run prints its check count)
+deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts benches/js/lib/yuku.ts benches/js/lib/malva.ts benches/js/lib/swc.ts benches/js/lib/postcss.ts benches/js/lib/rsvelte_parse.ts benches/js/lib/tsc.ts
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
@@ -668,7 +669,8 @@ every fixture's `expected.json` and `output_prettier.svelte`. The two pin sets
 **must stay identical**: the bench has to measure against the same
 parser/formatter that defines fixture correctness. Agreement across all pin sites
 (sidecar `VERSIONS` + its `npm:` imports, `benches/js/package.json`, actor.rs's
-acorn import-map pin) is enforced by `deno task pins:audit`
+acorn import-map pin, and the sidecar `deno.lock` — which also pins the
+literal-less transitives, `LOCKED_TRANSITIVE`) is enforced by `deno task pins:audit`
 (`scripts/check_canonical_pins.ts --pins`, gated in `deno task check`).
 
 **Checkout alignment** is the same script's other mode (`deno task
@@ -688,7 +690,9 @@ it.
 
 Bumping any of the five re-baselines the entire fixture corpus. Do it deliberately:
 edit `package.json` and `sidecar.ts` in lockstep (the `//canonical-sync` note in
-package.json restates this), run `deno task fixtures:update`, and review the
+package.json restates this), regenerate the frozen sidecar lock with `deno task
+pins:lock` (updating `LOCKED_TRANSITIVE` if the lock's transitives moved —
+`pins:audit` fails until both agree), run `deno task fixtures:update`, and review the
 resulting churn.
 
 **Fixture churn is only one of three ways an oracle bump lands, and the third is

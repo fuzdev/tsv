@@ -28,7 +28,9 @@
  * its own location, so a copy inside a temp node_modules resolves its sibling
  * there). A second staging WITHOUT the platform package asserts the
  * unsupported-platform error path; a third with the platform package but the
- * CLI binary removed asserts the dispatcher's JS fallback.
+ * CLI binary removed asserts the dispatcher's JS fallback; two further
+ * POSIX-only stagings assert the degraded binary paths (non-executable →
+ * warn + JS fallback, signal death → re-raise).
  *
  * Usage: node --test scripts/test_napi_npm.ts   (or `deno task test:napi:npm`)
  * Prerequisite: deno task build:napi:packages

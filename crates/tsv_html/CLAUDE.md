@@ -11,7 +11,7 @@ LSP, compiler), not just the formatter. See the root
 
 Zero dependencies on other `tsv_*` crates (only `phf` at runtime;
 `serde_json` at build time — see `Cargo.toml`).
-Current consumer: `tsv_svelte`'s printer.
+Current consumers: `tsv_svelte`'s printer, `tsv_svelte_compile`, and `tsv_debug`'s render/authoring audits.
 
 The printer-adapter layer — methods that resolve span-identity names and
 call into this crate — lives in `tsv_svelte/src/printer/classification/`,

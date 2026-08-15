@@ -33,8 +33,8 @@ grades); the reference halves live in `docs/`:
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `conformance:audit` · `conformance:audit:compiler` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save `roundtrip:audit:prettier`, which gates the pinned `../prettier` format suites when that checkout is present (a loud skip when not; ~0.1 s) | every commit; the CI `check` job |
-| **`deno task conformance:all`** | `pins:audit:checkouts` preflight, then `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
+| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `conformance:audit` · `conformance:audit:compiler` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save `roundtrip:audit:prettier`, which gates the pinned `../prettier` format suites when that checkout is present (a loud skip when not; ~0.1 s) | every commit; the CI `check` job |
+| **`deno task conformance:all`** | `pins:audit:checkouts` + `compile:fixtures:validate` preflights, then `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`perf`** view + the pinned `../prettier` format suites (absent dev repos skipped with a warning; floor = `../svelte` src) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
@@ -52,8 +52,8 @@ checkout alignment, oracle presence, corpus entries, build artifacts) ahead of t
 Publish re-probes per step — Step 3b's posture is under [§Pre-release
 aggregate](#pre-release-aggregate--conformance--conformanceall); Step 3c
 (`audit:corpus`) re-probes `../svelte` src (its reproducible floor) the same way, and
-the audit itself warn-skips any absent dev-repo checkout. CI runs `deno task check`
-only — it has no sibling checkouts, so of the pinned counts only the committed-tree
+the audit itself warn-skips any absent dev-repo checkout. CI's `check` job runs `deno task check`
+alone — it has no sibling checkouts, so of the pinned counts only the committed-tree
 ones (`fixtures_validate`, `swallow_audit`) execute there.
 
 **`deno task check` cannot prove real-code robustness.** `tests/fixtures` is
@@ -89,9 +89,10 @@ delta on the same row is the detector.
 - **Runtime-labeled sibling reports.** Each runtime writes its own
   `results/report.<runtime>.{json,md}` (+ a timestamped `…_<commit>.<runtime>.*`
   pair), same schema, never merged. `deno task bench:compose` (run at the end of
-  `bench:perf`) folds the siblings into the combined `results/report.{json,md}` that
-  tsv.fuz.dev consumes (`compose_reports.ts`; a per-runtime delta on a row is the
-  headline). The composer records per-source provenance (runtime, commit,
+  `bench:perf`) folds the siblings into the combined `results/report.{json,md}`
+  (`compose_reports.ts`; a per-runtime delta on a row is the
+  headline); tsv.fuz.dev consumes it plus `report.node.json` and
+  `report.conformance.node.json`. The composer records per-source provenance (runtime, commit,
   timestamp, tsv version, machine — in the JSON `sources[]` and the md header) and
   flags loudly (md banner + stderr + a JSON field): **mixed vintages**
   (`mixed_vintage`) when siblings come from different commits/versions — it folds
@@ -396,7 +397,7 @@ gate (own `KNOWN_GAPS`, freshness-checked on full-corpus runs). `.tsx` and
 directive rule mirrors tsc's own harness, which `is_multi_file_test` argues in full);
 `.d.ts` cases ARE graded (61 of them — a declaration file is ordinary TS to tsv, and
 the bench harvest skips them for a reason of its own, argued at each `DECLARATIONS`).
-Baseline: 13,708 scanned, 12,283 accept-parity, 0 untracked gaps. ⚠️ The root is the
+Baseline: 13,708 scanned, 12,284 accept-parity, a 487-entry over-acceptance pin, 0 untracked gaps. ⚠️ The root is the
 whole corpus deliberately: the old `conformance/parser` default was green at 768 files
 while 32 over-rejections sat untracked in the checker/emitter trees, whose ordinary TS is
 likelier reachable in real code than the parser torture suite. A
@@ -636,7 +637,8 @@ exact perf filenames). To publish to tsv.fuz.dev, run `npm run update-benchmarks
 `~/dev/tsv.fuz.dev` — its copy list names these files exactly, so renaming a report
 artifact means updating that script in the same change.
 
-The committed JSON (baseline `version: 7`) carries, beyond timing stats: top-level
+The committed JSON (per-runtime `version: 9` — the combined compose report keeps its
+own `version: 7`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
 `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
 numbers are machine-relative, so this travels with them; excludes hostname and
 volatile fields so it doesn't churn); `corpus_kind` (`perf` | `conformance`);
@@ -652,7 +654,8 @@ is identifiable by `files_iterated: null` — it was timed on nothing, rather th
 timed on the group's intersection. A consumer that reads `entries[]` as speeds must
 skip a row with null `ops_per_second`, not treat it as a zero. Top-level
 `suppressed_noise` records silenced third-party stderr crashes as `{pattern:
-count}`; top-level `variant_parity` records any same-engine native/wasm pair whose
+count}`; top-level `variant_parity` records any same-engine pair (two bindings, or one
+binding under two options) whose
 pre-flight accept sets disagreed (`[]` when healthy — a non-empty list in a
 committed report is a binding-boundary bug surfacing in the diff).
 `report.<runtime>.md` renders coverage/iterated as prose; the per-entry numbers,
@@ -981,8 +984,9 @@ and skip counts make it visible without `--verbose`.
   Rule: read getter-backed napi-WASI result fields **once into a local**
   (`lib/oxc_wasm.ts` does; `lib/oxc.ts` mirrors the form defensively). Two guards
   exist: the single-read pattern at the wrappers, and `bench.ts`'s
-  `warn_variant_parity` — after pre-flight, same-engine native/wasm pairs
-  (tsv↔tsv_wasm variants, oxc-parser↔oxc-parser-wasm) are compared file-for-file and
+  `warn_variant_parity` — after pre-flight, same-engine pairs
+  (tsv↔tsv_wasm variants, oxc-parser↔oxc-parser-wasm, yuku-parser↔yuku-parser-wasm,
+  rsvelte-parse↔rsvelte-parse-skip-expr-loc) are compared file-for-file and
   any accept-set divergence prints a `⚠ variant parity` warning (same engine ⇒ a
   divergence is a binding-boundary bug, not an engine difference).
 - **TypeScript canonical parser**: acorn-typescript fails on some modern syntax
@@ -1007,8 +1011,10 @@ and skip counts make it visible without `--verbose`.
   `oxfmt` itself) are unaffected because their per-iteration awaits resolve via
   microtasks, not timers.
 - **wasm-opt** runs with explicit feature flags in `crates/tsv_wasm/Cargo.toml` —
-  Rust 2024's bulk-memory and nontrapping-float-to-int ops are passed by name to
-  wasm-opt v117, giving ~−2% gzipped on the WASM bundle.
+  Rust 2024's bulk-memory and nontrapping-float-to-int ops, plus the simd128 and
+  multivalue features the `.cargo/config.toml` rustflags enable, are passed by name
+  to wasm-opt v117 (it rejects instructions whose features aren't named), giving
+  ~−2% gzipped on the WASM bundle.
 
 ## Diagnostic scripts
 

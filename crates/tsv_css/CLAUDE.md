@@ -4,7 +4,7 @@
 
 ## Architecture Position
 
-Depends on `tsv_lang` for shared primitives (spans, doc builder, comments, embedding config). Consumed by `tsv_svelte` for `<style>` block embedding, and by `tsv_cli` / `tsv_wasm` / `tsv_ffi` for top-level CSS files.
+Depends on `tsv_lang` for shared primitives (spans, doc builder, comments, embedding config). Consumed by `tsv_svelte` for `<style>` block embedding, and by `tsv_cli` / `tsv_wasm` / `tsv_ffi` / `tsv_napi` for top-level CSS files.
 
 **Sources of truth**: Svelte's `parseCss` defines the public AST shape; Prettier's `css` printer defines formatter output. Both are checked at fixture-validation time.
 

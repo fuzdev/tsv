@@ -54,7 +54,7 @@ pub struct FormatCommand {
     #[argh(option)]
     jobs: Option<usize>,
 
-    /// files and/or directories (directories recurse over .ts/.svelte/.css)
+    /// files and/or directories (directories recurse over .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css)
     #[argh(positional)]
     paths: Vec<String>,
 }
@@ -263,11 +263,13 @@ fn exit_bad_args(bad_args: &[String]) -> ! {
 
 /// An empty scope is a usage error for the format action (`--list` reports the
 /// empty set and exits 0 instead). Neutral wording: an empty result can mean "no
-/// .ts/.svelte/.css here" *or* "all of them are ignored" (e.g. a target under a
-/// gitignored dir), so don't imply a wrong-extension cause.
+/// .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css here" *or* "all of them are ignored"
+/// (e.g. a target under a gitignored dir), so don't imply a wrong-extension cause.
 fn exit_if_nothing_in_scope(file_count: usize, error_count: usize) {
     if file_count == 0 && error_count == 0 {
-        eprintln!("Error: No files to format — no unignored .ts/.svelte/.css files in scope");
+        eprintln!(
+            "Error: No files to format — no unignored .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css files in scope"
+        );
         process::exit(2);
     }
 }

@@ -45,8 +45,9 @@ project-wide conventions.
     inside an erased TypeScript region, the refuse-don't-erase TypeScript set
     (`enum` incl. `declare enum`, a value `namespace`, a constructor parameter
     property, a decorator, an `accessor` field, an `abstract` *property*, a
-    bodiless class method, a class index signature, `import =`/`export =`/`export
-    as namespace` — the last four are shapes the oracle mis-compiles into invalid
+    bodiless class method, a class index signature (a shape the oracle *crashes*
+    on), a dotted `namespace A.B`, `import =`/`export =`/`export
+    as namespace` — the import/export three are shapes the oracle mis-compiles into invalid
     JS), top-level `$:` legacy reactive
     statements (invalid in runes mode — a nested `$` label or a plain label is
     ordinary JS and clones through), `svelte/internal*` imports and
@@ -67,8 +68,8 @@ project-wide conventions.
     object-shorthand collapse — `attribute_class_style::build_spread_class_object`), the
     `style:` directives ride the `styles` argument (a **FLAT** object, **no**
     `|important` partitioning — the divergence from the non-spread
-    `$.attr_style` array — `attribute_class_style::build_spread_style_object`), and `<input>`
-    / a custom element set the `flags` argument
+    `$.attr_style` array — `attribute_class_style::build_spread_style_object`), and a foreign element /
+    a custom element / `<input>` set the `flags` argument (`3` / `2` / `4`)
     (trailing absent args elide, interior ones become `void 0`); a spread
     co-present with a legacy `on:`/`let:` refuses (`Refusal::RunesOnlyFence`),
     and a spread on a `<select>` (the `$$renderer.select`
@@ -221,7 +222,8 @@ project-wide conventions.
   ancestor-aware `element_is_svg`/`element_is_mathml` classifiers the whitespace,
   attribute-case, and spread-flag paths share (the `<a>`/`<title>` cases are svg only
   under an svg ancestor).
-- `erase.rs` — **TypeScript type erasure**, the compiler's `remove_typescript_nodes`:
+- `erase.rs` — **TypeScript type erasure**, the compiler's `remove_typescript_nodes`
+  (its `next_token_pos` is `pub use`d at the crate root):
   a tree→tree pre-pass over the instance script's `Program` producing a type-free
   statement list, run BEFORE every analysis pass and before codegen (the oracle's
   phase-1 placement). Structural sharing via an `Option<T>` return — `None` means
@@ -632,7 +634,7 @@ project-wide conventions.
   and the reset scan — including its custom-element short-circuit — is gated on
   `reset_by` being present, so only `dt`/`dd` reset.
 - `text_class.rs` — the **target** languages' lexical character classes
-  (`is_js_whitespace` / `js_trim` / `js_char_at` / `is_css_whitespace`), for the
+  (`is_js_whitespace` / `js_trim` / `js_char_at` / `is_css_whitespace` / `is_js_identifier`), for the
   source scans that reason about text without tokenizing it. ⚠️ Rust's
   `char::is_whitespace` is the Unicode `White_Space` property, which differs from
   ECMAScript `WhiteSpace` in **both** directions — `U+FEFF` is JS whitespace but
@@ -652,9 +654,10 @@ project-wide conventions.
   scope (`CssScoping`, read-only — `element_scope` is a span lookup),
   block-scope overlays, snippet hoist state, and the erased-region windows
   every `EmitEnv::erase` call collects. Module scaffold: `import * as $ from
-  'svelte/internal/server'`, then any instance-script `import` declarations
+  'svelte/internal/server'`, then the `<script module>` body program, then any
+  instance-script `import` declarations
   hoisted to module scope in source order (an import inside the component
-  function is invalid JS) + the exported component function. The whole body
+  function is invalid JS), + the exported component function. The whole body
   wraps in `$$renderer.component(($$renderer) => { … })` whenever
   `needs_context` fires (a dropped effect, the new/member/call analysis in
   `needs_context.rs`, or a non-empty `$bindable` set), which also forces the
@@ -670,10 +673,10 @@ project-wide conventions.
   The script store rewrite (`store_rewrite.rs`) runs over the instance body between
   the rune-rewrite loop and `EmitEnv` construction, using the `store_names` /
   `store_shadowed` sets frozen there.
-The **script side** is seven modules, split along the line a second transform
+The **script side** is eight modules, split along the line a second transform
 would need: four are target-independent (the oracle decides them before it
 chooses what to emit — `script_ts_gate`, `script_decls`, `script_bindings`,
-`script_collision`), and three are server-specific (`script_rewrite` and
+`script_collision`), and four are server-specific (`script_rewrite`, `destructure` and
 `script_props` mint server-module syntax; `script_comments` reasons about the
 server printer's comment policy, per its own header). They are listed here in
 pipeline order.
@@ -813,7 +816,7 @@ pipeline order.
   that deliberately over-refuses the case where a loc-bearing head expression
   flushes the comment first, and likewise the block-free special elements
   (`<svelte:window>`, `<slot>`). The split is keyed to the pinned oracle's
-  `reset_comment_index` behavior (esrap 2.2.12) — re-probe it if that pin moves.
+  `reset_comment_index` behavior (the locked esrap — `LOCKED_TRANSITIVE` in `scripts/check_canonical_pins.ts`) — re-probe it if that pin moves.
   The same index recovery governs a **module-script** comment along TWO independent
   axes, and `collect_script_comments` owns only the first: the module-AFTER-instance
   ordering, where the component body block (carrying the instance script's `loc`)
@@ -1127,8 +1130,8 @@ functions by host.
   `classes` (`attribute_class_style::build_spread_class_object` — identifier keys + shorthand)
   and the `style:` directives ride `styles`
   (`attribute_class_style::build_spread_style_object` — a FLAT object, no `|important`
-  partition), `<input>` / a custom element (hyphenated tag or `is`
-  attribute) set `flags` (`4` / `2`), and `elide_call_args` applies the oracle's
+  partition), a foreign (svg/mathml) element / a custom element (hyphenated tag or `is`
+  attribute) / `<input>` set `flags` (`3` / `2` / `4`, first match wins), and `elide_call_args` applies the oracle's
   `b.call` elision (trailing `void 0` dropped, interior padded). A co-present
   `on:`/`let:`, a `<select>`, or a load-error element refuses; the drop family is
   guarded-and-dropped. The non-spread path
@@ -1183,7 +1186,7 @@ The **attribute emitters** are three modules, split by what an attribute *is*
 rather than by where it is emitted (each covers both the inline and spread paths,
 so the shared validity forks stay whole). The dependency is one-way, with
 `attribute` the base: `attribute_class_style` borrows five value-shaping helpers
-from it, `attribute_bind` borrows exactly one of those five (`escape_html_attr`)
+(four hosted there; `is_js_identifier` lives in `text_class.rs`), `attribute_bind` borrows exactly one of those five (`escape_html_attr`)
 and calls `attribute_class_style` not at all, and neither is depended on back.
 There is deliberately no `attribute_common.rs` — it would add a module for five
 small functions and obscure that both halves genuinely depend on the base.
@@ -1212,9 +1215,10 @@ small functions and obscure that both halves genuinely depend on the base.
   `build_spread_object_property` — one `key: value` object property from a plain
   attribute (key lowercased, `shorthand` on a same-named identifier value), `None`
   for a dropped attribute (a single-expression event handler — still guarded — and
-  `defaultValue`/`defaultChecked`). Hosts the five helpers the class/style half
+  `defaultValue`/`defaultChecked`). Hosts four of the five helpers the class/style half
   shares — `collapse_attr_whitespace`, `preceded_by_quote`, `class_needs_clsx`,
-  `is_js_identifier`, and `escape_html_attr`, the attribute-position sibling of
+  and `escape_html_attr` (the fifth, `is_js_identifier`, lives in
+  `text_class.rs`) — `escape_html_attr` the attribute-position sibling of
   the fragment walk's text escape (`[&"<]` vs `[&<]` — a `"` is content in text
   and a delimiter here). `escape_html_attr` is the only one `attribute_bind`
   takes as well, and so the only edge from this module to both siblings.
@@ -1315,9 +1319,12 @@ classes, this one enumerates scoping candidates.
   as a possible sibling, it only PROBABLY exists (so it never triggers the `+`
   adjacent early-stop and carries no slot check — `css-prune.js:1041`/`1215`).
   Descends every SSR-reachable fragment (element/component/`<svelte:element>`
-  subtrees, `{#if}` / `{#each}` / `{#await}`-pending+then / `{#key}` / `{#snippet}`
-  bodies, `<svelte:head>`) but **not** `{:catch}` (dropped from output). The one
-  deliberate exception is `<svelte:boundary>`, descended UNCONDITIONALLY — including
+  subtrees, `{#if}` / `{#each}` / all three `{#await}` arms — `{:catch}` included — /
+  `{#key}` / `{#snippet}` bodies, `<svelte:head>`). Two descents deliberately exceed
+  the emitted set: `{:catch}` (never reaches SSR output, but the oracle's CSS pass
+  pushes all three arms alike, so a selector matching only catch content is still
+  KEPT and still scoped — excluding it made such a selector match nothing and
+  over-refuse) and `<svelte:boundary>`, descended UNCONDITIONALLY — including
   the children a `pending` snippet discards: the oracle's CSS pass runs before it
   decides what to emit, so a selector matching only dropped boundary content is still
   KEPT and still scoped. Safe because `element_scope` is a span lookup at emission, so
@@ -1402,8 +1409,8 @@ classes, this one enumerates scoping candidates.
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`
-(minimal for now), and the two error enums (`CompileError`'s two bug variants —
-`CorruptOutput` and `TypeErasureLeak` — are the compiler's two self-checks firing).
+(minimal for now), and the two error enums (`CompileError`'s three bug variants —
+`CorruptOutput`, `TypeErasureLeak`, and `GeneratedNameMissing` — are the compiler's self-checks firing).
 
 ## The Canonicalizer Contract
 
