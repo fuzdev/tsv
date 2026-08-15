@@ -39,8 +39,9 @@ prettier-plugin-svelte), and reports and feedback are appreciated.
 See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
-The only direct use of `unsafe` is in `tsv_ffi` and `tsv_napi`,
-because it's required at the language boundaries. Otherwise `unsafe_code = "forbid"`.
+The only hand-written `unsafe` is in `tsv_ffi`, where the C boundary requires it;
+`tsv_napi` relaxes the lint only to `deny` so napi-derive's generated code compiles —
+it hand-writes none. Otherwise `unsafe_code = "forbid"`.
 
 AI disclosure: this codebase is mostly LLM-generated, and the usual caveats apply.
 It's a high-effort project that prioritizes quality.
@@ -147,8 +148,9 @@ and package READMEs for the full API and CLI flags:
     and tsv has its own internal optimal AST
   - the parser can also emit optimized JSON that drops the per-node `loc` and
     Svelte `name_loc` objects, mirroring acorn's `locations: false` for improved performance
-    (`parse --no-locations`, the JS API's `{locations: false}` option, or the
-    native bindings' `*_no_locations` exports)
+    (`parse --no-locations`, or the JS API's `{locations: false}` option — the published
+    `@fuzdev/tsv` takes the same options bag; only the raw C-FFI / N-API addons keep
+    flat `*_no_locations` exports)
 - compatible with Prettier, with generic rethought APIs
   - formatting is similar Prettier and prettier-plugin-svelte for the common case,
     but intentionally diverges in some cases and fixes numerous bugs
@@ -264,6 +266,7 @@ tsv/
 │   ├── tsv_ts/        # TypeScript parser/formatter (standalone)
 │   ├── tsv_css/       # CSS parser/formatter (standalone)
 │   ├── tsv_svelte/    # Svelte parser/formatter (uses tsv_ts + tsv_css)
+│   ├── tsv_svelte_compile/ # experimental Svelte→JS compiler + JS canonicalizer (consumed only by tsv_debug)
 │   ├── tsv_check/     # experimental TypeScript binder/checker (may never ship; not in any shipped artifact)
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
 │   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)

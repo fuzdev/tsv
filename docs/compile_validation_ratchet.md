@@ -36,7 +36,7 @@ cargo run -p tsv_debug compile_corpus_compare --ratchet ../svelte/packages/svelt
 Sidecar-dependent (every file needs an oracle compile), so it is **not** in
 `deno task check` — the same reason `compile:corpus:compare` and `compile:fuzz` are
 freestanding ([compile_tooling.md](compile_tooling.md)). It is also outside `conformance` / `conformance:all` / publish Step 3b: the
-compiler arc ships no artifact and the branch is unmerged.
+compiler ships in no artifact.
 
 ⚠️ Always a **separate invocation** from `compile:corpus:compare`, never extra roots on
 it. Folding a ~2/3-invalid corpus into that run would corrupt its

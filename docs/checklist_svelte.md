@@ -4,13 +4,13 @@ Comprehensive reference for Svelte template syntax features supported by tsv's p
 
 ## Coverage
 
-All Svelte 5.x template syntax features are supported, as enumerated below; parse conformance is measured against Svelte's parser on the fixture suite and corpus (see [conformance_svelte.md](./conformance_svelte.md)). Experimental features that require compiler flags are listed under [Future Work](#future-work).
+All Svelte 5.x template syntax features are supported, as enumerated below; parse conformance is measured against Svelte's parser on the fixture suite and corpus (see [conformance_svelte.md](./conformance_svelte.md)). Experimental features that require compiler flags are listed under [Experimental Async](#experimental-async--parseformat-supported) — tsv parses and formats them regardless of the flag.
 
 **Spec References**:
 
 - Svelte docs: `../../svelte/documentation/docs/`
 - Compiler source: `../../svelte/packages/svelte/src/`
-- Existing fixtures: `tests/fixtures/svelte/` (500+ fixtures)
+- Existing fixtures: `tests/fixtures/svelte/` (850+ fixtures)
 
 ---
 
@@ -664,28 +664,30 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 ---
 
-# Future Work
+# Experimental Async — parse/format supported
 
-Experimental features requiring `experimental: { async: true }` in svelte.config.js. The flag will be removed in Svelte 6 (becomes stable).
+Features requiring `experimental: { async: true }` in svelte.config.js. The flag
+gates Svelte's *compilation*, not tsv's parse/format — tsv handles all of these
+today, each with gating fixtures — and will be removed in Svelte 6 (becomes stable).
 
 ## Async Expressions
 
 ### await in Script
 
-- Top-level await in `<script>` (`await fetch()`, `await Promise.all()`)
-- `await` inside `$derived()` (`let x = $derived(await fn())`)
+- Top-level await in `<script>` (`await fetch()`, `await Promise.all()`) — `svelte/script/await_toplevel`
+- `await` inside `$derived()` (`let x = $derived(await fn())`) — `svelte/runes/await_derived`
 
 ### await in Markup
 
-- Await expression tag (`{await promise}`)
-- Await with arithmetic (`{a} + {b} = {await add(a, b)}`)
+- Await expression tag (`{await promise}`) — `svelte/expressions/await_markup`
+- Await with arithmetic (`{a} + {b} = {await add(a, b)}`) — `svelte/expressions/await_markup`
 
 ### Async Utilities
 
-- `fork()` API (`fork(() => { ... })`)
-- `fork().commit()` / `fork().discard()`
-- `settled()` function (wait for async updates)
-- `$effect.pending()` for loading states
+- `fork()` API (`fork(() => { ... })`) — `svelte/runes/async_utilities`
+- `fork().commit()` / `fork().discard()` — `svelte/runes/async_utilities`
+- `settled()` function (wait for async updates) — `svelte/runes/async_utilities`
+- `$effect.pending()` for loading states — see **$effect.pending** under Supported
 
 ---
 

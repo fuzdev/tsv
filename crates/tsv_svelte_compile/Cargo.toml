@@ -15,7 +15,7 @@ tsv_css = { workspace = true, features = ["convert"] }
 bumpalo.workspace = true
 thiserror.workspace = true
 # ECMAScript IdentifierPart classification for the rune/store collision walk's
-# whole-identifier boundary test (`script_rewrite::is_identifier_part`).
+# whole-identifier boundary test (`script_collision.rs`'s `is_identifier_part`).
 unicode-ident.workspace = true
 
 [lints]

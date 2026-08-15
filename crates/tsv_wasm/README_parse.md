@@ -62,7 +62,7 @@ For sparse or repeated lookups, `create_locator(source, opts?)` holds the prebui
 
 ## Status
 
-v0.1 — pre-release. API may change.
+0.x — pre-release. API may change.
 
 ## License
 

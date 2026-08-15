@@ -43,6 +43,7 @@ reported as the finding it is.
 | flag | effect |
 | --- | --- |
 | `--json` | machine-readable report on stdout (logs go to stderr) |
+| `--report` | per-shape detail: every pinned shape with kind, count, payloads, and a reproducer |
 | `--jobs N` | worker threads (default: available parallelism) |
 | `--limit N` | cap the seed files |
 | `--payload <one>` | `block` \| `line` \| `jsdoc_cast` \| `annotation` \| `multiline` |
@@ -359,7 +360,8 @@ the short version:
 - **`code_regions`' reach.** A gap the region walk doesn't name is a gap never probed. Today
   a `.svelte` file's `<style>` content is unprobed — so a Svelte fixture containing only a
   `<style>` block yields **zero sites**. That one is held back by **yield, not difficulty**:
-  `Style::content_span` names it in a line, but measured over `tests/fixtures` it is +154k
+  `Style::content_span` names it in a line, but measured over `tests/fixtures` — before the
+  CSS in-block ledger extension, so re-measure before pricing it — it was +154k
   sites (+20% runtime) for 3 shapes, all `@import`-prelude double-prints. The thinness is
   structural — CSS's remaining unguarded comment surface is the declaration-value one the
   ledger cannot see at all — so the census, not the ledger, is what covers it.

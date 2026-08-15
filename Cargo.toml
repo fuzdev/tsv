@@ -41,8 +41,8 @@ tsv_discover = { path = "crates/tsv_discover" }
 
 # Language implementations
 # Default-features off ships parse + format only; consumers opt into the
-# wire-JSON conversion layer with `features = ["convert"]`. Only the
-# @fuzdev/tsv_format_wasm build leaves it off.
+# wire-JSON conversion layer with `features = ["convert"]`. The format-only
+# builds leave it off (@fuzdev/tsv_format_wasm, `build:ffi:format`).
 tsv_ts = { path = "crates/tsv_ts", default-features = false }
 tsv_css = { path = "crates/tsv_css", default-features = false }
 tsv_svelte = { path = "crates/tsv_svelte", default-features = false }

@@ -15,7 +15,7 @@
  * Usage:
  *   deno task publish                        # dry-run (validate everything)
  *   deno task publish --bump minor           # dry-run, preview the bump
- *   deno task publish --wetrun --bump patch  # bump + check + conformance:all + build + validate + publish + git
+ *   deno task publish --wetrun --bump patch  # bump + check + conformance:all + audit:corpus + build + validate + publish + git
  *   deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
  *
  * Flags:
@@ -25,9 +25,10 @@
  *                    <level> -->` marker (also required). A fresh wetrun needs
  *                    both, plus a non-empty `## Unreleased` section; a sentinel
  *                    retry runs without either.
- *   --no-check       skip `deno task check` AND the Step 3b conformance gates (faster
- *                    retries; also the only way to --wetrun on a machine missing the
- *                    Step 3b oracle checkouts — a missing oracle otherwise FAILS a wetrun)
+ *   --no-check       skip `deno task check`, the Step 3b conformance gates, AND the
+ *                    Step 3c corpus audit (faster retries; also the only way to --wetrun
+ *                    on a machine missing the Step 3b/3c oracle checkouts — a missing
+ *                    oracle otherwise FAILS a wetrun)
  *   --no-git         skip the git commit + tag + push finalization
  *
  * Retry: a failed wetrun leaves the bump in place plus a sentinel file; re-run
