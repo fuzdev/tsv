@@ -1,0 +1,1131 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 653,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A lone block collapses onto the ; line",
+			"start": 10,
+			"end": 51,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 60,
+			"end": 67,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A glued pair collapses the same way",
+			"start": 72,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 119,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 8
+				},
+				"end": {
+					"line": 6,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 128,
+			"end": 136,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 17
+				},
+				"end": {
+					"line": 6,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run whose later comment breaks takes the break with it",
+			"start": 141,
+			"end": 200,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 209,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 8
+				},
+				"end": {
+					"line": 9,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 219,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two blocks the author gave separate lines keep them, and the ; joins the last",
+			"start": 230,
+			"end": 310,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 319,
+			"end": 327,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 8
+				},
+				"end": {
+					"line": 14,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 329,
+			"end": 337,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank between two of them survives",
+			"start": 343,
+			"end": 382,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 391,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 8
+				},
+				"end": {
+					"line": 19,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 402,
+			"end": 410,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The else-to-empty-alternate gap answers identically",
+			"start": 416,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 491,
+			"end": 498,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 6
+				},
+				"end": {
+					"line": 26,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 522,
+			"end": 530,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 6
+				},
+				"end": {
+					"line": 29,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 532,
+			"end": 537,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " while and for-of reach the same gap",
+			"start": 543,
+			"end": 581,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 593,
+			"end": 600,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 11
+				},
+				"end": {
+					"line": 34,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 624,
+			"end": 632,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 20
+				},
+				"end": {
+					"line": 36,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 634,
+			"end": 639,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 652,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 643,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 53,
+					"end": 69,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 17
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 57,
+						"end": 58,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 5
+							},
+							"end": {
+								"line": 3,
+								"column": 6
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 60,
+								"end": 67
+							}
+						]
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 68,
+						"end": 69,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 16
+							},
+							"end": {
+								"line": 3,
+								"column": 17
+							}
+						}
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A lone block collapses onto the ; line",
+							"start": 10,
+							"end": 51
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 112,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 27
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 116,
+						"end": 117,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 5
+							},
+							"end": {
+								"line": 6,
+								"column": 6
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 119,
+								"end": 127
+							}
+						]
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 137,
+						"end": 138,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 26
+							},
+							"end": {
+								"line": 6,
+								"column": 27
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 128,
+								"end": 136
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued pair collapses the same way",
+							"start": 72,
+							"end": 110
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 202,
+					"end": 227,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 206,
+						"end": 207,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 5
+							},
+							"end": {
+								"line": 9,
+								"column": 6
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 209,
+								"end": 217
+							}
+						]
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 226,
+						"end": 227,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 219,
+								"end": 224
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run whose later comment breaks takes the break with it",
+							"start": 141,
+							"end": 200
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 312,
+					"end": 340,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 316,
+						"end": 317,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 5
+							},
+							"end": {
+								"line": 14,
+								"column": 6
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 319,
+								"end": 327
+							}
+						]
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 339,
+						"end": 340,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 329,
+								"end": 337
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two blocks the author gave separate lines keep them, and the ; joins the last",
+							"start": 230,
+							"end": 310
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 384,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 388,
+						"end": 389,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 5
+							},
+							"end": {
+								"line": 19,
+								"column": 6
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 391,
+								"end": 399
+							}
+						]
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 412,
+						"end": 413,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 402,
+								"end": 410
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank between two of them survives",
+							"start": 343,
+							"end": 382
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 472,
+					"end": 500,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 15
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 476,
+						"end": 477,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 5
+							},
+							"end": {
+								"line": 25,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 479,
+						"end": 484,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 8
+							},
+							"end": {
+								"line": 25,
+								"column": 13
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 479,
+							"end": 483,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 8
+								},
+								"end": {
+									"line": 25,
+									"column": 12
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 479,
+								"end": 481,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 8
+									},
+									"end": {
+										"line": 25,
+										"column": 10
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "EmptyStatement",
+						"start": 499,
+						"end": 500,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 14
+							},
+							"end": {
+								"line": 26,
+								"column": 15
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 491,
+								"end": 498
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The else-to-empty-alternate gap answers identically",
+							"start": 416,
+							"end": 470
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 503,
+					"end": 540,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 507,
+						"end": 508,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 5
+							},
+							"end": {
+								"line": 28,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 510,
+						"end": 515,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 8
+							},
+							"end": {
+								"line": 28,
+								"column": 13
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 510,
+							"end": 514,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 8
+								},
+								"end": {
+									"line": 28,
+									"column": 12
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 510,
+								"end": 512,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 8
+									},
+									"end": {
+										"line": 28,
+										"column": 10
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "EmptyStatement",
+						"start": 539,
+						"end": 540,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 1
+							},
+							"end": {
+								"line": 31,
+								"column": 2
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 522,
+								"end": 530
+							},
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 532,
+								"end": 537
+							}
+						]
+					}
+				},
+				{
+					"type": "WhileStatement",
+					"start": 583,
+					"end": 602,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 20
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 590,
+						"end": 591,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 8
+							},
+							"end": {
+								"line": 34,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 593,
+								"end": 600
+							}
+						]
+					},
+					"body": {
+						"type": "EmptyStatement",
+						"start": 601,
+						"end": 602,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 19
+							},
+							"end": {
+								"line": 34,
+								"column": 20
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " while and for-of reach the same gap",
+							"start": 543,
+							"end": 581
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 605,
+					"end": 642,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 2
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 610,
+						"end": 617,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 6
+							},
+							"end": {
+								"line": 36,
+								"column": 13
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 616,
+								"end": 617,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 12
+									},
+									"end": {
+										"line": 36,
+										"column": 13
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 616,
+									"end": 617,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 12
+										},
+										"end": {
+											"line": 36,
+											"column": 13
+										}
+									},
+									"name": "k"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 621,
+						"end": 622,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 17
+							},
+							"end": {
+								"line": 36,
+								"column": 18
+							}
+						},
+						"name": "o",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 624,
+								"end": 632
+							}
+						]
+					},
+					"body": {
+						"type": "EmptyStatement",
+						"start": 641,
+						"end": 642,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 1
+							},
+							"end": {
+								"line": 38,
+								"column": 2
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 634,
+								"end": 639
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

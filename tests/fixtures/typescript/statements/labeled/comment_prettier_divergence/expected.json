@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 74,
+	"end": 366,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,16 +13,160 @@
 		{
 			"type": "Line",
 			"value": " comment after label",
-			"start": 17,
-			"end": 39,
+			"start": 18,
+			"end": 40,
 			"loc": {
 				"start": {
 					"line": 2,
-					"column": 8
+					"column": 9
 				},
 				"end": {
 					"line": 2,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run keeps the lines the author gave it, in the position tsv holds it",
+			"start": 67,
+			"end": 140,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " cmt1 ",
+			"start": 150,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 9
+				},
+				"end": {
+					"line": 8,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " cmt2",
+			"start": 162,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " cmt3 ",
+			"start": 187,
+			"end": 197,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 9
+				},
+				"end": {
+					"line": 12,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " cmt4 ",
+			"start": 199,
+			"end": 209,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A pair the author glued stays on one line, and a lone block collapses",
+			"start": 219,
+			"end": 291,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " cmt5 ",
+			"start": 301,
+			"end": 311,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 9
+				},
+				"end": {
+					"line": 17,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " cmt6 ",
+			"start": 312,
+			"end": 322,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 20
+				},
+				"end": {
+					"line": 17,
 					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " cmt7 ",
+			"start": 339,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 9
+				},
+				"end": {
+					"line": 19,
+					"column": 19
 				}
 			}
 		}
@@ -30,19 +174,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 73,
+		"end": 365,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 64,
+			"end": 356,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 6,
+					"line": 20,
 					"column": 9
 				}
 			},
@@ -50,7 +194,7 @@
 				{
 					"type": "LabeledStatement",
 					"start": 10,
-					"end": 63,
+					"end": 64,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -63,8 +207,8 @@
 					},
 					"body": {
 						"type": "ForStatement",
-						"start": 41,
-						"end": 63,
+						"start": 42,
+						"end": 64,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -80,8 +224,8 @@
 						"update": null,
 						"body": {
 							"type": "BlockStatement",
-							"start": 50,
-							"end": 63,
+							"start": 51,
+							"end": 64,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -95,8 +239,8 @@
 							"body": [
 								{
 									"type": "BreakStatement",
-									"start": 54,
-									"end": 60,
+									"start": 55,
+									"end": 61,
 									"loc": {
 										"start": {
 											"line": 4,
@@ -115,15 +259,15 @@
 							{
 								"type": "Line",
 								"value": " comment after label",
-								"start": 17,
-								"end": 39
+								"start": 18,
+								"end": 40
 							}
 						]
 					},
 					"label": {
 						"type": "Identifier",
 						"start": 10,
-						"end": 15,
+						"end": 16,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -131,10 +275,392 @@
 							},
 							"end": {
 								"line": 2,
+								"column": 7
+							}
+						},
+						"name": "label1"
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 142,
+					"end": 176,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 6
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 171,
+						"end": 176,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
 								"column": 6
 							}
 						},
-						"name": "label"
+						"expression": {
+							"type": "CallExpression",
+							"start": 171,
+							"end": 175,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 5
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 171,
+								"end": 173,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 1
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " cmt1 ",
+								"start": 150,
+								"end": 160
+							},
+							{
+								"type": "Line",
+								"value": " cmt2",
+								"start": 162,
+								"end": 169
+							}
+						]
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 142,
+						"end": 148,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "label2"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run keeps the lines the author gave it, in the position tsv holds it",
+							"start": 67,
+							"end": 140
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 179,
+					"end": 216,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 6
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 211,
+						"end": 216,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 6
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 211,
+							"end": 215,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 5
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 211,
+								"end": 213,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 1
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " cmt3 ",
+								"start": 187,
+								"end": 197
+							},
+							{
+								"type": "Block",
+								"value": " cmt4 ",
+								"start": 199,
+								"end": 209
+							}
+						]
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 179,
+						"end": 185,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "label3"
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 293,
+					"end": 328,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 36
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 323,
+						"end": 328,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 31
+							},
+							"end": {
+								"line": 17,
+								"column": 36
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 323,
+							"end": 327,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 31
+								},
+								"end": {
+									"line": 17,
+									"column": 35
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 323,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 31
+									},
+									"end": {
+										"line": 17,
+										"column": 33
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " cmt5 ",
+								"start": 301,
+								"end": 311
+							},
+							{
+								"type": "Block",
+								"value": " cmt6 ",
+								"start": 312,
+								"end": 322
+							}
+						]
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 293,
+						"end": 299,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"name": "label4"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A pair the author glued stays on one line, and a lone block collapses",
+							"start": 219,
+							"end": 291
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 331,
+					"end": 355,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 25
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 350,
+						"end": 355,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 20
+							},
+							"end": {
+								"line": 19,
+								"column": 25
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 350,
+							"end": 354,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 20
+								},
+								"end": {
+									"line": 19,
+									"column": 24
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 350,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 20
+									},
+									"end": {
+										"line": 19,
+										"column": 22
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " cmt7 ",
+								"start": 339,
+								"end": 349
+							}
+						]
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 331,
+						"end": 337,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 1
+							},
+							"end": {
+								"line": 19,
+								"column": 7
+							}
+						},
+						"name": "label5"
 					}
 				}
 			],

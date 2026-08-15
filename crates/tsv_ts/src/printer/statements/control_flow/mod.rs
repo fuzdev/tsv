@@ -23,6 +23,29 @@ use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, comments_to_emit_in_range};
 
+/// Whether an author **blank** line between a header→body gap's comment run and the body
+/// survives ([`Printer::push_header_to_body_gap`]'s tail separator).
+///
+/// The question is the **brace**, not the run: `Drop` is the sanctioned divergence
+/// `while/line_before_body_comment` — prettier keeps the blank, tsv drops it so a body
+/// block's `{` never sits below one (`while (a)⏎// c⏎⏎{`), cataloged in
+/// `conformance_prettier_ts_comments.md` §"No blank above a body block's `{`". That
+/// licence stops where its argument stops: a gap whose body opens with no `{` has nothing
+/// to protect, prettier keeps the blank, and so does tsv (`Keep`).
+///
+/// Only the `else`→non-block gap passes `Keep` today, matching the non-block twin
+/// [`Printer::push_indented_header_to_body_gap`] — which reaches the same answer through
+/// the leading-run emitter rather than through this tail. The remaining brace-less
+/// callers (a labeled statement's `:`→body, `do`→body, `else`→else-if) still drop, an
+/// open residual rather than a decision.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HeaderBodyBlank {
+    /// The blank is dropped — the body's `{` must not sit below one.
+    Drop,
+    /// The blank survives, as it does between two comments in the same run.
+    Keep,
+}
+
 /// Which of prettier's three comment runs a control-flow gap's off-the-anchor-line
 /// comments form — the single fact all three of
 /// [`Printer::build_comments_between_parts`]'s per-gap policies follow from.
@@ -515,9 +538,19 @@ impl<'a> Printer<'a> {
     /// prettier drops it here too. The mirror of [`Self::push_block_to_keyword_gap`],
     /// which keeps it.
     ///
+    /// A blank *below* the run, between it and the body, is the caller's call
+    /// ([`HeaderBodyBlank`]) — the same rule read from the other side, and the one whose
+    /// answer depends on whether the body opens a `{`.
+    ///
     /// **Precondition**: the gap holds at least one comment to emit. Each caller's
     /// no-comment fast path differs (`") "` vs a bare space), so it stays theirs.
-    fn push_header_to_body_gap(&self, parts: &mut DocBuf, gap_start: u32, body_start: u32) {
+    fn push_header_to_body_gap(
+        &self,
+        parts: &mut DocBuf,
+        gap_start: u32,
+        body_start: u32,
+        blank: HeaderBodyBlank,
+    ) {
         let d = self.d();
         // A comment sharing the body's line is not trailing the anchor, so it does not
         // stay up there — but a **block** one glued to the body leads it inline; the
@@ -541,40 +574,67 @@ impl<'a> Printer<'a> {
         // gate and its emitter answering one question two ways — agreeing today only by
         // hand, and silently diverging the moment a bucket boundary moves.
         if self.header_to_body_gap_breaks(gap_start, body_start) {
-            parts.push(d.hardline());
+            match blank {
+                // ⚠️ A plain `hardline`, deliberately: the sanctioned divergence
+                // `while/line_before_body_comment`. See [`HeaderBodyBlank`] for the
+                // licence and where it stops.
+                HeaderBodyBlank::Drop => parts.push(d.hardline()),
+                HeaderBodyBlank::Keep => {
+                    // Anchored on the LAST comment this gap emitted, and bounded at the
+                    // glued run's first comment when one leads the body inline.
+                    match own_line.last().or_else(|| inline_prev.last()) {
+                        Some(last) => self.push_blank_preserving_hardline(
+                            parts,
+                            last.span.end,
+                            glued.first().map_or(body_start, |c| c.span.start),
+                        ),
+                        // An all-glued gap: nothing was emitted to measure a blank from,
+                        // and the `blank_seed` = `None` rule above stands.
+                        None => parts.push(d.hardline()),
+                    }
+                }
+            }
         } else {
             parts.push(d.text(" "));
         }
         self.push_glued_comment_run(parts, &glued);
     }
 
-    /// The header→body gap for a **non-block** body: the comment run, then the body on
-    /// its own line, all sharing the body's indent (`if (a)⏎↹// c⏎↹fn();` — prettier's
-    /// `adjustClause` shape). The caller pushes its own anchor (`)` / `else`) first.
+    /// The header→body gap for a **non-block** body: the comment run, then the body,
+    /// all sharing the body's indent (`if (a)⏎↹// c⏎↹fn();` — prettier's `adjustClause`
+    /// shape, `indent([line, clause])`, where the printed clause carries its own leading
+    /// comments). The caller pushes its own anchor (`)` / `do`) first, and gates on
+    /// [`Self::header_to_body_gap_breaks`] — the `line` is materialized here, so a gap
+    /// that would stay flat must take the caller's inline arm instead.
     ///
-    /// ⚠️ **Position-agnostic for a `//` only**, unlike [`Self::push_header_to_body_gap`];
-    /// a block comment keeps its authored line here too. For the `)` gap that split is
-    /// prettier's, measured on all four combinations:
+    /// ⚠️ **The whole gap is the BODY'S LEADING RUN**, so it takes the single leading-run
+    /// emitter ([`Printer::push_leading_comment_run`], prettier's `printLeadingComment`)
+    /// and every comment travels with the body — a block the author wrote trailing the
+    /// anchor included. A non-block body has no `{` for a trailing comment to anchor
+    /// against, which is why prettier attaches the run to the body here and tsv has
+    /// nothing to preserve by holding one member back.
     ///
-    /// | body | authored trailing `)` | authored own-line |
-    /// | --- | --- | --- |
-    /// | **non-block**, `//` | moved to its own line | own line |
-    /// | **non-block**, `/* */` | stays trailing | own line |
-    /// | **block**, either | stays trailing | own line |
+    /// This gap used to partition the anchor's line **per comment by kind** — block stays
+    /// trailing, `//` takes its own line — a four-row table measured on a SINGLE comment,
+    /// which a **run** breaks four ways at once (all pinned by the `head_body_nonblock_comment_run`
+    /// trio, `if` / `while` / `for`):
     ///
-    /// So only the non-block `//` normalizes. That is not tsv relocating a comment
-    /// against its own stance: a non-block body has no `{` for a trailing `//` to anchor
-    /// against, and prettier does the same, so there is nothing to diverge over. Routing
-    /// *that* case through the position-preserving emitter regressed
-    /// `if/head_body_nonblock_comment`, which pins the trailing authoring normalizing to
-    /// the own-line form under **both** formatters.
+    /// - a glued pair `) /* b1 */ // b2` **split**, stranding `/* b1 */` on the anchor's
+    ///   line — [`Printer::split_glued_comments`]'s own ⚠️ says a comment glued to one
+    ///   that takes its own line takes that line with it;
+    /// - `) /* b1 */⏎// b2` stranded `/* b1 */` the same way, with no glue to lose but a
+    ///   run split across two indent levels;
+    /// - a bare `) // b1` in for-in/for-of stayed on the anchor's line, because that
+    ///   family hand-rolled the gap instead of calling here (`append_close_paren_with_non_block_body`);
+    /// - an author **blank** between the run and the body was dropped, where prettier's
+    ///   `printLeadingComment` keeps it.
     ///
-    /// A blank line between two own-line comments survives via the shared comment-run
-    /// builder ([`Self::build_comments_between_parts`], on the same
-    /// [`Printer::push_blank_preserving_hardline`] rule `build_comments_between` follows).
+    /// The blank *above* the run is still dropped (this pushes a plain `hardline` ahead of
+    /// it), matching prettier and [`Self::push_header_to_body_gap`]'s `blank_seed` = `None`.
     ///
     /// ⚠️ The **`else`**→non-block gap does NOT share this — see
-    /// [`Self::push_indented_else_to_body_gap`], which preserves the authored position.
+    /// [`Self::push_indented_else_to_body_gap`], which preserves the authored position as a
+    /// sanctioned divergence.
     fn push_indented_header_to_body_gap(
         &self,
         parts: &mut DocBuf,
@@ -583,32 +643,15 @@ impl<'a> Printer<'a> {
         body_doc: DocId,
     ) {
         let d = self.d();
-        // A block comment glued to the body leads it inline rather than taking a line of
-        // its own.
-        let (anchor_line, own_line, glued) =
-            self.partition_body_gap_comments(gap_start, body_start);
-
-        // Only a **block** comment can stay on the anchor's line. A line comment authored
-        // trailing `)` normalizes to its own line — that is the position-agnostic half
-        // this gap is pinned to (`if/head_body_nonblock_comment`), and it is prettier's
-        // behavior too: a non-block body has no `{` for a trailing comment to anchor
-        // against. Source order survives the split because a comment trailing `)`
-        // precedes every own-line one.
-        let mut inline_prev: CommentVec<'a> = SmallVec::new();
-        let mut run: CommentVec<'a> = SmallVec::new();
-        for comment in anchor_line {
-            if comment.is_block {
-                inline_prev.push(comment);
-            } else {
-                run.push(comment);
-            }
-        }
-        run.extend(own_line);
-
         let mut inner = DocBuf::new();
-        self.build_comments_between_parts(&mut inner, &inline_prev, &run, GapCommentRun::Leading);
         inner.push(d.hardline());
-        self.push_glued_comment_run(&mut inner, &glued);
+        self.push_leading_comment_run(
+            &mut inner,
+            comments_to_emit_in_range(self.comments, gap_start, body_start),
+            body_start,
+            LeadingGlue::Adjacent,
+            d.empty(),
+        );
         inner.push(body_doc);
         parts.push(d.indent(d.concat(&inner)));
     }
@@ -633,7 +676,7 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         let mut inner = DocBuf::new();
-        self.push_header_to_body_gap(&mut inner, gap_start, body_start);
+        self.push_header_to_body_gap(&mut inner, gap_start, body_start, HeaderBodyBlank::Keep);
         inner.push(body_doc);
         parts.push(d.indent(d.concat(&inner)));
     }
@@ -742,13 +785,28 @@ impl<'a> Printer<'a> {
             parts.push(d.text(";"));
             return;
         }
-        parts.push(self.build_inline_comments_between_doc(gap_start, empty_start));
-        if self.has_line_comments_between(gap_start, empty_start) {
-            parts.push(d.hardline());
-            parts.push(d.text(";"));
-        } else {
-            parts.push(d.text(" ;"));
-        }
+        // The run STARTS on the anchor's line whatever the authoring — both formatters
+        // put it there, so there is no position to preserve — but the `;` it leads takes
+        // the run's own separators ([`Printer::push_leading_comment_run`]), grouped so the
+        // soft `line` after a broke-after block can still collapse (`if (a) /* c */ ;`).
+        //
+        // Asking `has_line_comments_between` for ONE separator at the end was the same
+        // question two spellings wide, and both answers were wrong where the run's are
+        // not: an **own-line** block (a newline on both sides) takes a hardline, so the
+        // `;` keeps its line rather than joining (`if (a)⏎/* c */⏎;`), and a block
+        // followed by a `//` breaks at the block's own soft `line` instead of gluing the
+        // pair (`if (a) /* c1 */⏎// c2⏎;`). Pinned by `if/empty_body_comment_run`.
+        parts.push(d.text(" "));
+        let mut inner = DocBuf::new();
+        self.push_leading_comment_run(
+            &mut inner,
+            comments_to_emit_in_range(self.comments, gap_start, empty_start),
+            empty_start,
+            LeadingGlue::AdjacentAnchorLine,
+            d.empty(),
+        );
+        inner.push(d.text(";"));
+        parts.push(d.group(d.concat(&inner)));
     }
 
     /// Append `)` + an empty statement body's gap ([`Self::push_empty_statement_gap`]).
@@ -778,7 +836,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         if self.has_comments_to_emit_between(paren_end, body_start) {
             parts.push(d.text(")"));
-            self.push_header_to_body_gap(parts, paren_end, body_start);
+            self.push_header_to_body_gap(parts, paren_end, body_start, HeaderBodyBlank::Drop);
         } else {
             parts.push(d.text(") "));
         }

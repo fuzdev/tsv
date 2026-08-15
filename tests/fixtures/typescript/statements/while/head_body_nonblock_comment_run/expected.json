@@ -1,0 +1,913 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 683,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A run the author glued onto the header's line moves down to the body whole",
+			"start": 10,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b1 ",
+			"start": 101,
+			"end": 109,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " b2",
+			"start": 110,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 11
+				},
+				"end": {
+					"line": 4,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block on the header's line joins the run below when a later comment breaks it",
+			"start": 126,
+			"end": 208,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b1 ",
+			"start": 222,
+			"end": 230,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " b2",
+			"start": 233,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank the author left between the run and the body survives",
+			"start": 249,
+			"end": 313,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " b1",
+			"start": 327,
+			"end": 332,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Do - a run glued onto the keyword's line moves down the same way",
+			"start": 344,
+			"end": 411,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b1 ",
+			"start": 418,
+			"end": 426,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " b2",
+			"start": 427,
+			"end": 432,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 11
+				},
+				"end": {
+					"line": 21,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Do - a block on the keyword's line joins the run below",
+			"start": 455,
+			"end": 512,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b1 ",
+			"start": 519,
+			"end": 527,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " b2",
+			"start": 530,
+			"end": 535,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - nothing forces a break, so a glued pair stays on the header's line",
+			"start": 558,
+			"end": 637,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b1 ",
+			"start": 649,
+			"end": 657,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 11
+				},
+				"end": {
+					"line": 33,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b2 ",
+			"start": 658,
+			"end": 666,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 20
+				},
+				"end": {
+					"line": 33,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 682,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 673,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 34,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "WhileStatement",
+					"start": 89,
+					"end": 123,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 7
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 96,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 3,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 118,
+						"end": 123,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 118,
+							"end": 122,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 6
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 118,
+								"end": 120,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 4
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " b1 ",
+								"start": 101,
+								"end": 109
+							},
+							{
+								"type": "Line",
+								"value": " b2",
+								"start": 110,
+								"end": 115
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author glued onto the header's line moves down to the body whole",
+							"start": 10,
+							"end": 87
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 210,
+					"end": 246,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 7
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 217,
+						"end": 218,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 8
+							},
+							"end": {
+								"line": 8,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 241,
+						"end": 246,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 241,
+							"end": 245,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 6
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 241,
+								"end": 243,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 4
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " b1 ",
+								"start": 222,
+								"end": 230
+							},
+							{
+								"type": "Line",
+								"value": " b2",
+								"start": 233,
+								"end": 238
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block on the header's line joins the run below when a later comment breaks it",
+							"start": 126,
+							"end": 208
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 315,
+					"end": 341,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 7
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 322,
+						"end": 323,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 8
+							},
+							"end": {
+								"line": 14,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 336,
+						"end": 341,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 336,
+							"end": 340,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 6
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 336,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " b1",
+								"start": 327,
+								"end": 332
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank the author left between the run and the body survives",
+							"start": 249,
+							"end": 313
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 413,
+					"end": 452,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 435,
+						"end": 440,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 2
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 435,
+							"end": 439,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 6
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 435,
+								"end": 437,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 4
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " b1 ",
+								"start": 418,
+								"end": 426
+							},
+							{
+								"type": "Line",
+								"value": " b2",
+								"start": 427,
+								"end": 432
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 449,
+						"end": 450,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 8
+							},
+							"end": {
+								"line": 23,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Do - a run glued onto the keyword's line moves down the same way",
+							"start": 344,
+							"end": 411
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 514,
+					"end": 555,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 538,
+						"end": 543,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 2
+							},
+							"end": {
+								"line": 29,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 538,
+							"end": 542,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 2
+								},
+								"end": {
+									"line": 29,
+									"column": 6
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 538,
+								"end": 540,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 4
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " b1 ",
+								"start": 519,
+								"end": 527
+							},
+							{
+								"type": "Line",
+								"value": " b2",
+								"start": 530,
+								"end": 535
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 552,
+						"end": 553,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 8
+							},
+							"end": {
+								"line": 30,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Do - a block on the keyword's line joins the run below",
+							"start": 455,
+							"end": 512
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 639,
+					"end": 672,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 34
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 646,
+						"end": 647,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 8
+							},
+							"end": {
+								"line": 33,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " b1 ",
+								"start": 649,
+								"end": 657
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 667,
+						"end": 672,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 29
+							},
+							"end": {
+								"line": 33,
+								"column": 34
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 667,
+							"end": 671,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 29
+								},
+								"end": {
+									"line": 33,
+									"column": 33
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 667,
+								"end": 669,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 29
+									},
+									"end": {
+										"line": 33,
+										"column": 31
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " b2 ",
+								"start": 658,
+								"end": 666
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - nothing forces a break, so a glued pair stays on the header's line",
+							"start": 558,
+							"end": 637
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
