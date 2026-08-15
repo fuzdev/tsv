@@ -31,7 +31,7 @@ use tsv_svelte::ast::internal::{
     HtmlTag, IfBlock, KeyBlock, RenderTag, SnippetBlock, SpecialElement, SpecialElementKind,
     SpecialThis,
 };
-use tsv_ts::ast::internal::{Expression, ExpressionStatement, Statement};
+use tsv_ts::ast::internal::{Expression, Statement};
 
 use crate::analyze::{ScopeEntry, evaluate, stringify_value};
 use crate::blocks::{
@@ -621,16 +621,7 @@ fn emit_title_element<'arena>(
     let call = env
         .b
         .member_call("$$renderer", "title", args.into_bump_slice());
-    let span = call.span();
-    out.push_statement(
-        &mut env.b,
-        arena,
-        Statement::ExpressionStatement(ExpressionStatement {
-            expression: call,
-            span,
-            is_directive: false,
-        }),
-    );
+    out.push_expression_statement(&mut env.b, arena, call);
     Ok(())
 }
 

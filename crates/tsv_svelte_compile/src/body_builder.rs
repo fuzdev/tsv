@@ -15,7 +15,7 @@
 //! component's root body.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_ts::ast::internal::{Expression, ExpressionStatement, Statement};
+use tsv_ts::ast::internal::{Expression, Statement};
 
 use crate::build::Builder;
 
@@ -132,13 +132,8 @@ impl<'arena> BodyBuilder<'arena> {
         let template = b.template_literal(&texts, exprs.into_bump_slice());
         let template_alloc = arena.alloc(template);
         let push_call = b.member_call("$$renderer", "push", std::slice::from_ref(template_alloc));
-        let span = push_call.span();
-        self.stmts
-            .push(Statement::ExpressionStatement(ExpressionStatement {
-                expression: push_call,
-                span,
-                is_directive: false,
-            }));
+        // Pushed directly rather than through `push_statement`: this IS the flush.
+        self.stmts.push(b.expression_statement(push_call));
     }
 
     /// Flush the pending template, then append a statement.
@@ -150,6 +145,18 @@ impl<'arena> BodyBuilder<'arena> {
     ) {
         self.flush(b, arena);
         self.stmts.push(stmt);
+    }
+
+    /// Flush the pending template, then append `expression` in statement
+    /// position — the shape every block/element emitter ends on.
+    pub(crate) fn push_expression_statement(
+        &mut self,
+        b: &mut Builder<'arena>,
+        arena: &'arena bumpalo::Bump,
+        expression: Expression<'arena>,
+    ) {
+        let stmt = b.expression_statement(expression);
+        self.push_statement(b, arena, stmt);
     }
 
     /// Finish: flush and return the statement slice.
