@@ -9,7 +9,13 @@
  * enabling dynamic discovery and plugin-like architecture.
  */
 
-import type { Language, Logger, ParseGoal, TsvImplementation } from './types.ts';
+import {
+	type Language,
+	LANGUAGES,
+	type Logger,
+	type ParseGoal,
+	type TsvImplementation
+} from './types.ts';
 import { CanonicalImplementation } from './canonical.ts';
 import { NativeImplementation } from './ffi.ts';
 import { NapiImplementation } from './napi.ts';
@@ -35,16 +41,55 @@ export type { TsvImplementation };
  * One optional implementation that failed to initialize on this machine — an
  * uninstalled package, a missing platform binding, a runtime that can't load a
  * given wasm entry, or a binding broken by an upstream bump.
+ *
+ * The INIT-time record, which is why it is not what the report publishes
+ * (`UnavailableImpl` below is): it carries BOTH identities the failure has,
+ * because they answer different questions — `impl` is what a human saw scroll
+ * past, `key` is what the registry joins on to name the ROWS the failure cost
+ * (`unavailable_with_rows`). Only the first survives to the wire.
  */
-export interface UnavailableImpl {
+export interface InitFailure {
+	/** The slot in `ImplementationSet` — the machine identity, never rendered. */
+	key: ImplKey;
 	/** The impl as the ⚠ init line names it, so terminal and report agree. */
 	impl: string;
 	/** First line of the load error — why it isn't here. */
 	reason: string;
 }
 
-/** Result of initializing implementations */
-export interface InitializedImplementations {
+/**
+ * A load failure as the REPORT carries it: the impl that failed, why, and the row
+ * names its absence removed from this surface's tables — `InitFailure` above
+ * joined against the surface's rows, with the internal `key` dropped.
+ *
+ * `rows` is the field a consumer can act on. Every other identity the report
+ * publishes is a row name — `entries[].name`, `variant_parity.impl`/`.sibling`
+ * ("the base ROW of the pair"), `report.ts`'s `DISPLAY_ORDER` — so a reader asking
+ * "why is this column blank?" holds a row name and nothing else. `impl` alone
+ * could not answer that: it is an init-line label (`OXC WASM`, `Biome`) that
+ * matches no row (`oxc-parser-wasm`, `biome-wasm`), and one impl can back several
+ * rows (`native` backs four; `oxc` backs `oxc-parser` AND `oxfmt`).
+ *
+ * Empty `rows` is meaningful, not a bug: the impl failed but defines no row on
+ * THIS surface (a `tsc` failure costs the perf surface nothing), so the machine is
+ * short while the tables are whole.
+ */
+export interface UnavailableImpl {
+	impl: string;
+	reason: string;
+	rows: string[];
+}
+
+/**
+ * The implementation slots plus the versions they were built from — the bag
+ * `get_benchmark_tasks` reads to decide which rows exist.
+ *
+ * Split out from `InitializedImplementations` because it is what every CONSUMER
+ * of that result actually takes (the registry, the version summary, the size
+ * table), and because the init result then carries a second one of these: the
+ * availability-independent `complete` view.
+ */
+export interface ImplementationSet {
 	/** All package versions */
 	versions: AllVersions;
 	/** Canonical implementation (prettier + svelte/compiler) - always available */
@@ -85,12 +130,48 @@ export interface InitializedImplementations {
 	rsvelte_parse: RsvelteParseImplementation | undefined;
 	/** swc (`@swc/core`, N-API) - parse only, TypeScript/JS; undefined if not available */
 	swc: SwcImplementation | undefined;
+}
+
+/**
+ * The slots that name an implementation — every key of `ImplementationSet` except
+ * the version bag. DERIVED, so a new impl gets a key the day its slot appears;
+ * a hand-written union would be the second source of truth this whole seam exists
+ * to avoid.
+ */
+export type ImplKey = Exclude<keyof ImplementationSet, 'versions'>;
+
+/** Result of initializing implementations */
+export interface InitializedImplementations extends ImplementationSet {
 	/**
 	 * Every optional impl above that failed to init, in init order — the machine's
 	 * shortfall as data rather than as terminal ⚠ lines. Empty `[]` on a full
-	 * machine. Reaches the report as `unavailable` (see `init_optional`).
+	 * machine. Reaches the report via `unavailable_with_rows`.
 	 */
-	unavailable: UnavailableImpl[];
+	unavailable: InitFailure[];
+	/**
+	 * The same slots with every FAILED impl's constructed-but-uninitialized
+	 * instance restored — what this harness would hold if every package loaded.
+	 *
+	 * This is what makes "which rows did that failure cost?" answerable at all. A
+	 * failed impl registers no task, so its rows cannot be recovered from the live
+	 * registry after the fact, and the alternative — a hand-written impl→rows map —
+	 * would be an unchecked second source of truth that nothing could contradict
+	 * (the very drift `SURFACE_DISCLOSURES` and the `DISPLAY_ORDER` guard exist to
+	 * prevent). Asking the ONE registry against a complete set keeps the answer
+	 * derived.
+	 *
+	 * Sound because the gates the registry evaluates are all construction-time
+	 * facts, never init state: `parse_languages`/`format_languages` are `readonly`
+	 * class fields (`BaseImplementation`), and `format`/`parse_internal`/
+	 * `parse_no_locations` are prototype methods. An uninitialized instance answers
+	 * every one of them exactly as a loaded one would.
+	 *
+	 * ⚠ Read for SHAPE only. Never hand this to `get_benchmark_tasks` directly — a
+	 * task built from it closes over an impl whose `init()` never ran, so running
+	 * one calls into a null binding. `get_defined_rows` is the safe accessor: it
+	 * returns names, not closures.
+	 */
+	complete: ImplementationSet;
 }
 
 /** Options for implementation initialization */
@@ -119,12 +200,16 @@ export interface InitOptions {
  * ROW from every table, and a reader diffing the committed report would see the
  * column disappear with nothing saying why. Same disclosure posture as
  * `suppressed_noise` and `variant_parity` in `bench.ts`.
+ *
+ * `key` rides along for that record — the failure has to be joinable back to the
+ * rows it cost, and the display label can't do it (see `UnavailableImpl`).
  */
 async function init_optional<T extends { init: () => Promise<void> }>(
 	impl: T,
+	key: ImplKey,
 	label: string,
 	logger: Logger,
-	unavailable: UnavailableImpl[],
+	unavailable: InitFailure[],
 	missing_label: string = label
 ): Promise<T | undefined> {
 	try {
@@ -136,6 +221,7 @@ async function init_optional<T extends { init: () => Promise<void> }>(
 		// First line only, like the native-panic classifier: a load failure's later
 		// lines are a stack trace, machine-specific and worthless in a committed diff.
 		unavailable.push({
+			key,
 			impl: missing_label,
 			reason: String(e instanceof Error ? e.message : e).split('\n')[0]
 		});
@@ -186,65 +272,59 @@ export async function init_implementations(
 	}
 
 	// Every impl below is optional and shares one failure posture — see `init_optional`.
-	const unavailable: UnavailableImpl[] = [];
+	const unavailable: InitFailure[] = [];
 	const optional = <T extends { init: () => Promise<void> }>(
 		impl: T,
+		key: ImplKey,
 		label: string,
 		missing_label?: string
-	) => init_optional(impl, label, logger, unavailable, missing_label);
+	) => init_optional(impl, key, label, logger, unavailable, missing_label);
 
-	const native_impl = await optional(native, native_label);
-	const wasm_impl = await optional(wasm, 'WASM');
-	const oxc_impl = await optional(
-		new OxcImplementation(versions.oxc),
-		'OXC (oxc-parser + oxfmt)',
-		'OXC'
-	);
-	const oxc_wasm_impl = await optional(
-		new OxcWasmImplementation(versions.oxc),
-		'OXC WASM (oxc-parser)',
-		'OXC WASM'
-	);
-	const tsc_impl = await optional(
-		new TscImplementation(),
-		`tsc ${versions.tsc.typescript} (parse-only)`,
-		'tsc'
-	);
+	// Constructed up front, one `new` per slot, so the two views below are visibly
+	// the SAME set read two ways: `complete` is every instance, the returned bag is
+	// the subset whose `init()` took. Inlining these into the `optional(...)` calls
+	// would leave a failed impl's instance unreachable, and with it the only
+	// non-hand-written answer to which rows its absence removed (`complete`).
+	const oxc = new OxcImplementation(versions.oxc);
+	const oxc_wasm = new OxcWasmImplementation(versions.oxc);
+	const tsc = new TscImplementation();
 	// One class, two bindings — see lib/yuku.ts.
-	const yuku_impl = await optional(
-		new YukuImplementation('yuku-parser', versions.yuku),
-		'yuku-parser (N-API)',
-		'yuku-parser'
-	);
+	const yuku = new YukuImplementation('yuku-parser', versions.yuku);
+	const yuku_wasm = new YukuImplementation('yuku-parser-wasm', versions.yuku);
+	const biome = new BiomeImplementation(versions.biome);
+	const dprint = new DprintImplementation(versions.dprint);
+	const malva = new MalvaImplementation(versions.malva);
+	const rsvelte = new RsvelteImplementation(versions.rsvelte);
+	// A different package from rsvelte-fmt above — the N-API addon, which unlike
+	// the fmt CLI does have an in-process API. See lib/rsvelte_parse.ts.
+	const rsvelte_parse = new RsvelteParseImplementation(versions.rsvelte_parse);
+	const swc = new SwcImplementation(versions.swc);
+	const postcss = new PostcssImplementation(versions.postcss);
+
+	const native_impl = await optional(native, 'native', native_label);
+	const wasm_impl = await optional(wasm, 'wasm', 'WASM');
+	const oxc_impl = await optional(oxc, 'oxc', 'OXC (oxc-parser + oxfmt)', 'OXC');
+	const oxc_wasm_impl = await optional(oxc_wasm, 'oxc_wasm', 'OXC WASM (oxc-parser)', 'OXC WASM');
+	const tsc_impl = await optional(tsc, 'tsc', `tsc ${versions.tsc.typescript} (parse-only)`, 'tsc');
+	const yuku_impl = await optional(yuku, 'yuku', 'yuku-parser (N-API)', 'yuku-parser');
 	const yuku_wasm_impl = await optional(
-		new YukuImplementation('yuku-parser-wasm', versions.yuku),
+		yuku_wasm,
+		'yuku_wasm',
 		'yuku-parser (WASM)',
 		'yuku-parser WASM'
 	);
-	const biome_impl = await optional(
-		new BiomeImplementation(versions.biome),
-		'Biome (WASM)',
-		'Biome'
-	);
-	const dprint_impl = await optional(
-		new DprintImplementation(versions.dprint),
-		'dprint (WASM)',
-		'dprint'
-	);
-	const malva_impl = await optional(
-		new MalvaImplementation(versions.malva),
-		'malva (WASM, CSS)',
-		'malva'
-	);
+	const biome_impl = await optional(biome, 'biome', 'Biome (WASM)', 'Biome');
+	const dprint_impl = await optional(dprint, 'dprint', 'dprint (WASM)', 'dprint');
+	const malva_impl = await optional(malva, 'malva', 'malva (WASM, CSS)', 'malva');
 	const rsvelte_impl = await optional(
-		new RsvelteImplementation(versions.rsvelte),
+		rsvelte,
+		'rsvelte',
 		'rsvelte-fmt (native binary, coverage-only)',
 		'rsvelte-fmt'
 	);
-	// A different package from rsvelte-fmt above — the N-API addon, which unlike
-	// the fmt CLI does have an in-process API. See lib/rsvelte_parse.ts.
 	const rsvelte_parse_impl = await optional(
-		new RsvelteParseImplementation(versions.rsvelte_parse),
+		rsvelte_parse,
+		'rsvelte_parse',
 		'rsvelte parse (N-API, svelte)',
 		'rsvelte parse'
 	);
@@ -263,12 +343,8 @@ export async function init_implementations(
 		);
 	}
 
-	const swc_impl = await optional(new SwcImplementation(versions.swc), 'swc (N-API)', 'swc');
-	const postcss_impl = await optional(
-		new PostcssImplementation(versions.postcss),
-		'postcss (CSS)',
-		'postcss'
-	);
+	const swc_impl = await optional(swc, 'swc', 'swc (N-API)', 'swc');
+	const postcss_impl = await optional(postcss, 'postcss', 'postcss (CSS)', 'postcss');
 
 	logger('');
 
@@ -289,7 +365,26 @@ export async function init_implementations(
 		rsvelte: rsvelte_impl,
 		rsvelte_parse: rsvelte_parse_impl,
 		swc: swc_impl,
-		unavailable
+		unavailable,
+		// Every instance, initialized or not — see `InitializedImplementations.complete`.
+		complete: {
+			versions,
+			canonical,
+			native,
+			wasm,
+			oxc,
+			oxc_wasm,
+			tsc,
+			yuku,
+			yuku_wasm,
+			biome,
+			dprint,
+			malva,
+			postcss,
+			rsvelte,
+			rsvelte_parse,
+			swc
+		}
 	};
 }
 
@@ -297,6 +392,16 @@ export async function init_implementations(
 export interface BenchmarkTask {
 	/** Display name in benchmark output */
 	name: string;
+	/**
+	 * The implementation slot backing this row.
+	 *
+	 * A row's name is its public identity; this is the internal one, and recording
+	 * it here is what lets a load failure be attributed to the rows it removed
+	 * without a hand-written map (`get_defined_rows` → `unavailable_with_rows`).
+	 * Many-to-one on purpose: `native` backs four parse rows, `oxc` backs
+	 * `oxc-parser` and `oxfmt`.
+	 */
+	impl: ImplKey;
 	/** Key for corpus size tracking (e.g., "parse/svelte/native") */
 	tracking_key: string;
 	/** Whether this benchmark runs async */
@@ -350,7 +455,7 @@ export interface BenchmarkTaskOptions {
  * Returns tasks in display order (canonical first, then alternatives).
  */
 export function get_benchmark_tasks(
-	impls: InitializedImplementations,
+	impls: ImplementationSet,
 	operation: 'parse' | 'format',
 	language: Language,
 	options: BenchmarkTaskOptions = {}
@@ -359,11 +464,17 @@ export function get_benchmark_tasks(
 	const group_name = `${operation}/${language}`;
 
 	/**
-	 * Register a sync task when `enabled`. The gate differs per impl — a missing
-	 * binding, an unsupported language, an absent optional method — so each caller
-	 * passes its own; `true` is an impl that's always present.
+	 * Register a sync task for implementation `impl` when `enabled`. The gate
+	 * differs per impl — a missing binding, an unsupported language, an absent
+	 * optional method, a surface this row is excluded from — so each caller passes
+	 * its own; `true` is an impl that's always present.
+	 *
+	 * `impl` is the OWNER, not the gate. It names which slot backs the row, which is
+	 * what lets the same traversal answer both "what runs here" (against the live
+	 * set) and "what does this surface define" (against `complete`).
 	 */
 	const add = (
+		impl: ImplKey,
 		enabled: unknown,
 		name: string,
 		key: string,
@@ -373,6 +484,7 @@ export function get_benchmark_tasks(
 		if (!enabled) return;
 		tasks.push({
 			name,
+			impl,
 			tracking_key: `${group_name}/${key}`,
 			is_async: false,
 			run,
@@ -387,6 +499,7 @@ export function get_benchmark_tasks(
 	 * free to drift from the name it's supposed to identify.
 	 */
 	const add_async = (
+		impl: ImplKey,
 		enabled: unknown,
 		name: string,
 		key: string,
@@ -395,6 +508,7 @@ export function get_benchmark_tasks(
 		if (!enabled) return;
 		tasks.push({
 			name,
+			impl,
 			tracking_key: `${group_name}/${key}`,
 			is_async: true,
 			run: () => {
@@ -406,15 +520,19 @@ export function get_benchmark_tasks(
 
 	if (operation === 'parse') {
 		// Canonical parser (always available)
-		add(true, canonical_parser_label(language), 'canonical', (source, _language, goal) =>
-			impls.canonical.parse(source, language, goal)
+		add(
+			'canonical',
+			true,
+			canonical_parser_label(language),
+			'canonical',
+			(source, _language, goal) => impls.canonical.parse(source, language, goal)
 		);
 
 		// Native + WASM parsers (with JSON serialization)
-		add(impls.native, 'tsv-json', 'native', (source, _language, goal) =>
+		add('native', impls.native, 'tsv-json', 'native', (source, _language, goal) =>
 			impls.native!.parse(source, language, goal)
 		);
-		add(impls.wasm, 'tsv_wasm-json', 'wasm', (source, _language, goal) =>
+		add('wasm', impls.wasm, 'tsv_wasm-json', 'wasm', (source, _language, goal) =>
 			impls.wasm!.parse(source, language, goal)
 		);
 
@@ -424,12 +542,14 @@ export function get_benchmark_tasks(
 		// mechanism-matched to their `-json` siblings. CSS is skipped — `parseCss`
 		// emits no `loc`, so a CSS no-locations row would duplicate `tsv-json`.
 		add(
+			'native',
 			impls.native?.parse_no_locations && language !== 'css',
 			'tsv-json-no-locations',
 			'native-no-locations',
 			(source, _language, goal) => impls.native!.parse_no_locations!(source, language, goal)
 		);
 		add(
+			'wasm',
 			impls.wasm?.parse_no_locations && language !== 'css',
 			'tsv_wasm-json-no-locations',
 			'wasm-no-locations',
@@ -438,12 +558,14 @@ export function get_benchmark_tasks(
 
 		// Internal parsing variants (no JSON serialization) - shows JSON overhead
 		add(
+			'native',
 			impls.native?.parse_internal,
 			'tsv-internal',
 			'native-internal',
 			(source, _language, goal) => impls.native!.parse_internal!(source, language, goal)
 		);
 		add(
+			'wasm',
 			impls.wasm?.parse_internal,
 			'tsv_wasm-internal',
 			'wasm-internal',
@@ -456,12 +578,14 @@ export function get_benchmark_tasks(
 		// `experimentalLazy` raw transfer is setup-dominated in every runtime (measures
 		// buffer copy, not parse speed) — see `lib/oxc.ts` and docs/benchmarks.md §Fairness caveats.
 		add(
+			'oxc',
 			impls.oxc?.supports_parse_language(language),
 			'oxc-parser',
 			'oxc',
 			(source, _language, goal) => impls.oxc!.parse(source, language, goal)
 		);
 		add(
+			'oxc_wasm',
 			impls.oxc_wasm?.supports_parse_language(language),
 			'oxc-parser-wasm',
 			'oxc-wasm',
@@ -483,6 +607,7 @@ export function get_benchmark_tasks(
 		//    per-source coverage breakdown is what keeps those two readings apart;
 		//    the aggregate row alone would blend them. See lib/tsc.ts.
 		add(
+			'tsc',
 			impls.tsc?.supports_parse_language(language) && options.corpus_kind === 'conformance',
 			'tsc',
 			'tsc',
@@ -503,12 +628,14 @@ export function get_benchmark_tasks(
 		// WASM binding is memory-safe and carries the engine on that surface. Both
 		// rows stay on the perf corpus, which contains no such input. See lib/yuku.ts.
 		add(
+			'yuku',
 			impls.yuku?.supports_parse_language(language) && options.corpus_kind !== 'conformance',
 			'yuku-parser',
 			'yuku',
 			(source, _language, goal) => impls.yuku!.parse(source, language, goal)
 		);
 		add(
+			'yuku_wasm',
 			impls.yuku_wasm?.supports_parse_language(language),
 			'yuku-parser-wasm',
 			'yuku-wasm',
@@ -522,6 +649,7 @@ export function get_benchmark_tasks(
 		// claims tsv's own drop-in contract, which makes the row a conformance datum
 		// as much as a speed one. See lib/rsvelte_parse.ts.
 		add(
+			'rsvelte_parse',
 			impls.rsvelte_parse?.supports_parse_language(language),
 			'rsvelte-parse',
 			'rsvelte-parse',
@@ -533,6 +661,7 @@ export function get_benchmark_tasks(
 		// row is NOT payload-matched to `tsv-json-no-locations` and is deliberately
 		// absent from report.ts's curated payload-matched lines.
 		add(
+			'rsvelte_parse',
 			impls.rsvelte_parse?.supports_parse_language(language),
 			'rsvelte-parse-skip-expr-loc',
 			'rsvelte-parse-skip-expr-loc',
@@ -546,8 +675,12 @@ export function get_benchmark_tasks(
 		// what lets it join the conformance surface without scoring script-goal
 		// test262 files as module-goal failures. Three real-corpus `.d.ts` rejections
 		// are catalogued in lib/perf_omit.ts.
-		add(impls.swc?.supports_parse_language(language), 'swc', 'swc', (source, _language, goal) =>
-			impls.swc!.parse(source, language, goal)
+		add(
+			'swc',
+			impls.swc?.supports_parse_language(language),
+			'swc',
+			'swc',
+			(source, _language, goal) => impls.swc!.parse(source, language, goal)
 		);
 
 		// postcss (CSS only) — the first third-party engine on `parse/css`, and the
@@ -555,18 +688,26 @@ export function get_benchmark_tasks(
 		// No native peer exists to add here: no Rust CSS parser exposes an AST to JS
 		// (lightningcss is transform-only, biome's js-api exposes no parse, malva is a
 		// formatter, oxc has no CSS parse binding). See lib/postcss.ts.
-		add(impls.postcss?.supports_parse_language(language), 'postcss', 'postcss', (source) =>
-			impls.postcss!.parse(source, language)
+		add(
+			'postcss',
+			impls.postcss?.supports_parse_language(language),
+			'postcss',
+			'postcss',
+			(source) => impls.postcss!.parse(source, language)
 		);
 	} else {
 		// Canonical formatter (prettier) - async
-		add_async(true, 'prettier', 'canonical', (source) =>
+		add_async('canonical', true, 'prettier', 'canonical', (source) =>
 			impls.canonical.format_async(source, language)
 		);
 
 		// Native + WASM formatters
-		add(impls.native?.format, 'tsv', 'native', (source) => impls.native!.format!(source, language));
-		add(impls.wasm?.format, 'tsv_wasm', 'wasm', (source) => impls.wasm!.format!(source, language));
+		add('native', impls.native?.format, 'tsv', 'native', (source) =>
+			impls.native!.format!(source, language)
+		);
+		add('wasm', impls.wasm?.format, 'tsv_wasm', 'wasm', (source) =>
+			impls.wasm!.format!(source, language)
+		);
 
 		// Forced-async control (opt-in). Same native engine as `tsv`, routed through
 		// the awaited async path so the `tsv` vs `tsv-forced-async` delta measures the
@@ -574,6 +715,7 @@ export function get_benchmark_tasks(
 		// the only added cost is the await. Rationale + why it's off by default:
 		// `BenchmarkTaskOptions.forced_async`.
 		add_async(
+			'native',
 			options.forced_async && impls.native?.format,
 			'tsv-forced-async',
 			'native-forced-async',
@@ -581,23 +723,27 @@ export function get_benchmark_tasks(
 		);
 
 		// OXC formatter (TypeScript/JS/CSS only) - async
-		add_async(impls.oxc?.supports_format_language(language), 'oxfmt', 'oxfmt', (source) =>
+		add_async('oxc', impls.oxc?.supports_format_language(language), 'oxfmt', 'oxfmt', (source) =>
 			impls.oxc!.format_async(source, language)
 		);
 
-		add(impls.biome?.supports_format_language(language), 'biome-wasm', 'biome', (source) =>
+		add('biome', impls.biome?.supports_format_language(language), 'biome-wasm', 'biome', (source) =>
 			impls.biome!.format(source, language)
 		);
 
 		// dprint formatter (TypeScript/JS only — the engine `deno fmt` runs)
-		add(impls.dprint?.supports_format_language(language), 'dprint-wasm', 'dprint', (source) =>
-			impls.dprint!.format(source, language)
+		add(
+			'dprint',
+			impls.dprint?.supports_format_language(language),
+			'dprint-wasm',
+			'dprint',
+			(source) => impls.dprint!.format(source, language)
 		);
 
 		// malva formatter (CSS only) — dprint's CSS plugin, over the same
 		// `@dprint/formatter` host. Gives format/css a second wasm-tier engine (the
 		// only other one is biome-wasm). See lib/malva.ts.
-		add(impls.malva?.supports_format_language(language), 'malva-wasm', 'malva', (source) =>
+		add('malva', impls.malva?.supports_format_language(language), 'malva-wasm', 'malva', (source) =>
 			impls.malva!.format(source, language)
 		);
 
@@ -610,6 +756,7 @@ export function get_benchmark_tasks(
 		// shape that suits a CLI — live in the separate hyperfine comparison
 		// published on tsv.fuz.dev. See lib/rsvelte.ts + docs/benchmarks.md §Coverage-only rows.
 		add(
+			'rsvelte',
 			impls.rsvelte?.supports_format_language(language),
 			'rsvelte-fmt',
 			'rsvelte',
@@ -619,6 +766,70 @@ export function get_benchmark_tasks(
 	}
 
 	return tasks;
+}
+
+/** One row this surface defines, and the implementation slot behind it. */
+export interface DefinedRow {
+	name: string;
+	impl: ImplKey;
+}
+
+/**
+ * Every row this surface DEFINES over `operations`, independent of what loaded —
+ * the policy question, asked of `get_benchmark_tasks` and answered against
+ * `impls.complete`.
+ *
+ * Two callers, both of which were previously asking the availability-dependent
+ * version and getting a subtly wrong answer:
+ *
+ * - the report's row-composition guards (`SURFACE_DISCLOSURES`, the `DISPLAY_ORDER`
+ *   check). Asked of the LIVE set, an `excluded` claim passes vacuously whenever
+ *   the impl merely failed to load — so re-enabling a row on a machine whose
+ *   binding didn't install would publish the stale sentence with the guard silent.
+ * - `unavailable_with_rows`, which needs the rows a failure removed.
+ *
+ * Returns plain data, never tasks: a task built from `complete` closes over an
+ * uninitialized impl, so the closures must not escape this function. Deduped by
+ * name — a row spans several languages (`tsv-json` is in all three) and this
+ * answers about rows, not cells.
+ */
+export function get_defined_rows(
+	impls: InitializedImplementations,
+	operations: ReadonlyArray<'parse' | 'format'>,
+	options: BenchmarkTaskOptions = {}
+): DefinedRow[] {
+	const rows = new Map<string, DefinedRow>();
+	for (const operation of operations) {
+		for (const language of LANGUAGES) {
+			for (const task of get_benchmark_tasks(impls.complete, operation, language, options)) {
+				if (!rows.has(task.name)) rows.set(task.name, { name: task.name, impl: task.impl });
+			}
+		}
+	}
+	return [...rows.values()];
+}
+
+/**
+ * The report's `unavailable`: each load failure with the ROW names its absence
+ * removed from this surface (see `UnavailableImpl`).
+ *
+ * A pure join over an ALREADY-COMPUTED `defined`, rather than a second
+ * `get_defined_rows` call, for the reason its caller states: the disclosure guard
+ * asks the same registry, and two builds are two chances to answer from different
+ * sets. Taking the rows as an argument also makes the surface-scoping visible —
+ * the same failure costs different rows on different surfaces (a `tsc` failure
+ * costs the perf surface nothing, a `yuku` failure costs the conformance surface
+ * nothing), so there is no answer independent of which rows are in play.
+ */
+export function unavailable_with_rows(
+	unavailable: readonly InitFailure[],
+	defined: readonly DefinedRow[]
+): UnavailableImpl[] {
+	return unavailable.map((u) => ({
+		impl: u.impl,
+		reason: u.reason,
+		rows: defined.filter((row) => row.impl === u.key).map((row) => row.name)
+	}));
 }
 
 /** Get canonical parser label for a language */
@@ -641,9 +852,7 @@ export function canonical_parser_label(lang: Language): string {
  * renders it — so producer and renderer can't disagree about which impls a report
  * carries. Adding an impl extends it there, once.
  */
-export function get_alternative_versions(
-	impls: InitializedImplementations
-): AlternativeVersionInfo {
+export function get_alternative_versions(impls: ImplementationSet): AlternativeVersionInfo {
 	return {
 		oxc_parser: impls.oxc?.versions['oxc-parser'],
 		oxfmt: impls.oxc?.versions.oxfmt,

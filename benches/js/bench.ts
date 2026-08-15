@@ -81,8 +81,10 @@ import {
 	canonical_parser_label,
 	get_alternative_versions,
 	get_benchmark_tasks,
+	get_defined_rows,
 	init_implementations,
-	type UnavailableImpl
+	type UnavailableImpl,
+	unavailable_with_rows
 } from './lib/implementations.ts';
 import {
 	type CoverageBySource,
@@ -571,26 +573,11 @@ const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
 ];
 
 /**
- * Every row name this surface's registry produces, over every operation+language
- * this run covers — the policy question, asked of `get_benchmark_tasks` directly
- * and independent of what the corpus happens to contain. Pure construction (each
- * task is a name plus a closure), so building the set costs nothing and runs before
- * a single file is read.
+ * This run's task-registry options, in one place: the row-composition guards below
+ * and the timed pass must ask the registry the SAME question, and two spellings of
+ * `{forced_async, corpus_kind}` were free to drift into asking different ones.
  */
-function registered_row_names(): Set<string> {
-	const names = new Set<string>();
-	for (const operation of OPERATIONS) {
-		for (const language of LANGUAGES) {
-			for (const task of get_benchmark_tasks(impls, operation, language, {
-				forced_async: BENCH_FORCED_ASYNC,
-				corpus_kind: CORPUS_MODE
-			})) {
-				names.add(task.name);
-			}
-		}
-	}
-	return names;
-}
+const TASK_OPTIONS = { forced_async: BENCH_FORCED_ASYNC, corpus_kind: CORPUS_MODE } as const;
 
 /**
  * Render `SURFACE_DISCLOSURES`, THROWING if a claim disagrees with this surface's
@@ -643,7 +630,17 @@ function surface_disclosure_lines(registered: Set<string>): {
 // report time after a full run whose output the throw would then discard.
 // Both checks below ask the same registry, so it is built ONCE — two calls would
 // invite them to answer from different sets after a future edit.
-const REGISTERED_ROWS = registered_row_names();
+//
+// The rows this surface DEFINES, not the rows this machine can run: both questions
+// below are about policy, and answering them from the live set makes an `excluded`
+// claim pass vacuously whenever the impl merely failed to load (see
+// `get_defined_rows`). It is also why the answer is stable across machines — a row
+// missing here is a decision, never a shortfall.
+//
+// The report's `unavailable` joins against this same list (`unavailable_with_rows`,
+// at save time), so it is computed once here for all three readers.
+const DEFINED_ROWS = get_defined_rows(impls, OPERATIONS, TASK_OPTIONS);
+const REGISTERED_ROWS = new Set(DEFINED_ROWS.map((r) => r.name));
 const { lines: SURFACE_DISCLOSURE_PROSE, warnings: surface_disclosure_warnings } = IS_CONFORMANCE
 	? surface_disclosure_lines(REGISTERED_ROWS)
 	: { lines: [], warnings: [] };
@@ -1025,10 +1022,7 @@ async function run_preflight_group(
 	const group_name = `${operation}/${language}`;
 	log(`\n· ${group_name}`);
 
-	const tasks = get_benchmark_tasks(impls, operation, language, {
-		forced_async: BENCH_FORCED_ASYNC,
-		corpus_kind: CORPUS_MODE
-	});
+	const tasks = get_benchmark_tasks(impls, operation, language, TASK_OPTIONS);
 	await run_preflight(tasks, files, language);
 
 	const task_tracking = new Map<string, string>();
@@ -1381,6 +1375,10 @@ interface Baseline {
 	 * silently as far as the committed report is concerned — the ⚠ init line lives
 	 * only in the terminal scroll — so without this a binding broken by a dep bump
 	 * reads as a report that simply never had that tool.
+	 *
+	 * Each entry names the ROWS the failure removed, not just the impl that failed:
+	 * a reader (or the site's cross-runtime table) holds a row name and nothing
+	 * else, and the init label matches none of them. See `UnavailableImpl`.
 	 */
 	unavailable: UnavailableImpl[];
 }
@@ -1533,7 +1531,13 @@ async function build_results_data(
 	}
 
 	return {
-		// Bumped 10 → 11 for `binary_sizes_absent` (the size table's composition
+		// Bumped 11 → 12 for `unavailable[].rows` — the row names each load failure
+		// removed from this surface. The entries previously carried only the ⚠ init
+		// LABEL (`OXC WASM`, `Biome`), which matches no row name (`oxc-parser-wasm`,
+		// `biome-wasm`), so the one consumer that has to join them — a table asking
+		// "is this blank cell a load failure?" — could never match. Every other
+		// identity the report publishes is a row name; this field now is too.
+		// 10 → 11 for `binary_sizes_absent` (the size table's composition
 		// disclosure — which expected artifacts were not on disk). 9 → 10 for
 		// `unavailable` (the impls that failed to init, so a row
 		// missing from every table has a recorded cause instead of only a ⚠ line in
@@ -1545,7 +1549,7 @@ async function build_results_data(
 		// machine-readable form). 6 → 7 added the top-level `machine` block (CPU model,
 		// OS/arch, runtime version); 5 → 6 added `corpus_kind` + `corpus_sources`;
 		// 4 → 5 added the `runtime` field, top-level and per row.
-		version: 11,
+		version: 12,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
 		timestamp: new Date().toISOString(),
@@ -1563,7 +1567,7 @@ async function build_results_data(
 		entries,
 		suppressed_noise: Object.fromEntries(suppressed_noise),
 		variant_parity: variant_parity_findings,
-		unavailable: impls.unavailable
+		unavailable: unavailable_with_rows(impls.unavailable, DEFINED_ROWS)
 	};
 }
 
@@ -2041,10 +2045,18 @@ if (write_report) {
 	// same KIND of diminished measurement, and this one leaves no trace in the
 	// table it thins: the row is simply gone, and the ⚠ init lines are far up the
 	// scroll. So name the shortfall at the moment the file is published.
-	if (impls.unavailable.length > 0) {
+	// Named by ROW, since the rows are what the published tables are missing — an
+	// impl whose absence costs this surface no row (`rows: []`) is a shortfall of
+	// the machine, not of the file, and says so.
+	if (results_data.unavailable.length > 0) {
+		const cost = results_data.unavailable
+			.map(
+				(u) => `${u.impl} (${u.rows.length > 0 ? u.rows.join(', ') : 'no rows on this surface'})`
+			)
+			.join('; ');
 		log(
-			`  ⚠ published without ${impls.unavailable.length} impl(s) that failed to load: ` +
-				`${impls.unavailable.map((u) => u.impl).join(', ')} (recorded in \`unavailable\`)`
+			`  ⚠ published without ${results_data.unavailable.length} impl(s) that failed to load: ` +
+				`${cost} (recorded in \`unavailable\`)`
 		);
 	}
 	if (results_data.binary_sizes_absent.length > 0) {

@@ -52,10 +52,17 @@ interface Machine {
 	runtime_version: string;
 }
 
-/** One impl that failed to init on a sibling's machine (`version` 10+ reports). */
+/**
+ * One impl that failed to init on a sibling's machine (`version` 10+ reports;
+ * `rows` from `version` 12).
+ *
+ * The fold below reads `rows`, never `impl`: these tables are keyed by row name,
+ * and `impl` is the init-line label (`Biome`), which matches none of them.
+ */
 interface UnavailableImpl {
 	impl: string;
 	reason: string;
+	rows?: string[];
 }
 
 interface Report {
@@ -151,18 +158,24 @@ const sources = present.map((r) => ({
 }));
 
 /**
- * Every impl a sibling recorded as unavailable, listed under the runtime that
+ * Every ROW a sibling recorded as unavailable, listed under the runtime that
  * recorded it — the asymmetry a reader of the folded rows would otherwise attribute
  * to speed. Siblings predating the field (`unavailable === null`) contribute
  * nothing, which is "not recorded" rather than a claim that nothing was missing.
  *
- * Not narrowed to the impls missing on SOME runtimes: an impl absent on all of them
- * is still a shortfall of the machine that produced these reports, and the fold has
- * no row for it either way. The md line below is worded to cover both.
+ * Rows, not impl labels, because that is the only identity that joins: a consumer
+ * asking "is this blank cell a load failure?" holds a row name, and `Biome` /
+ * `OXC WASM` match no row (`biome-wasm`, `oxc-parser-wasm`). A load failure that
+ * cost this surface no row contributes nothing here — correctly, since no table has
+ * a gap to explain.
+ *
+ * Not narrowed to the rows missing on SOME runtimes: a row absent on all of them is
+ * still a shortfall of the machine that produced these reports, and the fold has no
+ * row for it either way. The md line below is worded to cover both.
  */
 const unavailable_by_runtime = sources
-	.filter((s) => s.unavailable !== null && s.unavailable.length > 0)
-	.map((s) => ({ runtime: s.runtime, impls: s.unavailable!.map((u) => u.impl) }));
+	.map((s) => ({ runtime: s.runtime, rows: (s.unavailable ?? []).flatMap((u) => u.rows ?? []) }))
+	.filter((entry) => entry.rows.length > 0);
 const mixed_vintage =
 	new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}`)).size > 1;
 
@@ -182,11 +195,15 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
 
 // JSON: metadata + provenance per source + the comparison rows.
 const combined = {
-	// Bumped 7 → 8 for `unavailable_by_runtime` (which impls failed to load on which
+	// Bumped 8 → 9 for `unavailable_by_runtime[].rows` (was `.impls`): the entries
+	// carry the ROW names a runtime's load failures removed, which is the identity
+	// these tables are keyed by — the init labels they held before matched no row,
+	// so the lookup they exist for could never match. 7 → 8 added
+	// `unavailable_by_runtime` itself (which impls failed to load on which
 	// sibling, folded from their `unavailable` lists). Same discipline as the
 	// per-runtime reports: a new top-level field moves the number, so a consumer can
 	// tell "this composer didn't record it" from "there was nothing to record".
-	version: 8,
+	version: 9,
 	kind: 'combined' as const,
 	generated: new Date().toISOString(),
 	runtimes: present,
@@ -253,10 +270,11 @@ if (mixed_vintage) {
 if (unavailable_by_runtime.length > 0) {
 	md.push(
 		'**Not measured everywhere:** ' +
-			unavailable_by_runtime.map((u) => `${u.runtime} — ${u.impls.join(', ')}`).join('; ') +
-			'. These impls failed to load on the runtime(s) named, so they contribute no row ' +
-			'there — a row thinner than its neighbours, or missing outright, is a load failure ' +
-			'rather than a speed result. The per-runtime report’s `unavailable` carries the cause.\n'
+			unavailable_by_runtime.map((u) => `${u.runtime} — ${u.rows.join(', ')}`).join('; ') +
+			'. The implementation behind each row failed to load on the runtime(s) named, so it ' +
+			'contributes no measurement there — a row thinner than its neighbours, or missing ' +
+			'outright, is a load failure rather than a speed result. The per-runtime report’s ' +
+			'`unavailable` carries the impl and the cause.\n'
 	);
 }
 md.push(
@@ -341,9 +359,9 @@ if (mixed_machine) {
 }
 if (unavailable_by_runtime.length > 0) {
 	console.error(
-		'⚠ compose: impls unavailable on some runtimes (' +
-			unavailable_by_runtime.map((u) => `${u.runtime}=${u.impls.join('+')}`).join(' | ') +
-			') — their rows are absent there, which is a load failure rather than a speed result.'
+		'⚠ compose: rows unavailable on some runtimes (' +
+			unavailable_by_runtime.map((u) => `${u.runtime}=${u.rows.join('+')}`).join(' | ') +
+			') — absent there because the impl behind them failed to load, not as a speed result.'
 	);
 }
 console.log(`Composed cross-runtime report from: ${present.join(', ')}`);

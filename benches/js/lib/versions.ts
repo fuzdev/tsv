@@ -105,8 +105,17 @@ export interface AllVersions {
 }
 
 /**
- * The bare `x.y.z` of `name`'s `dependencies` entry, with any semver range marker
- * (`^`/`~`/`>=`/etc.) stripped — `'^4.4.3' -> '4.4.3'`.
+ * The `x.y.z` (plus any prerelease tail) of `name`'s `dependencies` entry, with any
+ * semver range marker (`^`/`~`/`>=`/etc.) stripped — `'^4.4.3' -> '4.4.3'`,
+ * `'2.0.0-alpha.3' -> '2.0.0-alpha.3'`.
+ *
+ * The prerelease tail is KEPT because this file has a second reader that keeps it:
+ * `check_node_modules.ts`'s `EXACT_PIN` treats `2.0.0-alpha.3` as an exact pin and
+ * compares the whole spec against the installed `version`. Dropping the tail here
+ * would make the two readers disagree about what one line of `package.json` says —
+ * the install check passing while this labels the report, the prettier cache key,
+ * and the fixtures gates' oracle-skew check with a version that was never
+ * installed. Keep the two spellings in step.
  *
  * THROWS when the entry is absent or carries no version. Every name read here is a
  * hard `dependencies` entry, so a miss is always a bug — a renamed or dropped
@@ -123,7 +132,7 @@ function dep_version(deps: Record<string, string>, name: string): string {
 				`it by name, so a rename or removal must update lib/versions.ts in the same change`
 		);
 	}
-	const m = spec.match(/(\d+\.\d+\.\d+)/);
+	const m = spec.match(/(\d+\.\d+\.\d+(?:-[\w.]+)?)/);
 	if (!m) {
 		throw new Error(`benches/js/package.json '${name}' version '${spec}' has no x.y.z to read`);
 	}

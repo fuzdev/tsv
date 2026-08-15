@@ -18,7 +18,6 @@ import {
 	get_benchmark_tasks,
 	init_implementations
 } from './lib/implementations.ts';
-import { current_runtime } from './lib/runtime.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 
 /**

@@ -44,7 +44,7 @@ import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { get_library_path } from './ffi.ts';
 import { get_napi_library_path } from './napi.ts';
-import { current_runtime } from './runtime.ts';
+import { current_runtime, wasm_target } from './runtime.ts';
 
 /**
  * Crates whose source compiles into EVERY measured tsv artifact (the shared
@@ -249,9 +249,11 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 /** Path to the executed WASM bundle's compiled `.wasm` for the given variant —
  * the runtime's own wasm-pack target (Deno → `deno`, Node/Bun → `nodejs`). */
 export function wasm_artifact_path(variant: 'format' | 'parse' | 'all'): string {
-	const target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
 	return fileURLToPath(
-		new URL(`../../../crates/tsv_wasm/pkg/${variant}/${target}/tsv_wasm_bg.wasm`, import.meta.url)
+		new URL(
+			`../../../crates/tsv_wasm/pkg/${variant}/${wasm_target()}/tsv_wasm_bg.wasm`,
+			import.meta.url
+		)
 	);
 }
 
@@ -300,7 +302,7 @@ export function native_artifact_check(): ArtifactCheck {
  * `native_artifact_check` and pass it themselves.
  */
 export async function check_executed_artifacts(): Promise<void> {
-	const target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
+	const target = wasm_target();
 	await check_artifact_freshness([
 		native_artifact_check(),
 		{

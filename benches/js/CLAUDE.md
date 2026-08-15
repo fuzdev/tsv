@@ -654,8 +654,8 @@ exact perf filenames). To publish to tsv.fuz.dev, run `npm run update-benchmarks
 `~/dev/tsv.fuz.dev` — its copy list names these files exactly, so renaming a report
 artifact means updating that script in the same change.
 
-The committed JSON (per-runtime `version: 11` — the combined compose report carries its
-own `version: 8`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
+The committed JSON (per-runtime `version: 12` — the combined compose report carries its
+own `version: 9`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
 `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
 numbers are machine-relative, so this travels with them; excludes hostname and
 volatile fields so it doesn't churn); `corpus_kind` (`perf` | `conformance`);
@@ -675,14 +675,32 @@ count}`; top-level `variant_parity` records any same-engine pair (two bindings, 
 binding under two options) whose
 pre-flight accept sets disagreed (`[]` when healthy — a non-empty list in a
 committed report is a binding-boundary bug surfacing in the diff); top-level
-`unavailable` records each optional impl that failed to init, as `{impl, reason}`
-with the load error's first line (`[]` on a full machine; under Bun oxc-parser-wasm
-and biome land there — the two known per-runtime load failures, §Cross-Runtime). The
+`unavailable` records each optional impl that failed to init, as `{impl, reason,
+rows}` — the ⚠ init line's label, the load error's first line, and the ROW names its
+absence removed from this surface (`[]` on a full machine; under Bun the two known
+per-runtime load failures land there as `OXC WASM → [oxc-parser-wasm]` and `Biome →
+[biome-wasm]`, §Cross-Runtime). The
 three answer escalating
 questions about the same surface — noise silenced, a row behaving wrongly, a row
 NOT THERE — and the last is the one a table can't ask, since an impl that stops
 loading takes its column out of every table and the ⚠ init line lives only in the
 run's output.
+
+**`rows` is the joinable half, and the reason it exists.** Every other identity the
+report publishes is a row name (`entries[].name`, `variant_parity.impl`/`.sibling`,
+`report.ts`'s `DISPLAY_ORDER`), so a consumer asking "is this blank cell a load
+failure?" holds a row name — which the init LABEL matches for no impl whose label
+differs from its row (`Biome` vs `biome-wasm`), and cannot match at all where one
+impl backs several rows (`native` backs four; `oxc` backs `oxc-parser` and `oxfmt`).
+`rows` is DERIVED, never mapped: `init_implementations` keeps each failed impl's
+constructed-but-uninitialized instance in `complete`, and `get_defined_rows` asks
+the one task registry against that set (sound because the gates it evaluates —
+`parse_languages`/`format_languages`, `format`/`parse_internal` — are
+construction-time facts, not init state). It is SURFACE-scoped for the same reason
+the disclosures are: a `tsc` failure costs the perf surface no row, a `yuku` failure
+costs the conformance surface none, and an empty `rows` says exactly that — the
+machine is short while the tables are whole. The composer folds these into
+`unavailable_by_runtime[].rows`.
 Top-level `binary_sizes_absent` names the artifacts the size table reached for and
 did not find — that table is the one section whose COMPOSITION varies by machine
 (a row exists only for a built artifact), so a tsv variant listed there usually
@@ -698,10 +716,14 @@ if the table says a row is excluded and this surface registers it, or vice versa
 The policy itself lives at the `corpus_kind` conditions in `lib/implementations.ts`,
 so the check is what keeps the published sentence from outliving the code —
 re-enabling yuku's N-API row after an upstream fix fails the run until the
-disclosure is updated. It asks the task REGISTRY (`get_benchmark_tasks`), not the
+disclosure is updated. It asks the task REGISTRY (`get_defined_rows`), not the
 rows a run measured, and asks it at init: a corpus filter can empty a whole group,
 and grading that as policy drift failed partial runs at report time, after their
-work and with nothing written. One absence is exempt — an **added** row whose impl
+work and with nothing written. The registry is asked the **availability-independent**
+question (`impls.complete`) — asked of the live set instead, an `excluded` claim
+passes vacuously whenever the impl merely failed to load, so a re-enabled row on a
+machine whose binding didn't install would publish the stale sentence with the guard
+silent. One absence is exempt — an **added** row whose impl
 never initialized is this machine coming up short (already in `unavailable`), so the
 run warns and drops that line instead of failing.
 
@@ -917,7 +939,9 @@ benches/js/
     ├── rsvelte.ts         # rsvelte-fmt wrapper (Svelte only; COVERAGE-ONLY, never timed)
     ├── rsvelte_parse.ts   # rsvelte PARSE wrapper (N-API addon — a DIFFERENT package from rsvelte.ts,
     │                      # and unlike it in-process, so it IS timed; 2 rows on parse/svelte)
-    ├── runtime.ts         # Cross-runtime helpers: current_runtime / os / arch normalizers
+    ├── runtime.ts         # Cross-runtime helpers: current_runtime / os / arch normalizers, plus the
+    │                      # artifact-naming pair every loader AND guard shares — native_library_filename
+    │                      # and wasm_target (the pkg/<variant>/<target>/ segment)
     ├── swc.ts             # swc wrapper (parse-only, TS/JS; both surfaces — goal axis is `isModule`)
     ├── ts_repo.ts         # Shared `../typescript`-corpus vocabulary: discovery + the baseline
     │                      # key/grammar-error rules (the ts-repo GATE and the harvest both read it,

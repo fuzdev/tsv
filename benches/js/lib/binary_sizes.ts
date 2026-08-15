@@ -21,7 +21,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { OXC_WASI_BINDING } from './check_node_modules.ts';
-import type { InitializedImplementations } from './implementations.ts';
+import type { ImplementationSet } from './implementations.ts';
 import { current_arch, current_os, current_runtime, native_library_filename } from './runtime.ts';
 import { rsvelte_binary_path } from './rsvelte.ts';
 
@@ -241,7 +241,7 @@ function napi_binding_dirs(
  * directly means an impl exists in exactly one place.
  */
 export async function collect_binary_sizes(
-	impls: InitializedImplementations
+	impls: ImplementationSet
 ): Promise<CollectedBinarySizes> {
 	const project_root = fileURLToPath(new URL('../../..', import.meta.url));
 	const node_modules = node_modules_dir();
