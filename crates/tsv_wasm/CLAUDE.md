@@ -54,7 +54,8 @@ rides its own custom section, so consumers `import type` AST nodes directly.
 ## Panic Reporting
 
 A `#[wasm_bindgen(start)]` hook forwards panic messages to `console.error`
-(**measured 468 B**), because under the shipped `panic = "abort"` + `strip` a
+(**measured at under +0.1% raw and gzipped** on `@fuzdev/tsv_format_wasm`, ~1.3 KB
+raw), because under the shipped `panic = "abort"` + `strip` a
 panic reaches the host as a bare `RuntimeError: unreachable`. The why — and why
 the `console.error` binding is hand-rolled rather than a dep — is in the comment
 above the hook in `src/lib.rs`.
