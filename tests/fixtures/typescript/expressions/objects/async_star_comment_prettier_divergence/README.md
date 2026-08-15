@@ -10,6 +10,12 @@ sites share the delimiter scan that finds the generator `*`.
 - Prettier: `async */* c */ m() {}` (moves the comment after `*`)
 - Ours: `async /* c */ *m() {}` (preserves between `async` and `*`)
 
+A **line** comment in this gap is unrepresentable in an object literal: there is
+no ASI to end the property, and `AsyncMethod : async [no LineTerminator here] *`
+(ecma262) makes the newline a syntax error, which both tsv and acorn report. The
+class form has no such restriction after `static` and pins the line-comment case
+(`../../../statements/class/async_star_comment_prettier_divergence/`).
+
 A `*` inside the comment (`/* a * b */`) is not mistaken for the generator
 star — the delimiter scan skips comment contents. The after-`*` position
 (`*/* comment */ m()`) is preserved identically by both formatters — see
