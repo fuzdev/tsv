@@ -663,19 +663,19 @@ impl<'a> Printer<'a> {
             // instead of the glued space: inside the parens group it materializes
             // exactly when the ternary drops to its own (paren-less) line — width
             // or a hard break in the body — and collapses to the glued bytes flat.
-            // An author blank after the run declines (a soft `line` cannot carry
-            // it — `run_takes_soft_separator`) and keeps the glued path.
-            let with_leading = if let Some(run) = self
-                .broke_after_value_leading_run(arrow_end, body_start)
-                .filter(|run| self.run_takes_soft_separator(arrow_end, body_start, run))
-            {
-                let mut run_parts = DocBuf::new();
-                self.push_leading_run_with_soft_line(&mut run_parts, &run);
-                run_parts.push(body_doc);
-                d.concat(&run_parts)
-            } else {
-                prepend_leading(d, gap_run(), body_doc)
-            };
+            // An author blank after the run declines inside the gate (a soft
+            // `line` cannot carry it; the trails-the-opener half is vacuous here —
+            // arm 1 routed every comment not glued to `=>` away) and keeps the
+            // glued path.
+            let with_leading =
+                if let Some(run) = self.opener_trailing_broke_after_run(arrow_end, body_start) {
+                    let mut run_parts = DocBuf::new();
+                    self.push_leading_run_with_soft_line(&mut run_parts, &run);
+                    run_parts.push(body_doc);
+                    d.concat(&run_parts)
+                } else {
+                    prepend_leading(d, gap_run(), body_doc)
+                };
             if d.will_break(body_doc) {
                 // Body has hardlines (multiline template in ternary, etc.)
                 // Use normal break layout — no parens needed
@@ -704,15 +704,12 @@ impl<'a> Printer<'a> {
             // (`hang_after_operator_run_doc`): flat renders the glued bytes; a
             // broken seam — the body's hard break or width — puts the run on its
             // own line with the body re-fitting below, prettier's
-            // `printLeadingComment` `line`. An author blank after the run
-            // declines (a soft `line` cannot carry it — `run_takes_soft_separator`)
-            // and keeps the glued path.
+            // `printLeadingComment` `line`. An author blank after the run declines
+            // inside the gate (a soft `line` cannot carry it; trails-the-opener is
+            // vacuous here, as at the ternary arm) and keeps the glued path.
             let body_doc = self.build_arrow_body_doc(expr);
             parts.push(
-                if let Some(run) = self
-                    .broke_after_value_leading_run(arrow_end, body_start)
-                    .filter(|run| self.run_takes_soft_separator(arrow_end, body_start, run))
-                {
+                if let Some(run) = self.opener_trailing_broke_after_run(arrow_end, body_start) {
                     self.hang_after_operator_run_doc(&run, body_doc)
                 } else {
                     hang_after_operator(d, prepend_leading(d, gap_run(), body_doc))

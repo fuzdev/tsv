@@ -1891,6 +1891,38 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The whole declarator / assignment-expression `=` broke-after arm —
+    /// prettier's break-after-operator (`chooseLayout`'s `hasLeadingOwnLineComment`
+    /// arm) in the type-alias seam's two-half form: the geometry gate
+    /// ([`Self::broke_after_value_leading_run`]), the value built through the
+    /// caller's own builder, then `Some(rhs_doc)` when either half applies —
+    /// a value carrying a hard break takes the blank-preserving hardline emitter
+    /// (any run authoring: the own-line emission is the preserved own-line shape),
+    /// anything else one hang group whose soft `line` breaks exactly when the
+    /// operator seam does, restricted to a run that may ride a soft separator
+    /// ([`Self::run_takes_soft_separator`]: trails the operator, no author blank).
+    /// A value that FITS collapses to the glued bytes in both formatters; a
+    /// width-broken one holds the run on its own line with the value re-fitting
+    /// below instead of stranding it mid-line (`⏎\t/* c */ aaa +`, a form
+    /// prettier never emits). Declines — a line comment (its mandatory-break path
+    /// owns it), an own-line-authored or blank-separated run before a fitting
+    /// value — keep the caller's layouts, which preserve those breaks; the value
+    /// doc built for a declined probe is discarded, as the combined gate's is.
+    /// The returned doc begins after the operator; the caller emits the LHS and
+    /// the operator text before it.
+    pub(crate) fn broke_after_operator_rhs_doc(
+        &self,
+        gap_start: u32,
+        value_start: u32,
+        build_value: impl FnOnce() -> DocId,
+    ) -> Option<DocId> {
+        let run = self.broke_after_value_leading_run(gap_start, value_start)?;
+        let value_doc = build_value();
+        (self.d().will_break(value_doc)
+            || self.run_takes_soft_separator(gap_start, value_start, &run))
+        .then(|| self.break_or_hang_after_operator_run_doc(&run, value_start, value_doc))
+    }
+
     /// The geometry half of the broke-after value gate: `Some(run)` when the
     /// `[gap_start, value_start)` gap holds a block-only leading run whose last
     /// comment the author broke after. Anything else — an empty gap, a line

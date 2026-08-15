@@ -228,40 +228,27 @@ impl<'a> Printer<'a> {
             && !matches!(assign.left, Expression::ObjectPattern(_))
             && !rhs_is_assignment
         {
-            // A block run the author broke AFTER (`w = /* c */⏎<value>`):
-            // prettier's break-after-operator (`chooseLayout`'s
-            // `hasLeadingOwnLineComment` arm) — the declarator's early branch
-            // (`build_variable_declaration_doc`), applied to the expression
-            // statement's operator, in the same two-half form: a value carrying a
-            // hard break takes the blank-preserving hardline emitter, anything
-            // else one hang group whose soft `line` breaks exactly when the
-            // operator seam does — a value that FITS collapses to the glued bytes
-            // in both formatters, a width-broken one holds the run on its own
-            // line. A line comment declines inside the gate, and a frozen RHS
-            // keeps the layout below: its bypass owns the directive's placement.
-            // Object property values and class fields deliberately do NOT take
-            // this rule — prettier relocates there and tsv preserves the authored
-            // position (conformance_prettier_ts_comments.md §Comment
+            // A block run the author broke AFTER (`w = /* c */⏎<value>`): the shared
+            // `=` broke-after arm ([`Printer::broke_after_operator_rhs_doc`] — the
+            // two-half rule, its declines, and what falls through live there),
+            // applied to the expression statement's operator. Site-specific gates:
+            // a frozen RHS keeps the layout below (its bypass owns the directive's
+            // placement), and object property values / class fields deliberately do
+            // NOT take this rule — prettier relocates there and tsv preserves the
+            // authored position (conformance_prettier_ts_comments.md §Comment
             // normalization, the `value_block_comment_break` family).
-            // As at the declarator, the width half applies only to a run that
-            // TRAILS the operator — an own-line-authored run with a fitting value
-            // keeps the layout below, which preserves its break.
             if rhs_frozen.is_none()
                 && rhs_comments.is_some()
-                && let Some(run) =
-                    self.broke_after_value_leading_run(effective_rhs_start, rhs_comment_end)
+                && let Some(rhs_doc) =
+                    self.broke_after_operator_rhs_doc(effective_rhs_start, rhs_comment_end, || {
+                        self.build_expression_doc_with_paren_comments(assign.right, assign.span.end)
+                    })
             {
-                let value_doc =
-                    self.build_expression_doc_with_paren_comments(assign.right, assign.span.end);
-                if d.will_break(value_doc)
-                    || self.run_takes_soft_separator(effective_rhs_start, rhs_comment_end, &run)
-                {
-                    return d.concat(&[
-                        left_doc,
-                        d.text(assign.operator.as_str_with_leading_space()),
-                        self.break_or_hang_after_operator_run_doc(&run, rhs_comment_end, value_doc),
-                    ]);
-                }
+                return d.concat(&[
+                    left_doc,
+                    d.text(assign.operator.as_str_with_leading_space()),
+                    rhs_doc,
+                ]);
             }
             return self.build_assignment_layout(
                 left_doc,
