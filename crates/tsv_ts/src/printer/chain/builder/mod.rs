@@ -105,13 +105,19 @@ pub fn build_chain_doc<'a>(
     let prev_has_comments = printer.set_chain_has_comments(
         printer.has_comments_on_page_between(chain_span.start, chain_span.end),
     );
-    let result = build_chain_doc_impl(groups, printer);
+    let result = build_chain_doc_impl(groups, chain_span.end, printer);
     printer.restore_chain_has_comments(prev_has_comments);
     printer.exit_chain_arg_share(was_active);
     result
 }
 
-fn build_chain_doc_impl<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> DocId {
+/// `chain_end` is the chain's source end — the anchor for the trailing member's
+/// trailer read ([`has_comments_forcing_expansion`]).
+fn build_chain_doc_impl<'a>(
+    groups: &[ChainGroup<'a>],
+    chain_end: u32,
+    printer: &Printer<'_>,
+) -> DocId {
     let d = printer.arena();
     if groups.is_empty() {
         return d.empty();
@@ -150,7 +156,7 @@ fn build_chain_doc_impl<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) ->
     // keeps `obj.aa(x).bb(cb)` flat with the arrow hugged and `.prop` trailing.
     // Folding the tail into the chain made `.bb` non-last and force-expanded it.
     if has_calls && let Some(peeled) = peel_trailing_member_tail(groups, printer) {
-        return build_peeled_tail_doc(groups, &peeled, printer);
+        return build_peeled_tail_doc(groups, chain_end, &peeled, printer);
     }
 
     // Prettier's logic (member-chain.js:351-359):
@@ -237,7 +243,9 @@ fn build_chain_doc_impl<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) ->
     // Comments between chain segments DO block the short chain path (matching
     // Prettier's nodeHasComment check).
     if groups.len() <= cutoff
-        && !(has_calls && chain_has_comments && has_comments_forcing_expansion(groups, printer))
+        && !(has_calls
+            && chain_has_comments
+            && has_comments_forcing_expansion(groups, chain_end, printer))
     {
         return build_short_chain_doc(
             first_groups,
@@ -250,7 +258,8 @@ fn build_chain_doc_impl<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) ->
     }
 
     // Long chains: force expand conditions (Prettier member-chain.js:400-407)
-    let force_expand = has_calls && should_force_chain_expand(groups, chain_has_comments, printer);
+    let force_expand =
+        has_calls && should_force_chain_expand(groups, chain_end, chain_has_comments, printer);
     build_long_chain_doc(
         groups,
         first_groups,
@@ -264,6 +273,7 @@ fn build_chain_doc_impl<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) ->
 /// Check if chain expansion should be forced
 fn should_force_chain_expand<'a>(
     groups: &[ChainGroup<'a>],
+    chain_end: u32,
     chain_has_comments: bool,
     printer: &Printer<'_>,
 ) -> bool {
@@ -298,7 +308,7 @@ fn should_force_chain_expand<'a>(
     // Comments between chain segments force expansion, EXCEPT for comments before
     // trailing members (which are handled specially by add_group_no_break)
     let has_forcing_comments =
-        chain_has_comments && has_comments_forcing_expansion(groups, printer);
+        chain_has_comments && has_comments_forcing_expansion(groups, chain_end, printer);
 
     has_blank_lines_between
         || has_forcing_comments
@@ -505,19 +515,22 @@ fn peel_trailing_member_tail<'a, 'p>(
 /// that group truncated.
 fn build_peeled_tail_doc<'a>(
     groups: &[ChainGroup<'a>],
+    chain_end: u32,
     peeled: &PeeledTail<'a, '_>,
     printer: &Printer<'_>,
 ) -> DocId {
     let call_group = &groups[peeled.last_call_group];
+    // The prefix ends with the call, so its build never reaches the trailing-MEMBER
+    // trailer read that `chain_end` anchors; it is passed through unchanged.
     let chain_doc = if peeled.last_call_idx + 1 == call_group.nodes.len() {
-        build_chain_doc_impl(&groups[..=peeled.last_call_group], printer)
+        build_chain_doc_impl(&groups[..=peeled.last_call_group], chain_end, printer)
     } else {
         let mut prefix: SmallVec<[ChainGroup<'a>; 4]> =
             groups[..peeled.last_call_group].iter().cloned().collect();
         let mut cut = call_group.clone();
         cut.nodes.truncate(peeled.last_call_idx + 1);
         prefix.push(cut);
-        build_chain_doc_impl(&prefix, printer)
+        build_chain_doc_impl(&prefix, chain_end, printer)
     };
     append_member_tail(chain_doc, peeled, printer)
 }

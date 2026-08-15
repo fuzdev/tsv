@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 475,
+	"end": 757,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,120 @@
 					"column": 14
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " The same rule on a SHORT chain — a lone call base, an identifier base, a same-line",
+			"start": 467,
+			"end": 552,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment, and statement position: the comment and the bracket indent one level.",
+			"start": 554,
+			"end": 635,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 654,
+			"end": 659,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 684,
+			"end": 689,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 713,
+			"end": 718,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 16
+				},
+				"end": {
+					"line": 32,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 734,
+			"end": 739,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 474,
+		"end": 756,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 465,
+			"end": 747,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 23,
+					"line": 37,
 					"column": 9
 				}
 			},
@@ -815,6 +911,465 @@
 							"end": 418
 						}
 					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 637,
+					"end": 666,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 643,
+							"end": 665,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 7
+								},
+								"end": {
+									"line": 28,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 643,
+								"end": 644,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 7
+									},
+									"end": {
+										"line": 26,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 647,
+								"end": 665,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 11
+									},
+									"end": {
+										"line": 28,
+										"column": 5
+									}
+								},
+								"object": {
+									"type": "CallExpression",
+									"start": 647,
+									"end": 651,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 11
+										},
+										"end": {
+											"line": 26,
+											"column": 15
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 647,
+										"end": 649,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 11
+											},
+											"end": {
+												"line": 26,
+												"column": 13
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"property": {
+									"type": "Literal",
+									"start": 663,
+									"end": 664,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 3
+										},
+										"end": {
+											"line": 28,
+											"column": 4
+										}
+									},
+									"value": 0,
+									"raw": "0",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c5",
+											"start": 654,
+											"end": 659
+										}
+									]
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same rule on a SHORT chain — a lone call base, an identifier base, a same-line",
+							"start": 467,
+							"end": 552
+						},
+						{
+							"type": "Line",
+							"value": " comment, and statement position: the comment and the bracket indent one level.",
+							"start": 554,
+							"end": 635
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 668,
+					"end": 696,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 674,
+							"end": 695,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 31,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 674,
+								"end": 675,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 678,
+								"end": 695,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 11
+									},
+									"end": {
+										"line": 31,
+										"column": 5
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 678,
+									"end": 681,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 11
+										},
+										"end": {
+											"line": 29,
+											"column": 14
+										}
+									},
+									"name": "arr"
+								},
+								"property": {
+									"type": "Literal",
+									"start": 693,
+									"end": 694,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 3
+										},
+										"end": {
+											"line": 31,
+											"column": 4
+										}
+									},
+									"value": 0,
+									"raw": "0",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c6",
+											"start": 684,
+											"end": 689
+										}
+									]
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 698,
+					"end": 725,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 704,
+							"end": 724,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 704,
+								"end": 705,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 7
+									},
+									"end": {
+										"line": 32,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 708,
+								"end": 724,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 11
+									},
+									"end": {
+										"line": 33,
+										"column": 5
+									}
+								},
+								"object": {
+									"type": "CallExpression",
+									"start": 708,
+									"end": 712,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 11
+										},
+										"end": {
+											"line": 32,
+											"column": 15
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 708,
+										"end": 710,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 11
+											},
+											"end": {
+												"line": 32,
+												"column": 13
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c7",
+											"start": 713,
+											"end": 718
+										}
+									]
+								},
+								"property": {
+									"type": "Literal",
+									"start": 722,
+									"end": 723,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 3
+										},
+										"end": {
+											"line": 33,
+											"column": 4
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 727,
+					"end": 746,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 727,
+						"end": 745,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 1
+							},
+							"end": {
+								"line": 36,
+								"column": 5
+							}
+						},
+						"object": {
+							"type": "CallExpression",
+							"start": 727,
+							"end": 731,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 1
+								},
+								"end": {
+									"line": 34,
+									"column": 5
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 727,
+								"end": 729,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 1
+									},
+									"end": {
+										"line": 34,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"property": {
+							"type": "Literal",
+							"start": 743,
+							"end": 744,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 3
+								},
+								"end": {
+									"line": 36,
+									"column": 4
+								}
+							},
+							"value": 0,
+							"raw": "0",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c8",
+									"start": 734,
+									"end": 739
+								}
+							]
+						},
+						"computed": true,
+						"optional": false
+					}
 				}
 			],
 			"sourceType": "module"

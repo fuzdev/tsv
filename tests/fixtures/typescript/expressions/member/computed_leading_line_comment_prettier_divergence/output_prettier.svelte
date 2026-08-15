@@ -15,4 +15,10 @@
 	const c =
 		arr // c3
 		[i];
+
+	// Inside a CHAIN, with a numeric index — the one accessor kind the chain grouping
+	// otherwise glues into the preceding group. The `//` makes it start a group
+	// instead, and the bracket-interior rule above is unchanged by that.
+	arr.foo() // c4
+	[0];
 </script>

@@ -408,7 +408,20 @@ fn linearize_member_node<'a>(
 /// Follows prettier's grouping algorithm:
 /// 1. First group: base + calls + non-null + numeric accessors + consecutive members
 /// 2. Remaining groups: members* + calls*, break when seeing memberish after call
-pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> ChainGroupVec<'a> {
+///
+/// Plus prettier's comment rule (member-chain.js: a node with a trailing comment
+/// closes its group), scoped to the comment kind that carries a correctness stake:
+/// a member whose gap holds a **line comment** starts a new group — the first
+/// group's "consecutive members" run stops ahead of it, a numeric accessor is not
+/// glued into the base group past it, and phase 2 closes the current group before
+/// it. What that buys is emitter routing, not layout: a member inside a group prints
+/// through `print_member_access`, which can only DEFER a gap `//` to the line end
+/// (`fn().bar.baz; // c` — where a second deferred `//` welds onto the first, and
+/// an own-line comment loses its line), while a group's first member takes the
+/// chain-level gap emitters, which break around the comment and keep it in place.
+/// The trailing member's own deferral is a different, sanctioned matter
+/// (`has_comments_forcing_expansion`).
+pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>], comments: &[Comment]) -> ChainGroupVec<'a> {
     if nodes.is_empty() {
         return ChainGroupVec::new();
     }
@@ -427,7 +440,9 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> ChainGroupVec<'a> {
     // Add: calls, non-null, numeric accessors to first group
     while i < nodes.len() {
         let node = &nodes[i];
-        if node.is_call() || node.is_non_null() || node.is_numeric_accessor() {
+        if (node.is_call() || node.is_non_null() || node.is_numeric_accessor())
+            && !gap_has_line_comment(node, comments)
+        {
             current.push(nodes[i]);
             i += 1;
         } else {
@@ -438,7 +453,11 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> ChainGroupVec<'a> {
     // If first node wasn't a call, add consecutive members
     // (but not the last one - that stays with subsequent calls)
     if !nodes[0].is_call() {
-        while i + 1 < nodes.len() && nodes[i].is_member() && nodes[i + 1].is_member() {
+        while i + 1 < nodes.len()
+            && nodes[i].is_member()
+            && nodes[i + 1].is_member()
+            && !gap_has_line_comment(&nodes[i], comments)
+        {
             current.push(nodes[i]);
             i += 1;
         }
@@ -448,14 +467,18 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> ChainGroupVec<'a> {
     current = ChainGroup::new();
 
     // Phase 2: Build remaining groups
-    // Pattern: (members)* (calls)*, break at memberish after call
+    // Pattern: (members)* (calls)*, break at memberish after call — or at a member
+    // whose gap holds a line comment (see above)
     let mut seen_call = false;
 
     while i < nodes.len() {
         let node = &nodes[i];
 
-        // When we've seen a call and encounter a member, start a new group
-        if seen_call && node.is_member() && !node.is_numeric_accessor() {
+        // When we've seen a call and encounter a member, start a new group — or when
+        // the member's gap holds a line comment (only a member has a gap)
+        if (seen_call && node.is_member() && !node.is_numeric_accessor())
+            || gap_has_line_comment(node, comments)
+        {
             if !current.is_empty() {
                 groups.push(current);
                 current = ChainGroup::new();
@@ -502,10 +525,35 @@ pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printe
         return false;
     }
 
-    // Don't merge if second group's first node has comments (not implemented yet)
-    // if has_comment(&groups[1].nodes[0]) { return false; }
+    // Prettier refuses the merge when the second group's first node carries a
+    // comment (`!hasComment(groups[1][0].node)`); tsv asks it of the kind that
+    // matters — a merged member prints through `print_member_access`, which defers a
+    // gap `//` to the line end (see `group_chain_nodes`), so a line comment there
+    // needs the unmerged path's chain-level emitter.
+    if gap_has_line_comment(&groups[1].nodes[0], printer.comments) {
+        return false;
+    }
 
     should_not_wrap(groups, printer)
+}
+
+/// Whether a chain node's comment gap (see [`ChainNode::comment_range`]) holds a
+/// line comment — the grouping's comment question. Nodes without a gap (a base, a
+/// call, a `!`) answer `false`.
+///
+/// ⚠️ This is the RAW range, not the printer's narrowed
+/// [`node_comment_gap`](super::printing::node_comment_gap): for a computed member the
+/// latter cuts the gap at the `[`, and it cannot be asked here — it reads
+/// `Printer::chain_has_comments`, which `build_chain_doc` sets *after* grouping. So a
+/// `//` written INSIDE the brackets (`arr.foo()[ // c⏎0]`) also starts a group. That
+/// is the wanted answer rather than a tolerated one: the comment still occupies the
+/// line the accessor would otherwise be glued onto, and the trailing group's own
+/// pre-bracket break is what keeps it off the index (pinned by
+/// `member/computed_leading_line_comment`). Take this asymmetry as deliberate before
+/// "fixing" the two spellings into one.
+fn gap_has_line_comment(node: &ChainNode<'_>, comments: &[Comment]) -> bool {
+    node.comment_range()
+        .is_some_and(|(start, end)| has_line_comments_in_range(comments, start, end))
 }
 
 /// Check if chain should NOT wrap between first and second groups
@@ -700,7 +748,7 @@ mod tests {
         let abcd = make_member(&arena, abc, "d", 5);
 
         let nodes = linearize_chain(&abcd);
-        let groups = group_chain_nodes(&nodes);
+        let groups = group_chain_nodes(&nodes, &[]);
 
         // For member-only chains, Prettier puts almost everything in first group
         // (all consecutive members except the last one if followed by more members)
@@ -726,7 +774,7 @@ mod tests {
         let abc = make_member(&arena, ab_call, "c", 7);
 
         let nodes = linearize_chain(&abc);
-        let groups = group_chain_nodes(&nodes);
+        let groups = group_chain_nodes(&nodes, &[]);
 
         // Grouping should break at member after call
         // Expected: [Base(a), Call()] [Member(.b), Call()] [Member(.c)]
@@ -744,7 +792,94 @@ mod tests {
 
     #[test]
     fn test_group_empty_input() {
-        let groups = group_chain_nodes(&[]);
+        let groups = group_chain_nodes(&[], &[]);
         assert!(groups.is_empty());
+    }
+
+    /// A line comment in `[start, start + 4)` — wide enough to fit inside the gaps
+    /// the helper below hands out.
+    fn make_line_comment(start: u32) -> Comment {
+        Comment {
+            content_span: Span::new(start + 2, start + 4),
+            is_block: false,
+            multiline: false,
+            span: Span::new(start, start + 4),
+            emit_character_field: false,
+            bump_pattern_columns: false,
+            owned_by_node: false,
+        }
+    }
+
+    fn make_member_node<'arena>(
+        name: &'arena str,
+        object_end: u32,
+        property_start: u32,
+    ) -> ChainNode<'arena> {
+        let ident_name = IdentName {
+            escaped: Some(name),
+            raw_len: 0,
+        };
+        ChainNode::member(ident_name, false, object_end, property_start)
+    }
+
+    /// The invariant the whole comment rule rests on: a member whose gap holds a line
+    /// comment is a group's FIRST node, never an interior one — only a group's first
+    /// member reaches the chain-level gap emitters, and a member printed inside a
+    /// group can merely defer the `//` to the line end, where two of them weld.
+    ///
+    /// Exercises all three places the grouping could otherwise absorb it: phase 1's
+    /// call/non-null/numeric run, phase 1's consecutive-members run, and phase 2's
+    /// members-after-a-call run.
+    #[test]
+    fn test_group_splits_at_a_member_whose_gap_holds_a_line_comment() {
+        let arena = Bump::new();
+        let base = make_identifier("a");
+        let call = make_call(&arena, make_identifier("a"), 1);
+        let Expression::CallExpression(call) = &call else {
+            panic!("make_call builds a CallExpression")
+        };
+
+        // a.b.c.d.e — every gap 10 bytes wide, so a comment can sit in any one
+        let members: Vec<ChainNode<'_>> = (0..4)
+            .map(|i| make_member_node("m", 20 + i * 10, 26 + i * 10))
+            .collect();
+
+        for (label, nodes) in [
+            ("member-only", {
+                let mut v = vec![ChainNode::base(&base, false)];
+                v.extend(members.iter().copied());
+                v
+            }),
+            ("after a call", {
+                let mut v = vec![ChainNode::base(&base, false), ChainNode::call(call)];
+                v.extend(members.iter().copied());
+                v
+            }),
+        ] {
+            for (commented, member) in members.iter().enumerate() {
+                let (gap_start, _) = member.comment_range().unwrap();
+                let comments = [make_line_comment(gap_start + 1)];
+                let groups = group_chain_nodes(&nodes, &comments);
+
+                let mut found = false;
+                for group in &groups {
+                    for (idx, node) in group.nodes.iter().enumerate() {
+                        if node.comment_range() != member.comment_range() {
+                            continue;
+                        }
+                        found = true;
+                        assert_eq!(
+                            idx, 0,
+                            "{label}: member {commented} with a `//` in its gap must \
+                             start its group, not sit at index {idx}"
+                        );
+                    }
+                }
+                assert!(
+                    found,
+                    "{label}: member {commented} vanished from the grouping"
+                );
+            }
+        }
     }
 }

@@ -19,6 +19,12 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 /// break); a line comment must end its line, so it forces the chain to break to
 /// preserve the comment where the author wrote it — see
 /// [`build_member_only_chain_with_comments_doc`].
+///
+/// The second spelling of "does a node's gap hold a `//`" — the grouping asks the same
+/// question as `analysis::gap_has_line_comment`, over the RAW `ChainNode::comment_range`
+/// rather than this printer-narrowed [`node_comment_gap`]. The two differ only for a
+/// computed member (the narrow one cuts at the `[`), and deliberately; read that
+/// function's warning before unifying them.
 pub(super) fn member_only_has_interior_line_comments<'a>(
     groups: &[ChainGroup<'a>],
     printer: &Printer<'_>,
