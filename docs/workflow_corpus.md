@@ -11,10 +11,13 @@ fixture-first TDD flow rather than this file's hunk workflow.
 Exit-code notes for `--all` runs: besides SAFETY (which always gates), the
 tools fail on an empty scope, an all-errored / zero-compared run (systemic
 sidecar/FFI failure), and on the **pinned per-language counts**
-(`benches/js/lib/gate_counts.ts` — see [gate_counts.md](gate_counts.md)): minimums on `compared`/`match` (live corpus — growth passes, drops
-fail) and exact pins on the negative buckets (`unknown`/`partial`/tsv parse
-failures — a new one fails until triaged; fixing some means re-pinning to
-record the win, which is exactly the loop this document drives).
+(`benches/js/lib/gate_counts.ts` — see [gate_counts.md](gate_counts.md)): a minimum on `compared` (live corpus — growth passes,
+drops fail), a minimum on `match` (over the **reproducible subset** — the
+version-pinned framework + prettier checkouts; live dev repos are a non-gating
+WARN), and exact pins on the negative buckets (parse's tsv-failure pin over the
+live corpus; format's `unknown`/`partial` pins over the reproducible subset — a
+new one fails until triaged; fixing some means re-pinning to record the win,
+which is exactly the loop this document drives).
 
 Repeat runs are cheap: prettier outputs are served from a content-addressed
 cache (../benches/js/CLAUDE.md §Prettier-output cache), so the

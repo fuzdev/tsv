@@ -12,10 +12,9 @@ Like `tsv_ffi`, the bindings reuse a **per-thread AST `Bump`** (`with_ast_arena`
 
 Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-bindings).
 
-## Two-stage rollout
+## Local build & CI
 
-- **(3a) measurement binding — done.** A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --profile napi`) drives the **Node** benchmark runner (`benches/js/lib/napi.ts` loads the built cdylib from `target/napi/` directly via `process.dlopen` — no `.node` rename). CI builds and boundary-tests the addon per OS (the `platforms` job runs `deno task test:napi` on macOS + Windows); **no cross-platform publish yet.**
-- **(3b) publish matrix — targets 0.3 (napi-only), decoupled from the WASM releases.** The cross-platform prebuilt `.node` artifacts (per-platform `optionalDependencies` under a thin `@fuzdev/tsv` loader) + release CI. They need GitHub release infrastructure (a tag-triggered matrix workflow) that the WASM/npm path doesn't — so N-API publish **must not block** the WASM package publish or the VS Code extension. It is expected to eventually **subsume** the WASM path as tsv's primary native distribution. Do **not** bolt N-API onto the single-machine `deno task publish`.
+A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --profile napi`) drives the **Node** benchmark runner (`benches/js/lib/napi.ts` loads the built cdylib from `target/napi/` directly via `process.dlopen` — no `.node` rename). CI builds and boundary-tests the addon per OS (the `platforms` job runs `deno task test:napi` on macOS + Windows). The cross-platform publish is the tag-triggered matrix workflow (see §The npm packages, **Release**), decoupled from the WASM releases — never bolted onto the single-machine `deno task publish`. The native set is expected to eventually **subsume** the WASM path as tsv's primary native distribution.
 
 ## Features
 
@@ -78,9 +77,10 @@ have no ESM loader, so the platform addon rides a
 `createRequire(import.meta.url)` shim (oxc-parser's shape); that is the only
 CommonJS left. A CommonJS host reaches the package by dynamic `import()` — the
 path every supported Node allows, and the one `test_napi_npm.ts` gates. It
-detects the platform triple (musl via `process.report`'s
-`glibcVersionRuntime`, trusted only positively, else a `/lib/ld-musl-*`
-probe), requires `@fuzdev/tsv-<triple>`, and on failure throws an error
+detects the platform triple (musl via a `/lib/ld-musl-*` probe first, then
+`process.report`'s `glibcVersionRuntime` — trusted only positively — to rule
+out a glibc system that merely has musl installed), requires
+`@fuzdev/tsv-<triple>`, and on failure throws an error
 naming the triple, the prebuilt set, and `@fuzdev/tsv_wasm` as the universal
 fallback.
 

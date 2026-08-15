@@ -49,9 +49,9 @@ allocations) is a negligible absolute change.
 - **Representative real-world** — `~/dev/svelte/packages/svelte/src`,
   `~/dev/kit/packages/kit/src`, and `~/dev/svelte-docinfo/src`. Large, diverse
   sources at moderate comment density — the middle ground the two app corpora
-  bracket. svelte and kit are mostly `.js` (which `tsv format` skips, but
-  `profile`/`json_profile` still time, parsed as TypeScript), so kit's
-  `.svelte` + `.ts` and svelte-docinfo's `.ts` are the formattable slices.
+  bracket. svelte and kit are mostly `.js`, which
+  tsv formats like the rest of the JS/TS family (parsed as TypeScript), so all
+  three sources are formattable end to end.
 
 **Measuring one language in isolation:** because `profile`/`json_profile` route
 every non-`.svelte`/`.css` file to the TypeScript parser, a directory that
@@ -75,7 +75,7 @@ parser) is the control that must read ~0.000% for a CSS-only change.
 
 ## Tooling
 
-Four tools, in order of use:
+The tools, in order of use:
 
 ### 1. `tsv_debug profile` — phase timing
 
