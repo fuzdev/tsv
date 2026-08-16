@@ -191,24 +191,19 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_alias_eq_value_doc(decl, eq_pos, has_complex_params, true));
         }
 
-        // Comments between the value and `;`: block comments stay before `;`
-        // (`type A = B /* c */;`), matching prettier; line comments move after `;`
-        // (`type A = B; // c`) since a line comment can't precede `;` on the same
-        // line. These were previously dropped entirely (content loss).
+        // Comments between the value and `;`, through the shared `;`-terminator seam:
+        // a same-line block stays before the `;` (`type A = B /* c */;` — the operand
+        // keeps it, the `import =` side of that axis), a same-line line comment floats
+        // after it (`type A = B; // c`), and an own-line comment drops below the `;`
+        // with any author blank above it intact.
+        //
+        // The last two shapes are why this is the shared emitter and not the kind-keyed
+        // loop it used to be: that loop answered "own-line?" with "is it a block?", so
+        // it pulled an own-line block up onto the value's line and ate the blank —
+        // disagreeing with every other `;` in the language (docs/comments.md §Trailing
+        // and dangling runs).
         let value_end = decl.type_annotation.span().end;
-        let mut trailing_line_parts = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, value_end, decl.span.end) {
-            if comment.is_block {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            } else {
-                trailing_line_parts.push(d.text(" "));
-                trailing_line_parts.push(self.build_comment_doc(comment));
-            }
-        }
-
-        parts.push(d.text(";"));
-        parts.extend(trailing_line_parts);
+        self.push_semicolon_with_gap_comments(&mut parts, value_end, decl.span.end, false);
 
         d.concat(&parts)
     }
@@ -1443,8 +1438,25 @@ impl<'a> Printer<'a> {
                 // namespace can't be dotted, so the name path always ran.
             }
             None => {
-                // Shorthand ambient module: `declare module 'name';`
-                parts.push(d.text(";"));
+                // Shorthand ambient module: `declare module 'name';`.
+                //
+                // The name→`;` gap is inside the node span, so no enclosing emitter
+                // reaches it — without this scan every comment there is DROPPED
+                // (docs/comments.md hazard 4). `block_after_separator` is `false`
+                // because prettier attaches the comment to the *name* and appends the
+                // `;` after it, so a same-line block stays before the terminator
+                // (`declare module 'a' /* c */;`) — the `import =` / `export =` side
+                // of that axis, not the statement-`;` side a `const` takes.
+                //
+                // Where the shorthand ended by ASI the span stops at the name and the
+                // gap is empty; any comment past it belongs to the statement's own
+                // trailing emitter.
+                self.push_semicolon_with_gap_comments(
+                    &mut parts,
+                    decl.id.span().end,
+                    decl.span.end,
+                    false,
+                );
             }
         }
 

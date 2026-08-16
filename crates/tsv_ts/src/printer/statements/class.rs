@@ -514,7 +514,7 @@ impl<'a> Printer<'a> {
         // same-line block trails *after* it (`x = 1 /* c */;` → `x = 1; /* c */`,
         // prettier 3.9), a same-line line trails after it via `line_suffix`, an own-line
         // comment drops to its own line after it (emitting a line comment before the `;`
-        // would swallow it). See `split_separator_gap_comments`.
+        // would swallow it). See `push_semicolon_with_gap_comments`.
         let content_end = prop
             .value
             .as_ref()
@@ -745,7 +745,7 @@ impl<'a> Printer<'a> {
             // (`a(): number; /* c */`, prettier 3.9 #18837) — unlike interface and
             // type-literal members, which keep a same-line block *before* the `;`
             // (so this class path does not use the shared `append_signature_end_comments`).
-            // See `split_separator_gap_comments`.
+            // See `push_semicolon_with_gap_comments`.
             let content_end = method.value.return_type.as_ref().map_or_else(
                 || {
                     self.find_closing_paren(method.value.params_start, method.span.end)
@@ -753,8 +753,7 @@ impl<'a> Printer<'a> {
                 },
                 |rt| rt.span.end,
             );
-            let semicolon_pos = method.span.end.saturating_sub(1);
-            self.push_semicolon_with_gap_comments(&mut parts, content_end, semicolon_pos, true);
+            self.push_semicolon_with_gap_comments(&mut parts, content_end, method.span.end, true);
         } else {
             self.append_body_with_sig_comments(&mut parts, sig_end, &method.value.body);
         }

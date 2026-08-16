@@ -234,9 +234,8 @@ impl<'a> Printer<'a> {
             parts.push(self.identifier_name_doc(label));
             // Comments between label and `;`: a same-line block trails *after* the `;`
             // (`break loop; /* c */`, prettier 3.9), a same-line line via `line_suffix`,
-            // an own-line comment on its own line after. See `split_separator_gap_comments`.
-            let semicolon_pos = span.end.saturating_sub(1);
-            self.push_semicolon_with_gap_comments(&mut parts, label.span.end, semicolon_pos, true);
+            // an own-line comment on its own line after. See `push_semicolon_with_gap_comments`.
+            self.push_semicolon_with_gap_comments(&mut parts, label.span.end, span.end, true);
             d.concat(&parts)
         } else {
             // No label: a bare keyword closed by `;`. It swallows a following explicit
