@@ -175,14 +175,24 @@ impl<'a> Printer<'a> {
             let doc = self.build_binary_chain_doc_with_continuation_indent(binary);
             return self.prepend_owned_leading_comment(expr, doc);
         }
-        // ⚠️ A SEQUENCE root deliberately does NOT join the binary here, though it is the
+        // ⚠️ A SEQUENCE root does NOT join the binary here by default, though it is the
         // same shape of chain: prettier's svelte expression-root wrapper reaches the
         // continuation indent through the binaryish parent rule, which a sequence's
         // `group(join([",", line]))` never consults — so prettier breaks `{(a,⏎b)}` flush
-        // and tsv matches it. The `{#if …}` head then inherits the flush form as well,
-        // where tsv breaks and prettier overflows the line: the divergence there is
-        // WHETHER to break, and keeping prettier's geometry is what stops it becoming a
-        // divergence about shape too.
+        // and tsv matches it at every head prettier width-wraps. The one head it does not
+        // wrap at all — a block head — asks for the indent explicitly
+        // (`EmbedContext::root_sequence_indents`), since there tsv's wrap is its own and
+        // owes its own geometry rather than a shape inherited from a position prettier
+        // answered.
+        if self.embed.root_sequence_indents
+            && let Expression::SequenceExpression(seq) = expr
+        {
+            // `build_sequence_doc` is not `build_expression_doc`, so the owned leading
+            // comment seam is this caller's (docs/comments.md hazard 1) — exactly the
+            // obligation the binary arm above discharges with its own prepend.
+            let doc = self.build_sequence_doc(seq, SeqLayout::Indented);
+            return self.prepend_owned_leading_comment(expr, doc);
+        }
         self.build_expression_doc(expr)
     }
 

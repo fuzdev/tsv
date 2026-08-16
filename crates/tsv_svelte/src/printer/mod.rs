@@ -432,6 +432,13 @@ impl<'a> Printer<'a> {
     /// `jsdoc_cast_cannot_hang` is the recipe's second load-bearing field: a braced head's
     /// value hugs its prefix, so a leading cast's own-line hardline has no matching hang and
     /// must reflow (see [`Self::build_head_value_doc`]).
+    ///
+    /// ⚠️ `EmbedContext::root_sequence_indents` is deliberately **not** part of the recipe:
+    /// the two heads have different oracles for a root sequence's wrap. Prettier
+    /// width-wraps `{@html (a,⏎b)}` flush, so a prefixed tag must keep that shape; it never
+    /// width-wraps a block head at all, so the block head owns its geometry and sets the
+    /// field itself ([`Self::build_expression_doc_for_block`]). Everything the two heads do
+    /// share stays here.
     pub(in crate::printer) fn head_embed(&self, opening_offset: usize) -> EmbedContext {
         EmbedContext {
             first_line_offset: TAB_WIDTH + opening_offset,
