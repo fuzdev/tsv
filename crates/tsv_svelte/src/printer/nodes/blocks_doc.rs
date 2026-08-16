@@ -248,6 +248,35 @@ fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthand {
     }
 }
 
+/// Where the awaited expression's leading/trailing-comment scan stops — the `{#await}` twin of
+/// [`each_expr_comment_end`], and the same question: **how far into the head does this
+/// expression's comment range reach?**
+///
+/// When a `then`/`catch` shorthand carries its binding pattern in the head, the range stops at
+/// the pattern start (mirroring `{#each}`'s `context.span().start`) so a comment *inside* the
+/// pattern isn't relocated out to trail the expression (`{#await p /* c */ then …}`) — the
+/// comment-aware `build_pattern_doc` preserves it in place instead. The full form carries its
+/// patterns in `{:then}`/`{:catch}` outside the head, so it keeps the head end.
+///
+/// ⚠️ **The head end is a CEILING on that narrowing, not merely its fallback.** A pattern the
+/// head *folds in* need not be written there: the shorthand a `catch`-first authoring folds to
+/// is `then`, whose binding sits in a `{:then}` clause AFTER the catch body
+/// (`{#await p catch e}BODY{:then v}…`). A range reaching that pattern spans the body's own
+/// emitted text, so every comment in the body printed twice — once relocated into the head —
+/// which is the seam's standing hazard: a comment range must never span text another emitter
+/// prints. `each_expr_comment_end` needs no such clamp only because an `{#each}` context is
+/// always written in its own head; a third narrowing here owes the same argument.
+/// Pinned by `svelte/blocks/await/catch_shorthand_body_comment_prettier_divergence`.
+fn await_expr_comment_end(block: &internal::AwaitBlock<'_>) -> u32 {
+    let head_end = block.opening_tag_span.end - 1;
+    match await_shorthand(block) {
+        AwaitShorthand::Then => block.value.as_ref().map_or(head_end, |v| v.span().start),
+        AwaitShorthand::Catch => block.error.as_ref().map_or(head_end, |e| e.span().start),
+        AwaitShorthand::None => head_end,
+    }
+    .min(head_end)
+}
+
 impl<'a> Printer<'a> {
     /// Whether a wrapped block head may dangle its `}` here. The head expression is
     /// allowed to break (`allow_wrapping` or a multiline context) AND the context permits
@@ -1230,24 +1259,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Build expression doc with context-dependent behavior
         let allow_wrapping = !has_preceding_breakable;
-        // When a `then`/`catch` shorthand carries its binding pattern in the head, bound
-        // the awaited expression's trailing-comment range at the pattern start (mirroring
-        // `{#each}`'s `context.span().start`) so a comment *inside* the pattern isn't
-        // relocated out to trail the expression (`{#await p /* c */ then …}`); the
-        // comment-aware `build_pattern_doc` preserves it in place instead. The full form
-        // carries its patterns in `{:then}`/`{:catch}` outside the head, so it keeps the
-        // head end.
-        let head_end = block.opening_tag_span.end - 1;
-        let expr_comment_end = match await_shorthand(block) {
-            AwaitShorthand::Then => block.value.as_ref().map_or(head_end, |v| v.span().start),
-            AwaitShorthand::Catch => block.error.as_ref().map_or(head_end, |e| e.span().start),
-            AwaitShorthand::None => head_end,
-        };
         let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
             block.opening_tag_span,
             &block.expression,
-            expr_comment_end,
+            await_expr_comment_end(block),
             allow_wrapping || in_multiline_context,
         );
 
