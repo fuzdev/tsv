@@ -678,7 +678,11 @@ impl<'a> Printer<'a> {
     ///
     /// - **Multiline context** (`in_multiline_context=true`): The condition is on its own line.
     ///   No `remove_lines()` is applied, allowing long chains to wrap naturally.
-    ///   Uses `LayoutMode::Embedded` for continuation indent on a wrapped ROOT binary.
+    ///   Uses `LayoutMode::Embedded` for continuation indent on a wrapped ROOT binary, plus
+    ///   `EmbedContext::root_sequence_indents` for the same indent on a wrapped ROOT
+    ///   sequence — the block head's own field, which the shared recipe deliberately omits
+    ///   (see [`Printer::head_embed`]). Both reach the `{#each}` key built through here too;
+    ///   it is inside the head prettier declines to wrap, so the same argument covers it.
     ///
     /// # Parameters
     /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
@@ -709,7 +713,15 @@ impl<'a> Printer<'a> {
         // continuation for the mode to style. The leading-cast reflow applies on both
         // arms — an inline head is still a braced head with no hang to offer.
         let embed = if in_multiline_context {
-            self.head_embed(opening_offset)
+            // `root_sequence_indents` is the block head's own field, not the shared
+            // recipe's: it is the one braced head prettier never width-wraps, so a root
+            // sequence's wrapped operands take the continuation indent a root binary
+            // already takes here. A prefixed tag builds under the same recipe WITHOUT it
+            // — prettier wraps `{@html (a,⏎b)}` flush and is the oracle there.
+            tsv_lang::EmbedContext {
+                root_sequence_indents: true,
+                ..self.head_embed(opening_offset)
+            }
         } else {
             self.cannot_hang_embed()
         };

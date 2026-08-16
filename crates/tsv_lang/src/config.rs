@@ -49,8 +49,9 @@ pub enum LayoutMode {
 ///
 /// ⚠️ **The width fields are read at render, not at doc-build.** The three width fields are
 /// consumed by the renderer, so they act only on the context handed to `arena_print_doc_*`.
-/// The context handed to a `build_*_doc` call reaches nothing but [`LayoutMode`] and
-/// [`Self::jsdoc_cast_cannot_hang`] (the two build-time fields): that doc is rendered
+/// The context handed to a `build_*_doc` call reaches nothing but [`LayoutMode`],
+/// [`Self::jsdoc_cast_cannot_hang`] and [`Self::root_sequence_indents`] (the three
+/// build-time fields): that doc is rendered
 /// later, under whatever context its host passes — so a width set there is inert, and a
 /// layout choice that looks keyed to one is really keyed to `mode`. (Same reason a
 /// build-time `current_column()` is always 0: build-time width state is disconnected from
@@ -102,6 +103,20 @@ pub struct EmbedContext {
     /// block form — leave this `false` and keep the authoring. See
     /// `docs/conformance_prettier_svelte.md` §Svelte: Own-line JSDoc cast at a braced head.
     pub jsdoc_cast_cannot_hang: bool,
+    /// Whether a comma **sequence** at this expression's ROOT indents its wrapped operands
+    /// instead of breaking them flush — the sequence's counterpart to the ContinuationIndent
+    /// a root binary chain takes from [`LayoutMode::Embedded`]. The third build-time field
+    /// (with `mode` and `jsdoc_cast_cannot_hang`), read once at the TS expression root
+    /// (`build_root_expression_doc`); a nested sequence keeps its parent-keyed layout.
+    ///
+    /// Set by `tsv_svelte` for the **block head** alone (`{#if …}` / `{#each …}` and the
+    /// `{#each}` key), the one braced head prettier never width-wraps — so tsv's own
+    /// wrap owes its own geometry, and the operands line up under the head exactly as a
+    /// binary chain's do. Every braced head prettier DOES wrap — the `{expr}` tag, a
+    /// braced attribute value, `{@html}` — leaves this `false` and keeps prettier's flush
+    /// `group(join([",", line]))`. See `docs/conformance_prettier_svelte.md` §Svelte:
+    /// Blocks.
+    pub root_sequence_indents: bool,
 }
 
 impl Default for EmbedContext {
@@ -112,6 +127,7 @@ impl Default for EmbedContext {
             suffix_width: 0,
             mode: LayoutMode::Standalone,
             jsdoc_cast_cannot_hang: false,
+            root_sequence_indents: false,
         }
     }
 }

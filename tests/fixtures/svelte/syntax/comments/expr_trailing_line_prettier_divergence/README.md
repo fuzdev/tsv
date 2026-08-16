@@ -29,7 +29,12 @@ Affected contexts mirror the block-comment sibling, plus the buffer-printed tags
 
 A `this={}` line comment also expands its element (the `//` forces the attribute to break,
 so the attributes can no longer sit on the tag's own line) — prettier expands it the same
-way for the positions it does keep, e.g. [expr_special_this](../expr_special_this/).
+way for the positions it does keep, e.g. [expr_special_this](../expr_special_this/). The
+same holds one level in for an `{#each}` **key**: the comment forces the key open, the key
+is a head of its own, and a broken head expands the whole construct — so the body and
+`{/each}` drop to their own lines exactly as they do when the *collection* carries the
+comment. The two `{#each}` cases here are that one rule asked twice
+([each/key_long](../../../blocks/each/key_long_prettier_divergence/)).
 
 `{@const x = value // c}` drops the comment like the rest — and this is the one case
 where prettier's output is additionally **corrupt**: under prettier-plugin-svelte 3.5.2

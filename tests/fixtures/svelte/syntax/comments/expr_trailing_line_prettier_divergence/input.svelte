@@ -21,7 +21,9 @@ as item}
 	{item}
 {/each}
 {#each items as item (item.id // c
-)}{item}{/each}
+)}
+	{item}
+{/each}
 {#await promise // c
 then val}
 	{val}
