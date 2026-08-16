@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 144
+# shapes: 138
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	',⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	']⟨⟩/*	line
@@ -84,12 +84,6 @@ DROPPED	}⟨⟩)).	annotation,block,jsdoc_cast,line,multiline
 DROPPED	}⟨⟩));	annotation,block,jsdoc_cast
 DROPPED	}⟨⟩/*	line
 DROPPED	}⟨⟩␣	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩"	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩"\"	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩'	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩'\	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩'\'	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩'\\	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩(	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩((	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩(()	annotation,block,jsdoc_cast,line,multiline
