@@ -24,6 +24,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Non-null optional-chain bare strip — ◆design_choice — [optional_paren_non_null_bare](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_bare_prettier_divergence/)
 - Class field key unquoting — ◆design_choice — [field_key_unquote](../tests/fixtures/typescript/declarations/class/field_key_unquote_prettier_divergence/)
 - Member-chain wide-last-argument hug convergence — ◆prettier_bug — [last_arg_hug_convergence_long](../tests/fixtures/typescript/expressions/calls/chained/last_arg_hug_convergence_long_prettier_divergence/)
+- Bodyless `declare global` — ◆prettier_bug — [global_shorthand](../tests/fixtures/typescript/declarations/namespace/global_shorthand_prettier_divergence/)
 
 **Instantiation expression parens**: Prettier strips parentheses from ternary and binary expressions in `TSInstantiationExpression` (`(x ? y : z)<T>` → `x ? y : z<T>`), changing semantics. Without parens, `<T>` only applies to the last operand. tsv preserves parens to maintain the original meaning. Both formatters agree on preserving parens for assignment expressions (`(x = y)<T>`). A class-expression operand in `export default` position — `export default (class {}<T>)` — is the same bug but sharper: stripping the parens makes the leading `class {}` a class _declaration_, so Prettier's output re-parses to a `ClassDeclaration` plus a dangling `<T>;` statement (a different AST), while tsv keeps the parens (adjudicated by `export_default_needs_parens`; see [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/)).
 
@@ -56,6 +57,33 @@ tsv treats these like any other function call—no special-casing for module pat
 **ES2015+ identifier property keys**: A property key that is a valid identifier renders unquoted (`{ 𐊧: 1 }`, not `{ '𐊧': 1 }`). tsv's identifier test uses the Unicode `ID_Start`/`ID_Continue` sets the ECMAScript grammar names (ecma262 §12.7 — `IdentifierName :: IdentifierStart`, `IdentifierStart :: UnicodeIDStart`; a well-formed `IdentifierName` is a `LiteralPropertyName` per §13.2.5), so it unquotes every key valid in **ES2015+**. Prettier unquotes only keys valid under **ES5** (a frozen legacy table), so it keeps an astral letter like `𐊧` (U+102A7 CARIAN LETTER, a valid `ID_Start` absent from ES5's table) quoted. The rule is position-scoped and never over-unquotes: object-literal keys, type-literal members, and interface members unquote; a key that is not a valid identifier (`'0a'`) stays quoted. tsv matches Biome. Fixture: [property_key_es2015_ident](../tests/fixtures/typescript/expressions/objects/property_key_es2015_ident_prettier_divergence/).
 
 **Member-chain wide-last-argument hug convergence**: A member chain whose last call's single argument is **object-rooted** — a bare object literal, or an arrow whose grammar-parenthesized expression body is one — authored flat, too wide to fit on **any** chain line, while the chain's head fits. Prettier is **non-idempotent** here: pass 1's flat argument carries no forced break, so the chain's one-line measurement reads the whole flat content, overflows, and the chain expands, the argument breaking inside it; pass 2 re-reads that multiline object as authored-expanded (printObject's newline-after-`{` rule), truncates its fit measurement at the forced break, and collapses back to the flat chain with the argument hugging (`expr.fn1().map((item) => ({⏎…⏎}))`). Pass 3 holds that form, so prettier settles rather than cycling — the divergence is one of convergence **speed**, and tsv prints prettier's own settled pass-2 form in **one** pass, a single authoring-independent fixed point, in every position the chain can sit (initializer, call argument, property value, Svelte template expression). The window is exact and gated: when the argument **does** fit flat on the expanded chain's continuation line, the broken chain keeping it flat is the shared stable form and tsv prints that (the fixture pins the exact 100/101 boundary); when an **earlier** call in the chain takes a function argument, prettier's `lastGroupWillBreakAndOtherCallsHaveFunctionArguments` refusal makes the expanded chain its settled form, and tsv matches — that refusal is a chain-level force-expand in tsv too, covering the object, array and arrow-body kinds alike ([expand_last_arg_earlier_callback](../tests/fixtures/typescript/expressions/calls/chained/expand_last_arg_earlier_callback/), a non-divergence). Two neighbouring kinds are deliberately outside the window: a flat-authored **array** argument has no authored-multiline re-read rule, so prettier is stable at the broken chain and tsv matches; a **`new`/call wrapper** around an object reaches its settled form in two passes only via the inner object — a deeper discriminator tsv does not model, so tsv prints prettier's pass-1 output there and shares its two-pass convergence, agreeing with prettier at every pass ([last_arg_wrapped_object](../tests/fixtures/typescript/expressions/calls/chained/last_arg_wrapped_object/) pins the settled form both keep). Fixture: [last_arg_hug_convergence_long](../tests/fixtures/typescript/expressions/calls/chained/last_arg_hug_convergence_long_prettier_divergence/).
+
+**Bodyless `declare global`**: `declare global;` (or closed by ASI) is one bodyless
+`TSModuleDeclaration` in tsv — `global: true`, no `body`, acorn's shape and the shape tsv
+already emits for the production's string-literal arm (`declare module 'a';`). Prettier prints
+`declare;⏎global;`, two identifier expression statements, so its output **re-parses to a
+different AST**.
+
+Both oracles' module-declaration production admits the form: acorn's
+`tsParseAmbientExternalModuleDeclaration` and tsc's `parseAmbientExternalModuleDeclaration` each
+take `global` as the name and then `if (braceL) body else semicolon()`, the same branch the string
+arm takes. Only tsc's *statement-level routing* diverts — `isDeclaration`'s `GlobalKeyword` case
+requires `{`, an identifier or `export` after `global`, so a `;` sends the whole thing down the
+expression-statement path. Prettier is not an independent witness: its `typescript` parser is tsc's.
+
+Following that reading is not available to tsv, for the reason
+[§tsv rejects what prettier formats](#tsv-rejects-what-prettier-formats) gives one construct over:
+the split needs a semicolon between `declare` and `global`, two words on **one line** with no
+`LineTerminator` between them, and no ASI rule may insert one. There tsv *rejects*, because acorn
+rejects too and no reading is left; here acorn supplies one, so tsv takes it rather than refusing
+to format the file. Without `declare`, a bodyless `global` stays an ordinary expression statement
+in all three — the bare arm is a declaration head only when `{` follows it.
+
+Behind `export` the shorthand is rejected by all three (`export` is left with nothing to attach
+to), while the **bodied** `export global {}` / `export declare global {}` are a Svelte divergence
+in the other direction — tsc and prettier take them, acorn's `export declare` allowlist omits
+`global` alone. See [global_export](../tests/fixtures/typescript/declarations/namespace/global_export_svelte_divergence/)
+and [conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections).
 
 **Class field key unquoting**: tsv applies that same "unquote a valid-identifier key" rule at **every** non-computed key position — object properties, type-literal / interface members, and every class member: method, accessor, static, and **field**. Prettier unquotes class method/accessor keys but leaves class *field* keys quoted (`'foo'() {}` → `foo() {}`, yet `'x' = 1` stays quoted), so under prettier an object property `{ 'x': 1 }` → `{ x: 1 }` while the class field `'x' = 1` does not — an inconsistency tsv removes. Unquoting is always meaning-preserving here: a valid-identifier key names the same member either way, and a string-keyed `'constructor'() {}` *is* the class's real constructor, so unquoting it to `constructor() {}` changes nothing. Non-identifier (`'0a'`, `'x-y'`) and escape-bearing keys stay quoted, and numeric keys are untouched. Fixtures: [field_key_unquote](../tests/fixtures/typescript/declarations/class/field_key_unquote_prettier_divergence/) (the field divergence — tsv unquotes where prettier keeps quoted), [member_key_unquote](../tests/fixtures/typescript/declarations/class/member_key_unquote/) (methods / accessors / static / `constructor`, a non-divergence where tsv matches prettier).
 
@@ -237,13 +265,27 @@ welding is the one thing the whole `[no LineTerminator here]` family exists to
 prevent.
 
 The rule generalizes past `declare`'s own gap to the heads that carry one of their
-own, and there tsv, tsc, prettier and acorn all agree, so those are ordinary
-`input_invalid_*` pins rather than divergences: a `declare namespace`/`module` name
-must be on the keyword's line (tsc's
+own: a `declare namespace`/`module` name must be on the keyword's line (tsc's
 `nextTokenIsIdentifierOrStringLiteralOnSameLine`; `declare namespace⏎N {}` is TS1434),
-and `abstract` must reach its `class` on one line. What does **not** carry the
-restriction, and stays accepted everywhere: `declare const⏎enum E {}`,
-`declare global⏎{}`, and a comment — even a multi-line one — wherever a break is
+and `abstract` must reach its `class` on one line. tsv and acorn reject **every**
+spelling of those, and so does prettier wherever the leftover is not a statement
+(`declare namespace⏎N {}`, `declare module⏎M {}`, `declare module⏎'a' {}` — tsc throws
+`Unexpected keyword or identifier`), so those are ordinary `input_invalid_*` pins.
+
+⚠️ Where the leftover *is* ASI-terminable, prettier prints it and the gap joins this
+section rather than leaving it: `declare module⏎'a';` becomes `declare;` `module;`
+`('a');`, `declare namespace⏎N;` becomes `declare;` `namespace;` `N;`, and the same
+holds when a comment carries the break (`declare module // c⏎'a';`). That is the
+identical slip one construct out — the words `declare` and `module` are on **one line**,
+so the semicolon between them is one no ASI rule may insert — and acorn rejects with
+tsv, so these ride as `input_invalid_*` files in
+[declare/line_break](../tests/fixtures/typescript/typescript_specific/declare/line_break/)
+beside the same-line-word cases above. The `[no LineTerminator here]` gate reads a
+comment's own newlines, so a *multi-line* block comment in the gap is the break, not an
+exemption from it.
+
+What does **not** carry the restriction, and stays accepted everywhere: `declare
+const⏎enum E {}`, `declare global⏎{}`, and a single-line comment wherever a break is
 allowed.
 
 **Behind `export` the same gap is not a divergence at all** — prettier and tsv both

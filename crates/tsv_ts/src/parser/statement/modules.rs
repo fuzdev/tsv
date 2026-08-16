@@ -21,6 +21,42 @@ struct TypeSpecifierParts<'arena> {
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
+    /// An **exported** `global` augmentation must carry its body: `export global { }`
+    /// and `export declare global { }` are declarations, `export global;` and
+    /// `export declare global;` are not.
+    ///
+    /// On the `export` route tsv follows **tsc**, whose `isDeclaration` demands `{`, an
+    /// identifier or `export` after `global` — with no body the augmentation is not a
+    /// declaration, so `export` is left with nothing to attach to and prettier throws
+    /// where it formats the bodied form. acorn rejects *all four* spellings, because
+    /// `tokenIsTSDeclarationStart` (which gates its `shouldParseExportStatement`)
+    /// enumerates every sibling ambient head — `abstract`, `declare`, `enum`, `module`,
+    /// `namespace`, `interface`, `type` — and omits exactly this one, while its own
+    /// statement path parses `global { }` happily. A verdict reached for every sibling
+    /// and not for this one is an oracle slip rather than a judgement, so tsv keeps the
+    /// two bodied spellings (`docs/conformance_svelte.md` §TypeScript Corrections).
+    ///
+    /// The restriction belongs to the `global` **name**, not to bodylessness: the
+    /// shorthand's string arm stays exportable (`export declare module 'c';`, accepted
+    /// by all three oracles). Asked at both export arms so the `declare` and bare
+    /// spellings cannot drift apart — which they had, tsv accepting `export declare
+    /// global { }` while rejecting `export global { }`, a split neither oracle makes.
+    fn require_exported_global_body(
+        &self,
+        declaration: &Statement<'arena>,
+    ) -> Result<(), ParseError> {
+        if let Statement::TSModuleDeclaration(module) = declaration
+            && module.global
+            && module.body.is_none()
+        {
+            return Err(self.error_msg_at(
+                "an exported 'global' augmentation must have a body",
+                module.span.start as usize,
+            ));
+        }
+        Ok(())
+    }
+
     /// Wrap a declaration statement in an `ExportNamedDeclaration` with no
     /// specifiers or source (`export <declaration>`).
     fn export_named(
@@ -264,6 +300,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // export declare function/class — ambient declarations are type-level
                     "declare" => {
                         let decl = self.parse_declare_statement()?;
+                        self.require_exported_global_body(&decl)?;
                         Ok(self.export_named(start, decl, ExportKind::Type))
                     }
                     // export abstract class Foo {}
@@ -275,6 +312,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     "namespace" | "module" => {
                         self.require_same_line_declaration_name(value)?;
                         let decl = self.parse_module_declaration()?;
+                        Ok(self.export_named(start, decl, ExportKind::Value))
+                    }
+                    // export global { } — the augmentation's bare spelling, which takes
+                    // the same `export` route its `declare` twin does. See
+                    // `require_exported_global_body` for why both are here.
+                    "global" => {
+                        // The inner declaration's span starts at `global`, not at
+                        // `export` — the shape every sibling arm produces, since
+                        // `export_named` is what carries the `export` keyword.
+                        let (global_start, _) = self.current_pos();
+                        let decl = self.parse_global_declaration(global_start, false)?;
+                        self.require_exported_global_body(&decl)?;
                         Ok(self.export_named(start, decl, ExportKind::Value))
                     }
                     _ => {

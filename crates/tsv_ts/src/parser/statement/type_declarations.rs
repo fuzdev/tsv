@@ -817,8 +817,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    /// Parse declare global: `declare global { ... }`
-    /// Parse a global augmentation: `global { … }`.
+    /// Parse a global augmentation: `declare global { … }` / `global { … }`, or the
+    /// bodyless `declare global;`.
     ///
     /// `declare` is `true` for `declare global { }` and `false` for a bare
     /// `global { }` (top-level, or implicitly-ambient inside a `declare module`,
@@ -827,6 +827,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// form). The body is parsed in ambient context when `declare` is set; a bare
     /// `global` nested in an already-ambient module keeps that context via
     /// `parse_module_block`'s save/restore.
+    ///
+    /// `global` is the identifier-named arm of the same ambient-module production the
+    /// string-literal arm takes above, **including its bodyless form** — acorn's
+    /// `tsParseAmbientExternalModuleDeclaration` reaches `if (braceL) body else
+    /// semicolon()` for both names, and tsc's `parseAmbientExternalModuleDeclaration`
+    /// is written identically. So a `declare global` closed by ASI is one bodyless
+    /// `TSModuleDeclaration`, not two identifier expression statements — prettier's
+    /// reading, which its `typescript` parser reaches only by *routing* around the
+    /// production (tsc's `isDeclaration` requires `{`, an identifier or `export` after
+    /// `global`) and which would need a semicolon inserted between `declare` and
+    /// `global`, two words with no `LineTerminator` between them, where no ASI rule
+    /// admits one. See `docs/conformance_prettier_ts.md` §TypeScript.
+    ///
+    /// **The bodyless arm is reachable only under `declare`**, matching both oracles:
+    /// a bare `global` is a declaration head only when `{` follows it (acorn's
+    /// `tsParseExpressionStatement`, mirrored by this parser's `peek_kind` gate in
+    /// `parse_statement`), so `global;` stays an ordinary expression statement — at the
+    /// top level and inside an ambient module alike. That is the caller's gate, not
+    /// this function's, and the two must stay in step.
     pub(super) fn parse_global_declaration(
         &mut self,
         start: usize,
@@ -843,13 +862,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Span::new(global_start as u32, global_end as u32),
         ));
 
-        // Parse body
-        let block = self.parse_module_block(declare)?;
-        let end = module_body_end(&block);
+        // Parse body, or the shorthand (bodyless) form — the same split the
+        // string-literal arm takes, terminated by ASI rather than a literal `;`.
+        let (body, end) = if matches!(self.current_kind(), TokenKind::BraceOpen) {
+            let block = self.parse_module_block(declare)?;
+            let end = module_body_end(&block);
+            (Some(block), end)
+        } else {
+            (None, self.semicolon_end()?)
+        };
 
         Ok(Statement::TSModuleDeclaration(TSModuleDeclaration {
             id,
-            body: Some(block),
+            body,
             declare,
             kind: TSModuleDeclarationKind::Module, // TypeScript uses module kind for global
             global: true,
