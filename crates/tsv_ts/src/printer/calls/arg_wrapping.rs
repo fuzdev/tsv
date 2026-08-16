@@ -770,6 +770,36 @@ pub(crate) fn arrow_body_tail_has_comments(
     printer.has_comments_on_page_between(body_expr.span().end, arrow.span.end)
 }
 
+/// Does a comment make an expression-body arrow unusable by a **reassembling hug arm** —
+/// one that prints a signature doc and a body doc rather than the arrow itself?
+///
+/// The two causes are independent and both fatal, so every such arm asks for both and the
+/// pair is stated here once rather than spelled out at each:
+///
+/// - [`arrow_signature_has_breaking_comments`] — the hug renders the callee and the
+///   signature's head on **one line**, which a break forced inside the signature makes
+///   impossible;
+/// - [`arrow_body_tail_has_comments`] — the reassembly skips the body-end→arrow-end gap, so
+///   a comment there reaches no emitter and is DROPPED.
+///
+/// Different reasons, one consequence: the arm declines and the general path prints the
+/// argument whole. They had drifted into six hand-spelled conjunctions across the three
+/// argument printers, half of them wrapped in a call-level `has_comments &&` fast gate and
+/// half bare — a shape where a new arm forgets one half and nothing says so. One arm still
+/// asks only the tail question; see the TODO at the chain's forced-expansion ARRAY body.
+///
+/// Ask it **after** the body kind, so an arrow heading for another arm pays no comment
+/// lookup; a caller holding a call-level "any comment on page" flag may gate it on that too,
+/// which is free — either question implies a comment inside the call's own window.
+pub(crate) fn arrow_hug_refused_by_comments(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body_expr: &internal::Expression<'_>,
+) -> bool {
+    arrow_signature_has_breaking_comments(printer, arrow)
+        || arrow_body_tail_has_comments(printer, arrow, body_expr)
+}
+
 /// Assemble the single `expandLastArg` state
 /// [`last_arg_has_own_line_post_arrow_comment`] selects: the head arguments stay inline, the
 /// last one breaks, and the softline drops `)` to its own line

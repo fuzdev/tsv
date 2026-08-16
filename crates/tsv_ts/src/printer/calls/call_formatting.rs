@@ -17,12 +17,13 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, arrow_body_tail_has_comments,
-    build_args_split_last, build_arrow_call_body_states, build_arrow_sig_doc,
-    build_break_body_state, build_call_args_expanded, build_call_args_with_blank_lines,
-    build_empty_args_doc, build_expand_all_args, build_expand_first_arg_doc, build_inline_args,
-    build_inline_hug_or_expand_all, build_inline_or_expand_all, build_own_line_post_arrow_state,
-    build_printed_argument_doc, could_expand_arrow_chain, first_arg_signature_refuses_expand_first,
+    ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap,
+    arrow_hug_refused_by_comments, build_args_split_last, build_arrow_call_body_states,
+    build_arrow_sig_doc, build_break_body_state, build_call_args_expanded,
+    build_call_args_with_blank_lines, build_empty_args_doc, build_expand_all_args,
+    build_expand_first_arg_doc, build_inline_args, build_inline_hug_or_expand_all,
+    build_inline_or_expand_all, build_own_line_post_arrow_state, build_printed_argument_doc,
+    could_expand_arrow_chain, first_arg_signature_refuses_expand_first,
     last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
@@ -812,15 +813,13 @@ fn try_single_arg_hug(
                 // Prettier's couldExpandArg keys on the body type and looks
                 // through the return-type annotation, so typed-return arrows
                 // (`(x): T => …`) are eligible too.
-                // Same signature-break refusal as the two arms above — a hug this
-                // conditional-group cannot honor (`arrow_signature_has_breaking_comments`).
-                // …and the same body-tail refusal: every state below reassembles the
-                // argument from a signature and a body doc, synthesizing its own parens
-                // around the ternary, so a comment on the body's tail reaches no emitter
-                // (`arrow_body_tail_has_comments`).
+                // The reassembling arm's refusal pair (`arrow_hug_refused_by_comments`): a
+                // break forced inside the signature this conditional-group cannot honor, and
+                // a comment on the body's tail — every state below reassembles the argument
+                // from a signature and a body doc, synthesizing its own parens around the
+                // ternary, so such a comment reaches no emitter.
                 if is_ternary_arrow_body(body_expr)
-                    && !arrow_signature_has_breaking_comments(printer, arrow)
-                    && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+                    && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
                 {
                     return Some(build_ternary_arrow_hug_states(
                         printer, callee, arrow, body_expr,
@@ -843,13 +842,11 @@ fn try_single_arg_hug(
             // the body type and ignores the return-type annotation, so typed-return
             // arrows (`(x): T => call()`) hug too.
             if arrow_body_is_call_through_non_null(body_expr)
-                // A break forced inside the signature invalidates this hug exactly as it
-                // does the object/array one above — see
-                // `arrow_signature_has_breaking_comments`.
-                && !arrow_signature_has_breaking_comments(printer, arrow)
-                // …and so does a comment on the body's own tail, which the states this
-                // builds reassemble past (`arrow_body_tail_has_comments`).
-                && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+                // The reassembling arm's refusal pair — a break forced inside the signature
+                // invalidates this hug exactly as it does the object/array one above, and so
+                // does a comment on the body's own tail, which the states this builds
+                // reassemble past (`arrow_hug_refused_by_comments`).
+                && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
             {
                 // Build the body ONCE and compose both hug/wrap states from it; building
                 // the whole arrow separately for the flat state re-built this same body
@@ -1144,12 +1141,9 @@ fn try_expand_last_function_arg(
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && (arrow_body_is_call_through_non_null(body_expr)
                 || matches!(&**body_expr, internal::Expression::ConditionalExpression(_)))
-            // A break forced inside the signature invalidates the hug at every one of these
-            // states, single- or multi-argument — see `arrow_signature_has_breaking_comments`.
-            && !arrow_signature_has_breaking_comments(printer, arrow)
-            // …and so does a comment on the body's own tail — the break-body state
-            // reassembles past it (`arrow_body_tail_has_comments`).
-            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+            // The reassembling arm's refusal pair, which holds at every one of these states,
+            // single- or multi-argument alike (`arrow_hug_refused_by_comments`).
+            && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
             // Reuse the pre-built call body (see above); conditional bodies build fresh.
@@ -1188,10 +1182,10 @@ fn try_expand_last_function_arg(
                 internal::Expression::ObjectExpression(_)
                     | internal::Expression::ArrayExpression(_)
             )
-            && !arrow_signature_has_breaking_comments(printer, arrow)
-            // …and the body-tail gap, here the grammar-required parens the hug state
-            // synthesizes around an object body (`arrow_body_tail_has_comments`).
-            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+            // The same refusal pair, whose body-tail half is here the grammar-required parens
+            // the hug state synthesizes around an object body
+            // (`arrow_hug_refused_by_comments`).
+            && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
             // Reuse the pre-built object/array body (see above).

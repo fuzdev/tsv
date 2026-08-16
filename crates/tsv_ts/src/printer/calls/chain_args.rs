@@ -15,11 +15,12 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    ArgItem, ChainArgKind, arrow_body_tail_has_comments, build_args_split_last,
-    build_arrow_sig_doc, build_break_body_state, build_chain_expand_all_args,
-    build_own_line_post_arrow_state, build_printed_argument_doc, classify_chain_arg,
-    first_arg_signature_refuses_expand_first, last_arg_has_own_line_post_arrow_comment,
-    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    ArgItem, ChainArgKind, arrow_body_tail_has_comments, arrow_hug_refused_by_comments,
+    build_args_split_last, build_arrow_sig_doc, build_break_body_state,
+    build_chain_expand_all_args, build_own_line_post_arrow_state, build_printed_argument_doc,
+    classify_chain_arg, first_arg_signature_refuses_expand_first,
+    last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
+    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
@@ -501,6 +502,14 @@ fn build_chain_args_force_expand(
     {
         // ARRAY body: `(sig => [\n  items,\n])` — array content on new lines, bracket
         // hugged.
+        //
+        // TODO: this is the one reassembling arm that asks half the refusal pair — the
+        // body-tail question alone, where its OBJECT twin below asks
+        // `arrow_hug_refused_by_comments` (and `!standard_expansion`). Instrumenting the arm's
+        // entry shows it reached 6 times over `tests/fixtures` and never over ~1.8k real
+        // files, with the signature question false at every hit, so no input is known that
+        // separates the two spellings — hence no fixture, hence no change. Close it the moment
+        // one turns up.
         if matches!(body_expr, Expression::ArrayExpression(_))
             && !arrow_body_tail_has_comments(printer, arrow, body_expr)
         {
@@ -515,8 +524,7 @@ fn build_chain_args_force_expand(
         // signature invalidates the hug (`arrow_signature_has_breaking_comments`).
         if matches!(body_expr, Expression::ObjectExpression(_))
             && !standard_expansion
-            && !arrow_signature_has_breaking_comments(printer, arrow)
-            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+            && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
         {
             let body_doc = d.parens(printer.build_arg_expression_doc_expanded(body_expr));
             return build_hugged_arrow_arg_doc(printer, parts, ctx, arrow, body_expr, body_doc);
@@ -534,8 +542,7 @@ fn build_chain_args_force_expand(
         // reasons as the object arm above.
         if !standard_expansion
             && (arrow_body_is_call_through_non_null(body_expr) || is_ternary_arrow_body(body_expr))
-            && !arrow_signature_has_breaking_comments(printer, arrow)
-            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+            && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
         {
             let body_doc = printer.build_expression_doc(body_expr);
             let body_doc =
@@ -764,14 +771,12 @@ fn build_chain_args_single(
         // `has_any_comment_text`: refusing the hug is a LAYOUT decision, so it must see a
         // comment the argument owns and prints itself (see `build_chain_args_multi`).
         && !last_arg_commented
-        // …and a break forced INSIDE the signature refuses it too, the shared rule the
-        // object/array arm below and the general gate already ask.
-        && !(has_any_comment_text && arrow_signature_has_breaking_comments(printer, arrow))
-        // …and so does a comment on the body's own tail, which the break states below
-        // reassemble past (`arrow_body_tail_has_comments`). The flat state prints the whole
-        // arrow and would keep it, but a state set that is only conditionally lossless is
-        // one width away from dropping the comment.
-        && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+        // …and the reassembling arm's refusal pair, the shared rule the object/array arm
+        // below and the general gate already ask (`arrow_hug_refused_by_comments`). Its
+        // body-tail half bites even though the flat state prints the whole arrow and would
+        // keep the comment: a state set that is only conditionally lossless is one width away
+        // from dropping it.
+        && !(has_any_comment_text && arrow_hug_refused_by_comments(printer, arrow, body_expr))
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -831,10 +836,10 @@ fn build_chain_args_single(
         && is_ternary_arrow_body(body_expr)
         // `has_any_comment_text`: see above — a layout gate counts an owned comment.
         && !last_arg_commented
-        && !(has_any_comment_text && arrow_signature_has_breaking_comments(printer, arrow))
-        // …and the body-tail gap refuses it, as above — here at every state, since the flat
-        // one synthesizes its own `(`/`)` around the body rather than printing the arrow.
-        && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+        // …and the same refusal pair as above — here its body-tail half bites at every state,
+        // since the flat one synthesizes its own `(`/`)` around the body rather than printing
+        // the arrow (`arrow_hug_refused_by_comments`).
+        && !(has_any_comment_text && arrow_hug_refused_by_comments(printer, arrow, body_expr))
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -1228,12 +1233,9 @@ fn build_chain_args_multi(
             &**body_expr,
             Expression::CallExpression(_) | Expression::ConditionalExpression(_)
         )
-        // A break forced inside the signature invalidates the hug here exactly as it does
-        // in the single-argument arms above — see `arrow_signature_has_breaking_comments`.
-        && !arrow_signature_has_breaking_comments(printer, arrow)
-        // …as does a comment on the body's own tail, which the break-body state below
-        // reassembles past (`arrow_body_tail_has_comments`).
-        && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+        // The reassembling arm's refusal pair, which bites here exactly as it does in the
+        // single-argument arms above (`arrow_hug_refused_by_comments`).
+        && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
     {
         // Expand-last arrow with a call body: build the body ONCE and inject it so the
         // whole-arrow arg doc reuses it (the break-body state below reuses it too) —
@@ -1304,10 +1306,9 @@ fn build_chain_args_multi(
             &**body_expr,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         )
-        && !arrow_signature_has_breaking_comments(printer, arrow)
-        // …and the body-tail gap, here the grammar-required parens the hug state
-        // synthesizes around an object body (`arrow_body_tail_has_comments`).
-        && !arrow_body_tail_has_comments(printer, arrow, body_expr)
+        // The same refusal pair, whose body-tail half is here the grammar-required parens the
+        // hug state synthesizes around an object body (`arrow_hug_refused_by_comments`).
+        && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
     {
         // Expand-last arrow with an object/array body: build the body ONCE and inject it so
         // the whole-arrow arg doc reuses it (the hug state below reuses it too) — building it

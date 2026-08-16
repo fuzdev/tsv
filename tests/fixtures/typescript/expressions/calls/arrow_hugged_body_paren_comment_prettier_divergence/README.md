@@ -31,16 +31,23 @@ the comment inside them, bound to the object; prettier moves it outside
 
 A **line** comment diverges for both body kinds: it forces the retained parens open,
 and the argument breaks out with them — the layout the identifier-body sibling
-already gives (`f(⏎ (x) => (⏎ x // c⏎ )⏎);`). Prettier drops the parens and hugs the
-signature instead. Prettier is non-idempotent there — its second pass floats the `//`
-past the body and re-parenthesizes the ternary, detaching the comment from the body
-entirely (`f(⏎ (x) => (x ? a : b) // c⏎);`) — so `audit_signature.txt` pins the whole
-chain.
+already gives (`f(⏎ (x) => (⏎ x // c⏎ )⏎);`) — in every printer alike, `new` included.
+Prettier's **first** pass drops the parens and hugs the signature
+(`f(1, (x) =>⏎ g() // c⏎);`), but it is non-idempotent there: its second pass breaks
+the argument out as well, floating the `//` past the body and re-parenthesizing a
+ternary, which detaches the comment from the body entirely
+(`f(⏎ (x) => (x ? a : b) // c⏎);`). So the *layout* converges at prettier's fixed
+point, and what remains of the divergence is the retained parens and with them the
+comment's position; `audit_signature.txt` pins the whole chain.
 
-The `new` printer's multi-argument path is the one exception to that break-out: it has
-no broken-out state to fall to, so the retained parens open in place and the signature
-stays hugged to `new F(1, ` (`new F(1, (x) => (⏎ g() // c⏎));`). Both layouts keep the
-comment inside the parens the author wrote; only where the argument lands differs.
+The break-out is one rule, not a per-printer accident: prettier's `couldExpandArg` is
+false for an expression body that is not object/array, so the argument is not
+hug-eligible and the general path prints it whole. `new`'s multi-argument arm reaches
+that fall-through the same way the plain call does — the convergence its non-comment
+face pins is [new_expand_last_nonexpandable_body](../new_expand_last_nonexpandable_body/),
+where a break with no comment in it (a multiline template, a source-multiline object
+under a binary operator) expands the argument list in both printers and both
+formatters.
 
 Reason: comment preservation. See
 [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)

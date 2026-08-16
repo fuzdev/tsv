@@ -19,7 +19,7 @@ use crate::printer::calls::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body,
 };
 use crate::printer::calls::{
-    ArgItem, ArgsJoin, PartitionedComments, arrow_body_tail_has_comments,
+    ArgItem, ArgsJoin, PartitionedComments, arrow_hug_refused_by_comments,
     build_args_joined_with_comments, build_args_split_last, build_arrow_call_body_states,
     build_arrow_sig_doc, build_break_body_state, build_call_args_expanded, build_expand_all_args,
     build_inline_args, build_inline_hug_or_expand_all, build_inline_or_expand_all,
@@ -298,16 +298,12 @@ impl<'a> Printer<'a> {
                         // Break: `new Xy((x) =>\n  x ? y : z,\n)`
                         // couldExpandArg keys on the body type, looking through the
                         // return-type annotation, so typed-return arrows are eligible.
-                        // A break forced inside the signature invalidates the hug —
-                        // the shared refusal, see `arrow_signature_has_breaking_comments`.
-                        let signature_forces_break =
-                            new_has_comments && arrow_signature_has_breaking_comments(self, arrow);
-                        // …and a comment on the body's own tail refuses it too: these
-                        // states reassemble the argument from a signature and a body doc
-                        // (`arrow_body_tail_has_comments`).
+                        // The reassembling arm's refusal pair — a break forced inside the
+                        // signature, or a comment on the body's own tail, either of which
+                        // these states cannot honor (`arrow_hug_refused_by_comments`).
                         if is_ternary_arrow_body(body_expr)
-                            && !signature_forces_break
-                            && !arrow_body_tail_has_comments(self, arrow, body_expr)
+                            && !(new_has_comments
+                                && arrow_hug_refused_by_comments(self, arrow, body_expr))
                         {
                             let sig_doc = build_arrow_sig_doc(self, arrow);
                             let body_doc = self.build_expression_doc(body_expr);
@@ -365,9 +361,9 @@ impl<'a> Printer<'a> {
                         // couldExpandArg keys on the body type, looking through the
                         // return-type annotation and a trailing non-null `!`.
                         if arrow_body_is_call_through_non_null(body_expr)
-                            && !signature_forces_break
-                            // Same body-tail refusal as the ternary arm above.
-                            && !arrow_body_tail_has_comments(self, arrow, body_expr)
+                            // Same refusal pair as the ternary arm above.
+                            && !(new_has_comments
+                                && arrow_hug_refused_by_comments(self, arrow, body_expr))
                         {
                             // Build the body ONCE (see `build_arrow_call_body_states`) — a
                             // separate whole-arrow doc re-built this body and recursed → O(2^depth).
@@ -619,9 +615,61 @@ impl<'a> Printer<'a> {
             let last_is_expandable_collection = last_arg.is_some_and(|arg| {
                 is_array_or_object_unwrapped(arg) && !is_concise_numeric_array(arg)
             });
+            // Prettier's `couldExpandArg` for the last argument — the classification the
+            // plain-call twin closes with (`try_expand_last_function_arg`'s
+            // `is_non_expandable_expr_arrow`) and this printer never had. Spelled as
+            // **reachability over this printer's own arms** rather than as a second body-kind
+            // list, so the two cannot drift: an arrow argument is hug-eligible when
+            // `could_expand_arrow_chain` claims it (a block body, an object/array body, or an
+            // arrow chain ending in one — all of which the `build_inline_or_expand_all` tail
+            // hugs whole), or when the break-body arm claims it (a call through a trailing `!`,
+            // or a ternary) and that arm's own refusal stays silent — the SAME
+            // `arrow_hug_refused_by_comments` the arm guards itself with, so the gate and the
+            // arm cannot drift apart. Anything else — a template, a binary, a member, a `new`
+            // body — no state below can hug, and the general path prints it whole.
+            //
+            // ⚠️ The gap was invisible without a FORCED break, because the general path and the
+            // ladder below agree whenever `fits()` can see the whole argument. A break inside
+            // such a body — a multiline template, a source-multiline object under a binary
+            // operator, the body-tail comment the break-body arm declines for — truncates that
+            // walk (tsv has no `propagateBreaks`, so a `conditional_group` measures a state flat
+            // to its first hardline), so `state_inline` reported itself as fitting and `new`
+            // hugged where every sibling printer expands. Prettier expands all three shapes at
+            // its fixed point, `new` included.
+            //
+            // Asked HERE rather than where the twin asks it — after the argument docs are built —
+            // because reaching it and then declining would build every argument TWICE, once here
+            // and once on the general path, which recurses into any call nested in the body:
+            // `new A(lead, p => new B(lead, q => …))` went 2^depth doc nodes (`fanout:audit`'s
+            // `ts_nested_arrow_multiarg_new`). Every predicate it asks is a pure AST/comment
+            // question, so none of them needs a doc.
+            let last_arg_hug_eligible = match last_arg {
+                Some(internal::Expression::ArrowFunctionExpression(arrow)) => {
+                    could_expand_arrow_chain(arrow)
+                        || match &arrow.body {
+                            internal::ArrowFunctionBody::Expression(body_expr) => {
+                                (arrow_body_is_call_through_non_null(body_expr)
+                                    || is_ternary_arrow_body(body_expr))
+                                    && !(new_has_comments
+                                        && arrow_hug_refused_by_comments(self, arrow, body_expr))
+                            }
+                            internal::ArrowFunctionBody::BlockStatement(_) => false,
+                        }
+                }
+                _ => true,
+            };
+            // …with one exception, which is why the twin can ask this late: an own-line comment
+            // after `=>` selects its own state ([`last_arg_has_own_line_post_arrow_comment`])
+            // ahead of any body-kind question, for a non-eligible body too. That state needs
+            // the argument docs, so it must keep the block — and it returns from inside it, so no
+            // second build follows.
+            let last_arg_takes_own_line_post_arrow_state = new_has_comments
+                && last_arg
+                    .is_some_and(|last| last_arg_has_own_line_post_arrow_comment(self, last));
 
             if new_expr.arguments.len() >= 2
                 && (last_is_function || last_is_expandable_collection)
+                && (last_arg_hug_eligible || last_arg_takes_own_line_post_arrow_state)
                 // The same question both twins ask (`any_comment_forces_expansion`), over a
                 // slice: a comment that needs a line of its own defeats the hug, an inline
                 // block glued between an argument and its comma does not. Asking "is there
@@ -689,11 +737,11 @@ impl<'a> Printer<'a> {
                                 &**body_expr,
                                 internal::Expression::ConditionalExpression(_)
                             ))
-                        // The multi-argument twin of the single-argument refusal above —
-                        // see `arrow_signature_has_breaking_comments`.
-                        && !(new_has_comments && arrow_signature_has_breaking_comments(self, arrow))
-                        // …and its body-tail twin, for the same reassembly reason.
-                        && !arrow_body_tail_has_comments(self, arrow, body_expr)
+                        // The multi-argument twin of the single-argument refusal above, and the
+                        // same question `last_arg_hug_eligible` already answered to let this
+                        // block be entered at all (`arrow_hug_refused_by_comments`).
+                        && !(new_has_comments
+                            && arrow_hug_refused_by_comments(self, arrow, body_expr))
                     {
                         let sig_doc = build_arrow_sig_doc(self, arrow);
                         // Reuse the pre-built call body (see above); conditional bodies build fresh.
