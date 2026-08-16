@@ -257,17 +257,19 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc(type_params));
         }
 
-        // Comments between type_params `>` and `(` go after type_params
-        if let (Some(tp_end), Some(paren_pos)) = (type_params_end, paren_pos) {
-            self.append_type_params_to_paren_comments(&mut parts, tp_end, paren_pos);
-        }
-
-        parts.push(self.build_signature_params_return_group(
+        let sig_doc = self.build_signature_params_return_group(
             method.params,
             method.type_parameters.as_ref(),
             method.return_type.as_ref(),
             paren_pos,
-        ));
+        );
+        // Comments between type_params `>` and `(` go after type_params
+        self.append_signature_head_gap_comments(
+            &mut parts,
+            type_params_end.zip(paren_pos),
+            d.empty(),
+            sig_doc,
+        );
         // Comments between return type (or params) and `;`
         self.append_signature_end_comments(
             &mut parts,
@@ -338,20 +340,34 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = smallvec![];
 
-        // `new ` prefix + its comment handling (construct signatures only).
-        if let Some(new_end) = new_keyword_end {
-            parts.push(d.text("new "));
-            // Comments between `new` and `<T>`: `new /* c */ <T>(...)`
-            if let Some(type_params) = type_parameters
-                && let Some(doc) = self.build_name_to_type_params_comments_opt(
+        // `new` prefix + its comment handling (construct signatures only).
+        //
+        // With type parameters the `new`→`<T>` gap is its own seam and the `>`→`(` gap
+        // below is the head gap. WITHOUT them the `new`→`(` gap IS the head gap, so it
+        // routes through the same shared emitter — its own separator deferred to that
+        // call, which is why the keyword is pushed bare here. It used to emit its run
+        // inline with a flush continuation, disagreeing with the constructor TYPE's
+        // identical `new`→`(` gap (`type C = new // c⏎\t(p: A) => A`) on the one axis
+        // §Uniform Forced-Continuation Indent makes uniform.
+        let new_paren_gap = match (new_keyword_end, type_parameters) {
+            (Some(new_end), None) => {
+                parts.push(d.text("new"));
+                Some(new_end)
+            }
+            (Some(new_end), Some(type_params)) => {
+                parts.push(d.text("new "));
+                // Comments between `new` and `<T>`: `new /* c */ <T>(...)`
+                if let Some(doc) = self.build_name_to_type_params_comments_opt(
                     new_end,
                     type_params.span.start,
                     CommentSpacing::Trailing,
-                )
-            {
-                parts.push(doc);
+                ) {
+                    parts.push(doc);
+                }
+                None
             }
-        }
+            (None, _) => None,
+        };
 
         // Print type parameters if present: `<T>` or `<T, U>`
         if let Some(type_params) = type_parameters {
@@ -368,29 +384,27 @@ impl<'a> Printer<'a> {
         )
         .map(|p| p as u32);
 
-        // Comments between type_params and `(` go after type_params
-        if let (Some(tp), Some(pp)) = (type_parameters.map(|t| t.span.end), paren_pos) {
-            self.append_type_params_to_paren_comments(&mut parts, tp, pp);
-        }
-
-        // Construct signature without type params: comments between `new` and `(`
-        // stay in place.
-        if let Some(new_end) = new_keyword_end
-            && type_parameters.is_none()
-            && let Some(pp) = paren_pos
-        {
-            for comment in comments_to_emit_in_range(self.comments, new_end, pp) {
-                parts.push(self.build_comment_doc(comment));
-                self.push_comment_kind_separator(&mut parts, comment);
-            }
-        }
-
-        parts.push(self.build_signature_params_return_group(
+        let sig_doc = self.build_signature_params_return_group(
             params,
             type_parameters,
             return_type,
             paren_pos,
-        ));
+        );
+        // The signature HEAD gap — `>`→`(` with type parameters, `new`→`(` without. The two
+        // differ only in what separates the head from the tail when nothing breaks: `<T>(` is
+        // glued, `new (` is not. A CALL signature has neither head, and takes no separator —
+        // its `(` opens the member.
+        let (head, flat_separator) = match (type_parameters.map(|t| t.span.end), new_paren_gap) {
+            (Some(type_params_end), _) => (Some(type_params_end), d.empty()),
+            (None, Some(new_end)) => (Some(new_end), d.text(" ")),
+            (None, None) => (None, d.empty()),
+        };
+        self.append_signature_head_gap_comments(
+            &mut parts,
+            head.zip(paren_pos),
+            flat_separator,
+            sig_doc,
+        );
         // Comments between return type (or params) and `;`
         self.append_signature_end_comments(&mut parts, return_type, paren_pos, span.end, deferred);
         d.group(d.concat(&parts))

@@ -1408,19 +1408,92 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Append comments between type params `>` and `(` to parts.
+    /// The `>`→`(` gap of a signature carrying `type_parameters`: the type-parameter list's
+    /// end paired with the opening paren that follows it, ready for
+    /// [`Self::append_signature_head_gap_comments`].
     ///
-    /// Block comments are emitted inline with a leading space. Line comments
-    /// use `line_suffix` so they're deferred to end of the rendered line
-    /// (avoids corruption where `// c` would swallow `(x: T)`).
-    pub(crate) fn append_type_params_to_paren_comments(
+    /// `None` when there are no type parameters, or when no `(` follows them — the scan skips
+    /// comments, so a `(` written *inside* one (`<T> /* c(d) */ (p: T)`) is not mistaken for
+    /// the parameter list's.
+    pub(crate) fn type_params_paren_gap(
+        &self,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+    ) -> Option<(u32, u32)> {
+        let tp = type_parameters?;
+        find_char_skipping_comments(
+            self.source.as_bytes(),
+            tp.span.end as usize,
+            self.source.len(),
+            b'(',
+        )
+        .map(|paren| (tp.span.end, paren as u32))
+    }
+
+    /// Emit the comments in a signature's HEAD→`(` gap and append the signature `tail`
+    /// (the parameter list, plus whatever the caller groups with it) behind them.
+    ///
+    /// Two gap families share this seam, because they answer the same question — the
+    /// type-parameter list's `>`→`(` gap in all eight of its spellings (arrow, function
+    /// expression and declaration, class and object method, `declare function`, method and
+    /// construct signature, function type), and the constructor type's `abstract`→`new` and
+    /// `new`→next keyword gaps.
+    ///
+    /// ⚠️ **A `//` here takes a real break, never a `line_suffix`.** A deferred run does not
+    /// leave the construct it was written in: deferring carries the comment past the
+    /// parameters, the `=>` and into the body, where a second `//` **welds** onto its line
+    /// (`// c1 // c2`, the second ceasing to be a comment) and an inline block **reorders**
+    /// ahead of it. Both outputs reparse and are their own fixed point, so the ledger, the
+    /// census, F1 and the fuzzer are all blind — this seam is the guard. So the line-comment
+    /// gap routes to [`Self::append_keyword_value_line_comments`], which keeps every comment
+    /// on the line the author gave it and drops the tail to a continuation line indented one
+    /// level ([`docs/conformance_prettier.md`](../../../../../docs/conformance_prettier.md)
+    /// §Uniform Forced-Continuation Indent) — the same emitter every sibling keyword→value
+    /// gap uses, rather than a rule of its own.
+    ///
+    /// A gap holding **only blocks** forces nothing and stays inline, which is what
+    /// [`Self::push_trailing_comments_in_range`] already renders for it: with no line comment
+    /// in the run nothing is deferred, so every block takes the inline arm and an authored
+    /// own-line break collapses, per §Comment Position Philosophy's single-line-block rule.
+    ///
+    /// `flat_separator` is what stands between the gap and `tail` when nothing breaks — empty
+    /// for a `>`→`(` gap (`<T>(p: T)` is glued), a space for the constructor type's keyword
+    /// gaps (`abstract new`). It is deliberately **not** emitted on the forced-break arm,
+    /// where the continuation's own hardline is the separator and a space would open the
+    /// line with stray indentation.
+    ///
+    /// `gap` is `None` where the head has no such gap at all — no type parameters, or a `(`
+    /// the scan cannot find in a partial signature — and the tail is then appended behind the
+    /// flat separator alone. Taking the `Option` here rather than at each caller is what keeps
+    /// the ten sites from restating the no-gap arm ten ways.
+    pub(crate) fn append_signature_head_gap_comments(
         &self,
         parts: &mut DocBuf,
-        type_params_end: u32,
-        paren_pos: u32,
+        gap: Option<(u32, u32)>,
+        flat_separator: DocId,
+        tail: DocId,
     ) {
-        for comment in comments_to_emit_in_range(self.comments, type_params_end, paren_pos) {
-            parts.push(self.build_trailing_comment_doc(comment));
+        let Some((gap_start, gap_end)) = gap else {
+            parts.push(flat_separator);
+            parts.push(tail);
+            return;
+        };
+        if self.has_line_comments_between(gap_start, gap_end) {
+            // ⚠️ The tail is GROUPED before it goes under the continuation. The break this
+            // gap forces belongs to the gap, not to the parameter list — but the run's
+            // hardline propagates into any tail that carries no group of its own, which
+            // tore `(p: T)` open on exactly the two spellings whose tail is ungrouped by
+            // construction (the arrow's `build_arrow_params_doc_ungrouped`, and the function
+            // type built from the same parts). Every other spelling arrives already grouped
+            // by `build_callable_signature_doc` / `build_signature_params_return_group` and
+            // is unaffected, so grouping here is what makes the eight agree — the same
+            // boundary prettier draws by emitting `print("typeParameters")` beside
+            // `group([parametersDoc, returnTypeDoc])` rather than inside it.
+            let tail = self.d().group(tail);
+            self.append_keyword_value_line_comments(parts, gap_start, gap_end, tail);
+        } else {
+            self.push_trailing_comments_in_range(parts, gap_start, gap_end);
+            parts.push(flat_separator);
+            parts.push(tail);
         }
     }
 

@@ -5,7 +5,7 @@
 		new /* c2 */ (): A;
 		new /* c3(d) */ (b: string): A;
 		new // c5
-		(c: boolean): A;
+			(c: boolean): A;
 	}
 
 	type B = {

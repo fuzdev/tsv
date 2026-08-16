@@ -7,7 +7,6 @@ use crate::printer::CommentSpacing;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// The modifier keywords that open a function head, in source order.
 ///
@@ -287,20 +286,6 @@ impl<'a> Printer<'a> {
         // Type parameters (TypeScript generics): function foo<T>()
         if let Some(type_params) = &decl.type_parameters {
             tail.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-
-            // Comments between type_params `>` and `(` go after type_params
-            if let Some(pp) = find_char_skipping_comments(
-                self.source.as_bytes(),
-                type_params.span.end as usize,
-                self.source.len(),
-                b'(',
-            ) {
-                self.append_type_params_to_paren_comments(
-                    &mut tail,
-                    type_params.span.end,
-                    pp as u32,
-                );
-            }
         }
 
         // Signature (params + return type) in a single group
@@ -311,7 +296,12 @@ impl<'a> Printer<'a> {
             decl.params_start,
             decl.body.span.start,
         );
-        tail.push(sig_doc);
+        self.append_signature_head_gap_comments(
+            &mut tail,
+            self.type_params_paren_gap(decl.type_parameters.as_ref()),
+            d.empty(),
+            sig_doc,
+        );
 
         // Handle comments between signature and body: function a() /* comment */ {}
         self.append_body_with_sig_comments(&mut tail, sig_end, &decl.body);
