@@ -29,7 +29,7 @@ use crate::printer::calls::{
 };
 use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
 use crate::printer::{
-    ParenContext, Printer, arrow_chain_has_return_type, container_may_have_multiline_content,
+    ParenContext, Printer, arrow_chain_should_break, container_may_have_multiline_content,
     has_multiline_content, is_curried_arrow_chain,
 };
 use tsv_lang::doc::DocBuf;
@@ -207,14 +207,15 @@ impl<'a> Printer<'a> {
                 {
                     // Which of prettier's two renderings this ONE doc is — see
                     // `call_formatting.rs`'s `build_block_arrow_hug_states`, which states the
-                    // rule (untyped chain → the progressive layout, whose flat rendering the
-                    // hug state measures identically; typed chain → `skip_arrow_chain`, whose
+                    // rule (a chain with no forced break → the progressive layout, whose flat
+                    // rendering the hug state measures identically; one that
+                    // `arrow_chain_should_break` forces → `skip_arrow_chain`, whose
                     // nested-arrow-break suppression is what the expand-last hug wants). One
                     // doc, deliberately: a second build recurses into a nested call, and
                     // paying it here would make the doc-node count 2^depth.
                     let arg0 = &new_expr.arguments[0];
                     let mut arrow_doc = if is_curried_arrow_chain(arg0)
-                        && arrow_chain_has_return_type(arrow)
+                        && arrow_chain_should_break(arrow)
                     {
                         self.skip_arrow_chain.set(true);
                         let doc = self.build_expression_doc(arg0);

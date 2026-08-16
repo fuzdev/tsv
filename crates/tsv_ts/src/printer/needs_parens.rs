@@ -732,6 +732,20 @@ fn needs_parens_binary_operand(
         return true;
     }
 
+    // A unary left operand of `in` / `instanceof` keeps CLARITY parens (prettier's
+    // `parentheses/needs-parentheses.js`, the `UnaryExpression` → `BinaryExpression` arm).
+    // The parse is unambiguous either way — `!` binds tighter than a relational operator —
+    // but `!a in b` reads as `!(a in b)` to a human, so the parens say which one the author
+    // wrote. An UpdateExpression is deliberately NOT covered: it falls through to this same
+    // arm in prettier, which keys the rule on `node.type === "UnaryExpression"`, so
+    // `a++ in b` stays bare.
+    if !is_right
+        && matches!(parent_op, BinaryOperator::In | BinaryOperator::Instanceof)
+        && matches!(expr, Expression::UnaryExpression(_))
+    {
+        return true;
+    }
+
     let Expression::BinaryExpression(child) = expr else {
         return false;
     };

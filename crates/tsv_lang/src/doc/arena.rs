@@ -1707,6 +1707,20 @@ impl DocArena {
         })
     }
 
+    /// [`Self::group_with_id`] whose break mode is decided by the caller rather than by
+    /// fit — prettier's `group(…, { id, shouldBreak })`. The id and the forced break go
+    /// together whenever some other doc reads the decision through
+    /// [`Self::indent_if_break`]: a caller that emitted [`Self::group_break`] instead would
+    /// break the group but leave the reader unable to see it.
+    pub fn group_with_id_break(&self, doc: DocId, id: GroupId, should_break: bool) -> DocId {
+        self.alloc(DocNode::Group {
+            contents: doc,
+            expanded_states: ChildRange::EMPTY,
+            id: Some(id),
+            should_break,
+        })
+    }
+
     /// Create a conditional group that tries multiple alternative layouts.
     ///
     /// `states[0]` is tried first (stored as `contents`), `states[1..]` stored in `expanded_states`.

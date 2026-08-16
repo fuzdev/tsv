@@ -61,8 +61,8 @@ pub(crate) use comments::{
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
-    arrow_chain_has_return_type, class_expr_has_decorators, is_call_on_member_chain,
-    is_curried_arrow_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
+    arrow_chain_should_break, class_expr_has_decorators, is_call_on_member_chain,
+    is_curried_arrow_chain, is_curried_arrow_chain_that_breaks, is_literal_member_chain,
     is_poorly_breakable_chain, is_regex_root_chain, is_self_expanding_value,
     is_simple_self_expanding, is_simple_value, is_single_call_on_member_chain,
     is_type_assertion_call, jsdoc_cast_comment_is_own_line,
@@ -188,24 +188,32 @@ pub struct Printer<'a> {
     /// only nested assignments (where parent is another assignment) use chain formatting
     /// Uses Cell for interior mutability so doc builders (&self) can set this
     pub(crate) in_top_level_assignment: Cell<bool>,
-    /// Whether we're inside a curried arrow function with return type.
-    /// When true, nested arrows always break after `=>` regardless of their own return type.
-    /// Used for: const f = (x: T): H => (y) => expr - ALL arrows break, not just the typed ones.
-    pub(crate) in_curried_typed_arrow: Cell<bool>,
+    /// Whether we're inside a curried arrow chain that `arrow_chain_should_break` forced
+    /// open, on the DEFAULT arrow path (the flattened `build_arrow_chain_doc` never sets it —
+    /// it stacks the heads itself). When true, every nested arrow breaks after its `=>`
+    /// whether or not it is the head that carried the trigger: `const f = (x: T): H => (y) =>
+    /// expr` stacks BOTH heads, not just the annotated one, which is the whole reason the
+    /// answer has to travel down rather than be re-asked per arrow.
+    pub(crate) in_stacked_arrow_chain: Cell<bool>,
     /// tsv's spelling of prettier's `expandLastArg` — the argument is being printed for an
     /// expand-last **hug** state, so it must render as prettier's `lastArg` rather than as
     /// its `printedArguments` (the counterpart is
     /// [`calls::build_printed_argument_doc`], which every broken-out argument goes through).
     ///
     /// ⚠️ **Its live job is the nested-arrow break, not the chain-layout bail.** Two readers
-    /// name it: `should_use_arrow_chain_layout`, where it is now REDUNDANT — the only two
-    /// sites that set it (`build_block_arrow_hug_states` and its `new` twin) do so solely for
-    /// a chain that already carries a return type / type params / a non-identifier param,
-    /// which that predicate refuses on its own — and `build_arrow_body`'s
-    /// `chain_has_return_type`, where it suppresses the break so the hugged body stays on the
-    /// `=>` line. That second reader is the whole reason the flag still exists; deleting it as
-    /// "the chain bail, already covered" would silently unhug every typed curried callback
-    /// (`calls/curried_arrow_chain` is the fixture that says so).
+    /// name it: `should_use_arrow_chain_layout`, where it is redundant only because the two
+    /// sites that set it (`build_block_arrow_hug_states` and its `new` twin) build the
+    /// argument WITHOUT going through [`calls::build_printed_argument_doc`], so no
+    /// `ArrowChainContext` is in scope and that predicate declines on the context alone — and
+    /// `build_arrow_body`'s `chain_should_break`, where it suppresses the break so the hugged
+    /// body stays on the `=>` line. That second reader is the whole reason the flag still
+    /// exists; deleting it as "the chain bail, already covered" would silently unhug every
+    /// typed curried callback (`calls/curried_arrow_chain` is the fixture that says so).
+    /// ⚠️ The first reader's redundancy is a fact about those two CALL SITES, not about the
+    /// predicate: it used to hold because `should_use_arrow_chain_layout` refused every
+    /// `shouldBreakChain` chain outright, and that refusal is gone (it is a break now, in
+    /// every context but the assignment RHS). A third setter that ran under a chain context
+    /// would make this term load-bearing.
     ///
     /// ⚠️ **Ambient, where prettier's is per-`print()`.** It therefore has to be CLEARED on
     /// the way into anything nested, which `build_printed_argument_doc` does — without that
@@ -415,7 +423,7 @@ impl<'a> Printer<'a> {
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
             in_top_level_assignment: Cell::new(false),
-            in_curried_typed_arrow: Cell::new(false),
+            in_stacked_arrow_chain: Cell::new(false),
             skip_arrow_chain: Cell::new(false),
             expand_last_arg_flat_params: Cell::new(false),
             test_call_flat_params: Cell::new(false),

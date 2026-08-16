@@ -26,37 +26,38 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_before_position};
 
-/// Check if an arrow body should stay on the same line as `=>` (no line break option).
+/// Whether an arrow body stays on the `=>` line for a reason that a forced chain break
+/// cannot overrule — the two unconditional disjuncts of prettier's `shouldPutBodyOnSameLine`
+/// (`print/arrow-function.js`):
 ///
-/// Prettier's `mayBreakAfterShortPrefix` - these expression types stay hugged to `=>`:
-/// - Object literals: `() => ({...})`
-/// - Array literals: `() => [...]`
-/// - Arrow functions: `() => () => ...`
-/// - Block statements (handled separately)
-/// - JSX elements (not yet supported)
-///   When true, body uses `" " + body` (simple space).
-///   When false, body uses `indent([line, body])` (can break to new line).
+/// - `shouldAlwaysAddParens` — a **sequence** body, which hugs "so that the required
+///   parentheses end up on their own lines". Its parens are the sequence's own hanging
+///   layout ([`SeqLayout::Hanging`]); breaking after the `=>` would put the `(` on the body's
+///   line and lose that shape.
+/// - `mayBreakAfterShortPrefix` — an **object**, **array** or nested **arrow** body (block
+///   bodies are handled by their own arm), plus `isTemplateOnItsOwnLine`: a multiline
+///   template hugs when its backtick shares the `=>`'s line and breaks when the author put it
+///   on its own, which keeps both authorings stable.
 ///
-/// Note: Template literals are NOT included here — they need source-position-dependent
-/// handling (hug when on same line as `=>`, break when on own line). That check is
-/// done in the caller via `is_template_on_same_line` which has access to source text.
-fn should_hug_arrow_body(expr: &internal::Expression<'_>) -> bool {
+/// ⚠️ **One rule, two printers.** The plain arrow body ([`Printer::build_arrow_expression_body`])
+/// and the curried chain's ([`Printer::build_arrow_chain_doc`]) are twins over prettier's one
+/// `shouldPutBodyOnSameLine`, and they have already drifted: the chain builder was missing
+/// the sequence disjunct, so a chain broken by `arrow_chain_should_break` hung `(a, b)` on
+/// the next line while its twin hugged it. Add a body kind here, not at a call site.
+///
+/// The third disjunct is deliberately NOT here: `shouldAddParensIfNotBreak` (a ternary body)
+/// is the one prettier gates on `!shouldBreakChain`, and it renders differently besides —
+/// parens in the flat form only ([`ternary_body_parens_group`]) — so each printer states it
+/// as its own arm.
+fn arrow_body_always_hugs(expr: &internal::Expression<'_>, source: &str) -> bool {
     matches!(
         expr,
-        internal::Expression::ObjectExpression(_)
+        internal::Expression::SequenceExpression(_)
+            | internal::Expression::ObjectExpression(_)
             | internal::Expression::ArrayExpression(_)
             | internal::Expression::ArrowFunctionExpression(_)
-    )
-}
-
-/// Check if an expression is a multiline template literal on the same line as `=>`.
-///
-/// Prettier's `isTemplateOnItsOwnLine` — hug when the backtick is on the same line
-/// as `=>` (no newline before it in source), break when the user placed it on its own line.
-/// This creates dual-stable behavior: both forms are preserved.
-fn is_template_on_same_line(source: &str, expr: &internal::Expression<'_>) -> bool {
-    is_multiline_template_expression(expr)
-        && !has_newline_before_position(source, expr.span().start)
+    ) || (is_multiline_template_expression(expr)
+        && !has_newline_before_position(source, expr.span().start))
 }
 
 /// Span of the ObjectExpression at an expression's leftmost (no-lookahead) position,
@@ -335,15 +336,15 @@ impl<'a> Printer<'a> {
         doc
     }
 
-    /// Run `build` with the curried-typed-arrow flag set to `value`, restoring the
+    /// Run `build` with [`Printer::in_stacked_arrow_chain`] set to `value`, restoring the
     /// prior value afterward. Mirrors `build_with_arrow_chain_context`: the flag is
     /// per-chain layout state that must not leak to sibling arrows nested inside the
     /// body (callbacks, object-property arrows). The arms that set it to the value
     /// it already holds rely on the restore returning that same value.
-    fn build_with_in_curried(&self, value: bool, build: impl FnOnce() -> DocId) -> DocId {
-        let prev = self.in_curried_typed_arrow.replace(value);
+    fn build_with_stacked_chain(&self, value: bool, build: impl FnOnce() -> DocId) -> DocId {
+        let prev = self.in_stacked_arrow_chain.replace(value);
         let doc = build();
-        self.in_curried_typed_arrow.set(prev);
+        self.in_stacked_arrow_chain.set(prev);
         doc
     }
 
@@ -507,9 +508,9 @@ impl<'a> Printer<'a> {
         // this is the flag's only live effect: in an expand-last hug (prettier's
         // `expandLastArg`, where `shouldPrintAsChain` is false) the body must stay on the `=>`
         // line rather than break. Dropping the term unhugs every typed curried callback.
-        let chain_has_return_type = is_arrow_body
+        let chain_should_break = is_arrow_body
             && !self.skip_arrow_chain.get()
-            && crate::printer::arrow_chain_has_return_type(arrow);
+            && crate::printer::arrow_chain_should_break(arrow);
 
         // Check if body arrow has trailing param comments (forces break)
         let body_arrow_param_comment_forces_break = matches!(
@@ -518,22 +519,19 @@ impl<'a> Printer<'a> {
                 if self.arrow_trailing_param_comment_forces_break(body_arrow)
         );
 
-        // Prettier's `shouldAlwaysAddParens` — the first disjunct of its
-        // `shouldPutBodyOnSameLine`, and a different question from
-        // `mayBreakAfterShortPrefix` above: a SEQUENCE body hugs the `=>` "so that the
-        // required parentheses end up on their own lines" (arrow-function.js). Its parens
-        // are the sequence's own hanging layout ([`SeqLayout::Hanging`]); breaking after the
-        // `=>` instead would put the `(` on the body's line and lose that shape.
-        let is_sequence_body = matches!(expr, internal::Expression::SequenceExpression(_));
-
         // Inline block comments don't prevent hugging — only own-line comments do.
         // `() => /* comment */ ({...})` hugs (inline block comment)
         // `() =>\n  /* comment */\n  ({...})` breaks (own-line comment)
+        //
+        // The two extra conjuncts are tsv's, not prettier's, and both are compensations for
+        // being on THIS path rather than the chain layout: a chain the break forces open must
+        // stack its heads here (the chain layout renders that break itself), and a trailing
+        // param comment in the body arrow's signature forces it multiline. Neither can fire
+        // for a body that is not an arrow, so a sequence / object / array / template body
+        // reaches the same answer both printers give.
         let should_hug = !has_own_line_comment
-            && (is_sequence_body
-                || should_hug_arrow_body(expr)
-                || is_template_on_same_line(self.source, expr))
-            && !chain_has_return_type
+            && arrow_body_always_hugs(expr, self.source)
+            && !chain_should_break
             && !body_arrow_param_comment_forces_break;
 
         // The curried-chain and parenthesized-ternary arms below *reassemble* the body —
@@ -618,7 +616,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(self.build_arrow_body_doc(expr));
             }
-        } else if is_arrow_body && (chain_has_return_type || self.in_curried_typed_arrow.get()) {
+        } else if is_arrow_body && (chain_should_break || self.in_stacked_arrow_chain.get()) {
             // Curried arrow chain - all arrows break without indent so they align:
             // const f = (x: T): H => (y) => expr   // outer has return type
             // const f = (x: T) => (y): H => expr   // inner has return type
@@ -628,9 +626,9 @@ impl<'a> Printer<'a> {
             //     (y) =>                    (y): H =>
             //         expr                      expr
             //
-            // The flag is already set when reached via `in_curried_typed_arrow`, so
+            // The flag is already set when reached via `in_stacked_arrow_chain`, so
             // unconditionally setting it `true` for the body build is equivalent.
-            let body_doc = self.build_with_in_curried(true, || {
+            let body_doc = self.build_with_stacked_chain(true, || {
                 self.build_arrow_body_doc_with_leading(expr, gap_run())
             });
             parts.push(d.concat(&[d.hardline(), body_doc]));
@@ -642,17 +640,17 @@ impl<'a> Printer<'a> {
             // (a, // c) =>
             //     (b, // c) =>
             //     (c, // c) => {}
-            let body_doc = self.build_with_in_curried(true, || {
+            let body_doc = self.build_with_stacked_chain(true, || {
                 self.build_arrow_body_doc_with_leading(expr, gap_run())
             });
             parts.push(d.indent_hardline(body_doc));
-        } else if self.in_curried_typed_arrow.get() {
+        } else if self.in_stacked_arrow_chain.get() {
             // Innermost arrow in curried chain - body is NOT another arrow.
             // This needs indent since it's the final expression.
             // Reset flag so arrows inside the body (e.g. callback args) aren't
             // treated as part of the curried chain; restore to `true` (its value on
             // entry, since this arm is reached only when the flag is set) afterward.
-            let body_doc = self.build_with_in_curried(false, || {
+            let body_doc = self.build_with_stacked_chain(false, || {
                 self.build_arrow_body_doc_with_leading(expr, gap_run())
             });
             parts.push(d.indent_hardline(body_doc));
@@ -774,7 +772,8 @@ impl<'a> Printer<'a> {
         // inside it (callbacks, object-property arrows) are NOT part of the
         // chain, so clear the flag so they aren't force-broken after `=>`.
         // Mirrors the innermost expression-body case above.
-        let block_doc = self.build_with_in_curried(false, || self.build_block_statement_doc(block));
+        let block_doc =
+            self.build_with_stacked_chain(false, || self.build_block_statement_doc(block));
 
         // A line comment (or own-line block comment) between `=>` and the block
         // body must break so the comment sits on its own line and the `{` drops
@@ -804,13 +803,23 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether to render an arrow as a flattened curried chain (prettier's
-    /// `printArrowFunctionSignatures`). Covers the untyped assignment-RHS and
-    /// call-arg/binaryish contexts: the body must be another arrow, the chain
-    /// must carry no return type / type params / non-identifier param (those
-    /// route through the existing break-after-operator path), and every comment
+    /// `printArrowFunctionSignatures`). Covers the assignment-RHS and
+    /// call-arg/binaryish contexts: the body must be another arrow, and every comment
     /// must sit in a region [`Printer::build_arrow_chain_doc`] emits
     /// ([`Self::chain_comment_outside_emitted_regions`]). A `None` context (no
     /// enclosing chain site) routes to the default arrow layout.
+    ///
+    /// ⚠️ [`crate::printer::arrow_chain_should_break`] — prettier's `shouldBreakChain` — is a **break**
+    /// decision, not a refusal, and it is one here in every context but `AssignmentRhs`.
+    /// The exception is real rather than stylistic: at an assignment the SITE already owns
+    /// the break, `choose_layout` answering the identical question with
+    /// `AssignmentLayout::BreakAfterOperator` (`assignment.rs`, `is_curried_arrow_chain_that_breaks`),
+    /// whose newline-after-`=` plus indent renders exactly what the chain layout's own
+    /// `indent([softline, …])` would — so letting the chain through there would apply the
+    /// indent twice. Nothing owns the break in call-argument or binaryish position, which is
+    /// why the refusal there simply lost it: the heads stayed flat one indent short of
+    /// prettier. Any future site that widens the context set inherits the break arm, not the
+    /// refusal, unless it can point at its own owner the way the assignment does.
     ///
     /// The `skip_arrow_chain` term below is **redundant but kept**: its two set sites fire
     /// only for a chain that already carries a return type / type params / a non-identifier
@@ -843,7 +852,9 @@ impl<'a> Printer<'a> {
         if !body_is_arrow {
             return false;
         }
-        if crate::printer::arrow_chain_has_return_type(arrow) {
+        if context == ArrowChainContext::AssignmentRhs
+            && crate::printer::arrow_chain_should_break(arrow)
+        {
             return false;
         }
         !self.chain_comment_outside_emitted_regions(arrow)
@@ -975,6 +986,13 @@ impl<'a> Printer<'a> {
             sig_docs.push(sig);
         });
 
+        // Prettier's `shouldBreakChain` — a head carrying a return type with params, type
+        // parameters, or a non-identifier parameter puts every head on its own line however
+        // short the chain is, and (below) denies the ternary terminal its same-line parens.
+        // Provably `false` under `AssignmentRhs`, where such a chain never reaches this
+        // builder at all — see `should_use_arrow_chain_layout`.
+        let should_break_chain = crate::printer::arrow_chain_should_break(head);
+
         // The heads group is keyed on `GroupId::ArrowChain`; its shape depends on
         // the parent context. Either way the terminal `=>` + body are emitted
         // after the group (below), and `indent_if_break` ties the body's indent
@@ -1005,20 +1023,21 @@ impl<'a> Printer<'a> {
                 // `split_first` is always `Some` here — a curried chain has ≥2
                 // heads — but matching avoids a panic path; the `None` arm falls
                 // back to the assignment-style joined group.
-                match sig_docs.split_first() {
+                let heads_doc = match sig_docs.split_first() {
                     Some((&sig0, rest)) => {
                         let rest_joined = d.join_doc(rest.iter().copied(), sep);
-                        d.group_with_id(
-                            d.concat(&[
-                                sig0,
-                                d.text(" =>"),
-                                d.indent(d.concat(&[d.line(), rest_joined])),
-                            ]),
-                            GroupId::ArrowChain,
-                        )
+                        d.concat(&[
+                            sig0,
+                            d.text(" =>"),
+                            d.indent(d.concat(&[d.line(), rest_joined])),
+                        ])
                     }
-                    None => d.group_with_id(d.join_doc(sig_docs, sep), GroupId::ArrowChain),
-                }
+                    None => d.join_doc(sig_docs, sep),
+                };
+                // Prettier's `shouldBreak: shouldBreakChain` on the same group. Only this
+                // arm passes it: `AssignmentRhs` never sees a triggering chain (see
+                // `should_use_arrow_chain_layout`, where the assignment site owns the break).
+                d.group_with_id_break(heads_doc, GroupId::ArrowChain, should_break_chain)
             }
         };
 
@@ -1031,15 +1050,24 @@ impl<'a> Printer<'a> {
         let body_part = match terminal {
             internal::ArrowFunctionBody::Expression(b) => {
                 let expr = b;
-                if should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr) {
-                    // Object/array/template body: hugs the last head, supplies its
-                    // own internal indent.
+                if arrow_body_always_hugs(expr, self.source) {
+                    // Object/array/template/sequence body: hugs the last head, supplies its
+                    // own internal indent, and does so however the chain broke.
                     d.concat(&[d.text(" "), self.build_arrow_body_doc(expr)])
                 } else if matches!(expr, internal::Expression::ConditionalExpression(_))
                     && !has_leftmost_object_expression(expr)
+                    && !should_break_chain
                 {
                     // Ternary body: parens when inline, none when broken
-                    // (prettier's shouldAddParensIfNotBreak).
+                    // (prettier's shouldAddParensIfNotBreak). ⚠️ Prettier gates this
+                    // disjunct of `shouldPutBodyOnSameLine` on `!shouldBreakChain`, and
+                    // alone among the three — a sequence (`shouldAlwaysAddParens`) and a
+                    // hugging body (`mayBreakAfterShortPrefix`) both keep the `=>` line
+                    // whatever the chain does. The reason is that this arm's parens exist
+                    // only to hold the ternary on ONE line, and a force-broken chain has
+                    // already given up on that: the heads are stacked, so the body hangs
+                    // bare beneath the last one (`() =>⏎  test ? 1 : 2`) rather than
+                    // rendering a delimiter for a rendering that no longer happens.
                     let body_doc = self.build_expression_doc(expr);
                     if d.will_break(body_doc) {
                         // No own group — the body's line is governed by the outer

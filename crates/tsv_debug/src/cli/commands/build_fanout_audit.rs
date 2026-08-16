@@ -218,10 +218,10 @@ fn gen_ts_nested_curried_arrow(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
-/// The TYPED twin of `gen_ts_nested_curried_arrow` — a destructured head makes
-/// `arrow_chain_has_return_type` true, so the chain layout is refused and the builder takes its
-/// other arm (`skip_arrow_chain`). Both arms must stay single-build; only one of them is
-/// exercised by the untyped axis.
+/// The BREAK-FORCING twin of `gen_ts_nested_curried_arrow` — a destructured head makes
+/// `arrow_chain_should_break` true, which sends the expand-last hug down its other arm
+/// (`skip_arrow_chain`, prettier's `expandLastArg` print) instead of reusing the chain doc.
+/// Both arms must stay single-build; only one of them is exercised by the other axis.
 fn gen_ts_nested_curried_arrow_typed(depth: usize) -> String {
     let mut expr = String::from("done");
     for i in 0..depth {
