@@ -281,9 +281,9 @@ impl<'a> Printer<'a> {
     ///   `export default @dec class {}`; the class expression is the left edge of what
     ///   follows the decorator run.
     /// - `build_assignment_pattern_doc` (`expressions/patterns.rs`) reassembles a
-    ///   destructuring default's **left** object pattern for the no-expand-on-nesting rule;
-    ///   the pattern is the left edge of the default. This is the receiving end of the
-    ///   left-spine hand-down warned about above, and the reason it is a caller at all.
+    ///   destructuring default's object-pattern left for the no-expand-on-nesting rule; the
+    ///   pattern's `{` is that left's first token, and the `AssignmentPattern` above it hands
+    ///   the claim *down* (`left_spine_child`), so nothing else catches it.
     /// - [`Self::build_frozen_node_doc`] and its layout-opaque sibling
     ///   [`Self::build_frozen_opaque_node_doc`] (`ignore.rs`) print a verbatim span; the frozen
     ///   span's start *is* the node's first printed byte by construction. The two differ only
@@ -291,6 +291,14 @@ impl<'a> Printer<'a> {
     ///   which is why the second exists rather than the member-expression freeze open-coding a
     ///   bare slice, as it did until a glued block ahead of a frozen chain base was found
     ///   dropped at six distinct gap positions.
+    /// - `build_directive_doc` (`statements/mod.rs`) prints a directive from the literal's
+    ///   own source bytes (`format_directive`, an exact code-unit sequence); a directive is a
+    ///   bare string literal by grammar, so that span start is the statement's first printed
+    ///   byte.
+    /// - `build_test_callee_flat_doc` (`calls/test_patterns.rs`) reassembles a test call's
+    ///   callee from its dotted parts (`test.describe.only`) for the break-free flat layout;
+    ///   the chain's leftmost name is the callee's first token, and the general callee path
+    ///   that would have claimed it is exactly what this arm replaces.
     ///
     /// Prefer collapsing a reassembly path onto `build_expression_doc` over adding another
     /// caller, and prefer wrapping the claim in a named builder (as the two frozen builders

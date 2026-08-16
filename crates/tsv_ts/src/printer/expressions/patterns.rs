@@ -9,6 +9,7 @@
 
 use super::assignment::RhsCommentInfo;
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
+use crate::printer::comments::next_real_element_start;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
     CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
@@ -34,6 +35,15 @@ enum AssignmentContext {
     /// Parent is an assignment expression
     /// → Use chain formatting (ungrouped with line elements)
     Chain,
+}
+
+/// The gap after array-pattern slot `i`, in this container's terms:
+/// [`next_real_element_start`] with the pattern's own fallback —
+/// [`internal::ArrayPattern::body_end`], which stops before a `: T` the pattern's span
+/// swallowed rather than at `span.end`. The array literal's twin is `array_gap_end`; each
+/// container names its own end once and the walk past the holes is shared.
+fn array_pattern_gap_end(arr: &internal::ArrayPattern<'_>, i: usize) -> u32 {
+    next_real_element_start(arr.elements, i).unwrap_or_else(|| arr.body_end())
 }
 
 /// Check if an arrow function has a nested arrow function as its body
@@ -1039,14 +1049,9 @@ impl<'a> Printer<'a> {
                 // expanded builder before this path is reached.
                 let elem_end = e.printed_end();
 
-                // Collect trailing comments, bounded by the next element or (past the
-                // last) the body's end — `ArrayPattern::body_end` carries why that bound
-                // is not `span.end`.
-                let upper_bound = arr
-                    .elements
-                    .get(i + 1)
-                    .and_then(|opt| opt.as_ref().map(|e| e.span().start))
-                    .unwrap_or_else(|| arr.body_end());
+                // Collect trailing comments, bounded by the next REAL element or (past the
+                // last) the body's end — `array_pattern_gap_end` carries both halves.
+                let upper_bound = array_pattern_gap_end(arr, i);
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
                 // Block comments around the comma (line comments force the expanded
@@ -1156,14 +1161,9 @@ impl<'a> Printer<'a> {
 
                 let elem_end = Self::element_claim_anchor(frozen_span, e.printed_end());
 
-                // Collect trailing comments, bounded by the next element or (past the
-                // last) the body's end — `ArrayPattern::body_end` carries why that bound
-                // is not `span.end`.
-                let upper_bound = arr
-                    .elements
-                    .get(i + 1)
-                    .and_then(|opt| opt.as_ref().map(|e| e.span().start))
-                    .unwrap_or_else(|| arr.body_end());
+                // Collect trailing comments, bounded by the next REAL element or (past the
+                // last) the body's end — `array_pattern_gap_end` carries both halves.
+                let upper_bound = array_pattern_gap_end(arr, i);
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
                 // Separator comma between elements; no trailing comma on the last
@@ -1173,10 +1173,12 @@ impl<'a> Printer<'a> {
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 if !is_last {
-                    // Check for blank line before next element (or its leading comment)
-                    let next_elem = arr.elements.get(i + 1).and_then(|opt| opt.as_ref());
-                    if let Some(next) = next_elem {
-                        let next_start = next.span().start;
+                    // Check for a blank line before the next REAL binding (or its leading
+                    // comment). A hole between them opens no gap of its own, so this is
+                    // still the gap after THIS element — the same walk the trailing run
+                    // took ([`next_real_element_start`]); asking only slot `i + 1` skipped
+                    // the check whenever a hole followed and DROPPED the author's blank.
+                    if let Some(next_start) = next_real_element_start(arr.elements, i) {
                         // The same range every other family's separator reads
                         // ([`Printer::item_gap_blank_scan`]): from the previous element's
                         // DISTANCE anchor (its shell end, not its claim anchor) to the first
@@ -1191,13 +1193,24 @@ impl<'a> Printer<'a> {
                         // both FABRICATED one, in the one family whose siblings do not.
                         // Stable once printed, so only a `compare` finds it.
                         //
-                        // `next_start` bounds the SEPARATOR search, `check_pos` the blank
-                        // scan: the comma may sit below the next element's leading comment,
-                        // where the content bound cannot see it
-                        // ([`Printer::has_blank_line_after_comma`]).
-                        let (from, check_pos) =
-                            self.item_gap_blank_scan(trailing.end_pos, next_start);
-                        if self.has_blank_line_after_comma(from, check_pos, next_start) {
+                        // `bound` bounds the SEPARATOR search, `check_pos` the blank scan:
+                        // the comma may sit below the next element's leading comment, where
+                        // the content bound cannot see it
+                        // ([`Printer::has_blank_line_after_comma`]). When slot `i + 1` is a
+                        // HOLE, the gap's next printed content is that hole's own comma and
+                        // BOTH bounds move there ([`Printer::hole_slot_comma`], the array
+                        // literal's rule): the separator this gap is measured from is this
+                        // element's own comma, which always precedes it, so nothing is left
+                        // to find past it — while a search allowed to run to the next real
+                        // binding finds the HOLE's comma instead and measures the blank on
+                        // the far side of it, where a hole never carries one.
+                        let bound = if matches!(arr.elements.get(i + 1), Some(None)) {
+                            self.hole_slot_comma(elem_end, next_start)
+                        } else {
+                            next_start
+                        };
+                        let (from, check_pos) = self.item_gap_blank_scan(trailing.end_pos, bound);
+                        if self.has_blank_line_after_comma(from, check_pos, bound) {
                             parts.push(d.literalline());
                         }
                     }
