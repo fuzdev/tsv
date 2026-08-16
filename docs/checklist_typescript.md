@@ -641,6 +641,17 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 - `declare global {}`
 - Bare `global {}` (no `declare`, top-level or nested in `declare module`)
 - Interface merging
+- **Shorthand (bodyless) ambient module** — the body is optional only for an
+  **external** module, i.e. one named by a string literal (`declare module 'a';`,
+  `module 'b';`, `export declare module 'c';`), and its terminator follows **ASI**,
+  not a literal `;`: a line break, `}` or EOF closes it, matching tsc's
+  `parseAmbientExternalModuleDeclaration` (`parseSemicolon`) and acorn-typescript's
+  `tsParseAmbientExternalModuleDeclaration` (`semicolon()`). An
+  identifier-named namespace/module has no shorthand and always takes a block, so
+  `declare namespace A;` / `declare module A;` / `namespace A;` are syntax errors in
+  both oracles. Covered by
+  `tests/fixtures/typescript/declarations/namespace/module_string_shorthand/`
+  (the ASI variant plus the three rejections) and `…_comment/` (the name→`;` gap)
 
 ### TypeScript-Only Imports/Exports
 

@@ -129,10 +129,9 @@ impl<'a> Printer<'a> {
         // prettier 3.9), a same-line line trails after it via `line_suffix`
         // (`fn() // c` → `fn(); // c`), an own-line comment drops to its own line after it
         // (emitting a line comment before the `;` would swallow it). See
-        // `split_separator_gap_comments`.
+        // `push_semicolon_with_gap_comments`.
         let expr_end = stmt.expression.span().end;
-        let semicolon_pos = stmt.span.end.saturating_sub(1);
-        self.push_semicolon_with_gap_comments(&mut parts, expr_end, semicolon_pos, true);
+        self.push_semicolon_with_gap_comments(&mut parts, expr_end, stmt.span.end, true);
         d.concat(&parts)
     }
 
@@ -308,7 +307,7 @@ impl<'a> Printer<'a> {
     /// between the keyword and that `;` sits *inside* the statement span (e.g.
     /// `debugger\n\n// c\n;` → span swallows `// c` and the `;`). Emitting just
     /// `keyword;` would drop them. Route the interior gap through
-    /// `split_separator_gap_comments`: a same-line block trails after `;`
+    /// `push_semicolon_with_gap_comments`: a same-line block trails after `;`
     /// (`debugger; /* c */`), a same-line line floats after `;` via `line_suffix`, an
     /// own-line comment drops to its own line (preceding blank line preserved). `span`
     /// is the full statement span — its end is the `;`, or the keyword end under ASI
@@ -320,9 +319,8 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let keyword_end = span.start + keyword.len() as u32;
-        let semicolon_pos = span.end.saturating_sub(1);
         let mut parts: DocBuf = smallvec![d.text(keyword)];
-        self.push_semicolon_with_gap_comments(&mut parts, keyword_end, semicolon_pos, true);
+        self.push_semicolon_with_gap_comments(&mut parts, keyword_end, span.end, true);
         d.concat(&parts)
     }
 }

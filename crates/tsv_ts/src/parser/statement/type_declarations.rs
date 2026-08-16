@@ -785,12 +785,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_expected("identifier or string literal for module name"));
         };
 
-        // Parse body or semicolon for shorthand
-        let (body, end) = if matches!(self.current_kind(), TokenKind::Semicolon) {
-            // Shorthand ambient module: `declare module 'name';`
-            let end = self.current_pos().1 as u32;
-            self.advance()?; // consume ';'
-            (None, end)
+        // Parse body, or the shorthand (bodyless) form.
+        //
+        // Only an **external** module — one named by a string literal — has a
+        // bodyless form (`declare module 'name';`), and its terminator follows ASI,
+        // not a literal `;`: tsc's `parseAmbientExternalModuleDeclaration` ends it
+        // with `parseSemicolon()` and acorn-typescript's
+        // `tsParseAmbientExternalModuleDeclaration` with `semicolon()`, so a line
+        // break, `}` or EOF closes it (`declare module 'jquery'` on its own line is
+        // ordinary `.d.ts` authoring). An identifier-named namespace/module has no
+        // shorthand in either oracle and always takes a block, so it falls through
+        // to `parse_module_block` and its `'{'` error.
+        let (body, end) = if matches!(id, TSModuleName::Literal(_))
+            && !matches!(self.current_kind(), TokenKind::BraceOpen)
+        {
+            (None, self.semicolon_end()?)
         } else {
             // Full body: `{ statements }`
             let block = self.parse_module_block(declare)?;

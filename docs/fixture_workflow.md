@@ -109,6 +109,17 @@ cargo run -p tsv_debug format_prettier .../input.svelte --no-line-widths 2>/dev/
 deno task fixtures:update:parsed <pattern>  # generate expected.json separately
 ```
 
+⚠️ **Never run `fixture_init` on an existing `_prettier_divergence` fixture whose input is
+not a prettier fixed point** — not even `--force` to pick up a case you hand-added. It
+formats the input *through prettier*, so it overwrites tsv's claimed form with prettier's,
+which is the exact thing the fixture exists to say tsv does NOT do. Nothing catches it:
+`fixtures:validate` then regenerates a self-consistent set around the new input and reports
+**green** while the fixture asserts the opposite of its README. To add a case to one of
+these, edit `input.svelte` by hand, then run `fixtures:update:parsed` and
+`fixtures:update:formatted` — which regenerate `expected.json`, `output_prettier.*` and any
+`audit_signature.txt` *from* the input rather than replacing it. Read the resulting
+`git diff` of `input.svelte`: it must contain only the lines you added.
+
 ### 1.4 Quick Parse Check
 
 ```bash

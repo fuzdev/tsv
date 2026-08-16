@@ -683,8 +683,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Emit a for-header clause terminator `;` with its content→`;` gap comments
-    /// bound to the `;` **like a list separator** (`split_separator_gap_comments`,
-    /// `block_after_separator: false`): a same-line block stays before the `;`
+    /// bound to the `;` **like a list separator** (the `split_comma_gap_comments`
+    /// binding, via `split_for_header_gap_comments`): a same-line block stays before the `;`
     /// (`a /* c */;`), a same-line line trails it via `line_suffix` (`a; // c`),
     /// and an own-line comment defers **after** the `;`, opening on the header's own
     /// `line` rather than on a break of its own

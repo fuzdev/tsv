@@ -2,7 +2,9 @@
 
 A line comment between a `namespace`/`module`/`declare global` header and its
 body `{` keeps its own line, and the `{` drops below it. Prettier relocates the
-comment past the `{` — into the body, or trailing the collapsed `{}`.
+comment past the `{` — into the body, or trailing the collapsed `{}`. The header's
+name shape doesn't change the gap: a bare identifier, a dotted one, the `global`
+keyword and a string-literal external-module name all take the same rule.
 
 tsv: `namespace N1 // c1\n{` — the comment stays in the gap the author wrote it in
 Prettier: `namespace N1 { // c1` (then, on its second pass, `namespace N1 {\n\t// c1`)

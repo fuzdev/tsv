@@ -343,7 +343,7 @@ impl<'a> Printer<'a> {
 
     /// Whether the construct spanning `[span_start, span_end)` ends its doc with a **line
     /// comment** rather than with its `;` — the case where its terminator gap held one and
-    /// [`Self::split_separator_gap_comments`] deferred it past the `;`, onto a line of its
+    /// [`Self::push_semicolon_with_gap_comments`] deferred it past the `;`, onto a line of its
     /// own.
     ///
     /// A caller that trails a same-line comment on this construct has to ask, because the
@@ -1354,36 +1354,28 @@ impl<'a> Printer<'a> {
     /// lossless — `expr; /* c */`); the list **`,` separator** passes `false` and keeps
     /// a same-line block before the comma (`X /* c */,`) — prettier did not change that.
     ///
-    /// Caller idiom: `let after = self.split_separator_gap_comments(parts, start, sep,
-    /// block_after_separator); parts.push(sep_text); parts.extend(after);`. Shared by the
-    /// list `,` separator (`emit_multiline_comma_with_comments`, `false`) and the
-    /// statement/member `;` terminator (variable / expression-statement / class-property,
-    /// `true`). Emitting an own-line comment *before* the separator would put the
-    /// separator on the comment's line — a `//` swallows it (content loss), a block just
-    /// diverges from prettier.
-    pub(crate) fn split_separator_gap_comments(
+    /// Caller idiom: `let after = self.split_comma_gap_comments(parts, elem_end,
+    /// comma_pos); parts.push(","); parts.extend(after);`. Emitting an own-line comment
+    /// *before* the separator would put the separator on the comment's line — a `//`
+    /// swallows it (content loss), a block just diverges from prettier.
+    ///
+    /// The **comma's** binding of both axes: a same-line block stays before it, and a
+    /// blank line above a deferred own-line comment does NOT survive it. Neither is a
+    /// caller preference — the `;` terminators state their own through
+    /// [`Self::push_semicolon_with_gap_comments`] (blank preserved at either block
+    /// binding, since a `;` ends its line) and the type-member one through
+    /// [`Self::split_member_terminator_gap_comments`].
+    pub(crate) fn split_comma_gap_comments(
         &self,
         parts: &mut DocBuf,
         start: u32,
         sep_pos: u32,
-        block_after_separator: bool,
     ) -> DocBuf {
-        // The two axes move together here: a `;` terminator (`true`) trails a same-line
-        // block after the separator AND preserves a blank line, while a `,`/for-header
-        // separator (`false`) does neither. The mixed `MemberTerminator` case (block
-        // before, blank preserved) uses `split_member_terminator_gap_comments`.
-        self.push_gap_comments(
-            parts,
-            start,
-            sep_pos,
-            block_after_separator,
-            block_after_separator,
-            self.d().hardline(),
-        )
+        self.push_gap_comments(parts, start, sep_pos, false, false, self.d().hardline())
     }
 
     /// The **for-header `;`** variant of
-    /// [`split_separator_gap_comments`](Self::split_separator_gap_comments): the same
+    /// [`split_comma_gap_comments`](Self::split_comma_gap_comments): the same
     /// binding (a same-line block stays before the `;`, no blank preserved), but the
     /// break onto the deferred run's **first** line is the header's own `line`.
     ///
@@ -1409,8 +1401,7 @@ impl<'a> Printer<'a> {
         self.push_gap_comments(parts, start, sep_pos, false, false, self.d().line())
     }
 
-    /// The [`split_separator_gap_comments`](Self::split_separator_gap_comments) caller
-    /// idiom for a **`;` terminator**, in one call: the gap's pre-`;` comments, the `;`,
+    /// The gap-split caller idiom for a **`;` terminator**, in one call: the gap's pre-`;` comments, the `;`,
     /// then the comments that belong after it.
     ///
     /// The ordering is the reason this exists rather than three lines at each site: the
@@ -1421,25 +1412,56 @@ impl<'a> Printer<'a> {
     /// `block_after_separator` is the terminator's own axis, not a caller preference:
     /// `true` for a statement/member `;` (prettier trails a same-line block past it —
     /// `expr; /* c */`), `false` where the operand keeps it (`import =` / `export =` /
-    /// `export as namespace`). A caller whose split is *conditional* keeps the raw idiom.
+    /// `export as namespace`, the ambient module shorthand). A caller whose split is
+    /// *conditional* keeps the raw idiom.
+    ///
+    /// ⚠️ **The blank rule is the SEPARATOR's, not that axis's.** A `;` terminator ends
+    /// its line, so an author blank above a deferred own-line comment survives it in
+    /// prettier — at *both* block bindings, since where the same-line block sits says
+    /// nothing about what an own-line comment two lines down is worth. Reading the blank
+    /// off `block_after_separator` — which is the **comma's** rule
+    /// ([`Self::split_comma_gap_comments`]), not a `;`'s — silently dropped it at every
+    /// `false` site;
+    /// this passes `preserve_blank` unconditionally, which is also what makes this and
+    /// [`Self::split_member_terminator_gap_comments`] one answer rather than two.
+    ///
+    /// The gap's far end is derived from `span_end` — the node's own end — rather than
+    /// taken from the caller, because "where is my `;`" has one answer and every
+    /// terminator here is **optional under ASI**. Where the author wrote one the span
+    /// runs through it, so the `;` is the byte before `span_end`; where ASI ended the
+    /// statement the span stops at its content, and the subtraction every caller used to
+    /// spell inline lands *inside* that content instead — the assumed-delimiter-position
+    /// hazard, harmless only because the resulting range happens to be empty. Stating it
+    /// once keeps it that way by construction.
     pub(crate) fn push_semicolon_with_gap_comments(
         &self,
         parts: &mut DocBuf,
-        start: u32,
-        semicolon_pos: u32,
+        content_end: u32,
+        span_end: u32,
         block_after_separator: bool,
     ) {
-        let after =
-            self.split_separator_gap_comments(parts, start, semicolon_pos, block_after_separator);
+        let semicolon_pos = if span_end > content_end {
+            span_end - 1
+        } else {
+            content_end
+        };
+        let after = self.push_gap_comments(
+            parts,
+            content_end,
+            semicolon_pos,
+            block_after_separator,
+            true,
+            self.d().hardline(),
+        );
         parts.push(self.d().text(";"));
         parts.extend(after);
     }
 
-    /// The **type-member `;`** variant of `split_separator_gap_comments`: a same-line
+    /// The **type-member `;`** variant of the gap split: a same-line
     /// block stays *before* the `;` (`a: A /* c */;`, like a list separator) **but** a
     /// blank line before an own-line comment IS preserved (like a statement terminator).
     /// This mixed binding is what prettier does for a type-literal / interface member
-    /// terminator, which the single `block_after_separator` bool can't express. Same
+    /// terminator, which neither of its two siblings' bindings expresses. Same
     /// caller idiom (the returned own-line docs are emitted by the type-element *joiner*
     /// after its `;`, since the member doc doesn't own the `;`).
     pub(crate) fn split_member_terminator_gap_comments(
@@ -1708,10 +1730,8 @@ impl<'a> Printer<'a> {
         // The comma binds to the element; same-line gap comments stay before it
         // (block inline, line via `line_suffix`), own-line ones defer to after it
         // (leading the next element). A same-line block stays *before* the comma
-        // (`block_after_separator: false`) — prettier 3.9 only moved the `;` case.
-        // See `split_separator_gap_comments`.
-        let deferred_own_line =
-            self.split_separator_gap_comments(parts, elem_end, comma_pos, false);
+        // — prettier 3.9 only moved the `;` case. See `split_comma_gap_comments`.
+        let deferred_own_line = self.split_comma_gap_comments(parts, elem_end, comma_pos);
 
         // This gap's anchor-line split ([`Self::gap_anchor_line_end`]), resolved ONCE for
         // the three readers below — the deferred run's last comment, and each of the two

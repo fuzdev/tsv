@@ -148,11 +148,10 @@ impl<'a> Printer<'a> {
         // line via `line_suffix`, an own-line comment on its own line after. (Unlike
         // an empty *body* `;` — `if (a) /* c */ ;` — which keeps the comment inline;
         // the do-while `;` is the statement terminator.) See
-        // `split_separator_gap_comments`.
+        // `push_semicolon_with_gap_comments`.
         if let Some(close) = close_paren {
             parts.push(d.text(")"));
-            let semicolon_pos = stmt.span.end.saturating_sub(1);
-            self.push_semicolon_with_gap_comments(&mut parts, close + 1, semicolon_pos, true);
+            self.push_semicolon_with_gap_comments(&mut parts, close + 1, stmt.span.end, true);
         } else {
             parts.push(d.text(");"));
         }

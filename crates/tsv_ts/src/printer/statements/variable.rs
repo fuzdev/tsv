@@ -885,20 +885,18 @@ impl<'a> Printer<'a> {
         // declaration: a same-line block trails *after* it (`const x = 1 /* c */;` →
         // `const x = 1; /* c */`, prettier 3.9), a same-line line trails after it via
         // `line_suffix` (`const x = 1; // c`), an own-line comment drops to its own line
-        // after it (`const x = 1;⏎// c`). See `split_separator_gap_comments`.
+        // after it (`const x = 1;⏎// c`). See `push_semicolon_with_gap_comments`.
         if emit_semicolon {
-            let mut after = DocBuf::new();
             if let Some(last) = decl.declarations.last() {
-                let semicolon_pos = decl.span.end.saturating_sub(1);
-                after = self.split_separator_gap_comments(
+                self.push_semicolon_with_gap_comments(
                     &mut parts,
                     last.span.end,
-                    semicolon_pos,
+                    decl.span.end,
                     true,
                 );
+            } else {
+                parts.push(d.text(";"));
             }
-            parts.push(d.text(";"));
-            parts.extend(after);
         }
 
         // Restore context flags
