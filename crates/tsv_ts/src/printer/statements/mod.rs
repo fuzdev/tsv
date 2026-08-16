@@ -115,11 +115,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         let mut parts: DocBuf = if stmt.is_directive {
-            // Directives are exact code-unit sequences; `format_directive` mirrors
-            // Prettier's `printDirective` (swap the outer quote to single only when
-            // the content has no quote, else verbatim). Never parenthesized.
-            let raw = stmt.expression.span().extract(self.source);
-            smallvec![d.text_pooled(&format_directive(raw))]
+            smallvec![self.build_directive_doc(stmt)]
         } else {
             smallvec![self.build_expression_statement_value_doc(stmt, in_program_or_block)]
         };
@@ -133,6 +129,28 @@ impl<'a> Printer<'a> {
         let expr_end = stmt.expression.span().end;
         self.push_semicolon_with_gap_comments(&mut parts, expr_end, stmt.span.end, true);
         d.concat(&parts)
+    }
+
+    /// A directive-prologue entry's VALUE — the literal's own source bytes, plus the
+    /// comment glued to them.
+    ///
+    /// Directives are exact code-unit sequences; `format_directive` mirrors Prettier's
+    /// `printDirective` (swap the outer quote to single only when the content has no
+    /// quote, else verbatim). Never parenthesized, and never routed through
+    /// `build_expression_doc` — `format_string_literal` re-quotes and re-escapes, which
+    /// is precisely what a directive must not do.
+    ///
+    /// Which makes this a **reassembly** in the sense of `docs/comments.md` hazard 1: the
+    /// glued block the parser bound to the string token (`owned_by_node`) is skipped by
+    /// every gap emitter, so nothing else can print it and the claim belongs here. A
+    /// directive is a bare string literal by grammar, so the literal's span start is the
+    /// statement's first printed byte — the left-edge fact
+    /// [`Printer::prepend_owned_leading_comment_at`] asks each caller for.
+    fn build_directive_doc(&self, stmt: &internal::ExpressionStatement<'_>) -> DocId {
+        let d = self.d();
+        let span = stmt.expression.span();
+        let text = d.text_pooled(&format_directive(span.extract(self.source)));
+        self.prepend_owned_leading_comment_at(span.start, text)
     }
 
     /// The non-directive expression statement's VALUE — the expression plus whatever parens
