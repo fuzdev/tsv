@@ -15,4 +15,14 @@
 	function fn1() {
 		return x; /* t */
 	}
+
+	// A `throw` argument answers the same, including when the operand takes clarity
+	// parens: those close before the gap, so they hold nothing inside.
+	function fn2() {
+		throw (c = d); /* t */
+	}
+
+	// `export default` too — and its own clarity pair closes at the expression, so it
+	// never encloses this gap the way a `return` argument's retained parens do.
+	export default (e = f); /* t */
 </script>
