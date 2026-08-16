@@ -647,7 +647,32 @@ impl<'a> Printer<'a> {
             ]))
         };
 
-        let inner_expr = self.build_expression_doc(type_assert.expression);
+        // The operand→`)` gap: what the author wrote inside the operand's grouping
+        // shell, before the assertion's own end (`<T>(x /* c */)`). The parser strips
+        // such a shell, and the assertion's span is what ends at that `)` — so no
+        // enclosing gap can reach these comments and nothing printed them. tsv RETAINS
+        // the shell for them, on the criterion the `as`/`satisfies` operand shell
+        // already uses: a shell is redundant only when the stripped form can still
+        // express the comment's position, and here it cannot — stripping hands the
+        // comment to the statement's terminator gap, which puts it after the `;`
+        // (`<T>x; /* c */`), no longer trailing the operand it was written against, and
+        // not even a fixed point on the way there. An empty gap still strips, so the
+        // retention is the comment's doing (`build_paren_operand_comment_doc` → `None`).
+        // See conformance_prettier_ts_comments.md §Comment relocation
+        // (Angle-bracket assertion operand shell).
+        let operand_gap_start = type_assert.expression.span().end;
+        let operand_gap_end = type_assert.span.end;
+        let retains_shell = self.has_comments_to_emit_between(operand_gap_start, operand_gap_end);
+
+        // A retained shell is a *breaking* paren, so its operand takes the continuation
+        // indent one gives — the non-null operand's rule. Without it a binary operand's
+        // continuation lines snap back to the enclosing indent, outside the `(` that is
+        // now being printed around them.
+        let inner_expr = if retains_shell {
+            self.build_expression_doc_with_indent_on_break(type_assert.expression)
+        } else {
+            self.build_expression_doc(type_assert.expression)
+        };
         let expr_doc = if expr_needs_parens {
             d.parens(inner_expr)
         } else {
@@ -675,9 +700,21 @@ impl<'a> Printer<'a> {
         // fixture follows.
         if self.has_line_comments_between(close_angle + 1, expr_start) {
             let trailing = self.build_trailing_gap_comments(close_angle + 1, expr_start);
+            // The retained shell supplies the operand's pair, so its body is the bare
+            // expression — `expr_needs_parens` would make it a second one. The
+            // `>`→operand comments are already in `trailing`, so they stay out of it.
+            let operand_doc = self
+                .build_paren_operand_comment_doc(
+                    operand_gap_start,
+                    operand_gap_end,
+                    inner_expr,
+                    inner_expr,
+                    ")",
+                )
+                .unwrap_or(expr_doc);
             return d.concat(&[
                 cast_doc,
-                d.indent(d.concat(&[d.concat(&trailing), d.hardline(), expr_doc])),
+                d.indent(d.concat(&[d.concat(&trailing), d.hardline(), operand_doc])),
             ]);
         }
 
@@ -689,6 +726,28 @@ impl<'a> Printer<'a> {
             CommentSpacing::Trailing,
             CommentFilter::BlockOnly,
         );
+
+        // A retained shell carries its own parens, so it bypasses the cast's break
+        // shell below rather than nesting inside it. The `>`→operand comments go
+        // INSIDE it, where the author wrote them (`<T>(/* c */ x /* d */)`) — emitting
+        // them onto the cast would move them out of the very parens being kept.
+        // `None` falls THROUGH to the layouts below rather than defaulting to the body:
+        // it means the gap had nothing to emit, and the body alone would have skipped
+        // both `expr_needs_parens` and the cast's break shell.
+        if retains_shell {
+            // The operand has one rendering here, so both layouts take the same body.
+            let body = d.concat(&[after_close_doc, inner_expr]);
+            if let Some(shell) = self.build_paren_operand_comment_doc(
+                operand_gap_start,
+                operand_gap_end,
+                body,
+                body,
+                ")",
+            ) {
+                return d.concat(&[cast_doc, shell]);
+            }
+        }
+
         let cast_group = d.concat(&[cast_doc, after_close_doc]);
 
         // `shouldBreakAfterCast`: object/array-literal expressions hug the cast
@@ -1122,7 +1181,7 @@ impl<'a> Printer<'a> {
                 None => inner_doc,
             };
             // The operand has one rendering here, so both layouts take the same body.
-            self.build_non_null_paren_operand_doc(
+            self.build_paren_operand_comment_doc(
                 argument_end,
                 non_null_expr.span.end,
                 body,
@@ -1198,7 +1257,7 @@ impl<'a> Printer<'a> {
             // chain's parenthesized base uses.
             let inner_start = non_null.expression.span().end;
             Some(
-                self.build_non_null_paren_operand_doc(
+                self.build_paren_operand_comment_doc(
                     inner_start,
                     non_null.span.end,
                     inner_doc,
