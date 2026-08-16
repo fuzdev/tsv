@@ -32,6 +32,13 @@
 		const d = 4;
 	}
 
+	// A string-named external module takes it too — the name is a literal, not an
+	// identifier, and the gap is the same one
+	declare module 'm' // c9
+	{
+		const f = 6;
+	}
+
 	// A single-line block comment collapses onto the header line and `{` hugs it
 	namespace N5 /* c8 */ {
 		const e = 5;

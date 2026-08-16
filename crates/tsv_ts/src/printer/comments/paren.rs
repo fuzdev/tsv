@@ -216,7 +216,7 @@ impl<'a> Printer<'a> {
     /// Used by return/throw, `export default`, and `export =` — the terminator callers
     /// whose argument may be parenthesized (unlike the expression-statement/var/
     /// class-property terminators, whose operand parens are consumed by inner printers —
-    /// they use `split_separator_gap_comments`).
+    /// they use `push_semicolon_with_gap_comments`).
     ///
     /// `keep_operand_line_inline` is set by callers that render the operand inside
     /// conditional grouping parens (the binary return/throw path). A same-line **line**
@@ -236,38 +236,52 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
+        // What physically precedes each comment — an **in-source** cursor that ADVANCES
+        // over every comment emitted, because own-line-ness is a question about a
+        // comment's own neighbours (docs/comments.md §Trailing and dangling runs). Held
+        // at `argument_end` it read the second half of an author-glued run across the
+        // first, called it own-line, and split the pair onto two lines.
+        let mut prev_end = argument_end;
+        // Whether anything is already buffered in a `line_suffix`. Once it is, a
+        // same-line block must buffer too: an inline emission renders at its doc
+        // position — right after the `;` — while the buffer flushes at the line's end,
+        // so the pair comes out REORDERED.
+        let mut run_deferred = false;
         for comment in comments_to_emit_in_range(self.comments, argument_end, span_end) {
-            let same_line = !self.has_newline_between(argument_end, comment.span.start);
-            if comment.is_block && same_line {
-                if operand_parens_printed && self.gap_has_close_paren(comment.span.end, span_end) {
-                    // Operand-attached (inside stripped parens): `return (x /* c */);`.
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                } else {
-                    // Statement-trailing block: trails after the `;` (prettier 3.9).
-                    deferred.push(d.text(" "));
-                    deferred.push(self.build_comment_doc(comment));
-                }
-            } else if !comment.is_block
-                && keep_operand_line_inline
-                && same_line
-                && self.gap_has_close_paren(comment.span.end, span_end)
-            {
+            let same_line = !self.has_newline_between(prev_end, comment.span.start);
+            let operand_enclosed =
+                same_line && self.gap_has_close_paren(comment.span.end, span_end);
+            if comment.is_block && operand_enclosed && operand_parens_printed {
+                // Operand-attached (inside stripped parens): `return (x /* c */);`.
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            } else if !comment.is_block && operand_enclosed && keep_operand_line_inline {
                 // Operand-attached line comment (inside stripped parens):
                 // `return (a && b // c\n);`. Stays inline before the `)`. Emitted as
                 // plain text — the caller's forced break means the following softline
                 // becomes the newline before `)`, so the comment never swallows it.
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
-            } else if !comment.is_block {
-                // Line comment: trails after the `;` via `line_suffix` (`return x; // c`).
-                deferred
-                    .push(d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)])));
+            } else if same_line {
+                // Statement-trailing, on the line it was written on: a block trails
+                // inline after the `;` (prettier 3.9), a line comment via `line_suffix`
+                // (`return x; // c`).
+                deferred.push(if run_deferred {
+                    self.build_trailing_line_comment_doc(comment)
+                } else {
+                    self.build_trailing_comment_doc(comment)
+                });
+                run_deferred |= !comment.is_block;
             } else {
-                // Own-line block comment: on its own line after the `;`.
-                deferred.push(d.hardline());
-                deferred.push(self.build_comment_doc(comment));
+                // Own-line — of EITHER kind. The break rides *inside* the `line_suffix`
+                // so it replays in run order after the `;`; a bare `hardline` here would
+                // render ahead of an already-buffered line comment and reorder the pair,
+                // and it dropped an author blank the terminator's own line survives.
+                let blank = self.has_blank_line_between(prev_end, comment.span.start);
+                deferred.push(self.build_trailing_comment_doc_own_line_blank(comment, blank));
+                run_deferred = true;
             }
+            prev_end = comment.span.end;
         }
         deferred
     }
@@ -819,7 +833,7 @@ impl<'a> Printer<'a> {
         // Every comment left here is a same-line block. Where the shell is the last
         // thing before a statement `;`, that block defers past the terminator — the same
         // answer the statement's own value-to-`;` gap gives once the shell is gone
-        // ([`Printer::split_separator_gap_comments`] and its terminator sibling), which is
+        // ([`Printer::push_semicolon_with_gap_comments`] and its terminator sibling), which is
         // what makes one pass enough. Keying the choice on the stripped `)` instead cannot
         // reach a fixed point: this output erases that `)`, so the next pass reads the
         // comment as statement-trailing and moves it (`(x /* t */);` → `x /* t */;` →

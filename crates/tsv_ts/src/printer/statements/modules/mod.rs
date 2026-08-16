@@ -973,8 +973,7 @@ impl<'a> Printer<'a> {
         // *before* the `;` (operand-attached — prettier 3.9 keeps it), while a same-line
         // **line** comment floats after the `;` via `line_suffix`. So this uses the
         // comma-style `block_after_separator: false`, not `finish_with_pre_semi`.
-        let semicolon_pos = decl.span.end.saturating_sub(1);
-        self.push_semicolon_with_gap_comments(&mut parts, ref_end, semicolon_pos, false);
+        self.push_semicolon_with_gap_comments(&mut parts, ref_end, decl.span.end, false);
         d.concat(&parts)
     }
 
@@ -1087,8 +1086,7 @@ impl<'a> Printer<'a> {
         ));
         // Trailing comment between the name and `;` (mirrors `export =` / import-equals):
         // a same-line block comment stays before `;`, a line comment floats after it.
-        let semicolon_pos = decl.span.end.saturating_sub(1);
-        self.push_semicolon_with_gap_comments(&mut parts, decl.id.span.end, semicolon_pos, false);
+        self.push_semicolon_with_gap_comments(&mut parts, decl.id.span.end, decl.span.end, false);
         d.concat(&parts)
     }
 }
