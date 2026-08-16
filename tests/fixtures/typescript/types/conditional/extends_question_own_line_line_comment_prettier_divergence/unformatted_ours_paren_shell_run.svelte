@@ -1,31 +1,32 @@
 <script lang="ts">
 	// A line comment on its own line before `?` keeps that line.
 	type A = B extends C
-		? // c
-			D
+		// c
+		? D
 		: E;
 
 	// Consecutive own-line comments each keep their line — merging them would turn
 	// the second `//` into text of the first.
 	type F = B extends C
-		? // c1
-			// c2
-			D
+		// c1
+		// c2
+		? D
 		: E;
 
 	// The false-branch sibling: an own-line run before `:` keeps its lines too.
 	type H = B extends C
 		? D
-		: // c1
-			// c2
-			E;
+		// c1
+		// c2
+		: E;
 
 	// A paren shell's relocated run and an own-line gap comment coexist on their own
 	// lines: only a comment that would SHARE the destination line declines the
 	// relocation, and an own-line one never can
-	type I = J extends K // c1
-		? // c2
-			L
+	type I = J extends (// c1
+		K)
+		// c2
+		? L
 		: M;
 
 	// Control: a comment the author left on the extends-type's line trails it.

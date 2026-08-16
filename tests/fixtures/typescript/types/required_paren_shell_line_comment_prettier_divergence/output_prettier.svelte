@@ -1,0 +1,53 @@
+<script lang="ts">
+	// Prefix type-operator operand
+	type A = keyof (B extends C ? D : E); // c
+
+	// The union operand prettier answers the same way — the control that shows the
+	// retention is not a blanket preference
+	type F = keyof (
+		G | H // c
+	);
+
+	// Optional tuple element
+	type I = [
+		(J extends K ? L : M)? // c
+	];
+
+	// Conditional check position
+	type N = (O extends P ? Q : R) extends S // c
+		? T
+		: U;
+
+	// Conditional `extends` position
+	type V = W extends (X extends Y ? Z : A1) // c
+		? B1
+		: C1;
+
+	// Array element, where the `[]` suffix rides outside the pair
+	type D1 = (E1 extends F1 ? G1 : H1)[]; // c
+
+	// Indexed-access object
+	type I1 = (J1 extends K1 ? L1 : M1)[N1]; // c
+
+	// The same pair with a LEADING run as well. The prefix operator is the one
+	// required-pair position that also has a keyword→value hang seam, and taking that
+	// hang stripped the very pair the operand needs
+	type Z2 = keyof // c1
+	(A3 extends B3 ? C3 : D3); // c2
+
+	// Type-parameter `extends` constraint, and its `infer` twin where the pair is not
+	// clarity but required — without it the enclosing conditional's `?` rebinds
+	function fn<
+		T extends // c1
+		(A extends B ? C : D) // c2
+	>(): void {}
+	type E2<F2> = F2 extends infer G2 extends // c1
+	(H2 extends I2 ? J2 : K2) // c2
+		? L2
+		: M2;
+
+	// Controls: with no comment each of these prints exactly one pair
+	type O1 = keyof (P1 extends Q1 ? R1 : S1);
+	type T1 = [(U1 extends V1 ? W1 : X1)?];
+	type Y1 = (Z1 extends A2 ? B2 : C2)[];
+</script>
