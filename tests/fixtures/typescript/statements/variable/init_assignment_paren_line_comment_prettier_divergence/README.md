@@ -11,8 +11,9 @@ stable under their respective formatters.
 
 tsv preserves the author's placement — the comment is inside the parens, trailing the
 operand — consistent with how it keeps the trailing comment inside for the block-comment
-case (`const w = (a = b /* c */)`), the sequence cases (`const x = (a, b // c)`), and the
-return value position
+case ([init_assignment_paren_block_comment](../init_assignment_paren_block_comment/),
+`const w = (a = b /* c */)` — that one MATCHES prettier), the sequence cases
+(`const x = (a, b // c)`), and the return value position
 ([value_position_trailing_comment](../../../expressions/sequence/value_position_trailing_comment/)).
 Prettier is internally inconsistent here: it keeps the *block* comment inside but
 relocates the *line* comment out past the `;`. Per Comment Position Philosophy, tsv
