@@ -22,8 +22,9 @@ use super::arg_wrapping::{
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
     build_expand_all_args, build_expand_first_arg_doc, build_inline_args,
     build_inline_hug_or_expand_all, build_inline_or_expand_all, build_own_line_post_arrow_state,
-    build_printed_argument_doc, could_expand_arrow_chain, last_arg_has_own_line_post_arrow_comment,
-    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    build_printed_argument_doc, could_expand_arrow_chain, first_arg_signature_refuses_expand_first,
+    last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
+    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
@@ -407,7 +408,9 @@ pub(super) fn build_call_doc_with_wrapping(
     // The inline tail can carry neither a comment running to EOL nor one leading the first
     // argument. Named rather than inlined, matching the `new` twin.
     let expand_first_blocked = arg_trailing_line_comment
-        || (call_has_comments && first_arg_has_any_comments(call.arguments, printer, paren_open));
+        || (call_has_comments
+            && (first_arg_has_any_comments(call.arguments, printer, paren_open)
+                || first_arg_signature_refuses_expand_first(printer, call.arguments)));
     if should_expand_first_arg(printer, call.arguments) && !expand_first_blocked {
         return build_expand_first_arg_doc(
             printer,
