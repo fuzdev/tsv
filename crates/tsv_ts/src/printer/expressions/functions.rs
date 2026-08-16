@@ -250,25 +250,73 @@ pub(in crate::printer) fn arrow_signature_has_breaking_comments(
     arrow: &internal::ArrowFunctionExpression<'_>,
 ) -> bool {
     // `arrow_token` is the `=>`, captured by the parser for exactly this kind of question.
-    // An unparenthesized `x => …` has no `(`, so the signature starts at the arrow node
-    // itself — which still catches `x /* a⏎b */ => y`.
-    let start = arrow.params_start.unwrap_or(arrow.span.start);
+    //
+    // **An EMPTY parameter list refuses nothing that `printFunctionParameters` owns.** Its
+    // `parameters.length === 0` arm returns the `(…)` doc *before* the bailout throw, so
+    // neither a broken type-parameter list nor a dangling `()` comment can defeat the hug
+    // (`fn(x, <⏎// c⏎T>() => {…})` and `fn(x, ( // c⏎): T => {…})` both stay hugged). What
+    // survives an empty list is the return type, because `printArrowFunctionSignature` asks
+    // `willBreak(returnTypeDoc)` itself, outside that early return — so the region shrinks
+    // to what follows `)`.
+    //
+    // With parameters present the region opens at the **type parameters**, not at the `(`:
+    // the bailout is `willBreak(typeParametersDoc) || willBreak(printed)`, one question over
+    // both, so a break forced inside `<…>` refuses the hug exactly as one inside the
+    // parameter list does — and the `>`→`(` gap between them belongs to the same region.
+    // Starting at the `(` asked only the second half, which hugged
+    // `fn(x, <⏎// c⏎T>(a: T) => {…})` onto the callee's line in every spelling.
+    // An unparenthesized `x => …` has no `(` either, so the region then opens at the arrow
+    // node itself — which still catches `x /* a⏎b */ => y`.
+    let start = if arrow.params.is_empty() {
+        arrow
+            .params_start
+            .and_then(|open| printer.find_closing_paren(open, arrow.arrow_token))
+            .unwrap_or(arrow.arrow_token)
+    } else {
+        arrow.type_parameters.as_ref().map_or_else(
+            || arrow.params_start.unwrap_or(arrow.span.start),
+            |type_params| type_params.span.start,
+        )
+    };
     printer.range_has_layout_stable_break_forcing_comment(start, arrow.arrow_token)
         || printer.arrow_trailing_param_comment_forces_break(arrow)
 }
 
-/// [`arrow_signature_has_breaking_comments`] for a `function` expression — the same refusal
-/// over the same kind of region, ending at the body's `{` since there is no `=>` to stop at.
+/// [`arrow_signature_has_breaking_comments`] for a `function` expression — the same refusal,
+/// over a **strictly smaller region**, because `printFunction` reaches the bailout by only
+/// one of the arrow's three routes.
 ///
 /// The **expand-last-argument hug asks one question regardless of the callback's kind.** Its
 /// arrow twin was gated at every hug state and this had no gate at all, so a `function`
 /// callback whose signature is forced to break kept a hug the arrow refuses
 /// (`fn(x, function (y // c⏎) { … })`).
+///
+/// But the region is the **parameter list only**, and its two exclusions are the oracle's,
+/// not an omission:
+///
+/// - **Type parameters are out.** `printFunction` prints them itself
+///   (`print("typeParameters")`, beside the group) and passes no `shouldPrintTypeParameters`,
+///   so `typeParametersDoc` is `""` where the throw reads it — `fn(x, function <⏎// c⏎T>(a: T)
+///   {…})` keeps the hug where its arrow spelling loses it.
+/// - **The return type is out.** The `willBreak(returnTypeDoc)` throw lives in
+///   `printArrowFunctionSignature`; `printFunction` has no counterpart, so it hugs
+///   `fn(x, function (p): // c⏎T {…})`. The region therefore stops at the return type's `:`
+///   — but not before it, since a comment in the `)`→`:` gap attaches to the **last
+///   parameter** and so does break `printed`.
+/// - And as for the arrow, an **empty** parameter list takes the
+///   `parameters.length === 0` early return, ahead of the throw, so nothing in it refuses.
 pub(in crate::printer) fn function_signature_has_breaking_comments(
     printer: &Printer<'_>,
     func: &internal::FunctionExpression<'_>,
 ) -> bool {
-    printer.range_has_layout_stable_break_forcing_comment(func.params_start, func.body.span.start)
+    let end = if func.params.is_empty() {
+        func.params_start
+    } else {
+        func.return_type
+            .as_ref()
+            .map_or(func.body.span.start, |return_type| return_type.span.start)
+    };
+    printer.range_has_layout_stable_break_forcing_comment(func.params_start, end)
         || printer.function_trailing_param_comment_forces_break(func)
 }
 
@@ -1696,23 +1744,22 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Params + return type + single-param hug + signature end, shared with
-        // `build_callable_signature_doc`.
-        let (params_doc, return_type_doc, sig_end) = self.build_signature_params_return(
+        // Params + return type in their own group, with the type parameters left OUTSIDE
+        // it — the declaration twin's shape, and prettier's: `printFunction` emits
+        // `print("typeParameters")` beside `group([parametersDoc, returnTypeDoc])`, never
+        // inside it. Grouping all three together made a break forced inside `<…>` break the
+        // parameter list along with it (`function <⏎// c⏎T>(⏎x: T⏎)`), which the declaration
+        // and class-method paths — the same signature, through the same helper — never did.
+        let (sig_doc, sig_end) = self.build_callable_signature_doc(
             func.params,
             func.type_parameters.as_ref(),
             func.return_type.as_ref(),
             func.params_start,
             body_start,
         );
+        sig_parts.push(sig_doc);
 
-        sig_parts.push(params_doc);
-        if let Some(rt_doc) = return_type_doc {
-            sig_parts.push(rt_doc);
-        }
-
-        // Wrap signature in a group for width-aware breaking
-        (d.group(d.concat(&sig_parts)), sig_end)
+        (d.concat(&sig_parts), sig_end)
     }
 
     /// Build a Doc for function expression body (type params, params, return type, body).

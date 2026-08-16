@@ -17,7 +17,8 @@ use super::arg_predicates::{
 use super::arg_wrapping::{
     ArgItem, ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
     build_chain_expand_all_args, build_own_line_post_arrow_state, build_printed_argument_doc,
-    classify_chain_arg, last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
+    classify_chain_arg, first_arg_signature_refuses_expand_first,
+    last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     wrap_args_with_soft_breaks, wrap_huggable_arg,
@@ -1403,13 +1404,18 @@ fn build_chain_args_multi(
     // shared `should_expand_first_arg` — the chain used to inline a copy of it, which is how
     // one of the two gets a fix and the other doesn't. Only the chain-specific refusals are
     // spelled out here.
+    // The refusals are one negated disjunction rather than a run of `&& !`: the shape test
+    // says the layout applies, and everything inside the parens is a reason it cannot.
     if should_expand_first_arg(printer, call.arguments)
-        && !comments_force_expansion
-        // `has_any_comment_text`, not `has_any_comments`: refusing the expand-FIRST hug is a
-        // LAYOUT decision, so it must see a comment the first argument owns and prints
-        // itself — the twin of the expand-last gate above.
-        && !(has_any_comment_text
-            && first_arg_has_any_comments(call.arguments, printer, paren_open))
+        && !(comments_force_expansion
+            // `has_any_comment_text`, not `has_any_comments`: refusing the expand-FIRST hug is
+            // a LAYOUT decision, so it must see a comment the first argument owns and prints
+            // itself — the twin of the expand-last gate above.
+            || (has_any_comment_text
+                && first_arg_has_any_comments(call.arguments, printer, paren_open))
+            // Prettier's `ArgExpansionBailout` reached through `expandFirstArg`; the plain-call
+            // and `new` twins fold the same call into their `expand_first_blocked`.
+            || first_arg_signature_refuses_expand_first(printer, call.arguments))
     {
         // First arg (callback) expands, tail args stay inline
         let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);

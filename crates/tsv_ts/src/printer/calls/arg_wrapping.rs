@@ -18,7 +18,9 @@ use super::arg_predicates::{
     is_short_second_arg_for_expand_first,
 };
 use crate::ast::internal;
-use crate::printer::expressions::functions::{arrow_token_end, has_leftmost_object_expression};
+use crate::printer::expressions::functions::{
+    arrow_signature_has_breaking_comments, arrow_token_end, has_leftmost_object_expression,
+};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -1281,6 +1283,32 @@ pub(super) fn should_expand_first_arg(
     is_short_second_arg_for_expand_first(&args[1], |start, end| {
         printer.has_comments_on_page_between(start, end)
     })
+}
+
+/// Whether the first argument's own signature refuses the expand-FIRST hug — prettier's
+/// `ArgExpansionBailout` reached through `expandFirstArg` instead of `expandLastArg`.
+///
+/// The expand-first hug renders the first argument's signature head on the callee's line,
+/// so a break forced inside that signature cannot be honored, exactly as at the expand-last
+/// states ([`arrow_signature_has_breaking_comments`], which this delegates to so the two
+/// directions ask one question).
+///
+/// **Arrow only, deliberately.** `printArrowFunctionSignature` takes
+/// `shouldExpandParameters = expandLastArg || expandFirstArg`, so an arrow bails out in both
+/// directions; `printFunction` gates its own on `args.expandLastArg` **alone**, so a
+/// `function` first argument never bails out and keeps the hug with its signature broken —
+/// in every callee spelling (plain call, `new`, member chain). Reaching for the kind-agnostic
+/// [`callback_signature_has_breaking_comments`](crate::printer::expressions::functions::callback_signature_has_breaking_comments)
+/// here would expand a list prettier hugs.
+pub(super) fn first_arg_signature_refuses_expand_first(
+    printer: &Printer<'_>,
+    args: &[internal::Expression<'_>],
+) -> bool {
+    matches!(
+        args.first(),
+        Some(internal::Expression::ArrowFunctionExpression(arrow))
+            if arrow_signature_has_breaking_comments(printer, arrow)
+    )
 }
 
 /// Append type arguments (`fn<T>`, `new Foo<K, V>`) to a callee doc, preserving

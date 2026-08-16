@@ -9,8 +9,9 @@ use super::arg_comments::{
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, build_call_args_with_blank_lines, build_empty_args_doc,
     build_expand_first_arg_doc, build_own_line_post_arrow_state,
-    last_arg_has_own_line_post_arrow_comment, should_expand_first_arg, try_hook_deps_args_doc,
-    try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
+    first_arg_signature_refuses_expand_first, last_arg_has_own_line_post_arrow_comment,
+    should_expand_first_arg, try_hook_deps_args_doc, try_hug_multiline_template_arg,
+    wrap_call_with_soft_breaks,
 };
 use crate::ast::internal;
 use crate::printer::calls::arg_predicates::{
@@ -460,7 +461,8 @@ impl<'a> Printer<'a> {
         // cascade's zero-comment fast gate, so a comment-free `new` asks neither predicate.
         let expand_first_blocked = new_has_comments
             && (has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self)
-                || first_arg_has_any_comments(new_expr.arguments, self, paren_open));
+                || first_arg_has_any_comments(new_expr.arguments, self, paren_open)
+                || first_arg_signature_refuses_expand_first(self, new_expr.arguments));
         // One `printCallArguments` prints both spellings, so the layout is the plain call's
         // (`build_expand_first_arg_doc`), not a copy of it.
         if should_expand_first_arg(self, new_expr.arguments) && !expand_first_blocked {

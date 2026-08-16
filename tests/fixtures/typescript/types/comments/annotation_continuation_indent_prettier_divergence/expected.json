@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1513,
+	"end": 1791,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -409,24 +409,88 @@
 					"column": 11
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " The `function` spelling of that call argument stays HUGGED — its return type is not",
+			"start": 1505,
+			"end": 1591,
+			"loc": {
+				"start": {
+					"line": 70,
+					"column": 1
+				},
+				"end": {
+					"line": 70,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " part of the hug question the arrow's is — so the head's own line is the callee's, and",
+			"start": 1593,
+			"end": 1681,
+			"loc": {
+				"start": {
+					"line": 71,
+					"column": 1
+				},
+				"end": {
+					"line": 71,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the continuation indents one level below it",
+			"start": 1683,
+			"end": 1729,
+			"loc": {
+				"start": {
+					"line": 72,
+					"column": 1
+				},
+				"end": {
+					"line": 72,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 1752,
+			"end": 1758,
+			"loc": {
+				"start": {
+					"line": 73,
+					"column": 22
+				},
+				"end": {
+					"line": 73,
+					"column": 28
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1512,
+		"end": 1790,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1503,
+			"end": 1781,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 69,
+					"line": 77,
 					"column": 9
 				}
 			},
@@ -2585,6 +2649,264 @@
 							"value": " arrow's head wherever that head sits, call argument included",
 							"start": 1382,
 							"end": 1445
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1731,
+					"end": 1780,
+					"loc": {
+						"start": {
+							"line": 73,
+							"column": 1
+						},
+						"end": {
+							"line": 76,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1731,
+						"end": 1779,
+						"loc": {
+							"start": {
+								"line": 73,
+								"column": 1
+							},
+							"end": {
+								"line": 76,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1731,
+							"end": 1734,
+							"loc": {
+								"start": {
+									"line": 73,
+									"column": 1
+								},
+								"end": {
+									"line": 73,
+									"column": 4
+								}
+							},
+							"name": "fn2"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1735,
+								"end": 1736,
+								"loc": {
+									"start": {
+										"line": 73,
+										"column": 5
+									},
+									"end": {
+										"line": 73,
+										"column": 6
+									}
+								},
+								"name": "x"
+							},
+							{
+								"type": "FunctionExpression",
+								"start": 1738,
+								"end": 1778,
+								"loc": {
+									"start": {
+										"line": 73,
+										"column": 8
+									},
+									"end": {
+										"line": 76,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1748,
+										"end": 1749,
+										"loc": {
+											"start": {
+												"line": 73,
+												"column": 18
+											},
+											"end": {
+												"line": 73,
+												"column": 19
+											}
+										},
+										"name": "a"
+									}
+								],
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 1750,
+									"end": 1762,
+									"loc": {
+										"start": {
+											"line": 73,
+											"column": 20
+										},
+										"end": {
+											"line": 74,
+											"column": 3
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1761,
+										"end": 1762,
+										"loc": {
+											"start": {
+												"line": 74,
+												"column": 2
+											},
+											"end": {
+												"line": 74,
+												"column": 3
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1761,
+											"end": 1762,
+											"loc": {
+												"start": {
+													"line": 74,
+													"column": 2
+												},
+												"end": {
+													"line": 74,
+													"column": 3
+												}
+											},
+											"name": "X"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c13",
+												"start": 1752,
+												"end": 1758
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "BlockStatement",
+									"start": 1763,
+									"end": 1778,
+									"loc": {
+										"start": {
+											"line": 74,
+											"column": 4
+										},
+										"end": {
+											"line": 76,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 1767,
+											"end": 1775,
+											"loc": {
+												"start": {
+													"line": 75,
+													"column": 2
+												},
+												"end": {
+													"line": 75,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 1767,
+												"end": 1774,
+												"loc": {
+													"start": {
+														"line": 75,
+														"column": 2
+													},
+													"end": {
+														"line": 75,
+														"column": 9
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 1767,
+													"end": 1771,
+													"loc": {
+														"start": {
+															"line": 75,
+															"column": 2
+														},
+														"end": {
+															"line": 75,
+															"column": 6
+														}
+													},
+													"name": "call"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 1772,
+														"end": 1773,
+														"loc": {
+															"start": {
+																"line": 75,
+																"column": 7
+															},
+															"end": {
+																"line": 75,
+																"column": 8
+															}
+														},
+														"name": "a"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `function` spelling of that call argument stays HUGGED — its return type is not",
+							"start": 1505,
+							"end": 1591
+						},
+						{
+							"type": "Line",
+							"value": " part of the hug question the arrow's is — so the head's own line is the callee's, and",
+							"start": 1593,
+							"end": 1681
+						},
+						{
+							"type": "Line",
+							"value": " the continuation indents one level below it",
+							"start": 1683,
+							"end": 1729
 						}
 					]
 				}

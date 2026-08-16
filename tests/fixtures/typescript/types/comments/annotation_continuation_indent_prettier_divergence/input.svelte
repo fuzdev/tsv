@@ -66,4 +66,12 @@
 			call(a);
 		}
 	);
+
+	// The `function` spelling of that call argument stays HUGGED — its return type is not
+	// part of the hug question the arrow's is — so the head's own line is the callee's, and
+	// the continuation indents one level below it
+	fn2(x, function (a): // c13
+		X {
+		call(a);
+	});
 </script>

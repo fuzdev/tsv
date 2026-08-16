@@ -14,6 +14,16 @@ position is worth its own case because it is where the layout question is easies
 to mistake for a hug or call-argument question — it is neither; the indent is this
 rule and reproduces with no call in sight.
 
+`c13` is that argument's `function` spelling, and the two land on different lines
+for a reason outside this rule: a break in an **arrow**'s return type refuses the
+expand-last hug (prettier throws `ArgExpansionBailout` from
+`printArrowFunctionSignature`), while a `function`'s return type is never asked, so
+it stays hugged and its head line is the callee's. Both formatters agree on that
+hug; only the continuation's indent divides them, which is what makes the pair a
+clean read of this rule against a fixed head. The refusal itself is pinned
+separately by
+[calls/callback_signature_comment_expands_call](../../../expressions/calls/callback_signature_comment_expands_call/).
+
 tsv applies the **uniform forced-continuation indent**: the comment trails `:`
 where the author wrote it and the type drops to a continuation line indented one
 level, so it reads as part of the declaration, not a sibling. Prettier leaves the
