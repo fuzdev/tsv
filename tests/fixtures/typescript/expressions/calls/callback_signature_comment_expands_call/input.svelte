@@ -224,4 +224,124 @@ c23 */ a
 	fn((/* c26 */ a) => {
 		call(a);
 	});
+
+	// ... and in the TYPE-PARAMETER list, the region ahead of the parameters — a break
+	// there refuses the hug just the same, in every spelling
+	fn(
+		x,
+		<
+			// c27
+			T extends A
+		>(
+			a: T
+		) => {
+			call(a);
+		}
+	);
+	a.b().c(
+		x,
+		<
+			// c28
+			T extends A
+		>(
+			a: T
+		) => {
+			call(a);
+		}
+	);
+	new Comp(
+		x,
+		<
+			/* c29
+c29 */ T extends A
+		>(
+			a: T
+		) => {
+			call(a);
+		}
+	);
+
+	// The FIRST argument's signature refuses the expand-first hug the same way
+	fn(
+		<
+			// c30
+			T extends A
+		>(
+			a: T
+		) => {
+			call(a);
+		},
+		x
+	);
+	a.b().c(
+		(
+			// c31
+			a
+		) => {
+			call(a);
+		},
+		x
+	);
+	new Comp(
+		(
+			// c32
+			a
+		) => {
+			call(a);
+		},
+		x
+	);
+
+	// Control: a `function` argument prints its type parameters outside the signature
+	// question, so a break there keeps the hug — and leaves the parameters flat
+	fn(x, function <
+		// c33
+		T extends A
+	>(a: T) {
+		call(a);
+	});
+
+	// Control: in the FIRST position a `function` argument keeps the hug whatever its
+	// signature does — only an arrow's signature is reprinted for that hug
+	fn(function (
+		// c34
+		a
+	) {
+		call(a);
+	}, x);
+
+	// An EMPTY parameter list refuses nothing that the parameter printer owns: neither a
+	// broken type-parameter list nor a comment dangling in the `()` defeats the hug
+	fn(x, <
+		// c35
+		T extends A
+	>() => {
+		call();
+	});
+	fn(x, (
+		// c36
+	): T => {
+		call();
+	});
+	fn(x, function (
+		// c37
+	): T {
+		call();
+	});
+
+	// ... but an arrow's RETURN TYPE is asked separately, so it still refuses even there
+	fn(
+		x,
+		() /* c38
+c38 */ : T => {
+			call();
+		}
+	);
+
+	// A `function`'s return type is not asked at all, so a break there keeps the hug —
+	// the one region where the two callback kinds answer differently
+	fn(x, function (a): /* c39
+c39 */ T {
+		call(a);
+	});
 </script>
