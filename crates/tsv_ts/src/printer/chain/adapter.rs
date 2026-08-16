@@ -6,7 +6,7 @@
 // their only implementor.
 
 use crate::ast::internal;
-use crate::printer::{CommentSpacing, Printer, RunLeadingBlank, comments_to_emit_in_range};
+use crate::printer::{CommentSpacing, Printer, comments_to_emit_in_range};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment, Span};
@@ -46,61 +46,6 @@ impl<'a> Printer<'a> {
         optional: bool,
     ) -> DocId {
         self.build_call_args_doc_for_chain_standard_expanded(call, optional)
-    }
-
-    /// The one emitter for a comment the author wrote between a **parenthesized**
-    /// non-null operand and its `!` — `(x + y /* c */)!`, `(a?.b // c⏎)!`.
-    ///
-    /// tsv keeps such a comment INSIDE the parens, where it was written; prettier
-    /// relocates it past the `)` (cataloged as the non-null grouped-operand
-    /// divergences). Three callers reach the same gap and must answer it identically:
-    /// the standalone non-null whose operand needs its parens (`build_non_null_doc`'s
-    /// needs-parens arm), the chain's parenthesized base (`ChainNode::Base`'s
-    /// `paren_comment_end`), and the required-paren positions that never enter a
-    /// chain — a `new` callee and a template tag (`build_sealed_non_null_paren_doc`).
-    ///
-    /// Returns `None` when the gap holds nothing to emit, leaving the caller to
-    /// render its own bare parens.
-    ///
-    /// `broken_body` renders the line-comment layout — a `//` cannot trail inline
-    /// before the `)` (it would swallow it), so the operand goes multiline with the
-    /// comment inside; `flat_body` renders the inline block-comment one. `close` is
-    /// what follows the operand: `")"` where a separate node prints the `!`, `")!"`
-    /// where this doc owns it.
-    pub(crate) fn build_non_null_paren_operand_doc(
-        &self,
-        start: u32,
-        end: u32,
-        flat_body: DocId,
-        broken_body: DocId,
-        close: &'static str,
-    ) -> Option<DocId> {
-        let d = self.arena();
-        if self.has_line_comments_between(start, end) {
-            // Every comment in this gap was authored AFTER the operand — there is no
-            // next node for one to lead — so the whole run trails, in authored order,
-            // on the anchored emitter (the layout is vertical: the closer's hardline
-            // below ends every line, and flushes the run's deferred `//`s; a boundary
-            // instead would end the line first, landing a blank before the closer).
-            // A chain-gap classification here is a category error: its `leading_*`
-            // buckets would hoist an own-line comment above the operand.
-            let mut inner = DocBuf::with_capacity(4);
-            inner.push(d.hardline());
-            inner.push(broken_body);
-            self.push_anchored_trailing_run(&mut inner, start, end, RunLeadingBlank::Keep);
-            return Some(d.concat(&[
-                d.text("("),
-                d.indent(d.concat(&inner)),
-                d.hardline(),
-                d.text(close),
-            ]));
-        }
-        if self.has_comments_to_emit_between(start, end) {
-            let trailing =
-                self.build_chain_block_comments_doc(start, end, CommentSpacing::Leading, false);
-            return Some(d.concat(&[d.text("("), flat_body, trailing, d.text(close)]));
-        }
-        None
     }
 
     pub(crate) fn build_chain_block_comments_doc(
