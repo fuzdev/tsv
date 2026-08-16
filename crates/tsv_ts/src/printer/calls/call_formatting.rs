@@ -4,7 +4,7 @@
 // all the special cases for call expression formatting.
 
 use super::super::{
-    ParenContext, Printer, arrow_chain_has_return_type, container_may_have_multiline_content,
+    ParenContext, Printer, arrow_chain_should_break, container_may_have_multiline_content,
     has_multiline_content, is_curried_arrow_chain,
 };
 use super::arg_comments::{
@@ -895,12 +895,14 @@ fn build_block_arrow_hug_states(
     //   the hug's rendering separately would buy nothing and cost everything: a second build
     //   of this argument recurses into any call nested in its body, so the doc-node count
     //   goes 2^depth on `fn((a) => (b) => { return fn(…); })`.
-    // - **Typed chain** (a return type, type params, or a non-identifier param anywhere) —
-    //   the progressive layout is refused outright, so `skip_arrow_chain`'s *other* job is
-    //   what this position needs: it suppresses the nested-arrow break
-    //   (`chain_has_return_type` in `build_arrow_body`) so the body still hugs `=>`, which is
-    //   exactly the expand-last hug. `calls/curried_arrow_chain` pins it.
-    let arrow_doc = if is_curried_arrow_chain(arg) && arrow_chain_has_return_type(arrow) {
+    // - **Break-forcing chain** (`arrow_chain_should_break`: a return type with params, type
+    //   params, or a non-identifier param anywhere) — this position wants prettier's
+    //   `expandLastArg` print, which has no chain at all, so it builds the argument OUTSIDE
+    //   `build_printed_argument_doc` (no `ArrowChainContext` in scope, so the chain layout
+    //   declines on the context) and sets `skip_arrow_chain` for its *other* job: suppressing
+    //   the nested-arrow break (`chain_should_break` in `build_arrow_body`) so the body still
+    //   hugs `=>`, which is exactly that hug. `calls/curried_arrow_chain` pins it.
+    let arrow_doc = if is_curried_arrow_chain(arg) && arrow_chain_should_break(arrow) {
         printer.skip_arrow_chain.set(true);
         let doc = printer.build_expression_doc(arg);
         printer.skip_arrow_chain.set(false);

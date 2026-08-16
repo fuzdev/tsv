@@ -83,20 +83,27 @@ impl<'a> Printer<'a> {
     ///   `i + 1` is a hole the next real element lies past that comma, and a scan running
     ///   that far reads the hole's own line break as an author's blank line.
     ///
-    /// The scan stops where slot `i + 1`'s printed content begins, so a blank line the
-    /// author left ahead of that content is inside the measured range. `upper_override`
-    /// supplies that position for a caller that already knows it — the expanding printer,
-    /// which stops at slot `i + 1`'s first leading comment. With `None` the position is
-    /// derived here, and it is **not** simply the next element's start: an OWNED comment
-    /// prints ahead of the element's first token from inside its own doc, so the content
-    /// begins at the comment. Bounding past it puts the author's blank line — which lies
-    /// *before* the comment — outside the range, where it is silently dropped.
+    /// The scan stops where slot `i + 1`'s **printed content** begins, so a blank line the
+    /// author left ahead of that content is inside the measured range. That position has
+    /// three spellings, and this function owns all three so no caller can answer with a
+    /// subset:
     ///
-    /// The derivation lives here rather than at the call sites because a glued block
-    /// comment is not itself an expansion trigger (it is neither a line, a multi-line, nor
-    /// an own-line comment), so it reaches the width-wrapping and multiline-content
-    /// printers too — every caller needs this, and one that forgets it loses blank lines
-    /// silently.
+    /// 1. slot `i + 1`'s first **emitted** leading comment — the only one a caller can know,
+    ///    since which comments a gap emits is the caller's own collection
+    ///    (`emitted_leading_start`, supplied by the expanding printer; every other printer
+    ///    passes `None`);
+    /// 2. else slot `i + 1`'s **owned** comment, which prints ahead of the element's first
+    ///    token from *inside* the element's own doc and so is invisible to the **to emit**
+    ///    axis a caller's list rides — a bound taken from that list alone lands past the
+    ///    comment, putting the author's blank line, which lies *before* it, outside the
+    ///    range where it is silently dropped;
+    /// 3. else the element itself.
+    ///
+    /// ⚠️ 2 is not the expanding printer's business either, though it once derived it
+    /// alongside 1: a glued block comment is not an expansion trigger (neither a line, a
+    /// multi-line, nor an own-line comment), so it reaches the width-wrapping and
+    /// multiline-content printers too. Two copies of one derivation, and only the copy here
+    /// carried the range guard.
     ///
     /// The hole guard runs first, so the scan always anchors on a real element's end —
     /// which also keeps a nested element's commas (`[[1, 2], , x]`) behind it.
@@ -104,7 +111,7 @@ impl<'a> Printer<'a> {
         &self,
         arr: &internal::ArrayExpression<'_>,
         i: usize,
-        upper_override: Option<u32>,
+        emitted_leading_start: Option<u32>,
     ) -> bool {
         let Some(elem) = arr.elements[i].as_ref() else {
             return false;
@@ -115,25 +122,43 @@ impl<'a> Printer<'a> {
         // comment, and `upper` stops at that comment's start
         // ([`Printer::has_blank_line_after_comma`]).
         let next_real = self.next_element_boundary(arr, i);
-        let upper = upper_override.unwrap_or_else(|| {
-            // Slot `i + 1`'s own boundary unless a hole sits in front of it.
-            if matches!(arr.elements.get(i + 1), Some(None)) {
-                // A hole terminates at its own comma: the second past this element, the
-                // first being this element's own separator.
-                return self
-                    .find_comma_in_range(elem_end, next_real)
-                    .and_then(|comma| self.find_comma_in_range(comma + 1, next_real))
-                    .unwrap_or(next_real);
-            }
-            // Slot `i + 1`'s owned comment, when it has one — guarded to this gap, since
-            // the lookup is keyed on the element's own span start.
-            arr.elements
-                .get(i + 1)
-                .and_then(|e| e.as_ref())
-                .and_then(|e| self.owned_leading_comment_start(e))
-                .filter(|&p| p > elem_end && p < next_real)
-                .unwrap_or(next_real)
-        });
+
+        // A HOLE's printed content is its comma alone, so none of the three spellings above
+        // applies — whatever a caller emits in this gap prints *past* that comma, and
+        // bounding there reads the hole's own line break as an author's blank line.
+        if matches!(arr.elements.get(i + 1), Some(None)) {
+            // The hole's comma: the second past this element, the first being this
+            // element's own separator.
+            let hole_comma = self
+                .find_comma_in_range(elem_end, next_real)
+                .and_then(|comma| self.find_comma_in_range(comma + 1, next_real))
+                .unwrap_or(next_real);
+            // …but a comment BELOW this element's line does not print at that comma either —
+            // it slides forward past it to lead the next real element — so the scan still
+            // stops at the comment. Left to run the whole span,
+            // `has_blank_line_after_comma`'s own comment-skip steps over it and takes the
+            // author's blank line in FRONT of it along (`x,⏎⏎// c⏎,⏎y`).
+            // The ceiling opens at the element-comma SPLIT, not at `elem_end`: a comment the
+            // split claims TRAILS this element on its line, and prettier's
+            // `isNextLineEmptyAfterIndex` skips exactly those before measuring, so bounding
+            // at one would read the blank *after* it as absent (`x, // c⏎⏎,⏎y`). Both
+            // spellings are live, one per side of the split.
+            let split = self.element_gap_split(arr, i, elem_end, next_real);
+            let upper = self.blank_scan_end(split, hole_comma);
+            return self.has_blank_line_after_comma(elem_end, upper, next_real);
+        }
+
+        let upper = emitted_leading_start
+            .or_else(|| {
+                // Guarded to this gap: the lookup is keyed on the element's own span start,
+                // which says nothing about which gap the comment it finds sits in.
+                arr.elements
+                    .get(i + 1)
+                    .and_then(|e| e.as_ref())
+                    .and_then(|e| self.owned_leading_comment_start(e))
+                    .filter(|&p| p > elem_end && p < next_real)
+            })
+            .unwrap_or(next_real);
         self.has_blank_line_after_comma(elem_end, upper, next_real)
     }
 
@@ -955,20 +980,14 @@ impl<'a> Printer<'a> {
             };
 
             // The separator for the gap BEFORE this slot. It is emitted here, by the slot
-            // that follows the gap, because only this slot knows where its own printed
-            // content begins — and that position is what the blank-line scan must stop at,
-            // so that a blank line the author left ahead of the content is inside the
-            // measured range. It is one of:
+            // that follows the gap, because the ONE thing only this slot knows is which
+            // comments its gap actually emits — and the blank-line scan must stop at the
+            // first of them, so that a blank line the author left ahead of it is inside the
+            // measured range. Everything else about that bound (the owned-comment case, the
+            // hole case, the plain element case) is `has_blank_line_after_slot`'s, since
+            // those reach printers that emit no leading run at all.
             //
-            // - a leading comment, when this gap emits one;
-            // - else the element's OWNED comment, which prints ahead of its first token
-            //   from inside the element's doc — invisible to the **to emit** axis the
-            //   leading list rides, so a bound taken from that list alone lands past the
-            //   comment, and the blank line before it falls outside the range and is lost;
-            // - else `None`, letting `has_blank_line_after_slot` take this slot's own
-            //   boundary — for a hole its comma, rather than the next real element past it.
-            //
-            // ⚠️ A **hole** always takes `None`, whatever the list above holds. Its printed
+            // ⚠️ A **hole** hands over nothing, whatever this slot's list holds. Its printed
             // content is the comma alone, and the trailing-hole branch below fills
             // `leading_comments` with the ARRAY's trailing run, which sits *past* that
             // comma: bounding the scan there reads the hole's own line break as an author's
@@ -976,13 +995,11 @@ impl<'a> Printer<'a> {
             // comment on its own line where the next pass measures a real blank
             // (`[x⏎/* c */, , ]` → `[x,⏎,⏎/* c */]` → `[x,⏎⏎,⏎/* c */]`).
             if i > 0 {
-                let content_start = elem.as_ref().and_then(|e| {
-                    leading_comments
-                        .first()
-                        .map(|c| c.span.start)
-                        .or_else(|| self.owned_leading_comment_start(e))
-                });
-                if self.has_blank_line_after_slot(arr, i - 1, content_start) {
+                let emitted_leading_start = elem
+                    .as_ref()
+                    .and_then(|_| leading_comments.first())
+                    .map(|c| c.span.start);
+                if self.has_blank_line_after_slot(arr, i - 1, emitted_leading_start) {
                     parts.push(d.literalline());
                 }
                 parts.push(d.hardline());

@@ -349,7 +349,27 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// which is why the arm splits the run rather than wrapping it. Measured over the full
 	// corpus: this file is the only move in any bucket, and `partial` / `safety` / `errors` /
 	// `expected_errors` are unchanged.
-	typescript: 108,
+	//
+	// 108 → 104: FOUR files LEAVE the bucket by MATCHING (`match` 2394 → 2398 over the
+	// reproducible subset), from three independent rules that happened to be measured
+	// together. `js/binary-expressions/in_instanceof.js` — a UNARY left operand of
+	// `in`/`instanceof` now keeps prettier's clarity parens (`(!a) in b`), the rule its
+	// `**` sibling already had in `needs_parens_binary_operand`; an `UpdateExpression` is
+	// still bare, which is prettier's own `node.type` term and the file's own control.
+	// `js/arrays/numbers-with-holes.js` — the blank-line scan across an ELISION stops at the
+	// first comment BELOW the element's line instead of running the whole span, so a blank
+	// the author left in front of a hole survives the comment's slide past the hole's comma.
+	// `js/arrows/chain-as-arg.js` + `js/arrows/chain-in-logical-expression.js` — prettier's
+	// `shouldBreakChain` is now a curried chain's group `shouldBreak` in call-argument and
+	// binaryish position rather than a refusal of the chain layout, so those heads take the
+	// progressive indent they were one level short of. Measured by diffing the `unknown`
+	// lists against a reverse-patched build over the whole corpus: these four are the only
+	// moves in any bucket, nothing arrived in `unknown`, and `partial` / `safety` / `errors`
+	// / `expected_errors` are byte-identical.
+	// ⚠️ That same measurement puts the reproducible-subset `match` at 2394 BEFORE this
+	// change, well above `CORPUS_FORMAT_MATCH_MIN`'s 2335 — a pre-existing slack in that
+	// floor, unrelated to this entry and deliberately not folded into it.
+	typescript: 104,
 	css: 23
 };
 

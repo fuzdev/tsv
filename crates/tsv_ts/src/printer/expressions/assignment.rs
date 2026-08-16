@@ -181,14 +181,14 @@ pub fn choose_layout(
     print_width: usize,
     comments: &[Comment],
 ) -> AssignmentLayout {
-    // Untyped curried arrow chains (`(a) => (b) => …`) use fluid layout: break
-    // after `=` only when the signature heads don't fit on the operator line,
-    // letting a hugging body (object/array/block) expand in place otherwise.
-    // Typed chains (any arrow has a return type with params, type parameters, or
-    // a non-identifier param) instead force the break via break-after-operator
-    // (handled by `is_curried_arrow_with_return_type` below), so the heads always
-    // drop onto their own lines.
-    if is_curried_arrow_chain(right_expr) && !is_curried_arrow_with_return_type(right_expr) {
+    // A curried arrow chain (`(a) => (b) => …`) with no head triggering prettier's
+    // `shouldBreakChain` uses fluid layout: break after `=` only when the signature heads
+    // don't fit on the operator line, letting a hugging body (object/array/block) expand in
+    // place otherwise. A chain that DOES trigger it forces the break via break-after-operator
+    // (handled by `is_curried_arrow_chain_that_breaks` below) — the assignment RHS renders
+    // that break itself, which is why `should_use_arrow_chain_layout` declines the chain
+    // layout here and only here.
+    if is_curried_arrow_chain(right_expr) && !is_curried_arrow_chain_that_breaks(right_expr) {
         return AssignmentLayout::Fluid;
     }
 
@@ -232,9 +232,9 @@ pub fn choose_layout(
         return AssignmentLayout::BreakAfterOperator;
     }
 
-    // Curried arrow functions with return type → break after operator
+    // A curried chain whose heads trigger `shouldBreakChain` → break after operator.
     // Produces: `key:\n  (x: T): H =>\n  (y) =>\n    expr`
-    if is_curried_arrow_with_return_type(right_expr) {
+    if is_curried_arrow_chain_that_breaks(right_expr) {
         return AssignmentLayout::BreakAfterOperator;
     }
 
@@ -285,8 +285,8 @@ pub fn class_expr_has_decorators(c: &internal::ClassExpression<'_>) -> bool {
 /// They use Fluid layout (from choose_layout default) which allows breaking
 /// after the operator when the total line exceeds printWidth.
 ///
-/// Note: Curried arrow functions with return type annotations are NOT self-expanding.
-/// They need BreakAfterOperator to produce:
+/// Note: a curried arrow chain whose heads trigger `arrow_chain_should_break` is NOT
+/// self-expanding. It needs BreakAfterOperator to produce:
 ///   const f =
 ///       (x: T): H =>
 ///       (y) => ...
@@ -300,8 +300,8 @@ pub fn is_self_expanding_value(expr: &Expression<'_>) -> bool {
         // a *decorated* one breaks after the operator instead (`choose_layout`).
         Expression::ClassExpression(c) => !class_expr_has_decorators(c),
 
-        // Arrow functions are self-expanding UNLESS they're curried with return type
-        Expression::ArrowFunctionExpression(_) => !is_curried_arrow_with_return_type(expr),
+        // Arrow functions are self-expanding UNLESS the chain's heads force the break
+        Expression::ArrowFunctionExpression(_) => !is_curried_arrow_chain_that_breaks(expr),
 
         _ => false,
     }
@@ -327,32 +327,26 @@ pub fn should_inline_logical_expression(binary: &internal::BinaryExpression<'_>)
     }
 }
 
-/// Check if an expression is a curried arrow function where ANY arrow in the chain
-/// has a return type annotation (with params). Returns false for non-curried arrows.
-///
-/// Prettier breaks the entire chain if ANY arrow has:
-/// - return type annotation AND parameters
-/// - type parameters (generics)
-/// - non-identifier params (destructuring, defaults)
+/// [`arrow_chain_should_break`] asked of an expression: is this a curried chain, and does
+/// any head in it trigger prettier's `shouldBreakChain`? False for a non-curried arrow.
 ///
 /// Examples that break:
-///   const f = (x: T): H => (y) => expr    // outer has return type
-///   const f = (x: T) => (y): H => expr    // inner has return type
-///   const f = (x: T): A => (y): B => expr // both have return types
+///   const f = (x: T): H => (y) => expr    // outer has a return type AND parameters
+///   const f = (x: T) => (y): H => expr    // inner does
+///   const f = ({ a }) => (y) => expr      // a non-identifier parameter
 ///
 /// Examples that stay inline:
-///   const f = (x: T) => (y) => expr       // neither has return type
-pub fn is_curried_arrow_with_return_type(expr: &Expression<'_>) -> bool {
-    // A curried chain (body is another arrow) where ANY arrow carries a
-    // return type / type params / non-identifier param.
+///   const f = (x: T) => (y) => expr       // an annotated identifier is still simple
+///   const f = (): H => (y) => expr        // a return type with no parameters
+pub fn is_curried_arrow_chain_that_breaks(expr: &Expression<'_>) -> bool {
     is_curried_arrow_chain(expr)
-        && matches!(expr, Expression::ArrowFunctionExpression(arrow) if arrow_chain_has_return_type(arrow))
+        && matches!(expr, Expression::ArrowFunctionExpression(arrow) if arrow_chain_should_break(arrow))
 }
 
 /// Check if an expression is a curried arrow function (its body is another
 /// arrow). The terminal body may be an expression or a block. Used to route the
-/// assignment RHS through the arrow-chain layout regardless of whether the chain
-/// carries a return type.
+/// assignment RHS through the arrow-chain layout regardless of whether any head
+/// triggers the chain break.
 pub fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
     if let Expression::ArrowFunctionExpression(arrow) = expr {
         matches!(
@@ -365,14 +359,22 @@ pub fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
     }
 }
 
-/// Recursively check if any arrow in a curried chain should trigger chain breaking.
-/// Used by both assignment context (for break-after-equals) and arrow body formatting.
+/// Prettier's `shouldBreakChain` (`print/arrow-function.js`), accumulated over every head of
+/// a curried chain: the chain's heads each take their own line, however short the chain is,
+/// when ANY head has
+/// - a return type annotation **and** parameters,
+/// - type parameters (generics like `<T>`), or
+/// - a parameter that is not a plain identifier (destructuring, default, rest).
 ///
-/// Prettier breaks the chain if ANY arrow has:
-/// - return type annotation AND parameters
-/// - type parameters (generics like `<T>`)
-/// - non-identifier params (destructuring, defaults, rest)
-pub fn arrow_chain_has_return_type(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
+/// ⚠️ **It is a BREAK, not a refusal of the chain layout**, and the name says so because
+/// reading it the other way is the bug it has already caused: spelled as
+/// "has a return type", it was used to route such a chain *out* of
+/// `build_arrow_chain_doc` entirely, which silently dropped the break in every position
+/// where nothing else owned one (call argument, binaryish operand). The one site that still
+/// declines on it is the assignment RHS, where `choose_layout` answers the same question
+/// with `AssignmentLayout::BreakAfterOperator` and so renders the break itself — see
+/// `should_use_arrow_chain_layout`.
+pub fn arrow_chain_should_break(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
     // Check this arrow for breaking conditions:
     // 1. return_type AND has params
     // 2. type_params (generics)
@@ -394,7 +396,7 @@ pub fn arrow_chain_has_return_type(arrow: &internal::ArrowFunctionExpression<'_>
     if let internal::ArrowFunctionBody::Expression(body) = &arrow.body
         && let Expression::ArrowFunctionExpression(inner) = &**body
     {
-        return arrow_chain_has_return_type(inner);
+        return arrow_chain_should_break(inner);
     }
 
     false
