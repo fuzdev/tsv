@@ -814,7 +814,13 @@ impl<'a> Printer<'a> {
         let doc = if indent_binary && let internal::Expression::BinaryExpression(binary) = expr {
             self.build_binary_chain_doc_with_continuation_indent(binary)
         } else {
-            self.build_expression_doc_with_paren_comments(expr, boundary_end)
+            // `position_parens: false` — deliberately, not by oversight. A branch's pair
+            // comes from `parenthesize_ternary_branch`, which wraps the doc this returns
+            // and would have to skip its wrap in lockstep; the branch also answers a
+            // different oracle than a declarator does (prettier ejects a terminator-adjacent
+            // alternate's comment past the `;` here, and keeps it inside there). Converting
+            // this position is its own fixture cycle.
+            self.build_expression_doc_with_paren_comments(expr, boundary_end, false)
         };
         // Parenthesize an `in` consequent/alternate inside a for-header init
         // (`for (a = c ? (b in c) : 0;…)`); a no-op elsewhere. Prettier wraps every

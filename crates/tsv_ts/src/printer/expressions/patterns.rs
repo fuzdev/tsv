@@ -160,8 +160,11 @@ impl<'a> Printer<'a> {
         if let Some(op_pos) = op_pos
             && let Some(continuation) =
                 self.build_operator_value_continuation(rhs_comment_start, op_pos, operator, || {
-                    let value_doc = self
-                        .build_expression_doc_with_paren_comments(assign.right, assign.span.end);
+                    let value_doc = self.build_expression_doc_with_paren_comments(
+                        assign.right,
+                        assign.span.end,
+                        false,
+                    );
                     self.prepend_rhs_comments(
                         value_doc,
                         op_pos + operator.len() as u32,
@@ -241,7 +244,11 @@ impl<'a> Printer<'a> {
                 && rhs_comments.is_some()
                 && let Some(rhs_doc) =
                     self.broke_after_operator_rhs_doc(effective_rhs_start, rhs_comment_end, || {
-                        self.build_expression_doc_with_paren_comments(assign.right, assign.span.end)
+                        self.build_expression_doc_with_paren_comments(
+                            assign.right,
+                            assign.span.end,
+                            false,
+                        )
                     })
             {
                 return d.concat(&[
@@ -271,7 +278,7 @@ impl<'a> Printer<'a> {
         } else if let Expression::AssignmentExpression(rhs_assign) = assign.right {
             self.build_assignment_doc_with_context(rhs_assign, AssignmentContext::Chain)
         } else {
-            self.build_expression_doc_with_paren_comments(assign.right, assign.span.end)
+            self.build_expression_doc_with_paren_comments(assign.right, assign.span.end, false)
         };
 
         // Prepend inline comments to right doc if present

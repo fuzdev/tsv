@@ -1170,7 +1170,7 @@ impl<'a> Printer<'a> {
         self.mark_jsdoc_cast_value_gap(right_expr);
         let right_doc = self.build_with_arrow_chain_context(chain_context, || {
             if let Some(boundary) = rhs_info.boundary {
-                self.build_expression_doc_with_paren_comments(right_expr, boundary)
+                self.build_expression_doc_with_paren_comments(right_expr, boundary, false)
             } else {
                 self.build_expression_doc(right_expr)
             }
