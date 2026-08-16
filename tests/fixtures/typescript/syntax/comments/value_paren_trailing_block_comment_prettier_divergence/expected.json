@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 505,
+	"end": 899,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,120 @@
 					"column": 19
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A `throw` argument answers the same, including when the operand takes clarity",
+			"start": 497,
+			"end": 577,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " parens: those close before the gap, so they hold nothing inside.",
+			"start": 579,
+			"end": 646,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 682,
+			"end": 689,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 17
+				},
+				"end": {
+					"line": 22,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `export default` too — and its own clarity pair closes at the expression, so it",
+			"start": 695,
+			"end": 777,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " never encloses this gap the way a `return` argument's retained parens do.",
+			"start": 779,
+			"end": 855,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 881,
+			"end": 888,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 25
+				},
+				"end": {
+					"line": 27,
+					"column": 32
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 504,
+		"end": 898,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 495,
+			"end": 889,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 18,
+					"line": 28,
 					"column": 9
 				}
 			},
@@ -620,6 +716,228 @@
 							"value": " A `return` argument is a value position too.",
 							"start": 406,
 							"end": 453
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 648,
+					"end": 692,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 657,
+						"end": 660,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 10
+							},
+							"end": {
+								"line": 21,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 663,
+						"end": 692,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 16
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ThrowStatement",
+								"start": 667,
+								"end": 681,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 16
+									}
+								},
+								"argument": {
+									"type": "AssignmentExpression",
+									"start": 674,
+									"end": 679,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 9
+										},
+										"end": {
+											"line": 22,
+											"column": 14
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 674,
+										"end": 675,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 9
+											},
+											"end": {
+												"line": 22,
+												"column": 10
+											}
+										},
+										"name": "c"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 678,
+										"end": 679,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 13
+											},
+											"end": {
+												"line": 22,
+												"column": 14
+											}
+										},
+										"name": "d"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 682,
+										"end": 689
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `throw` argument answers the same, including when the operand takes clarity",
+							"start": 497,
+							"end": 577
+						},
+						{
+							"type": "Line",
+							"value": " parens: those close before the gap, so they hold nothing inside.",
+							"start": 579,
+							"end": 646
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 857,
+					"end": 880,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 24
+						}
+					},
+					"declaration": {
+						"type": "AssignmentExpression",
+						"start": 873,
+						"end": 878,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 17
+							},
+							"end": {
+								"line": 27,
+								"column": 22
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 873,
+							"end": 874,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 17
+								},
+								"end": {
+									"line": 27,
+									"column": 18
+								}
+							},
+							"name": "e"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 877,
+							"end": 878,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 21
+								},
+								"end": {
+									"line": 27,
+									"column": 22
+								}
+							},
+							"name": "f"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `export default` too — and its own clarity pair closes at the expression, so it",
+							"start": 695,
+							"end": 777
+						},
+						{
+							"type": "Line",
+							"value": " never encloses this gap the way a `return` argument's retained parens do.",
+							"start": 779,
+							"end": 855
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 881,
+							"end": 888
 						}
 					]
 				}

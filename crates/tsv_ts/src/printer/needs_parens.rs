@@ -30,6 +30,20 @@ pub enum ParenContext {
     /// Variable declarator init: `const x = <expr>`
     VariableInit,
 
+    /// `for`-in / `for`-of iterable: `for (const x of <expr>)`
+    ///
+    /// An assignment as a value takes clarity parens here exactly as it does at a
+    /// declarator init. Prettier's `for` exemption for an assignment is keyed on
+    /// `ForStatement` init/update — a C-style header's own clause expression — and does
+    /// not reach `ForInStatement` / `ForOfStatement`.
+    ForInOfRight,
+
+    /// TypeScript export assignment value: `export = <expr>`
+    ///
+    /// The `export default` twin, minus its leftmost-token rule
+    /// ([`export_default_needs_parens`]) — nothing here can reparse as a declaration.
+    ExportAssignment,
+
     /// Expression statement: `<expr>;`
     ExpressionStatement,
 
@@ -159,8 +173,13 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         return true;
     }
     match ctx {
-        // Assignment as value needs parens: `const x = (y = z);`
-        ParenContext::VariableInit => matches!(expr, Expression::AssignmentExpression(_)),
+        // Assignment as value needs parens: `const x = (y = z);`,
+        // `for (const x of (y = z))`, `export = (y = z);`. A sequence supplies its own
+        // pair, and every other operand here (`??`, `as`, a ternary, `await`) is bare in
+        // prettier too.
+        ParenContext::VariableInit
+        | ParenContext::ForInOfRight
+        | ParenContext::ExportAssignment => assignment_value_needs_parens(expr),
 
         // Object pattern assignment needs parens: `({a} = x);`
         ParenContext::ExpressionStatement => needs_parens_expression_statement(expr),
@@ -640,11 +659,21 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
     walk(expr, false)
 }
 
-/// Whether `export default <expr>;` must wrap the expression in parens — true iff
-/// its first *printed* token would be a bare `function`/`class` keyword, which the
-/// grammar reads as a (hoisted) declaration, leaving the rest of the expression
+/// Whether `export default <expr>;` wraps the expression in parens — for either of two
+/// independent reasons.
+///
+/// **Semantic:** its first *printed* token would be a bare `function`/`class` keyword,
+/// which the grammar reads as a (hoisted) declaration, leaving the rest of the expression
 /// (`.m()`, `= 1`, `as T`) dangling and unreparseable. Mirrors prettier's
 /// `startsWithNoLookaheadToken(expr, isFunctionOrClass)` (parentheses/needs-parentheses.js).
+///
+/// **Clarity:** the value is an assignment ([`assignment_value_needs_parens`]) — the same
+/// answer every other value position gives. The two overlap only on an assignment whose
+/// leftmost token is a class/function, and either reason alone emits the one pair.
+///
+/// ⚠️ A `true` here does **not** mean the pair encloses the value's trailing comment gap:
+/// it closes at the expression, so `export default`'s terminator split passes
+/// `operand_parens_printed: false` (see `build_export_default_value_doc`).
 ///
 /// Unlike the shared `leftmost_no_lookahead`, the callee/tag/object descent is
 /// **paren-aware**: it stops when that child is itself parenthesized (a binary
@@ -655,10 +684,29 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
 /// conditional test, cast operand, …) print the keyword bare, so they recurse
 /// unconditionally like `leftmost_no_lookahead`.
 pub(crate) fn export_default_needs_parens(expr: &Expression<'_>) -> bool {
-    matches!(
-        export_default_leftmost(expr),
-        Expression::FunctionExpression(_) | Expression::ClassExpression(_)
-    )
+    // Two independent reasons for one pair — the value-position assignment rule below,
+    // and the leftmost-token rule this function is named for.
+    assignment_value_needs_parens(expr)
+        || matches!(
+            export_default_leftmost(expr),
+            Expression::FunctionExpression(_) | Expression::ClassExpression(_)
+        )
+}
+
+/// An assignment used as a VALUE takes clarity parens (`const x = (y = z);`).
+///
+/// Prettier's rule for `AssignmentExpression` is default-TRUE with a short exemption
+/// list, so this is the shape of nearly every value position: the declarator init, a
+/// `for`-in/of iterable, `export =`, and `export default`. The exemptions it does grant —
+/// a C-style `for` header's own init/update clause, an expression statement, a chained
+/// assignment's RHS, an object-pattern property value — are each answered by *their*
+/// context arm returning false, never here.
+///
+/// One predicate rather than a `matches!` per position: the four sites were four separate
+/// answers, and three of them were missing (`for (let i = (a = b); ;)`,
+/// `for (const x of (a = b))`, `export = (a = b)` all dropped the pair).
+fn assignment_value_needs_parens(expr: &Expression<'_>) -> bool {
+    matches!(expr, Expression::AssignmentExpression(_))
 }
 
 fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {

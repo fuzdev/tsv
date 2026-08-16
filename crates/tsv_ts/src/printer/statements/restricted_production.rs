@@ -112,30 +112,33 @@ impl<'a> Printer<'a> {
             // A line comment trails after the `;` in both keywords (`(a = b); // c`).
             // A same-line block comment differs (prettier is inconsistent between the
             // two): `return` keeps it INSIDE the parens (`return (a = b /* c */);`,
-            // #19263 — operand-attached), `throw` floats it OUT after `)`
-            // (`throw (a = b) /* c */;`).
-            if keyword == "return" {
-                let after = if has_trailing_comments {
-                    self.split_terminator_gap_comments(
-                        &mut parts,
-                        argument_end,
-                        span_end,
-                        false,
-                        true,
-                    )
-                } else {
-                    DocBuf::new()
-                };
-                parts.push(d.text(")"));
-                parts.push(d.text(";"));
-                parts.extend(after);
+            // #19263 — operand-attached), `throw` sends it past the `;`
+            // (`throw (a = b); /* c */`) exactly as its own bare operand does
+            // (`throw a; /* c */`).
+            //
+            // ⚠️ Both arms take the terminator split, and the keyword is exactly its
+            // `operand_parens_printed` argument — "does the pair printed just below
+            // ENCLOSE this comment?", which decides whether the split leaves the comment
+            // inside `parts` or hands it back to follow the `;`. Floating `throw`'s
+            // comment out to just after the `)` instead gave the statement a
+            // SECOND fixed point: `throw (a = b) /* c */;` reproduced itself, while the
+            // already-normalized `throw (a = b); /* c */` reproduced *itself*, so one
+            // source had two answers and F1 saw neither as wrong. That form was prettier's
+            // pass 1, not its fixed point.
+            let after = if has_trailing_comments {
+                self.split_terminator_gap_comments(
+                    &mut parts,
+                    argument_end,
+                    span_end,
+                    false,
+                    keyword == "return",
+                )
             } else {
-                parts.push(d.text(")"));
-                if has_trailing_comments {
-                    self.append_trailing_paren_comments(&mut parts, argument_end, span_end);
-                }
-                parts.push(d.text(";"));
-            }
+                DocBuf::new()
+            };
+            parts.push(d.text(")"));
+            parts.push(d.text(";"));
+            parts.extend(after);
             return d.concat(&parts);
         }
 

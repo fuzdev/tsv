@@ -624,8 +624,16 @@ impl<'a> Printer<'a> {
     /// AND a `)` exists in the source after those comments (confirming that the
     /// parser stripped a `ParenthesizedExpression`). Without the `)` check, this
     /// would false-positive on normal operator comments (e.g. ternary `? c /* comment */ :`).
+    ///
+    /// The existence check is **on page**, not *to emit*: every caller is a layout gate —
+    /// does this gap's content force the shell open, keep the pair, break the arrow — and
+    /// an owned comment still occupies the page it is not this gap's job to print
+    /// (`docs/comments.md` §the three axes). No owned comment can reach one of these gaps
+    /// today (ownership needs a node starting after the comment, and every shell gap ends
+    /// at a delimiter), so the axis is stated for the reader and for the next boundary
+    /// that widens, not for a behaviour it changes.
     pub(crate) fn has_trailing_paren_comments(&self, expr_end: u32, boundary_end: u32) -> bool {
-        if !self.has_comments_to_emit_between(expr_end, boundary_end) {
+        if !self.has_comments_on_page_between(expr_end, boundary_end) {
             return false;
         }
         // Find the last comment's end, then check for `)` between there and boundary
@@ -934,6 +942,32 @@ impl<'a> Printer<'a> {
             && self.shell_gap_retains_parens(expr_end, boundary_end, position_parens)
     }
 
+    /// Add a value position's clarity parens around a shell-built value — unless the shell
+    /// builder already supplied the pair ([`Self::shell_value_keeps_own_parens`]).
+    ///
+    /// The two declarator positions (statement-level and `for`-header) resolve
+    /// `position_parens` themselves, then hand it here with the doc the shell builder
+    /// returned for it. `position_parens` must be the value the **builder received**: the
+    /// two sides answer one question, and asking it twice is how the pair gets doubled at
+    /// one site and dropped at the other. A ternary branch answers a different pair
+    /// question than the flag it passes the builder, so it applies the predicate at its own
+    /// seam (`parenthesize_ternary_branch`) rather than through here.
+    pub(crate) fn wrap_value_position_parens(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+        position_parens: bool,
+        inner: DocId,
+    ) -> DocId {
+        if position_parens
+            && !self.shell_value_keeps_own_parens(expr, boundary_end, position_parens)
+        {
+            self.d().parens(inner)
+        } else {
+            inner
+        }
+    }
+
     /// Whether the gap's own content forces the shell to be RETAINED — the layout half of
     /// [`Self::shell_value_keeps_own_parens`], asked by the builder that acts on it and by
     /// the caller that must not double the pair.
@@ -972,6 +1006,12 @@ impl<'a> Printer<'a> {
     /// statement-level path, which is the point: the block comment strips inline and the
     /// line comment retains the shell for exactly the same reasons there.
     ///
+    /// `position_parens` carries the declarator's own clarity-paren answer
+    /// (`ParenContext::VariableInit` — an assignment as a value takes a pair), exactly as
+    /// the statement-level path carries it: a header declarator is a declarator, and the
+    /// `for` exemption prettier applies is to the init **clause's own expression**
+    /// (`for (a = b = c; ;)`), not to a value one binding deeper.
+    ///
     /// ⚠️ **This is the declarator's own value, not "lexically under a for header".** The
     /// ambient `in_for_init` flag spans nested function and class bodies, where a real
     /// statement terminator does exist and the deferral is correct
@@ -982,8 +1022,14 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression<'_>,
         boundary_end: u32,
+        position_parens: bool,
     ) -> DocId {
-        self.build_shell_value_doc(expr, boundary_end, ShellTail::ForClauseSeparator, false)
+        self.build_shell_value_doc(
+            expr,
+            boundary_end,
+            ShellTail::ForClauseSeparator,
+            position_parens,
+        )
     }
 
     fn build_shell_value_doc(
@@ -1052,9 +1098,12 @@ impl<'a> Printer<'a> {
         // what makes one pass enough. Keying the choice on the stripped `)` instead cannot
         // reach a fixed point: this output erases that `)`, so the next pass reads the
         // comment as statement-trailing and moves it (`(x /* t */);` → `x /* t */;` →
-        // `x; /* t */`). A shell that is NOT terminator-adjacent — a ternary branch, an
-        // object value, a non-last declarator, a nested assignment — keeps the block
-        // inline, where it is already its own fixed point.
+        // `x; /* t */`). A shell that is NOT terminator-adjacent — a ternary CONSEQUENT
+        // (whose gap ends at the `:`), an object value, a non-last declarator, a nested
+        // assignment — keeps the block inline, where it is already its own fixed point.
+        // A ternary ALTERNATE is terminator-adjacent and does reach this arm, which is
+        // prettier's answer there too; the pair its branch may print is applied outside,
+        // by `parenthesize_ternary_branch`, so nothing here crosses a surviving `)`.
         if tail == ShellTail::StatementTerminator
             && self.shell_meets_statement_terminator(boundary_end)
         {
