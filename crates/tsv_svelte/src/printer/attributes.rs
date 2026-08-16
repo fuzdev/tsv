@@ -32,8 +32,13 @@ enum DirectiveValue {
 }
 
 impl DirectiveValue {
-    /// Whether `name={name}` collapses to bare `name` for this directive.
-    const fn suppresses_shorthand(self) -> bool {
+    /// Whether this directive KIND has a bare-`name` shorthand at all — `class:` / `let:` /
+    /// `bind:` do, `on:` / `use:` / `animate:` / `transition:` do not.
+    ///
+    /// **Necessary, never sufficient**: whether a given *value* may take that form is
+    /// [`Printer::value_collapses_to_shorthand`], the one predicate every collapse site
+    /// asks. Reading this shape test as the whole answer is how the sites would drift.
+    const fn has_shorthand_form(self) -> bool {
         matches!(self, Self::Shorthand | Self::ShorthandBind)
     }
 }
@@ -593,7 +598,10 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a directive with an **expression** value: the head above plus an
     /// optional `={expr}`. Backs every directive except `style:`, whose value is a quoted
     /// text/tag list rather than an expression; `value` is the only thing they differ on
-    /// beyond the prefix, so the shorthand rule is stated once here instead of per builder.
+    /// beyond the prefix, so the per-kind half of the shorthand question is asked once here
+    /// rather than per builder. The per-value half is
+    /// [`Printer::value_collapses_to_shorthand`], shared with `style:` and with plain
+    /// attributes.
     fn build_directive_doc(
         &self,
         prefix: &'static str,
@@ -606,8 +614,12 @@ impl<'a> Printer<'a> {
         let mut parts = self.directive_head_parts(prefix, name_span, modifiers);
         if let Some(expr) = expression
             // Shorthand (`class:foo={foo}` → `class:foo`) suppresses the value entirely.
-            && !(value.suppresses_shorthand()
-                && self.is_identifier_with_name(expr, name_span.extract(self.source)))
+            && !(value.has_shorthand_form()
+                && self.value_collapses_to_shorthand(
+                    expr,
+                    name_span.extract(self.source),
+                    expression_tag_span,
+                ))
         {
             parts.extend(match value {
                 // bind: uses {getter, setter} syntax where SequenceExpression is bare (no parens)
@@ -665,7 +677,7 @@ impl<'a> Printer<'a> {
             internal::StyleDirectiveValue::True => {}
             internal::StyleDirectiveValue::ExpressionTag(tag) => {
                 // Only include expression if not shorthand (style:color={color} → style:color)
-                if !self.is_identifier_with_name(&tag.expression, name) {
+                if !self.value_collapses_to_shorthand(&tag.expression, name, Some(tag.span)) {
                     parts.push(d.text("="));
                     parts.push(self.build_expression_tag_doc(tag));
                 }
@@ -1240,39 +1252,57 @@ impl<'a> Printer<'a> {
         d.concat(&[d.text("{"), self.hug_head_content(head), d.text("}")])
     }
 
-    /// Check if an attribute is a shorthand: {name} where value is ExpressionTag(Identifier(name))
+    /// Whether an attribute prints as the shorthand `{name}` — its sole value part is an
+    /// `ExpressionTag` that [`Printer::value_collapses_to_shorthand`] admits. The quoted
+    /// spelling (`name="{name}"`) parses to the same single tag and so collapses too.
     fn is_shorthand_attribute(
         &self,
         attr: &internal::Attribute<'_>,
         value_parts: &[internal::AttributeValue<'_>],
     ) -> bool {
-        // Must be exactly one value part
-        if value_parts.len() != 1 {
-            return false;
-        }
-
-        // Must be an ExpressionTag
-        let internal::AttributeValue::ExpressionTag(expr_tag) = &value_parts[0] else {
+        let [internal::AttributeValue::ExpressionTag(expr_tag)] = value_parts else {
             return false;
         };
 
-        // Must contain an Identifier expression
-        let Expression::Identifier(ident) = &expr_tag.expression else {
-            return false;
-        };
-
-        // The identifier name must match the attribute name. Both are
-        // span-identity source slices now.
-        ident.name(self.source) == attr.name(self.source)
+        self.value_collapses_to_shorthand(
+            &expr_tag.expression,
+            attr.name(self.source),
+            Some(expr_tag.span),
+        )
     }
 
-    /// Check if expression is an identifier with the given name
-    fn is_identifier_with_name(&self, expr: &Expression<'_>, name: &str) -> bool {
-        if let Expression::Identifier(id) = expr {
-            id.name(self.source) == name
-        } else {
-            false
-        }
+    /// Whether a `name={name}` value may collapse to its **shorthand** form — `{name}` for a
+    /// plain attribute, bare `name` for a `class:` / `bind:` / `let:` / `style:` directive.
+    ///
+    /// Two conjuncts, and the second is what keeps the collapse lossless: the value is an
+    /// identifier spelling the attribute's own name, **and** no comment occupies the page
+    /// inside the tag's braces. The shorthand has nowhere to put one, so collapsing over a
+    /// comment DELETES it — a commented value therefore declines the collapse and prints the
+    /// ordinary `{…}` form, the same bytes it already prints when the name and the identifier
+    /// differ. Prettier collapses and drops; see `docs/conformance_prettier_svelte.md`
+    /// §Svelte: Attributes.
+    ///
+    /// **on page**, not to-emit: a block comment glued to the identifier is *owned* by it and
+    /// rides inside the expression's own doc, so an emit-keyed scan answers "no comment here"
+    /// for exactly the leading position this rule exists for.
+    ///
+    /// `tag_span` is `None` where the author already wrote the bare form — the parser
+    /// synthesizes the identifier and records no tag, so there are no braces to hold a
+    /// comment and the collapse is a no-op.
+    ///
+    /// One predicate for all three collapse sites ([`Printer::is_shorthand_attribute`],
+    /// [`Printer::build_directive_doc`] and the `style:` builder), so they cannot answer
+    /// apart.
+    fn value_collapses_to_shorthand(
+        &self,
+        expr: &Expression<'_>,
+        name: &str,
+        tag_span: Option<Span>,
+    ) -> bool {
+        matches!(expr, Expression::Identifier(id) if id.name(self.source) == name)
+            && tag_span.is_none_or(|s| {
+                !tsv_lang::has_comments_on_page_in_range(self.comments, s.start, s.end)
+            })
     }
 }
 
