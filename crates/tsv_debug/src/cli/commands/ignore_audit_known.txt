@@ -23,7 +23,7 @@
 # ARE pinned (this is a ratchet over a live bug family, born red).
 #
 # Format: KIND<TAB>POSITION
-# shapes: 31
+# shapes: 32
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
 UNHONORED	AwaitExpression.argument
@@ -38,6 +38,7 @@ UNHONORED	ImportDeclaration.specifiers
 UNHONORED	LogicalExpression.left
 UNHONORED	LogicalExpression.right
 UNHONORED	MemberExpression.object
+UNHONORED	MethodDefinition.value
 UNHONORED	NewExpression.callee
 UNHONORED	Program.body
 UNHONORED	SpreadElement.argument

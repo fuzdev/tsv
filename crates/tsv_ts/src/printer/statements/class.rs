@@ -717,20 +717,6 @@ impl<'a> Printer<'a> {
         // Type parameters if present: method<T>()
         if let Some(type_params) = &method.value.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc(type_params));
-
-            // Comments between type_params `>` and `(` go after type_params
-            if let Some(pp) = find_char_skipping_comments(
-                self.source.as_bytes(),
-                type_params.span.end as usize,
-                self.source.len(),
-                b'(',
-            ) {
-                self.append_type_params_to_paren_comments(
-                    &mut parts,
-                    type_params.span.end,
-                    pp as u32,
-                );
-            }
         }
 
         // Parameters and return type - shared callable-signature builder (same path
@@ -742,7 +728,12 @@ impl<'a> Printer<'a> {
             method.value.params_start,
             method.value.body.span.start,
         );
-        parts.push(sig_doc);
+        self.append_signature_head_gap_comments(
+            &mut parts,
+            self.type_params_paren_gap(method.value.type_parameters.as_ref()),
+            d.empty(),
+            sig_doc,
+        );
 
         // Overload signatures have empty body (start == end)
         let is_overload_signature = method.value.body.span.start == method.value.body.span.end;
