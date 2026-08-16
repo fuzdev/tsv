@@ -280,13 +280,21 @@ impl<'a> Printer<'a> {
     /// - `build_export_default_declaration_doc` (`statements/modules/mod.rs`) reassembles
     ///   `export default @dec class {}`; the class expression is the left edge of what
     ///   follows the decorator run.
+    /// - `build_assignment_pattern_doc` (`expressions/patterns.rs`) reassembles a
+    ///   destructuring default's object-pattern left for the no-expand-on-nesting rule; the
+    ///   pattern's `{` is that left's first token, and the `AssignmentPattern` above it hands
+    ///   the claim *down* (`left_spine_child`), so nothing else catches it.
     /// - [`Self::build_frozen_node_doc`] (`ignore.rs`) prints a verbatim span; the frozen
     ///   span's start *is* the node's first printed byte by construction.
+    /// - `build_directive_doc` (`statements/mod.rs`) prints a directive from the literal's
+    ///   own source bytes (`format_directive`, an exact code-unit sequence); a directive is a
+    ///   bare string literal by grammar, so that span start is the statement's first printed
+    ///   byte.
     ///
-    /// Prefer collapsing a reassembly path onto `build_expression_doc` over adding a fifth
+    /// Prefer collapsing a reassembly path onto `build_expression_doc` over adding another
     /// caller, and prefer wrapping the claim in a named builder (as `build_frozen_node_doc`
-    /// does) over open-coding it — the call count has gone 2 → 3 → 4, each time out of step
-    /// with whatever prose enumerated it.
+    /// does) over open-coding it — the call count has gone 2 → 3 → 4 → 6, each time out of
+    /// step with whatever prose enumerated it.
     pub(crate) fn prepend_owned_leading_comment_at(&self, start: u32, doc: DocId) -> DocId {
         // Document-level short-circuit (also covers the arrow-reassembly callers, which
         // reach here without going through `prepend_owned_leading_comment`).

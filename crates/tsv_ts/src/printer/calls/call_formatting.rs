@@ -69,7 +69,24 @@ pub(super) fn build_call_doc_with_wrapping(
     call: &internal::CallExpression<'_>,
 ) -> DocId {
     let d = printer.d();
-    let callee_doc = printer.build_expression_doc(call.callee);
+
+    // Test function calls (`it`, `test.only`, `describe`, …) stay on one line even past
+    // the print width — unless an argument gap holds a comment the flat layout has no
+    // emitter for, in which case the call expands like any other. Asked ONCE, here, and
+    // re-read by the layout branch below: the flat CALLEE and the flat LAYOUT are two
+    // halves of one decision, and a second `test_call_flat_layout_applies` call is a
+    // second question that can answer differently.
+    let test_call_flat = test_call_flat_layout_applies(call, printer);
+    // The flat callee is a break-free doc built straight from the chain parts, so a long
+    // `it.skip` never breaks at its `.`. It replaces ONLY the callee's own doc, which is why
+    // it is built HERE rather than in the layout branch: everything the general path wraps
+    // around a callee — the removed-paren comments (`(/* c */ it)(…)`), the type arguments
+    // and the gap before them (`it/* c */ <T>(…)`) — applies to it below. A branch that
+    // returns a doc assembled from its own callee skips every one of those, `<T>` included.
+    let callee_doc = test_call_flat
+        .then(|| build_test_callee_flat_doc(call.callee, printer))
+        .flatten()
+        .unwrap_or_else(|| printer.build_expression_doc(call.callee));
 
     // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
     // This must happen BEFORE adding removed-paren comments so comments stay outside
@@ -139,15 +156,9 @@ pub(super) fn build_call_doc_with_wrapping(
     // first-argument freeze) opens here.
     let paren_open = call_paren_open(call);
 
-    // Test function calls (it, test, describe, etc.) stay on one line
-    // even if they exceed print width — unless an argument gap holds a comment the
-    // flat layout has no emitter for (it would be dropped); such a call expands.
-    if test_call_flat_layout_applies(call, printer) {
-        // Build callee as a flat doc (no conditionalGroup) straight from the
-        // span-identity chain parts — this prevents breaking at `.skip` etc. even when
-        // very long, without materializing a throwaway callee `String`.
-        let flat_callee = build_test_callee_flat_doc(call.callee, printer).unwrap_or(callee);
-
+    // The test-call flat layout, whose break-free callee `callee` already carries (built
+    // at the top, so the type arguments and the removed-paren comments wrap it there).
+    if test_call_flat {
         // Check for trailing comments on last arg. The empty-args case returned
         // above, so `arguments` is non-empty here and `.last()` is always `Some`.
         #[allow(clippy::unreachable)] // empty args already returned above ⇒ last() is Some
@@ -187,7 +198,7 @@ pub(super) fn build_call_doc_with_wrapping(
         printer.test_call_flat_params.set(false);
 
         let mut parts: DocBuf = smallvec![
-            flat_callee,
+            callee,
             d.text("("),
             d.join_doc(arg_docs, d.text(", ")),
             d.text(")"),

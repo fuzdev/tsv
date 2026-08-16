@@ -72,6 +72,14 @@ fn get_identifier_name<'a>(expr: &internal::Expression<'a>) -> Option<(IdentName
 /// `test./* c */ skip`). Joining the parts with a bare `d.text(".")` scans none of
 /// them and drops what's there. It stays break-free: with no comment in a gap the
 /// pair is the same three text nodes as before.
+///
+/// Building from parts makes this a **reassembly** (`docs/comments.md` hazard 1): the callee
+/// never routes through `build_expression_doc`, so the comment glued to its first token has
+/// no other printer and `/* c */ it('a', fn)` loses it. The call above cannot cover for it —
+/// `prepend_owned_leading_comment` hands the claim DOWN when the left-spine child starts
+/// where the call does, and that child is exactly this callee. So the claim is made here, at
+/// the chain root's own span start: the callee's first printed byte, the left-edge fact
+/// [`Printer::prepend_owned_leading_comment_at`] asks each caller for.
 pub(super) fn build_test_callee_flat_doc(
     expr: &internal::Expression<'_>,
     printer: &Printer<'_>,
@@ -92,7 +100,7 @@ pub(super) fn build_test_callee_flat_doc(
         );
         prev_end = end;
     }
-    Some(doc)
+    Some(printer.prepend_owned_leading_comment_at(expr.span().start, doc))
 }
 
 /// Get the member chain parts from an expression
@@ -143,9 +151,11 @@ fn get_member_chain_parts<'a>(
 /// "would a comment be dropped?", which is the to-emit axis's question. A comment
 /// trailing the whole call is likewise fine — the layout emits that itself.
 ///
-/// Both routing sites ask this rather than [`is_test_call`] (`calls/mod.rs`'s
-/// chain-bypass and `call_formatting.rs`'s layout branch), so they cannot disagree about
-/// which calls take the flat form. See conformance_prettier_ts_comments.md §Comment relocation.
+/// Both routing sites ask this rather than [`is_test_call`] (`calls/mod.rs`'s chain-bypass,
+/// and `build_call_doc_with_wrapping`, which asks ONCE at its head and reads the answer twice
+/// — once to build the break-free callee, once to pick the layout), so they cannot disagree
+/// about which calls take the flat form. See conformance_prettier_ts_comments.md §Comment
+/// relocation.
 pub(super) fn test_call_flat_layout_applies(
     call: &internal::CallExpression<'_>,
     printer: &Printer<'_>,
