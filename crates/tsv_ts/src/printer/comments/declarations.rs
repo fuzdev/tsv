@@ -8,6 +8,7 @@
 use super::layout::hang_after_operator;
 use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
+use crate::printer::analysis;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -248,6 +249,41 @@ impl<'a> Printer<'a> {
             parts.push(marker_doc);
         }
         pos + 1
+    }
+
+    /// Emit a binding identifier's HEAD — its name plus any optional `?` marker — and
+    /// return the offset just past it: the left edge of the annotation's marker→`:` gap.
+    ///
+    /// The name is the leading `name_len` bytes of the span, but the span runs on over
+    /// `?`/`!`/`: T`, so the head's own end has to be scanned for
+    /// ([`analysis::skip_identifier_at`]) rather than read off the node — and the scan is
+    /// bounded by the annotation's `:` when there is one, so it can never run past the head
+    /// into the type. That derivation plus the marker push is the whole head, and the two
+    /// belong together because their *product* is the gap edge every annotation emitter
+    /// then keys on.
+    ///
+    /// Stated once because respelling it is what the function-type hug did — it pushed the
+    /// name and a bare `d.text("?")`, which silently skipped both gaps
+    /// [`Self::push_modifier_marker_doc`] owns (`docs/comments.md` hazard 4, the head
+    /// variant). A caller that needs an unusual annotation BODY passes it to
+    /// [`Self::build_binding_type_annotation_doc_with`]; nobody needs an unusual head.
+    pub(crate) fn push_identifier_head_doc(
+        &self,
+        parts: &mut DocBuf,
+        id: &internal::Identifier<'_>,
+    ) -> u32 {
+        parts.push(self.identifier_name_doc(id));
+        let search_end = id.type_annotation().map_or(id.span.end, |ta| ta.span.start);
+        let name_end = analysis::skip_identifier_at(
+            self.source.as_bytes(),
+            id.span.start as usize,
+            search_end as usize,
+        ) as u32;
+        if id.optional {
+            self.push_modifier_marker_doc(parts, name_end, b'?')
+        } else {
+            name_end
+        }
     }
 
     /// Emit comments in the gap between an optional `?`/`!` marker and a member's
@@ -539,9 +575,13 @@ impl<'a> Printer<'a> {
     ///
     /// Gates on `has_comments_to_emit_between` once, so the common no-comment path is a single
     /// binary search. Shared by every before-`:` site whose block form keeps the space
-    /// before `:`: index-signature keys, class properties, variable bindings, and
-    /// function parameters/identifiers. (Property signatures handle the gap inline:
-    /// their non-optional block form omits that space.)
+    /// before `:`: index-signature keys **and** their `]`→value-`:` gap, class properties,
+    /// variable bindings, and function parameters/identifiers — the last of those including
+    /// the function-type hug, which reaches the seam through
+    /// [`Self::build_binding_type_annotation_doc_with`] because only its annotation *body*
+    /// is unusual. (Property signatures handle the gap inline: their non-optional block form
+    /// omits that space, which is the one real split in the family and the reason this is a
+    /// shared seam rather than a shared flag.)
     ///
     /// An alone-on-line format-ignore directive in the gap freezes the whole `: type`
     /// annotation and keeps its own line (`build_frozen_annotation_head_doc`), asked
@@ -553,16 +593,43 @@ impl<'a> Printer<'a> {
         type_ann: &internal::TSTypeAnnotation<'_>,
         wrap: bool,
     ) -> DocId {
+        self.build_binding_type_annotation_doc_with(marker_end, type_ann, || {
+            if wrap {
+                self.build_type_annotation_doc_wrapping(type_ann)
+            } else {
+                self.build_type_annotation_doc(type_ann)
+            }
+        })
+    }
+
+    /// [`Self::build_binding_type_annotation_doc`] for a caller that builds the
+    /// `: type` doc itself — the marker→`:` gap is the same question wherever a
+    /// binding carries an annotation, but the annotation's own body is not.
+    ///
+    /// `build_annotation` returns the whole `: type` (leading `:` included), and is
+    /// invoked lazily: the frozen-head route emits a verbatim slice, so on that path
+    /// the doc would only be discarded.
+    ///
+    /// The one caller that needs this rather than the `wrap` flag is the
+    /// function/constructor-type **hug** (`build_function_params_doc`), whose single
+    /// object-typed parameter takes a type literal with no group of its own so the
+    /// literal's softlines join the function type's group. Before this seam existed it
+    /// respelled the whole head inline — name, `?`, `: ` — and so had no emitter for
+    /// either gap behind it, silently dropping any comment there (`docs/comments.md`
+    /// hazard 4); its sibling hug on the signature path never did, because it routes
+    /// through `build_function_type_param_expression_doc`.
+    pub(crate) fn build_binding_type_annotation_doc_with(
+        &self,
+        marker_end: u32,
+        type_ann: &internal::TSTypeAnnotation<'_>,
+        build_annotation: impl FnOnce() -> DocId,
+    ) -> DocId {
         let d = self.d();
         let colon_pos = type_ann.span.start;
         if let Some(frozen) = self.build_frozen_annotation_head_doc(marker_end, type_ann) {
             return frozen;
         }
-        let type_doc = if wrap {
-            self.build_type_annotation_doc_wrapping(type_ann)
-        } else {
-            self.build_type_annotation_doc(type_ann)
-        };
+        let type_doc = build_annotation();
         if !self.has_comments_to_emit_between(marker_end, colon_pos) {
             return type_doc;
         }
