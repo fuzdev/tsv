@@ -24,7 +24,7 @@ use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
-use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_before_position};
+use tsv_lang::source_scan::has_newline_before_position;
 
 /// Whether an arrow body stays on the `=>` line for a reason that a forced chain break
 /// cannot overrule — the two unconditional disjuncts of prettier's `shouldPutBodyOnSameLine`
@@ -1477,25 +1477,24 @@ impl<'a> Printer<'a> {
         // builder, which is why only a `//` survived.
         if let Some(tp) = &arrow.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(tp));
-
-            // Comments between type_params `>` and `(` go after type_params
-            if let Some(pp) = find_char_skipping_comments(
-                self.source.as_bytes(),
-                tp.span.end as usize,
-                self.source.len(),
-                b'(',
-            ) {
-                self.append_type_params_to_paren_comments(&mut parts, tp.span.end, pp as u32);
-            }
         }
 
-        // Function parameters
-        parts.push(self.build_arrow_params_doc_ungrouped(arrow));
-
-        // Return type annotation
+        // The signature TAIL — parameters plus return type — belongs to the `>`→`(` gap's
+        // emitter, not to `parts`: a `//` in that gap drops the whole tail to a continuation
+        // line, which it can only do while holding it.
+        let mut tail = DocBuf::new();
+        tail.push(self.build_arrow_params_doc_ungrouped(arrow));
         if let Some(return_type) = &arrow.return_type {
-            parts.push(self.build_arrow_return_type_doc(return_type, arrow.params_start));
+            tail.push(self.build_arrow_return_type_doc(return_type, arrow.params_start));
         }
+        let tail = d.concat(&tail);
+
+        self.append_signature_head_gap_comments(
+            &mut parts,
+            self.type_params_paren_gap(arrow.type_parameters.as_ref()),
+            d.empty(),
+            tail,
+        );
 
         d.concat(&parts)
     }
@@ -1728,20 +1727,6 @@ impl<'a> Printer<'a> {
         // Use _wrapping version for width-based line breaking
         if let Some(type_params) = &func.type_parameters {
             sig_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
-
-            // Comments between type_params `>` and `(` go after type_params
-            if let Some(pp) = find_char_skipping_comments(
-                self.source.as_bytes(),
-                type_params.span.end as usize,
-                self.source.len(),
-                b'(',
-            ) {
-                self.append_type_params_to_paren_comments(
-                    &mut sig_parts,
-                    type_params.span.end,
-                    pp as u32,
-                );
-            }
         }
 
         // Params + return type in their own group, with the type parameters left OUTSIDE
@@ -1757,7 +1742,12 @@ impl<'a> Printer<'a> {
             func.params_start,
             body_start,
         );
-        sig_parts.push(sig_doc);
+        self.append_signature_head_gap_comments(
+            &mut sig_parts,
+            self.type_params_paren_gap(func.type_parameters.as_ref()),
+            d.empty(),
+            sig_doc,
+        );
 
         (d.concat(&sig_parts), sig_end)
     }
