@@ -105,7 +105,7 @@ pub(crate) fn print_node_inner<'a>(
                 // `)`; tsv keeps it where the author wrote it. The `!` itself is the
                 // next node, so this doc closes at the `)`.
                 if let Some(end) = *paren_comment_end
-                    && let Some(doc) = printer.build_non_null_paren_operand_doc(
+                    && let Some(doc) = printer.build_paren_operand_comment_doc(
                         expr.span().end,
                         end,
                         inner_group,

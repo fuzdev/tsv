@@ -1,0 +1,21 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// A block comment between the operand and the `)` keeps the position the
+	// author gave it, and the operand's parens are retained for its sake.
+	const a = <T>x; /* c */
+	const b = <T>y; /* c1 */ /* c2 */
+
+	// An operand whose parens are required takes the same single pair.
+	const c = <T>(m + n); /* c */
+
+	// The gap is empty here, so the redundant parens strip as usual.
+	const d = <T>z;
+</script>
