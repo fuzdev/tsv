@@ -40,7 +40,7 @@ mod render;
 mod scan;
 
 pub(crate) use declarations::{ClassMemberModifiers, HeritageKeyword};
-pub(super) use element_comma::{block_is_before_comma, run_defers_line};
+pub(super) use element_comma::{block_is_before_comma, next_real_element_start, run_defers_line};
 pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
 pub(crate) use member_body::{MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam};
 pub(crate) use owned::OwnedCommentEffect;

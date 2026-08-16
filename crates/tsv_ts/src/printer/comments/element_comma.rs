@@ -27,6 +27,7 @@
 // comment is not relocated across it.
 
 use super::{CommentVec, Printer};
+use crate::ast::internal::Expression;
 use smallvec::SmallVec;
 use tsv_lang::Comment;
 use tsv_lang::Span;
@@ -60,6 +61,33 @@ pub(in crate::printer) fn block_is_before_comma(
 /// classifier and the array literal's `element_gap_split` — ask it here.
 pub(in crate::printer) fn run_defers_line(run: &[&Comment]) -> bool {
     run.last().is_some_and(|c| !c.is_block)
+}
+
+/// Where the gap after the real element in slot `idx` ENDS — at the next REAL element,
+/// however many elisions lie in between. `None` when only holes follow, which each
+/// container answers with its own trailing position (`array_gap_end`,
+/// `array_pattern_gap_end`, the two one-line namers that supply that fallback).
+///
+/// [`Printer::element_gap_split`] divides this gap between its two emitters; this is the
+/// gap itself, and only a container with holes has to compute it. **An elision opens no
+/// gap of its own**: it prints nothing and its comma is re-emitted structure outside every
+/// element span, so however many holes intervene the region between two real elements is
+/// ONE gap that both emitters must measure the same way. A one-slot lookup that gives up
+/// at a hole hands the whole rest of the container to the earlier element, which then
+/// claims a comment the later one claims too — `[a, , b // c] = x` printed the `//` on
+/// BOTH (`docs/comments.md` §The element-comma seam: unclaimed is a DROP, doubly-claimed a
+/// DOUBLE-PRINT).
+///
+/// ⚠️ **The BLANK-line scan does not end here** — it stops earlier, at
+/// [`Printer::hole_slot_comma`]. Two questions, two far ends, and answering either with
+/// the other's is a bug pointing the opposite way.
+pub(in crate::printer) fn next_real_element_start(
+    elements: &[Option<Expression<'_>>],
+    idx: usize,
+) -> Option<u32> {
+    elements[idx + 1..]
+        .iter()
+        .find_map(|e| e.as_ref().map(|e| e.span().start))
 }
 
 /// Trailing comments collected for a list element (property or array element)
@@ -174,6 +202,26 @@ impl<'a> Printer<'a> {
             }
         }
         shell_end
+    }
+
+    /// Where a blank-line scan STOPS when the next slot is a HOLE: at the hole's own
+    /// comma — the SECOND comma past this element, the first being the element's own
+    /// separator (`next_real`, the far end of the gap, when either is missing).
+    ///
+    /// A hole prints nothing, so the next slot's "printed content" is that comma alone and
+    /// none of the three spellings a real element's bound has applies. Everything a caller
+    /// emits in this gap prints *past* it, and a scan run that far reads the hole's own line
+    /// break as an author blank line. The complement is prettier's `node &&`: the blank
+    /// **after** a hole is structure, so nothing measures one — only the blank ahead of it,
+    /// which the author wrote against this element, survives.
+    ///
+    /// Stated once because both array containers ask it and only one of them used to: the
+    /// pattern skipped the gap entirely when a hole followed and DROPPED the author's blank
+    /// (`[a,⏎⏎,⏎b // c] = x`).
+    pub(in crate::printer) fn hole_slot_comma(&self, elem_end: u32, next_real: u32) -> u32 {
+        self.find_comma_in_range(elem_end, next_real)
+            .and_then(|comma| self.find_comma_in_range(comma + 1, next_real))
+            .unwrap_or(next_real)
     }
 
     /// Where a list item's INLINE trailing run ends, for the width-layout emitters that

@@ -7,7 +7,7 @@
 // - Comment preservation
 
 use crate::ast::internal::{self, Expression, LiteralValue};
-use crate::printer::comments::{block_is_before_comma, run_defers_line};
+use crate::printer::comments::{block_is_before_comma, next_real_element_start, run_defers_line};
 use crate::printer::{
     CommentVec, Printer, container_may_have_multiline_content, has_multiline_content,
 };
@@ -15,6 +15,15 @@ use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{comments_to_emit_in_range, has_multiline_block_comments_on_page_in_range};
+
+/// The gap after array slot `i`, in this container's terms: [`next_real_element_start`]
+/// with the literal's own fallback — just inside `]`, where a comment past the last real
+/// element slides to. The array PATTERN's twin is `array_pattern_gap_end`, whose fallback
+/// stops before a `: T` the pattern's span swallowed; each container names its own end
+/// once and the walk past the holes is shared.
+fn array_gap_end(arr: &internal::ArrayExpression<'_>, i: usize) -> u32 {
+    next_real_element_start(arr.elements, i).unwrap_or(arr.span.end - 1)
+}
 
 impl<'a> Printer<'a> {
     /// Check if array should force break based on Prettier's heuristic
@@ -56,21 +65,6 @@ impl<'a> Printer<'a> {
         true
     }
 
-    /// Calculate the boundary position for the next element (or array end)
-    ///
-    /// Used to find the range for trailing comments after an element.
-    /// Returns the start position of the next element, or the closing bracket if this is the last element.
-    fn next_element_boundary(
-        &self,
-        arr: &internal::ArrayExpression<'_>,
-        current_index: usize,
-    ) -> u32 {
-        arr.elements[current_index + 1..]
-            .iter()
-            .find_map(|e| e.as_ref().map(|e| e.span().start))
-            .unwrap_or(arr.span.end - 1)
-    }
-
     /// Blank-line rule for the gap after array slot `i` — prettier's
     /// `node && isLineAfterElementEmpty(node)` (`print/array.js`, `printArrayElements`).
     ///
@@ -107,6 +101,16 @@ impl<'a> Printer<'a> {
     ///
     /// The hole guard runs first, so the scan always anchors on a real element's end —
     /// which also keeps a nested element's commas (`[[1, 2], , x]`) behind it.
+    ///
+    /// ⚠️ **There is a SECOND implementation of this rule**, in the array PATTERN's
+    /// expanding builder (`expressions/patterns.rs`), and it is not foldable into this one:
+    /// the pattern anchors on the claimed run's shell-peeled end and takes its bound from
+    /// the first comment in SOURCE, where this one anchors on the element's span end and
+    /// takes the caller's emitted-leading list. The two share what they *can* — the walk
+    /// past the holes ([`next_real_element_start`]) and the hole ceiling
+    /// ([`Printer::hole_slot_comma`]) — so a change to either of THOSE is already shared,
+    /// but a change to the rule itself has to be made twice. The pattern lacking the hole
+    /// arm entirely is what DROPPED an author blank line before an elision.
     fn has_blank_line_after_slot(
         &self,
         arr: &internal::ArrayExpression<'_>,
@@ -121,18 +125,13 @@ impl<'a> Printer<'a> {
         // search, which runs past `upper`: the comma may sit below slot `i + 1`'s leading
         // comment, and `upper` stops at that comment's start
         // ([`Printer::has_blank_line_after_comma`]).
-        let next_real = self.next_element_boundary(arr, i);
+        let next_real = array_gap_end(arr, i);
 
         // A HOLE's printed content is its comma alone, so none of the three spellings above
         // applies — whatever a caller emits in this gap prints *past* that comma, and
         // bounding there reads the hole's own line break as an author's blank line.
         if matches!(arr.elements.get(i + 1), Some(None)) {
-            // The hole's comma: the second past this element, the first being this
-            // element's own separator.
-            let hole_comma = self
-                .find_comma_in_range(elem_end, next_real)
-                .and_then(|comma| self.find_comma_in_range(comma + 1, next_real))
-                .unwrap_or(next_real);
+            let hole_comma = self.hole_slot_comma(elem_end, next_real);
             // …but a comment BELOW this element's line does not print at that comma either —
             // it slides forward past it to lead the next real element — so the scan still
             // stops at the comment. Left to run the whole span,
@@ -395,7 +394,7 @@ impl<'a> Printer<'a> {
         // Bounded at `next_boundary`: this element's separator, if it has one, lies before the
         // next element. A SOURCE trailing comma past the last element is still found — the
         // `is_last` arm is what keeps the comments past it on this element.
-        let next_boundary = self.next_element_boundary(arr, current_index);
+        let next_boundary = array_gap_end(arr, current_index);
         let split = self.element_gap_split(arr, current_index, elem_end, next_boundary);
 
         // Everything below the split is this element's, by construction — the next
@@ -933,7 +932,7 @@ impl<'a> Printer<'a> {
 
         for (i, elem) in arr.elements.iter().enumerate() {
             // O(remaining elements) — compute once and reuse below.
-            let next_boundary = self.next_element_boundary(arr, i);
+            let next_boundary = array_gap_end(arr, i);
             let (elem_start, elem_end) = match elem {
                 Some(e) => (e.span().start, e.span().end),
                 None => (next_boundary, next_boundary),

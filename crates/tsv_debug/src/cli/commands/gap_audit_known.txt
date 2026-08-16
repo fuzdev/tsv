@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 138
+# shapes: 136
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	',⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	']⟨⟩/*	line
@@ -102,13 +102,11 @@ DROPPED	␣⟨⟩}	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	).⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	)⟨⟩.	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	...⟨⟩IDENT	line
 DOUBLE-PRINTED	<⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	>{⟨⟩IDENT	line
 DOUBLE-PRINTED	>⟨⟩()	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	IDENT⟨⟩).	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	IDENT⟨⟩>()	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	IDENT⟨⟩]	line
 DOUBLE-PRINTED	IDENT⟨⟩}</	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	IDENT⟨⟩}{:	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	}{⟨⟩IDENT	line
