@@ -4,7 +4,7 @@
 // - Type parameter declarations: `<T, U extends V = W>`
 // - Type parameter instantiation (type arguments): `<T, U>`
 
-use super::helpers::is_simple_type_arg;
+use super::helpers::{is_simple_type_arg, unwrap_parenthesized};
 use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
 use crate::ast::internal::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
@@ -296,7 +296,10 @@ impl<'a> Printer<'a> {
                     .expect("extends keyword must exist when constraint is present");
 
                 line_gap = self.route_pre_keyword_gap(&mut parts, prev_end, extends_pos);
-                self.keyword_value_head(extends_pos + "extends".len() as u32, constraint)
+                self.keyword_value_head_required_pair(
+                    extends_pos + "extends".len() as u32,
+                    constraint,
+                )
             } else {
                 KeywordValueHead::without_gap(constraint)
             };
@@ -478,21 +481,67 @@ impl<'a> Printer<'a> {
         // outright required (the enclosing conditional's `? :` rebinds without them —
         // prettier drops them there, producing unparseable output, a documented
         // divergence). The `=` default position strips them.
-        if matches!(value_type, TSType::Conditional(_))
-            && group_id == GroupId::TypeParameterConstraint
-        {
+        //
+        // Asked through the comment-BLIND [`unwrap_parenthesized`], because whether this
+        // constraint needs its parens is a fact about the GRAMMAR — a comment the author
+        // wrote in a shell around it decides nothing. `unwrap_redundant_parens` stops at
+        // a commented shell, so a comment dropped the constraint out of this arm and
+        // printed it bare, losing the very parens the `infer` case requires.
+        //
+        // A shell the trailing-run rule RETAINS is left to its own emitter
+        // (`build_parenthesized_type_unwrap_doc`), which owns the retain-vs-strip question
+        // for a trailing line comment: stripping here and lifting the `//` out would give
+        // that one gap a third answer, neither prettier's nor tsv's own.
+        //
+        // ⚠️ And the shell always DOES reach it here, because the constraint's head is
+        // resolved by [`Printer::keyword_value_head_required_pair`], which declines the
+        // paren-strip hang for exactly the shells this rule retains. Asking without that
+        // guarantee was a trap: the hang strips a shell whose leading gap holds a line
+        // comment, so one carrying BOTH (`(// c⏎ A extends B ? C : D // t)`) satisfied the
+        // retain rule while already being gone, and deferring to an emitter that never
+        // runs printed the constraint bare — for the `infer` case not a layout difference
+        // but output the canonical parser REJECTS (the `?` rebinds).
+        let conditional_constraint = matches!(
+            unwrap_parenthesized(head.value_type),
+            TSType::Conditional(_)
+        ) && group_id == GroupId::TypeParameterConstraint
+            && !self.paren_retains_for_trailing_run(head.child);
+        if conditional_constraint {
+            // The author's own shell (if any) is stripped, so this arm owns its three
+            // interior regions: the leading gap widens into the emitter's window below
+            // (`value_start`), the inner conditional prints between the re-emitted
+            // parens, and the trailing gap is lifted onto the end by the shared seam —
+            // the same partition `build_hang_value_doc` performs for every other arm.
+            // Building the pair by hand without that lift DROPPED the trailing comment
+            // ([`comments.md`](../../../../docs/comments.md) hazard 1).
+            let inner = unwrap_parenthesized(head.value_type);
+            let paren_doc = d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")]);
             // The clarity parens are re-emitted around the conditional, so the
             // keyword→value gap follows the same protocol as the unparenthesized
             // arms below: a line comment (or own-line multiline block) hangs the
             // parenthesized value on its own indented line, an inline block trails
             // the keyword before the `(`.
-            let paren_doc = d.concat(&[d.text("("), self.build_type_doc(value_type), d.text(")")]);
+            let mut hung: DocBuf = smallvec![];
             if let Some(keyword_end) = head.gap_start {
-                self.push_hang_or_inline_value(parts, keyword_end, head.value_start, paren_doc);
+                self.push_hang_or_inline_value(
+                    &mut hung,
+                    keyword_end,
+                    inner.span().start,
+                    paren_doc,
+                );
             } else {
-                parts.push(d.text(" "));
-                parts.push(paren_doc);
+                hung.push(d.text(" "));
+                hung.push(paren_doc);
             }
+            // The trailing gap holds only BLOCKS here — a `//` in it retains the shell,
+            // which never reaches this arm ([`Printer::keyword_value_head_required_pair`])
+            // — so the lift is inline and takes no break of its own.
+            parts.push(self.with_stripped_paren_trailing(
+                d.concat(&hung),
+                head.child,
+                inner,
+                TrailingBlock::Inline,
+            ));
             return;
         }
         if let Some(keyword_end) = head.gap_start {

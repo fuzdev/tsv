@@ -28,6 +28,33 @@ enum TypeLiteralMode {
     NoGroup,
 }
 
+/// How [`Printer::build_type_doc_maybe_parens_impl`]'s default paren arm levels the
+/// operand it wraps — and, with it, whether the trailing-object-intersection alignment
+/// applies at all.
+#[derive(Clone, Copy, PartialEq)]
+enum DefaultParenIndent {
+    /// Wrap the inner type in `d.indent`: the union-member offset / conditional
+    /// check-`extends` depth. The trailing-object alignment (`| {` double indent) is
+    /// correct only here.
+    Nested,
+    /// Leave the inner type bare — an **intersection** member takes its level from the
+    /// intersection printer's own `& `-line indent, so a second one here is spurious.
+    Bare,
+}
+
+/// Who emits a required pair's own shell **leading line-comment** run.
+#[derive(Clone, Copy, PartialEq)]
+enum ShellLeadingRun {
+    /// An upstream emitter already placed it — the union / intersection member callers
+    /// ([`Printer::build_union_type_doc_with_line_comments`]) and the conditional check /
+    /// `extends` callers (the stripped-shell relocation). Emitting here would
+    /// double-print it.
+    Upstream,
+    /// This site is the run's only emitter, so it renders inside the pair. True of an
+    /// optional tuple element, which has no upstream at all: its run was simply DROPPED.
+    Here,
+}
+
 impl<'a> Printer<'a> {
     //
     // Comment partitioning helpers
@@ -299,7 +326,33 @@ impl<'a> Printer<'a> {
         ts_type: &TSType<'_>,
         needs_parens: fn(&TSType<'_>) -> bool,
     ) -> DocId {
-        self.build_type_doc_maybe_parens_impl(ts_type, needs_parens, true)
+        self.build_type_doc_maybe_parens_impl(
+            ts_type,
+            needs_parens,
+            DefaultParenIndent::Nested,
+            ShellLeadingRun::Upstream,
+        )
+    }
+
+    /// Optional-tuple-element variant of [`Self::build_type_doc_maybe_parens`]: a paren
+    /// shell's own leading **line** comment is emitted INSIDE the parens.
+    ///
+    /// The shared entry point declines that run ([`ShellLeadingRun::Upstream`]) on the
+    /// argument that an upstream emitter already placed it. An optional tuple element has
+    /// no upstream at all — its run was simply DROPPED (`[(// c⏎T | U)?]` → `[(T | U)?]`)
+    /// — so it asks for [`ShellLeadingRun::Here`]. A licence stops where its argument
+    /// stops.
+    pub(super) fn build_optional_element_type_doc(
+        &self,
+        ts_type: &TSType<'_>,
+        needs_parens: fn(&TSType<'_>) -> bool,
+    ) -> DocId {
+        self.build_type_doc_maybe_parens_impl(
+            ts_type,
+            needs_parens,
+            DefaultParenIndent::Nested,
+            ShellLeadingRun::Here,
+        )
     }
 
     /// Intersection-member variant of `build_type_doc_maybe_parens`: the default
@@ -323,23 +376,26 @@ impl<'a> Printer<'a> {
         ts_type: &TSType<'_>,
         needs_parens: fn(&TSType<'_>) -> bool,
     ) -> DocId {
-        self.build_type_doc_maybe_parens_impl(ts_type, needs_parens, false)
+        self.build_type_doc_maybe_parens_impl(
+            ts_type,
+            needs_parens,
+            DefaultParenIndent::Bare,
+            ShellLeadingRun::Upstream,
+        )
     }
 
-    /// Shared implementation of `build_type_doc_maybe_parens` /
-    /// `build_intersection_member_type_doc`. `indent_default_paren` gates two paren
-    /// cases: (1) the default paren — `true` wraps the inner type in `d.indent`
-    /// (union-member offset / conditional check-extends depth), `false` leaves it
-    /// bare (intersection members); and (2) the trailing-object-intersection special
-    /// case — `true` takes it (the union-member `| {` double-indent alignment),
-    /// `false` skips it so the intersection member falls to the bare default arm
-    /// (single indent). Both keep an intersection member one level shallower than the
-    /// union-member/conditional layout.
+    /// Shared implementation of the three entry points above.
+    /// [`DefaultParenIndent`] gates two paren cases at once — the default paren's own
+    /// `d.indent`, and whether the trailing-object-intersection alignment applies —
+    /// which together keep an intersection member one level shallower than the
+    /// union-member / conditional layout. [`ShellLeadingRun`] names who emits a shell's
+    /// leading line-comment run.
     fn build_type_doc_maybe_parens_impl(
         &self,
         ts_type: &TSType<'_>,
         needs_parens: fn(&TSType<'_>) -> bool,
-        indent_default_paren: bool,
+        default_paren_indent: DefaultParenIndent,
+        shell_leading_run: ShellLeadingRun,
     ) -> DocId {
         let d = self.d();
         if needs_parens(ts_type) {
@@ -347,9 +403,9 @@ impl<'a> Printer<'a> {
             // doc that aligns the trailing object's body + closing `})` with the
             // union member's `| {` offset (`build_aligned_object_literal_doc`'s double
             // indent). That alignment is correct only in a union-member context
-            // (`indent_default_paren == true`, via `build_type_doc_maybe_parens` /
+            // (`DefaultParenIndent::Nested`, via `build_type_doc_maybe_parens` /
             // `build_union_member_offset_doc`); for an *intersection* member
-            // (`build_intersection_member_type_doc`, `indent_default_paren == false`)
+            // (`build_intersection_member_type_doc`, `DefaultParenIndent::Bare`)
             // the trailing object hangs one level too deep. There the default arm
             // below (bare `("(", inner, ")")`, no inner indent) reproduces the array
             // path's single-indent layout, matching prettier. See
@@ -357,7 +413,7 @@ impl<'a> Printer<'a> {
             // `aligned_trailing_object_shell` is the whole question — including which
             // comments the aligned opening can hold; a `//` in its member gaps declines
             // it and falls through to the default arm below.
-            if indent_default_paren
+            if default_paren_indent == DefaultParenIndent::Nested
                 && let Some((intersection, obj)) = self.aligned_trailing_object_shell(ts_type)
             {
                 return self.build_parenthesized_intersection_trailing_object_doc(
@@ -369,7 +425,23 @@ impl<'a> Printer<'a> {
 
             // Special case: parenthesized union type
             if let TSType::Union(union) = unwrap_parenthesized(ts_type) {
-                return self.build_parenthesized_union_doc(union, outermost_paren(ts_type), false);
+                return self.build_parenthesized_union_doc(
+                    union,
+                    outermost_paren(ts_type),
+                    shell_leading_run == ShellLeadingRun::Here,
+                );
+            }
+
+            // The union arm above renders a shell's own leading LINE run inside the
+            // required pair, opening it. Every other operand kind reaches the same
+            // position through the default arm below, where the run would render GLUED to
+            // the `(` — so the caller that asked for the union treatment gets it here too,
+            // and one position stops having two spellings. Only a `//` asks: a block
+            // stays inline in both.
+            if shell_leading_run == ShellLeadingRun::Here
+                && self.stripped_paren_hang_has_leading_line_comment(ts_type)
+            {
+                return self.build_open_required_paren_doc(ts_type);
             }
 
             // Default case: parenthesize the inner type. The inner `d.indent`
@@ -377,16 +449,19 @@ impl<'a> Printer<'a> {
             // for intersection members, which take their level from the
             // intersection printer's own `& `-line indent — see
             // `build_intersection_member_type_doc`.
-            let inner = self.build_type_doc(ts_type);
-            d.concat(&[
-                d.text("("),
-                if indent_default_paren {
-                    d.indent(inner)
-                } else {
-                    inner
-                },
-                d.text(")"),
-            ])
+            // Through the shared required-pair seam, so a shell that already prints its
+            // own `(`…`)` doesn't get a second one — `[((⏎↹A extends B ? C : D // c⏎))?]`
+            // where the comment-free authoring prints `[(A extends B ? C : D)?]`.
+            self.build_required_paren_operand_doc(ts_type, |inner| {
+                d.concat(&[
+                    d.text("("),
+                    match default_paren_indent {
+                        DefaultParenIndent::Nested => d.indent(inner),
+                        DefaultParenIndent::Bare => inner,
+                    },
+                    d.text(")"),
+                ])
+            })
         } else {
             // Type-operand positions (union/intersection members, conditional
             // check/extends types, optional tuple elements) break the OUTERMOST

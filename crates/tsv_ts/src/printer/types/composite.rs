@@ -46,6 +46,38 @@ fn tuple_elem_span(ty: &TSType<'_>) -> Span {
     unwrap_parenthesized(ty).span()
 }
 
+/// Whether a conditional-type branch renders as a **nested conditional** — the question
+/// [`Printer::build_conditional_branch_tail_doc`] routes on and the branch closures in
+/// [`Printer::build_conditional_type_doc_inner`] build from.
+///
+/// The peel is deliberately the comment-blind [`unwrap_parenthesized`]: what a branch *is*
+/// is a fact about the grammar, and a shell the author wrote around it changes nothing.
+/// Asking the comment-aware `unwrap_redundant_parens` here — which stops at a shell holding
+/// comments — let a comment flip the branch out of this arm and into the generic one, whose
+/// per-branch `indent` then doubled the nested conditional's own always-on indent.
+fn conditional_branch_is_nested(branch: &TSType<'_>) -> bool {
+    matches!(unwrap_parenthesized(branch), TSType::Conditional(_))
+}
+
+/// The **deep** interior gaps of a conditional branch's redundant paren shell, as
+/// `(leading, trailing)` — from the outermost `(` to the fully-unwrapped inner type, and
+/// from that type back out to the outermost `)`. `None` when the branch carries no shell.
+///
+/// Deep, not per-paren, for the reason [`Printer::stripped_paren_leading_line_comments`]
+/// widened: a comment in a doubly-nested shell (`((/* c */ T))`) falls *between* the two
+/// `(`s, where either paren's own window is blind to it.
+fn branch_shell_gaps(branch: &TSType<'_>) -> Option<(Span, Span)> {
+    if !matches!(branch, TSType::Parenthesized(_)) {
+        return None;
+    }
+    let shell = branch.span();
+    let inner = unwrap_parenthesized(branch).span();
+    Some((
+        Span::new(shell.start + 1, inner.start),
+        Span::new(inner.end, shell.end - 1),
+    ))
+}
+
 /// How an array type renders its `[]` suffix — the verdict
 /// [`Printer::array_suffix_layout`] resolves once for both the emitter and the
 /// type-alias `=` gate.
@@ -176,6 +208,8 @@ impl<'a> Printer<'a> {
         let needs_breaking = has_breaking_comments_around_question
             || has_breaking_comments_after_colon
             || has_trailing_line_comment_on_true
+            || self.nested_branch_shell_forces_break(c.true_type)
+            || self.nested_branch_shell_forces_break(c.false_type)
             || routes.any();
 
         if needs_breaking {
@@ -193,7 +227,7 @@ impl<'a> Printer<'a> {
                 // Nested conditional in true position:
                 // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
                 // - Broken: no parens (the line breaks provide clarity)
-                let inner_doc = self.build_conditional_type_doc_inner(inner);
+                let inner_doc = self.build_nested_conditional_branch_doc(c.true_type, inner, false);
                 if d.will_break(inner_doc) {
                     // Inner doc forces breaking — use broken layout directly
                     inner_doc
@@ -209,7 +243,7 @@ impl<'a> Printer<'a> {
         // No parens needed for nested conditionals in false position (right-associative).
         let false_type_doc = || {
             if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
-                self.build_conditional_type_doc_inner(inner)
+                self.build_nested_conditional_branch_doc(c.false_type, inner, false)
             } else {
                 self.build_type_doc(c.false_type)
             }
@@ -280,6 +314,99 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// The doc for a conditional branch that renders as a **nested conditional**
+    /// ([`conditional_branch_is_nested`]), with its redundant paren shell's own interior
+    /// comments claimed on this seam.
+    ///
+    /// The shell is ordinarily stripped — a nested conditional prints the clarity pair the
+    /// *branch* decides on, not the one the author typed — so its two interior gaps have
+    /// no other emitter, and everything written in them was DROPPED
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 4, head and tail variants at
+    /// once): `? (/* c */ B extends C ? D : E)` lost the comment, `? (B extends C ? D : E
+    /// /* c */)` lost it, and a `//` in either gap was lost with the code after it.
+    ///
+    /// The one shell that is NOT stripped ([`Self::nested_branch_shell_retains`]) hands
+    /// both gaps back to its own emitter instead — this seam claims neither there.
+    ///
+    /// `leading_claimed` is the breaking layout's relocation: there a pure leading
+    /// line-comment run has already been emitted above the operator
+    /// ([`Self::stripped_paren_leading_line_comments`]), so claiming it again would
+    /// double-print it (hazard 3). The trailing gap is this seam's in every layout.
+    fn build_nested_conditional_branch_doc(
+        &self,
+        branch: &TSType<'_>,
+        inner: &TSConditionalType<'_>,
+        leading_claimed: bool,
+    ) -> DocId {
+        let d = self.d();
+        let Some((leading, trailing)) = branch_shell_gaps(branch) else {
+            return self.build_conditional_type_doc_inner(inner);
+        };
+        if self.nested_branch_shell_retains(branch) {
+            // The shell survives, so its own emitter owns BOTH gaps — this seam claims
+            // neither. Mutually exclusive with `leading_claimed` by construction: the
+            // relocation that sets it (`stripped_paren_leading_line_comments`) declines
+            // any shell carrying a trailing comment, which is exactly what retains.
+            debug_assert!(
+                !leading_claimed,
+                "a retained shell's leading run is never relocated"
+            );
+            return self.build_type_doc(branch);
+        }
+        let mut parts: DocBuf = DocBuf::new();
+        if !leading_claimed {
+            self.push_paren_shell_leading_run(&mut parts, leading.start, leading.end, true);
+        }
+        parts.push(self.build_conditional_type_doc_inner(inner));
+        self.push_trailing_comments_in_range(&mut parts, trailing.start, trailing.end);
+        d.concat(&parts)
+    }
+
+    /// Whether a nested-conditional branch's stripped shell holds a comment that cannot
+    /// share its line — one the flat layout has no room for.
+    ///
+    /// The gate and the emitter must read the SAME region. Every other `needs_breaking`
+    /// term stops at the branch's own span start, which for a parenthesized branch is the
+    /// shell's `(` — so a `//` the author wrote *inside* the shell was invisible here while
+    /// [`Self::build_nested_conditional_branch_doc`] still emits it, landing a deferred
+    /// comment in a FLAT branch where it swallows the `: …` behind it.
+    ///
+    /// Only a nested-conditional branch asks: every other branch keeps its shell and routes
+    /// through `build_parenthesized_type_unwrap_doc`, which answers retain-vs-defer itself.
+    /// A **trailing block** stays inline (prettier keeps `? (A extends B ? C : D /* c */)`
+    /// flat), so only the leading gap consults the wider own-line gate.
+    fn nested_branch_shell_forces_break(&self, branch: &TSType<'_>) -> bool {
+        let Some((leading, trailing)) = branch_shell_gaps(branch) else {
+            return false;
+        };
+        conditional_branch_is_nested(branch)
+            && (self.comments_force_own_line_between(leading.start, leading.end)
+                || self.has_line_comments_between(trailing.start, trailing.end))
+    }
+
+    /// Whether a nested-conditional branch's redundant paren shell must be **retained**
+    /// instead of stripped: it holds a trailing **line** comment and the enclosing
+    /// conditional has no `:` left to flush that comment against
+    /// ([`Printer::conditional_branch_colon_follows`]).
+    ///
+    /// The branch-position reading of the rule
+    /// [`Printer::paren_shell_retains_for_trailing_run`] states for a shell in general —
+    /// asked separately because that one folds in the *member* carve-out (`|`/`&`
+    /// follows), which is never the question here. In the TRUE position the outer arm's
+    /// own break ends the line right after the branch, so the deferred run flushes on the
+    /// branch it was written on and the strip is lossless (prettier agrees, and
+    /// `conditional/branch_paren_comment` case K pins it). In the FALSE position nothing
+    /// but the statement tail follows: the same deferral carried the `//` past the `;`,
+    /// where the reparse — the shell now gone — re-collapses the conditional onto one
+    /// line, so the output was not a fixed point.
+    fn nested_branch_shell_retains(&self, branch: &TSType<'_>) -> bool {
+        let Some((_, trailing)) = branch_shell_gaps(branch) else {
+            return false;
+        };
+        self.has_line_comments_between(trailing.start, trailing.end)
+            && !self.conditional_branch_colon_follows(branch.span().end)
+    }
+
     /// Build the conditional check-type doc. A redundant-paren-stripped union or
     /// intersection check uses the hanging layout Prettier applies via
     /// `printTernaryTest` + `shouldIndentUnionType`: a (non-hug) union breaks
@@ -327,10 +454,7 @@ impl<'a> Printer<'a> {
             // (`indent(line)`); every other branch nests its run inside the branch's
             // structural indent with a bare `line`. Built inside the closure so the
             // comment-free path allocates nothing.
-            let soft_sep = if matches!(
-                self.unwrap_redundant_parens(branch_type),
-                TSType::Conditional(_)
-            ) {
+            let soft_sep = if conditional_branch_is_nested(branch_type) {
                 d.indent(d.line())
             } else {
                 d.line()
@@ -395,6 +519,44 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text(" "), d.indent(self.prepend_opt(run, inner))])
             }
         };
+        // Every other branch: `on_new_line` puts it one level in via literal tab text
+        // (not `d.indent`, which would shift nested content too), otherwise it follows
+        // the operator's space. `structural_indent` is Prettier's `printBranch` =
+        // `indent(print(branch))` under useTabs — every non-conditional branch (tuple,
+        // mapped, object, function/constructor type, …) sits one level past the operator.
+        let plain = |branch_doc: DocId, structural_indent: bool| {
+            if on_new_line {
+                d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
+            } else {
+                let tail = self.prepend_opt(run, branch_doc);
+                d.concat(&[
+                    d.text(" "),
+                    if structural_indent {
+                        d.indent(tail)
+                    } else {
+                        tail
+                    },
+                ])
+            }
+        };
+        // A nested conditional branch is the one that declines that structural indent: it
+        // is already leveled by its OWN always-on `indent(parts)` (the `d.indent` at the
+        // tail of `build_conditional_type_doc_inner`). This mirrors Prettier's
+        // `forceNoIndent`: a conditional in true/false position drops its own
+        // `indent(parts)` (`forceNoIndent ? parts : indent(parts)`) precisely so the outer
+        // `printBranch` indent lands it one level in — tsv reaches the same
+        // one-level-per-nesting result from the other side (parts always indented, branch
+        // never), so adding an indent here would double it. Guarded by
+        // `conditional/branch_nested_chain`.
+        //
+        // Asked ahead of the match, and through the comment-BLIND
+        // [`conditional_branch_is_nested`], because the answer is the branch closure's
+        // too: `unwrap_redundant_parens` stops at a shell holding comments, so a comment
+        // there dropped the branch into the generic arm and double-indented it while the
+        // closure went on building the bare nested conditional.
+        if conditional_branch_is_nested(branch_type) {
+            return plain(branch_doc(), false);
+        }
         match self.unwrap_redundant_parens(branch_type) {
             // `union_prints_hugged`, not the bare syntactic `union_hug_shape` — see
             // `build_conditional_check_doc`; here a bare ask left the members one indent
@@ -406,39 +568,87 @@ impl<'a> Printer<'a> {
                 hang(self.build_union_type_doc(u))
             }
             TSType::Intersection(i) => hang(self.intersection_hanging_with_indent(i)),
-            // A nested conditional branch is already leveled by its OWN always-on
-            // `indent(parts)` (the `d.indent` at the tail of
-            // `build_conditional_type_doc_inner`), so it must NOT also take the
-            // per-branch indent below. This mirrors Prettier's `forceNoIndent`:
-            // a conditional in true/false position drops its own `indent(parts)`
-            // (`forceNoIndent ? parts : indent(parts)`) precisely so the outer
-            // `printBranch` indent lands it one level in — tsv reaches the same
-            // one-level-per-nesting result from the other side (parts always
-            // indented, branch never), so adding an indent here would double it.
-            // Guarded by `conditional/branch_nested_chain`.
-            TSType::Conditional(_) => {
-                let branch_doc = branch_doc();
-                if on_new_line {
-                    d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
-                } else {
-                    d.concat(&[d.text(" "), self.prepend_opt(run, branch_doc)])
-                }
-            }
-            _ => {
-                let branch_doc = branch_doc();
-                if on_new_line {
-                    // Literal tab text (not d.indent) shifts only the first line
-                    // without increasing the structural indent level for nested
-                    // content.
-                    d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
-                } else {
-                    // Prettier's `printBranch` = `indent(print(branch))` under
-                    // useTabs: every non-conditional branch (tuple, mapped, object,
-                    // function/constructor type, …) sits one level past the operator.
-                    d.concat(&[d.text(" "), d.indent(self.prepend_opt(run, branch_doc))])
-                }
-            }
+            _ => plain(branch_doc(), true),
         }
+    }
+
+    /// The extends-type shell's leading line-comment run, when relocating it to trail the
+    /// extends-type is LICENSED — `None` where it is not, leaving the mixed/trailing hang
+    /// to keep the run in place.
+    ///
+    /// The licence is losslessness, and it holds exactly while the destination line ends
+    /// up holding **one** `//`. Three runs land on that line and the count is their sum:
+    ///
+    /// - the shell's own run — more than one comment in it welds on arrival
+    ///   (`T extends (// c1⏎// c2⏎U)`);
+    /// - the extends-type→`?` gap's **same-line** prefix, which trails the extends-type
+    ///   (`T extends (// c1⏎U) // c2`). Only the same-line prefix: an own-line comment
+    ///   there keeps its own line above the `?`
+    ///   ([`Printer::build_own_line_preserving_run`], the seam that splits this very gap),
+    ///   so it can never share the destination — reading the whole gap declined a
+    ///   relocation both formatters perform losslessly;
+    /// - the TRUE branch's own shell run, which the breaking builder relocates onto this
+    ///   same line right behind the extends run (`T extends (// c1⏎U) ? (// c2⏎V) : W`) —
+    ///   a contributor no window over this conditional's own gaps can see.
+    ///
+    /// The cheap `matches!` + line-comment scan fail-fast
+    /// ([`Printer::stripped_paren_has_leading_line_comment`]) gates the collector, so a
+    /// comment-free conditional — the overwhelming case — allocates nothing here.
+    fn extends_relocatable_run(&self, c: &TSConditionalType<'_>) -> Option<CommentVec<'_>> {
+        if !self.stripped_paren_has_leading_line_comment(c.extends_type) {
+            return None;
+        }
+        let run = self.stripped_paren_leading_line_comments(c.extends_type);
+        if run.len() != 1 {
+            return None;
+        }
+        let extends_end = c.extends_type.span().end;
+        let gap_welds =
+            comments_to_emit_in_range(self.comments, extends_end, c.true_type.span().start)
+                .any(|cm| !cm.is_block && self.is_same_line(extends_end, cm.span.start));
+        if gap_welds
+            || !self
+                .stripped_paren_leading_line_comments(c.true_type)
+                .is_empty()
+        {
+            return None;
+        }
+        Some(run)
+    }
+
+    /// A conditional BRANCH shell's leading line-comment run, when relocating it to trail
+    /// the node before the operator is LICENSED — **empty** where it is not, leaving the
+    /// run to print inside the shell the author wrote it in.
+    ///
+    /// The branch-position twin of [`Self::extends_relocatable_run`], carrying the same
+    /// licence: the destination line must end up holding exactly one `//`. `anchor` is the
+    /// node the run would trail (the extends-type for the `?` arm, the true branch for the
+    /// `:` arm) and `[anchor, gap_end)` its operator gap, whose **same-line** prefix
+    /// shares that line — an own-line comment there keeps its own line above the operator
+    /// ([`Printer::build_own_line_preserving_run`]) and cannot collide.
+    ///
+    /// Without the bound both authorings welded: a run of two inside the shell
+    /// (`? (// c1⏎// c2⏎V)`) and a comment already trailing the anchor
+    /// (`T extends U // c2⏎? (// c1⏎V)`) each rendered back to back on one line, the
+    /// second `//` becoming text of the first — a comment gone, irreversibly, the merged
+    /// form being a fixed point. Declining costs nothing: the shell's own emitter prints
+    /// the run where it was written, which is also where prettier puts it.
+    fn branch_relocatable_run(
+        &self,
+        branch: &TSType<'_>,
+        anchor: u32,
+        gap_end: u32,
+    ) -> CommentVec<'_> {
+        if !self.stripped_paren_has_leading_line_comment(branch) {
+            return CommentVec::new();
+        }
+        let run = self.stripped_paren_leading_line_comments(branch);
+        if run.len() != 1 {
+            return CommentVec::new();
+        }
+        let welds = comments_to_emit_in_range(self.comments, anchor, gap_end)
+            .any(|cm| !cm.is_block && self.is_same_line(anchor, cm.span.start));
+        if welds { CommentVec::new() } else { run }
     }
 
     /// Build the extends clause doc for a conditional type, including comments
@@ -506,11 +716,31 @@ impl<'a> Printer<'a> {
         // pure-line trail-on-inner is the conditional-extends' own canonical, pinned by
         // the non-divergence `extends_paren_leading_line_comment`; a mixed/trailing shell
         // declines it (below).
-        if self.stripped_paren_has_leading_line_comment(c.extends_type) {
+        //
+        // ⚠️ It applies only where the destination line ends up holding exactly ONE `//`
+        // ([`Self::extends_relocatable_run`]). The relocation's whole argument is that
+        // trailing the run on the extends-type is lossless, and that stops being true as
+        // soon as two line comments share the destination: they render back to back and
+        // the second `//` becomes text of the first — one comment where the author wrote
+        // two, irreversibly, the merged form being a fixed point in both formatters.
+        // Prettier welds in every such authoring; tsv keeps the shell instead, via the
+        // mixed/trailing hang below, where every comment stays distinct and on its own
+        // line. A licence stops where its argument stops.
+        if let Some(relocated_run) = self.extends_relocatable_run(c) {
             let inner = unwrap_parenthesized(c.extends_type);
             let mut parts: DocBuf = smallvec![d.text(" "), comments_after_extends];
-            parts.push(self.build_type_doc(inner));
-            for comment in self.stripped_paren_leading_line_comments(c.extends_type) {
+            // The strip sheds only the REDUNDANT layers: a required pair is re-added, on
+            // the same rule the unfrozen arm below and the general extends path use. A
+            // bare `build_type_doc` here shed them all, and for a **conditional** inner
+            // that is not a layout difference but invalid output — `W extends (// c⏎X
+            // extends Y ? Z : A1) ? B1 : C1` printed `W extends X extends Y ? Z : A1 // c
+            // ⏎? B1 : C1`, which the canonical parser REJECTS (the `?` rebinds). The
+            // prefix-operator hang seam already recomputes its own `needs_parens` on the
+            // unwrapped operand for exactly this reason; this was its lagging twin.
+            parts.push(
+                self.build_type_doc_maybe_parens(inner, type_needs_parens_for_conditional_extends),
+            );
+            for comment in &relocated_run {
                 parts.push(self.build_trailing_line_comment_doc(comment));
             }
             return d.concat(&parts);
@@ -661,12 +891,12 @@ impl<'a> Printer<'a> {
         let true_paren_leading_line_comments: CommentVec<'_> = if true_route {
             CommentVec::new()
         } else {
-            self.stripped_paren_leading_line_comments(c.true_type)
+            self.branch_relocatable_run(c.true_type, extends_type_end, true_type_start)
         };
         let false_paren_leading_line_comments: CommentVec<'_> = if false_route {
             CommentVec::new()
         } else {
-            self.stripped_paren_leading_line_comments(c.false_type)
+            self.branch_relocatable_run(c.false_type, true_type_end, false_type_start)
         };
 
         // Find `extends` keyword position (reused for both extends_type_doc and comments_before_extends)
@@ -836,10 +1066,14 @@ impl<'a> Printer<'a> {
         branch: &TSType<'_>,
         paren_leading: &CommentVec<'_>,
     ) -> DocId {
-        if !paren_leading.is_empty() {
+        // The nested-conditional question comes FIRST, and unconditionally: routing a
+        // relocated branch through the grouped `build_type_doc` instead gave the nested
+        // conditional a group of its own, so it printed FLAT inside an already-broken
+        // parent where prettier breaks it with the parent.
+        if let TSType::Conditional(inner) = unwrap_parenthesized(branch) {
+            self.build_nested_conditional_branch_doc(branch, inner, !paren_leading.is_empty())
+        } else if !paren_leading.is_empty() {
             self.build_type_doc(unwrap_parenthesized(branch))
-        } else if let TSType::Conditional(inner) = unwrap_parenthesized(branch) {
-            self.build_conditional_type_doc_inner(inner)
         } else {
             self.build_type_doc(branch)
         }
@@ -1704,13 +1938,17 @@ impl<'a> Printer<'a> {
             parts.push(self.build_array_suffix_doc(arr));
             return d.concat(&parts);
         }
-        let element_doc = self.build_type_doc(arr.element_type);
         let suffix_doc = self.build_array_suffix_doc(arr);
-        if type_needs_parens_for_array_element(arr.element_type) {
-            d.concat(&[d.text("("), element_doc, d.text(")"), suffix_doc])
+        // The `[]` suffix rides OUTSIDE the required-pair decision — the shell may already
+        // print the pair, but the suffix is the array type's own and always emits.
+        let element_doc = if type_needs_parens_for_array_element(arr.element_type) {
+            self.build_required_paren_operand_doc(arr.element_type, |element| {
+                d.concat(&[d.text("("), element, d.text(")")])
+            })
         } else {
-            d.concat(&[element_doc, suffix_doc])
-        }
+            self.build_type_doc(arr.element_type)
+        };
+        d.concat(&[element_doc, suffix_doc])
     }
 
     /// Everything after an array type's element: the element→`[` gap and the `[]`

@@ -20,6 +20,14 @@
 		// c2
 		: E;
 
+	// A paren shell's relocated run and an own-line gap comment coexist on their own
+	// lines: only a comment that would SHARE the destination line declines the
+	// relocation, and an own-line one never can
+	type I = J extends K // c1
+		// c2
+		? L
+		: M;
+
 	// Control: a comment the author left on the extends-type's line trails it.
 	type G = B extends C // c
 		? D

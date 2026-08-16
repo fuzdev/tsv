@@ -299,8 +299,25 @@ impl<'a> Printer<'a> {
                 // than dropped, a redundant one is shed. A mixed / trailing shell hoists
                 // losslessly too — the trailing comment via `with_stripped_paren_trailing`,
                 // applied after the operand's own parens are (re-)added.
+                //
+                // ⚠️ Except a shell the trailing-run rule RETAINS. The prefix operator is
+                // the one REQUIRED-pair position that also has a keyword→value hang seam,
+                // and taking the hang there stripped a shell whose pair the operand needs
+                // anyway, re-added it bare, and lifted the `//` out past the `;` —
+                // `keyof (// c1⏎ B extends C ? D : E // c2)` printing `keyof // c1⏎(B
+                // extends C ? D : E); // c2`, where a second trailing `//` then welds onto
+                // the first. Its four sibling required-pair positions (optional element,
+                // conditional check / `extends`, array element, indexed-access object)
+                // have no hang seam and so already retain. Declining here lands this one
+                // on the same emitter they use: the gap left to measure is `keyof`→`(`,
+                // which holds nothing, so the inline path below runs and
+                // `build_required_paren_operand_doc` hands the shell to its own builder.
                 let (operand_hang_start, operand_hang_type) =
-                    self.keyword_value_stripped_paren_hang(o.type_annotation);
+                    if self.paren_retains_for_trailing_run(o.type_annotation) {
+                        (o.type_annotation.span().start, o.type_annotation)
+                    } else {
+                        self.keyword_value_stripped_paren_hang(o.type_annotation)
+                    };
                 if self.comments_force_own_line_between(keyword_end, operand_hang_start) {
                     let operand_doc = self.build_type_doc(operand_hang_type);
                     let value_doc = if type_needs_parens_for_prefix_operator(operand_hang_type) {
@@ -344,14 +361,13 @@ impl<'a> Printer<'a> {
                 {
                     parts.push(union_doc);
                 } else {
-                    let operand_doc = self.build_type_doc(o.type_annotation);
-                    if needs_parens {
-                        parts.push(d.text("("));
-                        parts.push(operand_doc);
-                        parts.push(d.text(")"));
+                    parts.push(if needs_parens {
+                        self.build_required_paren_operand_doc(o.type_annotation, |operand| {
+                            d.concat(&[d.text("("), operand, d.text(")")])
+                        })
                     } else {
-                        parts.push(operand_doc);
-                    }
+                        self.build_type_doc(o.type_annotation)
+                    });
                 }
                 d.concat(&parts)
             }
@@ -420,13 +436,12 @@ impl<'a> Printer<'a> {
                 let object_doc = self
                     .build_expanded_parenthesized_union_opt(i.object_type)
                     .unwrap_or_else(|| {
-                        let needs_parens =
-                            type_needs_parens_for_indexed_access_object(i.object_type);
-                        let object_doc = self.build_type_doc(i.object_type);
-                        if needs_parens {
-                            d.concat(&[d.text("("), object_doc, d.text(")")])
+                        if type_needs_parens_for_indexed_access_object(i.object_type) {
+                            self.build_required_paren_operand_doc(i.object_type, |object| {
+                                d.concat(&[d.text("("), object, d.text(")")])
+                            })
                         } else {
-                            object_doc
+                            self.build_type_doc(i.object_type)
                         }
                     });
                 // Comments in the object→`[` gap (`A /* c */[K]`) trail the object
@@ -579,7 +594,11 @@ impl<'a> Printer<'a> {
                 ])
             }
             TSType::Optional(o) => {
-                let inner = self.build_type_doc_maybe_parens(
+                // The optional element is the SOLE emitter of its operand shell's leading
+                // line-comment run — no union-member relocation, no stripped-shell hang
+                // upstream — so it takes the variant that keeps the run inside the parens
+                // rather than the shared entry point, which declines it.
+                let inner = self.build_optional_element_type_doc(
                     o.type_annotation,
                     type_needs_parens_for_optional_element,
                 );
@@ -827,7 +846,14 @@ impl<'a> Printer<'a> {
     /// Kept separate from the narrow predicate so the union-member / conditional-`extends`
     /// callers of the `stripped_*_leading_line_comments` pair — which retain the paren and
     /// preserve every comment *in place* — are unaffected.
-    fn stripped_paren_hang_has_leading_line_comment(&self, ty: &TSType<'_>) -> bool {
+    ///
+    /// Read by the hang seam as "a line comment forces the hang", and by
+    /// [`Self::build_open_required_paren_doc`]'s gate as the same underlying fact — the
+    /// deep leading gap holds a `//` — so the two cannot drift on where that gap ends.
+    pub(in crate::printer) fn stripped_paren_hang_has_leading_line_comment(
+        &self,
+        ty: &TSType<'_>,
+    ) -> bool {
         matches!(ty, TSType::Parenthesized(_))
             && self.has_line_comments_between(
                 ty.span().start + 1,
@@ -871,6 +897,15 @@ impl<'a> Printer<'a> {
     /// a trailing **block** comment follows `trailing_block` — see [`TrailingBlock`] for
     /// the position rationale.
     /// Mirrors [`Self::build_parenthesized_type_unwrap_doc`]'s trailing arm.
+    ///
+    /// ⚠️ The run is emitted by [`Self::push_trailing_comments_in_range`], the shared
+    /// trailing-gap seam, whose policy this gap's [`TrailingBlock::Inline`] spelling
+    /// exactly is — never by a loop of its own. Open-coding it dropped the seam's own-line
+    /// rule, and back-to-back `line_suffix`es WELD: `(// c⏎ T // t⏎ // x)` lifted
+    /// `// t // x` onto one line, the second `//` becoming text of the first. The
+    /// [`TrailingBlock::Deferred`] arm below is the one thing the seam cannot express — a
+    /// **block** deferring past a value position's terminator — and it carries the same
+    /// own-line rule for the same reason.
     pub(in crate::printer) fn with_stripped_paren_trailing(
         &self,
         value_doc: DocId,
@@ -889,33 +924,52 @@ impl<'a> Printer<'a> {
         }
         let d = self.d();
         let mut parts: DocBuf = smallvec![value_doc];
-        let mut needs_break = false;
-        for comment in comments_to_emit_in_range(self.comments, trailing_start, trailing_end) {
-            if comment.is_block && matches!(trailing_block, TrailingBlock::Inline) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            } else {
-                // Trailing line comment (always), or a deferred trailing block at a value
-                // position: defer to end of line so it lands past the terminator.
-                let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
-                parts.push(d.line_suffix(suffix));
-                // A trailing LINE comment must end its own line, so force the enclosing
-                // group open; a deferred trailing BLOCK rides `line_suffix` alone (it
-                // flushes before the statement's own terminator/newline) and must NOT
-                // force a break — at an inline value position that would split the value
-                // onto its own line. Hang callers already break via their leading comment,
-                // so this is a no-op for them.
-                needs_break |= !comment.is_block;
+        let needs_break = match trailing_block {
+            TrailingBlock::Inline => {
+                self.push_trailing_comments_in_range(&mut parts, trailing_start, trailing_end)
             }
-        }
+            TrailingBlock::Deferred => {
+                let mut has_line_comment = false;
+                // The in-source cursor the own-line question is asked against — it
+                // advances over every comment emitted here, deferred or not.
+                let mut prev_end = trailing_start;
+                for comment in
+                    comments_to_emit_in_range(self.comments, trailing_start, trailing_end)
+                {
+                    // Everything defers at a value position, so the break that separates
+                    // two of them must ride INSIDE the `line_suffix` — a real one between
+                    // them would land in the enclosing construct instead.
+                    parts.push(
+                        if self.comment_has_newline_between(prev_end, comment.span.start) {
+                            self.build_trailing_comment_doc_own_line(comment)
+                        } else {
+                            d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)]))
+                        },
+                    );
+                    // A trailing LINE comment must end its own line, so force the group the
+                    // run flushes in open; a deferred trailing BLOCK rides `line_suffix`
+                    // alone (it flushes before the statement's own terminator/newline) and
+                    // must NOT force a break — at an inline value position that would split
+                    // the value onto its own line.
+                    has_line_comment |= !comment.is_block;
+                    prev_end = comment.span.end;
+                }
+                has_line_comment
+            }
+        };
         if needs_break {
-            // Unscoped `break_parent`, deliberately NOT the flush-scoped node the
-            // stripped shell emits (`build_parenthesized_type_unwrap_doc`): every
-            // caller is a hang seam whose leading comment regenerates the same
-            // hardlines on the reparse, so the force is reproducible — the scoped
-            // node exists for strips whose comment ends up in a different gap next
-            // pass, which a hang's retained geometry never does.
-            parts.push(d.break_parent());
+            // Flush-SCOPED (`DocArena::flush_break`), not the unscoped `break_parent`.
+            // The force is redundant for these callers in the first place — every one is
+            // a hang seam whose leading comment already emits real hardlines — but
+            // "redundant" is not "inert": `arena_fits` returns false the moment its walk
+            // reaches a `BreakParent`, and that walk continues into the REST commands, so
+            // an unscoped node here also collapses the flat measurement of every SIBLING
+            // group before it. The hung value's own group is exactly such a sibling — a
+            // conditional constraint printed `(A extends B⏎↹? C⏎↹: D) // t` where its
+            // comment-free twin, and prettier, print it flat. The scoped node arms a
+            // pending flush instead: the group owning the next line opportunity breaks,
+            // one with none stays flat.
+            parts.push(d.flush_break());
         }
         d.concat(&parts)
     }
@@ -956,6 +1010,41 @@ impl<'a> Printer<'a> {
     /// window end and the emitter's claim end, and a head that derived them separately
     /// could gate on one window while claiming another — a dropped or double-printed
     /// comment. [`Self::build_keyword_value_doc`] is the matching value builder.
+    /// [`Self::keyword_value_head`] for a **required-pair** position — one where the
+    /// author's shell and a pair the construct needs anyway are the same pair (the
+    /// type-parameter `extends` constraint; the prefix operator makes the same call
+    /// inline). A shell the trailing-run rule RETAINS is left whole here instead of being
+    /// handed to the paren-strip hang seam.
+    ///
+    /// Two things go wrong when the hang takes it. The pair it strips is one the operand
+    /// needs, so the arm downstream has to re-mint it — and for an `infer` constraint,
+    /// failing to is output the canonical parser rejects. And the trailing `//` it lifts
+    /// out renders through a `hardline` that takes whatever indent it flushes at, one
+    /// level deeper than the value→`>` gap where the NEXT pass finds that same comment
+    /// once the shell is gone: two authorings, two indents, so tsv's own output was not a
+    /// fixed point. Retaining answers both — the shell opens, and every comment in it
+    /// stays where it was written.
+    ///
+    /// A **frozen** head still wins: a directive in the keyword gap freezes the child
+    /// verbatim, which is a stronger claim on the same bytes.
+    pub(in crate::printer) fn keyword_value_head_required_pair<'t>(
+        &self,
+        gap_start: u32,
+        child: &'t TSType<'t>,
+    ) -> KeywordValueHead<'t> {
+        if !self.single_child_frozen(gap_start, child) && self.paren_retains_for_trailing_run(child)
+        {
+            return KeywordValueHead {
+                gap_start: Some(gap_start),
+                frozen: false,
+                value_start: child.span().start,
+                child,
+                value_type: child,
+            };
+        }
+        self.keyword_value_head(gap_start, child)
+    }
+
     pub(in crate::printer) fn keyword_value_head<'t>(
         &self,
         gap_start: u32,
@@ -1138,6 +1227,73 @@ impl<'a> Printer<'a> {
         self.paren_shell_retains_for_trailing_run(p)
     }
 
+    /// Build `ty`'s doc and wrap it in the parens an enclosing construct **requires**
+    /// around it — unless `ty`'s own doc already prints a pair, in which case the required
+    /// one is already on the page and `wrap` is skipped.
+    ///
+    /// The ENCLOSING-side reading of [`Self::paren_retains_for_trailing_run`]: a shell that
+    /// rule retains emits its own `(`…`)`, so a caller adding the required pair on top
+    /// minted a SECOND one the author never wrote — `keyof ((⏎↹A extends B ? C : D // c⏎))`
+    /// where the comment-free authoring prints `keyof (A extends B ? C : D)`. Four sites
+    /// asked the question independently (prefix-operator operand, the shared
+    /// `build_type_doc_maybe_parens` default arm, array element, indexed-access object) and
+    /// all four were wrong the same way; they share it here instead, so a fifth cannot
+    /// drift. The rule the divergence catalog states for the shell's own side is the same
+    /// one: *a comment never changes which parens are retained, only where it renders once
+    /// they are.*
+    ///
+    /// `wrap` receives the operand doc and supplies the pair — callers differ in what rides
+    /// inside it (a bare pair, an `indent`, a following `[]` suffix), so the shape is the
+    /// caller's and only the *decision* is shared.
+    ///
+    /// The prefix operator needs that decision a **second** time, before this: it is the
+    /// only required-pair position that also has a keyword→value hang seam, and the hang
+    /// would strip the shell before it ever reached here. Both asks read the one predicate.
+    pub(in crate::printer) fn build_required_paren_operand_doc(
+        &self,
+        ty: &TSType<'_>,
+        wrap: impl FnOnce(DocId) -> DocId,
+    ) -> DocId {
+        let operand_doc = self.build_type_doc(ty);
+        if self.paren_retains_for_trailing_run(ty) {
+            return operand_doc;
+        }
+        wrap(operand_doc)
+    }
+
+    /// Emit a **required** pair OPEN around its operand, with the shell's own deep
+    /// interior gaps rendered inside it: `(⏎↹// c⏎↹T⏎)`.
+    ///
+    /// The shape [`Self::build_parenthesized_type_unwrap_doc`]'s retain arm produces, and
+    /// the one a parenthesized **union** operand already reaches through
+    /// [`Self::build_parenthesized_union_doc`] — offered here so the operands that are
+    /// not unions can reach it too. Glued instead (`(// c⏎↹T)?`), the `(` sits on the
+    /// comment's line and the `)` on the type's, which is a third form neither the union
+    /// spelling of the same position nor prettier produces.
+    ///
+    /// The gaps are the **deep** ones — outermost `(` to fully-unwrapped inner, and back
+    /// — so a doubly-nested shell (`((// c⏎T))`) still collapses to the one pair and its
+    /// comment, which falls between the two `(`s, is still found.
+    pub(in crate::printer) fn build_open_required_paren_doc(&self, shell: &TSType<'_>) -> DocId {
+        let d = self.d();
+        let inner = unwrap_parenthesized(shell);
+        let mut parts: DocBuf = DocBuf::new();
+        self.push_paren_shell_leading_run(
+            &mut parts,
+            shell.span().start + 1,
+            inner.span().start,
+            true,
+        );
+        parts.push(self.build_type_doc(inner));
+        self.push_trailing_comments_in_range(&mut parts, inner.span().end, shell.span().end - 1);
+        d.concat(&[
+            d.text("("),
+            d.indent_hardline(d.concat(&parts)),
+            d.hardline(),
+            d.text(")"),
+        ])
+    }
+
     /// The [`Self::paren_retains_for_trailing_run`] answer for an already-matched shell.
     fn paren_shell_retains_for_trailing_run(&self, p: &TSParenthesizedType<'_>) -> bool {
         // A **line** comment is the only thing that retains the shell: a trailing run of
@@ -1175,6 +1331,36 @@ impl<'a> Printer<'a> {
     /// the licence never breaks a group the flush doesn't land in — see
     /// [`Self::build_parenthesized_type_unwrap_doc`]'s trailing arm.
     fn type_member_separator_follows(&self, pos: u32) -> bool {
+        matches!(self.byte_after_closers(pos), Some(b'|' | b'&'))
+    }
+
+    /// Whether a conditional type's `:` still follows `pos` — the branch-position reading
+    /// of the same carve-out [`Self::type_member_separator_follows`] states for members.
+    ///
+    /// A nested-conditional branch's redundant shell is stripped (the branch prints the
+    /// clarity pair it decides on, not the one the author typed), so a trailing line
+    /// comment in that shell is deferred. That is lossless exactly while the enclosing
+    /// conditional still has its `:` to come: the arm break ends the output line right
+    /// after this branch and the run flushes on the branch it was written on. In the
+    /// FALSE position nothing but the statement's own tail follows, so the same deferral
+    /// carries the `//` past the `;` — onto a line the reparse cannot re-break, which is
+    /// non-idempotent — and the shell is retained instead.
+    ///
+    /// Asked of the SOURCE rather than of a true/false flag because the answer is about
+    /// what follows the whole nest: an inner false branch inside an outer TRUE branch
+    /// (`A extends B ? (C extends D ? E : (F ? G : H // c)) : I`) still has the outer
+    /// `:` to flush against, and the `)`-crossing walk finds it.
+    pub(in crate::printer) fn conditional_branch_colon_follows(&self, pos: u32) -> bool {
+        matches!(self.byte_after_closers(pos), Some(b':'))
+    }
+
+    /// The first significant source byte after `pos`, looking through trivia and through
+    /// any `)` closers — the shared scanner behind
+    /// [`Self::type_member_separator_follows`] and
+    /// [`Self::conditional_branch_colon_follows`]. A crossed `)` is an enclosing layer,
+    /// redundant or retained, and either way cannot separate this construct from the
+    /// break that follows it. `None` at end of source.
+    fn byte_after_closers(&self, pos: u32) -> Option<u8> {
         let bytes = self.source.as_bytes();
         let end = bytes.len();
         let mut i = pos as usize;
@@ -1188,9 +1374,9 @@ impl<'a> Printer<'a> {
                 i = next;
                 continue;
             }
-            return b == b'|' || b == b'&';
+            return Some(b);
         }
-        false
+        None
     }
 
     /// Unwrap redundant, comment-free `TSParenthesizedType` layers to find the
