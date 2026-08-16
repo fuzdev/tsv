@@ -154,7 +154,7 @@ pub(super) fn push_empty_args(
 /// spans is enough to avoid mistaking a comment-internal comma (`a /* p, q */, b`)
 /// for the separator.
 #[inline]
-pub(crate) fn find_comma_pos(source: &str, start: u32, end: u32) -> Option<usize> {
+fn find_comma_pos(source: &str, start: u32, end: u32) -> Option<usize> {
     // Byte scan is safe: `,`, `/`, `*`, `\n` are ASCII and never appear as a
     // UTF-8 continuation byte, so multibyte content in a comment can't false-match.
     let bytes = source.as_bytes();
@@ -214,14 +214,21 @@ pub(crate) fn skip_stripped_open_paren(source: &str, from: u32, to: u32) -> u32 
 }
 
 /// Check if a comment is before the comma position
+///
+/// ⚠️ **Private, and it should stay that way.** The comma-relative reading is an internal
+/// detail of the seam's own partition ([`PartitionedComments::for_routed_arg_gap`] and the
+/// emitters over it); an argument layout that asks it *directly* is re-deriving which
+/// argument a comment binds to, which is the shape of every bug this seam has produced.
+/// Callers take the partition.
 #[inline]
-pub(crate) fn is_comment_before_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
+fn is_comment_before_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
     (comment.span.start as usize) < comma_pos
 }
 
-/// Check if a comment is after the comma position
+/// Check if a comment is after the comma position — private for the reason on
+/// [`is_comment_before_comma`].
 #[inline]
-pub(crate) fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
+fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
     (comment.span.start as usize) > comma_pos
 }
 
@@ -374,11 +381,7 @@ pub(crate) fn has_stripped_paren_gap(source: &str, start: u32, end: u32) -> bool
 ///
 /// True if they share a source line, or if the gap between them contains only stripped
 /// grouping parens on the same line as the comment (e.g., `/** @type {T} */ (\n\texpr)`).
-pub(super) fn is_comment_inline_with_next(
-    printer: &Printer<'_>,
-    comment_end: u32,
-    next_pos: u32,
-) -> bool {
+fn is_comment_inline_with_next(printer: &Printer<'_>, comment_end: u32, next_pos: u32) -> bool {
     printer.is_same_line(comment_end, next_pos)
         || has_stripped_paren_gap(printer.source, comment_end, next_pos)
 }
@@ -930,7 +933,11 @@ impl<'a> PartitionedComments<'a> {
     /// comma or a leading `,` puts content ahead of a comment two lines below the opener,
     /// which this would call trailing — pulling it onto the delimiter's line *and* leaving
     /// it for the first item's leading run to print again. Use [`Self::new`] there.
-    pub fn for_item_gap(printer: &Printer<'a>, start: u32, end: u32) -> Self {
+    ///
+    /// ⚠️ **Private: the unrouted partition is not a state an argument gap is ever in.**
+    /// Its one caller is [`Self::for_routed_arg_gap`]; see there for why the two steps are
+    /// one. A comma-less gap takes [`Self::for_closer_gap`], not this.
+    fn for_item_gap(printer: &Printer<'a>, start: u32, end: u32) -> Self {
         Self::from_trailing_run(
             printer.trailing_comment_run(start, end),
             printer,
@@ -946,12 +953,14 @@ impl<'a> PartitionedComments<'a> {
     /// an after-comma block that HUGS the next argument (it leads that argument, and both
     /// formatters agree) and one the author STRANDED on the comma line (it trails it — the
     /// sanctioned relocation divergence). A caller that partitions without routing turns
-    /// every hugging comment into a stranded one and silently moves it, so the pair is
-    /// named here rather than left to five call sites to remember.
+    /// every hugging comment into a stranded one and silently moves it: same bytes, a
+    /// different position, nothing dropped and no gate firing. So both halves are **private
+    /// to this file** and this is the only argument-gap constructor — the unrouted state is
+    /// unconstructible rather than merely discouraged.
     ///
     /// Every argument gap that HOLDS A COMMA takes this. The comma-less spellings — a last
-    /// argument's gap to the `)`, a single argument — take [`Self::for_closer_gap`] or the
-    /// bare [`Self::for_item_gap`], where the route has no comma to find and is a no-op.
+    /// argument's gap to the `)`, a single argument — take [`Self::for_closer_gap`], whose
+    /// trailing run follows the closer's own rule.
     pub fn for_routed_arg_gap(printer: &Printer<'a>, start: u32, end: u32) -> Self {
         let mut pc = Self::for_item_gap(printer, start, end);
         pc.route_after_comma_hugging_to_leading(printer);
@@ -1024,7 +1033,7 @@ impl<'a> PartitionedComments<'a> {
     /// [`Self::emit_trailing_comments_around_comma`], the line break, then `leading` (own-line
     /// comments + hugged after-comma) via [`Self::emit_leading_comments_inline_aware`] — so the
     /// rule lives here once and every argument path inherits it.
-    pub fn route_after_comma_hugging_to_leading(&mut self, printer: &Printer<'_>) {
+    fn route_after_comma_hugging_to_leading(&mut self, printer: &Printer<'_>) {
         let Some(comma_pos) = find_comma_pos(printer.source, self.start, self.end) else {
             return;
         };
