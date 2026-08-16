@@ -946,7 +946,11 @@ DROP, doubly-claimed a DOUBLE-PRINT. `collect_trailing_comments` / `push_element
 state that split once (object literal, both patterns, specifier list, enum members); the array
 literal states its own as a POSITION rather than two filters (`element_gap_split`, each
 emitter taking a range), which is what keeps its three readers — trailing, leading, end-of-array
-scan — from drifting apart. Three standing rules: the leading scan resumes at the trailing run's
+scan — from drifting apart; the **call-argument family** (plain call, `new`, member chain,
+`import()`) states it as `PartitionedComments::for_routed_arg_gap` — the partition and its
+hugging **route** as ONE step, since partitioning without the route silently reclassifies every
+hugging comment as stranded, moving it with nothing dropped and no gate firing. Three standing
+rules: the leading scan resumes at the trailing run's
 **end**, never past the separator — a comment before a comma the author pushed onto its own line
 (`a: 1⏎// c⏎, b`) belongs to neither side otherwise, which was a live drop at four sites; the
 claimed run must stay a **prefix** of the gap, so a same-line block ahead of a deferred line
