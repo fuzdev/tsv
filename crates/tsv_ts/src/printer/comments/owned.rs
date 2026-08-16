@@ -280,13 +280,25 @@ impl<'a> Printer<'a> {
     /// - `build_export_default_declaration_doc` (`statements/modules/mod.rs`) reassembles
     ///   `export default @dec class {}`; the class expression is the left edge of what
     ///   follows the decorator run.
-    /// - [`Self::build_frozen_node_doc`] (`ignore.rs`) prints a verbatim span; the frozen
-    ///   span's start *is* the node's first printed byte by construction.
+    /// - `build_assignment_pattern_doc` (`expressions/patterns.rs`) reassembles a
+    ///   destructuring default's **left** object pattern for the no-expand-on-nesting rule;
+    ///   the pattern is the left edge of the default. This is the receiving end of the
+    ///   left-spine hand-down warned about above, and the reason it is a caller at all.
+    /// - [`Self::build_frozen_node_doc`] and its layout-opaque sibling
+    ///   [`Self::build_frozen_opaque_node_doc`] (`ignore.rs`) print a verbatim span; the frozen
+    ///   span's start *is* the node's first printed byte by construction. The two differ only
+    ///   in whether the slice's multi-line-ness reaches the container, never in the claim —
+    ///   which is why the second exists rather than the member-expression freeze open-coding a
+    ///   bare slice, as it did until a glued block ahead of a frozen chain base was found
+    ///   dropped at six distinct gap positions.
     ///
-    /// Prefer collapsing a reassembly path onto `build_expression_doc` over adding a fifth
-    /// caller, and prefer wrapping the claim in a named builder (as `build_frozen_node_doc`
-    /// does) over open-coding it — the call count has gone 2 → 3 → 4, each time out of step
-    /// with whatever prose enumerated it.
+    /// Prefer collapsing a reassembly path onto `build_expression_doc` over adding another
+    /// caller, and prefer wrapping the claim in a named builder (as the two frozen builders
+    /// do) over open-coding it. ⚠️ **Keep the list above whole and count-free** — it has been
+    /// wrong at nearly every size it has been, because a running total is the one part of it
+    /// no compiler checks, and each new caller arrived alongside prose still describing the
+    /// last one. `grep prepend_owned_leading_comment_at` is the authority; a bullet here is a
+    /// per-caller *argument*, and a caller with no bullet is a claim nobody has justified.
     pub(crate) fn prepend_owned_leading_comment_at(&self, start: u32, doc: DocId) -> DocId {
         // Document-level short-circuit (also covers the arrow-reassembly callers, which
         // reach here without going through `prepend_owned_leading_comment`).

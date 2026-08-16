@@ -1107,7 +1107,16 @@ impl<'a> Printer<'a> {
 
         if head_frozen {
             content.push(self.build_frozen_node_doc(seq.span));
-            return self.wrap_in_block_structure(d.concat(&content), false);
+            // The run PAST the slice, exactly as the unfrozen tail below emits it. A freeze
+            // replaces the sequence's own doc; it does not own the gap between that doc's end
+            // and the value's `}`, so returning here left that gap with no emitter at all —
+            // the very hole the unfrozen tail names as its reason for existing. Scanning from
+            // `seq.span.end` keeps it strictly outside the verbatim text, so a comment written
+            // INSIDE the slice still rides in it rather than being printed twice.
+            let (trailing_docs, ends_with_line_comment) =
+                self.trailing_comment_docs(seq.span.end, tag_span.end - 1, true);
+            content.extend(trailing_docs);
+            return self.wrap_in_block_structure(d.concat(&content), ends_with_line_comment);
         }
 
         let mut items: DocBuf = DocBuf::new();
