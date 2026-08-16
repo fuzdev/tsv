@@ -60,8 +60,8 @@
 	// argument builder, a third layout family with its own reassembly
 	f(expr, 1).g((x) => (x ? a : b /* c */));
 
-	// the `new` printer's multi-argument arm keeps the head hug, where the plain call
-	// above breaks the argument out under the same comment
+	// the `new` printer's multi-argument arm breaks the argument out too — it declines a
+	// non-expandable expression body exactly as the plain call above does
 	new F(
 		1,
 		(x) => g() // c
