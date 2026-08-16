@@ -1,0 +1,446 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 205,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An exported global augmentation, in both its spellings",
+			"start": 20,
+			"end": 77,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 58
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 204,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 79,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 2
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "TSModuleDeclaration",
+						"start": 86,
+						"end": 131,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"global": true,
+						"id": {
+							"type": "Identifier",
+							"start": 86,
+							"end": 92,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 8
+								},
+								"end": {
+									"line": 3,
+									"column": 14
+								}
+							},
+							"name": "global"
+						},
+						"body": {
+							"type": "TSModuleBlock",
+							"start": 93,
+							"end": 131,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 15
+								},
+								"end": {
+									"line": 7,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "TSInterfaceDeclaration",
+									"start": 97,
+									"end": 128,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 3
+										}
+									},
+									"id": {
+										"type": "Identifier",
+										"start": 107,
+										"end": 108,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 12
+											},
+											"end": {
+												"line": 4,
+												"column": 13
+											}
+										},
+										"name": "A"
+									},
+									"body": {
+										"type": "TSInterfaceBody",
+										"start": 109,
+										"end": 128,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 14
+											},
+											"end": {
+												"line": 6,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "TSPropertySignature",
+												"start": 114,
+												"end": 124,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 3
+													},
+													"end": {
+														"line": 5,
+														"column": 13
+													}
+												},
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 114,
+													"end": 115,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 3
+														},
+														"end": {
+															"line": 5,
+															"column": 4
+														}
+													},
+													"name": "a"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 115,
+													"end": 123,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 4
+														},
+														"end": {
+															"line": 5,
+															"column": 12
+														}
+													},
+													"typeAnnotation": {
+														"type": "TSStringKeyword",
+														"start": 117,
+														"end": 123,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 6
+															},
+															"end": {
+																"line": 5,
+																"column": 12
+															}
+														}
+													}
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An exported global augmentation, in both its spellings",
+							"start": 20,
+							"end": 77
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 134,
+					"end": 194,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 2
+						}
+					},
+					"exportKind": "type",
+					"declaration": {
+						"type": "TSModuleDeclaration",
+						"start": 141,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 8
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"global": true,
+						"id": {
+							"type": "Identifier",
+							"start": 149,
+							"end": 155,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 16
+								},
+								"end": {
+									"line": 9,
+									"column": 22
+								}
+							},
+							"name": "global"
+						},
+						"body": {
+							"type": "TSModuleBlock",
+							"start": 156,
+							"end": 194,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 23
+								},
+								"end": {
+									"line": 13,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "TSInterfaceDeclaration",
+									"start": 160,
+									"end": 191,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 3
+										}
+									},
+									"id": {
+										"type": "Identifier",
+										"start": 170,
+										"end": 171,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 12
+											},
+											"end": {
+												"line": 10,
+												"column": 13
+											}
+										},
+										"name": "B"
+									},
+									"body": {
+										"type": "TSInterfaceBody",
+										"start": 172,
+										"end": 191,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 14
+											},
+											"end": {
+												"line": 12,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "TSPropertySignature",
+												"start": 177,
+												"end": 187,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 3
+													},
+													"end": {
+														"line": 11,
+														"column": 13
+													}
+												},
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 177,
+													"end": 178,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 3
+														},
+														"end": {
+															"line": 11,
+															"column": 4
+														}
+													},
+													"name": "b"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 178,
+													"end": 186,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 4
+														},
+														"end": {
+															"line": 11,
+															"column": 12
+														}
+													},
+													"typeAnnotation": {
+														"type": "TSStringKeyword",
+														"start": 180,
+														"end": 186,
+														"loc": {
+															"start": {
+																"line": 11,
+																"column": 6
+															},
+															"end": {
+																"line": 11,
+																"column": 12
+															}
+														}
+													}
+												}
+											}
+										]
+									}
+								}
+							]
+						},
+						"declare": true
+					},
+					"specifiers": [],
+					"source": null
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

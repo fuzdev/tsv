@@ -1,0 +1,519 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 478,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A bodyless `declare global` is the ambient-module production's other name",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block comment written before the `;` stays before it",
+			"start": 116,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 190,
+			"end": 197,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 16
+				},
+				"end": {
+					"line": 6,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The bodied form is unchanged",
+			"start": 201,
+			"end": 232,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Without `declare`, a bodyless `global` is an ordinary expression statement",
+			"start": 273,
+			"end": 350,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " And so is one inside an ambient module, where `declare` is implicit",
+			"start": 362,
+			"end": 432,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 71
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 477,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 468,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSModuleDeclaration",
+					"start": 98,
+					"end": 113,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 16
+						}
+					},
+					"global": true,
+					"id": {
+						"type": "Identifier",
+						"start": 106,
+						"end": 112,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 3,
+								"column": 15
+							}
+						},
+						"name": "global"
+					},
+					"declare": true,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A bodyless `declare global` is the ambient-module production's other name",
+							"start": 20,
+							"end": 96
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 175,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 24
+						}
+					},
+					"global": true,
+					"id": {
+						"type": "Identifier",
+						"start": 183,
+						"end": 189,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 9
+							},
+							"end": {
+								"line": 6,
+								"column": 15
+							}
+						},
+						"name": "global",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 190,
+								"end": 197
+							}
+						]
+					},
+					"declare": true,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment written before the `;` stays before it",
+							"start": 116,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 234,
+					"end": 270,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"global": true,
+					"id": {
+						"type": "Identifier",
+						"start": 242,
+						"end": 248,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 9
+							},
+							"end": {
+								"line": 9,
+								"column": 15
+							}
+						},
+						"name": "global"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 249,
+						"end": 270,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 16
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 253,
+								"end": 267,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 16
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 257,
+										"end": 266,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 6
+											},
+											"end": {
+												"line": 10,
+												"column": 15
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 257,
+											"end": 266,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 6
+												},
+												"end": {
+													"line": 10,
+													"column": 15
+												}
+											},
+											"name": "a",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 258,
+												"end": 266,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 7
+													},
+													"end": {
+														"line": 10,
+														"column": 15
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSStringKeyword",
+													"start": 260,
+													"end": 266,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 9
+														},
+														"end": {
+															"line": 10,
+															"column": 15
+														}
+													}
+												}
+											}
+										},
+										"init": null
+									}
+								],
+								"kind": "var"
+							}
+						]
+					},
+					"declare": true,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The bodied form is unchanged",
+							"start": 201,
+							"end": 232
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 352,
+					"end": 359,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 352,
+						"end": 358,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "global"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Without `declare`, a bodyless `global` is an ordinary expression statement",
+							"start": 273,
+							"end": 350
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 434,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Literal",
+						"start": 449,
+						"end": 452,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 16
+							},
+							"end": {
+								"line": 17,
+								"column": 19
+							}
+						},
+						"value": "a",
+						"raw": "'a'"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 453,
+						"end": 467,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 20
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 457,
+								"end": 464,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 457,
+									"end": 463,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 8
+										}
+									},
+									"name": "global"
+								}
+							}
+						]
+					},
+					"declare": true,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " And so is one inside an ambient module, where `declare` is implicit",
+							"start": 362,
+							"end": 432
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
