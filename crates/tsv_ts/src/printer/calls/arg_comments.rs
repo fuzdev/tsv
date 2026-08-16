@@ -11,7 +11,6 @@ use super::super::{CommentFilter, CommentSpacing, LeadingGlue, Printer};
 use crate::ast::internal;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
-use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Open a non-last argument gap that may carry comments and emit its head into
@@ -46,8 +45,8 @@ impl<'a> Printer<'a> {
         prev_arg: &internal::Expression<'_>,
         next_arg_start: u32,
     ) -> InterArgGap<'a> {
-        let mut pc = PartitionedComments::for_item_gap(self, prev_arg.span().end, next_arg_start);
-        pc.route_after_comma_hugging_to_leading(self);
+        let mut pc =
+            PartitionedComments::for_routed_arg_gap(self, prev_arg.span().end, next_arg_start);
         // The argument's own doc may already end in a deferred `//` (a spread whose
         // stripped parens held one); a second one may not join that line.
         let prev_defers_line = self.defers_trailing_line_comment(prev_arg);
@@ -226,112 +225,60 @@ pub(crate) fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usi
     (comment.span.start as usize) > comma_pos
 }
 
-/// Build inline block comments AFTER the comma as leading on the next arg.
+/// One argument gap's comments, as the two docs the break sits between: everything
+/// through the comma (before-comma blocks, the comma, a stranded after-comma block, a
+/// deferred `//`), and the next argument's leading run.
 ///
-/// For `fn(a, /** @type {T} */ b)`, the comment is after the comma and should
-/// be emitted as `/** @type {T} */ ` before `b`, not as trailing on `a`. Shared
-/// by the call, `new`, and chain expand-first paths so a block comment leading the
-/// second arg is preserved inline rather than dropped.
-pub(super) fn build_after_comma_leading_comments(
-    printer: &Printer<'_>,
-    prev_arg_end: u32,
-    arg_start: u32,
-) -> Option<DocId> {
-    let d = printer.d();
-    let comma_pos = find_comma_pos(printer.source, prev_arg_end, arg_start)?;
-    let mut parts = DocBuf::new();
-    for comment in comments_to_emit_in_range(printer.comments, prev_arg_end, arg_start) {
-        if is_comment_after_comma(comment, comma_pos)
-            && comment.is_block
-            && is_comment_inline_with_next(printer, comment.span.end, arg_start)
-        {
-            parts.push(printer.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
-    }
-    if parts.is_empty() {
-        None
-    } else {
-        Some(d.concat(&parts))
-    }
-}
-
-/// Build inline block comments BEFORE the comma as trailing on the current arg.
+/// The caller supplies the separator between them — a bare `" "` in an inline state, a
+/// `line` in a broken-out one — so both of
+/// [`super::arg_wrapping::build_args_split_last`]'s states describe the gap with the same
+/// two docs and can only differ in whether that separator breaks.
 ///
-/// For `fn(a /* comment */, b)`, the comment is before the comma and should
-/// be emitted as ` /* comment */` after `a`.
-pub(super) fn build_before_comma_trailing_comments(
-    printer: &Printer<'_>,
-    arg_end: u32,
-    next_arg_start: u32,
-) -> Option<DocId> {
-    let d = printer.d();
-    let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start)?;
-    let mut parts = DocBuf::new();
-    for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start) {
-        if is_comment_before_comma(comment, comma_pos)
-            && comment.is_block
-            && printer.is_same_line(arg_end, comment.span.start)
-        {
-            parts.push(d.text(" "));
-            parts.push(printer.build_comment_doc(comment));
-        }
-    }
-    if parts.is_empty() {
-        None
-    } else {
-        Some(d.concat(&parts))
-    }
-}
-
-/// The inline block comments of one argument gap, split around its comma: what trails the
-/// previous argument, and what leads the next one.
+/// ⚠️ **The gap is the SEAM, so it takes the shared partition, not a same-line filter.**
+/// Both halves are [`PartitionedComments::for_item_gap`]'s, routed by
+/// [`PartitionedComments::route_after_comma_hugging_to_leading`] and emitted by the two
+/// canonical emitters — the same pair [`Printer::open_inter_arg_gap`] hands the
+/// comment-aware path, so the expand-last states cannot answer the seam differently. A
+/// hand-rolled loop here filtered the gap on a same-line anchor read BACKWARD from the
+/// previous argument, which is neither of the seam's questions: it dropped every comment
+/// of a run the author wrote below the comma (`fn(a,⏎/* c1 */ /* c2 */ b, {})` lost
+/// `/* c1 */`, and the broke-after authoring lost both — the run's separator is prettier's
+/// soft `line`, which lives in [`Printer::push_leading_comment_run`] and cannot be
+/// re-derived from a filter), and it flattened a **stranded** after-comma block onto the
+/// next argument, contradicting the sanctioned divergence the comment-aware path prints
+/// (`nonlast_arg_after_comma_block_stranded_prettier_divergence`).
 ///
-/// ⚠️ **The same-line anchor ADVANCES over each comment emitted** (`docs/comments.md`: a
-/// run's anchor advances over each comment it emits). Re-asking a FIXED anchor — the
-/// previous argument's end — per comment reads the second half of an author-written run
-/// *across* the first: a run whose first comment is multi-line puts the second on a later
-/// line than the argument, the same-line test says no, and nothing else in the gap emits it,
-/// so it is DROPPED (`fn(a /* x⏎y */ /* c */, b, {})`). The anchor is the argument only for
-/// the run's FIRST comment.
+/// **Which of the two gap forms to reach for.** This one and [`Printer::open_inter_arg_gap`]
+/// are a pair over the same partition and the same emitters, and differ in what the caller
+/// owes back:
 ///
-/// One computation for both of [`super::arg_wrapping::build_args_split_last`]'s states —
-/// the inline head and the broken-out one — since the two states describing the same gap
-/// differently is what let the broken-out one drop the after-comma half entirely.
-pub(super) fn split_gap_inline_blocks(
+/// - **This one** hands back the two docs and asks nothing. It does *not* emit a spread's
+///   stripped-paren interior, nor demote a `//` behind an argument that already defers one.
+///   Its callers are the layouts that never see either, because
+///   [`any_comment_forces_expansion`] (via `spread_paren_comment_forces_expansion`) routes
+///   such a call to the comment-aware path before any of them is selected — the invariant
+///   that makes the omission sound, and the thing to re-check before giving it a new caller.
+/// - [`Printer::open_inter_arg_gap`] emits into the caller's buffer, covers both of those,
+///   and returns a `forces_expansion` **obligation** the caller must act on. Take it in any
+///   builder that can still choose to expand.
+///
+/// Folding this into that one would hand three call sites an obligation they would each have
+/// to ignore, which is the shape of latent bug this seam keeps producing — so they stay two
+/// entry points over one implementation rather than one entry point with a dead return.
+pub(super) fn build_arg_gap_docs(
     printer: &Printer<'_>,
     arg_end: u32,
     next_arg_start: u32,
 ) -> (DocBuf, DocBuf) {
-    let d = printer.d();
-    let mut before = DocBuf::new();
-    let mut after = DocBuf::new();
-    let Some(comma_pos) = find_comma_pos(printer.source, arg_end, next_arg_start) else {
-        return (before, after);
-    };
+    let pc = PartitionedComments::for_routed_arg_gap(printer, arg_end, next_arg_start);
 
-    let mut anchor = arg_end;
-    for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start) {
-        if !comment.is_block
-            || !tsv_lang::printing::is_same_line_fast(
-                printer.comment_line_breaks,
-                anchor,
-                comment.span.start,
-            )
-        {
-            continue;
-        }
-        if is_comment_before_comma(comment, comma_pos) {
-            before.push(d.text(" "));
-            before.push(printer.build_comment_doc(comment));
-        } else {
-            after.push(printer.build_comment_doc(comment));
-            after.push(d.text(" "));
-        }
-        anchor = comment.span.end;
-    }
+    let mut through_comma = DocBuf::new();
+    pc.emit_trailing_comments_around_comma(&mut through_comma, printer);
 
-    (before, after)
+    let mut leading = DocBuf::new();
+    pc.emit_leading_comments_inline_aware(&mut leading, printer);
+
+    (through_comma, leading)
 }
 
 //
@@ -654,13 +601,22 @@ pub(super) fn first_arg_has_any_comments(
         return true;
     }
 
-    // Trailing: comments between first arg end and comma
-    if arguments.len() >= 2 {
-        let first_end = first.span().end;
-        let next_start = arguments[1].span().start;
-        if let Some(cp) = find_comma_pos(printer.source, first_end, next_start) {
-            return printer.has_comments_on_page_between(first_end, cp as u32);
-        }
+    // Trailing: the run the FOLLOWING GAP binds to this argument — asked as the gap's own
+    // emitter asks it ([`PartitionedComments::for_item_gap`] + the hugging route), so the
+    // gate and the seam cannot disagree about which argument a comment belongs to.
+    //
+    // ⚠️ **The before-comma half is not the whole run.** Reading only `[first_end, comma)`
+    // misses a block the author STRANDED after the comma (`() => {…}, /* c */⏎b`), which
+    // prettier binds as this argument's trailing comment (nothing follows it on its line)
+    // and which therefore refuses the hug — tsv took the hug instead and, because the
+    // inline tail emits only what leads the next argument, DROPPED the comment outright.
+    // The routing step is what keeps the hugging spelling (`}, /* c */ b`) out of the run:
+    // there the block leads the next argument, prettier's `hasComment(firstArg)` is false,
+    // and the hug is correct.
+    if let Some(second) = arguments.get(1) {
+        let gap =
+            PartitionedComments::for_routed_arg_gap(printer, first.span().end, second.span().start);
+        return gap.has_trailing_comments();
     }
 
     false
@@ -981,6 +937,25 @@ impl<'a> PartitionedComments<'a> {
             start,
             end,
         )
+    }
+
+    /// Partition an **argument** gap and route it — [`Self::for_item_gap`] followed by
+    /// [`Self::route_after_comma_hugging_to_leading`].
+    ///
+    /// ⚠️ **The two are one step, never two.** The routing is the whole difference between
+    /// an after-comma block that HUGS the next argument (it leads that argument, and both
+    /// formatters agree) and one the author STRANDED on the comma line (it trails it — the
+    /// sanctioned relocation divergence). A caller that partitions without routing turns
+    /// every hugging comment into a stranded one and silently moves it, so the pair is
+    /// named here rather than left to five call sites to remember.
+    ///
+    /// Every argument gap that HOLDS A COMMA takes this. The comma-less spellings — a last
+    /// argument's gap to the `)`, a single argument — take [`Self::for_closer_gap`] or the
+    /// bare [`Self::for_item_gap`], where the route has no comma to find and is a no-op.
+    pub fn for_routed_arg_gap(printer: &Printer<'a>, start: u32, end: u32) -> Self {
+        let mut pc = Self::for_item_gap(printer, start, end);
+        pc.route_after_comma_hugging_to_leading(printer);
+        pc
     }
 
     /// Partition a **last-item→`)`** gap — the one that holds the comma

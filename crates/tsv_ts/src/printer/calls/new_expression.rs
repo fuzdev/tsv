@@ -3,14 +3,14 @@
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
 use super::arg_comments::{
-    any_arg_empty_line, any_comment_forces_expansion_slice, build_after_comma_leading_comments,
-    first_arg_has_any_comments, last_arg_has_comments,
+    any_arg_empty_line, any_comment_forces_expansion_slice, first_arg_has_any_comments,
+    last_arg_has_comments,
 };
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_own_line_post_arrow_state, last_arg_has_own_line_post_arrow_comment,
-    should_expand_first_arg, try_hook_deps_args_doc, try_hug_multiline_template_arg,
-    wrap_call_with_soft_breaks,
+    build_expand_first_arg_doc, build_own_line_post_arrow_state,
+    last_arg_has_own_line_post_arrow_comment, should_expand_first_arg, try_hook_deps_args_doc,
+    try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
 };
 use crate::ast::internal;
 use crate::printer::calls::arg_predicates::{
@@ -460,47 +460,16 @@ impl<'a> Printer<'a> {
         let expand_first_blocked = new_has_comments
             && (has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self)
                 || first_arg_has_any_comments(new_expr.arguments, self, paren_open));
+        // One `printCallArguments` prints both spellings, so the layout is the plain call's
+        // (`build_expand_first_arg_doc`), not a copy of it.
         if should_expand_first_arg(self, new_expr.arguments) && !expand_first_blocked {
-            let first_arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
-
-            // The tail, built as parts like the plain call's twin so the break question
-            // below reads the same docs it does. Carry an inline block comment leading the
-            // second arg after the comma (`}, /* c */ arg`) so it isn't dropped — matching
-            // prettier's expand-first.
-            let mut tail_parts = DocBuf::new();
-            tail_parts.push(d.text(", "));
-            if let Some(leading) = build_after_comma_leading_comments(
+            return build_expand_first_arg_doc(
                 self,
-                new_expr.arguments[0].span().end,
-                new_expr.arguments[1].span().start,
-            ) {
-                tail_parts.push(leading);
-            }
-            tail_parts.push(self.build_expression_doc(&new_expr.arguments[1]));
-
-            // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut() — shared by
-            // `NewExpression`, since one `printCallArguments` prints both. An inline tail
-            // cannot carry an argument that breaks: without this the first argument hugs and
-            // a broken tail trails it (`new A(() => {⏎…⏎}, fn(⏎// c⏎b))`), a form prettier
-            // never emits. See the twin in `call_formatting.rs`.
-            if tail_parts.iter().any(|&id| d.will_break(id)) {
-                return build_call_args_expanded(
-                    self,
-                    callee_with_types,
-                    new_expr.arguments,
-                    paren_open,
-                    new_expr.span.end,
-                    ArgItem::Plain,
-                );
-            }
-
-            return d.concat(&[
                 callee_with_types,
-                d.text("("),
-                first_arg_doc,
-                d.concat(&tail_parts),
-                d.text(")"),
-            ]);
+                new_expr.arguments,
+                paren_open,
+                new_expr.span.end,
+            );
         }
 
         // Check for trailing LINE comments on arguments (forces hardline expansion)
