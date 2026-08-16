@@ -1001,6 +1001,12 @@ impl<'a> Printer<'a> {
                 || paren_pos.is_none_or(|pos| {
                     !self.has_comments_to_emit_between(pos + 1, params[0].span().start)
                 });
+            // A comment in either delimiter gap declines the hug outright, so the
+            // breakable path below is what places it — the hug arm emits neither gap and
+            // must not grow an emitter for one. `no_trailing_comments` asks exactly the
+            // range `[param end, close paren)` that `end_boundary` spans, so the arm's
+            // trailing gap is provably empty; with no `)` located `end_boundary` collapses
+            // onto the param end and the range is empty again.
             let no_trailing_comments = !window_has_comments
                 || close_paren_pos
                     .is_none_or(|cp| !self.has_comments_to_emit_between(params[0].span().end, cp));
@@ -1022,33 +1028,36 @@ impl<'a> Printer<'a> {
                 // TypeLiteral's group wrapper, its softlines directly contribute to the
                 // function type group's breaking decision.
                 parts.push(d.text("("));
-                // Build identifier name + optional marker
-                parts.push(self.identifier_name_doc(id));
-                if id.optional {
-                    parts.push(d.text("?"));
-                }
-                // Build type annotation with TypeLiteral that has softlines but no group wrapper
-                // Extract comments between `:` and the TypeLiteral (e.g., `x: /* c */ { a: T }`)
-                let colon_end = type_ann.span.start + 1;
-                let type_start = type_ann.type_annotation.span().start;
-                parts.push(d.text(": "));
-                if window_has_comments
-                    && let Some(comments) = self
-                        .build_inline_comments_between_doc_trailing_space_opt(colon_end, type_start)
-                {
-                    parts.push(comments);
-                }
-                parts.push(self.build_type_literal_doc_for_function_param(type_literal));
-
-                // Handle trailing comments after the param (between type literal and
-                // close paren); `end_boundary` is that close paren (or the param end
-                // fallback — identical for this single-param path).
-                let param_end = params[0].span().end;
-                for comment in comments_to_emit_in_range(self.comments, param_end, end_boundary) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
-
+                // The head and the gaps behind it — name→`?` and marker→`:` — take the
+                // same landings the value-side identifier does, from the same two seams
+                // (`build_identifier_doc_inner` is the other caller). Respelling the head
+                // inline instead left both gaps without an emitter, so a comment in either
+                // was dropped (`docs/comments.md` hazard 4, the head variant); only the
+                // annotation's BODY is this path's own, and that is what `_with` varies.
+                let after_modifier = self.push_identifier_head_doc(&mut parts, id);
+                parts.push(self.build_binding_type_annotation_doc_with(
+                    after_modifier,
+                    type_ann,
+                    || {
+                        // Build type annotation with TypeLiteral that has softlines but no
+                        // group wrapper. Extract comments between `:` and the TypeLiteral
+                        // (e.g., `x: /* c */ { a: T }`)
+                        let colon_end = type_ann.span.start + 1;
+                        let type_start = type_ann.type_annotation.span().start;
+                        let mut annotation: DocBuf = smallvec![d.text(": ")];
+                        if window_has_comments
+                            && let Some(comments) = self
+                                .build_inline_comments_between_doc_trailing_space_opt(
+                                    colon_end, type_start,
+                                )
+                        {
+                            annotation.push(comments);
+                        }
+                        annotation
+                            .push(self.build_type_literal_doc_for_function_param(type_literal));
+                        d.concat(&annotation)
+                    },
+                ));
                 parts.push(d.text(")"));
             } else if !window_has_comments {
                 // Zero-comment fast path: plain params joined by `,` + line — no

@@ -10,7 +10,6 @@
 
 use crate::ast::internal::{self, LiteralValue};
 use crate::printer::Printer;
-use crate::printer::analysis;
 use crate::printer::decorators::DecoratorHost;
 use smallvec::{SmallVec, smallvec};
 use std::borrow::Cow;
@@ -376,24 +375,10 @@ impl<'a> Printer<'a> {
 
         let mut parts = DocBuf::new();
 
-        // Add identifier name
-        parts.push(self.identifier_name_doc(id));
-
-        // Compute name_end for comment extraction (used by optional and type annotation)
-        let search_end = id.type_annotation().map_or(id.span.end, |ta| ta.span.start);
-        let raw_name_end = analysis::skip_identifier_at(
-            self.source.as_bytes(),
-            id.span.start as usize,
-            search_end as usize,
-        ) as u32;
-
-        // Handle optional marker (e.g., `a?` in `function fn(a?: number) {}`),
-        // with comments between name and `?` (e.g., `a /* c */?`)
-        let after_modifier = if id.optional {
-            self.push_modifier_marker_doc(&mut parts, raw_name_end, b'?')
-        } else {
-            raw_name_end
-        };
+        // The name plus any optional marker (`a?` in `function fn(a?: number) {}`),
+        // preserving comments in the name→`?` gap (`a /* c */?`), and returning the
+        // left edge of the annotation gap below.
+        let after_modifier = self.push_identifier_head_doc(&mut parts, id);
 
         // Type annotation, handling a before-`:` comment between the name (and any
         // `?`) and `:` — line → indented continuation, block → inline before `:`.

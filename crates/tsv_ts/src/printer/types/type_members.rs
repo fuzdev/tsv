@@ -659,62 +659,25 @@ impl<'a> Printer<'a> {
         // index signature (`[key: string]`) has no value `:`/type, so its gap starts
         // just past `]`.
         let gap_start = if let Some(type_annotation) = &idx.type_annotation {
-            // Detect comments between `]` and the value `:` (search only up to the colon,
-            // not the type start). Emission is below, after the value type is built.
-            let val_colon_pos = type_annotation.span.start;
-            let has_bracket_colon_comment = bracket_close_pos
-                .is_some_and(|cp| self.has_comments_to_emit_between(cp + 1, val_colon_pos));
-            let bracket_colon_hangs = bracket_close_pos
-                .is_some_and(|cp| self.comments_force_own_line_between(cp + 1, val_colon_pos));
-
-            // Build the value type annotation. Both branches delegate to the shared
-            // `build_type_annotation_doc`, which owns the value-`:`→type comment handling
-            // (a line comment breaks + indents so the `//` can't swallow the type), the
-            // redundant comment-free paren stripping, and the union (break-after-`:` to
-            // leading-`|`) / intersection (hug `:`, continuations wrap) layouts. The only
-            // difference is the `]`→value-`:` comment, emitted here: it sits after `]`
-            // (prettier relocates it into the brackets).
-            // An alone-on-line format-ignore directive in the `]`→value-`:` gap freezes
-            // the whole `: type` annotation and keeps its own line, replacing every arm
-            // below (the line arm's continuation indent would trail the directive on the
-            // `]` line — an inert placement, losing the freeze on the second pass).
-            if let Some(frozen) = bracket_close_pos.and_then(|close_pos| {
-                self.build_frozen_annotation_head_doc(close_pos + 1, type_annotation)
-            }) {
-                parts.push(frozen);
-            } else {
-                let val_annotation = self.build_type_annotation_doc(type_annotation);
-                match bracket_close_pos {
-                    Some(close_pos) if has_bracket_colon_comment && bracket_colon_hangs => {
-                        // A line comment — or a multiline block the author broke after — in
-                        // this gap: the first comment trails `]` on its line, then the
-                        // remaining comments and the value `:` drop to continuation lines
-                        // indented one level (uniform forced-continuation indent, the
-                        // shared `build_continuation_indent` — each hanging comment ends its
-                        // own line so a `//` can't swallow the next comment or the `: V`).
-                        // Mirrors the `: Type` line-comment layout in
-                        // `build_type_annotation_doc`.
-                        parts.push(self.build_continuation_indent(
-                            close_pos + 1,
-                            val_colon_pos,
-                            val_annotation,
-                        ));
-                    }
-                    Some(close_pos) if has_bracket_colon_comment => {
-                        // Glued block comment(s) only (a line comment always hangs): stay
-                        // inline before the value `:` (`[k: T] /* c */ : V`).
-                        for comment in
-                            comments_to_emit_in_range(self.comments, close_pos + 1, val_colon_pos)
-                        {
-                            parts.push(d.text(" "));
-                            parts.push(self.build_comment_doc(comment));
-                        }
-                        parts.push(d.text(" "));
-                        parts.push(val_annotation);
-                    }
-                    _ => parts.push(val_annotation),
+            // `]`→value-`:` is the before-`:` gap in its bracketed spelling, so it takes the
+            // shared binding seam rather than a fourth hand-rolled copy of it: the same
+            // frozen-head check (an alone-on-line format-ignore directive keeps its own line
+            // and freezes the whole `: type` — trailing it on the `]` line is inert and
+            // loses the freeze on pass 2), the same continuation indent for a hanging
+            // comment, the same inline run for glued blocks (`[k: T] /* c */ : V`), and the
+            // same `build_type_annotation_doc` body for everything past the `:`. Prettier
+            // relocates this one into the brackets — see
+            // [§Uniform Forced-Continuation Indent](../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent),
+            // which already lists this site beside the key/binding/parameter spellings.
+            //
+            // The seam needs the gap's left edge, so a `]` we could not locate falls back to
+            // the bare annotation — the arm the hand-rolled `match` also ended on.
+            parts.push(match bracket_close_pos {
+                Some(close_pos) => {
+                    self.build_binding_type_annotation_doc(close_pos + 1, type_annotation, false)
                 }
-            }
+                None => self.build_type_annotation_doc(type_annotation),
+            });
             type_annotation.span.end
         } else {
             bracket_close_pos.map_or(idx.span.end, |cp| cp + 1)
