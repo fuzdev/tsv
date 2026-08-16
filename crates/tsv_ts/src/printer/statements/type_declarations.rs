@@ -118,16 +118,20 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![];
-        if decl.declare {
-            parts.push(d.text("declare "));
-        }
-        parts.push(d.text("type"));
-        // Comments between keyword and name: `type /* c */ A = string`
-        parts.push(d.text(" "));
-        if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
+        // The header keyword, word by word — `declare`'s gap before `type` is a
+        // position of its own and must not be folded into the keyword→name scan below.
+        let (keyword_doc, keyword_end) = self.build_declaration_head_doc(
+            decl.declare,
+            &["type"],
             decl.span.start,
             decl.id.span.start,
-        ) {
+        );
+        parts.push(keyword_doc);
+        // Comments between keyword and name: `type /* c */ A = string`
+        parts.push(d.text(" "));
+        if let Some(comments) = self
+            .build_inline_comments_between_doc_trailing_space_opt(keyword_end, decl.id.span.start)
+        {
             parts.push(comments);
         }
         parts.push(self.identifier_name_doc(&decl.id));
@@ -686,16 +690,20 @@ impl<'a> Printer<'a> {
         let group_mode = decl.extends.len() > 1 || has_heritage_comments;
 
         let mut header_parts: DocBuf = smallvec![];
-        if decl.declare {
-            header_parts.push(d.text("declare "));
-        }
-        header_parts.push(d.text("interface"));
-        // Comments between keyword and name: `interface /* c */ A {}`
-        header_parts.push(d.text(" "));
-        if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
+        // Word by word, so `declare`'s own gap before `interface` keeps its comment
+        // instead of folding into the keyword→name scan below.
+        let (keyword_doc, keyword_end) = self.build_declaration_head_doc(
+            decl.declare,
+            &["interface"],
             decl.span.start,
             decl.id.span.start,
-        ) {
+        );
+        header_parts.push(keyword_doc);
+        // Comments between keyword and name: `interface /* c */ A {}`
+        header_parts.push(d.text(" "));
+        if let Some(comments) = self
+            .build_inline_comments_between_doc_trailing_space_opt(keyword_end, decl.id.span.start)
+        {
             header_parts.push(comments);
         }
         header_parts.push(self.identifier_name_doc(&decl.id));
@@ -1003,17 +1011,21 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut prefix = DocBuf::new();
 
-        // `declare` prefix if ambient declaration
-        if decl.declare {
-            prefix.push(d.text("declare "));
-        }
-
-        // `const` prefix if const enum
-        if decl.r#const {
-            prefix.push(d.text("const "));
-        }
-
-        prefix.push(d.text("enum"));
+        // `declare` / `const` prefixes, word by word: this is the only three-word
+        // declaration head (`declare const enum`), so it is where folding the run into
+        // one measured span costs the most — both interior gaps land on the name at once.
+        let head: &[&'static str] = if decl.r#const {
+            &["const", "enum"]
+        } else {
+            &["enum"]
+        };
+        let (keyword_doc, keyword_end) = self.build_declaration_head_doc(
+            decl.declare,
+            head,
+            decl.span.start,
+            decl.id.span.start,
+        );
+        prefix.push(keyword_doc);
 
         // Everything after the `enum`→name gap is collected into `parts` (the
         // continuation), so a *line* comment in that gap indents the whole
@@ -1160,9 +1172,12 @@ impl<'a> Printer<'a> {
         }
 
         // Comments between `enum` and the name; a line comment indents the whole
-        // continuation (uniform declaration-header rule).
+        // continuation (uniform declaration-header rule). From `keyword_end`, not the
+        // span start: the head above already emitted the `declare`→`const`→`enum`
+        // gaps, and scanning from the start here would print them a second time — and
+        // at the wrong position.
         prefix.push(self.build_keyword_to_name_continuation(
-            decl.span.start,
+            keyword_end,
             decl.id.span.start,
             d.concat(&parts),
         ));
@@ -1295,51 +1310,55 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
 
-        // Only print keywords for root declaration
+        // Only print keywords for root declaration — a nested one (`namespace A.B {}`'s
+        // `B`) is reached through the dotted-pair printer with its head already emitted.
         if is_root {
-            // `declare` prefix if ambient declaration
-            if decl.declare {
-                parts.push(d.text("declare "));
-            }
-
-            // `global` is special - it replaces namespace/module keyword
+            // `global` is special — it replaces the namespace/module keyword and is the
+            // name as well, so its head is `declare global` with nothing after it. That
+            // makes it the one arm with no keyword→name gap: a comment in the
+            // `declare`→`global` gap has no later name to be relocated onto, and stays
+            // before `global` in prettier too. The shared head builder emits it there,
+            // and a bare `global {}` reduces to the single-word case (the span starts at
+            // `global`, so the window is empty).
             if decl.global {
-                // A comment in the `declare`→`global` gap (`declare /* c */ global {}`)
-                // stays before `global`, matching prettier — `global` is both keyword
-                // and name here, so there is no later name to relocate it onto (the
-                // non-global branch handles its keyword→name gap below). For a bare
-                // `global {}` the span starts at `global`, so the range is empty.
-                let global_start = decl.id.span().start;
-                parts.push(self.build_inline_comments_between_doc_trailing_space(
+                let (keyword_doc, _) = self.build_declaration_head_doc(
+                    decl.declare,
+                    &["global"],
                     decl.span.start,
-                    global_start,
-                ));
-                parts.push(d.text("global"));
+                    decl.id.span().end,
+                );
+                parts.push(keyword_doc);
             } else {
-                // Use the original keyword (namespace or module)
-                match decl.kind {
-                    internal::TSModuleDeclarationKind::Namespace => {
-                        parts.push(d.text("namespace "));
-                    }
-                    internal::TSModuleDeclarationKind::Module => {
-                        parts.push(d.text("module "));
-                    }
+                // Word by word, so `declare`'s gap before the head keyword keeps its
+                // comment rather than folding into the keyword→name scan that follows.
+                let head: &[&'static str] = match decl.kind {
+                    internal::TSModuleDeclarationKind::Namespace => &["namespace"],
+                    internal::TSModuleDeclarationKind::Module => &["module"],
+                };
+                let name_start = decl.id.span().start;
+                let (keyword_doc, keyword_end) = self.build_declaration_head_doc(
+                    decl.declare,
+                    head,
+                    decl.span.start,
+                    name_start,
+                );
+                parts.push(keyword_doc);
+                parts.push(d.text(" "));
+                // Comments between the head keyword and the name:
+                // `declare namespace /* c */ A {}`. Emitted here rather than beside the
+                // name below so `keyword_end` never has to outlive the keyword that
+                // defines it — a nested declaration prints no keyword and opens no such
+                // gap, which is why only this arm asks.
+                if let Some(comments) = self
+                    .build_inline_comments_between_doc_trailing_space_opt(keyword_end, name_start)
+                {
+                    parts.push(comments);
                 }
             }
         }
 
         // Module/namespace name (if not global)
         if !decl.global {
-            // Comments between keywords and name: `declare namespace /* c */ A {}`
-            let name_start = decl.id.span().start;
-            if is_root {
-                parts.push(
-                    self.build_inline_comments_between_doc_trailing_space(
-                        decl.span.start,
-                        name_start,
-                    ),
-                );
-            }
             let name_doc = match &decl.id {
                 internal::TSModuleName::Identifier(id) => self.identifier_name_doc(id),
                 internal::TSModuleName::Literal(lit) => self.build_literal_doc(lit),

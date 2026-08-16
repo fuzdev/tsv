@@ -888,18 +888,56 @@ impl<'a> Printer<'a> {
         (doc, keyword_end)
     }
 
+    /// Build a **declaration header's** keyword run — an optional `declare` modifier
+    /// ahead of `head` (`["namespace"]`, `["interface"]`, `["const", "enum"]`, …) —
+    /// returning it with the offset just past its last word, where the caller's
+    /// keyword→name gap opens.
+    ///
+    /// The one shape every ambient-capable header shares, over
+    /// [`Self::build_keyword_words_doc`]: `start` is the declaration's span start (which
+    /// `declare` begins when present) and `name_start` bounds the word search.
+    ///
+    /// ⚠️ **Every declaration header must build its keyword through here rather than
+    /// pushing the words as text.** Measured text locates no interior gap, so the
+    /// header's keyword→name emitter is left scanning from the declaration's start and
+    /// prints whatever sits between the words *after* the last one — collapsing
+    /// `declare /* a */ namespace /* b */ N` into `declare namespace /* a */ /* b */ N`,
+    /// where "annotates the ambient-ness" and "annotates the name" become one position.
+    /// That is the relocation `docs/conformance_prettier_ts_comments.md` §Comments inside
+    /// a multi-word keyword catalogs prettier for and tsv preserves against; it was tsv's
+    /// own behavior at `namespace`, `module`, `interface`, `enum`, `type` and
+    /// `const enum` until each was routed here, and no fixture saw it.
+    pub(crate) fn build_declaration_head_doc(
+        &self,
+        declare: bool,
+        head: &[&'static str],
+        start: u32,
+        name_start: u32,
+    ) -> (DocId, u32) {
+        let mut words: SmallVec<[&'static str; 3]> = SmallVec::new();
+        if declare {
+            words.push("declare");
+        }
+        words.extend_from_slice(head);
+        self.build_keyword_words_doc(&words, start, name_start)
+    }
+
     /// Build a declaration header's keyword→name gap comment followed by the rest
     /// of the declaration (`continuation`), indenting that continuation one level
     /// when a *line* comment forces the break.
     ///
     /// `keyword_end` bounds the start of the comment scan and `name_start` its end
-    /// (the start of the name, or first declarator). Usually `keyword_end` is just
-    /// past the final keyword before the name (`function`/`*`, `class`, `const`, …),
-    /// but the `enum` and `declare function` printers pass the declaration start, so
-    /// a comment in an earlier inter-keyword gap (`const /* c */ enum`,
-    /// `declare /* c */ function`) is captured here too and relocated after the
-    /// keyword — matching the pre-refactor behavior. The preceding keyword token must
-    /// be emitted **without** a trailing space; the leading space is supplied here.
+    /// (the start of the name, or first declarator). It is **just past the final
+    /// keyword word** before the name (`function`/`*`, `class`, `const`, `enum`, …) —
+    /// never the declaration's start. ⚠️ Widening it to swallow an *earlier*
+    /// inter-keyword gap (`declare /* c */ enum`, `const /* c */ enum`) does not merely
+    /// scan more: it prints that comment **after** the keyword, collapsing two authored
+    /// positions into one. That is the relocation
+    /// `docs/conformance_prettier_ts_comments.md` §Comments inside a multi-word
+    /// keyword catalogs prettier for, and it was tsv's own behavior at five heads until
+    /// each was routed through [`Printer::build_keyword_words_doc`], which locates the
+    /// words and emits their gaps in place. The preceding keyword token must be emitted
+    /// **without** a trailing space; the leading space is supplied here.
     ///
     /// - **Line comment**: ends its line with a hardline, so the whole continuation
     ///   is wrapped in `indent` to read as a statement continuation rather than a
