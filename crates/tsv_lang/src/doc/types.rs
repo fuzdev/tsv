@@ -32,6 +32,14 @@ pub enum GroupId {
     /// head group resolves (before the body), so a shared variant is safe under
     /// block nesting.
     BlockHead,
+    /// An `{#each}` key's parens (`… as item (key)}`): the same shape as
+    /// [`Self::BlockHead`] one level in, with `)` as the dangling closer. A distinct
+    /// variant rather than a shared one because the two are **not** in the read-then-resolve
+    /// order that makes `BlockHead` safe under nesting: the key sits inside the head's
+    /// clause, which the head group's own `fits()` walks as a rest-command — so a shared id
+    /// would have the key's `if_break` consulted while the head's mode is still being
+    /// decided.
+    BlockKey,
 }
 
 impl GroupId {
@@ -39,7 +47,7 @@ impl GroupId {
     /// group-mode map (indexed by `id as usize`), which replaces a per-render
     /// `HashMap`. Keep in sync when adding a variant — a stale (too-small) value
     /// would index out of bounds, caught immediately by the fixture suite.
-    pub(crate) const COUNT: usize = 6;
+    pub(crate) const COUNT: usize = 7;
 }
 
 /// Context for doc rendering - provides hints about trailing punctuation

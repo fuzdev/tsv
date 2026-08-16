@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 688,
+	"end": 1090,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -186,25 +186,25 @@
 			{
 				"type": "Comment",
 				"start": 310,
-				"end": 369,
-				"data": " head alone at 101: wraps at the comma, `}` dangles "
+				"end": 381,
+				"data": " head alone at 101: operands indent under the head, `}` dangles "
 			},
 			{
 				"type": "Text",
-				"start": 369,
-				"end": 370,
+				"start": 381,
+				"end": 382,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 370,
-				"end": 481,
+				"start": 382,
+				"end": 494,
 				"test": {
 					"type": "SequenceExpression",
-					"start": 376,
-					"end": 469,
+					"start": 388,
+					"end": 482,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -212,14 +212,14 @@
 						},
 						"end": {
 							"line": 11,
-							"column": 46
+							"column": 47
 						}
 					},
 					"expressions": [
 						{
 							"type": "Identifier",
-							"start": 376,
-							"end": 421,
+							"start": 388,
+							"end": 433,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -234,16 +234,16 @@
 						},
 						{
 							"type": "Identifier",
-							"start": 423,
-							"end": 469,
+							"start": 436,
+							"end": 482,
 							"loc": {
 								"start": {
 									"line": 11,
-									"column": 0
+									"column": 1
 								},
 								"end": {
 									"line": 11,
-									"column": 46
+									"column": 47
 								}
 							},
 							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -255,8 +255,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 472,
-							"end": 476,
+							"start": 485,
+							"end": 489,
 							"raw": "\n\tx\n",
 							"data": "\n\tx\n"
 						}
@@ -266,32 +266,32 @@
 			},
 			{
 				"type": "Text",
-				"start": 481,
-				"end": 483,
+				"start": 494,
+				"end": 496,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 483,
-				"end": 559,
+				"start": 496,
+				"end": 572,
 				"data": " `{#each}`: the `as` clause follows the wrapped head on the `}` line "
 			},
 			{
 				"type": "Text",
-				"start": 559,
-				"end": 560,
+				"start": 572,
+				"end": 573,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "EachBlock",
-				"start": 560,
-				"end": 687,
+				"start": 573,
+				"end": 701,
 				"expression": {
 					"type": "SequenceExpression",
-					"start": 568,
-					"end": 661,
+					"start": 581,
+					"end": 675,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -299,14 +299,14 @@
 						},
 						"end": {
 							"line": 18,
-							"column": 46
+							"column": 47
 						}
 					},
 					"expressions": [
 						{
 							"type": "Identifier",
-							"start": 568,
-							"end": 613,
+							"start": 581,
+							"end": 626,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -321,16 +321,16 @@
 						},
 						{
 							"type": "Identifier",
-							"start": 615,
-							"end": 661,
+							"start": 629,
+							"end": 675,
 							"loc": {
 								"start": {
 									"line": 18,
-									"column": 0
+									"column": 1
 								},
 								"end": {
 									"line": 18,
-									"column": 46
+									"column": 47
 								}
 							},
 							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -342,19 +342,19 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 671,
-							"end": 673,
+							"start": 685,
+							"end": 687,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 673,
-							"end": 679,
+							"start": 687,
+							"end": 693,
 							"expression": {
 								"type": "Identifier",
-								"start": 674,
-								"end": 678,
+								"start": 688,
+								"end": 692,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -370,8 +370,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 679,
-							"end": 680,
+							"start": 693,
+							"end": 694,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -380,20 +380,316 @@
 				"context": {
 					"type": "Identifier",
 					"name": "item",
-					"start": 666,
-					"end": 670,
+					"start": 680,
+					"end": 684,
 					"loc": {
 						"start": {
 							"line": 19,
 							"column": 3,
-							"character": 666
+							"character": 680
 						},
 						"end": {
 							"line": 19,
 							"column": 7,
-							"character": 670
+							"character": 684
 						}
 					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 701,
+				"end": 703,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 703,
+				"end": 772,
+				"data": " an `{#each}` key is a head of its own — at 100 it stays flat "
+			},
+			{
+				"type": "Text",
+				"start": 772,
+				"end": 773,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 773,
+				"end": 886,
+				"expression": {
+					"type": "Identifier",
+					"start": 780,
+					"end": 782,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 7
+						},
+						"end": {
+							"line": 24,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 873,
+							"end": 875,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 875,
+							"end": 878,
+							"expression": {
+								"type": "Identifier",
+								"start": 876,
+								"end": 877,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 3
+									}
+								},
+								"name": "x"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 878,
+							"end": 879,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "x",
+					"start": 786,
+					"end": 787,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 13,
+							"character": 786
+						},
+						"end": {
+							"line": 24,
+							"column": 14,
+							"character": 787
+						}
+					}
+				},
+				"key": {
+					"type": "SequenceExpression",
+					"start": 790,
+					"end": 870,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 17
+						},
+						"end": {
+							"line": 24,
+							"column": 97
+						}
+					},
+					"expressions": [
+						{
+							"type": "Identifier",
+							"start": 790,
+							"end": 830,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 17
+								},
+								"end": {
+									"line": 24,
+									"column": 57
+								}
+							},
+							"name": "expr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						},
+						{
+							"type": "Identifier",
+							"start": 832,
+							"end": 870,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 59
+								},
+								"end": {
+									"line": 24,
+									"column": 97
+								}
+							},
+							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 886,
+				"end": 888,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 888,
+				"end": 972,
+				"data": " the same key at 101: same indent, and its `)` drops like a block head's `}` "
+			},
+			{
+				"type": "Text",
+				"start": 972,
+				"end": 973,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 973,
+				"end": 1089,
+				"expression": {
+					"type": "Identifier",
+					"start": 980,
+					"end": 982,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 7
+						},
+						"end": {
+							"line": 29,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1076,
+							"end": 1078,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1078,
+							"end": 1081,
+							"expression": {
+								"type": "Identifier",
+								"start": 1079,
+								"end": 1080,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 3
+									}
+								},
+								"name": "x"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1081,
+							"end": 1082,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "x",
+					"start": 986,
+					"end": 987,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 13,
+							"character": 986
+						},
+						"end": {
+							"line": 29,
+							"column": 14,
+							"character": 987
+						}
+					}
+				},
+				"key": {
+					"type": "SequenceExpression",
+					"start": 990,
+					"end": 1072,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 17
+						},
+						"end": {
+							"line": 30,
+							"column": 40
+						}
+					},
+					"expressions": [
+						{
+							"type": "Identifier",
+							"start": 990,
+							"end": 1030,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 17
+								},
+								"end": {
+									"line": 29,
+									"column": 57
+								}
+							},
+							"name": "expr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						},
+						{
+							"type": "Identifier",
+							"start": 1033,
+							"end": 1072,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 1
+								},
+								"end": {
+									"line": 30,
+									"column": 40
+								}
+							},
+							"name": "expr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+						}
+					]
 				}
 			}
 		]

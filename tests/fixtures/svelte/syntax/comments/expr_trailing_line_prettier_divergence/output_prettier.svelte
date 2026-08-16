@@ -13,7 +13,9 @@
 {#each items as item}
 	{item}
 {/each}
-{#each items as item (item.id)}{item}{/each}
+{#each items as item (item.id)}
+	{item}
+{/each}
 {#await promise then val}
 	{val}
 {/await}
