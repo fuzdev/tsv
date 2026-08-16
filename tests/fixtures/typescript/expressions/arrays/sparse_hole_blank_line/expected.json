@@ -1,0 +1,505 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 597,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A blank line before a hole is the previous ELEMENT's blank, so it survives — the",
+			"start": 10,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment slides past the hole's comma to lead the next element, the blank stays put",
+			"start": 95,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 211,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same blank with no comment in the gap",
+			"start": 226,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A hole carries no blank of its own — a blank AFTER one is dropped",
+			"start": 396,
+			"end": 464,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 69
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 596,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 29,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 182,
+					"end": 223,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 188,
+							"end": 222,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 188,
+								"end": 189,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 192,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 196,
+										"end": 197,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 3
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 201,
+										"end": 202,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 3
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									},
+									null,
+									{
+										"type": "Literal",
+										"start": 218,
+										"end": 219,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 3
+											}
+										},
+										"value": 3,
+										"raw": "3",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 211,
+												"end": 215
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line before a hole is the previous ELEMENT's blank, so it survives — the",
+							"start": 10,
+							"end": 93
+						},
+						{
+							"type": "Line",
+							"value": " comment slides past the hole's comma to lead the next element, the blank stays put",
+							"start": 95,
+							"end": 180
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 272,
+					"end": 393,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 278,
+							"end": 392,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 278,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 282,
+								"end": 392,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 286,
+										"end": 316,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 32
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 320,
+										"end": 350,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 32
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									null,
+									{
+										"type": "Identifier",
+										"start": 359,
+										"end": 389,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 32
+											}
+										},
+										"name": "cccccccccccccccccccccccccccccc"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same blank with no comment in the gap",
+							"start": 226,
+							"end": 270
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 466,
+					"end": 586,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 472,
+							"end": 585,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 28,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 472,
+								"end": 473,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 476,
+								"end": 585,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 11
+									},
+									"end": {
+										"line": 28,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 480,
+										"end": 510,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 32
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									null,
+									{
+										"type": "Identifier",
+										"start": 518,
+										"end": 548,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 32
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									{
+										"type": "Identifier",
+										"start": 552,
+										"end": 582,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 2
+											},
+											"end": {
+												"line": 27,
+												"column": 32
+											}
+										},
+										"name": "cccccccccccccccccccccccccccccc"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A hole carries no blank of its own — a blank AFTER one is dropped",
+							"start": 396,
+							"end": 464
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

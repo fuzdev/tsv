@@ -6,7 +6,7 @@ use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext,
     analysis, class_expr_has_decorators, conditional_should_break_after_op,
-    is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_with_return_type,
+    is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
     is_literal_member_chain, is_module_path_fluid_call, is_multiline_string_literal,
     is_poorly_breakable_chain, is_pure_property_chain, is_regex_root_chain,
     is_self_expanding_value, is_simple_self_expanding, is_simple_value,
@@ -727,8 +727,11 @@ impl<'a> Printer<'a> {
                     && !has_complex_destructuring
                     && !is_arrow_with_breakable_left;
 
-                // Curried arrows with return type always break after `=`
-                let is_curried_arrow = is_curried_arrow_with_return_type(init);
+                // A curried chain whose heads trigger `arrow_chain_should_break` breaks
+                // after `=` unconditionally; every other curried chain goes fluid below.
+                // ⚠️ This pair is the declarator's hand-rolled twin of `choose_layout`'s
+                // `Fluid` / `BreakAfterOperator` arms — see the ⚠️ on `build_assignment_layout`.
+                let is_curried_arrow = is_curried_arrow_chain_that_breaks(init);
 
                 if has_comments_after_eq
                     && let Some(rhs) =
@@ -752,13 +755,18 @@ impl<'a> Printer<'a> {
                     }
                     parts.push(d.indent_hardline(init_value_doc()));
                 } else if is_curried_arrow {
-                    // Curried arrow with return type: mandatory break after `=`
-                    // The arrow expression formatter handles the rest of the breaking
+                    // Mandatory break after `=`; the arrow printer stacks the heads under it.
+                    // ⚠️ Deliberately does NOT set `ArrowChainContext::AssignmentRhs`, unlike
+                    // the arm below — and it is only equivalent to setting it because
+                    // `should_use_arrow_chain_layout` declines a `shouldBreakChain` chain in
+                    // exactly that context, precisely so this `=` can own the break instead.
+                    // `build_assignment_layout` sets the context for EVERY curried chain and
+                    // leans on the same decline; if that decline ever moves, both sites move.
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
                     parts.push(d.indent_hardline(init_value_doc()));
                 } else if is_curried_arrow_chain(init) {
-                    // Untyped curried arrow chain: fluid break after `=`. The chain's
+                    // Every other curried chain: fluid break after `=`. The chain's
                     // signature heads break only when they don't fit on the operator
                     // line; a hugging body otherwise expands in place. The context tells
                     // the arrow printer to use the assignment-RHS chain layout.

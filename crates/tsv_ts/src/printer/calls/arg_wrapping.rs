@@ -7,7 +7,7 @@
 
 use super::super::{
     ArrowChainContext, CommentSpacing, Printer, is_curried_arrow_chain,
-    is_curried_arrow_with_return_type, is_multiline_template_expression,
+    is_multiline_template_expression,
 };
 use super::arg_comments::{
     any_arg_gap_has_comment_on_page, build_arg_gap_docs, emit_first_arg_leading_comments,
@@ -36,14 +36,18 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// state had no chain layout at all, which is the whole bug class this helper closes.
 ///
 /// Prettier's other printing — the `expandLastArg` `lastArg` its hug states read — has
-/// exactly one caller left, [`Printer::skip_arrow_chain`]'s, and only for a typed chain:
-/// see `call_formatting.rs`'s `build_block_arrow_hug_states`, which states why an untyped
-/// chain needs no second build (and why paying for one would be 2^depth).
+/// exactly one caller left, [`Printer::skip_arrow_chain`]'s, and only for a chain
+/// `arrow_chain_should_break` forces open: see `call_formatting.rs`'s
+/// `build_block_arrow_hug_states`, which states why every other chain needs no second build
+/// (and why paying for one would be 2^depth).
 ///
-/// Only an **untyped** chain is routed: `should_use_arrow_chain_layout` refuses a chain
-/// carrying a return type, type params, or a non-identifier param anywhere, so the context
-/// is inert for those (nothing else reads it) — and saying so here keeps the helper's name
-/// honest, since a typed chain's call-argument layout is a separate, cataloged question.
+/// **Every** curried chain is routed, break-forcing or not — the binaryish site
+/// (`build_chain_aware_operand_doc`) has always done the same, and the refusal lives in one
+/// place, `should_use_arrow_chain_layout`. A second copy of it here is what kept prettier's
+/// `shouldBreakChain` from ever reaching a call argument: the trigger it names (a return
+/// type with params, type params, a non-identifier param) is a **break** decision inside the
+/// chain layout, not a reason to leave it, and gating the context on it meant the outer
+/// arrow fell back to the default layout, which owns no chain break in this position.
 ///
 /// `build` stays a closure because the callers disagree on which builder to run
 /// (`build_expression_doc` vs `build_arg_expression_doc`) — only the context is shared.
@@ -51,8 +55,9 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// correctness fix rather than hygiene. Prettier's `expandLastArg` is an argument to one
 /// `print()` call — it describes the node being printed and nested prints never inherit it —
 /// whereas tsv spells it as ambient `Printer` state, so without a clear it survives the
-/// descent: a **typed** chain's hug (the one position that still sets the flag) suppressed
-/// the progressive layout of an entirely different, untyped chain nested in its body
+/// descent: the hug of a chain `arrow_chain_should_break` forces open (the one position that
+/// still sets the flag) suppressed the progressive layout of an entirely different chain
+/// nested in its body
 /// (`fn(({ a }) => ({ b }) => { return g((x, …) => (y) => z); })`). Every argument of every
 /// nested call routes through here, which is exactly the seam where the flag stops applying.
 pub(crate) fn build_printed_argument_doc(
@@ -61,7 +66,7 @@ pub(crate) fn build_printed_argument_doc(
     build: impl FnOnce() -> DocId,
 ) -> DocId {
     let outer_skip = printer.skip_arrow_chain.replace(false);
-    let doc = if is_curried_arrow_chain(arg) && !is_curried_arrow_with_return_type(arg) {
+    let doc = if is_curried_arrow_chain(arg) {
         printer.build_with_arrow_chain_context(ArrowChainContext::CallArgOrBinaryish, build)
     } else {
         build()
