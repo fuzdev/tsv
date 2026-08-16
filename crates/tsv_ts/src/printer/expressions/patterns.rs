@@ -38,12 +38,13 @@ enum AssignmentContext {
 }
 
 /// The gap after array-pattern slot `i`, in this container's terms:
-/// [`next_real_element_start`] with the pattern's own fallback —
-/// [`internal::ArrayPattern::body_end`], which stops before a `: T` the pattern's span
-/// swallowed rather than at `span.end`. The array literal's twin is `array_gap_end`; each
-/// container names its own end once and the walk past the holes is shared.
-fn array_pattern_gap_end(arr: &internal::ArrayPattern<'_>, i: usize) -> u32 {
-    next_real_element_start(arr.elements, i).unwrap_or_else(|| arr.body_end())
+/// [`next_real_element_start`] with the pattern's own fallback — the body end its caller
+/// already derived ([`Printer::array_pattern_tail`]), which stops at the closing `]`
+/// rather than running on over a `?` / `: T` the pattern's span swallowed. The array
+/// literal's twin is `array_gap_end`; each container names its own end once and the walk
+/// past the holes is shared.
+fn array_pattern_gap_end(arr: &internal::ArrayPattern<'_>, i: usize, body_end: u32) -> u32 {
+    next_real_element_start(arr.elements, i).unwrap_or(body_end)
 }
 
 /// Check if an arrow function has a nested arrow function as its body
@@ -55,6 +56,23 @@ fn is_nested_arrow_function(expr: &Expression<'_>) -> bool {
         return matches!(body_expr, Expression::ArrowFunctionExpression(_));
     }
     false
+}
+
+/// A destructuring pattern's TAIL — the optional `?` marker and `: Type` annotation that
+/// follow its closing `}`/`]` — paired with the body end they hang off.
+///
+/// The pairing is the whole point. `body_end` is both the bound every comment scan over the
+/// pattern takes and the left edge of the tail's own first gap (`}`→`?`), so the two are one
+/// fact about one node. Derived together ([`Printer::object_pattern_tail`] /
+/// [`Printer::array_pattern_tail`]) rather than re-spelled at each site that needs both, where
+/// one node's bound could be handed another's marker — the mismatch that a bound passed
+/// alongside its node, instead of with it, makes expressible.
+#[derive(Clone, Copy)]
+struct PatternTail<'a> {
+    /// Just past the closing `}`/`]` — see [`Printer::pattern_body_end`].
+    body_end: u32,
+    optional: bool,
+    type_annotation: Option<&'a internal::TSTypeAnnotation<'a>>,
 }
 
 /// Layout role of an assignment-chain segment's right side (`a = b = value`).
@@ -343,23 +361,118 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build the doc tail that follows a destructuring-pattern parameter's
-    /// closing `]`/`}`: the optional `?` marker (parameter position only), then a
-    /// `: Type` annotation. Either may be absent — `[]`, `[]?`, `[]: T`, `[]?: T`.
-    /// Shared by every object/array pattern path so the `?` lands between the
-    /// brackets and the type uniformly.
-    fn build_pattern_optional_type_tail(
+    /// Where a destructuring pattern's `{…}` / `[…]` body ENDS — the offset just past the
+    /// closing delimiter.
+    ///
+    /// The bound every comment scan over the pattern takes. The pattern's own span runs on
+    /// over a `?` marker and a `: T` annotation, so with either present the closer has to be
+    /// **scanned for** rather than read off the node: `last_content_end` is the last
+    /// element's span end (just inside the opening delimiter when the pattern is empty), and
+    /// everything between it and the closer is whitespace, comments, and at most one comma —
+    /// so the first `closing` byte outside a comment is the delimiter itself.
+    ///
+    /// Naming the annotation's start instead is the same-shaped near-miss the identifier
+    /// head made: it reads as "the body's end" and is one *token* too far, which hands the
+    /// pattern's three head gaps (`}`→`?`, `?`→`:`, `}`→`:`) to the interior scans. They then
+    /// print a comment written OUTSIDE the brackets inside them — re-associating it with the
+    /// last element — while the empty-pattern emitter's `span_end - 1` (its contract is "one
+    /// past the closer") lands inside the comment and drops it outright.
+    fn pattern_body_end(
         &self,
+        span: Span,
         optional: bool,
         type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
-    ) -> DocId {
+        last_content_end: u32,
+        closing: u8,
+    ) -> u32 {
+        // No `?` and no `: T`: the span already ends at the closing delimiter.
+        if !optional && type_annotation.is_none() {
+            return span.end;
+        }
+        find_char_skipping_comments(
+            self.source.as_bytes(),
+            last_content_end as usize,
+            span.end as usize,
+            closing,
+        )
+        .map_or_else(
+            // Unreachable for a parsed pattern — a tail implies a closer before it. Falling
+            // back to the pre-scan reading keeps a hypothetical miss at today's behavior
+            // rather than claiming the annotation's own comments.
+            || type_annotation.map_or(span.end, |t| t.span.start),
+            |pos| pos as u32 + 1,
+        )
+    }
+
+    /// The object pattern's [`PatternTail`] — [`Self::pattern_body_end`] in its brace
+    /// spelling, paired with the tail it bounds.
+    fn object_pattern_tail<'t>(&self, obj: &'t internal::ObjectPattern<'_>) -> PatternTail<'t> {
+        let optional = obj.optional;
+        let type_annotation = obj.type_annotation.as_ref();
+        let last_content_end = obj
+            .properties
+            .last()
+            .map_or(obj.span.start + 1, |p| p.span().end);
+        PatternTail {
+            body_end: self.pattern_body_end(
+                obj.span,
+                optional,
+                type_annotation,
+                last_content_end,
+                b'}',
+            ),
+            optional,
+            type_annotation,
+        }
+    }
+
+    /// The array pattern's [`PatternTail`]. A trailing hole carries no span, so the scan
+    /// starts at the last REAL element — the commas past it are structure.
+    fn array_pattern_tail<'t>(&self, arr: &'t internal::ArrayPattern<'_>) -> PatternTail<'t> {
+        let optional = arr.optional;
+        let type_annotation = arr.type_annotation.as_ref();
+        let last_content_end = arr
+            .elements
+            .iter()
+            .rev()
+            .flatten()
+            .next()
+            .map_or(arr.span.start + 1, |e| e.span().end);
+        PatternTail {
+            body_end: self.pattern_body_end(
+                arr.span,
+                optional,
+                type_annotation,
+                last_content_end,
+                b']',
+            ),
+            optional,
+            type_annotation,
+        }
+    }
+
+    /// Build the doc for a destructuring pattern's [`PatternTail`] — the optional `?` marker
+    /// (parameter position only), then a `: Type` annotation. Either may be absent: `[]`,
+    /// `[]?`, `[]: T`, `[]?: T`. Shared by every object/array pattern path so the `?` lands
+    /// between the brackets and the type uniformly.
+    ///
+    /// The tail is **position-keyed** rather than position-free because the two head gaps
+    /// behind it are nobody else's: respelling the marker as a bare `?` and calling
+    /// [`Self::build_type_annotation_doc`] skips both landings that own them
+    /// ([`Self::push_modifier_marker_doc`], [`Self::build_binding_type_annotation_doc`]) —
+    /// `docs/comments.md` hazard 4 in its head variant, and the same defect the function-type
+    /// hug had. Routing them is also what makes the pattern head agree with the identifier
+    /// head it is a spelling of: one rule for `a /* c */?: T` and `{ a } /* c */?: T` alike.
+    fn build_pattern_tail_doc(&self, tail: PatternTail<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        if optional {
-            parts.push(d.text("?"));
-        }
-        if let Some(ta) = type_annotation {
-            parts.push(self.build_type_annotation_doc(ta));
+        let marker_end = if tail.optional {
+            self.push_modifier_marker_doc(&mut parts, tail.body_end, b'?')
+        } else {
+            tail.body_end
+        };
+        if let Some(ta) = tail.type_annotation {
+            parts.push(self.build_binding_type_annotation_doc(marker_end, ta, false));
         }
         d.concat(&parts)
     }
@@ -391,15 +504,16 @@ impl<'a> Printer<'a> {
             // a blank after the `{` is not a reason to expand, and acting on one made
             // the expanded output its own second fixed point (`collection_formatting_hints`).
             let should_expand = object_pattern_should_expand(obj, context);
-            let boundary = obj.body_end();
+            let tail = self.object_pattern_tail(obj);
+            let boundary = tail.body_end;
             let has_comments = self.has_comments_on_page_between(obj.span.start, boundary);
             let (has_line_comments, has_blank_lines) =
-                self.object_pattern_formatting_hints(obj, has_comments);
+                self.object_pattern_formatting_hints(obj, boundary, has_comments);
             let has_own_line_block =
-                has_comments && self.object_pattern_has_own_line_block_comments(obj);
+                has_comments && self.object_pattern_has_own_line_block_comments(obj, boundary);
 
             if should_expand || has_line_comments || has_blank_lines || has_own_line_block {
-                self.build_expanded_object_pattern_doc(obj)
+                self.build_expanded_object_pattern_doc(obj, tail)
             } else {
                 // Use group with line breaks for width-based expansion
                 // Include type annotation in the group so its width is considered
@@ -433,7 +547,7 @@ impl<'a> Printer<'a> {
                     let upper_bound = obj
                         .properties
                         .get(i + 1)
-                        .map_or_else(|| obj.body_end(), |next| next.span().start);
+                        .map_or(boundary, |next| next.span().start);
                     let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
                     // Separator comma between properties; no trailing comma on the last
@@ -451,7 +565,7 @@ impl<'a> Printer<'a> {
 
                 // Whatever the last property's trailing run left unclaimed, before the
                 // closing brace — e.g. `{a /*, b*/}`.
-                let trailing = self.build_object_pattern_trailing_comments(obj, prev_end);
+                let trailing = self.build_object_pattern_trailing_comments(prev_end, boundary);
                 parts.push(trailing);
 
                 // Build group contents: { + properties + } with bracketSpacing
@@ -464,12 +578,7 @@ impl<'a> Printer<'a> {
                 ];
 
                 // Include `?` + type annotation in the group for width calculation
-                group_parts.push(
-                    self.build_pattern_optional_type_tail(
-                        obj.optional,
-                        obj.type_annotation.as_ref(),
-                    ),
-                );
+                group_parts.push(self.build_pattern_tail_doc(tail));
 
                 d.group(d.concat(&group_parts))
             }
@@ -487,13 +596,8 @@ impl<'a> Printer<'a> {
     /// is neither on the property's line nor unclaimed. The expanded paths use
     /// `build_pattern_trailing_dangling_comments` instead, which puts each comment on its
     /// own line.
-    fn build_object_pattern_trailing_comments(
-        &self,
-        obj: &internal::ObjectPattern<'_>,
-        prev_end: u32,
-    ) -> DocId {
+    fn build_object_pattern_trailing_comments(&self, prev_end: u32, boundary: u32) -> DocId {
         let d = self.d();
-        let boundary = obj.body_end();
 
         let mut parts = DocBuf::new();
         for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
@@ -660,9 +764,9 @@ impl<'a> Printer<'a> {
     fn object_pattern_formatting_hints(
         &self,
         obj: &internal::ObjectPattern<'_>,
+        boundary: u32,
         has_comments: bool,
     ) -> (bool, bool) {
-        let boundary = obj.body_end();
         self.collection_formatting_hints(
             obj.span.start,
             boundary,
@@ -681,8 +785,8 @@ impl<'a> Printer<'a> {
     fn object_pattern_has_own_line_block_comments(
         &self,
         obj: &internal::ObjectPattern<'_>,
+        boundary: u32,
     ) -> bool {
-        let boundary = obj.body_end();
         let span = Span::new(obj.span.start, boundary);
         self.has_own_line_block_comments_in_bracket_list(span, obj.properties, |prop| {
             // The property's PRINTED span — see the array pattern's twin.
@@ -696,17 +800,20 @@ impl<'a> Printer<'a> {
         // Bound the comment scan to the braces (before any `?`/`: Type`), mirroring
         // `build_empty_array_pattern_doc`. Scanning the full span would pull a
         // comment out of the type annotation into the empty `{}` and duplicate it.
-        let body_end = obj.body_end();
-        let body_doc =
-            self.build_empty_braces_inline_with_comments_doc(Span::new(obj.span.start, body_end));
-        let tail =
-            self.build_pattern_optional_type_tail(obj.optional, obj.type_annotation.as_ref());
-        d.concat(&[body_doc, tail])
+        let tail = self.object_pattern_tail(obj);
+        let body_doc = self
+            .build_empty_braces_inline_with_comments_doc(Span::new(obj.span.start, tail.body_end));
+        d.concat(&[body_doc, self.build_pattern_tail_doc(tail)])
     }
 
     /// Build expanded doc for object pattern with hardlines (always multiline)
-    fn build_expanded_object_pattern_doc(&self, obj: &internal::ObjectPattern<'_>) -> DocId {
+    fn build_expanded_object_pattern_doc(
+        &self,
+        obj: &internal::ObjectPattern<'_>,
+        tail: PatternTail<'_>,
+    ) -> DocId {
         let d = self.d();
+        let boundary = tail.body_end;
 
         // Zero-comment fast gate: one binary search over the whole object-pattern
         // window (up to any `: Type` annotation) decides whether the per-property
@@ -720,7 +827,6 @@ impl<'a> Printer<'a> {
         // reach this branch via nesting with no line comment, and the loop must
         // still emit it. The expansion decision itself runs earlier and is
         // unaffected. Canonical reference: build_params_doc_with_comments.
-        let boundary = obj.body_end();
         let has_comments = self.has_comments_to_emit_between(obj.span.start, boundary);
 
         // A comment trailing the opening `{` on its own line is kept on the `{`
@@ -770,7 +876,7 @@ impl<'a> Printer<'a> {
             let upper_bound = obj
                 .properties
                 .get(i + 1)
-                .map_or_else(|| obj.body_end(), |next| next.span().start);
+                .map_or(boundary, |next| next.span().start);
             let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
 
             // Separator comma between properties; no trailing comma on the last
@@ -810,9 +916,7 @@ impl<'a> Printer<'a> {
             d.text("}"),
         ];
 
-        result_parts.push(
-            self.build_pattern_optional_type_tail(obj.optional, obj.type_annotation.as_ref()),
-        );
+        result_parts.push(self.build_pattern_tail_doc(tail));
 
         d.concat(&result_parts)
     }
@@ -962,7 +1066,8 @@ impl<'a> Printer<'a> {
         // DROPPED outright (fixture `array_own_line_multiline_comment_expand`).
         // `has_own_line_block_comments_in_bracket_list` deliberately skips multi-line
         // comments — the multi-line question is this separate predicate's, not its.
-        let boundary = arr.body_end();
+        let tail = self.array_pattern_tail(arr);
+        let boundary = tail.body_end;
         let has_comments = self.has_comments_on_page_between(arr.span.start, boundary);
         let (has_line_comments, has_multiline_block, has_own_line_block) = if has_comments {
             // Flatten once (skip holes) and share across the scans.
@@ -997,24 +1102,22 @@ impl<'a> Printer<'a> {
         };
 
         if has_line_comments || has_multiline_block || has_own_line_block {
-            self.build_expanded_array_pattern_doc(arr)
+            self.build_expanded_array_pattern_doc(arr, tail)
         } else {
-            self.build_grouped_array_pattern_doc(arr, has_comments)
+            self.build_grouped_array_pattern_doc(arr, tail, has_comments)
         }
     }
 
     /// Build doc for empty array pattern: `[]` with optional type annotation
     fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
         let d = self.d();
-        // For array patterns with type annotations, the body ends before the annotation
-        let body_end = arr.body_end();
+        // For array patterns with a `?` / type annotation, the body ends at the `]`
+        let tail = self.array_pattern_tail(arr);
 
         let body_doc =
-            self.build_empty_brackets_inline_with_comments_doc_range(arr.span.start, body_end);
+            self.build_empty_brackets_inline_with_comments_doc_range(arr.span.start, tail.body_end);
 
-        let tail =
-            self.build_pattern_optional_type_tail(arr.optional, arr.type_annotation.as_ref());
-        d.concat(&[body_doc, tail])
+        d.concat(&[body_doc, self.build_pattern_tail_doc(tail)])
     }
 
     /// Build grouped array pattern doc (width-based expansion). `has_comments` is the
@@ -1024,9 +1127,11 @@ impl<'a> Printer<'a> {
     fn build_grouped_array_pattern_doc(
         &self,
         arr: &internal::ArrayPattern<'_>,
+        tail: PatternTail<'_>,
         has_comments: bool,
     ) -> DocId {
         let d = self.d();
+        let boundary = tail.body_end;
         let mut parts = d.pooled_docbuf();
         let mut prev_end = arr.span.start + 1;
 
@@ -1051,7 +1156,7 @@ impl<'a> Printer<'a> {
 
                 // Collect trailing comments, bounded by the next REAL element or (past the
                 // last) the body's end — `array_pattern_gap_end` carries both halves.
-                let upper_bound = array_pattern_gap_end(arr, i);
+                let upper_bound = array_pattern_gap_end(arr, i, boundary);
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
                 // Block comments around the comma (line comments force the expanded
@@ -1086,7 +1191,6 @@ impl<'a> Printer<'a> {
         // sides partition the gap. A line comment routes to the expanded path, so only
         // blocks reach here.
         if has_comments && arr.elements.last().is_some_and(Option::is_none) {
-            let boundary = arr.body_end();
             for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
@@ -1106,14 +1210,17 @@ impl<'a> Printer<'a> {
 
         let group_doc = d.group(d.concat(&group_parts));
 
-        let tail =
-            self.build_pattern_optional_type_tail(arr.optional, arr.type_annotation.as_ref());
-        d.concat(&[group_doc, tail])
+        d.concat(&[group_doc, self.build_pattern_tail_doc(tail)])
     }
 
     /// Build expanded array pattern doc (always multiline)
-    fn build_expanded_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
+    fn build_expanded_array_pattern_doc(
+        &self,
+        arr: &internal::ArrayPattern<'_>,
+        tail: PatternTail<'_>,
+    ) -> DocId {
         let d = self.d();
+        let boundary = tail.body_end;
         let mut parts = DocBuf::new();
         let mut prev_end = arr.span.start + 1;
 
@@ -1163,7 +1270,7 @@ impl<'a> Printer<'a> {
 
                 // Collect trailing comments, bounded by the next REAL element or (past the
                 // last) the body's end — `array_pattern_gap_end` carries both halves.
-                let upper_bound = array_pattern_gap_end(arr, i);
+                let upper_bound = array_pattern_gap_end(arr, i, boundary);
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
                 // Separator comma between elements; no trailing comma on the last
@@ -1228,7 +1335,6 @@ impl<'a> Printer<'a> {
         }
 
         // Check for dangling comments after the last element (before `]`)
-        let boundary = arr.body_end();
         let past_elision = arr.elements.last().is_some_and(Option::is_none);
         parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary, past_elision));
 
@@ -1241,9 +1347,7 @@ impl<'a> Printer<'a> {
             d.text("]"),
         ];
 
-        result_parts.push(
-            self.build_pattern_optional_type_tail(arr.optional, arr.type_annotation.as_ref()),
-        );
+        result_parts.push(self.build_pattern_tail_doc(tail));
 
         d.concat(&result_parts)
     }

@@ -1,0 +1,564 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 301,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An empty pattern's interior comment stays inside the brackets the author",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " wrote it in, annotation or not.",
+			"start": 97,
+			"end": 131,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 141,
+			"end": 149,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 9
+				},
+				"end": {
+					"line": 4,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 168,
+			"end": 176,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 8
+				},
+				"end": {
+					"line": 5,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Inside and outside are distinct positions, and both are kept.",
+			"start": 188,
+			"end": 252,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 262,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 9
+				},
+				"end": {
+					"line": 8,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 273,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 20
+				},
+				"end": {
+					"line": 8,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 300,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 291,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 133,
+					"end": 159,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 139,
+							"end": 158,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 139,
+								"end": 154,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 22
+									}
+								},
+								"properties": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 151,
+									"end": 154,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 19
+										},
+										"end": {
+											"line": 4,
+											"column": 22
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 153,
+										"end": 154,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 21
+											},
+											"end": {
+												"line": 4,
+												"column": 22
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 153,
+											"end": 154,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 21
+												},
+												"end": {
+													"line": 4,
+													"column": 22
+												}
+											},
+											"name": "T"
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 141,
+											"end": 149
+										}
+									]
+								}
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 157,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 25
+									},
+									"end": {
+										"line": 4,
+										"column": 26
+									}
+								},
+								"name": "x"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An empty pattern's interior comment stays inside the brackets the author",
+							"start": 20,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " wrote it in, annotation or not.",
+							"start": 97,
+							"end": 131
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 161,
+					"end": 185,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 167,
+							"end": 184,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 167,
+								"end": 180,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 20
+									}
+								},
+								"elements": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 177,
+									"end": 180,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 17
+										},
+										"end": {
+											"line": 5,
+											"column": 20
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 179,
+										"end": 180,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 19
+											},
+											"end": {
+												"line": 5,
+												"column": 20
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 179,
+											"end": 180,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 19
+												},
+												"end": {
+													"line": 5,
+													"column": 20
+												}
+											},
+											"name": "U"
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 168,
+											"end": 176
+										}
+									]
+								}
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 183,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 23
+									},
+									"end": {
+										"line": 5,
+										"column": 24
+									}
+								},
+								"name": "y"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 254,
+					"end": 290,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 260,
+							"end": 289,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 260,
+								"end": 285,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 32
+									}
+								},
+								"properties": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 282,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 29
+										},
+										"end": {
+											"line": 8,
+											"column": 32
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 284,
+										"end": 285,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 31
+											},
+											"end": {
+												"line": 8,
+												"column": 32
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 284,
+											"end": 285,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 31
+												},
+												"end": {
+													"line": 8,
+													"column": 32
+												}
+											},
+											"name": "V"
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c3 ",
+											"start": 262,
+											"end": 270
+										},
+										{
+											"type": "Block",
+											"value": " c4 ",
+											"start": 273,
+											"end": 281
+										}
+									]
+								}
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 288,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 35
+									},
+									"end": {
+										"line": 8,
+										"column": 36
+									}
+								},
+								"name": "z"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Inside and outside are distinct positions, and both are kept.",
+							"start": 188,
+							"end": 252
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

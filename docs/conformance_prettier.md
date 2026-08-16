@@ -194,6 +194,10 @@ its tail:
   ([param_key_colon_line_comment](../tests/fixtures/typescript/declarations/function/param_key_colon_line_comment_prettier_divergence/)),
   destructuring renames
   ([rename_key_colon_line_comment](../tests/fixtures/typescript/expressions/destructuring/rename_key_colon_line_comment_prettier_divergence/)),
+  destructuring **patterns** — where the head the gap follows is the closing `}`/`]`
+  rather than a name, so the same rule covers the pattern's `}`→`?`, `?`→`:` and
+  `}`→`:` gaps
+  ([pattern_bracket_colon_line_comment](../tests/fixtures/typescript/expressions/destructuring/pattern_bracket_colon_line_comment_prettier_divergence/)),
   and named tuple members — label→`:`, the optional `?`→`:`, and a rest member's
   label
   ([tuple/label_colon_line_comment](../tests/fixtures/typescript/types/tuple/label_colon_line_comment_prettier_divergence/)).

@@ -748,6 +748,28 @@ pub(crate) fn last_arg_has_own_line_post_arrow_comment(
     }
 }
 
+/// Whether a comment sits in the arrow's body-end→arrow-end gap — an
+/// author-parenthesized body's stripped `)` region, or (for an object body) the
+/// grammar-required parens a hug layout synthesizes.
+///
+/// The other end of the arrow body from [`last_arg_has_own_line_post_arrow_comment`],
+/// and asked for the same reason: **every** hug state reassembles the argument from a
+/// signature doc and a body doc rather than printing the whole arrow, so it is blind to
+/// this gap — a comment there reaches no emitter and is DROPPED. The arm must decline,
+/// leaving the generic path to print the argument through the comment-aware body
+/// cascade, which retains the parens and is also prettier's settled form for the
+/// commented shape. **On page**, not to-emit: an owned comment still rides that region.
+///
+/// Asked last in each arm's guard, after the body kind, so an arrow heading for another
+/// arm pays no comment lookup.
+pub(crate) fn arrow_body_tail_has_comments(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body_expr: &internal::Expression<'_>,
+) -> bool {
+    printer.has_comments_on_page_between(body_expr.span().end, arrow.span.end)
+}
+
 /// Assemble the single `expandLastArg` state
 /// [`last_arg_has_own_line_post_arrow_comment`] selects: the head arguments stay inline, the
 /// last one breaks, and the softline drops `)` to its own line
