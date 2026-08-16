@@ -1693,9 +1693,12 @@ impl<'a> Printer<'a> {
         // isn't read as the `for (x in y)` separator. Set for the whole init
         // subtree (prettier parenthesizes every `in` lexically under the init,
         // including inside nested function/class bodies); a nested for-header
-        // re-enables it for its own init. The `wrap_for_init_in` calls below cover
-        // the positions that build an expression without a `needs_parens` check;
-        // everything else routes through `needs_parens`, now flag-aware.
+        // re-enables it for its own init. The `wrap_for_init_in` calls cover the
+        // positions that build an expression without a `needs_parens` check;
+        // everything else routes through `needs_parens`, now flag-aware. The
+        // DECLARATION arm's wrap is not spelled here — it lives inside
+        // `build_for_init_value_doc`, which has to place the parens relative to the
+        // grouping shell's trailing comment rather than simply around the value.
         let saved_in_for_init = self.in_for_init.replace(true);
         let result = match init {
             internal::ForInit::VariableDeclaration(decl) => {
@@ -1735,6 +1738,14 @@ impl<'a> Printer<'a> {
                         let id_end = declarator.id.span().end;
                         let init_start = init.span().start;
                         let eq_pos = self.find_equals_position(id_end, init_start);
+                        // Every branch below builds this declarator's value the SAME way —
+                        // through the header's own shell handler, which owns both the
+                        // trailing-comment gap and the `[~In]` parens. Naming it once is what
+                        // stops the branches drifting: them each spelling out a bare
+                        // `build_expression_doc` is exactly how that gap came to have no
+                        // emitter, dropping every comment written in it.
+                        let build_value =
+                            || self.build_for_init_value_doc(init, declarator.span.end);
                         // An init declarator's `=` is a value gap, exactly as the
                         // statement-level one is (`build_variable_declaration_doc`): an
                         // own-line JSDoc cast hangs after the `=` rather than printing its
@@ -1755,9 +1766,7 @@ impl<'a> Printer<'a> {
                         let continuation = before_eq
                             .then(|| {
                                 self.build_initializer_line_continuation(id_end, eq_pos, || {
-                                    let value = self
-                                        .wrap_for_init_in(init, self.build_expression_doc(init));
-                                    self.prepend_rhs_comments(value, eq_pos + 1, init_start)
+                                    self.prepend_rhs_comments(build_value(), eq_pos + 1, init_start)
                                 })
                             })
                             .flatten();
@@ -1775,9 +1784,7 @@ impl<'a> Printer<'a> {
                             // hugs the value across a source newline (`i = /* c */⏎0` →
                             // `i = /* c */ 0`) and keeps the header flat.
                             if let Some(rhs) =
-                                self.build_eq_comment_break_rhs(eq_pos, init_start, || {
-                                    self.wrap_for_init_in(init, self.build_expression_doc(init))
-                                })
+                                self.build_eq_comment_break_rhs(eq_pos, init_start, build_value)
                             {
                                 one.push(rhs);
                             } else if self.owned_leading_comment_effect(init)
@@ -1793,10 +1800,7 @@ impl<'a> Printer<'a> {
                                 // had NO fixed point: pass 2 read the comment as mid-line and
                                 // collapsed the whole header.
                                 one.push(d.text(" ="));
-                                one.push(hang_after_operator(
-                                    d,
-                                    self.wrap_for_init_in(init, self.build_expression_doc(init)),
-                                ));
+                                one.push(hang_after_operator(d, build_value()));
                             } else {
                                 one.push(d.text(" = "));
                                 if let Some(comments) =
@@ -1804,9 +1808,7 @@ impl<'a> Printer<'a> {
                                 {
                                     one.push(comments);
                                 }
-                                one.push(
-                                    self.wrap_for_init_in(init, self.build_expression_doc(init)),
-                                );
+                                one.push(build_value());
                             }
                         }
                     }
