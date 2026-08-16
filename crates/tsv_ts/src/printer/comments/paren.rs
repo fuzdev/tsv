@@ -15,6 +15,23 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char_skipping_comments, skip_trivia};
 
+/// What follows a stripped grouping shell, and so whether a trailing block comment has a
+/// statement terminator to defer past.
+///
+/// The distinction cannot be read off the source at the shell: both spellings put a `;`
+/// there, and only the caller knows whether it TERMINATES a statement or SEPARATES a
+/// clause. Reading the byte alone sent a `for` header's init comment past the header's
+/// own separator, out of the declarator that owned it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ShellTail {
+    /// A statement value position — a declarator initializer, an assignment RHS, a
+    /// `return` / `throw` argument, `export default`. A following `;` ends the statement,
+    /// so a trailing block defers past it (see [`Printer::build_expression_doc_with_paren_comments`]).
+    StatementTerminator,
+    /// A `for` header's init clause. A following `;` separates clauses, so nothing defers.
+    ForClauseSeparator,
+}
+
 /// How [`Printer::build_paren_leading_value_doc`] splits a `(`→value gap: the run the
 /// `(` line keeps, the value with the rest of the run prepended, and whether the caller
 /// must open its parens.
@@ -769,16 +786,65 @@ impl<'a> Printer<'a> {
     /// own-line comments need the parens (a bare line comment would swallow the
     /// following token), so those defer to `build_expression_doc_keep_paren_comments`.
     ///
-    /// Used for variable init, assignment RHS, and ternary branches.
+    /// Used for variable init, assignment RHS, and ternary branches. A `for` header's
+    /// init declarator takes [`Self::build_for_init_value_doc`] instead — same handling,
+    /// minus the statement-terminator deferral its `;` does not license.
     pub(crate) fn build_expression_doc_with_paren_comments(
         &self,
         expr: &internal::Expression<'_>,
         boundary_end: u32,
     ) -> DocId {
+        self.build_shell_value_doc(expr, boundary_end, ShellTail::StatementTerminator)
+    }
+
+    /// The `for`-header init counterpart of
+    /// [`Self::build_expression_doc_with_paren_comments`].
+    ///
+    /// A header init declarator's shell is followed by the header's **clause separator**,
+    /// not by a statement `;`, so the deferral arm below must not fire: a comment sent
+    /// past that separator leaves the declarator it was written in, and there is nothing
+    /// out there to hold it — prettier, which does relocate it, cannot keep it either
+    /// (its next pass carries a run's later comment clean out of the header, past the
+    /// `)`, into the body's leading position). Everything else is shared with the
+    /// statement-level path, which is the point: the block comment strips inline and the
+    /// line comment retains the shell for exactly the same reasons there.
+    ///
+    /// ⚠️ **This is the declarator's own value, not "lexically under a for header".** The
+    /// ambient `in_for_init` flag spans nested function and class bodies, where a real
+    /// statement terminator does exist and the deferral is correct
+    /// (`for (let i = (() => { const k = (a /* c */); })(); ;)` keeps `k`'s comment past
+    /// its `;`) — so the distinction is threaded from the one builder that knows it
+    /// rather than read from that flag.
+    pub(crate) fn build_for_init_value_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+    ) -> DocId {
+        self.build_shell_value_doc(expr, boundary_end, ShellTail::ForClauseSeparator)
+    }
+
+    fn build_shell_value_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+        tail: ShellTail,
+    ) -> DocId {
         let expr_end = expr.span().end;
+        // The for-header's `[~In]` parens are applied HERE rather than by the caller,
+        // because only the paths below know where they belong relative to the shell's
+        // comment. They are tsv's parens, not the author's, so a comment written AFTER
+        // the shell has to land outside them (`(a in b) /* c */`, not `(a in b /* c */)`)
+        // — the same rule that keeps a synthesized paren from landing inside an owned
+        // comment (`docs/comments.md`). The two paths that return early supply their own
+        // pair: a sequence self-parenthesizes, and the keep-paren path RETAINS the shell,
+        // which already parenthesizes the `in` — wrapping either would double it.
+        let wrap_in = |doc: DocId| match tail {
+            ShellTail::ForClauseSeparator => self.wrap_for_init_in(expr, doc),
+            ShellTail::StatementTerminator => doc,
+        };
 
         if !self.has_trailing_paren_comments(expr_end, boundary_end) {
-            return self.build_expression_doc(expr);
+            return wrap_in(self.build_expression_doc(expr));
         }
 
         // A sequence operand in this (value) position keeps its trailing comment
@@ -814,7 +880,7 @@ impl<'a> Printer<'a> {
         }
 
         let d = self.d();
-        let inner = self.build_expression_doc(expr);
+        let inner = wrap_in(self.build_expression_doc(expr));
 
         // Every comment left here is a same-line block. Where the shell is the last
         // thing before a statement `;`, that block defers past the terminator — the same
@@ -826,7 +892,9 @@ impl<'a> Printer<'a> {
         // `x; /* t */`). A shell that is NOT terminator-adjacent — a ternary branch, an
         // object value, a non-last declarator, a nested assignment — keeps the block
         // inline, where it is already its own fixed point.
-        if self.shell_meets_statement_terminator(boundary_end) {
+        if tail == ShellTail::StatementTerminator
+            && self.shell_meets_statement_terminator(boundary_end)
+        {
             let mut parts: DocBuf = smallvec![inner];
             for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
                 let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
