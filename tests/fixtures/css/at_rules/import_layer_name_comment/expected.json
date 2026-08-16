@@ -1,0 +1,73 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 139,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 47,
+				"name": "import",
+				"prelude": "url('a.css') layer( a)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 49,
+				"end": 87,
+				"name": "import",
+				"prelude": "url('b.css') layer(a )",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 89,
+				"end": 130,
+				"name": "import",
+				"prelude": "url('c.css') layer(a.  b)",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 36,
+				"end": 43,
+				"position": 19
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 78,
+				"end": 85,
+				"position": 21
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 119,
+				"end": 126,
+				"position": 22
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 131,
+			"styles": "\n\t@import url('a.css') layer(/* c */ a);\n\t@import url('b.css') layer(a /* c */);\n\t@import url('c.css') layer(a. /* c */ b);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 140,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

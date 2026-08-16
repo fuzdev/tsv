@@ -259,6 +259,17 @@ impl<'a> Printer<'a> {
             if let [arg @ CssValue::String { .. }] = args {
                 return self.flat_function_doc(name, self.build_css_value_doc(arg));
             }
+            // The same string plus a trailing comment region (`url('a.css' /* c */)`) —
+            // still the string path, so the quote still normalizes; the region joins
+            // single-spaced, the crate's uniform comment-spacing rule (prettier freezes the
+            // authored spacing — conformance_prettier_css.md §CSS: Comments). Kept separate
+            // from the arm above rather than folded into it: `join` mints a separator
+            // `text` node the single-arg case would never spend, and that case is every
+            // `url()` in a stylesheet. A *leading* comment cannot reach here at all — it
+            // makes `url(` an opaque `<url-token>`, which lands on the verbatim arm below.
+            if let [CssValue::String { .. }, ..] = args {
+                return self.flat_function_doc(name, self.build_separated_values_doc(args, " "));
+            }
             // Unquoted url() — the content is opaque. Emit the raw source verbatim,
             // stripping only the whitespace right after `url(` and right before `)`
             // (prettier's `printer-postcss.js` url handling). Rejoining parsed args

@@ -908,6 +908,71 @@ fn url_token_has_unclosed_paren(text: &str) -> bool {
     depth > 0
 }
 
+/// Consume a run of whitespace and comments, returning the run's comments as one
+/// outer-trimmed span (`None` when it held none, which is the overwhelmingly common case
+/// and leaves this a plain `skip_whitespace`).
+///
+/// The span is handed to a `CssValue::Identifier`, whose printer runs the comment-aware
+/// `normalize_css_whitespace` over it — so a two-comment run comes back single-spaced like
+/// every other CSS comment run. The comments are deliberately **not** registered (see
+/// [`CssParser::skip_whitespace_and_comments`]): the span re-emits them verbatim, and
+/// registering would additionally offer them to the `@import` prelude's gap emitters, which
+/// print between the parsed values — outside this function, where they would print twice.
+fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
+    let mut start = None;
+    let mut end = 0u32;
+    loop {
+        if parser.check(TokenKind::Whitespace) {
+            parser.advance()?;
+        } else if parser.check(TokenKind::Comment) {
+            start.get_or_insert_with(|| parser.span_pos(parser.current_start));
+            end = parser.span_pos(parser.current_end);
+            parser.advance()?;
+        } else {
+            break;
+        }
+    }
+    Ok(start.map(|start| Span { start, end }))
+}
+
+/// Consume a function's argument list up to — but not including — its **matching** `)`,
+/// returning the arguments' outer-trimmed span (`None` when the region held nothing but
+/// whitespace).
+///
+/// Per CSS Syntax 3 §"consume a function" the contents are a component-value list, so a
+/// nested `(…)`/`fn(…)` must not end the list at its first inner `)` — hence the depth
+/// count. Whitespace is trimmed off both ends; a **comment** is not, because it is content
+/// this region re-emits rather than a separator: §4.3.2 `consume comments` returns nothing,
+/// which makes a comment transparent to the *grammar* while it still occupies the text.
+///
+/// Those comments are deliberately left **unregistered** (see
+/// [`CssParser::skip_whitespace_and_comments`], whose doc states the rule): the span
+/// re-emits them verbatim, and registering would additionally offer them to the `@import`
+/// prelude's gap emitters, which print *between* the parsed values — outside this
+/// function, where they would print a second time.
+///
+/// The single definition of how far a prelude function's arguments reach — the `layer()`
+/// arm reads the span, the `<general-enclosed>` arm only needs the seek.
+fn consume_function_args(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
+    let mut start = None;
+    let mut end = 0u32;
+    let mut depth: u32 = 0;
+    while !parser.check(TokenKind::Eof) {
+        match parser.current_kind {
+            TokenKind::RightParen if depth == 0 => break,
+            TokenKind::LeftParen => depth += 1,
+            TokenKind::RightParen => depth -= 1,
+            _ => {}
+        }
+        if !parser.check(TokenKind::Whitespace) {
+            start.get_or_insert_with(|| parser.span_pos(parser.current_start));
+            end = parser.span_pos(parser.current_end);
+        }
+        parser.advance()?;
+    }
+    Ok(start.map(|start| Span { start, end }))
+}
+
 /// Parse a function value (e.g., url(), layer(), supports())
 fn parse_function_value<'arena>(
     parser: &mut CssParser<'_, 'arena>,
@@ -971,7 +1036,20 @@ fn parse_function_value<'arena>(
                 },
             });
             parser.advance()?;
-            parser.skip_whitespace()?;
+            // A comment may TRAIL the quoted argument (CSS Syntax 3 §4.3.2: a comment
+            // yields no token, so it is transparent to the grammar). It is carried as its
+            // own region rather than skipped, which keeps the argument on the structured
+            // string path — and with it the quote normalization (`"a.css"` → `'a.css'`)
+            // that the opaque bare-URL path would have lost. Before this it reached no arm
+            // at all: it fell past the argument into the `)` check below and rejected the
+            // whole stylesheet.
+            //
+            // Only the trailing side needs this. A *leading* comment never arrives here:
+            // `consume_url_token` classifies `url(` as a function-token only when a QUOTE
+            // follows (past whitespace — a comment is not whitespace, css-syntax §4.3.4),
+            // so a leading comment makes the whole thing an opaque `<url-token>` whose
+            // contents this function never sees.
+            args.extend(take_comment_run(parser)?.map(|span| CssValue::Identifier { span }));
         } else {
             // Unquoted bare URL (`url(a.css)`, `url(a.css?x=1)`): an opaque token run
             // up to ')'. Leave args empty — both the public-AST conversion and the
@@ -981,38 +1059,27 @@ fn parse_function_value<'arena>(
             }
         }
     } else if name.eq_ignore_ascii_case("layer") {
-        // layer(name) - parse the layer name as identifier
-        parser.skip_whitespace()?;
-        if parser.check(TokenKind::Identifier) {
-            let arg_start = parser.span_pos(parser.current_start);
-            let arg_end = parser.span_pos(parser.current_end);
-            // Identifier text recovered verbatim from `span` at print time.
-            args.push(CssValue::Identifier {
-                span: Span {
-                    start: arg_start,
-                    end: arg_end,
-                },
-            });
-            parser.advance()?;
-        }
-        parser.skip_whitespace()?;
+        // `layer(<layer-name>)` — css-cascade-5 §layer-names spells the argument
+        // `<ident> [ '.' <ident> ]*`, so the DOTTED form is the primary one and a single
+        // identifier token cannot bound it. Reading one and stopping made every other
+        // spelling a parse ERROR — `layer(a.b)` among them — rejecting the whole stylesheet
+        // where `parseCss` and prettier both accept.
+        //
+        // The argument is therefore one region (`consume_function_args`, which owns the
+        // reach rule), carried as a single `Identifier`. That routes it through
+        // `build_identifier_doc`'s comment-aware `normalize_css_whitespace`, which is where
+        // `layer(  a.b  )` → `layer(a.b)` comes from and which spaces a glued `a./* c */b`
+        // to `a. /* c */ b` — prettier's value-parse answer, so this whole family matches.
+        // A whitespace-only argument (`layer()`) yields `None`, leaving `args` empty and
+        // routing the printer to its verbatim function span, the form this arm already
+        // produced.
+        args.extend(consume_function_args(parser)?.map(|span| CssValue::Identifier { span }));
     } else {
         // Other unknown functions (e.g. `scope((.a) to (.b))`, css-cascade-6 scoped
-        // `@import`) — consume the args opaquely to the MATCHING `)`. Per CSS Syntax 3
-        // §consume-a-function the contents are a component-value list, so a nested
-        // `(…)`/`fn(…)` must not end the arg at its first inner `)`; track paren depth.
-        // Args stay empty — the printer and public-AST conversion reconstruct the
-        // function verbatim from its span.
-        let mut depth: u32 = 0;
-        while !parser.check(TokenKind::Eof) {
-            match parser.current_kind {
-                TokenKind::RightParen if depth == 0 => break,
-                TokenKind::LeftParen => depth += 1,
-                TokenKind::RightParen => depth -= 1,
-                _ => {}
-            }
-            parser.advance()?;
-        }
+        // `@import`) — consume the args opaquely. Args stay empty: the printer and the
+        // public-AST conversion both reconstruct the function verbatim from its span, so
+        // the region's bounds are needed only to find the closing `)`.
+        consume_function_args(parser)?;
     }
 
     if !parser.check(TokenKind::RightParen) {
