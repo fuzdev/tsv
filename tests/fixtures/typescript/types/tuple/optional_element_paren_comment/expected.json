@@ -1,0 +1,1066 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 554,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An optional element's operand needs its parens, so the author's shell and the",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " required pair are the same pair: a leading line comment renders inside that one",
+			"start": 102,
+			"end": 184,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 204,
+			"end": 208,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 3
+				},
+				"end": {
+					"line": 6,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A redundant double shell still collapses to the one pair",
+			"start": 229,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 308,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 3
+				},
+				"end": {
+					"line": 14,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The block spellings of both of the shell's gaps stay inline",
+			"start": 333,
+			"end": 395,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 408,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 12
+				},
+				"end": {
+					"line": 20,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 444,
+			"end": 451,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 18
+				},
+				"end": {
+					"line": 21,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control: with no comment the element prints exactly one pair",
+			"start": 458,
+			"end": 521,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 64
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 553,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 544,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 186,
+					"end": 226,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 191,
+						"end": 192,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 195,
+						"end": 225,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSOptionalType",
+								"start": 199,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 4
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 199,
+									"end": 221,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 3
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 212,
+										"end": 217,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 3
+											},
+											"end": {
+												"line": 7,
+												"column": 8
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 212,
+												"end": 213,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 3
+													},
+													"end": {
+														"line": 7,
+														"column": 4
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 212,
+													"end": 213,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 3
+														},
+														"end": {
+															"line": 7,
+															"column": 4
+														}
+													},
+													"name": "T"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 216,
+												"end": 217,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 7
+													},
+													"end": {
+														"line": 7,
+														"column": 8
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 216,
+													"end": 217,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 7
+														},
+														"end": {
+															"line": 7,
+															"column": 8
+														}
+													},
+													"name": "U"
+												}
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 204,
+												"end": 208
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An optional element's operand needs its parens, so the author's shell and the",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " required pair are the same pair: a leading line comment renders inside that one",
+							"start": 102,
+							"end": 184
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 290,
+					"end": 330,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 295,
+						"end": 296,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 299,
+						"end": 329,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 10
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSOptionalType",
+								"start": 303,
+								"end": 326,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 4
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 303,
+									"end": 325,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 316,
+										"end": 321,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 8
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 316,
+												"end": 317,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 3
+													},
+													"end": {
+														"line": 15,
+														"column": 4
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 316,
+													"end": 317,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 3
+														},
+														"end": {
+															"line": 15,
+															"column": 4
+														}
+													},
+													"name": "T"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 320,
+												"end": 321,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 7
+													},
+													"end": {
+														"line": 15,
+														"column": 8
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 320,
+													"end": 321,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 7
+														},
+														"end": {
+															"line": 15,
+															"column": 8
+														}
+													},
+													"name": "U"
+												}
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 308,
+												"end": 312
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A redundant double shell still collapses to the one pair",
+							"start": 229,
+							"end": 288
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 397,
+					"end": 425,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 29
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 402,
+						"end": 403,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 6
+							},
+							"end": {
+								"line": 20,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 406,
+						"end": 424,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 10
+							},
+							"end": {
+								"line": 20,
+								"column": 28
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSOptionalType",
+								"start": 407,
+								"end": 423,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 27
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 407,
+									"end": 422,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 11
+										},
+										"end": {
+											"line": 20,
+											"column": 26
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 416,
+										"end": 421,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 20
+											},
+											"end": {
+												"line": 20,
+												"column": 25
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 416,
+												"end": 417,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 20
+													},
+													"end": {
+														"line": 20,
+														"column": 21
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 416,
+													"end": 417,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 20
+														},
+														"end": {
+															"line": 20,
+															"column": 21
+														}
+													},
+													"name": "T"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 420,
+												"end": 421,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 24
+													},
+													"end": {
+														"line": 20,
+														"column": 25
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 420,
+													"end": 421,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 24
+														},
+														"end": {
+															"line": 20,
+															"column": 25
+														}
+													},
+													"name": "U"
+												}
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 408,
+												"end": 415
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The block spellings of both of the shell's gaps stay inline",
+							"start": 333,
+							"end": 395
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 427,
+					"end": 455,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 29
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 432,
+						"end": 433,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 436,
+						"end": 454,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 10
+							},
+							"end": {
+								"line": 21,
+								"column": 28
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSOptionalType",
+								"start": 437,
+								"end": 453,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 21,
+										"column": 27
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 437,
+									"end": 452,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 26
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 438,
+										"end": 443,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 12
+											},
+											"end": {
+												"line": 21,
+												"column": 17
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 438,
+												"end": 439,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 12
+													},
+													"end": {
+														"line": 21,
+														"column": 13
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 438,
+													"end": 439,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 12
+														},
+														"end": {
+															"line": 21,
+															"column": 13
+														}
+													},
+													"name": "T"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 442,
+												"end": 443,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 16
+													},
+													"end": {
+														"line": 21,
+														"column": 17
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 442,
+													"end": 443,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 16
+														},
+														"end": {
+															"line": 21,
+															"column": 17
+														}
+													},
+													"name": "U"
+												}
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 444,
+												"end": 451
+											}
+										]
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 523,
+					"end": 543,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 21
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 528,
+						"end": 529,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 6
+							},
+							"end": {
+								"line": 24,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 532,
+						"end": 542,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 10
+							},
+							"end": {
+								"line": 24,
+								"column": 20
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSOptionalType",
+								"start": 533,
+								"end": 541,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 11
+									},
+									"end": {
+										"line": 24,
+										"column": 19
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 533,
+									"end": 540,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 11
+										},
+										"end": {
+											"line": 24,
+											"column": 18
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 534,
+										"end": 539,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 12
+											},
+											"end": {
+												"line": 24,
+												"column": 17
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 534,
+												"end": 535,
+												"loc": {
+													"start": {
+														"line": 24,
+														"column": 12
+													},
+													"end": {
+														"line": 24,
+														"column": 13
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 534,
+													"end": 535,
+													"loc": {
+														"start": {
+															"line": 24,
+															"column": 12
+														},
+														"end": {
+															"line": 24,
+															"column": 13
+														}
+													},
+													"name": "T"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 538,
+												"end": 539,
+												"loc": {
+													"start": {
+														"line": 24,
+														"column": 16
+													},
+													"end": {
+														"line": 24,
+														"column": 17
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 538,
+													"end": 539,
+													"loc": {
+														"start": {
+															"line": 24,
+															"column": 16
+														},
+														"end": {
+															"line": 24,
+															"column": 17
+														}
+													},
+													"name": "U"
+												}
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: with no comment the element prints exactly one pair",
+							"start": 458,
+							"end": 521
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

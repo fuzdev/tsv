@@ -24,5 +24,14 @@ onto the extends-type's line merges it (`B extends C // c1 // c2`): the second
 the same rule for its own run —
 [consecutive_branch_comment](../consecutive_branch_comment/).
 
+Case **I** is the other side of that coin, and the reason the weld bound in
+[extends_paren_line_comment_weld](../extends_paren_line_comment_weld_prettier_divergence/)
+asks a **same-line** question rather than scanning the whole gap. A paren shell's
+relocated run lands on the extends-type's line; an own-line comment in the gap
+keeps its own line and can never share it, so the two coexist and the relocation
+still happens (`unformatted_ours_paren_shell_run.svelte` pins the shell
+authoring). Declining on any line comment anywhere in the gap refused a
+relocation both formatters perform losslessly.
+
 Reason: Comment relocation. See
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
