@@ -1,0 +1,51 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 127,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 41,
+				"name": "import",
+				"prelude": "url('a.css') layer(a.b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 43,
+				"end": 77,
+				"name": "import",
+				"prelude": "url('b.css') layer(a.b.c)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 79,
+				"end": 118,
+				"name": "import",
+				"prelude": "url('c.css') layer(a.b) screen",
+				"block": null
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 7,
+			"end": 119,
+			"styles": "\n\t@import url('a.css') layer(a.b);\n\t@import url('b.css') layer(a.b.c);\n\t@import url('c.css') layer(a.b) screen;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 128,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
