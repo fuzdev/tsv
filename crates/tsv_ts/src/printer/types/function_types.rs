@@ -296,53 +296,41 @@ impl<'a> Printer<'a> {
 
         let paren_search_start = type_parameters.map_or(span_start, |tp| tp.span.end);
 
-        // Comments between type_params and `(` go after type_params
-        if let Some(tp) = type_parameters
-            && let Some(pp) = find_char_skipping_comments(
-                self.source.as_bytes(),
-                tp.span.end as usize,
-                self.source.len(),
-                b'(',
-            )
-        {
-            self.append_type_params_to_paren_comments(parts, tp.span.end, pp as u32);
-        }
-
-        parts.extend(self.build_grouped_params_and_return_type(
+        let d = self.d();
+        let sig_parts = self.build_grouped_params_and_return_type(
             params,
             paren_search_start,
             return_type,
             type_parameters,
-        ));
+        );
+        // Comments between type_params and `(` go after type_params
+        self.append_signature_head_gap_comments(
+            parts,
+            self.type_params_paren_gap(type_parameters),
+            d.empty(),
+            d.concat(&sig_parts),
+        );
     }
 
     /// Build a Doc for a constructor type: `new () => T` or `abstract new <T>() => T`
     pub(super) fn build_constructor_type_doc(&self, c: &TSConstructorType<'_>) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
 
-        if c.abstract_ {
-            // Preserve a comment in the `abstract`→`new` keyword gap
-            // (`abstract /* c */ new`). Prettier relocates it after `new`; per
-            // Comment Position Philosophy we keep it in place (block inline, line
-            // comment floated via `line_suffix` — same treatment as the `new`→`(`
-            // gap below). Without this it was dropped (content loss).
-            let abstract_end = self
-                .find_keyword_in_range(c.span.start, c.return_type.span.start, "abstract")
-                .map_or(c.span.start, |p| p + "abstract".len() as u32);
-            let new_start = self
-                .find_keyword_in_range(abstract_end, c.return_type.span.start, "new")
-                .unwrap_or(abstract_end);
-            parts.push(d.text("abstract"));
-            self.append_type_params_to_paren_comments(&mut parts, abstract_end, new_start);
-            parts.push(d.text(" "));
-        }
+        // Built inside-out: each keyword gap OWNS everything after it, because a `//` in
+        // the gap drops that whole remainder to a continuation line.
+        let mut sig_parts = DocBuf::new();
+        self.append_type_params_and_signature(
+            &mut sig_parts,
+            c.type_parameters.as_ref(),
+            c.params,
+            &c.return_type,
+            c.span.start,
+        );
 
         // Comments between `new` and the type params / `(` (e.g. `new /* c */ ()`).
         // Prettier relocates these (after `)`, before the first param, or — with
         // type params — keeps them in place); per Comment Position Philosophy we
         // preserve the user's position after `new`. Without this they were dropped.
-        parts.push(d.text("new"));
         let new_end = self
             .find_keyword_in_range(c.span.start, c.return_type.span.start, "new")
             .map_or(c.span.start, |p| p + "new".len() as u32);
@@ -359,19 +347,36 @@ impl<'a> Printer<'a> {
                 )
                 .map(|p| p as u32)
             });
-        if let Some(next_start) = next_token_start {
-            self.append_type_params_to_paren_comments(&mut parts, new_end, next_start);
-        }
-        parts.push(d.text(" "));
-
-        self.append_type_params_and_signature(
-            &mut parts,
-            c.type_parameters.as_ref(),
-            c.params,
-            &c.return_type,
-            c.span.start,
+        let mut new_parts: DocBuf = smallvec![d.text("new")];
+        self.append_signature_head_gap_comments(
+            &mut new_parts,
+            next_token_start.map(|next_start| (new_end, next_start)),
+            d.text(" "),
+            d.concat(&sig_parts),
         );
+        let new_doc = d.concat(&new_parts);
 
+        if !c.abstract_ {
+            return d.group(new_doc);
+        }
+
+        // Preserve a comment in the `abstract`→`new` keyword gap (`abstract /* c */ new`).
+        // Prettier relocates it after `new`; per Comment Position Philosophy we keep it in
+        // place, and the whole `new …` tail above is what a `//` here drops to its
+        // continuation line.
+        let abstract_end = self
+            .find_keyword_in_range(c.span.start, c.return_type.span.start, "abstract")
+            .map_or(c.span.start, |p| p + "abstract".len() as u32);
+        let new_start = self
+            .find_keyword_in_range(abstract_end, c.return_type.span.start, "new")
+            .unwrap_or(abstract_end);
+        let mut parts: DocBuf = smallvec![d.text("abstract")];
+        self.append_signature_head_gap_comments(
+            &mut parts,
+            Some((abstract_end, new_start)),
+            d.text(" "),
+            new_doc,
+        );
         d.group(d.concat(&parts))
     }
 

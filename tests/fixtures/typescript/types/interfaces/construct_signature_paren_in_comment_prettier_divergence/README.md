@@ -7,8 +7,11 @@ params the comment lands after the `)` instead: `new /* c */ (): A` becomes
 `new () /* c */ : A`. Line comments move into expanded multiline params.
 
 We preserve the comment between `new` and `(`: `new /* c */ (a: number): A`,
-a line comment staying on the `new` line with the params following
-(`new // c` then `(a: number): A;`) — matching
+a line comment staying on the `new` line with the params dropping to a
+continuation line indented one level (`new // c` then `\t(a: number): A;` —
+[§Uniform Forced-Continuation
+Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent),
+the same indent this gap's constructor-type twin below already took) — matching
 the typed form `new /* c */ <T>(...)`, which both formatters keep in place
 (see `../construct_signature_comment/`). Covers interfaces and type literals,
 including comments containing `(`.
