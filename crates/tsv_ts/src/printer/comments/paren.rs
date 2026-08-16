@@ -6,7 +6,7 @@
 // re-added with the parens when stripping would relocate them, or prepended at a
 // chain base.
 
-use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
+use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank};
 use crate::ast::internal;
 use crate::printer::expressions::operators::SeqLayout;
 use smallvec::smallvec;
@@ -1359,5 +1359,69 @@ impl<'a> Printer<'a> {
             return self.d().concat(&[comments, doc]);
         }
         doc
+    }
+
+    /// The one emitter for a comment the author wrote between a **parenthesized**
+    /// operand and the `)` that closes its shell — `(x + y /* c */)!`,
+    /// `(a?.b // c⏎)!`, `<T>(x /* c */)`.
+    ///
+    /// tsv keeps such a comment INSIDE the parens, where it was written; prettier
+    /// relocates it past the `)` (cataloged as the non-null grouped-operand and
+    /// angle-bracket assertion-operand divergences). Four constructs reach this gap and
+    /// must answer it identically: the standalone non-null whose operand needs its
+    /// parens (`build_non_null_doc`'s needs-parens arm), the chain's parenthesized
+    /// base (`ChainNode::Base`'s `paren_comment_end`), the required-paren positions
+    /// that never enter a chain — a `new` callee and a template tag
+    /// (`build_sealed_non_null_paren_doc`) — and the angle-bracket type assertion,
+    /// whose own span is what ends at the `)` (`build_ts_type_assertion_doc`, which
+    /// calls from each of its two return paths).
+    ///
+    /// `flat_body` and `broken_body` are the same doc at every caller but the chain
+    /// base, which alone has two renderings of its operand — the split is earned there
+    /// and nowhere else.
+    ///
+    /// Returns `None` when the gap holds nothing to emit, leaving the caller to
+    /// render its own bare parens — which is what makes the retention the comment's
+    /// doing: an empty gap still strips a redundant shell.
+    ///
+    /// `broken_body` renders the line-comment layout — a `//` cannot trail inline
+    /// before the `)` (it would swallow it), so the operand goes multiline with the
+    /// comment inside; `flat_body` renders the inline block-comment one. `close` is
+    /// what follows the operand: `")"` where a separate node prints the `!` (or where
+    /// nothing does), `")!"` where this doc owns it.
+    pub(crate) fn build_paren_operand_comment_doc(
+        &self,
+        start: u32,
+        end: u32,
+        flat_body: DocId,
+        broken_body: DocId,
+        close: &'static str,
+    ) -> Option<DocId> {
+        let d = self.d();
+        if self.has_line_comments_between(start, end) {
+            // Every comment in this gap was authored AFTER the operand — there is no
+            // next node for one to lead — so the whole run trails, in authored order,
+            // on the anchored emitter (the layout is vertical: the closer's hardline
+            // below ends every line, and flushes the run's deferred `//`s; a boundary
+            // instead would end the line first, landing a blank before the closer).
+            // A chain-gap classification here is a category error: its `leading_*`
+            // buckets would hoist an own-line comment above the operand.
+            let mut inner = DocBuf::with_capacity(4);
+            inner.push(d.hardline());
+            inner.push(broken_body);
+            self.push_anchored_trailing_run(&mut inner, start, end, RunLeadingBlank::Keep);
+            return Some(d.concat(&[
+                d.text("("),
+                d.indent(d.concat(&inner)),
+                d.hardline(),
+                d.text(close),
+            ]));
+        }
+        if self.has_comments_to_emit_between(start, end) {
+            let trailing =
+                self.build_chain_block_comments_doc(start, end, CommentSpacing::Leading, false);
+            return Some(d.concat(&[d.text("("), flat_body, trailing, d.text(close)]));
+        }
+        None
     }
 }

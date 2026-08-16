@@ -231,7 +231,7 @@ fn linearize_recursive<'a>(
             // - a `//` in the operand→`!` gap (`(aaa // c⏎)!.bbb`), which can only come
             //   from a grouping shell — written bare, the `//` would swallow the `!`
             //   (`[no LineTerminator here]`). The shell is RETAINED for the comment's
-            //   sake, emitted inside the parens (`build_non_null_paren_operand_doc`'s
+            //   sake, emitted inside the parens (`build_paren_operand_comment_doc`'s
             //   line-comment layout), the same answer the standalone non-null gives
             //   this gap. Flattening instead hands the region to `NonNullGap::Bang`,
             //   whose emitter is block-only — the `//` would be dropped, with nothing
