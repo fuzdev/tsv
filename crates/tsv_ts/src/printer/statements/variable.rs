@@ -47,8 +47,14 @@ impl<'a> Printer<'a> {
     ///
     /// The paren decision carries the for-header rule via `self.in_for_init`: a
     /// statement-level `const x = b in c` lexically under a for-header init (e.g. in a
-    /// nested function body) parenthesizes the `in` like every other position there.
-    /// (A for-header's *own* declarator is built in `build_for_init_doc`, not here.)
+    /// nested function body) parenthesizes the `in` like every other position there —
+    /// this path's shell builder is the `StatementTerminator` tail, whose `wrap_in` is a
+    /// no-op, so the caller is the only one who can supply that pair.
+    ///
+    /// ⚠️ A for-header's *own* declarator is built in `build_for_init_doc` and passes
+    /// `false` for the same argument, deliberately: its `ForClauseSeparator` tail DOES
+    /// apply `wrap_in`, so reading the flag there would spell one wrap twice. The
+    /// asymmetry is the point — don't "fix" it into agreement.
     ///
     /// `frozen` is the value-head freeze this position resolved (`=`→initializer, per
     /// [`Printer::value_head_frozen_span`]): the whole initializer prints verbatim, with
@@ -70,13 +76,7 @@ impl<'a> Printer<'a> {
             needs_parens(init, ParenContext::VariableInit, self.in_for_init.get());
         let inner =
             self.build_expression_doc_with_paren_comments(init, boundary_end, position_parens);
-        if position_parens
-            && !self.shell_value_keeps_own_parens(init, boundary_end, position_parens)
-        {
-            self.d().parens(inner)
-        } else {
-            inner
-        }
+        self.wrap_value_position_parens(init, boundary_end, position_parens, inner)
     }
 
     /// Build a doc for a variable binding pattern with optional definite assignment assertion.

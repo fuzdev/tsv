@@ -7,6 +7,7 @@ use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
     CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer, RunLeadingBlank,
+    needs_parens,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -1143,7 +1144,7 @@ impl<'a> Printer<'a> {
         self.append_for_in_of_block_comments(&mut parts, spans.keyword_end, spans.right_start);
         parts.push(d.text(" "));
 
-        parts.push(self.build_expression_doc(right));
+        parts.push(self.build_for_in_of_right_doc(right));
 
         // Comments after right, before close paren — the `)` follows with no separator
         if let Some(close) = spans.close_paren {
@@ -1156,6 +1157,22 @@ impl<'a> Printer<'a> {
         // Group so a non-block body's `adjustClause` line breaks on overflow
         // (matches Prettier's `printForXStatement`).
         d.group(d.concat(&parts))
+    }
+
+    /// The for-in/for-of iterable's doc, carrying the clarity parens its value position
+    /// takes (`for (const x of (y = z))` — see [`ParenContext::ForInOfRight`]).
+    ///
+    /// One seam for both header layouts (inline + line-comment), so an iterable cannot be
+    /// parenthesized in one and bare in the other — the same reason a ternary's two
+    /// layouts share `parenthesize_ternary_branch`. Both used to spell a bare
+    /// `build_expression_doc` here, which is why the pair was missing from both.
+    fn build_for_in_of_right_doc(&self, right: &Expression<'_>) -> DocId {
+        let doc = self.build_expression_doc(right);
+        if needs_parens(right, ParenContext::ForInOfRight, self.in_for_init.get()) {
+            self.d().parens(doc)
+        } else {
+            doc
+        }
     }
 
     /// Resolve the for-in/for-of header's source positions into a `ForInOfSpans`,
@@ -1340,7 +1357,7 @@ impl<'a> Printer<'a> {
 
         // Right side (items)
         keyword_parts.push(d.hardline());
-        keyword_parts.push(self.build_expression_doc(right));
+        keyword_parts.push(self.build_for_in_of_right_doc(right));
 
         // Comments after the iterable, before the `)` — the same run rule.
         if let Some(close) = spans.close_paren {
@@ -1744,8 +1761,36 @@ impl<'a> Printer<'a> {
                         // stops the branches drifting: them each spelling out a bare
                         // `build_expression_doc` is exactly how that gap came to have no
                         // emitter, dropping every comment written in it.
-                        let build_value =
-                            || self.build_for_init_value_doc(init, declarator.span.end);
+                        //
+                        // A header declarator is a declarator: its initializer takes the same
+                        // `ParenContext::VariableInit` pair the statement-level one does
+                        // (`build_init_value_doc`), and skipping it here dropped an
+                        // assignment's clarity parens outright (`for (let i = (a = b); ;)` →
+                        // `let i = a = b`). Prettier's `for` exemption is for the init
+                        // **clause's own expression** (`for (a = b = c; ;)`, handled by the
+                        // Expression arm below), not for a value one binding deeper.
+                        //
+                        // ⚠️ The ambient `[~In]` argument is `false` HERE and only here: the
+                        // header's `in` parens are the shell builder's to place (they must
+                        // land inside the shell's trailing comment, not around it —
+                        // `build_shell_value_doc`), so reading `self.in_for_init` would
+                        // spell that one wrap twice and double the pair
+                        // (`for (let k = (a in b); ;)` → `((a in b))`). This flag answers
+                        // only "does the declarator POSITION parenthesize its value?".
+                        let position_parens = needs_parens(init, ParenContext::VariableInit, false);
+                        let build_value = || {
+                            let inner = self.build_for_init_value_doc(
+                                init,
+                                declarator.span.end,
+                                position_parens,
+                            );
+                            self.wrap_value_position_parens(
+                                init,
+                                declarator.span.end,
+                                position_parens,
+                                inner,
+                            )
+                        };
                         // An init declarator's `=` is a value gap, exactly as the
                         // statement-level one is (`build_variable_declaration_doc`): an
                         // own-line JSDoc cast hangs after the `=` rather than printing its

@@ -2,7 +2,19 @@
 
 A redundant paren shell around a **value** whose trailing gap holds a block comment
 (`const a = (x /* t */);`), at every `;`-terminated value position: a declarator
-initializer, an assignment RHS, a compound assignment, and a `return` argument.
+initializer, an assignment RHS, a compound assignment, a `return` argument, a `throw`
+argument, and `export default`.
+
+The `throw` and `export default` cells state the boundary of the one carve-out: a comment
+stays *inline before the `;`* only when a `)` the OUTPUT prints still encloses it. That is
+true of a `return` argument's retained parens
+([operand_paren_assignment_comment](../../../statements/return_throw/operand_paren_assignment_comment/))
+and false of the clarity pair a `throw` operand or an `export default` value takes — those
+close at the expression, leaving the gap outside them. Keying the carve-out on the *source*
+shell's `)` instead cost both positions their one-pass answer (pass 1 held the comment at
+`throw (c = d) /* t */;` / `export default (e = f) /* t */;`), which is exactly the
+fixed-point failure `split_terminator_gap_comments` warns of — and at `throw` it left the
+statement with **two** fixed points, one per authoring, which F1 cannot see.
 
 **tsv**: strips the shell and defers the trailing block past the statement `;` (via
 `line_suffix`) — the declarator's own value-to-`;` trailing-comment handling — reaching

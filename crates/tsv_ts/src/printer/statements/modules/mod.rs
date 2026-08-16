@@ -20,6 +20,7 @@ pub(super) use super::{Printer, build_entity_name_doc};
 use crate::ast::internal;
 use crate::printer::calls::PartitionedComments;
 use crate::printer::needs_parens::export_default_needs_parens;
+use crate::printer::{ParenContext, needs_parens};
 use smallvec::SmallVec;
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -52,7 +53,18 @@ impl<'a> Printer<'a> {
             &["export", "="],
             decl.span.start,
             value_span.start,
-            |keyword_end| self.build_value_head_doc(keyword_end, &decl.expression),
+            |keyword_end| {
+                let value = self.build_value_head_doc(keyword_end, &decl.expression);
+                // An assignment as the exported value takes clarity parens, the same
+                // answer every other value position gives (`ParenContext::ExportAssignment`).
+                // Inside the freeze closure so a frozen value keeps the position's pair,
+                // exactly as `export default` does.
+                if needs_parens(&decl.expression, ParenContext::ExportAssignment, false) {
+                    d.parens(value)
+                } else {
+                    value
+                }
+            },
         );
         let argument_end = value_span.end;
         let has_trailing_comments = self.has_comments_to_emit_between(argument_end, decl.span.end);
@@ -404,8 +416,7 @@ impl<'a> Printer<'a> {
                 // (parentheses/needs-parentheses.js). Decorated class expressions are
                 // handled by the decorated forms; the FunctionDeclaration/ClassDeclaration
                 // arms cover bare `export default function/class …`.
-                let operand_parens_printed = export_default_needs_parens(expr);
-                if operand_parens_printed {
+                if export_default_needs_parens(expr) {
                     expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
                 }
                 let argument_end = value_span.end;
@@ -413,12 +424,21 @@ impl<'a> Printer<'a> {
                     return d.concat(&[expr_doc, d.text(";")]);
                 }
                 let mut parts = smallvec![expr_doc];
+                // `operand_parens_printed: false` — this position's pair closes at the
+                // EXPRESSION's end, so it never encloses the terminator gap: a comment
+                // written inside the author's shell (`export default (x /* c */);`) is
+                // outside the `)` this printer emits. Passing the wrap flag read the
+                // SOURCE shell's `)` instead, which is the fixed-point failure that
+                // helper's doc names — pass 1 held the comment before the `;`
+                // (`(function () {}) /* c */;`), pass 2 saw no shell and moved it past.
+                // A `return`/`throw` argument passes `true` because ITS retained parens
+                // are built around the comment.
                 let after = self.split_terminator_gap_comments(
                     &mut parts,
                     argument_end,
                     decl.span.end,
                     false,
-                    operand_parens_printed,
+                    false,
                 );
                 parts.push(d.text(";"));
                 parts.extend(after);
