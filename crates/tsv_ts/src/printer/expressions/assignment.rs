@@ -1409,9 +1409,22 @@ impl<'a> Printer<'a> {
                 // chain still breaks internally and the layout answer is the same —
                 // keep the RHS on the operator line rather than also breaking after
                 // `=` (`const a = obj[ // force⏎…`).
+                //
+                // ⚠️ A **frozen** gap is the one exception, and for the reason the rule
+                // is stated on: there is no chain to break. The `//` there is the
+                // format-ignore directive itself, and what follows is a verbatim slice
+                // the chain formatter never lays out — so the `=` owes it nothing, and
+                // the RHS takes the same layout its unfrozen twin takes. Reading the
+                // directive as a chain break instead pinned the RHS to the `=` line
+                // where the identical unfrozen source hangs it
+                // (`const a = /* line1⏎line2 */ obj⏎// prettier-ignore⏎.prop`), a
+                // divergence only an owned multi-line comment ahead of the base makes
+                // visible — see `build_frozen_opaque_node_doc`.
                 let obj_end = member.object.span().end;
                 let prop_start = member.property.span().start;
-                if self.has_line_comments_between(obj_end, prop_start) {
+                if !self.member_gap_frozen(obj_end, prop_start)
+                    && self.has_line_comments_between(obj_end, prop_start)
+                {
                     return true;
                 }
                 self.has_line_comments_in_chain(member.object)

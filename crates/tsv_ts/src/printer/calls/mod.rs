@@ -214,7 +214,7 @@ impl<'a> Printer<'a> {
         // etc.) that the chain formatter would otherwise reformat. Mirrors
         // prettier's `hasPrettierIgnore` → verbatim-print behavior.
         if self.member_gap_frozen(member.object.span().end, member.property.span().start) {
-            return self.raw_source_doc(member.span);
+            return self.build_frozen_opaque_node_doc(member.span);
         }
 
         // Use chain-based implementation

@@ -28,6 +28,12 @@ use tsv_ts::Expression;
 /// every position in it outside the key parens is a parse error in canonical Svelte, so
 /// closing the range here drops nothing. Shared by the standard and whitespace-sensitive
 /// each builders so the two can't drift.
+///
+/// An `{#each}` context is always written in its own head, so the narrowing needs no ceiling.
+/// Its `{#await}` twin `await_expr_comment_end` does — the head there can fold in a binding the
+/// author wrote past the body — and both answer the one question this seam asks: how far into
+/// the head does the expression's comment range reach, without spanning text someone else
+/// prints.
 pub(super) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
     match &block.context {
         Some(context) => context.span().start,

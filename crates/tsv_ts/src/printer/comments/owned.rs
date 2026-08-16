@@ -284,17 +284,29 @@ impl<'a> Printer<'a> {
     ///   destructuring default's object-pattern left for the no-expand-on-nesting rule; the
     ///   pattern's `{` is that left's first token, and the `AssignmentPattern` above it hands
     ///   the claim *down* (`left_spine_child`), so nothing else catches it.
-    /// - [`Self::build_frozen_node_doc`] (`ignore.rs`) prints a verbatim span; the frozen
-    ///   span's start *is* the node's first printed byte by construction.
+    /// - [`Self::build_frozen_node_doc`] and its layout-opaque sibling
+    ///   [`Self::build_frozen_opaque_node_doc`] (`ignore.rs`) print a verbatim span; the frozen
+    ///   span's start *is* the node's first printed byte by construction. The two differ only
+    ///   in whether the slice's multi-line-ness reaches the container, never in the claim —
+    ///   which is why the second exists rather than the member-expression freeze open-coding a
+    ///   bare slice, as it did until a glued block ahead of a frozen chain base was found
+    ///   dropped at six distinct gap positions.
     /// - `build_directive_doc` (`statements/mod.rs`) prints a directive from the literal's
     ///   own source bytes (`format_directive`, an exact code-unit sequence); a directive is a
     ///   bare string literal by grammar, so that span start is the statement's first printed
     ///   byte.
+    /// - `build_test_callee_flat_doc` (`calls/test_patterns.rs`) reassembles a test call's
+    ///   callee from its dotted parts (`test.describe.only`) for the break-free flat layout;
+    ///   the chain's leftmost name is the callee's first token, and the general callee path
+    ///   that would have claimed it is exactly what this arm replaces.
     ///
     /// Prefer collapsing a reassembly path onto `build_expression_doc` over adding another
-    /// caller, and prefer wrapping the claim in a named builder (as `build_frozen_node_doc`
-    /// does) over open-coding it — the call count has gone 2 → 3 → 4 → 6, each time out of
-    /// step with whatever prose enumerated it.
+    /// caller, and prefer wrapping the claim in a named builder (as the two frozen builders
+    /// do) over open-coding it. ⚠️ **Keep the list above whole and count-free** — it has been
+    /// wrong at nearly every size it has been, because a running total is the one part of it
+    /// no compiler checks, and each new caller arrived alongside prose still describing the
+    /// last one. `grep prepend_owned_leading_comment_at` is the authority; a bullet here is a
+    /// per-caller *argument*, and a caller with no bullet is a claim nobody has justified.
     pub(crate) fn prepend_owned_leading_comment_at(&self, start: u32, doc: DocId) -> DocId {
         // Document-level short-circuit (also covers the arrow-reassembly callers, which
         // reach here without going through `prepend_owned_leading_comment`).

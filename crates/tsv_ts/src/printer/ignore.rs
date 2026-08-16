@@ -746,6 +746,32 @@ impl<'a> Printer<'a> {
         self.prepend_owned_leading_comment_at(frozen.start, self.build_frozen_span_doc(frozen))
     }
 
+    /// [`Self::build_frozen_node_doc`] minus the must-break — the claim, over a slice whose
+    /// multi-line-ness is deliberately kept **opaque** to its container.
+    ///
+    /// The two differ by exactly that signal, and the difference is a real rule rather than an
+    /// oversight: a frozen MEMBER EXPRESSION is layout-opaque on purpose, so every container
+    /// around it keeps its own tight layout (`f1(fn(2.0000)⏎// prettier-ignore⏎.c)` stays
+    /// hugged, the ternary stays inline), which is what
+    /// `typescript/expressions/member/prettier_ignore_containers` pins. Handing this site the
+    /// must-break variant tears each of those containers open.
+    ///
+    /// The claim itself is not optional either way: the slice starts at the member's own first
+    /// byte, so a block comment **glued** ahead of the chain base — owned by it, skipped by
+    /// every gap emitter — sits outside the slice and nothing else prints it
+    /// (`docs/comments.md` hazard 1, the replacement shape). Widening the slice is not the
+    /// alternative: the comment would then be frozen text and stop reindenting with its
+    /// context. Pinned by `typescript/expressions/member/prettier_ignore_base_comment`, and by
+    /// the Svelte attribute spelling `svelte/syntax/prettier_ignore/attr_expression`, whose
+    /// `={`→base gap is the same position one host out.
+    #[inline]
+    pub(in crate::printer) fn build_frozen_opaque_node_doc(&self, frozen: Span) -> DocId {
+        self.prepend_owned_leading_comment_at(
+            frozen.start,
+            self.raw_source_range(frozen.start, frozen.end),
+        )
+    }
+
     /// The frozen verbatim slice for a value in a paren-context position, with the clarity
     /// parens that context supplies re-synthesized around it: an assignment prints as
     /// `fn((a = b))` as an argument and as `if ((a = b))` as a condition, and those parens
