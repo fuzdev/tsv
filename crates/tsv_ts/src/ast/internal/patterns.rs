@@ -32,22 +32,6 @@ pub struct ObjectPattern<'arena> {
     pub span: Span,
 }
 
-impl ObjectPattern<'_> {
-    /// Where the `{…}` body ENDS — the closing brace, or the start of a `: T` annotation
-    /// the pattern's span swallowed.
-    ///
-    /// The bound every comment scan over the pattern takes, and the link is load-bearing:
-    /// the annotation prints its own comments, so a range run to `span.end` claims one the
-    /// annotation's doc also prints. A `?` is inside the body either way (it precedes the
-    /// annotation and rides inside `span`), which is the pre-existing reading — no comment
-    /// can sit between the `}` and it that the brace scan doesn't already own.
-    pub fn body_end(&self) -> u32 {
-        self.type_annotation
-            .as_ref()
-            .map_or(self.span.end, |t| t.span.start)
-    }
-}
-
 /// Object pattern property - either a regular property or a rest element
 #[derive(Debug, Clone)]
 pub enum ObjectPatternProperty<'arena> {
@@ -108,16 +92,6 @@ pub struct ArrayPattern<'arena> {
     /// emitted last in the wire, matching acorn.
     pub decorators: Option<&'arena [Decorator<'arena>]>,
     pub span: Span,
-}
-
-impl ArrayPattern<'_> {
-    /// Where the `[…]` body ENDS — the object pattern's [`ObjectPattern::body_end`] in its
-    /// bracket spelling, and load-bearing for the same reason.
-    pub fn body_end(&self) -> u32 {
-        self.type_annotation
-            .as_ref()
-            .map_or(self.span.end, |t| t.span.start)
-    }
 }
 
 /// Assignment pattern for default values in destructuring: `a = 1`
