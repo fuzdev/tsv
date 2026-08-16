@@ -19,14 +19,15 @@ use crate::printer::calls::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body,
 };
 use crate::printer::calls::{
-    ArgItem, ArgsJoin, PartitionedComments, build_args_joined_with_comments, build_args_split_last,
-    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
-    build_call_args_expanded, build_expand_all_args, build_inline_args,
-    build_inline_hug_or_expand_all, build_inline_or_expand_all, build_printed_argument_doc,
-    could_expand_arrow_chain, has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, last_two_args_same_type, prebuild_expand_last_break_body,
-    prepend_arrow_body_comments, should_force_expansion_for_comments,
-    wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
+    ArgItem, ArgsJoin, PartitionedComments, arrow_body_tail_has_comments,
+    build_args_joined_with_comments, build_args_split_last, build_arrow_call_body_states,
+    build_arrow_sig_doc, build_break_body_state, build_call_args_expanded, build_expand_all_args,
+    build_inline_args, build_inline_hug_or_expand_all, build_inline_or_expand_all,
+    build_printed_argument_doc, could_expand_arrow_chain, has_inter_argument_comments_slice,
+    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
+    prebuild_expand_last_break_body, prepend_arrow_body_comments,
+    should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
+    wrap_call_with_will_break_guard,
 };
 use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
 use crate::printer::{
@@ -301,7 +302,13 @@ impl<'a> Printer<'a> {
                         // the shared refusal, see `arrow_signature_has_breaking_comments`.
                         let signature_forces_break =
                             new_has_comments && arrow_signature_has_breaking_comments(self, arrow);
-                        if is_ternary_arrow_body(body_expr) && !signature_forces_break {
+                        // …and a comment on the body's own tail refuses it too: these
+                        // states reassemble the argument from a signature and a body doc
+                        // (`arrow_body_tail_has_comments`).
+                        if is_ternary_arrow_body(body_expr)
+                            && !signature_forces_break
+                            && !arrow_body_tail_has_comments(self, arrow, body_expr)
+                        {
                             let sig_doc = build_arrow_sig_doc(self, arrow);
                             let body_doc = self.build_expression_doc(body_expr);
                             let body_doc = prepend_arrow_body_comments(
@@ -357,7 +364,10 @@ impl<'a> Printer<'a> {
                         // Simple call body: 2-state break at =>
                         // couldExpandArg keys on the body type, looking through the
                         // return-type annotation and a trailing non-null `!`.
-                        if arrow_body_is_call_through_non_null(body_expr) && !signature_forces_break
+                        if arrow_body_is_call_through_non_null(body_expr)
+                            && !signature_forces_break
+                            // Same body-tail refusal as the ternary arm above.
+                            && !arrow_body_tail_has_comments(self, arrow, body_expr)
                         {
                             // Build the body ONCE (see `build_arrow_call_body_states`) — a
                             // separate whole-arrow doc re-built this body and recursed → O(2^depth).
@@ -682,6 +692,8 @@ impl<'a> Printer<'a> {
                         // The multi-argument twin of the single-argument refusal above —
                         // see `arrow_signature_has_breaking_comments`.
                         && !(new_has_comments && arrow_signature_has_breaking_comments(self, arrow))
+                        // …and its body-tail twin, for the same reassembly reason.
+                        && !arrow_body_tail_has_comments(self, arrow, body_expr)
                     {
                         let sig_doc = build_arrow_sig_doc(self, arrow);
                         // Reuse the pre-built call body (see above); conditional bodies build fresh.

@@ -17,10 +17,10 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_split_last,
-    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
-    build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_expand_all_args, build_expand_first_arg_doc, build_inline_args,
+    ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, arrow_body_tail_has_comments,
+    build_args_split_last, build_arrow_call_body_states, build_arrow_sig_doc,
+    build_break_body_state, build_call_args_expanded, build_call_args_with_blank_lines,
+    build_empty_args_doc, build_expand_all_args, build_expand_first_arg_doc, build_inline_args,
     build_inline_hug_or_expand_all, build_inline_or_expand_all, build_own_line_post_arrow_state,
     build_printed_argument_doc, could_expand_arrow_chain, first_arg_signature_refuses_expand_first,
     last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
@@ -510,6 +510,27 @@ pub(super) fn build_call_doc_with_wrapping(
     wrap_call_with_will_break_guard(d, callee, arg_parts)
 }
 
+/// Close the lone argument's `argument`→`)` gap.
+///
+/// Every branch of [`try_single_arg_comment_paths`] opens a gap *before* the argument, and
+/// each one owes the gap *after* it — the branches are chosen on what leads the argument,
+/// but they all print the whole `(…)`. `has_own_line_trailing_comment` has already routed
+/// every own-line comment in this gap to the general path, so what reaches here is
+/// same-line blocks, which stay on the argument's line.
+///
+/// One emitter because a branch that forgot it printed the gap it opened and dropped the
+/// one it closed (`f(⏎// c⏎a /* t */)` → `f(⏎// c⏎a)`).
+fn push_lone_arg_trailing_comments(
+    printer: &Printer<'_>,
+    parts: &mut DocBuf,
+    arg_end: u32,
+    paren_close: u32,
+) {
+    if let Some(trailing) = printer.build_inline_comments_between_doc_opt(arg_end, paren_close) {
+        parts.push(trailing);
+    }
+}
+
 /// Single-argument comment paths: leading line comments (multi-line expansion)
 /// and inline block comments before the lone argument. Returns `None` when the
 /// argument has no such comments — or has own-line trailing comments, which
@@ -589,6 +610,7 @@ fn try_single_arg_comment_paths(
         // An own-line directive in the gap freezes the argument verbatim (Rule A);
         // this branch already keeps such a comment on its own line.
         inner.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0));
+        push_lone_arg_trailing_comments(printer, &mut inner, arg_end, paren_close);
 
         return Some(d.concat(&[
             callee,
@@ -624,11 +646,7 @@ fn try_single_arg_comment_paths(
             let mut parts: DocBuf = DocBuf::new();
             printer.push_leading_run_with_soft_line(&mut parts, &run);
             parts.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0));
-            if let Some(trailing) =
-                printer.build_inline_comments_between_doc_opt(arg_end, paren_close)
-            {
-                parts.push(trailing);
-            }
+            push_lone_arg_trailing_comments(printer, &mut parts, arg_end, paren_close);
             return Some(wrap_call_with_soft_breaks(d, callee, d.concat(&parts)));
         }
         let inline_comments = printer.build_rhs_comments_glued_opt(paren_open, arg_start);
@@ -639,17 +657,14 @@ fn try_single_arg_comment_paths(
         // (a line comment routes to the branch above).
         let arg_doc = ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0);
 
-        // Build comment + arg, including any trailing comments after the arg
-        // Note: build_rhs_comments_opt already adds trailing space after each comment
+        // Leading run, argument, trailing run — `build_rhs_comments_glued_opt` already
+        // adds the trailing space after each comment it emits.
         let mut parts: DocBuf = DocBuf::new();
         if let Some(inline) = inline_comments {
             parts.push(inline);
         }
         parts.push(arg_doc);
-        if let Some(trailing) = printer.build_inline_comments_between_doc_opt(arg_end, paren_close)
-        {
-            parts.push(trailing);
-        }
+        push_lone_arg_trailing_comments(printer, &mut parts, arg_end, paren_close);
         let arg_with_comment = d.concat(&parts);
 
         // Soft-break wrapping so the outer call can expand when content exceeds print
@@ -799,8 +814,13 @@ fn try_single_arg_hug(
                 // (`(x): T => …`) are eligible too.
                 // Same signature-break refusal as the two arms above — a hug this
                 // conditional-group cannot honor (`arrow_signature_has_breaking_comments`).
+                // …and the same body-tail refusal: every state below reassembles the
+                // argument from a signature and a body doc, synthesizing its own parens
+                // around the ternary, so a comment on the body's tail reaches no emitter
+                // (`arrow_body_tail_has_comments`).
                 if is_ternary_arrow_body(body_expr)
                     && !arrow_signature_has_breaking_comments(printer, arrow)
+                    && !arrow_body_tail_has_comments(printer, arrow, body_expr)
                 {
                     return Some(build_ternary_arrow_hug_states(
                         printer, callee, arrow, body_expr,
@@ -827,6 +847,9 @@ fn try_single_arg_hug(
                 // does the object/array one above — see
                 // `arrow_signature_has_breaking_comments`.
                 && !arrow_signature_has_breaking_comments(printer, arrow)
+                // …and so does a comment on the body's own tail, which the states this
+                // builds reassemble past (`arrow_body_tail_has_comments`).
+                && !arrow_body_tail_has_comments(printer, arrow, body_expr)
             {
                 // Build the body ONCE and compose both hug/wrap states from it; building
                 // the whole arrow separately for the flat state re-built this same body
@@ -1124,6 +1147,9 @@ fn try_expand_last_function_arg(
             // A break forced inside the signature invalidates the hug at every one of these
             // states, single- or multi-argument — see `arrow_signature_has_breaking_comments`.
             && !arrow_signature_has_breaking_comments(printer, arrow)
+            // …and so does a comment on the body's own tail — the break-body state
+            // reassembles past it (`arrow_body_tail_has_comments`).
+            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
             // Reuse the pre-built call body (see above); conditional bodies build fresh.
@@ -1163,6 +1189,9 @@ fn try_expand_last_function_arg(
                     | internal::Expression::ArrayExpression(_)
             )
             && !arrow_signature_has_breaking_comments(printer, arrow)
+            // …and the body-tail gap, here the grammar-required parens the hug state
+            // synthesizes around an object body (`arrow_body_tail_has_comments`).
+            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
             // Reuse the pre-built object/array body (see above).

@@ -37,9 +37,9 @@ pub(crate) use arg_comments::{
     should_force_expansion_for_comments, skip_stripped_open_paren,
 };
 pub(crate) use arg_wrapping::{
-    ArgItem, ArgsJoin, build_args_joined_with_comments, build_args_split_last,
-    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
-    build_call_args_expanded, build_expand_all_args, build_inline_args,
+    ArgItem, ArgsJoin, arrow_body_tail_has_comments, build_args_joined_with_comments,
+    build_args_split_last, build_arrow_call_body_states, build_arrow_sig_doc,
+    build_break_body_state, build_call_args_expanded, build_expand_all_args, build_inline_args,
     build_inline_hug_or_expand_all, build_inline_or_expand_all, build_printed_argument_doc,
     could_expand_arrow_chain, last_two_args_same_type, prebuild_expand_last_break_body,
     prepend_arrow_body_comments, wrap_call_with_hard_breaks_paren_line,

@@ -15,11 +15,11 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    ArgItem, ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
-    build_chain_expand_all_args, build_own_line_post_arrow_state, build_printed_argument_doc,
-    classify_chain_arg, first_arg_signature_refuses_expand_first,
-    last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
-    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    ArgItem, ChainArgKind, arrow_body_tail_has_comments, build_args_split_last,
+    build_arrow_sig_doc, build_break_body_state, build_chain_expand_all_args,
+    build_own_line_post_arrow_state, build_printed_argument_doc, classify_chain_arg,
+    first_arg_signature_refuses_expand_first, last_arg_has_own_line_post_arrow_comment,
+    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
@@ -156,24 +156,10 @@ pub(super) fn build_call_args_doc_for_chain(
     build_call_args_doc_for_chain_impl(printer, call, optional, false, false)
 }
 
-/// Check if a single argument is an arrow function with a breakable body
-/// (call expression or ternary).
-///
-/// These patterns use the arrow-hugging layout `(sig =>\n body,\n)` even when
-/// the chain forces expansion, matching prettier's behavior.
-/// Array bodies are excluded — they use the self-expanding layout `(sig => [\n items\n])`.
-fn is_single_arrow_with_breakable_body(arg: &Expression<'_>) -> bool {
-    if let Expression::ArrowFunctionExpression(arrow) = arg
-        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-    {
-        return arrow_body_is_call_through_non_null(body_expr) || is_ternary_arrow_body(body_expr);
-    }
-    false
-}
-
-/// A lone arrow argument with an EXPRESSION body — the shape the two
-/// expandable-literal hug arms in [`build_chain_args_force_expand`] share, before
-/// either asks its own body kind.
+/// A lone arrow argument with an EXPRESSION body — the shape every hug arm in
+/// [`build_chain_args_force_expand`] shares, before each asks its own body kind
+/// (an expandable literal, or the breakable call / ternary that takes the
+/// `(sig =>\n body,\n)` layout even when the chain forces expansion).
 fn single_arrow_expression_body<'a>(
     call: &'a internal::CallExpression<'a>,
 ) -> Option<(
@@ -190,26 +176,6 @@ fn single_arrow_expression_body<'a>(
         internal::ArrowFunctionBody::Expression(body) => Some((arrow, body)),
         internal::ArrowFunctionBody::BlockStatement(_) => None,
     }
-}
-
-/// Whether a comment sits in the arrow's body-end→arrow-end gap — an
-/// author-parenthesized body's stripped `)` region, or (for an object body) the
-/// grammar-required parens this layout synthesizes.
-///
-/// The hug arms reassemble the argument from its signature and body docs, so they
-/// are blind to that gap: a comment there reaches no emitter and the arm must
-/// decline, leaving the generic loop to print the argument through the
-/// comment-aware path — which is also prettier's settled form for the commented
-/// shape. **On page**, not to-emit: an owned comment still rides that region.
-///
-/// Asked last in each arm's guard, after the body kind, so an arrow heading for
-/// another arm pays no comment lookup.
-fn arrow_body_tail_has_comments(
-    printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
-    body_expr: &Expression<'_>,
-) -> bool {
-    printer.has_comments_on_page_between(body_expr.span().end, call.arguments[0].span().end)
 }
 
 /// The hugged-arrow layout both expandable-literal arms emit: `(sig => <body>)`,
@@ -521,11 +487,11 @@ fn build_chain_args_force_expand(
         }
     }
 
-    // Special case: single arrow arg with an expandable LITERAL body — the body expands
-    // internally and the signature hugs the call paren (prettier's couldExpandArg), so
-    // fits() measures only `chain.map((sig) => [` / `=> ({` and truncates at the body's
-    // first hardline.
-    // Skip when comments_force_expansion — this layout has no line to put a comment that
+    // Special case: a single arrow arg the signature can hug to the call paren (prettier's
+    // couldExpandArg) — three body kinds, each with its own layout below. For the two
+    // expandable LITERAL bodies fits() measures only `chain.map((sig) => [` / `=> ({` and
+    // truncates at the body's first hardline; the breakable ones break after `=>` instead.
+    // Skip when comments_force_expansion — these layouts have no line to put a comment that
     // must own one on, and the `(`-line channel `leading_comment_doc` cannot carry has no
     // home here either.
     // Skip on a commented last argument — see `last_arg_commented` above.
@@ -536,7 +502,7 @@ fn build_chain_args_force_expand(
         // ARRAY body: `(sig => [\n  items,\n])` — array content on new lines, bracket
         // hugged.
         if matches!(body_expr, Expression::ArrayExpression(_))
-            && !arrow_body_tail_has_comments(printer, call, body_expr)
+            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
         {
             let body_doc = printer.build_arg_expression_doc_expanded(body_expr);
             return build_hugged_arrow_arg_doc(printer, parts, ctx, arrow, body_expr, body_doc);
@@ -550,36 +516,26 @@ fn build_chain_args_force_expand(
         if matches!(body_expr, Expression::ObjectExpression(_))
             && !standard_expansion
             && !arrow_signature_has_breaking_comments(printer, arrow)
-            && !arrow_body_tail_has_comments(printer, call, body_expr)
+            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
         {
             let body_doc = d.parens(printer.build_arg_expression_doc_expanded(body_expr));
             return build_hugged_arrow_arg_doc(printer, parts, ctx, arrow, body_expr, body_doc);
         }
-    }
 
-    // Special case: single arrow arg with breakable body (call, ternary).
-    // Use the arrow-hugging break state directly: `(sig =>\n  body,\n)`
-    // This matches prettier which keeps the signature hugged even when forcing expansion.
-    // couldExpandArg keys on the body type (looking through the return-type annotation),
-    // so typed-return arrows hug too.
-    // Skip when standard_expansion is requested — short chains where the chain
-    // doesn't break between groups need the standard `(\n  args,\n)` form to keep
-    // the first line short enough for fits().
-    // Skip on a commented last argument, like the two arms above — the standard form below
-    // routes the argument→`)` gap through `emit_last_arg_trailing_comments`, which is also
-    // prettier's layout for a commented argument.
-    if !standard_expansion
-        && !last_arg_commented
-        && !comments_force_expansion
-        && call.arguments.len() == 1
-        && is_single_arrow_with_breakable_body(&call.arguments[0])
-    {
-        let arg = &call.arguments[0];
-        if let Expression::ArrowFunctionExpression(arrow) = arg
-            && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-            // …unless a break forced inside the signature invalidates the hug — see
-            // `arrow_signature_has_breaking_comments`.
+        // BREAKABLE body (call, ternary): the arrow-hugging break state directly,
+        // `(sig =>\n  body,\n)` — prettier keeps the signature hugged even when forcing
+        // expansion. couldExpandArg keys on the body type (looking through the return-type
+        // annotation and a trailing `!`), so typed-return arrows hug too.
+        // Skipped under standard expansion — short chains where the chain doesn't break
+        // between groups need the standard `(\n  args,\n)` form to keep the first line short
+        // enough for fits(); the standard form routes the argument→`)` gap through
+        // `emit_last_arg_trailing_comments`, which is also prettier's layout for a commented
+        // argument. Skipped on a signature break and on a body-tail comment for the same
+        // reasons as the object arm above.
+        if !standard_expansion
+            && (arrow_body_is_call_through_non_null(body_expr) || is_ternary_arrow_body(body_expr))
             && !arrow_signature_has_breaking_comments(printer, arrow)
+            && !arrow_body_tail_has_comments(printer, arrow, body_expr)
         {
             let body_doc = printer.build_expression_doc(body_expr);
             let body_doc =
@@ -811,6 +767,11 @@ fn build_chain_args_single(
         // …and a break forced INSIDE the signature refuses it too, the shared rule the
         // object/array arm below and the general gate already ask.
         && !(has_any_comment_text && arrow_signature_has_breaking_comments(printer, arrow))
+        // …and so does a comment on the body's own tail, which the break states below
+        // reassemble past (`arrow_body_tail_has_comments`). The flat state prints the whole
+        // arrow and would keep it, but a state set that is only conditionally lossless is
+        // one width away from dropping the comment.
+        && !arrow_body_tail_has_comments(printer, arrow, body_expr)
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -871,6 +832,9 @@ fn build_chain_args_single(
         // `has_any_comment_text`: see above — a layout gate counts an owned comment.
         && !last_arg_commented
         && !(has_any_comment_text && arrow_signature_has_breaking_comments(printer, arrow))
+        // …and the body-tail gap refuses it, as above — here at every state, since the flat
+        // one synthesizes its own `(`/`)` around the body rather than printing the arrow.
+        && !arrow_body_tail_has_comments(printer, arrow, body_expr)
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -1267,6 +1231,9 @@ fn build_chain_args_multi(
         // A break forced inside the signature invalidates the hug here exactly as it does
         // in the single-argument arms above — see `arrow_signature_has_breaking_comments`.
         && !arrow_signature_has_breaking_comments(printer, arrow)
+        // …as does a comment on the body's own tail, which the break-body state below
+        // reassembles past (`arrow_body_tail_has_comments`).
+        && !arrow_body_tail_has_comments(printer, arrow, body_expr)
     {
         // Expand-last arrow with a call body: build the body ONCE and inject it so the
         // whole-arrow arg doc reuses it (the break-body state below reuses it too) —
@@ -1338,6 +1305,9 @@ fn build_chain_args_multi(
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         )
         && !arrow_signature_has_breaking_comments(printer, arrow)
+        // …and the body-tail gap, here the grammar-required parens the hug state
+        // synthesizes around an object body (`arrow_body_tail_has_comments`).
+        && !arrow_body_tail_has_comments(printer, arrow, body_expr)
     {
         // Expand-last arrow with an object/array body: build the body ONCE and inject it so
         // the whole-arrow arg doc reuses it (the hug state below reuses it too) — building it
