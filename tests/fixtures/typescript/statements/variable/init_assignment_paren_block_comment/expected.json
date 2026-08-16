@@ -1,0 +1,1052 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 657,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment trailing a parenthesized assignment operand in a value position stays",
+			"start": 20,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " INSIDE the parens: the value position re-adds that pair, so the comment would have to",
+			"start": 110,
+			"end": 198,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " cross a `)` the output still prints to reach the statement's `;`.",
+			"start": 200,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 287,
+			"end": 294,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 18
+				},
+				"end": {
+					"line": 5,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Every assignment flavour answers alike.",
+			"start": 299,
+			"end": 341,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 361,
+			"end": 368,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 19
+				},
+				"end": {
+					"line": 8,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 392,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 20
+				},
+				"end": {
+					"line": 10,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 425,
+			"end": 432,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 22
+				},
+				"end": {
+					"line": 12,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run collapses in source order, still inside.",
+			"start": 437,
+			"end": 486,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t1 ",
+			"start": 505,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 18
+				},
+				"end": {
+					"line": 15,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t2 ",
+			"start": 514,
+			"end": 522,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 27
+				},
+				"end": {
+					"line": 15,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A non-last declarator has no terminator to defer past, and already answered so.",
+			"start": 527,
+			"end": 609,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 628,
+			"end": 635,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 18
+				},
+				"end": {
+					"line": 18,
+					"column": 25
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 656,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 647,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 270,
+					"end": 296,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 276,
+							"end": 295,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 276,
+								"end": 277,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 281,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 12
+									},
+									"end": {
+										"line": 5,
+										"column": 17
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 281,
+									"end": 282,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 12
+										},
+										"end": {
+											"line": 5,
+											"column": 13
+										}
+									},
+									"name": "b"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 285,
+									"end": 286,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 16
+										},
+										"end": {
+											"line": 5,
+											"column": 17
+										}
+									},
+									"name": "c"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 287,
+										"end": 294
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment trailing a parenthesized assignment operand in a value position stays",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " INSIDE the parens: the value position re-adds that pair, so the comment would have to",
+							"start": 110,
+							"end": 198
+						},
+						{
+							"type": "Line",
+							"value": " cross a `)` the output still prints to reach the statement's `;`.",
+							"start": 200,
+							"end": 268
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 343,
+					"end": 370,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 349,
+							"end": 369,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 349,
+								"end": 350,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 354,
+								"end": 360,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 12
+									},
+									"end": {
+										"line": 8,
+										"column": 18
+									}
+								},
+								"operator": "+=",
+								"left": {
+									"type": "Identifier",
+									"start": 354,
+									"end": 355,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 12
+										},
+										"end": {
+											"line": 8,
+											"column": 13
+										}
+									},
+									"name": "e"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 359,
+									"end": 360,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 17
+										},
+										"end": {
+											"line": 8,
+											"column": 18
+										}
+									},
+									"name": "f"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 361,
+										"end": 368
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Every assignment flavour answers alike.",
+							"start": 299,
+							"end": 341
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 373,
+					"end": 401,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 379,
+							"end": 400,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 379,
+								"end": 380,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 384,
+								"end": 391,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 12
+									},
+									"end": {
+										"line": 10,
+										"column": 19
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "ArrayPattern",
+									"start": 384,
+									"end": 387,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 12
+										},
+										"end": {
+											"line": 10,
+											"column": 15
+										}
+									},
+									"elements": [
+										{
+											"type": "Identifier",
+											"start": 385,
+											"end": 386,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 13
+												},
+												"end": {
+													"line": 10,
+													"column": 14
+												}
+											},
+											"name": "h"
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 390,
+									"end": 391,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 18
+										},
+										"end": {
+											"line": 10,
+											"column": 19
+										}
+									},
+									"name": "i"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 392,
+										"end": 399
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 404,
+					"end": 434,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 31
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 410,
+							"end": 433,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 30
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 410,
+								"end": 411,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "j"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 415,
+								"end": 424,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 12
+									},
+									"end": {
+										"line": 12,
+										"column": 21
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 415,
+									"end": 416,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 12
+										},
+										"end": {
+											"line": 12,
+											"column": 13
+										}
+									},
+									"name": "k"
+								},
+								"right": {
+									"type": "AssignmentExpression",
+									"start": 419,
+									"end": 424,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 16
+										},
+										"end": {
+											"line": 12,
+											"column": 21
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 419,
+										"end": 420,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 16
+											},
+											"end": {
+												"line": 12,
+												"column": 17
+											}
+										},
+										"name": "l"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 423,
+										"end": 424,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 20
+											},
+											"end": {
+												"line": 12,
+												"column": 21
+											}
+										},
+										"name": "m"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 425,
+										"end": 432
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 488,
+					"end": 524,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 494,
+							"end": 523,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 494,
+								"end": 495,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "n"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 499,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 12
+									},
+									"end": {
+										"line": 15,
+										"column": 17
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 499,
+									"end": 500,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 12
+										},
+										"end": {
+											"line": 15,
+											"column": 13
+										}
+									},
+									"name": "o"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 503,
+									"end": 504,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 16
+										},
+										"end": {
+											"line": 15,
+											"column": 17
+										}
+									},
+									"name": "p"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t1 ",
+										"start": 505,
+										"end": 513
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run collapses in source order, still inside.",
+							"start": 437,
+							"end": 486
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 611,
+					"end": 646,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 617,
+							"end": 636,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 617,
+								"end": 618,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "q"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 622,
+								"end": 627,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 12
+									},
+									"end": {
+										"line": 18,
+										"column": 17
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 622,
+									"end": 623,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 12
+										},
+										"end": {
+											"line": 18,
+											"column": 13
+										}
+									},
+									"name": "r"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 626,
+									"end": 627,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 16
+										},
+										"end": {
+											"line": 18,
+											"column": 17
+										}
+									},
+									"name": "s"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 628,
+										"end": 635
+									}
+								]
+							}
+						},
+						{
+							"type": "VariableDeclarator",
+							"start": 640,
+							"end": 645,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 19,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 640,
+								"end": 641,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 3
+									}
+								},
+								"name": "u"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 644,
+								"end": 645,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 6
+									},
+									"end": {
+										"line": 19,
+										"column": 7
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " t2 ",
+							"start": 514,
+							"end": 522
+						},
+						{
+							"type": "Line",
+							"value": " A non-last declarator has no terminator to defer past, and already answered so.",
+							"start": 527,
+							"end": 609
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

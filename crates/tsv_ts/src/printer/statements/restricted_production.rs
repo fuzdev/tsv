@@ -147,14 +147,15 @@ impl<'a> Printer<'a> {
             && let Expression::SequenceExpression(seq) = arg
         {
             // The grouping `)` sits outside `seq.span` (the parens aren't part of the
-            // node); a trailing comment before it stays inside the parens.
-            let grouping_close = find_char_skipping_comments(
-                self.source.as_bytes(),
-                argument_end as usize,
-                span_end as usize,
-                b')',
-            )
-            .map_or(argument_end, |p| p as u32);
+            // node); a trailing comment before it stays inside the parens. Scan to the
+            // OUTERMOST `)`, since every redundant shell collapses into the single pair
+            // `seq_doc` emits ([`Printer::collapsed_grouping_close`]) — stopping at the
+            // first sent a doubly-shelled argument's comment out to the terminator gap
+            // (`return ((a, b) /* c */);` → `return (a, b) /* c */;`, then past the `;`
+            // on the next pass), where the single-shell form keeps it inside.
+            let grouping_close = self
+                .collapsed_grouping_close(argument_end, span_end)
+                .unwrap_or(argument_end);
             let seq_doc = self.build_sequence_doc_value(seq, grouping_close, SeqLayout::Hanging);
             let mut parts: DocBuf = if let Some(comments_doc) = inline_comments {
                 smallvec![d.text(keyword), d.text(" "), comments_doc, seq_doc]

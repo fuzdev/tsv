@@ -640,6 +640,93 @@ impl<'a> Printer<'a> {
             .any(|b| b == b')')
     }
 
+    /// The **outermost** grouping `)` a self-parenthesizing value's shells collapse into.
+    ///
+    /// A sequence supplies its own required parens, so the printer emits ONE pair where
+    /// the source may hold several — those parens plus every redundant shell the parser
+    /// stripped around them. The single emitted `)` stands in for all of them, and no
+    /// enclosing emitter can see inside a paren pair
+    /// ([`Self::trailing_paren_comment_parts`]), so every comment up to the LAST close
+    /// has to be emitted inside. Scanning to the FIRST one bounded the range at the
+    /// innermost paren and dropped the comment that sits past it outright
+    /// (`const k = ((a, b) /* c */);` → `const k = (a, b);`).
+    ///
+    /// The walk steps over `)` and trivia only, so it stops at the shell run's end rather
+    /// than at the caller's boundary — an enclosing construct's own `)` is unreachable
+    /// even where that boundary is loose (an `as` cast's operand shell, whose boundary
+    /// spans the keyword and its type).
+    ///
+    /// `None` when the gap holds no `)` at all, leaving the caller its own fallback.
+    pub(in crate::printer) fn collapsed_grouping_close(
+        &self,
+        expr_end: u32,
+        boundary_end: u32,
+    ) -> Option<u32> {
+        let bytes = self.source.as_bytes();
+        let mut i = expr_end;
+        let mut close = None;
+        while let Some(pos) = self.next_significant_byte(i, boundary_end) {
+            if bytes[pos] != b')' {
+                break;
+            }
+            close = Some(pos as u32);
+            i = pos as u32 + 1;
+        }
+        close
+    }
+
+    /// A sequence value sitting inside a stripped grouping shell: its own required parens
+    /// ARE the pair the printer emits, and a trailing comment stays inside them
+    /// (`const x = (a, b /* c */)`) rather than floating out after `)` or doubling the
+    /// shell ([`Printer::build_sequence_doc_value`], prettier #19263).
+    ///
+    /// The one seam both shell builders route through, because locating that pair's close
+    /// is one question with one answer: they held separate copies of the scan and both
+    /// were wrong the same way, dropping the comment of a doubly-shelled value at every
+    /// position they serve (`const k = ((a, b) /* c */);`, `() => ((a, b) /* c */)`).
+    ///
+    /// The `boundary_end` fallback is defensive: a value only reaches a *shell* builder
+    /// with a grouping pair around it in source, so the walk has a `)` to find. The
+    /// restricted-production site answers this differently and keeps its own scan —
+    /// there a bare `return a, b;` has no pair at all, and sweeping to the boundary
+    /// would pull the statement's own terminator-gap comments inside the parens.
+    fn build_shell_sequence_doc(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+        expr_end: u32,
+        boundary_end: u32,
+        layout: SeqLayout,
+    ) -> DocId {
+        let grouping_close = self
+            .collapsed_grouping_close(expr_end, boundary_end)
+            .unwrap_or(boundary_end);
+        self.build_sequence_doc_value(seq, grouping_close, layout)
+    }
+
+    /// The index of the next byte that is neither whitespace nor trivia, at or after
+    /// `start` and before `end`; `None` when the range holds nothing else.
+    ///
+    /// The "what actually comes next in the source?" step both shell questions ask —
+    /// [`Self::collapsed_grouping_close`] takes it once per `)`, and
+    /// [`Self::shell_meets_statement_terminator`] once. A comment occupies bytes even
+    /// where nothing emits it, so a walk that stepped over whitespace alone would stop
+    /// on the `/` and answer about the wrong token.
+    fn next_significant_byte(&self, start: u32, end: u32) -> Option<usize> {
+        let bytes = self.source.as_bytes();
+        let end = end as usize;
+        let mut i = start as usize;
+        while i < end {
+            if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+                i = next;
+            } else if bytes[i].is_ascii_whitespace() {
+                i += 1;
+            } else {
+                return Some(i);
+            }
+        }
+        None
+    }
+
     /// Whether a comment in `[expr_end, boundary_end)` forces the operand's grouping
     /// parens to **survive**, at a gap the grammar marks `[no LineTerminator here]`.
     ///
@@ -800,6 +887,11 @@ impl<'a> Printer<'a> {
     /// own-line comments need the parens (a bare line comment would swallow the
     /// following token), so those defer to `build_expression_doc_keep_paren_comments`.
     ///
+    /// `position_parens` says the CALLING POSITION will parenthesize this value anyway
+    /// (`const x = (a = b)`), which makes the shell **retained** rather than stripped —
+    /// see [`Self::shell_value_keeps_own_parens`], the one predicate that answer is read
+    /// through.
+    ///
     /// Used for variable init, assignment RHS, and ternary branches. A `for` header's
     /// init declarator takes [`Self::build_for_init_value_doc`] instead — same handling,
     /// minus the statement-terminator deferral its `;` does not license.
@@ -807,8 +899,65 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression<'_>,
         boundary_end: u32,
+        position_parens: bool,
     ) -> DocId {
-        self.build_shell_value_doc(expr, boundary_end, ShellTail::StatementTerminator)
+        self.build_shell_value_doc(
+            expr,
+            boundary_end,
+            ShellTail::StatementTerminator,
+            position_parens,
+        )
+    }
+
+    /// Whether [`Self::build_expression_doc_with_paren_comments`] supplies the value's
+    /// paren pair ITSELF, so the calling position must not add a second one.
+    ///
+    /// The single predicate both re-parenthesizing positions ask — a declarator
+    /// initializer and a ternary branch. They each own a `needs_parens` question of their
+    /// own (`position_parens`), but "did the callee already wrap?" is one question with
+    /// one answer, and answering it twice is how the pair gets doubled at one site and
+    /// dropped at the other (a ternary CONSEQUENT bounds this scan empty, so the callee
+    /// never wraps there however the position answers `needs_parens`).
+    pub(crate) fn shell_value_keeps_own_parens(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+        position_parens: bool,
+    ) -> bool {
+        // A sequence self-parenthesizes on every path, so it never takes the caller's
+        // pair and is excluded rather than reported here.
+        if matches!(expr, internal::Expression::SequenceExpression(_)) {
+            return false;
+        }
+        let expr_end = expr.span().end;
+        self.has_trailing_paren_comments(expr_end, boundary_end)
+            && self.shell_gap_retains_parens(expr_end, boundary_end, position_parens)
+    }
+
+    /// Whether the gap's own content forces the shell to be RETAINED — the layout half of
+    /// [`Self::shell_value_keeps_own_parens`], asked by the builder that acts on it and by
+    /// the caller that must not double the pair.
+    ///
+    /// ⚠️ **One question, one predicate, one AXIS.** The two sides used to spell this
+    /// separately AND on different axes — the caller counting comments **on page**, the
+    /// builder only those it would **emit** — so an owned comment in the gap would have had
+    /// the caller skip a wrap the builder never made, stripping the value's clarity parens.
+    /// This is a layout gate ("does anything occupy the page here?"), so the on-page axis is
+    /// the correct one for both (`docs/comments.md` §the three axes).
+    fn shell_gap_retains_parens(
+        &self,
+        expr_end: u32,
+        boundary_end: u32,
+        position_parens: bool,
+    ) -> bool {
+        // The calling position parenthesizes this value anyway, so the pair is in the
+        // output whatever this builder does — nothing may cross it.
+        position_parens
+            // A line comment would swallow the following `;`, and an own-line comment has
+            // no inline placement, so either needs the parens on its own account.
+            || self
+                .comments_on_page_between(expr_end, boundary_end)
+                .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start))
     }
 
     /// The `for`-header init counterpart of
@@ -834,7 +983,7 @@ impl<'a> Printer<'a> {
         expr: &internal::Expression<'_>,
         boundary_end: u32,
     ) -> DocId {
-        self.build_shell_value_doc(expr, boundary_end, ShellTail::ForClauseSeparator)
+        self.build_shell_value_doc(expr, boundary_end, ShellTail::ForClauseSeparator, false)
     }
 
     fn build_shell_value_doc(
@@ -842,6 +991,7 @@ impl<'a> Printer<'a> {
         expr: &internal::Expression<'_>,
         boundary_end: u32,
         tail: ShellTail,
+        position_parens: bool,
     ) -> DocId {
         let expr_end = expr.span().end;
         // The for-header's `[~In]` parens are applied HERE rather than by the caller,
@@ -861,31 +1011,30 @@ impl<'a> Printer<'a> {
             return wrap_in(self.build_expression_doc(expr));
         }
 
-        // A sequence operand in this (value) position keeps its trailing comment
-        // INSIDE its own required parens — `const x = (a, b /* c */)` / `(a, b // c)`
-        // — instead of floating it out (`(a, b) /* c */`) or doubling the grouping
-        // paren (`((a, b) // c)`). Prettier keeps sequence trailing comments inside
-        // the parens in value positions (#19263). The grouping `)` sits outside
-        // `seq.span` (the parens aren't part of the node), so scan to it.
+        // Every position this serves — variable init, assignment RHS, ternary branch —
+        // is prettier's default layout arm; the two that hang (a `return`/`throw`
+        // argument, an arrow body) claim their sequence before reaching here.
         if let internal::Expression::SequenceExpression(seq) = expr {
-            let grouping_close = find_char_skipping_comments(
-                self.source.as_bytes(),
-                expr_end as usize,
-                boundary_end as usize,
-                b')',
-            )
-            .map_or(boundary_end, |p| p as u32);
-            // Every position this serves — variable init, assignment RHS, ternary branch —
-            // is prettier's default layout arm; the two that hang (a `return`/`throw`
-            // argument, an arrow body) claim their sequence before reaching here.
-            return self.build_sequence_doc_value(seq, grouping_close, SeqLayout::Aligned);
+            return self.build_shell_sequence_doc(seq, expr_end, boundary_end, SeqLayout::Aligned);
         }
 
-        // Line / own-line comments need the paren wrapping (a bare line comment
-        // would swallow the following `;`); defer those to the keep variant.
-        let has_multiline = comments_to_emit_in_range(self.comments, expr_end, boundary_end)
-            .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
-        if has_multiline {
+        // Two reasons the shell is RETAINED rather than stripped, and either sends the
+        // comment inside the pair:
+        //
+        // - a line / own-line comment needs the parens on its own account (a bare line
+        //   comment would swallow the following `;`);
+        // - the calling POSITION parenthesizes this value anyway (`const x = (a = b)`),
+        //   so the pair is in the output whatever this builder does.
+        //
+        // The second is what stops the deferral below from marching a comment across a
+        // `)` the output still prints. That arm's licence is "this output erases the
+        // `)`" — true for a plain value (`const a = (x /* t */);` → `const a = x; /* t */`),
+        // false here, and a licence stops where its argument stops: the block comment of
+        // a parenthesized assignment was relocating out of a surviving pair
+        // (`const k = (x = y /* c */);` → `const k = (x = y); /* c */`) while the same
+        // construct one comma over — a non-last declarator, with no terminator to defer
+        // past — already kept it inside, and prettier keeps it inside in both.
+        if self.shell_gap_retains_parens(expr_end, boundary_end, position_parens) {
             return self.build_expression_doc_keep_paren_comments(
                 expr,
                 boundary_end,
@@ -930,18 +1079,8 @@ impl<'a> Printer<'a> {
     /// sees the same `;` and no shell — agrees.
     fn shell_meets_statement_terminator(&self, boundary_end: u32) -> bool {
         let bytes = self.source.as_bytes();
-        let end = bytes.len();
-        let mut i = boundary_end as usize;
-        while i < end {
-            if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
-                i = next;
-            } else if bytes[i].is_ascii_whitespace() {
-                i += 1;
-            } else {
-                return bytes[i] == b';';
-            }
-        }
-        false
+        self.next_significant_byte(boundary_end, bytes.len() as u32)
+            .is_some_and(|pos| bytes[pos] == b';')
     }
 
     /// The comments between an expression's end and a following `)`, as ready-to-append
@@ -1016,22 +1155,12 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_end = expr.span().end;
 
-        // A sequence in this (value) position keeps its trailing comment INSIDE its own
-        // required parens (`() => (1, 2, 3 /* c */)`) rather than doubling the grouping
-        // paren (`() => ((1, 2, 3) /* c */)`) — the same rule and path as
-        // `build_expression_doc_with_paren_comments`. `build_expression_doc` would
-        // self-parenthesize the sequence and then this method would re-wrap it. The
-        // grouping `)` sits outside `seq.span`, so scan to it. `layout` is the caller's —
-        // an arrow body hangs its operands, the ASI-shell operands align.
+        // A sequence self-parenthesizes, so it takes the shared arm rather than the
+        // paren-restoring path below — `build_expression_doc` would emit its parens and
+        // this method would re-wrap them (`() => ((1, 2, 3) /* c */)`). `layout` is the
+        // caller's: an arrow body hangs its operands, the ASI-shell operands align.
         if let internal::Expression::SequenceExpression(seq) = expr {
-            let grouping_close = find_char_skipping_comments(
-                self.source.as_bytes(),
-                expr_end as usize,
-                boundary_end as usize,
-                b')',
-            )
-            .map_or(boundary_end, |p| p as u32);
-            return self.build_sequence_doc_value(seq, grouping_close, layout);
+            return self.build_shell_sequence_doc(seq, expr_end, boundary_end, layout);
         }
 
         let Some((comment_parts, needs_break)) =

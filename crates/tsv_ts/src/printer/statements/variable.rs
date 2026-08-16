@@ -36,9 +36,14 @@ fn build_fluid_assignment_doc(d: &DocArena, id_doc: DocId, init_doc: DocId) -> D
 impl<'a> Printer<'a> {
     /// Build a variable initializer value, wrapping it in parens for the value
     /// position when needed (`const x = (a = b)`) — but NOT double-wrapping when
-    /// `build_expression_doc_with_paren_comments` already added its own parens around
-    /// a multiline trailing comment (`const y = (a = b // c)` stays single, not
-    /// `((a = b // c))`). The single paren then matches the assignment-RHS rendering.
+    /// `build_expression_doc_with_paren_comments` already added its own pair around a
+    /// trailing comment (`const y = (a = b // c)` stays single, not `((a = b // c))`).
+    /// The single paren then matches the assignment-RHS rendering.
+    ///
+    /// `position_parens` is asked ONCE and answers two questions that must agree — the
+    /// wrap below, and whether the shell builder holds the comment inside the pair
+    /// ([`Printer::shell_value_keeps_own_parens`]). Asking it separately on each side is
+    /// how the pair gets doubled or dropped.
     ///
     /// The paren decision carries the for-header rule via `self.in_for_init`: a
     /// statement-level `const x = b in c` lexically under a for-header init (e.g. in a
@@ -61,30 +66,17 @@ impl<'a> Printer<'a> {
         }
         // Declarator init — an `ancestorNameMap` value position.
         self.mark_ternary_extra_indent(init);
-        let inner = self.build_expression_doc_with_paren_comments(init, boundary_end);
-        if needs_parens(init, ParenContext::VariableInit, self.in_for_init.get())
-            && !self.init_keeps_own_parens(init, boundary_end)
+        let position_parens =
+            needs_parens(init, ParenContext::VariableInit, self.in_for_init.get());
+        let inner =
+            self.build_expression_doc_with_paren_comments(init, boundary_end, position_parens);
+        if position_parens
+            && !self.shell_value_keeps_own_parens(init, boundary_end, position_parens)
         {
             self.d().parens(inner)
         } else {
             inner
         }
-    }
-
-    /// True when `build_expression_doc_with_paren_comments` wraps `init` in its own
-    /// parens (the keep-paren-comments path: a non-sequence with a multiline trailing
-    /// paren comment), so the value-position wrap must not add a second pair. A
-    /// sequence self-parenthesizes via `build_sequence_doc_value` and already reports
-    /// `needs_parens == false`, so it never double-wraps and is excluded here.
-    fn init_keeps_own_parens(&self, init: &Expression<'_>, boundary_end: u32) -> bool {
-        if matches!(init, Expression::SequenceExpression(_)) {
-            return false;
-        }
-        let expr_end = init.span().end;
-        self.has_trailing_paren_comments(expr_end, boundary_end)
-            && self
-                .comments_on_page_between(expr_end, boundary_end)
-                .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start))
     }
 
     /// Build a doc for a variable binding pattern with optional definite assignment assertion.
@@ -413,6 +405,7 @@ impl<'a> Printer<'a> {
                             let value_doc = self.build_expression_doc_with_paren_comments(
                                 init,
                                 declarator.span.end,
+                                false,
                             );
                             self.prepend_rhs_comments(value_doc, equals_pos + 1, init_start)
                         })
