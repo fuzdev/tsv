@@ -6,8 +6,7 @@
 use super::super::comments::CommentSpacing;
 use super::super::{Printer, is_curried_arrow_chain, is_multiline_template_expression};
 use super::arg_comments::{
-    PartitionedComments, any_arg_empty_line, any_comment_forces_expansion,
-    build_after_comma_leading_comments, build_before_comma_trailing_comments,
+    PartitionedComments, any_arg_empty_line, any_comment_forces_expansion, build_arg_gap_docs,
     emit_last_arg_trailing_comments, first_arg_has_any_comments, has_inter_argument_comments,
     has_trailing_comments_on_args, last_arg_has_comments, push_empty_args,
 };
@@ -115,14 +114,19 @@ fn build_inline_leading_comments(
 /// Build inline trailing block comments for an argument (non-expansion path).
 ///
 /// Used for the last arg (comments before closing paren) and single-arg paths
-/// where there's no comma to split around.
+/// where there's no comma to split around — i.e. always a **closer** gap, which is why it
+/// takes [`PartitionedComments::for_closer_gap`] rather than the inter-item walk. The two
+/// differ only in their claim on a **line** comment, and this emitter reads only
+/// `trailing_block`, so the constructor is output-neutral here today; it is the contract
+/// that matters, since the inter-item walk's rule is wrong for a gap holding the comma
+/// `trailingComma: 'none'` deletes and would start mattering the moment this emitted more.
 fn build_inline_trailing_comments(
     printer: &Printer<'_>,
     arg_end: u32,
     next_boundary: u32,
 ) -> Option<DocId> {
     let d = printer.d();
-    let pc = PartitionedComments::for_item_gap(printer, arg_end, next_boundary);
+    let pc = PartitionedComments::for_closer_gap(printer, arg_end, next_boundary);
 
     if !pc.has_trailing_block() {
         return None;
@@ -1411,23 +1415,45 @@ fn build_chain_args_multi(
         let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
         let second_arg_doc = printer.build_arg_expression_doc(&call.arguments[1]);
 
-        // Inter-arg comment handling (e.g., `a.b((x) => { ... }, /** @type {T} */ c)`)
+        // Inter-arg comment handling through the shared argument-gap seam (e.g.
+        // `a.b((x) => { ... }, /** @type {T} */ c)`): `through_comma` carries the
+        // before-comma run, the comma itself and a stranded after-comma block, `gap_leading`
+        // the second argument's leading run. The break sits between them, and that
+        // separator is the ONLY thing the two arms below differ in.
         let first_end = call.arguments[0].span().end;
         let second_start = call.arguments[1].span().start;
-        let inter_leading = build_after_comma_leading_comments(printer, first_end, second_start);
-        let inter_trailing = build_before_comma_trailing_comments(printer, first_end, second_start);
+        let (through_comma, gap_leading) = build_arg_gap_docs(printer, first_end, second_start);
+        // The last argument's gap to the `)` — a region no inter-argument gap covers.
+        let mut tail_trailing = DocBuf::new();
+        emit_last_arg_trailing_comments(
+            printer,
+            &mut tail_trailing,
+            &call.arguments[1],
+            call.span.end,
+        );
 
         // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
-        if d.will_break(second_arg_doc) {
+        //
+        // ⚠️ `tailArgs` is the printed tail ARGUMENT **plus the comments printed with it**,
+        // so the question is asked of the whole tail — as the `call_formatting.rs` and
+        // `new_expression.rs` twins ask it of their `tail_parts`. Asking only
+        // `second_arg_doc` is the same question minus whatever the argument's own doc does
+        // not carry, and OWNERSHIP decides that: a lone block leading the tail is owned by
+        // the argument and rides inside its doc (so the narrow ask happens to be right),
+        // while a run's unowned head rides this gap instead — `}, /* c1⏎c2 */ /* c3 */ b`
+        // kept the hug with a multi-line comment sitting in it, a form prettier never
+        // emits. `docs/comments.md` hazard 2.
+        let mut tail_parts: DocBuf = smallvec![second_arg_doc];
+        tail_parts.extend(through_comma.iter().copied());
+        tail_parts.extend(gap_leading.iter().copied());
+        tail_parts.extend(tail_trailing.iter().copied());
+        if tail_parts.iter().any(|&id| d.will_break(id)) {
             let mut all_parts: DocBuf = smallvec![first_arg_doc];
-            if let Some(t) = inter_trailing {
-                all_parts.push(t);
-            }
-            all_parts.push(d.comma_hardline());
-            if let Some(l) = inter_leading {
-                all_parts.push(l);
-            }
+            all_parts.extend(through_comma.iter().copied());
+            all_parts.push(d.hardline());
+            all_parts.extend(gap_leading.iter().copied());
             all_parts.push(second_arg_doc);
+            all_parts.extend(tail_trailing.iter().copied());
             parts.push(d.text(prefix));
             parts.push(d.indent_hardline(d.concat(&all_parts)));
             parts.push(d.hardline());
@@ -1437,14 +1463,11 @@ fn build_chain_args_multi(
 
         parts.push(d.text(prefix));
         parts.push(first_arg_doc);
-        if let Some(t) = inter_trailing {
-            parts.push(t);
-        }
-        parts.push(d.text(", "));
-        if let Some(l) = inter_leading {
-            parts.push(l);
-        }
+        parts.extend(through_comma.iter().copied());
+        parts.push(d.text(" "));
+        parts.extend(gap_leading.iter().copied());
         parts.push(second_arg_doc);
+        parts.extend(tail_trailing.iter().copied());
         parts.push(d.text(")"));
         return d.concat(&parts);
     }
@@ -1544,14 +1567,14 @@ fn build_chain_args_multi(
         } else {
             let next_arg_start = call.arguments[i + 1].span().start;
             if has_any_comments && printer.has_comments_to_emit_between(arg_end, next_arg_start) {
-                let mut pc = PartitionedComments::for_item_gap(printer, arg_end, next_arg_start);
-                pc.route_after_comma_hugging_to_leading(printer);
-                // before-comma blocks trail the arg, the comma, stranded after-comma
-                // blocks (`A`).
-                pc.emit_trailing_comments_around_comma(&mut arg_parts, printer);
+                // The shared argument-gap seam: everything through the comma
+                // (before-comma blocks, the comma, a stranded after-comma block `A`), the
+                // break, then the next argument's leading run (hugging after-comma `C` +
+                // own-line comments).
+                let (through_comma, leading) = build_arg_gap_docs(printer, arg_end, next_arg_start);
+                arg_parts.extend(through_comma);
                 arg_parts.push(d.line());
-                // hugging after-comma + own-line comments lead the next arg (`C`).
-                pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
+                arg_parts.extend(leading);
             } else {
                 arg_parts.push(d.comma_line());
             }

@@ -9,8 +9,8 @@ use super::super::{
 };
 use super::arg_comments::{
     PartitionedComments, any_arg_empty_line, any_comment_forces_expansion,
-    build_after_comma_leading_comments, first_arg_has_any_comments, has_inter_argument_comments,
-    has_trailing_comments_on_args, last_arg_has_comments, should_force_expansion_for_comments,
+    first_arg_has_any_comments, has_inter_argument_comments, has_trailing_comments_on_args,
+    last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_concise_numeric_array,
@@ -20,10 +20,10 @@ use super::arg_wrapping::{
     ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_expand_all_args, build_inline_args, build_inline_hug_or_expand_all,
-    build_inline_or_expand_all, build_own_line_post_arrow_state, build_printed_argument_doc,
-    could_expand_arrow_chain, last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
-    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    build_expand_all_args, build_expand_first_arg_doc, build_inline_args,
+    build_inline_hug_or_expand_all, build_inline_or_expand_all, build_own_line_post_arrow_state,
+    build_printed_argument_doc, could_expand_arrow_chain, last_arg_has_own_line_post_arrow_comment,
+    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
@@ -409,46 +409,13 @@ pub(super) fn build_call_doc_with_wrapping(
     let expand_first_blocked = arg_trailing_line_comment
         || (call_has_comments && first_arg_has_any_comments(call.arguments, printer, paren_open));
     if should_expand_first_arg(printer, call.arguments) && !expand_first_blocked {
-        let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
-
-        // Build tail args (everything after first), carrying any inline block comment
-        // that leads a tail arg after its comma (`}, /* c */ arg`) so it isn't dropped —
-        // matching prettier's expand-first, which keeps the comment inline.
-        let mut tail_parts = DocBuf::new();
-        let mut prev_end = call.arguments[0].span().end;
-        for arg in call.arguments.iter().skip(1) {
-            tail_parts.push(d.text(", "));
-            if let Some(leading) =
-                build_after_comma_leading_comments(printer, prev_end, arg.span().start)
-            {
-                tail_parts.push(leading);
-            }
-            tail_parts.push(printer.build_expression_doc(arg));
-            prev_end = arg.span().end;
-        }
-
-        // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
-        // When any tail arg's doc will break, the inline tail won't work.
-        if tail_parts.iter().any(|&id| d.will_break(id)) {
-            return build_call_args_expanded(
-                printer,
-                callee,
-                call.arguments,
-                paren_open,
-                call.span.end,
-                ArgItem::Plain,
-            );
-        }
-
-        // Structure: callee + ( + first_arg_with_breaks + , + tail_args + )
-        // The first arg can expand internally, but tail args stay inline
-        return d.concat(&[
+        return build_expand_first_arg_doc(
+            printer,
             callee,
-            d.text("("),
-            first_arg_doc,
-            d.concat(&tail_parts),
-            d.text(")"),
-        ]);
+            call.arguments,
+            paren_open,
+            call.span.end,
+        );
     }
 
     // No all-arrows arm here: `is_function_composition_args` above already covers it.

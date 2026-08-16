@@ -28,5 +28,10 @@ author wrote it — `/* b1 */` before the comma (trailing the arg), `/* s */` af
 — while prettier relocates **both** before the comma (`a /* b1 */ /* s */,`). The
 two halves compose: the before-comma rule and the stranded rule hold independently.
 
-Covers the plain-call, `new`, and chained-call argument paths. See
+Covers the plain-call, `new`, and chained-call argument paths. The gap after the **first**
+argument reaches the same rule through a layout refusal — a stranded block there is that
+argument's trailing comment, so both formatters decline the expand-first hug and break every
+argument out
+([expand_first_stranded_after_comma](../expand_first_stranded_after_comma_prettier_divergence/)).
+See
 [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -10,8 +10,8 @@ use super::super::{
     is_curried_arrow_with_return_type, is_multiline_template_expression,
 };
 use super::arg_comments::{
-    any_arg_gap_has_comment_on_page, emit_first_arg_leading_comments,
-    emit_last_arg_trailing_comments, push_empty_args, split_gap_inline_blocks,
+    any_arg_gap_has_comment_on_page, build_arg_gap_docs, emit_first_arg_leading_comments,
+    emit_last_arg_trailing_comments, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_react_hook_call_with_deps_array,
@@ -531,14 +531,14 @@ pub(crate) fn build_args_split_last(
         head_parts.push(lc);
     }
 
-    // Each gap's inline blocks, split around its comma — computed ONCE per gap and read by
-    // both states below, because the two states describing the same gap differently is how
-    // the broken-out one came to drop the after-comma half entirely.
-    // Only the `, ` separator is structural; the gap scan is pure comment placement, so gate it.
+    // Each gap's comments as the two docs the break sits between — computed ONCE per gap
+    // and read by both states below, because the two states describing the same gap
+    // differently is how the broken-out one came to drop the after-comma half entirely.
+    // Only the comma is structural; the gap scan is pure comment placement, so gate it.
     let gap_blocks: SmallVec<[(DocBuf, DocBuf); 4]> = if has_comments {
         arguments
             .windows(2)
-            .map(|pair| split_gap_inline_blocks(printer, pair[0].span().end, pair[1].span().start))
+            .map(|pair| build_arg_gap_docs(printer, pair[0].span().end, pair[1].span().start))
             .collect()
     } else {
         SmallVec::new()
@@ -547,10 +547,12 @@ pub(crate) fn build_args_split_last(
     for (i, doc) in arg_docs.iter().take(arg_docs.len() - 1).enumerate() {
         head_parts.push(*doc);
 
-        if let Some((before, after)) = gap_blocks.get(i) {
-            head_parts.extend(before.iter().copied());
-            head_parts.push(d.text(", "));
-            head_parts.extend(after.iter().copied());
+        // This state is measured flat, so the gap's separator is the space a collapsed
+        // `line` renders as; the leading run's own soft `line` collapses with it.
+        if let Some((through_comma, leading)) = gap_blocks.get(i) {
+            head_parts.extend(through_comma.iter().copied());
+            head_parts.push(d.text(" "));
+            head_parts.extend(leading.iter().copied());
         } else {
             head_parts.push(d.text(", "));
         }
@@ -564,25 +566,24 @@ pub(crate) fn build_args_split_last(
     }
 
     for (i, doc) in arg_docs.iter().enumerate() {
-        if i > 0 {
-            all_args_parts.push(d.comma_line());
-            // ⚠️ The gap is claimed by TWO emitters that must PARTITION it — the
-            // before-comma half trails the previous argument, this one leads the next.
-            // Emitting only the before-comma half here DROPPED every comment the author
-            // wrote after the comma whenever this state was the one selected
-            // (`fn(a, /* c */ (b), {})`), while the head state printed it — the same gap,
-            // two answers, and only the losing one reachable.
-            // `docs/comments.md` §The element-comma seam.
-            if let Some((_, after)) = gap_blocks.get(i - 1) {
-                all_args_parts.extend(after.iter().copied());
-            }
-        }
         all_args_parts.push(*doc);
 
-        if i < arg_docs.len() - 1
-            && let Some((before, _)) = gap_blocks.get(i)
-        {
-            all_args_parts.extend(before.iter().copied());
+        if i + 1 < arg_docs.len() {
+            // ⚠️ The gap is claimed by TWO emitters that must PARTITION it — everything
+            // through the comma trails the previous argument, the leading run leads the
+            // next. Emitting only one half here DROPPED every comment on the other side
+            // whenever this state was the one selected (`fn(a, /* c */ (b), {})`), while
+            // the head state printed it — the same gap, two answers, and only the losing
+            // one reachable. Both halves now come from one call, placed together rather
+            // than split across two iterations, so the break can only land between them.
+            // `docs/comments.md` §The element-comma seam.
+            if let Some((through_comma, leading)) = gap_blocks.get(i) {
+                all_args_parts.extend(through_comma.iter().copied());
+                all_args_parts.push(d.line());
+                all_args_parts.extend(leading.iter().copied());
+            } else {
+                all_args_parts.push(d.comma_line());
+            }
         }
     }
     let all_args_broken = d.concat(&all_args_parts);
@@ -835,6 +836,75 @@ pub(crate) fn build_inline_hug_or_expand_all(
     ]);
     let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
     d.conditional_group(&[state_inline, state_hug, state_expand_all])
+}
+
+/// Prettier's expand-FIRST layout: a block-function first argument hugs and the tail stays
+/// inline past its `}` (`setTimeout(() => { tick(); }, 100)`).
+///
+/// The layout twin of [`should_expand_first_arg`], which gates it. The **predicate** was
+/// already shared and the layout was not, which is precisely how one copy gets a fix and the
+/// other doesn't — the `new` spelling reached neither the argument-gap seam nor the last
+/// argument's gap and dropped a comment in each, while the chain's asked its break question
+/// of the argument doc alone. One body now, for the plain call and `new` alike; the chain
+/// keeps its own spelling (a `&'static str` opener and a hardline-built broken form rather
+/// than [`build_call_args_expanded`]), as it does for the expand-last ladder above.
+///
+/// The tail is written as **everything after the first argument** — prettier's
+/// `printedArguments.slice(1)` — though `should_expand_first_arg` admits exactly two, so it
+/// is one argument plus the two gaps around it: the inter-argument seam
+/// ([`build_arg_gap_docs`]) and the last argument's gap to the `)`
+/// ([`emit_last_arg_trailing_comments`]).
+///
+/// Returns the fully-expanded form when the tail will break — prettier's
+/// `if (tailArgs.some(willBreak)) return allArgsBrokenOut()`. An inline tail cannot carry an
+/// argument that breaks: without it the first argument hugs and a broken tail trails it
+/// (`new A(() => {⏎…⏎}, fn(⏎// c⏎b))`), a form prettier never emits. `tailArgs` is the printed
+/// argument **plus the comments printed with it**, which is why the question is asked of the
+/// whole `tail_parts` and not of the argument's own doc — ownership decides what that doc
+/// carries (`docs/comments.md` hazard 2).
+pub(super) fn build_expand_first_arg_doc(
+    printer: &Printer<'_>,
+    callee: DocId,
+    arguments: &[internal::Expression<'_>],
+    paren_open: u32,
+    call_end: u32,
+) -> DocId {
+    let d = printer.d();
+    let first_arg_doc = printer.build_expression_doc(&arguments[0]);
+
+    let mut tail_parts = DocBuf::new();
+    let mut prev_end = arguments[0].span().end;
+    for arg in arguments.iter().skip(1) {
+        let (through_comma, leading) = build_arg_gap_docs(printer, prev_end, arg.span().start);
+        tail_parts.extend(through_comma);
+        tail_parts.push(d.text(" "));
+        tail_parts.extend(leading);
+        tail_parts.push(printer.build_expression_doc(arg));
+        prev_end = arg.span().end;
+    }
+    if let Some(last_arg) = arguments.last() {
+        emit_last_arg_trailing_comments(printer, &mut tail_parts, last_arg, call_end);
+    }
+
+    if tail_parts.iter().any(|&id| d.will_break(id)) {
+        return build_call_args_expanded(
+            printer,
+            callee,
+            arguments,
+            paren_open,
+            call_end,
+            ArgItem::Plain,
+        );
+    }
+
+    // The first argument can expand internally; the tail stays on its closing line.
+    d.concat(&[
+        callee,
+        d.text("("),
+        first_arg_doc,
+        d.concat(&tail_parts),
+        d.text(")"),
+    ])
 }
 
 /// Check if the last two arguments have the same outer AST type.
@@ -1181,8 +1251,8 @@ pub(super) fn should_expand_first_arg(
     // breaks all args. tsv matches by blocking expand-first here. A cast-wrapped
     // collection (`/* c */ {} as T`) is deliberately NOT blocked — prettier's comment
     // attaches to the cast, `couldExpandArg` stays false, and it expand-firsts; the
-    // expand-first path carries the inter-arg leading comment via
-    // `build_after_comma_leading_comments`.
+    // expand-first path carries the inter-arg leading comment through the shared
+    // argument-gap seam (`build_arg_gap_docs`).
     //
     // A JSDoc cast never reaches this gate, and must not be added to it: prettier keeps
     // the cast's parens, so its `couldExpandArg` sees an opaque paren node rather than the

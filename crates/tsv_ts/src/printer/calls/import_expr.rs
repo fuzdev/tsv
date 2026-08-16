@@ -222,8 +222,7 @@ pub(in crate::printer) fn build_import_args_comment_layout(
         return None;
     }
 
-    let mut inter = PartitionedComments::for_item_gap(printer, source_end, options.start);
-    inter.route_after_comma_hugging_to_leading(printer);
+    let inter = PartitionedComments::for_routed_arg_gap(printer, source_end, options.start);
 
     // Source arg + comma: before-comma blocks trail the source; stranded after-comma
     // blocks and line comments follow the comma.
