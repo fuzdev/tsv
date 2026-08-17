@@ -1,5 +1,5 @@
 <style>
-/* outer /* inner */ div {
+/* outer /* inner */div {
 color: red;
 }
 </style>

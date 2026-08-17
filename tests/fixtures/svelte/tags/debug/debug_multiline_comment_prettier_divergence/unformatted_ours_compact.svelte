@@ -1,2 +1,2 @@
-{@debug /* c
-*/ x}
+{@debug/* c
+*/x}

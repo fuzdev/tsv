@@ -1,5 +1,5 @@
 <!-- exactly 100 chars - the head stays on one line -->
-<template    lang="pug"    data-attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">
+<template lang="pug" data-attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">
 h1 text
 </template>
 

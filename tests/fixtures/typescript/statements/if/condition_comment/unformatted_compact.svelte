@@ -8,7 +8,7 @@
 	}
 
 	// Block comment variant
-	if (/* before */ x /* inline */
+	if (/* before */x/* inline */
 /* trailing */
 	) {
 		b();
@@ -16,7 +16,7 @@
 
 	// A glued pair in the trailing gap keeps the one line the author gave it
 	if (x
-/* c1 */   /* c2 */
+/* c1 *//* c2 */
 	) {
 		c();
 	}

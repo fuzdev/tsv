@@ -1,3 +1,3 @@
 <script>
-a /* comment */=b;
+a/* comment */=b;
 </script>

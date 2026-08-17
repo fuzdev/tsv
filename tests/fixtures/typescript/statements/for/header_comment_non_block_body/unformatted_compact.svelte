@@ -11,5 +11,5 @@
 	// multiline header + block comment between ) and body — both drop to the body line
 	for(let i=0;
 	// c
-	i<10;i++) /* b */ fn();
+	i<10;i++)/* b */fn();
 </script>

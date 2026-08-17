@@ -6,10 +6,10 @@
 	const a = function fn2/* c2 */() {};
 
 	// Class expression (no heritage)
-	const b = class A/* c3 */ {};
+	const b = class A/* c3 */{};
 
 	// Type alias
-	type B/* c4 */ = string;
+	type B/* c4 */= string;
 
 	// Declare function
 	declare function fn3/* c5 */(): void;

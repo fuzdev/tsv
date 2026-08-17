@@ -8,7 +8,7 @@
 	}
 
 	// Block comment variant
-	while (/* before */ x /* inline */
+	while (/* before */x/* inline */
 		/* trailing */
 	) {
 		b();

@@ -18,7 +18,7 @@ b`);
 	f(1,(x)=>({
 		k:1
 	}));
-	new F(1,(x)=>   ({
+	new F(1,(x)=>({
 		k:1
 	}));
 
@@ -28,11 +28,11 @@ b`);
 	f(1,()=>()=>({
 		k:1
 	}));
-	new F(1,()=>  ()=>({
+	new F(1,()=>()=>({
 		k:1
 	}));
 
 	// a short non-expandable body needs no break and stays inline in both
 	f(1,(x)=>x.y.z);
-	new F(1,(x)=>  x.y.z);
+	new F(1,(x)=>x.y.z);
 </script>

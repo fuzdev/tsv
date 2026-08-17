@@ -302,6 +302,12 @@ Variants stress-test normalization — unusual formatting that should collapse t
 - `unformatted_compact` → Minimal whitespace — `if(cond){expr;}`
 - `unformatted_spaces` → Excessive whitespace — `if  (  cond  )  {  expr  ;  }`
 
+⚠️ **The two are directional opposites, and `deno task variants:audit` gates it**:
+a `_compact` variant never widens a gap, a `_spaces` variant never empties one.
+Write both where the input supports both. A variant that must move whitespace
+*both* ways (the weld itself is the subject) takes a qualified name instead —
+see [fixture_naming.md §Standard Variant Names](./fixture_naming.md#standard-variant-names).
+
 **Preserve blank lines between statements** — prettier preserves them, so compact variants must too. Without matching blank lines, the variant won't normalize to input.
 
 ```svelte

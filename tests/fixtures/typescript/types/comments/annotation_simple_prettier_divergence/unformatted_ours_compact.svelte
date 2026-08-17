@@ -11,6 +11,6 @@ X; // trailing
 g: // c1
 // c2
 X; h: // leading
-X; /* trailing */
+X;/* trailing */
 };
 </script>

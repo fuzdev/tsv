@@ -4,7 +4,7 @@
 ></span>
 
 <!-- Whitespace-only content collapses (render-free); the close still hugs -->
-<span data-attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">   </span>
+<span data-attr="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  >   </span>
 
 <!-- Block element: always hugged (both formatters agree) -->
 <div

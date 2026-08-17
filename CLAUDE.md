@@ -184,6 +184,7 @@ deno task compile:fixtures:validate  # compile fixtures: oracle freshness + expe
 ```bash
 deno task conformance:audit          # doc/fixture integrity: divergences cataloged, every Markdown link in the repo resolves, divergence READMEs back-link, no catalog-family drift
 deno task conformance:audit:compiler # compile-fixture divergence integrity + checklist ↔ `Refusal` drift
+deno task variants:audit             # `_compact`/`_spaces` variant DIRECTION: the pair is two opposite claims about one input, so a `_compact` may never widen a whitespace gap and a `_spaces` may never empty one (bare suffixes only — a qualified name like `unformatted_ours_hug_spaced` is the escape hatch for a deliberately bidirectional variant)
 deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation
 deno task pins:audit                 # canonical-oracle PIN AGREEMENT, a repo fact: sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map, and the sidecar deno.lock must be identical. The lock also pins what no literal names — the oracle's own transitive deps (`LOCKED_TRANSITIVE`: esrap, which PRINTS svelte's compiled JS)
 deno task pins:lock                  # REGENERATE the sidecar lockfile (crates/tsv_debug/src/deno/deno.lock) after a canonical pin bump — the lock is frozen at runtime, so this is the only way it moves; `--check` reports drift without writing. Not a gate (resolution depends on what the registry currently offers). `--allow-fresh` opts past deno's 24h `minimumDependencyAge` supply-chain window, needed ONLY to take a version published in the last day — a lock made with it reproduces flag-free once that version ages out
@@ -538,7 +539,7 @@ and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 
 **Other file types** (same structure): `.ts`/`.svelte.ts` use acorn-typescript for parsing; `.css` uses Svelte's `parseCss`. All use prettier for formatting.
 
-**Unformatted variant rules:** Same content structure as input, only whitespace differs. Both formatters must normalize to exactly match input. For `.svelte` fixtures this is **enforced**: the render-equivalence check (R rules, ./docs/fixture_overview.md) asserts the variant and `input` produce the same browser-visible render via `svelte compile` — so a formatter bug that changed the render *and* happened to land on `input` can't pass green.
+**Unformatted variant rules:** Same content structure as input — usually only whitespace differs, and the **bare** `_compact` / `_spaces` names claim exactly that, in one direction (gated by `deno task variants:audit`; see ./docs/fixture_naming.md#standard-variant-names). A variant that also flips a *token* prettier normalizes away — a trailing comma, quote style, `<br>` for `<br />` — takes a name that says so (`unformatted_no_self_closing`, `unformatted_with_closing_tag`); ~300 bare-named variants predate that rule and the audit reports them as ungraded rather than pretending to cover them. Both formatters must normalize to exactly match input. For `.svelte` fixtures this is **enforced**: the render-equivalence check (R rules, ./docs/fixture_overview.md) asserts the variant and `input` produce the same browser-visible render via `svelte compile` — so a formatter bug that changed the render *and* happened to land on `input` can't pass green.
 
 **Invalid syntax rules (`input_invalid_*`):** Must fail BOTH parsers. One syntax error per file.
 
@@ -696,6 +697,15 @@ cargo run -p tsv_debug conformance_audit
 # tripwire) + checklist ↔ `Refusal` drift (a bucket key the catalog can't produce GATES; the
 # reverse is report-only). Pure Rust; gated in `deno task check`. --json.
 cargo run -p tsv_debug compile_conformance_audit
+
+# variant_audit - the `_compact` / `_spaces` variant DIRECTION: the pair is two opposite claims
+# about one reference form (input.*, or output_prettier.* for `unformatted_prettier_*`), so a
+# `_compact` may never widen a newline-free whitespace gap and a `_spaces` may never empty one.
+# Bare suffixes only — a qualified name (`unformatted_ours_hug_spaced`) is the escape hatch for a
+# deliberately bidirectional variant. A variant that is not whitespace-only against its reference
+# cannot be aligned and is reported UNGRADED, never silently skipped. Pure Rust; gated in
+# `deno task check`. --list, --json. See ./docs/audits.md
+cargo run -p tsv_debug variant_audit
 
 # canonicalize_audit - canonicalize_js at corpus scale: run twice per TS/JS file and bucket —
 # input-rejected (informational), NON-IDEMPOTENT / CORRUPT-OUTPUT / COMMENT-LOSS (all failures).

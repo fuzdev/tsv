@@ -9,5 +9,5 @@
 	@import url('./e.css') supports(display:grid),screen;
 
 	/* a comment before the comma keeps the comma glued to it */
-	@import url('./f.css') supports(display:grid) /* c */,screen;
+	@import url('./f.css') supports(display:grid)/* c */,screen;
 </style>

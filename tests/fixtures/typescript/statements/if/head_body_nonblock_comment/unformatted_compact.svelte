@@ -30,7 +30,7 @@
 // Block comment glued to a keyword-opening body stays on the body's line
 if(a)
 // c1
-/* c2 */ for (;;) {
+/* c2 */for (;;) {
 			break;
 		}
 </script>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	class A extends Base {
-		constructor( override   a:number ){ super(); }
+		constructor(override a:number){ super(); }
 	}
 
 	class B extends Base {
@@ -15,8 +15,8 @@
 
 	// `override` as a plain parameter name (not a modifier — no binding follows it)
 	class D {
-		constructor( override ){}
-		method( override:number ){}
-		other( override, x:string ){}
+		constructor(override){}
+		method(override:number){}
+		other(override, x:string){}
 	}
 </script>

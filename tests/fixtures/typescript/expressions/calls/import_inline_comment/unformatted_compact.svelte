@@ -5,5 +5,5 @@
 
 	const c = import(/* webpackChunkName: "chunk" */'./a');
 
-	const d = import(/* comment1 */ /* comment2 */expr);
+	const d = import(/* comment1 *//* comment2 */expr);
 </script>

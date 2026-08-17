@@ -1,5 +1,5 @@
 <style>
-	div>span {
+	div  >  span {
 		font-weight: bold;
 	}
 
@@ -7,7 +7,7 @@
 		list-style: none;
 	}
 
-	.class1>.class2 {
+	.class1  >  .class2 {
 		color: red;
 	}
 </style>

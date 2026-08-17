@@ -4,8 +4,8 @@
 	const xor2 = 1^2^3;
 
 	// Bitwise NOT (unary)
-	const not = ~ x;
-	const notNot = ~ ~ x;
+	const not = ~x;
+	const notNot = ~~x;
 
 	// Left shift
 	const left = a<<b;

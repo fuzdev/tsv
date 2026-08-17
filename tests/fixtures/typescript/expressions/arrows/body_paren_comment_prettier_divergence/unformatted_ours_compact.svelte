@@ -38,7 +38,7 @@
 
 	// same-line comment group after a body break — block + line stay together
 	const i=()=>(x
-/* i1 */ // i2
+/* i1 */// i2
 	);
 
 	// object-literal body — parens are required, comment kept inside (not after `)`)

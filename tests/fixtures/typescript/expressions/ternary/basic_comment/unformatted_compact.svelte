@@ -11,5 +11,5 @@
 	const y = cond ? a : b;// trailing after ternary
 
 	// Block comment variant
-	const z = /* after equals *//* before */cond/* after cond */?/* before cons */a:/* before alt */b;
+	const z =/* after equals *//* before */cond/* after cond */?/* before cons */a:/* before alt */b;
 </script>

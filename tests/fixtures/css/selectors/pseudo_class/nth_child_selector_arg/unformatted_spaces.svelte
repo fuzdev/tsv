@@ -14,7 +14,7 @@
 	:nth-child( a:hover ) {
 		color: teal;
 	}
-	:nth-child(.class1,.class2) {
+	:nth-child(  .class1 ,  .class2  ) {
 		color: orange;
 	}
 	:nth-child(.class1  >  .class2) {
