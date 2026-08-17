@@ -9,11 +9,11 @@
 	b2=2;
 
 	// Trailing block before the comma plus a same-line line comment: both trail the comma.
-	let a3=1 /* block */, // line
+	let a3=1/* block */, // line
 	b3=2;
 
 	// Trailing block before the comma plus an own-line line comment: the line comment sits below.
-	let a4=1 /* block */,
+	let a4=1/* block */,
 	// line
 	b4=2;
 </script>

@@ -1,12 +1,12 @@
 <style>
 @scope    {
 a {
-color:red;
+color:   red;
 }
 }
 @scope   to (.b)    {
 		a {
-				color:red;
+				color:   red;
 		}
 }
 </style>

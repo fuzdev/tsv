@@ -30,7 +30,7 @@
 	>(arg);
 
 	// a plain glued block comment on a sole argument is preserved
-	const t = fn3</* c */ { x : 1 }>(arg);
+	const t = fn3< /* c */ { x : 1 }>(arg);
 
 	// own-line directive on a sole argument: the list expands (a frozen argument
 	// never hugs the angle brackets — the directive stays own-line)

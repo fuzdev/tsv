@@ -12,7 +12,7 @@
 	fn();
 
 	// A pair the author glued stays on one line, and a lone block collapses
-	label4:/* cmt5 */ /* cmt6 */ fn();
+	label4:/* cmt5 *//* cmt6 */fn();
 
-	label5:/* cmt7 */ fn();
+	label5:/* cmt7 */fn();
 </script>

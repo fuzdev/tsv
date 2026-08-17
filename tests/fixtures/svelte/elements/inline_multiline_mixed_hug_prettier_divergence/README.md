@@ -11,7 +11,8 @@ are the same document. tsv therefore converges every authoring on one form, wher
 — its hugged form dangles while its whitespace form stays intact (the last case here).
 
 `prettier_variant_hug.svelte` is prettier's dangle form: prettier keeps it stable, tsv normalizes it
-to the block-style input. `unformatted_ours_spaces.svelte` is a loose authoring tsv likewise
-normalizes to input (prettier dangles it instead).
+to the block-style input. `unformatted_ours_hug_spaced.svelte` is a loose authoring tsv likewise
+normalizes to input (prettier dangles it instead) — qualified rather than `_spaces` because the
+hug is its subject, so it pads the interior while welding the boundary.
 
 See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

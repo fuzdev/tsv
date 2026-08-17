@@ -1,7 +1,7 @@
 <script lang="ts">
 namespace A {
 const a = 1; // line trailing
-const b = 2; /* block trailing */
+const b = 2;/* block trailing */
 }
 
 namespace B {

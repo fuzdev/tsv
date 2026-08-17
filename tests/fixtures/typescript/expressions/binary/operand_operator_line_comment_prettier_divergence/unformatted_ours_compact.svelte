@@ -24,7 +24,7 @@
 	// (syntax/comments/separator_glued_run)
 	const f =
 		g
-		/* c1 */ /* c2 */
+		/* c1 *//* c2 */
 		// c3
 		+ h;
 

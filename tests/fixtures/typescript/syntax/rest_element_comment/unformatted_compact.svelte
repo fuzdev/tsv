@@ -10,5 +10,5 @@
 	type G = (...args/* c */: string[]) => void;
 
 	// a destructuring rest binding keeps the gap comment outside the brackets
-	function h(...[ a ]/* c */: string[]) {}
+	function h(...[a]/* c */: string[]) {}
 </script>

@@ -12,5 +12,5 @@ export {e,
 f} from './b';
 
 // A same-line block comment does NOT force expansion
-import {g,/* c */ h} from './c';
+import {g,/* c */h} from './c';
 </script>

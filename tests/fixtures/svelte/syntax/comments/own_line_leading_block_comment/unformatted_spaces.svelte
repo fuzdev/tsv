@@ -2,11 +2,11 @@
 the value never pulls up onto the comment's closing line. Covers the JS-expression
 gaps that share one leading-comment emitter. -->
 <div
-	class={/* l1
+	class={ /* l1
 l2 */
 		x}
 >
-	{/* l1
+	{ /* l1
 l2 */
 			x}
 </div>

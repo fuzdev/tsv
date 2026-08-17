@@ -26,7 +26,7 @@
 
 	// a glued block comment is owned by the argument and rides inside its doc, so the
 	// hug survives
-	new A(/* c */ { a:   1 });
+	new A( /* c */ { a:   1 });
 
-	new A(/* c */ [a,   b]);
+	new A( /* c */ [a,   b]);
 </script>

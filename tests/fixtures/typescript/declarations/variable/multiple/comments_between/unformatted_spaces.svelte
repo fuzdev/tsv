@@ -1,1 +1,5 @@
-<script>const a = 1  ,   /* comment */   b   =   2;</script>
+<script>
+
+		const a = 1  ,   /* comment */   b   =   2;
+
+</script>

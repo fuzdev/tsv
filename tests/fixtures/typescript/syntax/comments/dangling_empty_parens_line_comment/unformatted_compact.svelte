@@ -39,7 +39,7 @@
 	);
 
 	// Block comment then line comment - each on its own line
-	fn(/* dangling */ // dangling
+	fn(/* dangling */// dangling
 	);
 
 	// Comment containing close paren character

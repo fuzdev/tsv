@@ -37,10 +37,27 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [F1 sweep](#f1-idempotency-sweep-idempotencysweep) | `idempotency:sweep` | pass-2 reflow on real code | conformance cadence |
 | [Corpus bundle](#the-corpus-bundle-auditcorpus) | `audit:corpus` | the content-loss / robustness bundle over real code | publish Step 3c |
 | [Lexer diff](#differential-lexer-harness-lex_diff) | — | token-stream drift after a lexer change | dev tool |
+| [Variant direction](#variant-whitespace-direction-audit-variantsaudit) | `variants:audit` | a `_compact` variant that ADDS whitespace, or a `_spaces` variant that REMOVES it — the pair's two directions collapsing into one | `deno task check` |
 | [Conformance audit](#conformance-audit-conformanceaudit) | `conformance:audit` | doc/fixture catalog + link integrity | `deno task check` |
 | [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `deno task check` |
 | [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `deno task check` |
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
+
+⚠️ **Editing whitespace in a fixture is never local to that fixture.** The four
+injection ratchets — [gaps](#gap-injection-audit-gapsaudit),
+[blanks](#blank-line-injection-audit-blanksaudit),
+[fabrication](#blank-fabrication-audit-fabricationaudit),
+[ignore](#ignore-directive-honoring-audit-ignoreaudit) — enumerate their sites **from
+the seed text**, and the seeds are every fixture file, variants included. Whitespace
+you delete is a site they can no longer probe, so a pinned bug whose only reproducer
+lived in that spelling stops firing and its ratchet fails **STALE**. The fix is to
+restore the shape, never to re-pin: a `known.txt` line is a real bug on a work list,
+and dropping it retires a bug nobody fixed. Find what was lost by running the audit
+with `--report` against an unmodified checkout — that also answers "did I cause this
+or inherit it?" — and re-home the shape in a variant whose name describes it. A shape
+that is *bidirectional* (a space before a bracket, the identifier glued after) fits
+neither bare `_compact` nor `_spaces` and needs its own qualified variant. After any
+whitespace edit across many fixtures, run all four.
 
 ## Line-Comment Swallow Audit (`swallow:audit`)
 
@@ -1041,6 +1058,113 @@ cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden --write  
 cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          # check against it
 # Options: --write (capture instead of check), --verbose (first divergent line per file)
 ```
+
+## Variant Whitespace-Direction Audit (`variants:audit`)
+
+```bash
+# variant_audit - the `_compact` / `_spaces` variant names are a matched pair of
+# OPPOSITE claims about one input, and the pair is the point: compact removes
+# whitespace the formatter normalizes away, spaces adds it, so between them a
+# fixture is squeezed from both sides. The N rules prove only that a variant LANDS
+# on input; nothing asked which direction it travelled from, and the corpus drifted
+# (a `_compact` padding `interface Empty {  }`, a `_spaces` stripping `h1 + p` to
+# `h1+p`). A wrong-way variant is a DUPLICATE of its sibling under the other name,
+# and the direction it was meant to cover goes untested silently.
+cargo run -p tsv_debug variant_audit          # audit (exit 1 on any wrong-way variant)
+cargo run -p tsv_debug variant_audit --list   # every graded variant + emptied/widened counts,
+#                                               then the ungraded (not whitespace-only) ones
+# Also: --json. Gated in `deno task check` via the `variants:audit` task. Pure Rust —
+# no Deno, no formatter run.
+```
+
+**The instrument.** A whitespace-only variant shares its input's non-whitespace
+character stream, so the two align on it: at every position the input holds a
+whitespace run and the variant holds the run that replaced it. Exact — no lexer,
+no removability heuristic. Two events are graded:
+
+- **EMPTIED** — input's run non-empty, variant's empty. `_spaces` must never.
+- **WIDENED** — *neither* run contains a newline and the variant's is strictly
+  longer. `_compact` must never.
+
+⚠️ **The newline exclusion on WIDENED is load-bearing.** Raw length over-flags: a
+`_spaces` variant joining a deeply-indented input replaces `\n\t\t\t` (4 chars)
+with `  ` (2) — shorter, yet plainly adding horizontal space. Comparing lengths
+only where both sides are newline-free asks the horizontal question in isolation;
+the vertical axis is left to EMPTIED, which no re-indentation can trip.
+
+⚠️ **The whitespace class is `is_collapsible_ws_char`, never `is_ascii_whitespace`.**
+Here the class decides how the two files ALIGN, so a character wrongly counted as
+whitespace shifts one stream against the other and every later gap is graded
+against the wrong partner. The narrow class is also conservative: a real
+whitespace character treated as content merely splits one gap into two, both
+still graded.
+
+**Scope: the bare suffix only.** Graded names are `unformatted_`,
+`unformatted_ours_` and `unformatted_prettier_` followed by exactly `compact` or
+`spaces`. Each prefix also names the **reference** the gaps align against — the form
+the variant must normalize to, which is `input.*` for the first two (N4/N5) and
+`output_prettier.*` for `unformatted_prettier_*` (N8). Aligning every prefix against
+`input` would grade that one against a form it makes no claim about, and the mismatch
+would surface as an alignment failure — i.e. land in the blind spot below rather than
+raise an error. A qualified name (`unformatted_unicode_spaces`,
+`unformatted_ours_hug_spaced`, `unformatted_ours_tail_weld`,
+`unformatted_compactish`) makes a narrower claim than the bare directional one and
+is out of scope by construction — the sanctioned home for a variant that must move
+whitespace *both* ways because the weld itself is its subject. The
+oracle-generated forms (`prettier_variant_compact`, `variant_compact`,
+`divergent_variant_compact`, `prettier_intermediate*`) are prettier's own output,
+so grading them would put the audit in an argument with the oracle.
+
+**Vacuity.** `check_graded_nonzero` plus a private `VARIANTS_GRADED_MIN` floor —
+the shared `FIXTURES_FORMATTED_MIN` counts formatted files, a different
+population. The floor catches the partial collapse zero cannot see: a walk that
+still finds fixtures but stops recognizing variants (a bucket rename, a prefix
+typo, an extension mismatch). Re-pin deliberately when a variant is renamed out of
+scope.
+
+⚠️ **Blind spot: the unalignable variants** (~303 today, ~13% of the variants in
+scope). A variant whose non-whitespace stream differs from its reference cannot be
+aligned, so it cannot be graded. They are counted, and listed by `--list` / `--json`,
+rather than dropped — a silently-excluded class reads as a covered one.
+
+The composition is measured, not assumed: a clear majority differ by exactly a
+**trailing comma** before a closer (`}` / `)` / `]` / `>`), then quote flips
+(`'x'` → `"x"`), then an added paren or a leading `|`. Only that tail is a *naming*
+problem (a whitespace name over a genuinely mixed edit); the trailing-comma class is a
+whitespace variant plus one mechanical token `trailingComma: 'none'` deletes, and its
+direction is exactly what one wants graded — normalizing a trailing comma before a
+closer would recover about half the blind spot. Both that and re-homing the tail are
+deliberately outside this gate today.
+
+**What it does NOT prove.** Only the direction, never the *extent*: a `_compact`
+variant that empties one gap and leaves twenty removable ones passes. Extent is
+nonetheless **decidable** — empty one gap, re-format, and see whether it still lands on
+the reference — and measuring it is what says why the gate stops short. About 21% of
+the non-empty gaps in `_compact` variants are removable that way, but the rest are
+mandatory separators, and forcing maximality would delete injection sites
+`gaps:audit` / `blanks:audit` / `ignore:audit` enumerate from the seed text
+([docs/gap_audit.md](./gap_audit.md)) — a whitespace edit strands the reproducer of a
+pinned bug.
+
+⚠️ **One subclass is held at zero by convention rather than by the gate: a HORIZONTAL
+gap touching a block comment.** Comment-adjacent gaps measured 59% removable (816 of
+1383) — three times the rest — because gluing is exactly what makes a comment's
+binding interesting: `owned_by_node` is *defined* by glue
+([docs/comments.md](./comments.md)), so a space-padded comment in a compact variant
+exercises nothing its own input does not. Every newline-free one that both formatters
+still normalize is now glued (334 of the 368 horizontal candidates); the 34 left are
+structurally required — tsv refuses the glue (`<div/* c */>` reparses the `/` as a
+self-close), or prettier would no longer normalize the glued form back to input
+(N3/N10).
+
+**The newline-carrying ones are deliberately left alone** (1015 of them), on the same
+reasoning that makes WIDENED horizontal-only above: whether a comment sits on its own
+line is *authorship*, not volume — it is what `is_own_line_comment` and
+`comment_hugs_next` read — so welding one onto the next line rewrites the authoring
+rather than compacting it, and takes a fixture's own explanatory prose down with it.
+When adding a `_compact` variant, glue its comments **horizontally** and leave their
+lines; a glued form that stops normalizing is the signal to leave that gap, not a
+reason to pad the rest.
 
 ## Conformance Audit (`conformance:audit`)
 

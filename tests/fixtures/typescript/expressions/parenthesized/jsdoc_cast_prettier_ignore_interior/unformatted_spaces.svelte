@@ -24,7 +24,7 @@
 
 	// an ordinary own-line comment in the same gap still collapses inline (no freeze,
 	// nothing to preserve)
-	const h = /** @type {T} */ (/* c */ fn(1, 2));
+	const h = /** @type {T} */ ( /* c */ fn(1, 2));
 
 	// a block comment glued before the inner is owned by it and stays put
 		const i = /** @type {T} */ (

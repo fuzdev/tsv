@@ -406,6 +406,12 @@ on real codebases.
 
 **Normalization validations (N)** - Variants normalize correctly:
 
+⚠️ The N rules prove only that a variant **lands on** its target; none asks which
+direction it travelled from, so a `_compact` that pads and a `_spaces` that strips both
+pass here. That is a separate gate —
+[audits.md §Variant Whitespace-Direction Audit](./audits.md#variant-whitespace-direction-audit-variantsaudit),
+`deno task variants:audit`.
+
 - **N1**: `prettier_variant_*.*`: `prettier(file) == file` (prettier idempotent, Rule 1)
 - **N2**: `prettier_variant_*.*` normalizes to input with our formatter (Rule 2)
 - **N3**: `unformatted_*.*` normalizes with prettier (runs wherever `unformatted_*` files are allowed — S9 restricts them to directories where input is prettier-stable)

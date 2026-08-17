@@ -4,8 +4,8 @@
 	/** @type {T} */(a[i])*=3;
 
 	// cast as a no-declaration for-of / for-in head target
-	for (/** @type {T} */ (a) of items) {
+	for (/** @type {T} */(a) of items) {
 	}
-	for (/** @type {T} */ (a.b) in obj) {
+	for (/** @type {T} */(a.b) in obj) {
 	}
 </script>

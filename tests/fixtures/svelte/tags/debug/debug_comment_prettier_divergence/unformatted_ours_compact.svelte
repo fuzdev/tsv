@@ -1,1 +1,1 @@
-{@debug /* comment */a}
+{@debug/* comment */a}

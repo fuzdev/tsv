@@ -1,1 +1,1 @@
-<span data-attr="value">{#if cond} text {/if}</span>
+<span data-attr="value">  {#if cond} text {/if}  </span>

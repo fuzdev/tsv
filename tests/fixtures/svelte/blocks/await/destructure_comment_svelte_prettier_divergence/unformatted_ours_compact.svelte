@@ -6,7 +6,7 @@
 <!-- :then and :catch branches preserve interior pattern comments too -->
 {#await promise}
 	loading
-{:then {b /* c */}}
+{:then {b/* c */}}
 	<div>{b}</div>
 {:catch [.../* c */rest]}
 	<div>x</div>

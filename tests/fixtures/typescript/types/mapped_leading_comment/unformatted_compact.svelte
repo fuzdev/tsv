@@ -17,21 +17,21 @@
 	};
 
 	// Block comment inline (single-line mapped type)
-	type C = {[/* inline */ K in keyof T]: V};
+	type C = {[/* inline */K in keyof T]: V};
 
 	// Block comment between : and V (multiline)
 	type D = {
-		[K in keyof T]: /* before value */ V;
+		[K in keyof T]:/* before value */V;
 	};
 
 	// Block comment between : and V (single-line)
-	type E = {[K in keyof T]: /* before */ V};
+	type E = {[K in keyof T]:/* before */V};
 
 	// Block comment after V (multiline)
 	type F = {
-		[K in keyof T]: V /* after value */;
+		[K in keyof T]: V/* after value */;
 	};
 
 	// Block comment after V (single-line)
-	type G = {[K in keyof T]: V /* after */};
+	type G = {[K in keyof T]: V/* after */};
 </script>

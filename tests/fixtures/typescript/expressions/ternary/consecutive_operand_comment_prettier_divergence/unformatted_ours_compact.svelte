@@ -25,7 +25,7 @@
 	// Boundary (a MATCH, not a divergence): a block + line comment authored on the
 	// test's own line both stay trailing — only later-line comments move. A `//`
 	// ends its line, so it is always last in a same-line run.
-	const d = cond /* c1 */ // c2
+	const d = cond/* c1 */// c2
 	? x
 	: y;
 </script>

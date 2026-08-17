@@ -1,1 +1,5 @@
-<script lang="ts">const a : number = 1  ,   b : string   =   'text';</script>
+<script lang="ts">
+
+		const a : number = 1  ,   b : string   =   'text';
+
+</script>

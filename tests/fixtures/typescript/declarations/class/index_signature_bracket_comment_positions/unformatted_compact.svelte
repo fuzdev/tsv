@@ -20,7 +20,7 @@ k:string
 }
 // a glued run leads the key inline
 class F {
-[/* f */ /* g */k:string]:T;
+[/* f *//* g */k:string]:T;
 }
 // an author blank line before the key is preserved
 class G {

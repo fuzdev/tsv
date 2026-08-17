@@ -9,7 +9,7 @@ h1 text
 </template>
 
 <!-- Trailing block comment is self-delimiting, so the head stays on one line -->
-<template    lang="pug"    /* c */   >
+<template lang="pug"/* c */>
 h1 text
 </template>
 

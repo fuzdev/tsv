@@ -37,7 +37,7 @@ fn(
 (argument1111111,argument2222222,argument3333333,argument4444444,argument5555555)=>(argument6)=>body);
 
 // A trailing block comment after the last argument - same progressive indent
-fn(aaa,(argument1111111,argument2222222,argument3333333,argument4444444,argument55)=>(argument6)=>body /* c */);
+fn(aaa,(argument1111111,argument2222222,argument3333333,argument4444444,argument55)=>(argument6)=>body/* c */);
 
 // A typed outer chain does not suppress a nested call's own chain layout - prettier's
 // expandLastArg applies to the argument being printed, never to what is nested in it

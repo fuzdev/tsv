@@ -3,13 +3,13 @@
 	.class1,  /* x1
 y1
 z1 */  .class2 {
-		color:red;
+		color:   red;
 	}
 
 	/* before opening brace */
 	.class3  /* x2
 y2 */  {
-		color:blue;
+		color:   blue;
 	}
 
 	/* declaration value */
@@ -23,6 +23,6 @@ y3 */  red;
 /* y4
 z4 */
 	span {
-		color:green;
+		color:   green;
 	}
 </style>

@@ -1,6 +1,6 @@
 <style>
 	/* Basic :has() with combinators */
-	a:has(>img) {
+	a:has(  >  img  ) {
 		display: block;
 	}
 
@@ -9,7 +9,7 @@
 	}
 
 	/* :has() with multiple selectors */
-	article:has(h2,h3) {
+	article:has(  h2 ,  h3  ) {
 		padding: 20px;
 	}
 
@@ -19,12 +19,12 @@
 	}
 
 	/* Chained :has() */
-	section:has(>h2):has(>p) {
+	section:has(  >  h2  ):has(  >  p  ) {
 		border: 1px solid red;
 	}
 
 	/* :has() combined with :is() and :not() */
-	:is(.class1,.class2):has(  span  ) {
+	:is(  .class1 ,  .class2  ):has(  span  ) {
 		color: blue;
 	}
 

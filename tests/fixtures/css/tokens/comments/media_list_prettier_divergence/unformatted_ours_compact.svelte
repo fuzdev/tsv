@@ -1,6 +1,6 @@
 <style>
 	/* Multiple comment positions - we normalize spacing, Prettier preserves input */
-	@media /* a */screen/* b */and/* c */(min-width: 500px) {
+	@media/* a */screen/* b */and/* c */(min-width: 500px) {
 		div {
 			color: red;
 		}
@@ -14,7 +14,7 @@
 	}
 
 	/* Comment inside condition value */
-	@media (min-width: /* size */500px) {
+	@media (min-width:/* size */500px) {
 		div {
 			color: green;
 		}
