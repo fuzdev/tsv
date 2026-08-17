@@ -566,10 +566,22 @@ impl<'a> Printer<'a> {
     /// Used by chain arg formatting when we need the object/array to expand
     /// internally with hardlines so fits() can correctly measure the first line.
     /// For example, `.fn({prop})` should become `.fn({\n  prop,\n})` when expanded.
+    ///
+    /// ⚠️ The two literal arms reach their builders directly rather than through
+    /// [`Self::build_expression_doc`], so the owned-comment seam is theirs to discharge
+    /// (`docs/comments.md` hazard 1): a block glued to the `{`/`[` is bound to that node and
+    /// printed by its doc, and `build_object_doc_expanded`'s own comment gate asks only about
+    /// the object's INTERIOR — a comment one byte before `span.start` is outside every window
+    /// it consults, so without the prepend it is DROPPED. The `_` arm needs none:
+    /// `build_arg_expression_doc` routes there.
     pub(super) fn build_arg_expression_doc_expanded(&self, expr: &Expression<'_>) -> DocId {
         match expr {
-            Expression::ObjectExpression(obj) => self.build_object_doc_expanded(obj),
-            Expression::ArrayExpression(arr) => self.build_array_doc_expanded(arr),
+            Expression::ObjectExpression(obj) => {
+                self.prepend_owned_leading_comment(expr, self.build_object_doc_expanded(obj))
+            }
+            Expression::ArrayExpression(arr) => {
+                self.prepend_owned_leading_comment(expr, self.build_array_doc_expanded(arr))
+            }
             // For other expressions, use normal doc building
             _ => self.build_arg_expression_doc(expr),
         }

@@ -15,6 +15,32 @@ use super::super::errors::{
 };
 use super::super::{FixtureValidation, UndocumentedPrettierOutput};
 
+/// What already pins an `unformatted_ours_*` suffix's prettier chain, so
+/// [`validate_n10_cross_path_discovery`] does not report it as undocumented.
+///
+/// Two spellings, because a chain can be pinned by NAME or by CONTENT: N12 pins a whole
+/// chain under its own suffix, while an intermediate pins one unstable form — and a suffix
+/// whose first pass lands on a form a sibling already recorded is covered by that one file
+/// (S22 forbids the byte-copy that would give it a file of its own).
+struct ChainPins {
+    /// Suffixes whose chain `audit_signature_<suffix>.txt` pins (N12).
+    signature_suffixes: HashSet<String>,
+    /// Contents of the `prettier_intermediate*_*` files that verified (N7/N7b/N7c).
+    intermediate_forms: Vec<String>,
+}
+
+impl ChainPins {
+    /// Is this suffix's prettier output already pinned — by its own chain signature, or by
+    /// a sibling intermediate holding the same form?
+    fn covers(&self, suffix: &str, prettier_output: &str) -> bool {
+        self.signature_suffixes.contains(suffix)
+            || self
+                .intermediate_forms
+                .iter()
+                .any(|form| form == prettier_output)
+    }
+}
+
 /// Find the first `prettier_variant_*` file whose content equals `content`.
 ///
 /// A `prettier_variant_*` already asserts ours → input (N2) AND pins prettier's
@@ -461,7 +487,11 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
     validate_n3_unformatted_normalizes(result, fixture, input, files).await;
     let unformatted_ours_outputs =
         validate_n6_unformatted_ours(result, fixture, input, input_ext, files).await;
-    validate_n7_prettier_intermediates(
+    // The three intermediate families return the forms they verified. A suffix whose own
+    // prettier output IS one of them is pinned by that file — S22 forbids a byte-copy under
+    // a second name, so the sharing is how two sources whose chains coincide are both
+    // covered by the one file that records the form.
+    let mut intermediate_forms = validate_n7_prettier_intermediates(
         result,
         fixture,
         input,
@@ -470,24 +500,28 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
         &unformatted_ours_outputs,
     )
     .await;
-    validate_n7b_intermediates_to_variant(
-        result,
-        fixture,
-        input,
-        input_ext,
-        files,
-        &unformatted_ours_outputs,
-    )
-    .await;
-    validate_n7c_intermediates_to_divergent_variant(
-        result,
-        fixture,
-        input,
-        input_ext,
-        files,
-        &unformatted_ours_outputs,
-    )
-    .await;
+    intermediate_forms.extend(
+        validate_n7b_intermediates_to_variant(
+            result,
+            fixture,
+            input,
+            input_ext,
+            files,
+            &unformatted_ours_outputs,
+        )
+        .await,
+    );
+    intermediate_forms.extend(
+        validate_n7c_intermediates_to_divergent_variant(
+            result,
+            fixture,
+            input,
+            input_ext,
+            files,
+            &unformatted_ours_outputs,
+        )
+        .await,
+    );
     validate_n8_unformatted_prettier(result, fixture, files).await;
     // N12 before N10: the chain signatures it verifies are exactly what N10 must not
     // report as undocumented.
@@ -502,6 +536,10 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
         &pins,
     )
     .await;
+    let chain_pins = ChainPins {
+        signature_suffixes: chain_pinned,
+        intermediate_forms,
+    };
     validate_n10_cross_path_discovery(
         result,
         fixture,
@@ -509,7 +547,7 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
         input_ext,
         &unformatted_ours_outputs,
         &pins,
-        &chain_pinned,
+        &chain_pins,
     )
     .await;
 }
@@ -746,6 +784,9 @@ async fn validate_n6_unformatted_ours(
 /// N7: prettier_intermediate_* validation
 ///
 /// These files capture prettier's unstable first-pass output from unformatted_ours_* files.
+///
+/// Returns the contents of the intermediates that verified — the forms a sibling suffix
+/// may share (see [`validate_n10_cross_path_discovery`]).
 async fn validate_n7_prettier_intermediates(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -753,10 +794,11 @@ async fn validate_n7_prettier_intermediates(
     input_ext: &str,
     files: &FixtureFiles,
     unformatted_ours_prettier_outputs: &HashMap<String, String>,
-) {
+) -> Vec<String> {
     let fixture_dir = &fixture.path;
     let prettier_parser = fixture.input_type().prettier_parser();
 
+    let mut verified_contents = Vec::new();
     let mut converged = 0;
 
     for intermediate_name in &files.prettier_intermediate {
@@ -831,6 +873,7 @@ async fn validate_n7_prettier_intermediates(
                     );
                 } else {
                     converged += 1;
+                    verified_contents.push(intermediate_content);
                 }
             }
             Err(e) => {
@@ -844,12 +887,16 @@ async fn validate_n7_prettier_intermediates(
     if converged > 0 {
         result.add_success(ValidationSuccess::PrettierIntermediatesConverge(converged));
     }
+
+    verified_contents
 }
 
 /// N7b: prettier_intermediate_to_variant_* validation
 ///
 /// Like N7, but the second pass must converge to a documented variant_*/prettier_variant_*
 /// file (not input).
+///
+/// Returns the contents of the intermediates that verified, as N7 does.
 async fn validate_n7b_intermediates_to_variant(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -857,7 +904,7 @@ async fn validate_n7b_intermediates_to_variant(
     input_ext: &str,
     files: &FixtureFiles,
     unformatted_ours_prettier_outputs: &HashMap<String, String>,
-) {
+) -> Vec<String> {
     let fixture_dir = &fixture.path;
     let prettier_parser = fixture.input_type().prettier_parser();
 
@@ -876,6 +923,7 @@ async fn validate_n7b_intermediates_to_variant(
         }
     }
 
+    let mut verified_contents = Vec::new();
     let mut converged = 0;
 
     for intermediate_name in &files.prettier_intermediate_to_variant {
@@ -976,6 +1024,7 @@ async fn validate_n7b_intermediates_to_variant(
                     }
                 } else {
                     converged += 1;
+                    verified_contents.push(intermediate_content);
                 }
             }
             Err(e) => {
@@ -991,6 +1040,8 @@ async fn validate_n7b_intermediates_to_variant(
             converged,
         ));
     }
+
+    verified_contents
 }
 
 /// N7c: prettier_intermediate_to_divergent_variant_* validation
@@ -1010,7 +1061,7 @@ async fn validate_n7c_intermediates_to_divergent_variant(
     input_ext: &str,
     files: &FixtureFiles,
     unformatted_ours_prettier_outputs: &HashMap<String, String>,
-) {
+) -> Vec<String> {
     let fixture_dir = &fixture.path;
     let prettier_parser = fixture.input_type().prettier_parser();
 
@@ -1024,6 +1075,7 @@ async fn validate_n7c_intermediates_to_divergent_variant(
         }
     }
 
+    let mut verified_contents = Vec::new();
     let mut converged = 0;
 
     for intermediate_name in &files.prettier_intermediate_to_divergent_variant {
@@ -1125,6 +1177,7 @@ async fn validate_n7c_intermediates_to_divergent_variant(
                     }
                 } else {
                     converged += 1;
+                    verified_contents.push(intermediate_content);
                 }
             }
             Err(e) => {
@@ -1140,6 +1193,8 @@ async fn validate_n7c_intermediates_to_divergent_variant(
             ValidationSuccess::PrettierIntermediatesToDivergentVariantConverge(converged),
         );
     }
+
+    verified_contents
 }
 
 /// N8: unformatted_prettier_* validation
@@ -1247,7 +1302,7 @@ async fn validate_n10_cross_path_discovery(
     input_ext: &str,
     unformatted_ours_prettier_outputs: &HashMap<String, String>,
     pins: &SingleFormPins,
-    chain_pinned_suffixes: &HashSet<String>,
+    chain_pins: &ChainPins,
 ) {
     // Also claim suffixes where prettier(unformatted_ours_*) == input (those got N6 errors, not novel)
     // These are already not in unformatted_ours_prettier_outputs (they were flagged as errors)
@@ -1259,9 +1314,10 @@ async fn validate_n10_cross_path_discovery(
             continue;
         }
 
-        // N12 pinned this output as a full chain — the case no single-form marker can
-        // express. Already verified byte-exact there, so it is not undocumented.
-        if chain_pinned_suffixes.contains(suffix) {
+        // Already pinned: N12 recorded this suffix's whole chain, or a sibling's
+        // `prettier_intermediate*_*` records this exact first-pass form and N7/N7b/N7c
+        // verified the chain out of it. Either way it is not undocumented.
+        if chain_pins.covers(suffix, prettier_output) {
             continue;
         }
 

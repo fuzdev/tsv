@@ -24,8 +24,7 @@ use crate::printer::calls::{
     build_call_args_expanded, build_printed_argument_doc, could_expand_arrow_chain,
     has_inter_argument_comments_slice, has_trailing_comments_slice,
     has_trailing_line_comments_slice, prepend_arrow_body_comments,
-    should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
-    wrap_call_with_will_break_guard,
+    wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
 };
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
@@ -637,19 +636,9 @@ impl<'a> Printer<'a> {
                 paren_open,
                 first_arg_start,
             );
-            let has_paren_line = gap_pc.has_trailing_comments();
-            if has_paren_line
-                && should_force_expansion_for_comments(self, paren_open, first_arg_start)
-            {
+            if gap_pc.pulls_to_delimiter_line(self) {
                 let mut paren_line_prefix = DocBuf::new();
-                gap_pc.emit_trailing_comments(&mut paren_line_prefix, self);
-                if let Some(pulled_end) = gap_pc.trailing_end() {
-                    self.push_delimiter_glued_blank(
-                        &mut paren_line_prefix,
-                        pulled_end,
-                        first_arg_start,
-                    );
-                }
+                gap_pc.emit_delimiter_line_pull(&mut paren_line_prefix, self);
 
                 let mut inner = DocBuf::new();
                 for comment in &gap_pc.leading {
