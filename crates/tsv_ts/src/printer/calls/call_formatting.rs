@@ -17,8 +17,8 @@ use super::arg_predicates::{
 };
 use super::arg_wrapping::{
     ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap,
-    arrow_body_expands_internally, arrow_hug_refused_by_comments,
-    build_arrow_arg_doc_for_hug_states, build_arrow_call_body_states, build_arrow_sig_doc,
+    arrow_body_expands_internally, arrow_hug_refused_by_comments, build_arrow_call_body_states,
+    build_arrow_hug_arg_docs, build_arrow_hug_printed_doc, build_arrow_sig_doc,
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
     build_expand_first_arg_doc, build_own_line_post_arrow_state, build_printed_argument_doc,
     build_single_arrow_arg_states, build_single_container_arg_doc, could_expand_arrow_chain,
@@ -833,19 +833,21 @@ fn build_block_arrow_hug_states(
     arg: &internal::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
+    let build = || printer.build_expression_doc(arg);
 
-    // The ONE argument doc every state below shares, and which of prettier's two renderings
-    // it is: [`build_arrow_arg_doc_for_hug_states`], shared with the `new` twin.
-    let arrow_doc = build_arrow_arg_doc_for_hug_states(printer, arg, arrow);
+    // ⚠️ Both comment refusals are asked BEFORE the pair below and read only the
+    // `printedArguments` printing — the pair is a second build of the argument, which
+    // recurses into any call nested in its body ([`build_arrow_hug_printed_doc`]).
 
     // If the arrow has trailing param comments, the params will be multiline,
     // so we should force the wrapped state (prettier behavior)
     if arrow_signature_has_breaking_comments(printer, arrow) {
         // Force wrapped state when arrow has trailing param comments
+        let printed = build_arrow_hug_printed_doc(printer, arg, arrow, build);
         return d.concat(&[
             callee,
             d.text("("),
-            d.indent(d.concat(&[d.softline(), arrow_doc])),
+            d.indent(d.concat(&[d.softline(), printed])),
             d.softline(),
             d.text(")"),
         ]);
@@ -856,16 +858,21 @@ fn build_block_arrow_hug_states(
     // because the rule is the gap's and not the body's — see
     // [`last_arg_has_own_line_post_arrow_comment`].
     if last_arg_has_own_line_post_arrow_comment(printer, arg) {
+        let printed = build_arrow_hug_printed_doc(printer, arg, arrow, build);
         return d.concat(&[
             callee,
-            build_own_line_post_arrow_state(d, d.text("("), &[], arrow_doc),
+            build_own_line_post_arrow_state(d, d.text("("), &[], printed),
         ]);
     }
 
-    // The state ladder, shared with the `new` single-argument arm — an object/array body gets
-    // the middle state that expands it internally while the arrow stays hugged.
+    // Prettier's two printings of the argument, and which of them each state reads:
+    // [`build_arrow_hug_arg_docs`], shared with the `new` twin.
+    let docs = build_arrow_hug_arg_docs(printer, arg, arrow, build);
+
+    // The state ladder, shared with the `new` single-argument arm — an object/array terminal
+    // gets the middle state that expands it internally while the arrow stays hugged.
     // See also: chain_args.rs's parallel chain-context implementation.
-    build_single_arrow_arg_states(d, callee, arrow_doc, arrow_body_expands_internally(arrow))
+    build_single_arrow_arg_states(d, callee, docs, arrow_body_expands_internally(arrow))
 }
 
 /// Build the 3-state expand-last layout for a single expression arrow with a

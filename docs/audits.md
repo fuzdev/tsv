@@ -406,11 +406,12 @@ it by hand — the anchor rule is `Printer::element_claim_anchor`.
 # sibling-`>` dangle / {#snippet} / {#key}; ts member chains, ternaries, conditional
 # types, nested calls, and the expand-last arrow family — plain, multi-arg, `new`,
 # chain, object-body, conditional-body, `function`, and curried, the last in untyped /
-# typed / `new` / chain spellings) at increasing depth, failing if the doc-node count
-# grows faster than ~depth^3. An axis earns its place by REACHING a builder no other
-# axis does; the curried four came from a real 2^depth regression that the family as it
-# then stood could not see. Deterministic, pure Rust, no Deno. Exits 1 on any
-# super-linear case.
+# typed / `new` / chain / object-TERMINAL spellings, the object-terminal one again in
+# single-argument, multi-argument and chain forms) at increasing depth, failing if the
+# doc-node count grows faster than ~depth^3. An axis earns its place by REACHING a
+# builder no other axis does; the curried axes came from real 2^depth regressions that
+# the family as it then stood could not see. Deterministic, pure Rust, no Deno. Exits 1
+# on any super-linear case.
 cargo run -p tsv_debug build_fanout_audit
 # Also: --json. Gated in `deno task check` via the `fanout:audit` task.
 ```
