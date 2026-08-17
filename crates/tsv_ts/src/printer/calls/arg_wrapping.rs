@@ -6,8 +6,8 @@
 // - Building argument lists split into head/last patterns
 
 use super::super::{
-    ArrowChainContext, CommentSpacing, Printer, arrow_chain_should_break, is_curried_arrow_chain,
-    is_multiline_template_expression,
+    ArrowChainContext, CommentSpacing, Printer, ShareTag, arrow_chain_should_break,
+    is_curried_arrow_chain, is_multiline_template_expression,
 };
 use super::arg_comments::{
     any_arg_gap_has_comment_on_page, build_arg_gap_docs, emit_first_arg_leading_comments,
@@ -20,6 +20,7 @@ use super::arg_predicates::{
 use crate::ast::internal;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, arrow_token_end, has_leftmost_object_expression,
+    prepend_leading,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
@@ -37,11 +38,12 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// reused a `skip_arrow_chain` doc (tsv's spelling of `expandLastArg`) for its broken-out
 /// state had no chain layout at all, which is the whole bug class this helper closes.
 ///
-/// Prettier's other printing — the `expandLastArg` `lastArg` its hug states read — has
-/// exactly one caller left, [`Printer::skip_arrow_chain`]'s, and only for a chain
-/// `arrow_chain_should_break` forces open: see `call_formatting.rs`'s
-/// `build_block_arrow_hug_states`, which states why every other chain needs no second build
-/// (and why paying for one would be 2^depth).
+/// Prettier's other printing — the `expandLastArg` `lastArg` its hug states read — is
+/// [`build_expand_last_arg_doc`]'s, and it is built BESIDE this one only where a hug state
+/// renders the argument broken: the object/array terminal, in each of the four argument
+/// printers. Every other shape reads one doc, this one. [`build_arrow_hug_arg_docs`] states
+/// the rule per shape, and why paying for a second build off the injected-body path would be
+/// 2^depth.
 ///
 /// **Every** curried chain is routed, break-forcing or not — the binaryish site
 /// (`build_chain_aware_operand_doc`) has always done the same, and the refusal lives in one
@@ -57,11 +59,18 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// correctness fix rather than hygiene. Prettier's `expandLastArg` is an argument to one
 /// `print()` call — it describes the node being printed and nested prints never inherit it —
 /// whereas tsv spells it as ambient `Printer` state, so without a clear it survives the
-/// descent: the hug of a chain `arrow_chain_should_break` forces open (the one position that
-/// still sets the flag) suppressed the progressive layout of an entirely different chain
+/// descent: the hug of a chain `arrow_chain_should_break` forces open (one of the positions
+/// that set it) suppressed the progressive layout of an entirely different chain
 /// nested in its body
 /// (`fn(({ a }) => ({ b }) => { return g((x, …) => (y) => z); })`). Every argument of every
 /// nested call routes through here, which is exactly the seam where the flag stops applying.
+//
+// TODO: only HALF of `expandLastArg` stops at this seam. `expand_last_arg_flat_params` — the
+// `removeLines` half, set by the same `build_expand_last_arg_doc` — is not cleared here, so it
+// survives the descent and `remove_lines`es the parameters of every arrow built under it,
+// including one nested inside the hugged body, where prettier applies `removeLines` to the
+// last argument's OWN parameters only. No fixture pins it; clear both, or record why the
+// halves differ.
 pub(crate) fn build_printed_argument_doc(
     printer: &Printer<'_>,
     arg: &internal::Expression<'_>,
@@ -344,16 +353,17 @@ fn classify_arrow_body(arrow: &internal::ArrowFunctionExpression<'_>) -> ChainAr
 /// - `() => () => [arr]` → true (array body)
 /// - `() => () => call()` → false (call in arrow chain)
 /// - `() => () => cond ? a : b` → false (conditional in arrow chain)
+///
+/// The chain walk is [`arrow_terminal_expression_body`]'s — `None` there IS the block
+/// terminal, so this is that predicate plus the two literal kinds, and the two cannot drift
+/// on how deep a chain reaches.
 pub(crate) fn could_expand_arrow_chain(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
-    match &arrow.body {
-        internal::ArrowFunctionBody::BlockStatement(_) => true,
-        internal::ArrowFunctionBody::Expression(expr) => match &**expr {
-            internal::Expression::ObjectExpression(_)
-            | internal::Expression::ArrayExpression(_) => true,
-            internal::Expression::ArrowFunctionExpression(inner) => could_expand_arrow_chain(inner),
-            _ => false,
-        },
-    }
+    arrow_terminal_expression_body(arrow).is_none_or(|body| {
+        matches!(
+            body,
+            internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
+        )
+    })
 }
 
 /// Classify how an expression body should be formatted.
@@ -463,49 +473,101 @@ pub(crate) fn arrow_hug_body_needs_parens(body_expr: &internal::Expression<'_>) 
     matches!(body_expr, internal::Expression::ObjectExpression(_))
 }
 
-/// Pre-build an expand-last-arg arrow's **object/array** body once (the sibling of
-/// `prebuild_expand_last_break_body` for the object/array hug path). Returns
-/// `(body span, inject doc, hug body doc)`:
-/// - `inject doc` is what the whole arrow's `build_arrow_body_doc` produces for this body —
-///   `d.parens(obj)` for an object (the leftmost-object parens: `build_arrow_body_doc` wraps
-///   the whole-body object in `d.parens` exactly as this does), or the bare array doc for an
-///   array — and is injected so the whole-arrow arg doc reuses it;
-/// - `hug body doc` is what the hug state wraps in `group_break` — the same doc, since it
-///   renders the same body in the same position ([`arrow_hug_body_needs_parens`]).
+/// An arrow's **terminal** expression body — its own, or, through a curried chain
+/// (`(a) => (b) => X`), the last head's. `None` for a block terminal.
 ///
-/// Both share the single body build, so `f(lead, x => ({{ k: f(lead, y => …) }}))` stays
-/// linear. Returns `None` (unchanged) when the last arg isn't an object/array-body arrow or
-/// the call carries comments.
+/// The chain is walked because prettier's `expandLastArg` print has no chain layout
+/// (`printArrowFunction`: `shouldPrintAsChain = !args.expandLastArg && …`), so a chain is
+/// just a run of signatures ending in this body — which is why every hug question keyed on
+/// "what kind of body is this?" is keyed on the terminal, at any depth.
+pub(crate) fn arrow_terminal_expression_body<'arena>(
+    arrow: &internal::ArrowFunctionExpression<'arena>,
+) -> Option<&'arena internal::Expression<'arena>> {
+    let mut current = arrow;
+    loop {
+        match &current.body {
+            internal::ArrowFunctionBody::Expression(body) => match body {
+                internal::Expression::ArrowFunctionExpression(inner) => current = inner,
+                _ => return Some(body),
+            },
+            internal::ArrowFunctionBody::BlockStatement(_) => return None,
+        }
+    }
+}
+
+/// Whether an arrow's body **expands internally** — an object or array literal, whose own doc
+/// breaks while the arrow itself stays hugged to the callee's `(`.
+///
+/// Asked of the [terminal](arrow_terminal_expression_body), so a curried chain whose last head
+/// returns an object or array answers `true`: prettier hugs the whole run of signatures and
+/// expands only the terminal (`fn((a) => (b) => ({⏎…⏎}))`).
+///
+/// ⚠️ **The states this selects must render the argument's `expandLastArg` printing**
+/// ([`build_expand_last_arg_doc`]), never its `printedArguments` one. Wrapping the *chain*
+/// doc in `group_break` breaks the chain's own heads onto separate lines, and the truncated
+/// `fits` walk then reports that as fitting — hugging a many-head chain prettier breaks out
+/// on width, since its `expandLastArg` print has no chain layout to break
+/// (`expressions/arrow/curried_untyped_call_arg_long` catches exactly that).
+pub(crate) fn arrow_body_expands_internally(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
+    arrow_terminal_expression_body(arrow).is_some_and(|body| {
+        matches!(
+            body,
+            internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
+        )
+    })
+}
+
+/// Pre-build an expand-last-arg arrow's **object/array** terminal body once, returning
+/// `(body span, body doc)`.
+///
+/// The doc is what the whole arrow's `build_arrow_body_doc` produces for this body —
+/// `d.parens(obj)` for an object (the leftmost-object parens: `build_arrow_body_doc` wraps the
+/// whole-body object in `d.parens` exactly as this does), or the bare array doc for an array.
+/// The caller injects it ([`Printer::inject_arrow_body`]) so **both** printings of the
+/// argument reuse the one build: prettier's `printedArguments` entry and its `expandLastArg`
+/// `lastArg`. Without that, the second printing recurses into any call nested in the body and
+/// `f(lead, x => ({ k: f(lead, y => …) }))` costs 2^depth doc nodes (`fanout:audit`).
+///
+/// Returns `Some` for exactly the shape [`arrow_body_expands_internally`] claims — the two ask
+/// the same question of the same [terminal](arrow_terminal_expression_body) — and `None`
+/// otherwise. **Deliberately not gated on the call carrying comments**, unlike its
+/// `prebuild_expand_last_break_body` sibling: this body kind reaches `build_arrow_body_doc`'s
+/// leftmost-object arm, whose only work beside the build is the parens reproduced here, so the
+/// injected doc is what that arm would produce with or without comments — and a comment-gated
+/// prebuild would leave the second printing to rebuild the subtree, which is the 2^depth shape
+/// on any nesting the gate happens to open.
 pub(crate) fn prebuild_expand_last_obj_array_body(
     printer: &Printer<'_>,
     last_arg: Option<&internal::Expression<'_>>,
-    call_has_comments: bool,
-) -> Option<(u32, DocId, DocId)> {
-    if call_has_comments {
+) -> Option<(u32, DocId)> {
+    let d = printer.d();
+    let internal::Expression::ArrowFunctionExpression(arrow) = last_arg? else {
+        return None;
+    };
+    let body_expr = arrow_terminal_expression_body(arrow)?;
+    if !matches!(
+        body_expr,
+        internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
+    ) {
         return None;
     }
-    let d = printer.d();
-    if let Some(internal::Expression::ArrowFunctionExpression(arrow)) = last_arg
-        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-    {
-        if !matches!(
-            &**body_expr,
-            internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
-        ) {
-            return None;
-        }
+    // Shared across a member chain's `conditional_group` candidates like every other build
+    // under one — this prebuild runs per candidate, and without the share it rebuilds the
+    // whole terminal subtree each time (`fanout:audit`'s `ts_nested_curried_arrow_obj_chain`
+    // caught exactly that). Outside a chain the key is `None` and it builds as before.
+    let share_key = printer.chain_share_key(body_expr, ShareTag::ExpandLastBody);
+    let doc = printer.chain_shared_doc(share_key, || {
         let raw = build_arrow_body_like_arrow(printer, body_expr);
-        // One paren rule, one site ([`arrow_hug_body_needs_parens`]) — the inject doc and the
-        // hug doc render the same body in the same position, so they cannot answer differently.
-        let doc = if arrow_hug_body_needs_parens(body_expr) {
+        // One paren rule, one site ([`arrow_hug_body_needs_parens`]) — the injected doc stands
+        // in for what the arrow's own body build would have produced, so it must answer
+        // identically.
+        if arrow_hug_body_needs_parens(body_expr) {
             d.parens(raw)
         } else {
             raw
-        };
-        Some((body_expr.span().start, doc, doc))
-    } else {
-        None
-    }
+        }
+    });
+    Some((body_expr.span().start, doc))
 }
 
 /// Build argument docs split into head parts (with commas), last arg, and broken form
@@ -768,15 +830,24 @@ pub(crate) fn last_arg_has_own_line_post_arrow_comment(
 /// grammar-required parens a hug layout synthesizes.
 ///
 /// The other end of the arrow body from [`last_arg_has_own_line_post_arrow_comment`],
-/// and asked for the same reason: **every** hug state reassembles the argument from a
-/// signature doc and a body doc rather than printing the whole arrow, so it is blind to
+/// and asked for the same reason: **most** hug states reassemble the argument from a
+/// signature doc and a body doc rather than printing the whole arrow, so they are blind to
 /// this gap — a comment there reaches no emitter and is DROPPED. The arm must decline,
 /// leaving the generic path to print the argument through the comment-aware body
 /// cascade, which retains the parens and is also prettier's settled form for the
 /// commented shape. **On page**, not to-emit: an owned comment still rides that region.
 ///
+/// The **object/array terminal** arms are the exception: they render the argument's own
+/// `expandLastArg` printing ([`build_expand_last_arg_doc`]), so the gap does reach an
+/// emitter there and their refusal is uniformity rather than necessity. They keep it so the
+/// family answers a commented body one way, and because the retained-paren form is what tsv
+/// settles on either way (`docs/conformance_prettier_ts_comments.md` §Comment relocation).
+///
 /// Asked last in each arm's guard, after the body kind, so an arrow heading for another
 /// arm pays no comment lookup.
+//
+// TODO: probe whether the object/array arms can hug a tail-commented body rather than
+// declining, now that they no longer reassemble.
 pub(crate) fn arrow_body_tail_has_comments(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
@@ -891,50 +962,159 @@ pub(crate) fn build_single_container_arg_doc(
     d.concat(&[callee, d.text("("), arg_doc, d.text(")")])
 }
 
-/// Build the ONE argument doc a lone huggable arrow's hug states share, choosing which of
-/// prettier's two renderings it is.
+/// Prettier's `lastArg` — the hugged argument printed with `expandLastArg: true`, the
+/// counterpart of [`build_printed_argument_doc`]'s `printedArguments` entry.
 ///
-/// Prettier prints such an argument TWICE — `printedArguments` with no `expandLastArg` (so
-/// `shouldPrintAsChain` holds and a curried chain takes the progressive layout), feeding
-/// `allArgsBrokenOut()`, and a separate `lastArg` with `expandLastArg: true`, feeding the hug
-/// states. tsv builds only one, and which one is the whole question:
+/// Two things follow from that flag, and this is the one place both are set:
 ///
-/// - **Untyped chain** — the progressive layout ([`build_printed_argument_doc`]). Its FLAT
-///   rendering is byte-identical to the hugged one, so the hug state (measured flat) still
-///   selects identically; the two diverge only once the argument is broken out, which is what
-///   the broken states want.
+/// - **no chain layout** (`skip_arrow_chain`), because `printArrowFunction` computes
+///   `shouldPrintAsChain = !args.expandLastArg && …` — so a curried chain prints as a plain
+///   run of `sig =>` with the terminal body hugged, and a long one simply fails on width;
+/// - **flat parameters** (`expand_last_arg_flat_params`), prettier's `removeLines` over
+///   `printFunctionParameters(…, expandArg)`, so a destructured head cannot shatter inside a
+///   hug state and the ladder falls through to the broken-out one instead.
+///
+/// `build` stays a closure for the same reason [`build_printed_argument_doc`]'s does — the
+/// callers disagree on which builder to run (`build_expression_doc` vs
+/// `build_arg_expression_doc`).
+///
+/// ⚠️ **Only build this where a hug state actually renders the argument BROKEN.** It is a
+/// second build of the argument, and a second build recurses into any call nested in the body
+/// — 2^depth doc nodes (`fanout:audit`) unless the body is injected
+/// ([`prebuild_expand_last_obj_array_body`]). That injection covers exactly the object/array
+/// terminal, which is exactly where the middle state exists.
+pub(crate) fn build_expand_last_arg_doc(
+    printer: &Printer<'_>,
+    build: impl FnOnce() -> DocId,
+) -> DocId {
+    let prev_skip = printer.skip_arrow_chain.replace(true);
+    let prev_flat = printer.expand_last_arg_flat_params.replace(true);
+    let doc = build();
+    printer.skip_arrow_chain.set(prev_skip);
+    printer.expand_last_arg_flat_params.set(prev_flat);
+    doc
+}
+
+/// Prettier's two printings of one hugged argument, named apart so a state cannot read the
+/// wrong one.
+///
+/// `printCallArguments` builds both — `printedArguments`, which `allArgsBrokenOut()` reads,
+/// and a separate `lastArg` printed with `expandLastArg: true`, which the hug states read.
+/// They differ for a curried chain (chain layout vs none) and for a breakable parameter list
+/// (grouped vs `removeLines`), and agree flat otherwise.
+#[derive(Clone, Copy)]
+pub(crate) struct HugArgDocs {
+    /// `lastArg` — [`build_expand_last_arg_doc`]. The hug states.
+    pub(crate) expanded: DocId,
+    /// The `printedArguments` entry — [`build_printed_argument_doc`]. The broken-out state.
+    pub(crate) printed: DocId,
+}
+
+impl HugArgDocs {
+    /// Prepend a leading-comment run to both printings.
+    ///
+    /// Keeps them the SAME `DocId` where they already are (every one-doc shape), so the
+    /// one-doc property survives the prepend instead of becoming two equal-but-distinct
+    /// nodes.
+    pub(crate) fn with_leading(self, d: &DocArena, leading: Option<DocId>) -> Self {
+        let Some(leading) = leading else {
+            return self;
+        };
+        let printed = prepend_leading(d, Some(leading), self.printed);
+        let expanded = if self.expanded == self.printed {
+            printed
+        } else {
+            prepend_leading(d, Some(leading), self.expanded)
+        };
+        Self { expanded, printed }
+    }
+}
+
+/// Build the argument docs a lone huggable arrow's hug states read, paying for the second
+/// printing only where a state can tell the two apart.
+///
+/// - **Object/array terminal** (at any curried depth) — the ladder has a middle state that
+///   renders the argument BROKEN, where the chain layout would break the chain's own heads
+///   (see [`arrow_body_expands_internally`]), so both printings are built. The pair stays
+///   linear because the terminal body is [pre-built and
+///   injected](prebuild_expand_last_obj_array_body) around both builds — which is why that
+///   prebuild answers this exact shape unconditionally.
 /// - **Break-forcing chain** ([`arrow_chain_should_break`]: a return type with params, type
-///   params, or a non-identifier param anywhere) — this position wants prettier's
-///   `expandLastArg` print, which has no chain at all, so the argument is built OUTSIDE
-///   `build_printed_argument_doc` (no `ArrowChainContext` in scope, so the chain layout declines
-///   on the context) with `skip_arrow_chain` set for its *other* job: suppressing the
-///   nested-arrow break so the body still hugs `=>`. `calls/curried_arrow_chain` pins it.
+///   params, or a non-identifier param anywhere) with a **block** terminal — one doc, the
+///   chain-free one, in every state: the chain layout is built OUTSIDE
+///   [`build_printed_argument_doc`] (no `ArrowChainContext` in scope, so it declines on the
+///   context) with `skip_arrow_chain` set for its *other* job, suppressing the nested-arrow
+///   break so the body still hugs `=>`. `calls/curried_arrow_chain` pins it. No body injection
+///   reaches a block terminal, so a second build here would be 2^depth
+///   (`fanout:audit`'s `ts_nested_curried_arrow_typed`).
+/// - **Everything else** — one doc, the progressive layout. Its FLAT rendering is
+///   byte-identical to the hugged one, so the two remaining states select identically.
 ///
-/// One doc, deliberately: a second build recurses into any call nested in the body, so paying
-/// for one here would make the doc-node count 2^depth.
-pub(crate) fn build_arrow_arg_doc_for_hug_states(
+/// `build` is the caller's argument builder (`build_expression_doc` vs
+/// `build_arg_expression_doc`), the one thing the plain-call, `new` and member-chain sites
+/// disagree on — everything above is shared so the three cannot drift on which printing a
+/// state reads.
+pub(crate) fn build_arrow_hug_arg_docs(
     printer: &Printer<'_>,
     arg: &internal::Expression<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
+    build: impl Fn() -> DocId,
+) -> HugArgDocs {
+    let inject = prebuild_expand_last_obj_array_body(printer, Some(arg));
+    if inject.is_none() {
+        let one = build_arrow_hug_printed_doc(printer, arg, arrow, build);
+        return HugArgDocs {
+            expanded: one,
+            printed: one,
+        };
+    }
+    printer.with_arrow_body_inject(inject, || {
+        let printed = build_printed_argument_doc(printer, arg, &build);
+        let expanded = build_expand_last_arg_doc(printer, &build);
+        HugArgDocs { expanded, printed }
+    })
+}
+
+/// The `printedArguments` half of [`build_arrow_hug_arg_docs`] alone — what a state that
+/// renders the argument BROKEN OUT reads, and the only printing the comment-refusal states
+/// read at all.
+///
+/// Split out so a refusal pays ONE build: the `expandLastArg` printing beside it is a second
+/// build of the argument, which recurses into any call nested in its body. A caller whose
+/// early-return arms read only this must therefore ask its comment questions **before**
+/// reaching for the pair — the constant-factor shape `docs/audits.md` §Build-Fanout Audit
+/// says to find syntactically, since no depth curve can separate it from the baseline.
+pub(crate) fn build_arrow_hug_printed_doc(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    build: impl FnOnce() -> DocId,
 ) -> DocId {
-    if is_curried_arrow_chain(arg) && arrow_chain_should_break(arrow) {
-        printer.skip_arrow_chain.set(true);
-        let doc = printer.build_expression_doc(arg);
-        printer.skip_arrow_chain.set(false);
+    // The break-forcing-chain arm is the pair's `None`-injection arm, keyed on the same
+    // question the prebuild answers ([`arrow_body_expands_internally`]) so the two agree on
+    // which shape has no second printing to tell apart.
+    if !arrow_body_expands_internally(arrow)
+        && is_curried_arrow_chain(arg)
+        && arrow_chain_should_break(arrow)
+    {
+        let prev = printer.skip_arrow_chain.replace(true);
+        let doc = build();
+        printer.skip_arrow_chain.set(prev);
         return doc;
     }
-    build_printed_argument_doc(printer, arg, || printer.build_expression_doc(arg))
+    build_printed_argument_doc(printer, arg, build)
 }
 
 /// The state ladder a **lone** huggable arrow argument selects among (`callee((x) => …)`),
 /// shared by the plain-call and `new` single-argument printers.
 ///
 /// Two shapes, keyed on whether the arrow's body **expands internally** — an object or array
-/// literal body, whose own doc can break while the arrow stays hugged to `callee(`:
+/// literal terminal, whose own doc can break while the arrow stays hugged to `callee(`:
 ///
-/// - such a body gets three states — hug flat, hug with the body broken
-///   (`group_break(arrow_doc)`), then the argument on its own line;
-/// - every other huggable body (a block, an expandable arrow chain) has only the outer two,
+/// - such a terminal gets three states — hug flat, hug with the body broken
+///   (`group_break(expanded)`, prettier's `group(lastArg, { shouldBreak: true })`), then the
+///   argument on its own line;
+/// - every other huggable body (a block, a block-terminal arrow chain) has only the outer two,
 ///   since there is nothing between "hugged" and "broken out".
 ///
 /// ⚠️ **The middle state is what a hand-rolled two-state copy loses, and its absence cannot be
@@ -947,62 +1127,38 @@ pub(crate) fn build_arrow_arg_doc_for_hug_states(
 pub(crate) fn build_single_arrow_arg_states(
     d: &DocArena,
     callee: DocId,
-    arrow_doc: DocId,
+    docs: HugArgDocs,
     body_expands_internally: bool,
 ) -> DocId {
-    let state_hug = d.concat(&[callee, d.text("("), arrow_doc, d.text(")")]);
+    let state_hug = d.concat(&[callee, d.text("("), docs.expanded, d.text(")")]);
     let state_broken_out = d.concat(&[
         callee,
         d.text("("),
-        d.indent(d.concat(&[d.softline(), arrow_doc])),
+        d.indent(d.concat(&[d.softline(), docs.printed])),
         d.softline(),
         d.text(")"),
     ]);
     if !body_expands_internally {
         return d.conditional_group(&[state_hug, state_broken_out]);
     }
-    let state_body_break = d.concat(&[callee, d.text("("), d.group_break(arrow_doc), d.text(")")]);
+    let state_body_break = d.concat(&[
+        callee,
+        d.text("("),
+        d.group_break(docs.expanded),
+        d.text(")"),
+    ]);
     // The broken-out state uses hard `line`s inside a `group_break` here rather than the
     // softlines above: it is the last state, so it must render broken rather than re-measure.
     let state_all_broken = d.concat(&[
         callee,
         d.group_break(d.concat(&[
             d.text("("),
-            d.indent(d.concat(&[d.line(), arrow_doc])),
+            d.indent(d.concat(&[d.line(), docs.printed])),
             d.line(),
             d.text(")"),
         ])),
     ]);
     d.conditional_group(&[state_hug, state_body_break, state_all_broken])
-}
-
-/// Whether an arrow's body **expands internally** — an object or array literal, whose own doc
-/// breaks while the arrow itself stays hugged to the callee's `(`.
-///
-/// The single-argument counterpart of the body-kind test the expand-last object/array arm
-/// makes, named once so the ladder above and its callers cannot drift on what "expands" means.
-///
-/// ⚠️ **The body is read DIRECTLY — deliberately not through a curried chain.** A chain whose
-/// terminal is an object or array (`(x) => () => ({ … })`) does expand internally in prettier's
-/// output, and tsv breaks the whole argument out instead, so widening this to recurse looks like
-/// the fix. It is not: tsv's argument doc for a chain **is** the progressive chain layout, so the
-/// extra `group_break` state breaks the chain's own heads onto separate lines and then FITS —
-/// hugging a many-head chain prettier breaks out
-/// (`expressions/arrow/curried_untyped_call_arg_long` catches exactly that, in both the lone-
-/// and last-argument positions). Prettier can offer the state because its `expandLastArg` print
-/// has no chain layout at all, so a long chain simply does not fit and the state is rejected on
-/// width. Matching it needs that second, chain-free rendering of the argument — a second build,
-/// which recurses into any call nested in the body (2^depth, `fanout:audit`) — so the shape is
-/// left diverging rather than papered over here. TODO: close it if that rendering ever becomes
-/// cheap enough to build (a cached `skip_arrow_chain` doc would do it).
-pub(crate) fn arrow_body_expands_internally(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
-    match &arrow.body {
-        internal::ArrowFunctionBody::Expression(body_expr) => matches!(
-            &**body_expr,
-            internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
-        ),
-        internal::ArrowFunctionBody::BlockStatement(_) => false,
-    }
 }
 
 /// Build a conditional group that tries inline first, then expands all args.

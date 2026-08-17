@@ -87,6 +87,42 @@ use tsv_lang::{
     },
 };
 
+/// Which builder a chain-share entry belongs to — the builder half of the share-map tag,
+/// sitting ABOVE the two `expandLastArg` state bits it is OR-ed with.
+///
+/// One node is reached by more than one builder, and their docs are NOT interchangeable: the
+/// expand-last body prebuild wraps an object body in the grammar's parens, which the argument
+/// builder never does. Keying them apart is what lets both cache instead of one of them
+/// poisoning the other.
+///
+/// ⚠️ A new variant must claim a bit **outside** [`ShareTag::SKIP_ARROW_CHAIN_BIT`] /
+/// [`ShareTag::FLAT_PARAMS_BIT`] — a collision there silently merges a builder with a state,
+/// which is a cache hit that is not byte-identical to a rebuild.
+#[derive(Clone, Copy)]
+pub(crate) enum ShareTag {
+    /// [`Printer::build_arg_expression_doc`] — a call argument.
+    ArgExpression = 0b0000_0100,
+    /// `calls::prebuild_expand_last_obj_array_body` — an arrow's object/array terminal body,
+    /// parens included, as the arrow's own body build would produce it.
+    ExpandLastBody = 0b0000_1000,
+}
+
+impl ShareTag {
+    /// `skip_arrow_chain` was set for this build (prettier's `expandLastArg`, chain half).
+    pub(crate) const SKIP_ARROW_CHAIN_BIT: u8 = 0b0000_0001;
+    /// `expand_last_arg_flat_params` was set for this build (its `removeLines` half).
+    pub(crate) const FLAT_PARAMS_BIT: u8 = 0b0000_0010;
+    /// The two bits above, which no builder discriminant may claim.
+    const STATE_BITS: u8 = Self::SKIP_ARROW_CHAIN_BIT | Self::FLAT_PARAMS_BIT;
+}
+
+// The invariant the whole share map rests on, stated where a new variant is written rather
+// than only in prose: a builder that overlapped a state bit would answer a lookup made under
+// different `expandLastArg` state, which is a hit that is NOT byte-identical to a rebuild.
+const _: () = assert!(ShareTag::ArgExpression as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::ExpandLastBody as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::ArgExpression as u8 != ShareTag::ExpandLastBody as u8);
+
 /// The parent context that routes a curried arrow chain (`(a) => (b) => …`)
 /// through a flattened chain layout, mirroring prettier's
 /// `printArrowFunctionSignatures` parent-context branches. Set by the enclosing
@@ -341,30 +377,30 @@ pub struct Printer<'a> {
     /// `needs_parens` check (assignment RHS, ternary branches/test).
     /// Uses Cell for interior mutability so doc builders (&self) can set this.
     pub(crate) in_for_init: Cell<bool>,
-    /// Whether the scoped argument-doc share map for member-chain building is
-    /// active: an argument expression's pointer → its already-built
-    /// [`Self::build_arg_expression_doc`] `DocId`. A member chain renders the same
-    /// group **flat** (`print_group`) and **expanded** (`print_group_expanded`)
-    /// across `conditional_group` candidates; without sharing, the recursive arg
-    /// build runs once per candidate and a nested chain in a call arg compounds to
-    /// O(4^depth) — the member-chain rebuild blowup. The flat and expanded builds
-    /// differ in Printer state **only** via `skip_arrow_chain` /
-    /// `expand_last_arg_flat_params` — `expand_last_arg_flat_params` set within
-    /// `calls/chain_args.rs` itself, `skip_arrow_chain` only ever reachable from a call
-    /// NESTED in an argument (its two set sites live in `call_formatting.rs` /
-    /// `new_expression.rs`, and `build_printed_argument_doc` clears it on the way in);
-    /// every other flag is statement-constant during a
-    /// chain or set identically by the shared AST traversal, so a given node is
-    /// reached under identical state in both candidates. Hence the cache is
-    /// consulted only when [`Self::chain_arg_share_eligible`] (active + both of
-    /// those flags clear), making a hit byte-identical to a rebuild. Active only
-    /// between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
-    /// `build_chain_doc`); keyed by node pointer (stable — the AST arena is
-    /// immutable during formatting). The map's *storage* is the doc arena's
-    /// parked [`DocArena::share_map_scratch`] (cleared at both enter and exit, so
-    /// between chains — and across printers sharing one arena — it is logically
-    /// empty and only its table capacity persists, killing the per-printer
-    /// `HashMap` resize chain).
+    /// Whether the scoped doc-share map for member-chain building is active: an AST
+    /// node's pointer **plus a build tag** ([`ShareTag`]) → the `DocId` already built
+    /// for it. A member chain renders the same group **flat** (`print_group`) and
+    /// **expanded** (`print_group_expanded`) across `conditional_group` candidates;
+    /// without sharing, each recursive build runs once per candidate and a nested chain
+    /// in a call arg compounds to O(4^depth) — the member-chain rebuild blowup.
+    ///
+    /// **The tag is what makes a hit byte-identical.** A given node is reached under
+    /// identical Printer state in both candidates *except* for `skip_arrow_chain` /
+    /// `expand_last_arg_flat_params` (prettier's `expandLastArg`, which
+    /// `calls/chain_args.rs` sets to build the hugged printing of an argument beside its
+    /// `printedArguments` one), and except for which *builder* is asking — the argument
+    /// builder or the expand-last body prebuild, which wraps an object body in the
+    /// grammar's parens. Both distinctions ride in the tag, so each variant caches
+    /// separately instead of the cache being refused for the whole node. Every other
+    /// flag is statement-constant during a chain or set identically by the shared AST
+    /// traversal.
+    ///
+    /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
+    /// `build_chain_doc`); the pointer is stable, the AST arena being immutable during
+    /// formatting. The map's *storage* is the doc arena's parked
+    /// [`DocArena::share_map_scratch`] (cleared at both enter and exit, so between chains
+    /// — and across printers sharing one arena — it is logically empty and only its table
+    /// capacity persists, killing the per-printer `HashMap` resize chain).
     pub(crate) chain_arg_share_active: Cell<bool>,
     /// Expand-last-arg body reuse: `(body-expr span start, pre-built body DocId)`.
     /// The call/new expand-last paths build an arrow's call body **once** up front
@@ -452,6 +488,27 @@ impl<'a> Printer<'a> {
     /// Restore the previous expand-last-arg body injection (from `inject_arrow_body`).
     pub(crate) fn restore_arrow_body_inject(&self, prev: Option<(u32, DocId)>) {
         self.arrow_body_inject.set(prev);
+    }
+
+    /// Run `build` with `inject` armed ([`Self::inject_arrow_body`]), restoring the previous
+    /// injection after. `None` arms nothing and just runs `build`.
+    ///
+    /// The scoped form, because the injection is a single slot on the printer and every arm
+    /// that arms one must hand it back — a call/`new` expand-last path re-arms the SAME
+    /// injection around each printing of its argument, so the pairs interleave and a
+    /// hand-rolled `if let Some(prev)` per site is where one goes missing.
+    pub(crate) fn with_arrow_body_inject<R>(
+        &self,
+        inject: Option<(u32, DocId)>,
+        build: impl FnOnce() -> R,
+    ) -> R {
+        let Some((span, doc)) = inject else {
+            return build();
+        };
+        let prev = self.inject_arrow_body(span, doc);
+        let out = build();
+        self.restore_arrow_body_inject(prev);
+        out
     }
 
     /// Wrap `doc` in parens when `expr` is an `in` binary built directly inside a
@@ -655,16 +712,43 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether `build_arg_expression_doc` may share its result via the chain-arg share map.
-    /// True only while a member chain is building (`chain_arg_share_active`) AND the two
-    /// flags that make the flat vs expanded chain-group builds diverge are clear — see
-    /// the `chain_arg_share_active` field doc. When either is set we're building an arrow arg in
-    /// the expand-last / curried path, which the expanded candidate builds under different
-    /// state, so it must not share.
-    pub(crate) fn chain_arg_share_eligible(&self) -> bool {
-        self.chain_arg_share_active.get()
-            && !self.skip_arrow_chain.get()
-            && !self.expand_last_arg_flat_params.get()
+    /// The share-map key for `node` under `builder`, or `None` when no member chain is
+    /// building and there is nothing to share with.
+    ///
+    /// The key carries the builder AND the two `expandLastArg` flags, which are the only
+    /// Printer state a chain's flat and expanded candidates reach a given node under
+    /// differently — so a hit is byte-identical to a rebuild by construction rather than
+    /// by the caller having checked. See the `chain_arg_share_active` field doc.
+    pub(crate) fn chain_share_key<T>(&self, node: &T, builder: ShareTag) -> Option<(usize, u8)> {
+        if !self.chain_arg_share_active.get() {
+            return None;
+        }
+        let mut tag = builder as u8;
+        if self.skip_arrow_chain.get() {
+            tag |= ShareTag::SKIP_ARROW_CHAIN_BIT;
+        }
+        if self.expand_last_arg_flat_params.get() {
+            tag |= ShareTag::FLAT_PARAMS_BIT;
+        }
+        Some((std::ptr::from_ref(node) as usize, tag))
+    }
+
+    /// Look up `key` in the chain share map, or build and record it.
+    pub(crate) fn chain_shared_doc(
+        &self,
+        key: Option<(usize, u8)>,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let Some(key) = key else {
+            return build();
+        };
+        let share_map = self.arena.share_map_scratch();
+        if let Some(&doc) = share_map.borrow().get(&key) {
+            return doc;
+        }
+        let doc = build();
+        share_map.borrow_mut().insert(key, doc);
+        doc
     }
 
     /// Activate the chain-arg share map for the outermost `build_chain_doc` only. Returns the

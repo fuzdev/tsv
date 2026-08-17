@@ -218,6 +218,45 @@ fn gen_ts_nested_curried_arrow(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// The OBJECT-TERMINAL curried chain (`f((a) => (b) => ({ … }))`), the one curried shape whose
+/// hug ladder has a middle state — so it is the one that legitimately builds the argument TWICE,
+/// as prettier's `printedArguments` and its `expandLastArg` `lastArg`. The three siblings all end
+/// in a BLOCK and so cannot reach this arm at all.
+///
+/// What holds the curve is the terminal body being pre-built and injected around both builds
+/// (`prebuild_expand_last_obj_array_body`): the second printing then costs the chain's signatures
+/// rather than the subtree, and the nested call inside the object is built once. Drop the
+/// injection and this axis goes 2^depth.
+fn gen_ts_nested_curried_arrow_obj(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}((a{i}) => (b{i}) => ({{ k{i}: {expr} }}))");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// The multi-argument twin of `gen_ts_nested_curried_arrow_obj` — `expand_last.rs`'s arm rather
+/// than the single-argument ladder, which re-injects the pre-built body around its own second
+/// printing.
+fn gen_ts_nested_curried_arrow_obj_multiarg(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}('lead{i}', (a{i}) => (b{i}) => ({{ k{i}: {expr} }}))");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// The member-chain twin (`chain_args.rs`, both its single- and multi-argument object/array
+/// arms), which owns its own copy of the injection. The curried argument sits on a NON-LAST
+/// chain call for the reason `gen_ts_nested_curried_arrow_chain` gives.
+fn gen_ts_nested_curried_arrow_obj_chain(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("obj{i}.method((a{i}) => (b{i}) => ({{ k{i}: {expr} }})).next()");
+    }
+    format!("const v = {expr};\n")
+}
+
 /// The BREAK-FORCING twin of `gen_ts_nested_curried_arrow` — a destructured head makes
 /// `arrow_chain_should_break` true, which sends the expand-last hug down its other arm
 /// (`skip_arrow_chain`, prettier's `expandLastArg` print) instead of reusing the chain doc.
@@ -247,12 +286,11 @@ fn gen_ts_nested_curried_arrow_new(depth: usize) -> String {
 /// decorative — a distinction confirmed by probing which builder each shape reaches.
 ///
 /// ⚠️ Unlike its three siblings, a double build in that arm does **not** move this curve, and
-/// that is a fact about the chain path rather than a gap here: a chain argument's
-/// `build_arg_expression_doc` rides the chain-arg share map
-/// (`Printer::chain_arg_share_eligible`), so the second build returns the same `DocId`. The
-/// axis still holds the growth curve for everything the map does not cover — the map is off
-/// whenever `skip_arrow_chain` or `expand_last_arg_flat_params` is set, which is exactly the
-/// state the hug renderings build under.
+/// that is a fact about the chain path rather than a gap here: every build under a chain rides
+/// the chain share map (`Printer::chain_share_key`), whose key carries the builder and the
+/// `expandLastArg` state, so a repeat under the same state returns the same `DocId`. The axis
+/// still holds the growth curve for everything the map does not cover — anything built outside
+/// a share scope, and anything whose state varies per candidate.
 fn gen_ts_nested_curried_arrow_chain(depth: usize) -> String {
     let mut expr = String::from("done");
     for i in 0..depth {
@@ -534,6 +572,24 @@ impl BuildFanoutAuditCommand {
                 name: "ts_nested_curried_arrow_chain",
                 parser: ParserType::TypeScript,
                 generate: gen_ts_nested_curried_arrow_chain,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_curried_arrow_obj",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_curried_arrow_obj,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_curried_arrow_obj_multiarg",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_curried_arrow_obj_multiarg,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_curried_arrow_obj_chain",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_curried_arrow_obj_chain,
                 depths: &[4, 8, 12],
             },
             Construct {

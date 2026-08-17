@@ -29,6 +29,7 @@ mod template_literal;
 
 use self::operators::{OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
+use crate::printer::ShareTag;
 use crate::printer::comments::{CommentFilter, CommentSpacing};
 use crate::printer::decorators::DecoratorHost;
 use crate::printer::types::TrailingBlock;
@@ -531,18 +532,10 @@ impl<'a> Printer<'a> {
         // Member-chain arg-doc sharing: a chain builds the same group flat and expanded
         // across `conditional_group` candidates; reuse the one build instead of
         // re-recursing (kills the O(4^depth) rebuild — see the `chain_arg_share_active`
-        // field doc). Eligibility guarantees a hit is byte-identical to a rebuild.
-        if self.chain_arg_share_eligible() {
-            let key = std::ptr::from_ref(expr) as usize;
-            let share_map = self.arena.share_map_scratch();
-            if let Some(&doc) = share_map.borrow().get(&key) {
-                return doc;
-            }
-            let doc = self.build_arg_expression_doc_uncached(expr);
-            share_map.borrow_mut().insert(key, doc);
-            return doc;
-        }
-        self.build_arg_expression_doc_uncached(expr)
+        // field doc). The key carries the builder and the `expandLastArg` state, so a hit
+        // is byte-identical to a rebuild.
+        let key = self.chain_share_key(expr, ShareTag::ArgExpression);
+        self.chain_shared_doc(key, || self.build_arg_expression_doc_uncached(expr))
     }
 
     fn build_arg_expression_doc_uncached(&self, expr: &Expression<'_>) -> DocId {
