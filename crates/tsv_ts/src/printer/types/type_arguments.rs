@@ -156,7 +156,13 @@ impl<'a> Printer<'a> {
         // point neither the bare authoring nor prettier produces;
         // `type_position_parens_glued_block_comment_prettier_divergence` is that claim. Only
         // a block the author gave a line of its own expands.
-        let arg_span = |ty: &TSType<'_>| self.leading_paren_unwrapped(ty).span();
+        //
+        // The same reading covers a shell one link DOWN — at the argument's leading printed
+        // edge (`Foo<A, (⏎// c⏎B) & C>`), where the argument node itself is not the shell:
+        // [`Self::list_item_printed_span`] starts the argument past that run, so the run is
+        // in this list's own gap here and at every emitter below.
+        let arg_span =
+            |ty: &TSType<'_>| self.list_item_printed_span(self.leading_paren_unwrapped(ty));
         self.has_expanding_comments_in_bracket_list(args.span, args.params, arg_span)
     }
 
@@ -259,14 +265,18 @@ impl<'a> Printer<'a> {
         self.build_angle_list_with_line_comments(
             args.span,
             args.params.len(),
-            |i| self.leading_paren_unwrapped(&args.params[i]).span(),
+            |i| self.list_item_printed_span(self.leading_paren_unwrapped(&args.params[i])),
             |i, frozen| {
                 let param = self.leading_paren_unwrapped(&args.params[i]);
                 if frozen {
-                    self.build_frozen_list_member_doc(param)
-                } else {
-                    self.build_type_arg_doc(param, is_multi)
+                    return self.build_frozen_list_member_doc(param);
                 }
+                // The list emits this argument's leading-edge shell run (its span above
+                // starts past it), so the shell declines its own copy.
+                let claim = self.leading_edge_shell_claim(param);
+                self.with_claimed_shell_leading_run(claim, || {
+                    self.build_type_arg_doc(param, is_multi)
+                })
             },
         )
     }

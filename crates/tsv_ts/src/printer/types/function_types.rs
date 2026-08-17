@@ -13,6 +13,7 @@ use super::{BlankRule, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -153,6 +154,27 @@ impl<'a> Printer<'a> {
         return_type: &internal::TSTypeAnnotation<'_>,
         leading_space: bool,
     ) -> DocId {
+        // A redundant shell at the return type's leading printed EDGE — an array suffix
+        // over it, an indexed access, a conditional's check type — strips, so its `//`
+        // lands in THIS gap and the reparse finds it here. Claim it once, around the whole
+        // tail, so every layout below builds with the shell's own copy suppressed; left to
+        // itself the shell emitted a bare `hardline` at its own indent (flush, where this
+        // gap hangs one level) and a `flush_break` that opened a conditional the reparse
+        // then printed flat. See [`Printer::leading_edge_shell_claim`].
+        let claim = self
+            .leading_edge_shell_claim(self.leading_paren_unwrapped(return_type.type_annotation));
+        self.with_claimed_shell_leading_run(claim, || {
+            self.build_function_type_return_doc_claimed(return_type, leading_space, claim)
+        })
+    }
+
+    /// [`Self::build_function_type_return_doc`]'s body, built under its claim.
+    fn build_function_type_return_doc_claimed(
+        &self,
+        return_type: &internal::TSTypeAnnotation<'_>,
+        leading_space: bool,
+        claim: Option<Span>,
+    ) -> DocId {
         let d = self.d();
         // `=>` with the optional leading space, as static text — the leading-space
         // flag selects among four fixed strings, so no per-call String alloc.
@@ -167,7 +189,9 @@ impl<'a> Printer<'a> {
         // `() => // c⏎T` and `() => (// c⏎T)` reach the same fixed point instead of the
         // shell's own flush hang.
         let return_ty = self.leading_paren_unwrapped(return_type.type_annotation);
-        let type_start = return_ty.span().start;
+        // The gap's window ends past a claimed leading-edge shell's run, so this emitter
+        // prints it — one window, one emitter, the pair `leading_edge_shell_claim` returns.
+        let type_start = claim.map_or_else(|| return_ty.span().start, |shell| shell.end);
         // An alone-on-line format-ignore directive in the `=>`→return gap stays
         // OWN-LINE — the trailing-hang emitter below would relocate it to trail the
         // `=>` (`=> // prettier-ignore`), an inert placement that loses the freeze on

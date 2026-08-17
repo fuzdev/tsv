@@ -89,4 +89,15 @@
 	let d2: ( // c15
 		D2
 	)[] extends E2 ? F2 : G2;
+
+	// a redundant paren LAYER between the gap and the shell — the descent peels it, so an
+	// author's extra pair changes nothing, in both placements
+	let d3: (( // c16
+		D3
+	)[]);
+
+	const e3 = f3 as ((
+		// c17
+		G3
+	)['k']);
 </script>

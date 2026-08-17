@@ -79,6 +79,13 @@
 
 	let d2: // c15
 	D2[] extends E2 ? F2 : G2;
+
+	// a redundant paren LAYER between the gap and the shell — the descent peels it, so an
+	// author's extra pair changes nothing, in both placements
+	let d3: // c16
+	D3[];
+
+	const e3 = f3 as G3['k']; // c17
 </script>
 
 %%PASS=3 (fixed point)%%
@@ -155,4 +162,11 @@
 
 	let d2: // c15
 	D2[] extends E2 ? F2 : G2;
+
+	// a redundant paren LAYER between the gap and the shell — the descent peels it, so an
+	// author's extra pair changes nothing, in both placements
+	let d3: // c16
+	D3[];
+
+	const e3 = f3 as G3['k']; // c17
 </script>
