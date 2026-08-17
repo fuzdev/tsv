@@ -64,13 +64,15 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// nested in its body
 /// (`fn(({ a }) => ({ b }) => { return g((x, …) => (y) => z); })`). Every argument of every
 /// nested call routes through here, which is exactly the seam where the flag stops applying.
-//
-// TODO: only HALF of `expandLastArg` stops at this seam. `expand_last_arg_flat_params` — the
-// `removeLines` half, set by the same `build_expand_last_arg_doc` — is not cleared here, so it
-// survives the descent and `remove_lines`es the parameters of every arrow built under it,
-// including one nested inside the hugged body, where prettier applies `removeLines` to the
-// last argument's OWN parameters only. No fixture pins it; clear both, or record why the
-// halves differ.
+///
+/// ⚠️ Only the CHAIN half stops here, and the asymmetry is the two halves' consumers rather
+/// than an omission. `expand_last_arg_flat_params` — prettier's `removeLines` — is consumed
+/// one level in, at the arrow's own body seam (`build_arrow_doc_wrapping`), which is where
+/// prettier's single `print("body", args)` edge ends: the flag reaches the hugged argument
+/// and travels only down an arrow-body spine, so nothing under a non-arrow body ever sees it
+/// and this seam has nothing left to clear. `skip_arrow_chain` is read ABOVE any body, by the
+/// chain-layout gate at the top of that same builder, so a nested argument would still enter
+/// it under the outer flag — hence the clear here.
 pub(crate) fn build_printed_argument_doc(
     printer: &Printer<'_>,
     arg: &internal::Expression<'_>,
@@ -837,17 +839,21 @@ pub(crate) fn last_arg_has_own_line_post_arrow_comment(
 /// cascade, which retains the parens and is also prettier's settled form for the
 /// commented shape. **On page**, not to-emit: an owned comment still rides that region.
 ///
-/// The **object/array terminal** arms are the exception: they render the argument's own
-/// `expandLastArg` printing ([`build_expand_last_arg_doc`]), so the gap does reach an
-/// emitter there and their refusal is uniformity rather than necessity. They keep it so the
-/// family answers a commented body one way, and because the retained-paren form is what tsv
-/// settles on either way (`docs/conformance_prettier_ts_comments.md` §Comment relocation).
+/// ⚠️ **The multi-argument object/array-terminal arms do NOT ask it**, and that is a rule
+/// rather than an oversight: they render the argument's own `expandLastArg` printing
+/// ([`build_expand_last_obj_array_doc`]), so the gap has an emitter there and the refusal
+/// bought nothing. It cost two things. The *single*-argument twin of the same layout
+/// (`build_block_arrow_hug_states`) never asked, so tsv hugged
+/// `f((x) => ({ … } /* c */))` and broke every argument out for
+/// `f(1, (x) => ({ … } /* c */))` — one construct answered two ways. And the broken-out form
+/// was **not a fixed point**: with the object now written multi-line, the second pass reads it
+/// as a source-multiline `group_break`, the `fits` walk stops at that break, and the inline
+/// state wins — F1, from ordinary authored code. Both are pinned by
+/// `calls/arrow_hugged_body_paren_comment_long_prettier_divergence`, whose
+/// `unformatted_ours_compact` carries the one-line authoring the fixed point erases.
 ///
 /// Asked last in each arm's guard, after the body kind, so an arrow heading for another
 /// arm pays no comment lookup.
-//
-// TODO: probe whether the object/array arms can hug a tail-commented body rather than
-// declining, now that they no longer reassemble.
 pub(crate) fn arrow_body_tail_has_comments(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
@@ -873,6 +879,11 @@ pub(crate) fn arrow_body_tail_has_comments(
 /// argument printers, half of them wrapped in a call-level `has_comments &&` fast gate and
 /// half bare — a shape where a new arm forgets one half and nothing says so. One arm still
 /// asks only the tail question; see the TODO at the chain's forced-expansion ARRAY body.
+///
+/// ⚠️ **Only a REASSEMBLING arm may ask this pair.** An arm that renders the argument's own
+/// `expandLastArg` printing asks the signature half alone — the tail half's whole argument is
+/// the reassembly, and asking it there is a layout bug rather than caution
+/// ([`arrow_body_tail_has_comments`]).
 ///
 /// Ask it **after** the body kind, so an arrow heading for another arm pays no comment
 /// lookup; a caller holding a call-level "any comment on page" flag may gate it on that too,
@@ -902,22 +913,167 @@ pub(crate) fn arrow_hug_refused_by_comments(
 ///
 /// One rule for all six sites — the single-argument hug and the multi-argument expand-last
 /// of each of the three call-argument printers — because they have drifted apart on exactly
-/// this kind of arm before. `head_parts` is empty at the single-argument sites; `prefix`
-/// carries `(` for a call or `new` (whose callee sits outside the returned group) and the
-/// chain's own `(` / `?.(`.
-pub(crate) fn build_own_line_post_arrow_state(
+/// this kind of arm before. `head_parts` is empty at the single-argument sites.
+///
+/// ⚠️ **It is a STATE, not a layout — the ladder below is what makes it one.** Prettier does
+/// not have a state for this shape at all: the own-line comment merely lands a hardline
+/// inside the `expandLastArg` printing, which stays inside `printCallArguments`'
+/// `conditionalGroup` and therefore keeps `allArgsBrokenOut()` behind it. See
+/// [`build_own_line_post_arrow_doc`], which every caller takes instead of this.
+fn build_own_line_post_arrow_state(
     d: &DocArena,
-    prefix: DocId,
+    opener: ArgOpener,
     head_parts: &[DocId],
     last_arg_doc: DocId,
 ) -> DocId {
-    d.group_break(d.concat(&[
-        prefix,
-        d.concat(head_parts),
-        d.group_break(last_arg_doc),
-        d.softline(),
-        d.text(")"),
-    ]))
+    opener.after_callee(
+        d,
+        d.group_break(d.concat(&[
+            opener.open_text(d),
+            d.concat(head_parts),
+            d.group_break(last_arg_doc),
+            d.softline(),
+            d.text(")"),
+        ])),
+    )
+}
+
+/// The own-line-post-arrow **ladder**: that state, then `allArgsBrokenOut()`.
+///
+/// The fallback is the whole point. The state renders the signature on the callee's line, and
+/// with a hardline waiting in the body the `fits()` walk stops right after it — so the only
+/// thing measured IS that signature, and a signature too wide for the line has nowhere to go
+/// without a second state. tsv had none, and the two spellings of "nowhere to go" were both
+/// wrong: where the signature stayed breakable it **shattered in place**
+/// (`fn(({⏎\ta,⏎\tb⏎}) =>⏎\t// c⏎\t…)`), and where a caller had flattened it
+/// (`build_flat_params_arg_doc`) it simply **overflowed**, printing past the print width with
+/// no break candidate left. Prettier does neither: its `allArgsBrokenOut()` drops the whole
+/// argument to its own line and the signature then breaks there if it still must. Pinned by
+/// `calls/arrow_object_body_own_line_comment_long`.
+///
+/// ⚠️ **The two states read the two PRINTINGS, and both halves are load-bearing.** The state
+/// takes the `expandLastArg` one, whose parameters are flat — without that, `fits()` reaches
+/// the signature's first parameter `line` (a plain `group` inherits BREAK mode from the
+/// state's own `group_break`, prettier's `fits` rule) and stops there, so the state is
+/// selected on a measurement that never saw the signature's width and the parameters shatter
+/// in place. The fallback takes the `printedArguments` one, whose parameters can still break
+/// once the argument has a line of its own. Handing either state the other's doc reproduces
+/// one of the two bugs exactly.
+pub(crate) fn build_own_line_post_arrow_doc(
+    d: &DocArena,
+    opener: ArgOpener,
+    head_parts: &[DocId],
+    expanded_last_arg_doc: DocId,
+    all_args_broken: DocId,
+) -> DocId {
+    d.conditional_group(&[
+        build_own_line_post_arrow_state(d, opener, head_parts, expanded_last_arg_doc),
+        opener.expand_all(d, all_args_broken),
+    ])
+}
+
+/// The two printings [`build_own_line_post_arrow_doc`]'s states read, for the two
+/// **single-argument** sites (the plain call's and `new`'s lone-arrow hug).
+///
+/// Unlike [`build_arrow_hug_arg_docs`] this always pays for both, because here the states are
+/// told apart for **every** body kind rather than only at an object/array terminal — a block
+/// or call body shatters its parameters exactly as an object one does. The object/array body
+/// injection is still armed around the pair, so that shape stays linear; the rest costs one
+/// extra traversal of the argument, which is what prettier pays unconditionally
+/// (`printedArguments` beside `printedExpanded`).
+pub(crate) fn build_own_line_post_arrow_arg_docs(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+    build: impl Fn() -> DocId,
+) -> HugArgDocs {
+    let Some(inject) = prebuild_own_line_post_arrow_body(printer, Some(arg)) else {
+        let one = build_printed_argument_doc(printer, arg, &build);
+        return HugArgDocs {
+            expanded: one,
+            printed: one,
+        };
+    };
+    printer.with_arrow_body_inject(Some(inject), || HugArgDocs {
+        printed: build_printed_argument_doc(printer, arg, &build),
+        expanded: build_expand_last_arg_doc(printer, &build),
+    })
+}
+
+/// The `expandLastArg` printing the own-line-post-arrow state reads, for the two
+/// **multi-argument** sites — whose `printedArguments` docs already exist from
+/// `build_args_split_last`, so only this second one is left to build.
+///
+/// `inject` is [`prebuild_own_line_post_arrow_body`]'s answer, armed by the caller around
+/// `build_args_split_last` as well so the body is built once and shared. When it is `None` no
+/// prebuild covers the shape, and the caller's single printing is returned instead: the ladder
+/// degenerates to one doc rather than paying a 2^depth second build.
+pub(crate) fn build_own_line_post_arrow_expanded(
+    printer: &Printer<'_>,
+    inject: Option<(u32, DocId)>,
+    printed: DocId,
+    build: impl FnOnce() -> DocId,
+) -> DocId {
+    if inject.is_none() {
+        return printed;
+    }
+    printer.with_arrow_body_inject(inject, || build_expand_last_arg_doc(printer, build))
+}
+
+/// The body an own-line-post-arrow argument can have **pre-built and injected**, so its two
+/// printings cost signatures rather than the whole subtree — `None` when no prebuild
+/// reproduces what the body's own builder would emit, in which case the caller must fall back
+/// to ONE printing (the ladder then degenerates, exactly as
+/// [`build_arrow_hug_arg_docs`] does for the shapes it cannot inject).
+///
+/// The route is what makes this wider than its siblings: an own-line comment in the `=>`→body
+/// gap sends **every** expression body through `build_arrow_body_doc_with_leading`, which
+/// consults the injection above any body-kind branch. So the terminal is claimed by whichever
+/// prebuild reproduces that branch — the object/array one adds the grammar's parens, the
+/// block one is the block builder itself — and the two bodies whose branch does something
+/// else is declined: a **leftmost-object** expression (an object behind a cast, a member
+/// access, …) has a paren target threaded into its build, so a bare doc would print a body
+/// missing the parens the grammar requires. A **ternary** needs no exclusion on this route
+/// even though it takes `if_break` layout parens elsewhere — the own-line run that selects
+/// this whole state is a forced break, and `build_arrow_body_doc_with_leading`'s conditional
+/// arm answers a breaking body with the NO-parens form, which is exactly the bare doc.
+///
+/// ⚠️ **Cost, not taste.** Without an injection the second printing rebuilds the argument's
+/// whole subtree, so a nest of these shapes goes 2^depth — `fanout:audit`'s
+/// `ts_nested_arrow_own_line_comment_block` measured 204,783 doc nodes at depth 12 before the
+/// block hook existed.
+pub(crate) fn prebuild_own_line_post_arrow_body(
+    printer: &Printer<'_>,
+    last_arg: Option<&internal::Expression<'_>>,
+) -> Option<(u32, DocId)> {
+    if let Some(obj) = prebuild_expand_last_obj_array_body(printer, last_arg) {
+        return Some(obj);
+    }
+    let internal::Expression::ArrowFunctionExpression(arrow) = last_arg? else {
+        return None;
+    };
+    // The TERMINAL arrow's body, for the same reason every other hug question walks there:
+    // under `expandLastArg` a curried argument is a plain run of signatures ending in it.
+    let mut current = arrow;
+    loop {
+        match &current.body {
+            internal::ArrowFunctionBody::BlockStatement(block) => {
+                return Some((block.span.start, printer.arrow_block_body_doc(block)));
+            }
+            internal::ArrowFunctionBody::Expression(body) => {
+                if let internal::Expression::ArrowFunctionExpression(inner) = body {
+                    current = inner;
+                    continue;
+                }
+                if has_leftmost_object_expression(body) {
+                    return None;
+                }
+                return Some((
+                    body.span().start,
+                    build_arrow_body_like_arrow(printer, body),
+                ));
+            }
+        }
+    }
 }
 
 /// The lone **container** argument's hug — an object or array literal, including one behind a
@@ -991,6 +1147,32 @@ pub(crate) fn build_expand_last_arg_doc(
     let prev_flat = printer.expand_last_arg_flat_params.replace(true);
     let doc = build();
     printer.skip_arrow_chain.set(prev_skip);
+    printer.expand_last_arg_flat_params.set(prev_flat);
+    doc
+}
+
+/// The **flat-parameter** half of [`build_expand_last_arg_doc`] alone — for the chain's
+/// forced-expansion loop, which renders a lone arrow argument's signature flat (prettier's
+/// `expandLastArg` `removeLines`) while leaving its chain layout alone.
+///
+/// ⚠️ It **restores** the previous value rather than clearing, which is the difference between
+/// a scoped flag and a global one: an outer hug can still hold the flag when this layout runs
+/// beneath it — on an arrow-body spine, or inside a signature the outer hug is building — and
+/// a bare `set(false)` on the way out silently unhugs everything the outer printing had left
+/// to do. Same save/restore shape as [`build_expand_last_arg_doc`].
+///
+/// ⚠️ **Flattening is only safe where the layout cannot fall through.** This loop is the
+/// terminal one — its argument already sits on its own broken-out line, so the remaining break
+/// belongs after `=>` and never inside the parameter list. A layout with a state ladder must
+/// NOT reuse this: a flat signature that overflows has no break candidate left, which is
+/// exactly the bug the own-line-post-arrow state carried while it flattened its one printing
+/// ([`build_own_line_post_arrow_doc`]).
+pub(crate) fn build_flat_params_arg_doc(
+    printer: &Printer<'_>,
+    build: impl FnOnce() -> DocId,
+) -> DocId {
+    let prev_flat = printer.expand_last_arg_flat_params.replace(true);
+    let doc = build();
     printer.expand_last_arg_flat_params.set(prev_flat);
     doc
 }
@@ -1201,10 +1383,9 @@ pub(crate) fn build_inline_or_expand_all(
 /// no pre-check screens for one; the *same*-type path, which has no hug state, needs that
 /// check and does it at its own call site.
 ///
-/// Shared by the plain-call and `new` argument printers, which answer this identically;
-/// the member-chain twin (`chain_args.rs`) builds the same ladder over a `&'static str`
-/// opener rather than a callee doc, so it keeps its own spelling — see
-/// [`build_chain_expand_all_args`].
+/// Shared by the plain-call and `new` argument printers, which answer this identically, and —
+/// through [`ArgOpener`] — by the member-chain twin, whose only difference is that its callee
+/// sits outside the returned group.
 pub(crate) fn build_inline_hug_or_expand_all(
     d: &DocArena,
     callee: DocId,
@@ -1212,16 +1393,126 @@ pub(crate) fn build_inline_hug_or_expand_all(
     last_arg_doc: DocId,
     all_args_broken: DocId,
 ) -> DocId {
-    let state_inline = build_inline_args(d, callee, head_parts, last_arg_doc);
-    let state_hug = d.concat(&[
-        callee,
-        d.text("("),
-        d.concat(head_parts),
-        d.group_break(last_arg_doc),
-        d.text(")"),
-    ]);
-    let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
-    d.conditional_group(&[state_inline, state_hug, state_expand_all])
+    ArgOpener::Callee(callee).inline_hug_or_expand_all(d, head_parts, last_arg_doc, all_args_broken)
+}
+
+/// What an argument-state doc opens with, in the two spellings the printers genuinely
+/// disagree on — and the ONLY thing they disagree on, which is why every ladder below takes
+/// one of these rather than being written twice.
+///
+/// The plain-call and `new` printers return a doc that carries the callee, so each state adds
+/// the `(` itself. The member chain's callee is a separate group the chain printer places, so
+/// its argument doc starts at the paren and the `?.(` optional spelling rides in the same
+/// string.
+#[derive(Clone, Copy)]
+pub(crate) enum ArgOpener {
+    /// The whole head the `(` follows — for `new` that includes the keyword and type
+    /// arguments.
+    Callee(DocId),
+    /// The chain's own `(` / `?.(`.
+    ChainPrefix(&'static str),
+}
+
+impl ArgOpener {
+    /// The opening delimiter's own text — `(` for a callee spelling, the chain's `(` / `?.(`.
+    fn open_text(self, d: &DocArena) -> DocId {
+        match self {
+            Self::Callee(_) => d.text("("),
+            Self::ChainPrefix(prefix) => d.text(prefix),
+        }
+    }
+
+    /// Place `doc` after the callee this spelling carries, if any. The callee stays **outside**
+    /// whatever group `doc` is — its own groups measure themselves, and a hardline in the
+    /// callee must not force the argument list open. Same placement `build_expand_all_args`
+    /// uses.
+    fn after_callee(self, d: &DocArena, doc: DocId) -> DocId {
+        match self {
+            Self::Callee(callee) => d.concat(&[callee, doc]),
+            Self::ChainPrefix(_) => doc,
+        }
+    }
+
+    /// `opener(head_parts last_arg)` — everything on one line.
+    fn inline(self, d: &DocArena, head_parts: &[DocId], last_arg_doc: DocId) -> DocId {
+        match self {
+            Self::Callee(callee) => build_inline_args(d, callee, head_parts, last_arg_doc),
+            Self::ChainPrefix(prefix) => d.concat(&[
+                d.text(prefix),
+                d.concat(head_parts),
+                last_arg_doc,
+                d.text(")"),
+            ]),
+        }
+    }
+
+    /// The hug: head arguments inline, the last one broken open
+    /// (prettier's `group(lastArg, { shouldBreak: true })`).
+    fn hug(self, d: &DocArena, head_parts: &[DocId], last_arg_doc: DocId) -> DocId {
+        self.inline(d, head_parts, d.group_break(last_arg_doc))
+    }
+
+    /// Prettier's `allArgsBrokenOut()` — every argument on its own line.
+    pub(crate) fn expand_all(self, d: &DocArena, all_args_broken: DocId) -> DocId {
+        match self {
+            Self::Callee(callee) => build_expand_all_args(d, callee, all_args_broken),
+            Self::ChainPrefix(prefix) => build_chain_expand_all_args(d, prefix, all_args_broken),
+        }
+    }
+
+    /// The three-state ladder: inline → hug → expand all. See
+    /// [`build_inline_hug_or_expand_all`] for what each state is for.
+    fn inline_hug_or_expand_all(
+        self,
+        d: &DocArena,
+        head_parts: &[DocId],
+        last_arg_doc: DocId,
+        all_args_broken: DocId,
+    ) -> DocId {
+        d.conditional_group(&[
+            self.inline(d, head_parts, last_arg_doc),
+            self.hug(d, head_parts, last_arg_doc),
+            self.expand_all(d, all_args_broken),
+        ])
+    }
+}
+
+/// The expand-last layout for an arrow with an **object / array terminal** — the head
+/// arguments stay inline and the terminal expands internally
+/// (`fn(arg, (x) => ({⏎\ta: x⏎}))`), through any number of curried heads.
+///
+/// One body for the plain-call / `new` printer and the member-chain one, which had drifted
+/// into two copies of the same four steps. Everything here is load-bearing and was stated
+/// twice before:
+///
+/// - the **willBreak bail** must precede the second printing below, since only the two states
+///   past it read one (prettier's `if (headArgs.some(willBreak)) return allArgsBrokenOut()`).
+///   The plain-call caller has already answered it for every arm, so there it is provably
+///   false — the ask lives here so a caller cannot reach the ladder without it;
+/// - both hug states read the argument's **`expandLastArg`** printing
+///   ([`build_expand_last_arg_doc`]), never its `printedArguments` one — wrapping the chain
+///   doc in `group_break` would break the chain's own heads and the truncated `fits` walk
+///   would then hug a chain prettier breaks out on width;
+/// - the pre-built terminal body is **re-injected** around that printing, so the second build
+///   costs signatures rather than the whole subtree (`fanout:audit`).
+///
+/// `build` is the caller's argument builder — `build_expression_doc` vs
+/// `build_arg_expression_doc`, the one thing the two sites still disagree on.
+pub(crate) fn build_expand_last_obj_array_doc(
+    printer: &Printer<'_>,
+    opener: ArgOpener,
+    obj_reuse: Option<(u32, DocId)>,
+    head_parts: &[DocId],
+    all_args_broken: DocId,
+    build: impl FnOnce() -> DocId,
+) -> DocId {
+    let d = printer.d();
+    if head_parts.iter().any(|&id| d.will_break(id)) {
+        return opener.expand_all(d, all_args_broken);
+    }
+    let expanded =
+        printer.with_arrow_body_inject(obj_reuse, || build_expand_last_arg_doc(printer, build));
+    opener.inline_hug_or_expand_all(d, head_parts, expanded, all_args_broken)
 }
 
 /// Prettier's expand-FIRST layout: a block-function first argument hugs and the tail stays

@@ -444,7 +444,8 @@ impl<'a> Printer<'a> {
         // `expandLastArg` path prints params with `removeLines`, which is what lets a
         // force-broken arrow keep its destructuring param inline and fall through to
         // the all-args-broken-out layout instead of shattering the param.
-        if self.expand_last_arg_flat_params.get() {
+        let flat_params = self.expand_last_arg_flat_params.get();
+        if flat_params {
             parts.push(d.remove_lines(sig_doc));
         } else {
             parts.push(d.group(sig_doc));
@@ -458,6 +459,31 @@ impl<'a> Printer<'a> {
 
         // Body: expression bodies can break to a new line with indent; block bodies
         // stay hugged to `=>`.
+        //
+        // ⚠️ This is where `expand_last_arg_flat_params` STOPS. Prettier hands
+        // `expandLastArg` to exactly one nested print — `bodyDoc = print("body", args)`
+        // (`print/arrow-function.js`) — so it reaches the hugged argument and then travels
+        // only down an ARROW-BODY spine (`shouldPrintAsChain` is false under the flag, so
+        // each head prints its body with the same `args` and the run of signatures all take
+        // `removeLines`). Every other body kind receives the flag and ignores it: the object
+        // / array / ternary printers pass no `args` to their own children, so an arrow nested
+        // inside the hugged body keeps its break points. tsv spells the flag as ambient
+        // `Printer` state, so without this clear it survived the whole descent and
+        // `remove_lines`ed such an arrow's parameters — printing a 101-column line where
+        // prettier shatters the destructuring param
+        // (`calls/chained/expand_last_nested_arrow_params_long`). The signature above is
+        // built with the flag still set, which is what keeps prettier's `removeLines` over
+        // the argument's OWN parameters — including anything nested in a parameter default,
+        // where prettier's doc-level transform strips lines too.
+        let body_is_arrow = matches!(
+            &arrow.body,
+            internal::ArrowFunctionBody::Expression(expr)
+                if matches!(&**expr, internal::Expression::ArrowFunctionExpression(_))
+        );
+        let restore_flat = flat_params && !body_is_arrow;
+        if restore_flat {
+            self.expand_last_arg_flat_params.set(false);
+        }
         match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => {
                 self.build_arrow_expression_body(&mut parts, expr, arrow, arrow_end);
@@ -465,6 +491,9 @@ impl<'a> Printer<'a> {
             internal::ArrowFunctionBody::BlockStatement(block) => {
                 self.build_arrow_block_body(&mut parts, block, arrow_end);
             }
+        }
+        if restore_flat {
+            self.expand_last_arg_flat_params.set(true);
         }
 
         d.concat(&parts)
@@ -800,6 +829,23 @@ impl<'a> Printer<'a> {
     /// Emit the body of an arrow with a block-statement body (the `=>` already
     /// pushed) into `parts`. A block body always stays hugged to `=>` and
     /// terminates any curried-arrow chain.
+    /// The doc an arrow's **block** body renders as, on its own — the block-body counterpart
+    /// of [`Self::build_arrow_body_doc`], split out so an argument printer can pre-build it
+    /// once and inject it ([`Self::inject_arrow_body`]) rather than have each of the two
+    /// `expandLastArg` printings rebuild the whole body.
+    ///
+    /// A block body terminates any curried-arrow chain — arrows nested inside it (callbacks,
+    /// object-property arrows) are NOT part of the chain, so the stacked-chain flag is cleared
+    /// so they aren't force-broken after `=>`. Mirrors the innermost expression-body case.
+    pub(crate) fn arrow_block_body_doc(&self, block: &internal::BlockStatement<'_>) -> DocId {
+        if let Some((span, doc)) = self.arrow_body_inject.get()
+            && span == block.span.start
+        {
+            return doc;
+        }
+        self.build_with_stacked_chain(false, || self.build_block_statement_doc(block))
+    }
+
     fn build_arrow_block_body(
         &self,
         parts: &mut DocBuf,
@@ -816,12 +862,7 @@ impl<'a> Printer<'a> {
         let body_start = block.span.start;
         let has_post_arrow_comments = self.has_comments_to_emit_between(arrow_end, body_start);
 
-        // A block body terminates any curried-arrow chain — arrows nested
-        // inside it (callbacks, object-property arrows) are NOT part of the
-        // chain, so clear the flag so they aren't force-broken after `=>`.
-        // Mirrors the innermost expression-body case above.
-        let block_doc =
-            self.build_with_stacked_chain(false, || self.build_block_statement_doc(block));
+        let block_doc = self.arrow_block_body_doc(block);
 
         // A line comment (or own-line block comment) between `=>` and the block
         // body must break so the comment sits on its own line and the `{` drops

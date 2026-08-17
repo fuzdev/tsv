@@ -18,4 +18,26 @@
 		1,
 		(x) => (g(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) /* c */)
 	);
+
+	// an OBJECT terminal one argument over — 100 chars, everything inline
+	f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, (x) => ({ k: x } /* c */));
+
+	// 101 chars: the head argument stays inline and the object expands behind the
+	// signature, the layout that renders the argument's own expand-last printing
+	f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, (x) => ({
+		k: x
+	} /* c */));
+
+	// the member chain's twin of that state — 100 chars, then 101
+	obj
+		.a()
+		.b()
+		.m(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, (x) => ({ k: x } /* c */));
+
+	obj
+		.a()
+		.b()
+		.m(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, (x) => ({
+			k: x
+		} /* c */));
 </script>

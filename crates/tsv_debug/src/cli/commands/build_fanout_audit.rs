@@ -204,6 +204,41 @@ fn gen_ts_nested_arrow_obj_single(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// SINGLE-arg last-arg arrow with an OWN-LINE comment after `=>` and an OBJECT body — the
+/// state that legitimately builds the argument TWICE (`build_own_line_post_arrow_arg_docs`:
+/// the `expandLastArg` printing for the hug state, the `printedArguments` one for the
+/// `allArgsBrokenOut()` fallback behind it). The object terminal keeps the body injection
+/// armed, which is what holds the pair linear.
+fn gen_ts_nested_arrow_own_line_comment_obj(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} =>\n// c{i}\n({{ k{i}: {expr} }}))");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// The same shape with a **BLOCK** body — the axis that matters, because no body injection
+/// reaches a block terminal, so both printings rebuild the argument's whole subtree. This is
+/// the one construct where the second build is paid unguarded, and the exponent is what says
+/// whether it compounds.
+fn gen_ts_nested_arrow_own_line_comment_block(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} =>\n// c{i}\n{{ return {expr}; }})");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// The same shape with a plain **CALL** body — the third prebuild arm, where the injected doc
+/// is the body's own build rather than a paren-wrapped or block one.
+fn gen_ts_nested_arrow_own_line_comment_call(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} =>\n// c{i}\ng{i}({expr}))");
+    }
+    format!("const v = {expr};\n")
+}
+
 /// SINGLE-arg **curried** arrow chain (`f((a) => (b) => {{ … }})`) whose block terminal holds
 /// the next such call — `call_formatting.rs`'s `build_block_arrow_hug_states`. Prettier prints
 /// its last argument twice (`printedArguments` vs an `expandLastArg` `lastArg`), so this is the
@@ -596,6 +631,24 @@ impl BuildFanoutAuditCommand {
                 name: "ts_nested_arrow_obj_multiarg",
                 parser: ParserType::TypeScript,
                 generate: gen_ts_nested_arrow_obj_multiarg,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_own_line_comment_obj",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_own_line_comment_obj,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_own_line_comment_block",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_own_line_comment_block,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_own_line_comment_call",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_own_line_comment_call,
                 depths: &[4, 8, 12],
             },
             Construct {
