@@ -6,7 +6,7 @@
 
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use crate::printer::comments::CommentSpacing;
-use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
+use crate::printer::{CommentVec, DelimiterGluedBlank, ParenContext, Printer, RunLeadingBlank};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -195,7 +195,22 @@ impl<'a> Printer<'a> {
         // `!(/* c */ x)` while it fits and drops below the comment once it doesn't. The
         // gluing variant (`build_rhs_comments_glued_opt`) spends that `line` on an
         // unconditional space and can only ever reach the first of those two forms.
-        let leading_comments_opt = self.build_rhs_comments_opt(operator_end, argument_start);
+        // The opening-delimiter rule at the comment-holder `(`: a `//` the author glued to
+        // it keeps that line ([`Printer::split_open_delimiter_glued_run`]), as at `return (`
+        // / `throw (`, a retained type paren shell, every bracket and every statement
+        // header. This shell was the value family's last holdout — prettier un-glues here
+        // and tsv followed, which is the one-position-agreeing shape that froze the rule
+        // everywhere else it was found (`docs/comments.md` §The delimiter-line question).
+        //
+        // The gap opens at the OPERATOR's end because the parser strips the source `(` — so
+        // the region spans it, and "no newline before the comment" is exactly "the author
+        // wrote it on the line this shell's re-added `(` will sit on".
+        let (paren_glued, leading_run_start) = self.split_open_delimiter_glued_run(
+            operator_end,
+            argument_start,
+            DelimiterGluedBlank::Keep,
+        );
+        let leading_comments_opt = self.build_rhs_comments_opt(leading_run_start, argument_start);
         // Whether a leading comment is *present* — the gate for re-adding the parens — as
         // opposed to whether this emitter has to print it. A **forward-binding** comment (a
         // bundler annotation, a JSDoc cast) is `owned_by_node`, so the operand's own doc
@@ -234,10 +249,20 @@ impl<'a> Printer<'a> {
         let operand_encloses_owned_comment =
             matches!(unary.argument, Expression::SequenceExpression(_))
                 || (arg_needs_parens && !matches!(unary.argument, Expression::BinaryExpression(_)));
+        // Anchored at `leading_run_start`, not `operator_end`: the glued `//` above already
+        // left the run, and counting it here would make the name a lie (it is never owned —
+        // `owned ⇒ is_block`). Inert for the wrap, which ORs the two, but this flag is the
+        // reason the wrap survives a run the emitter prints nothing for, so it has to mean
+        // what it says.
         let owned_leading_comment = leading_comments_opt.is_none()
             && !operand_encloses_owned_comment
-            && tsv_lang::has_comments_on_page_in_range(self.comments, operator_end, argument_start);
-        let has_leading_comments = leading_comments_opt.is_some() || owned_leading_comment;
+            && tsv_lang::has_comments_on_page_in_range(
+                self.comments,
+                leading_run_start,
+                argument_start,
+            );
+        let has_leading_comments =
+            paren_glued.is_some() || leading_comments_opt.is_some() || owned_leading_comment;
 
         // Check for trailing comments after the argument but inside the original parens.
         // When the parser strips grouping parens from `!(x /* c */)`, the comment
@@ -299,13 +324,23 @@ impl<'a> Printer<'a> {
             // comment reaches the group as a real hardline: an own-line trailing comment
             // through `push_trailing_run_separator`, a `//` or own-line block in the
             // LEADING run through `push_leading_comment_run`'s third separator.
-            let shell = d.concat(&[
-                d.text("("),
-                d.indent(d.concat(&parts)),
-                d.softline(),
-                d.text(")"),
-            ]);
-            if self.has_line_comments_between(argument_end, unary.span.end) {
+            let mut shell_parts: DocBuf = smallvec![d.text("(")];
+            // The glued `//` rides on the `(`'s own line, ahead of the `indent` — no break
+            // precedes it, so the indent would have nothing to act on anyway.
+            shell_parts.extend(paren_glued);
+            shell_parts.push(d.indent(d.concat(&parts)));
+            shell_parts.push(d.softline());
+            shell_parts.push(d.text(")"));
+            let shell = d.concat(&shell_parts);
+            // The second break the group cannot see for itself. A `//` in the leading run
+            // reaches it as a real `hardline` through `push_leading_comment_run` — but the
+            // glued one has LEFT that run, so nothing inside the group forces it open any
+            // more, and a flat shell would put `x)` on the `//`'s own line and swallow it.
+            // Claiming the delimiter's line is therefore a break obligation, not just a
+            // placement: the shell rendered the same way before, the comment merely sat one
+            // line lower.
+            if paren_glued.is_some() || self.has_line_comments_between(argument_end, unary.span.end)
+            {
                 d.group_break(shell)
             } else {
                 d.group(shell)

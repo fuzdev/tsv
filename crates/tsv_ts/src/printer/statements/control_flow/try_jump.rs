@@ -1,6 +1,6 @@
 // try/catch/finally, throw, break/continue, and labeled statement printing
 
-use super::OpenParenLineComments;
+use super::OpenParenLineBlockComment;
 use crate::ast::internal::{self, Statement};
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
@@ -100,7 +100,7 @@ impl<'a> Printer<'a> {
                     param,
                     open,
                     close,
-                    OpenParenLineComments::Normalize,
+                    OpenParenLineBlockComment::JoinsRun,
                 ));
             } else {
                 parts.push(self.build_expression_doc(param));
