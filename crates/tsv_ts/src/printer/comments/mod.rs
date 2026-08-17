@@ -1034,6 +1034,49 @@ impl<'a> Printer<'a> {
         has_line_comment
     }
 
+    /// Split a retained paren SHELL's leading run at the author's GLUE: a **line** comment
+    /// written on the `(`'s own line is returned separately, for the caller to emit right
+    /// after the `(` (`( // c`), and the rest of the run resumes below it inside the
+    /// shell. Returns `(glued, resume)`, where `resume` is where the remaining run starts
+    /// — `start` unchanged when nothing was glued.
+    ///
+    /// This is the opening-delimiter rule every other bracket already follows: what the
+    /// author put on the `(`/`[`/`{`/`<` line stays there, and what they put on its own
+    /// line keeps its own line, so both authorings are fixed points
+    /// (`Printer::push_leading_comment_run`'s glue test, asked here of the delimiter
+    /// rather than of the item). Only a `//` can claim the line and only one can — it runs
+    /// to end of line — and only a comment the author actually glued; a **block** is
+    /// untouched, since it already renders inline inside the shell.
+    pub(crate) fn split_paren_shell_glued_leading_run(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> (Option<DocId>, u32) {
+        let d = self.d();
+        let Some(comment) = comments_to_emit_in_range(self.comments, start, end).next() else {
+            return (None, start);
+        };
+        if comment.is_block || self.comment_has_newline_between(start, comment.span.start) {
+            return (None, start);
+        }
+        let mut parts = DocBuf::new();
+        parts.push(d.text(" "));
+        parts.push(self.build_comment_doc(comment));
+        // An author blank below the glued comment survives it, exactly as it does below an
+        // own-line one ([`Self::push_paren_shell_leading_run`]) — the caller's own break
+        // opens the next line, so this hardline is the blank itself. Claiming the comment
+        // for the `(` line must not cost the blank underneath it: which line the comment
+        // sits on and how far the author separated it from the type are two facts, and the
+        // run emitter below never sees this one because the comment left its range.
+        let next_start = comments_to_emit_in_range(self.comments, comment.span.end, end)
+            .next()
+            .map_or(end, |c| c.span.start);
+        if self.has_blank_line_between(comment.span.end, next_start) {
+            parts.push(d.hardline());
+        }
+        (Some(d.concat(&parts)), comment.span.end)
+    }
+
     /// Emit a retained-paren SHELL's leading run — the comments in `[start, end)`
     /// between the shell's `(` and the type it wraps — each followed by its own
     /// separator: a space for a block (`(/* c */ a | b)`), a `hardline` for a line
@@ -1045,14 +1088,16 @@ impl<'a> Printer<'a> {
     /// `build_union_type_doc_with_line_comments`), so emitting here would double-print
     /// it; the block arm always emits.
     ///
-    /// ⚠️ Deliberately NOT [`Self::push_leading_comment_run`], the canonical leading
-    /// emitter: that one keys each separator on what FOLLOWS the comment (the glue
-    /// test, blank-line preservation), while a shell's run keys on the comment's own
-    /// kind. Routing these through it is a behavior change (it would newly hug and
-    /// newly preserve blank lines at three paren shells), not a collapse — so the
-    /// divergence lives here, in one place, instead of hand-rolled at each shell.
-    /// TODO: converge the two, fixtures-first — the shells are the last leading-run
-    /// sites deciding a separator without asking what follows.
+    /// ⚠️ Still not [`Self::push_leading_comment_run`], the canonical leading emitter —
+    /// a shell's separator is the delimiter's question, not the item's — but no longer
+    /// keyed on the comment's own KIND alone, which was the whole of the difference. Both
+    /// of that emitter's what-follows rules now hold here too: the **glue** test (asked
+    /// one step earlier, by [`Self::split_paren_shell_glued_leading_run`], since a glued
+    /// comment belongs to the `(` line the caller owns) and **blank-line preservation**
+    /// below. The shells were the last leading-run sites deciding a separator without
+    /// asking what follows, and each half was a real difference from every other opening
+    /// delimiter: `fn(`, `[`, `{` and `<` keep both the glue and the blank, and prettier
+    /// keeps the blank at all of them too.
     pub(crate) fn push_paren_shell_leading_run(
         &self,
         parts: &mut DocBuf,
@@ -1062,7 +1107,8 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let d = self.d();
         let mut has_line_comment = false;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        let run: CommentVec<'_> = comments_to_emit_in_range(self.comments, start, end).collect();
+        for (i, comment) in run.iter().enumerate() {
             if comment.is_block {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
@@ -1070,6 +1116,18 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.hardline());
                 has_line_comment = true;
+                // An author blank between this comment and what follows it — the next
+                // comment, or the type the shell wraps — is authorship, not shell
+                // structure, and every other opening delimiter keeps it (`fn(`, `{`, `[`,
+                // where prettier keeps it too). Dropping it here made the shells the one
+                // place tsv erased a blank line both its own siblings and prettier
+                // preserve. A blank between the `(` and the FIRST comment is a different
+                // question and stays erased: it sits against the delimiter, where every
+                // formatter — tsv and prettier alike, at every bracket — drops it.
+                let next_start = run.get(i + 1).map_or(end, |c| c.span.start);
+                if self.has_blank_line_between(comment.span.end, next_start) {
+                    parts.push(d.hardline());
+                }
             }
         }
         has_line_comment

@@ -988,8 +988,17 @@ impl<'a> Printer<'a> {
             // the declarator's own value→`;` handling so the paren form is idempotent in one
             // pass. A leading block still trails the keyword inline. Without the defer the
             // cast emits the block before the `;` and the next pass relocates it.
+            //
+            // ⚠️ A trailing **line** comment declines the strip entirely
+            // (`paren_retains_for_trailing_run`): a `//` deferred past the `;` lands on the
+            // statement's own trailing line, welding with a comment authored in the
+            // declarator's gap (`as (F // c4⏎) // c5` → `as F; // c4 // c5`, the second
+            // `//` becoming text of the first). This is the cast's own second path to the
+            // strip — the hang seam above is the first — and the retain rule has to be
+            // asked at both.
             let inner = unwrap_parenthesized(type_annotation);
             if inner.span() != type_annotation.span()
+                && !self.paren_retains_for_trailing_run(type_annotation)
                 && self.has_comments_to_emit_between(inner.span().end, type_annotation.span().end)
             {
                 for comment in comments_to_emit_in_range(self.comments, kw_end, inner.span().start)

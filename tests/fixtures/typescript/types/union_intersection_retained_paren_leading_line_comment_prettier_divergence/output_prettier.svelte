@@ -9,8 +9,17 @@
 
 	// first member is a retained-paren intersection with a trailing object, which
 	// supplies its own aligned layout - the comment is kept inside the parens the same
-	// way, hugging the `(` above the intersection
+	// way, on the `(` line the author wrote it on
 	type FirstIntersection =
+		| // c
+		  (A & {
+				a: 1;
+		  })
+		| C;
+
+	// the same shell with the comment on its own line, which it keeps - both authorings
+	// are fixed points here as at every other opening delimiter
+	type FirstIntersectionOwnLine =
 		| // c
 		  (A & {
 				a: 1;
