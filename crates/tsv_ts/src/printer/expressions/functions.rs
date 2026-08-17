@@ -680,12 +680,19 @@ impl<'a> Printer<'a> {
             // seams' rule; the shared gate + emitter). A body that fits declines
             // and keeps the glued hug, whose flat render is the same bytes
             // prettier's collapsed `line` produces.
-            if let Some((run, body_doc)) =
-                self.breaking_value_leading_run(arrow_end, body_start, || {
-                    self.build_arrow_body_doc(expr)
-                })
-            {
-                parts.push(self.break_after_operator_run_doc(&run, body_start, body_doc));
+            //
+            // The geometry is [`Self::arrow_gap_broke_after_run`] rather than this arm's
+            // own reading, because the enclosing CALL must ask the identical question to
+            // know whether its `)` drops with the body — see that predicate.
+            let broken = self
+                .arrow_gap_broke_after_run(arrow, arrow_end, body_start)
+                .and_then(|run| {
+                    let body_doc = self.build_arrow_body_doc(expr);
+                    d.will_break(body_doc)
+                        .then(|| self.break_after_operator_run_doc(&run, body_start, body_doc))
+                });
+            if let Some(doc) = broken {
+                parts.push(doc);
             } else {
                 parts.push(d.text(" "));
                 if let Some(run) = gap_run() {
@@ -1743,6 +1750,48 @@ impl<'a> Printer<'a> {
             }
         }
         false
+    }
+
+    /// The hug arm's half of "does the `=>`→body gap break": `Some(run)` when a block run
+    /// glued to `=>` that the author broke AFTER precedes a hug-eligible body — the geometry
+    /// [`Self::breaking_value_leading_run`] asks in [`Self::build_arrow_expression_body`]'s
+    /// hug arm, plus the two conditions that arm is reached through.
+    ///
+    /// ⚠️ **It exists so the CALL can ask the arrow's own question.** The gap breaks down two
+    /// arms — [`Self::has_own_line_post_arrow_comment`] (a newline BEFORE the comment, or a
+    /// line / multiline one) and this one (a newline AFTER it) — and prettier has no such
+    /// split: `shouldPutBodyOnSameLine` is one boolean, and the `softline` that lands an
+    /// `expandLastArg` call's `)` sits in the same group as the `line` that drops the body
+    /// (`trailingSpace` in `print/arrow-function.js`), so the two move together by
+    /// construction. tsv's call printers read only the first arm, so a gap broken by this one
+    /// dropped the body while `))` stayed glued — and pass 2, now reading the emitted break as
+    /// a newline BEFORE, moved the `)`. An F1 2-cycle, not a divergence; pinned by
+    /// `calls/arrow_object_body_broke_after_comment` and by three `blanks:audit` shapes.
+    ///
+    /// The two extra conditions are the arm's preconditions, not this question's: a
+    /// **trailing-paren comment** takes the retained-paren arm ABOVE the ladder (which asks
+    /// the first arm alone), and a body that does not always hug never reaches the hug arm at
+    /// all. `should_hug`'s remaining conjuncts cannot fire here — both require an ARROW body,
+    /// and every caller has already walked to the terminal arrow.
+    ///
+    /// Geometry only: the arm also requires the body doc to `will_break`, which the caller
+    /// answers against the body it is about to inject, so no probe builds a doc of its own.
+    /// A body that FITS keeps the glued hug in both formatters (`=> /* c */ ({ a: 1 })`).
+    pub(crate) fn arrow_gap_broke_after_run(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+        sig_end: u32,
+        body_start: u32,
+    ) -> Option<CommentVec<'a>> {
+        let internal::ArrowFunctionBody::Expression(body) = &arrow.body else {
+            return None;
+        };
+        if !arrow_body_always_hugs(body, self.source)
+            || self.has_trailing_paren_comments(body.span().end, arrow.span.end)
+        {
+            return None;
+        }
+        self.broke_after_value_leading_run(sig_end, body_start)
     }
 
     /// Build a Doc for an arrow function (simple, non-wrapping version for nested contexts)

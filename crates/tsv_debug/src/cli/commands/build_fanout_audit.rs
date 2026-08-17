@@ -239,6 +239,19 @@ fn gen_ts_nested_arrow_own_line_comment_call(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// The **other** arm of the same gap question: a block comment GLUED to `=>` that the author
+/// broke after, before an object body that hard-breaks. It selects the identical state
+/// (`last_arg_arrow_gap_break`), and answering it needs the body's `will_break` — so this is
+/// the axis that says whether that probe built a doc of its own. It must not: the gate hands
+/// its injection to both printings, exactly as the own-line arm above does.
+fn gen_ts_nested_arrow_broke_after_comment_obj(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} => /* c{i} */\n({{\nk{i}: {expr}\n}}))");
+    }
+    format!("const v = {expr};\n")
+}
+
 /// SINGLE-arg **curried** arrow chain (`f((a) => (b) => {{ … }})`) whose block terminal holds
 /// the next such call — `call_formatting.rs`'s `build_block_arrow_hug_states`. Prettier prints
 /// its last argument twice (`printedArguments` vs an `expandLastArg` `lastArg`), so this is the
@@ -649,6 +662,12 @@ impl BuildFanoutAuditCommand {
                 name: "ts_nested_arrow_own_line_comment_call",
                 parser: ParserType::TypeScript,
                 generate: gen_ts_nested_arrow_own_line_comment_call,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_broke_after_comment_obj",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_broke_after_comment_obj,
                 depths: &[4, 8, 12],
             },
             Construct {
