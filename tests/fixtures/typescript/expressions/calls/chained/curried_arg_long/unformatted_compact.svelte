@@ -22,6 +22,6 @@ obj.method((a)=>(b)=>{return body;}).next();
 
 // A trailing block comment defeats the hug - the argument breaks out (a `function`
 // expression is the other shape that reaches the same arm)
-obj.method((a)=>(b)=>{return body;} /* c */).next();
-obj.method(function(){return body;} /* c */).next();
+obj.method((a)=>(b)=>{return body;}/* c */).next();
+obj.method(function(){return body;}/* c */).next();
 </script>

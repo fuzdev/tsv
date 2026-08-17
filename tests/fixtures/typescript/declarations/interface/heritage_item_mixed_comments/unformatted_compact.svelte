@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Block then line comment between extends items
-	interface A extends I /* c1 */,
+	interface A extends I/* c1 */,
 		// c2
 		J {}
 
@@ -10,7 +10,7 @@
 		J {}
 
 	// Trailing block before the comma plus a same-line line comment: both trail the comma
-	interface C extends I /* c1 */, // c2
+	interface C extends I/* c1 */, // c2
 		J {}
 
 	// Own-line line comment after the comma sits on its own line below

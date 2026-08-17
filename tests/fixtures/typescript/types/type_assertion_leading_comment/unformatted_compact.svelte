@@ -1,3 +1,3 @@
 <script lang="ts">
-	const a = /* c */<string>w;
+	const a =/* c */<string>w;
 </script>

@@ -29,7 +29,7 @@
 
 	// Block comment after V (multiline)
 	type F = {
-		[  K   in   keyof   T  ]:   V   /* after value */;
+		[  K   in   keyof   T  ]:   V   /* after value */ ;
 	};
 
 	// Block comment after V (single-line)

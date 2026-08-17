@@ -29,4 +29,4 @@ text{expr}
 </span>
 
 <!-- Text-only COLLAPSES to single line (newlines between words are separators, the boundary run trims) -->
-<a   href="x">text</a>
+<a href="x">text</a>

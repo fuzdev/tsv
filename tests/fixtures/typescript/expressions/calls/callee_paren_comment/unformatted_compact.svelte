@@ -9,5 +9,5 @@
 	const c=/* @__PURE__ */new Date().toISOString();
 
 	// New expression callee with comment
-	const d=new /* comment */Foo();
+	const d=new/* comment */Foo();
 </script>

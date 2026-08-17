@@ -14,10 +14,10 @@
 		color: green;
 	}
 	/* a comma makes the argument a selector list of An+B/selector terms */
-	:nth-child(2n,.class1) {
+	:nth-child(  2n ,  .class1  ) {
 		color: teal;
 	}
-	:nth-child(odd,even) {
+	:nth-child(  odd ,  even  ) {
 		color: orange;
 	}
 </style>

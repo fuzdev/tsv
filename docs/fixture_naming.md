@@ -295,6 +295,63 @@ Variant name — purpose (example):
 - Regular directory: `unformatted_compact.svelte`, `unformatted_spaces.svelte`
 - `_prettier_divergence` directory: `unformatted_ours_compact.svelte`, `unformatted_ours_spaces.svelte`
 
+#### `_compact` and `_spaces` are directional opposites (gated)
+
+The two are a matched pair of opposite claims about the same input, and the pair
+is the point: `_compact` **removes** whitespace the formatter normalizes away,
+`_spaces` **adds** whitespace the formatter normalizes away, so between them a
+fixture is squeezed from both sides. Write both where the input supports both.
+
+The N rules prove only that a variant *lands on* input; they never ask which
+direction it travelled from. `deno task variants:audit` asks exactly that, by
+aligning the variant to the input on their shared non-whitespace character
+stream and grading each whitespace gap:
+
+- a **`_compact`** variant must never make a gap **wider** (compared only where
+  neither side has a newline, so re-indentation isn't misread as widening);
+- a **`_spaces`** variant must never make a gap **empty**.
+
+A variant pointing the wrong way is not a weaker test — it is a *duplicate* of
+its sibling under the other one's name, and the direction it was meant to cover
+goes untested with nothing to say so.
+
+**Direction is gated; *extent* is convention.** The audit never asks whether a
+`_compact` variant is maximally compact — most non-empty gaps are mandatory
+separators, and squeezing the removable ones would delete injection sites the
+ratchets enumerate from the seed text. The one place to be strict is a **horizontal**
+gap touching a block comment: glue it. `owned_by_node` is defined by glue, so a
+space-padded comment in a compact variant tests nothing its own input does not. Leave
+the gap when the glued form stops normalizing to input under *either* formatter — and
+leave a gap carrying a **newline** regardless: whether a comment is on its own line is
+authorship, not volume, so welding it onto the next line rewrites the authoring (and
+eats the fixture's own prose) rather than compacting it. See
+[audits.md §Variant Whitespace-Direction Audit](./audits.md#variant-whitespace-direction-audit-variantsaudit).
+
+**When the mix is deliberate, rename rather than force the content.** Some
+variants must move both ways because the *weld itself* is the subject — the
+hug/boundary fixtures, where gluing a body to its head or tail is what makes
+prettier diverge, while the interior stays padded. Those take a **qualified**
+name that says what they test (`unformatted_ours_head_weld`,
+`unformatted_ours_tail_weld`, `unformatted_ours_hug_spaced`), or
+`unformatted_mixed_spacing` for plain chaos. Only the **bare** suffixes
+`compact` / `spaces` make the directional claim, so a qualified name is out of
+the audit's scope by construction — that is the sanctioned escape hatch, not an
+evasion. `unformatted_unicode_spaces` is qualified for the same reason: it
+substitutes U+00A0 for a space rather than changing whitespace volume at all.
+
+⚠️ **Adding boundary whitespace can dissolve an `_ours_` claim.** Several
+`unformatted_ours_spaces` variants only diverged from prettier because their
+element-content boundary was welded; spacing that boundary makes prettier
+normalize to input too, so N6 fails and the file must become a plain
+`unformatted_spaces` (allowed wherever the directory has no `output_prettier.*`
+— S9). That is a *strengthening*: the fixture gains a both-formatter
+normalization test and keeps its divergence claim in its `_compact` sibling.
+
+The oracle-generated forms — `prettier_variant_compact`, `variant_compact`,
+`divergent_variant_compact`, `prettier_intermediate*` — are **prettier's own
+output**, so their suffix names the form prettier preserved rather than an
+authoring instruction. They are never graded.
+
 ---
 
 ## Prettier Divergence File Naming

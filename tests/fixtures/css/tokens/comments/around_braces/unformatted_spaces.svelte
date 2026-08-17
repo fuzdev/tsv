@@ -5,7 +5,7 @@
 
 	.class2   {
 		/* comment */ 
-		color:blue;
+		color:   blue;
 	}
 
 	.class3 {
@@ -14,7 +14,7 @@
 	}
 
 .class4 {
-	color:yellow;
+	color:   yellow;
 }  /* comment */ 
 
 	.class5 {

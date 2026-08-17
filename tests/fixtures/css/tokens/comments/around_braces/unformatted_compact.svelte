@@ -1,5 +1,5 @@
 <style>
-	.class1 /* comment */ {color:red;}
+	.class1 /* comment */{color:red;}
 
 	.class2 {/* comment */color:blue;}
 

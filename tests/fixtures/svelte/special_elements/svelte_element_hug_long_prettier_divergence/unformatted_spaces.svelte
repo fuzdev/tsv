@@ -9,4 +9,4 @@
 
 <!-- 101 chars with text children: the content lays out block-style (both tags intact);
      prettier dangles the delimiters instead — see prettier_variant_dangle -->
-<svelte:element   this="span"   class="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"   >text</svelte:element>
+<svelte:element   this="span"   class="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"   >  text  </svelte:element>

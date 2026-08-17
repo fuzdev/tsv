@@ -36,7 +36,7 @@ use commands::{
     razor_audit::RazorAuditCommand, render_audit::RenderAuditCommand,
     render_compare::RenderCompareCommand, roundtrip_audit::RoundtripAuditCommand,
     scan_audit::ScanAuditCommand, test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
-    tsc_conformance::TscConformanceCommand,
+    tsc_conformance::TscConformanceCommand, variant_audit::VariantAuditCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -154,6 +154,7 @@ pub enum Subcommand {
     Test262(Test262Command),
     TscConformance(TscConformanceCommand),
     TsFixtureAudit(TsFixtureAuditCommand),
+    VariantAudit(VariantAuditCommand),
     WidthAudit(WidthAuditCommand),
 }
 
@@ -220,6 +221,7 @@ impl TopLevel {
             Subcommand::Test262(c) => c.run(),
             Subcommand::TscConformance(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),
+            Subcommand::VariantAudit(c) => c.run(),
             Subcommand::WidthAudit(c) => c.run(),
         }
     }

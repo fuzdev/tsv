@@ -18,5 +18,5 @@
 	import f from './ssssssssssssssssssssssssssssssssssssssssssssssssss.json' with {type:'json',resolution:'import'};
 
 	/* control: a comment on the attribute restores breaking */
-	import g from './qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq.json' with {type:'json' /* c */};
+	import g from './qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq.json' with {type:'json'/* c */};
 </script>

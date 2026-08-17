@@ -1,1 +1,1 @@
-<input bind:value={/* c */ a,b} />
+<input bind:value={/* c */a,b} />
