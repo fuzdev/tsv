@@ -1,5 +1,6 @@
 <script>
-	if (// first
+	if (
+// first
 		// second
 		// third
 		x
@@ -7,14 +8,16 @@
 		a();
 	}
 
-	while (// first
+	while (
+// first
 		// second
 		y
 	) {
 		b();
 	}
 
-	switch (// first
+	switch (
+// first
 		// second
 		z
 	) {

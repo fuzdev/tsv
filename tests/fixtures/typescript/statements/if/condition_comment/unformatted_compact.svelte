@@ -1,5 +1,6 @@
 <script>
-	if (// before condition
+	if (
+// before condition
 		x// inline with condition
 		// trailing after condition
 	) {

@@ -14,7 +14,9 @@ use super::{Printer, StandaloneGlue};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
-use crate::printer::{MemberBlankScan, MemberBody, MemberFreeze, MemberSeam};
+use crate::printer::{
+    DelimiterGluedBlank, MemberBlankScan, MemberBody, MemberFreeze, MemberSeam, ShellLeadingRun,
+};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -42,19 +44,6 @@ enum DefaultParenIndent {
     Bare,
 }
 
-/// Who emits a required pair's own shell **leading line-comment** run.
-#[derive(Clone, Copy, PartialEq)]
-enum ShellLeadingRun {
-    /// An upstream emitter already placed it — the union / intersection member callers
-    /// ([`Printer::build_union_type_doc_with_line_comments`]) and the conditional check /
-    /// `extends` callers (the stripped-shell relocation). Emitting here would
-    /// double-print it.
-    Upstream,
-    /// This site is the run's only emitter, so it renders inside the pair. True of an
-    /// optional tuple element, which has no upstream at all: its run was simply DROPPED.
-    Here,
-}
-
 impl<'a> Printer<'a> {
     //
     // Comment partitioning helpers
@@ -66,10 +55,12 @@ impl<'a> Printer<'a> {
     /// ([`MemberSeam::AroundSeparator`]) and a format-ignore freeze stops at the
     /// member's content end rather than carrying a second terminator out with it.
     ///
-    /// `delimiter_pull_pos` is `None` for the alignment caller, which keeps the
-    /// delimiter-line comment relocating in that path; `freeze` is
-    /// [`MemberFreeze::Never`] there too — a union-member / parenthesized-intersection
-    /// object type has never honored a directive in a member gap.
+    /// `delimiter_pull_pos` is the opening `{`'s own position where the caller pulled a
+    /// delimiter-line comment onto it, so this walk drops the same comment from the first
+    /// member's leading set — both callers supply it, since both keep such a comment on
+    /// the `{` line. `freeze` is [`MemberFreeze::Never`] for the alignment caller — a
+    /// union-member / parenthesized-intersection object type has never honored a directive
+    /// in a member gap.
     fn type_literal_member_body(
         &self,
         t: &TSTypeLiteral<'_>,
@@ -84,6 +75,35 @@ impl<'a> Printer<'a> {
             blank_scan: MemberBlankScan::PastComments,
             freeze,
             seam: MemberSeam::AroundSeparator,
+        }
+    }
+
+    /// The `{`-line comment pull a type literal's **forced-multiline** body takes: the
+    /// prefix docs to emit right behind the `{`, and the position the member walk excludes
+    /// them at ([`Printer::delimiter_line_comment_prefix`], the open-delimiter family).
+    ///
+    /// Both renderings ask it — the plain literal ([`Self::build_type_literal_doc_inner`])
+    /// and the union-member / parenthesized-intersection **alignment** one
+    /// ([`Self::build_aligned_object_literal_doc`], members double-indented, `}` at the
+    /// member's `align(2)` offset). They differ only in geometry, and a rendering difference
+    /// is no reason for a comment-position one; two spellings of that decision is how they
+    /// came to answer this gap differently for as long as they did, keyed on nothing the
+    /// author can see — whether the object happened to be a union member.
+    ///
+    /// Only the forced-multiline arm asks, and it needs no gate of its own: a `//` or an
+    /// own-line comment is exactly what forces that arm, and an inline block already hugs
+    /// the first member on the width-aware one. Empty of both with no members — an empty
+    /// body has no first member to pull ahead of, and its own emitter owns the braces.
+    fn type_literal_brace_line_pull(
+        &self,
+        t: &TSTypeLiteral<'_>,
+        comments_present: bool,
+    ) -> (DocBuf, Option<u32>) {
+        match t.members.first() {
+            Some(first) if comments_present => {
+                self.delimiter_line_comment_prefix(t.span.start, first.span().start)
+            }
+            _ => (DocBuf::new(), None),
         }
     }
 
@@ -428,7 +448,7 @@ impl<'a> Printer<'a> {
                 return self.build_parenthesized_union_doc(
                     union,
                     outermost_paren(ts_type),
-                    shell_leading_run == ShellLeadingRun::Here,
+                    shell_leading_run,
                 );
             }
 
@@ -497,7 +517,7 @@ impl<'a> Printer<'a> {
             //
             // `outermost_paren`, whose doc carries why an inner layer would truncate the
             // gap scan (`((A | B) /* c */)[]`).
-            Some(self.build_parenthesized_union_doc(u, outermost_paren(ty), true))
+            Some(self.build_parenthesized_union_doc(u, outermost_paren(ty), ShellLeadingRun::Here))
         } else {
             None
         }
@@ -521,47 +541,50 @@ impl<'a> Printer<'a> {
     /// before `)` (`(a | b /* c */)`). Prettier hoists these out of the parens; tsv
     /// keeps them with the parenthesized member. A trailing *line* comment before `)`
     /// is preserved here too (forcing the group to break). A leading *line* comment
-    /// after `(` is only emitted here when `emit_inner_leading_line_comments` is set —
-    /// the paren-union member arms of `build_union_type_doc_with_line_comments`, which
-    /// keep such a comment inside the parens for EVERY member (first or later); other
-    /// callers pass `false` because a leading line comment has already been handled
-    /// upstream (relocated or emitted before the member).
+    /// after `(` is only emitted here for [`ShellLeadingRun::Here`] — the paren-union
+    /// member arms of `build_union_type_doc_with_line_comments`, which keep such a
+    /// comment inside the parens for EVERY member (first or later); other callers pass
+    /// [`ShellLeadingRun::Upstream`] because a leading line comment has already been
+    /// handled upstream (relocated or emitted before the member).
     pub(super) fn build_parenthesized_union_doc(
         &self,
         union: &TSUnionType<'_>,
         paren: Option<&TSParenthesizedType<'_>>,
-        emit_inner_leading_line_comments: bool,
+        shell_leading_run: ShellLeadingRun,
     ) -> DocId {
         let d = self.d();
         let union_doc = self.build_union_type_doc(union);
 
         let mut needs_break = false;
         // A `//` the author glued to the `(` keeps that line, as at every other opening
-        // delimiter (`split_paren_shell_glued_leading_run`); the `softline` below is then
+        // delimiter (`split_open_delimiter_glued_run`); the `softline` below is then
         // the break that ends the comment's line. The doc and the position the rest of the
         // run resumes at travel together, so there is no resume value to read when nothing
         // was glued.
         let glued = paren
-            .filter(|_| emit_inner_leading_line_comments)
+            .filter(|_| shell_leading_run == ShellLeadingRun::Here)
             .and_then(|p| {
-                let (doc, resume) =
-                    self.split_paren_shell_glued_leading_run(p.span.start + 1, union.span.start);
+                let (doc, resume) = self.split_open_delimiter_glued_run(
+                    p.span.start + 1,
+                    union.span.start,
+                    DelimiterGluedBlank::Keep,
+                );
                 doc.map(|doc| (doc, resume))
             });
         needs_break |= glued.is_some();
         let mut indented: DocBuf = smallvec![d.softline()];
         if let Some(p) = paren {
             // Leading comments between `(` and the union. Block comments stay inline
-            // (`(/* c */ a | b)`). A leading *line* comment reaches here only when
-            // `emit_inner_leading_line_comments` is set — the paren-union member of an
-            // outer union, whose comment tsv keeps inside the parens leading the inner
-            // union (for every member, not just the first). A line comment must end its
-            // line, so it forces the paren group to break.
+            // (`(/* c */ a | b)`). A leading *line* comment reaches here only for
+            // `ShellLeadingRun::Here` — the paren-union member of an outer union, whose
+            // comment tsv keeps inside the parens leading the inner union (for every
+            // member, not just the first). A line comment must end its line, so it forces
+            // the paren group to break.
             needs_break |= self.push_paren_shell_leading_run(
                 &mut indented,
                 glued.map_or(p.span.start + 1, |(_, resume)| resume),
                 union.span.start,
-                emit_inner_leading_line_comments,
+                shell_leading_run,
             );
         }
         indented.push(union_doc);
@@ -633,17 +656,24 @@ impl<'a> Printer<'a> {
         if let Some(p) = paren {
             // The opening-delimiter rule, at the one shell whose `(` is this builder's own
             // text rather than a wrapper's: the author's glued `//` claims that line
-            // (`split_paren_shell_glued_leading_run`) and an own-line run keeps its own,
+            // (`split_open_delimiter_glued_run`) and an own-line run keeps its own,
             // so both authorings are fixed points here as at every other bracket. It used
             // to glue either way — the run rode directly behind the `(` with no break in
             // front of it.
-            let (glued, resume) =
-                self.split_paren_shell_glued_leading_run(p.span.start + 1, intersection.span.start);
+            let (glued, resume) = self.split_open_delimiter_glued_run(
+                p.span.start + 1,
+                intersection.span.start,
+                DelimiterGluedBlank::Keep,
+            );
             let glued_here = glued.is_some();
             opening_parts.extend(glued);
             let mut lead: DocBuf = DocBuf::new();
-            let has_line =
-                self.push_paren_shell_leading_run(&mut lead, resume, intersection.span.start, true);
+            let has_line = self.push_paren_shell_leading_run(
+                &mut lead,
+                resume,
+                intersection.span.start,
+                ShellLeadingRun::Here,
+            );
             // A `//` on the `(` line — the author's, or the first this run emits — has to
             // end that line before anything else goes on it, and this builder supplies no
             // break of its own (the `A & {` follows immediately). A **block**-only run
@@ -763,6 +793,7 @@ impl<'a> Printer<'a> {
         t: &TSTypeLiteral<'_>,
         force_multiline: bool,
         comments_present: bool,
+        delimiter_pull_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
         if t.members.is_empty() {
@@ -778,7 +809,12 @@ impl<'a> Printer<'a> {
             self.build_member_list_docs_into(
                 &mut member_parts,
                 t.members,
-                self.type_literal_member_body(t, comments_present, None, MemberFreeze::Never),
+                self.type_literal_member_body(
+                    t,
+                    comments_present,
+                    delimiter_pull_pos,
+                    MemberFreeze::Never,
+                ),
                 TSTypeElement::span,
                 |m| m.content_end(self.source),
                 |m, deferred| self.build_type_member_doc_inner(m, deferred),
@@ -1000,10 +1036,21 @@ impl<'a> Printer<'a> {
         // span; every comment sub-query below is bounded within it.
         let comments_present = self.has_comments_to_emit_between(obj.span.start, obj.span.end);
         let force_multiline = self.type_literal_force_multiline(obj, comments_present);
+        // A comment trailing the opening `{` on its line stays on it, through the SAME
+        // decision the plain type literal makes ([`Self::type_literal_brace_line_pull`]).
+        // This rendering was the open-delimiter family's last un-converted relocation: it
+        // passed `None` for the pull position, so the comment fell through to the first
+        // member's leading run and moved into the body.
+        let (brace_line_prefix, delimiter_pull_pos) = if force_multiline {
+            self.type_literal_brace_line_pull(obj, comments_present)
+        } else {
+            (DocBuf::new(), None)
+        };
         let members_doc = self.build_type_literal_members_only_doc_for_alignment(
             obj,
             force_multiline,
             comments_present,
+            delimiter_pull_pos,
         );
 
         // Closing inner boundary: a hardline when forced multiline, else the
@@ -1017,6 +1064,9 @@ impl<'a> Printer<'a> {
 
         d.group(d.concat(&[
             opening,
+            // The pulled comment rides on the `{`'s own line, ahead of the indent — no
+            // break precedes it, so the indent has nothing to act on.
+            d.concat(&brace_line_prefix),
             d.indent(d.indent(members_doc)),
             // The closing delimiter takes the union member's `align(2)` sub-tab
             // offset (2 literal spaces), so it lands under its opener at any tab
@@ -1083,12 +1133,8 @@ impl<'a> Printer<'a> {
             // line as the first member's leading comment). A line/own-line
             // comment is itself what forces this multiline branch. See
             // conformance_prettier_ts_comments.md §Comment relocation (Type literal `{`).
-            let first_member_start = t.members[0].span().start;
-            let (brace_line_prefix, delimiter_pull_pos) = if comments_present {
-                self.delimiter_line_comment_prefix(t.span.start, first_member_start)
-            } else {
-                (DocBuf::new(), None)
-            };
+            let (brace_line_prefix, delimiter_pull_pos) =
+                self.type_literal_brace_line_pull(t, comments_present);
             parts.push(d.concat(&brace_line_prefix));
 
             // Multi-line format (same for both modes) — the shared member-body walk. A

@@ -3,7 +3,7 @@
 // Condition-group layout and body handling for while/do-while, including the
 // do-while comment-preservation divergence from Prettier.
 
-use super::super::OpenParenLineComments;
+use super::super::OpenParenLineBlockComment;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
@@ -134,12 +134,12 @@ impl<'a> Printer<'a> {
         // clarity parens an assignment takes (`do {} while ((x = y))`). The one axis
         // that parts do-while from the rest is the `(`-line comment policy — a comment
         // after `while (` stays in place, where prettier relocates it outside the parens
-        // (`OpenParenLineComments::Preserve`).
+        // (`OpenParenLineBlockComment::Preserve`).
         parts.push(self.build_statement_condition_doc(
             &stmt.test,
             open_paren,
             close_paren,
-            OpenParenLineComments::Preserve,
+            OpenParenLineBlockComment::Preserve,
         ));
 
         // Comments between the condition's `)` and the do-while's terminating `;`,

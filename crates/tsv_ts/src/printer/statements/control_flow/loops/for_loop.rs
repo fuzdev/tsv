@@ -6,8 +6,8 @@
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
-    CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer, RunLeadingBlank,
-    needs_parens,
+    CommentVec, DelimiterGluedBlank, LeadingGlue, OwnedCommentEffect, ParenContext, Printer,
+    RunLeadingBlank, needs_parens,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -522,16 +522,44 @@ impl<'a> Printer<'a> {
         let test_frozen = clause_frozen(test_search_start, spans.test_start, test_end);
         let update_frozen = clause_frozen(update_search_start, spans.update_start, update_end);
 
+        // The opening-delimiter rule at the `for` header's `(`: a `//` the author glued to
+        // it keeps that line ([`Printer::split_open_delimiter_glued_run`]), as at every
+        // other opening delimiter and at the condition-headed statements
+        // (`OpenParenLineBlockComment`'s ⚠️). Only the INIT region is `(`-anchored — the
+        // later clauses open past a `;`, where a comment on the previous clause's line is
+        // that clause's (`push_for_clause_same_line_comments`), so the rule cannot reach
+        // them. Both init arms take it, since an empty init slot still sits behind the `(`.
+        let (paren_glued, init_region_start) =
+            match (spans.init_region_start(), spans.init_region_end()) {
+                (Some(start), Some(end)) => {
+                    let (glued, resume) =
+                        self.split_open_delimiter_glued_run(start, end, DelimiterGluedBlank::Keep);
+                    (glued, Some(resume))
+                }
+                // No locatable region — a degenerate header with no `(`, or one whose init
+                // slot has neither a clause nor a `;` to bound it.
+                (start, _) => (None, start),
+            };
+
         // Check if we have any own-line comments that force expansion. A line
         // comment anywhere in the header also forces it: the `//` runs to end of
         // line, so the clauses after it must move to their own lines (matching
         // prettier) — otherwise the comment swallows the rest of the header.
+        //
+        // A glued `//` is the same fact reached without both parens: it ends its own line,
+        // so the first clause can never pull up beside it. The range read below can't see
+        // that on a degenerate header (it needs the `)` too), and a header left flat around
+        // one would let the comment swallow the clause — so the split reports it here
+        // rather than hardening the init separator alone, which left the header's OPENING
+        // and CLOSING separators free to disagree.
         let has_line_comment_in_header = paren_interior
             .is_some_and(|(open, close)| self.has_line_comments_between(open + 1, close));
-        let has_own_line_comments =
-            has_line_comment_in_header || self.for_header_has_own_line_comments(&spans);
+        let has_own_line_comments = has_line_comment_in_header
+            || paren_glued.is_some()
+            || self.for_header_has_own_line_comments(&spans);
 
         let mut inner_parts = DocBuf::new();
+        inner_parts.extend(paren_glued);
 
         // Every clause is laid out the same way: its region's comments, then the
         // clause (or nothing, when the slot is empty), then its `;`. Each region is
@@ -541,7 +569,7 @@ impl<'a> Printer<'a> {
         // Init clause. Its separator is the header's own `softline` — `for (` and the
         // first clause together when the header fits, the clause on its own line when
         // it breaks — where the later clauses take the `line` that follows their `;`.
-        if let (Some(start), Some(init_start)) = (spans.init_region_start(), spans.init_start) {
+        if let (Some(start), Some(init_start)) = (init_region_start, spans.init_start) {
             self.push_for_clause_leading_section(
                 &mut inner_parts,
                 start,
@@ -551,8 +579,7 @@ impl<'a> Printer<'a> {
             );
         } else {
             inner_parts.push(d.softline());
-            if let (Some(start), Some(region_end)) =
-                (spans.init_region_start(), spans.init_region_end())
+            if let (Some(start), Some(region_end)) = (init_region_start, spans.init_region_end())
                 && self.push_for_empty_slot_comments(&mut inner_parts, start, region_end)
             {
                 // The `;` that terminates the slot starts a fresh line (or is
@@ -1311,16 +1338,29 @@ impl<'a> Printer<'a> {
         // `push_leading_comment_run`. The `(`'s own `hardline` leads the run and the
         // emitter supplies every break inside it and the one before the binding, so no
         // separator here is this site's. See the header-gap note above this function.
-        let (leading_run, leading_glued) = spans
-            .open_paren
-            .map(|open| {
-                self.split_glued_comments(comments_to_emit_in_range(
-                    self.comments,
-                    open + 1,
-                    spans.left_start,
-                ))
-            })
-            .unwrap_or_default();
+        //
+        // Ahead of it, the opening-delimiter rule: a `//` the author glued to the `(`
+        // keeps that line ([`Printer::split_open_delimiter_glued_run`]), as at the C-style
+        // header and every other opening delimiter. It is emitted OUTSIDE this `inner`
+        // (into the caller's `parts`, right behind the `(`) so no break precedes it, and
+        // the `hardline` below then places the binding.
+        let (leading_run, leading_glued) = if let Some(open) = spans.open_paren {
+            // The doc and the position the rest of the run resumes at travel together, so
+            // the two emitters cannot disagree about where the claim ended.
+            let (glued, resume) = self.split_open_delimiter_glued_run(
+                open + 1,
+                spans.left_start,
+                DelimiterGluedBlank::Keep,
+            );
+            parts.extend(glued);
+            self.split_glued_comments(comments_to_emit_in_range(
+                self.comments,
+                resume,
+                spans.left_start,
+            ))
+        } else {
+            Default::default()
+        };
 
         inner.push(d.hardline());
         self.push_leading_comment_run(

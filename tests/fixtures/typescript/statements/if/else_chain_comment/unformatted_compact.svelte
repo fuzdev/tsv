@@ -1,13 +1,16 @@
 <script>
-	if (// before a
+	if (
+// before a
 		a// inline with a
 	) {
 		fn1();
-	} else if (// before b
+	} else if (
+// before b
 		b// inline with b
 	) {
 		fn2();
-	} else if (// before c
+	} else if (
+// before c
 		c// inline with c
 	) {
 		fn3();

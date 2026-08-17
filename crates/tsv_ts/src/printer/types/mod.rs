@@ -41,9 +41,9 @@ pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
-use crate::printer::CommentVec;
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::layout::hang_after_operator;
+use crate::printer::{CommentVec, DelimiterGluedBlank, ShellLeadingRun};
 use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
@@ -1354,11 +1354,12 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         // A `//` the author glued to the `(` keeps that line, as at every other opening
-        // delimiter (`split_paren_shell_glued_leading_run`); the rest of the run resumes
+        // delimiter (`split_open_delimiter_glued_run`); the rest of the run resumes
         // below it, inside the shell.
-        let (glued, resume) = self.split_paren_shell_glued_leading_run(paren_open, inner_start);
+        let (glued, resume) =
+            self.split_open_delimiter_glued_run(paren_open, inner_start, DelimiterGluedBlank::Keep);
         let mut body: DocBuf = DocBuf::new();
-        self.push_paren_shell_leading_run(&mut body, resume, inner_start, true);
+        self.push_paren_shell_leading_run(&mut body, resume, inner_start, ShellLeadingRun::Here);
         body.push(inner_doc);
         self.push_trailing_comments_in_range(&mut body, inner_end, paren_close);
         let mut parts: DocBuf = smallvec![d.text("(")];
@@ -1561,8 +1562,12 @@ impl<'a> Printer<'a> {
         // it would push it past the end of the enclosing construct and can produce
         // invalid output (`[// leading a, b]`).
         if has_leading {
-            needs_break |=
-                self.push_paren_shell_leading_run(&mut parts, paren_open, inner_start, true);
+            needs_break |= self.push_paren_shell_leading_run(
+                &mut parts,
+                paren_open,
+                inner_start,
+                ShellLeadingRun::Here,
+            );
         }
 
         parts.push(self.build_type_doc(p.type_annotation));

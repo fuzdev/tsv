@@ -767,34 +767,6 @@ impl<'a> Printer<'a> {
             && self.has_trailing_paren_comments(expr_end, boundary_end)
     }
 
-    /// Split a `//` line comment the author put on the grouping `(`'s **own line** off the
-    /// front of the leading run, so it can trail the `(` (`( // c⏎\tvalue`) rather than
-    /// dropping to its own line below it. Returns that comment's doc plus the position the
-    /// rest of the leading run starts at.
-    ///
-    /// A `//` runs to end of line, so this is the only placement that keeps it where the
-    /// author wrote it; every other leading comment takes the ordinary run
-    /// ([`Self::build_rhs_comments_opt`]). Shared by the two shells that emit this gap —
-    /// the restricted-production hang ([`Printer::build_restricted_production_paren_doc`])
-    /// and the ASI-gap operand shell ([`Self::build_asi_operand_shell_doc`]) — so the two
-    /// cannot answer differently about the same authoring.
-    pub(crate) fn split_paren_line_trailing_comment(
-        &self,
-        gap_start: u32,
-        open_paren: Option<u32>,
-        value_start: u32,
-    ) -> (Option<DocId>, u32) {
-        let first = comments_to_emit_in_range(self.comments, gap_start, value_start).next();
-        match (open_paren, first) {
-            (Some(op), Some(c))
-                if !c.is_block && !self.has_newline_between(op + 1, c.span.start) =>
-            {
-                (Some(self.build_comment_doc(c)), c.span.end)
-            }
-            _ => (None, gap_start),
-        }
-    }
-
     /// The operand of an ASI-sensitive gap (an `as`/`satisfies` keyword, a postfix
     /// `++`/`--`) rendered inside the grouping-paren shell that holds its comments,
     /// emitting **both** of the shell's gaps — `(`→operand and operand→`)`.
@@ -856,8 +828,11 @@ impl<'a> Printer<'a> {
         // no-op there.
         self.expr_stmt_paren_target.set(None);
 
+        // The opening-delimiter rule at this shell's `(`: a `//` the author glued to it
+        // keeps that line ([`Self::split_located_paren_glued_run`]), as at every other
+        // opening delimiter. The doc carries its own leading space.
         let (paren_trailing, run_start) =
-            self.split_paren_line_trailing_comment(leading_start, open, expr_start);
+            self.split_located_paren_glued_run(leading_start, open, expr_start);
         let leading_run = self.build_rhs_comments_opt(run_start, expr_start);
 
         let mut body = DocBuf::new();
@@ -873,8 +848,8 @@ impl<'a> Printer<'a> {
 
         let open_doc = match paren_trailing {
             // `( // c` — the comment runs to end of line and the indent's hardline supplies
-            // the break, so nothing following it is swallowed.
-            Some(comment) => d.concat(&[d.text("( "), comment]),
+            // the break, so nothing following it is swallowed. The space is the split's.
+            Some(comment) => d.concat(&[d.text("("), comment]),
             None => d.text("("),
         };
         Some(d.concat(&[

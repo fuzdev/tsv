@@ -988,7 +988,16 @@ impl<'a> Printer<'a> {
             // declarator's gap (`as (F // c4⏎) // c5` → `as F; // c4 // c5`, the second
             // `//` becoming text of the first). This is the cast's own second path to the
             // strip — the hang seam above is the first — and the retain rule has to be
-            // asked at both.
+            // asked at both. The two are genuinely different rules (that one hangs on a
+            // leading `//`, this one defers a trailing block past the `;`) sharing one
+            // precondition, not a duplicate.
+            //
+            // The cast peels a shell in a THIRD place — `unwrap_redundant_parens` above,
+            // feeding the union / intersection hanging tails — and that one needs no ask:
+            // it peels only a shell with no comments in either gap
+            // (`paren_inner_comment_flags == (false, false)`), so it can never reach one
+            // the retain rule retains. Satisfying the precondition structurally is the
+            // stronger form; a fourth path that peels a COMMENTED shell has to ask.
             let inner = unwrap_parenthesized(type_annotation);
             if inner.span() != type_annotation.span()
                 && !self.paren_retains_for_trailing_run(type_annotation)

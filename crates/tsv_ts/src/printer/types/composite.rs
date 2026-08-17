@@ -17,8 +17,8 @@ use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer,
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
-use crate::printer::CommentVec;
 use crate::printer::layout::{bracketed_list_body, hang_after_operator};
+use crate::printer::{CommentVec, ShellLeadingRun};
 use smallvec::smallvec;
 use tsv_lang::Comment;
 use tsv_lang::INDENT;
@@ -227,7 +227,11 @@ impl<'a> Printer<'a> {
                 // Nested conditional in true position:
                 // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
                 // - Broken: no parens (the line breaks provide clarity)
-                let inner_doc = self.build_nested_conditional_branch_doc(c.true_type, inner, false);
+                let inner_doc = self.build_nested_conditional_branch_doc(
+                    c.true_type,
+                    inner,
+                    ShellLeadingRun::Here,
+                );
                 if d.will_break(inner_doc) {
                     // Inner doc forces breaking — use broken layout directly
                     inner_doc
@@ -243,7 +247,7 @@ impl<'a> Printer<'a> {
         // No parens needed for nested conditionals in false position (right-associative).
         let false_type_doc = || {
             if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
-                self.build_nested_conditional_branch_doc(c.false_type, inner, false)
+                self.build_nested_conditional_branch_doc(c.false_type, inner, ShellLeadingRun::Here)
             } else {
                 self.build_type_doc(c.false_type)
             }
@@ -328,15 +332,16 @@ impl<'a> Printer<'a> {
     /// The one shell that is NOT stripped ([`Self::nested_branch_shell_retains`]) hands
     /// both gaps back to its own emitter instead — this seam claims neither there.
     ///
-    /// `leading_claimed` is the breaking layout's relocation: there a pure leading
-    /// line-comment run has already been emitted above the operator
-    /// ([`Self::stripped_paren_leading_line_comments`]), so claiming it again would
-    /// double-print it (hazard 3). The trailing gap is this seam's in every layout.
+    /// `shell_leading_run` is the breaking layout's relocation: at
+    /// [`ShellLeadingRun::Upstream`] a pure leading line-comment run has already been
+    /// emitted above the operator ([`Self::stripped_paren_leading_line_comments`]), so
+    /// claiming it again would double-print it (hazard 3). The trailing gap is this
+    /// seam's in every layout.
     fn build_nested_conditional_branch_doc(
         &self,
         branch: &TSType<'_>,
         inner: &TSConditionalType<'_>,
-        leading_claimed: bool,
+        shell_leading_run: ShellLeadingRun,
     ) -> DocId {
         let d = self.d();
         let Some((leading, trailing)) = branch_shell_gaps(branch) else {
@@ -344,19 +349,27 @@ impl<'a> Printer<'a> {
         };
         if self.nested_branch_shell_retains(branch) {
             // The shell survives, so its own emitter owns BOTH gaps — this seam claims
-            // neither. Mutually exclusive with `leading_claimed` by construction: the
-            // relocation that sets it (`stripped_paren_leading_line_comments`) declines
-            // any shell carrying a trailing comment, which is exactly what retains.
+            // neither. Mutually exclusive with the relocation by construction: what sets
+            // it (`stripped_paren_leading_line_comments`) declines any shell carrying a
+            // trailing comment, which is exactly what retains.
             debug_assert!(
-                !leading_claimed,
+                shell_leading_run == ShellLeadingRun::Here,
                 "a retained shell's leading run is never relocated"
             );
             return self.build_type_doc(branch);
         }
         let mut parts: DocBuf = DocBuf::new();
-        if !leading_claimed {
-            self.push_paren_shell_leading_run(&mut parts, leading.start, leading.end, true);
-        }
+        // `Upstream` skips only the LINE comments, which is the whole of what the
+        // relocation claims: `stripped_paren_leading_line_comments` returns a run only
+        // when every comment in the gap is a `//`, so there is no block left behind for
+        // the emitter to owe — and stating it as the shared axis rather than as a skipped
+        // call keeps that reading checkable at the emitter rather than here.
+        self.push_paren_shell_leading_run(
+            &mut parts,
+            leading.start,
+            leading.end,
+            shell_leading_run,
+        );
         parts.push(self.build_conditional_type_doc_inner(inner));
         self.push_trailing_comments_in_range(&mut parts, trailing.start, trailing.end);
         d.concat(&parts)
@@ -1071,7 +1084,15 @@ impl<'a> Printer<'a> {
         // conditional a group of its own, so it printed FLAT inside an already-broken
         // parent where prettier breaks it with the parent.
         if let TSType::Conditional(inner) = unwrap_parenthesized(branch) {
-            self.build_nested_conditional_branch_doc(branch, inner, !paren_leading.is_empty())
+            self.build_nested_conditional_branch_doc(
+                branch,
+                inner,
+                if paren_leading.is_empty() {
+                    ShellLeadingRun::Here
+                } else {
+                    ShellLeadingRun::Upstream
+                },
+            )
         } else if !paren_leading.is_empty() {
             self.build_type_doc(unwrap_parenthesized(branch))
         } else {

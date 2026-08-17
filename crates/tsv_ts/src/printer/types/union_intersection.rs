@@ -16,6 +16,7 @@ use super::{CommentFilter, CommentSpacing, Printer, TrailingBlock};
 use crate::ast::internal::{Comment, TSIntersectionType, TSType, TSTypeLiteral, TSUnionType};
 use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
+use crate::printer::ShellLeadingRun;
 use crate::printer::ignore::LeadingRunFreeze;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
@@ -1063,7 +1064,7 @@ impl<'a> Printer<'a> {
                 parts.extend(first_leading);
                 parts.push(d.align(
                     2,
-                    self.build_parenthesized_union_doc(inner_union, Some(p), true),
+                    self.build_parenthesized_union_doc(inner_union, Some(p), ShellLeadingRun::Here),
                 ));
             } else {
                 // The leading run takes the member's per-member offset. Whenever the run
@@ -2207,7 +2208,7 @@ impl<'a> Printer<'a> {
             && let TSType::Union(inner_union) = p.type_annotation
             && self.paren_has_leading_line_comment(p)
         {
-            self.build_parenthesized_union_doc(inner_union, Some(p), true)
+            self.build_parenthesized_union_doc(inner_union, Some(p), ShellLeadingRun::Here)
         } else {
             self.build_intersection_member_type_doc(t, member_parens)
         }
@@ -2284,14 +2285,15 @@ impl<'a> Printer<'a> {
             // Re-wrap inner in parens (e.g., union in intersection: `(A | B) & C`).
             if let TSType::Union(union) = inner {
                 // The hoisted leading line comment is emitted by the caller, so pass
-                // `false` to keep `build_parenthesized_union_doc` block-comment-only.
+                // `ShellLeadingRun::Upstream` to keep `build_parenthesized_union_doc`
+                // block-comment-only.
                 // The outermost paren bounds the block-comment scan, so a block comment
                 // authored in the stripped shell (before the union) is still preserved.
                 let paren = match first_member {
                     TSType::Parenthesized(p) => Some(p),
                     _ => None,
                 };
-                self.build_parenthesized_union_doc(union, paren, false)
+                self.build_parenthesized_union_doc(union, paren, ShellLeadingRun::Upstream)
             } else {
                 // Matches the bare intersection-member parenthesization in
                 // `build_intersection_member_type_doc`: no inner `d.indent`, the

@@ -17,7 +17,7 @@ mod try_jump;
 use smallvec::SmallVec;
 
 use crate::ast::internal::{Expression, Statement, UnaryOperator};
-use crate::printer::{CommentVec, LeadingGlue, Printer};
+use crate::printer::{CommentVec, DelimiterGluedBlank, LeadingGlue, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -140,21 +140,29 @@ impl GapCommentRun {
     }
 }
 
-/// What happens to a comment the author wrote on the condition's `(` line — the one
-/// axis the paren-headed constructs part on in
-/// [`Printer::build_condition_group_with_comments`]. Both values are pinned, so
-/// neither can absorb the other.
+/// What happens to a **block** comment the author wrote on the condition's `(` line — the
+/// one axis the paren-headed constructs still part on in
+/// [`Printer::build_condition_group_with_comments`]. Both values are pinned, so neither
+/// can absorb the other.
+///
+/// ⚠️ A **line** comment is no longer on this axis: a `//` the author glued to the `(`
+/// keeps that line at every one of these constructs, the opening-delimiter rule every
+/// other delimiter in the printer already follows
+/// ([`Printer::split_open_delimiter_glued_run`], pinned by
+/// [`condition_paren_glued_line_comment`](../../../../../../tests/fixtures/typescript/syntax/comments/condition_paren_glued_line_comment_prettier_divergence/)).
+/// The axis was two rules read off one flag while `if`-like heads followed prettier here
+/// and do-while did not; what remains is only the block half, which is genuinely
+/// do-while's alone.
 #[derive(Clone, Copy)]
-enum OpenParenLineComments {
-    /// The comment joins the shared leading run below the opening separator, which
-    /// places it by the run's own glue rule rather than on a line of its own —
-    /// prettier's placement, pinned by
+enum OpenParenLineBlockComment {
+    /// The block joins the shared leading run below the opening separator, which places it
+    /// by the run's own glue rule rather than on a line of its own — prettier's placement
+    /// **and tsv's at every other delimiter**, since nothing forces the header open around
+    /// a block (`fn(/* c */ a)`, `if (/* c */ a)`). Pinned by
     /// [`condition_comment`](../../../../../../tests/fixtures/typescript/statements/if/condition_comment/)'s
-    /// `unformatted_compact`, whose two arms are the whole rule: `if (// c` drops the
-    /// comment to its own line, `if (/* c */ x` keeps it on the condition's. Every
-    /// construct but do-while.
-    Normalize,
-    /// The comment stays on the `(` line — the do-while sanction
+    /// `unformatted_compact`. Every construct but do-while.
+    JoinsRun,
+    /// The block stays on the `(` line — the do-while sanction
     /// ([`open_paren_comment_prettier_divergence`](../../../../../../tests/fixtures/typescript/statements/do_while/open_paren_comment_prettier_divergence/)),
     /// where prettier moves the comment out of the parens entirely: past the `;` for a
     /// `//`, ahead of the `while` for a block comment.
@@ -469,7 +477,7 @@ impl<'a> Printer<'a> {
     /// gap that follows it.
     ///
     /// The preamble `if` and `while` build **identically**: the same paren scan, the same
-    /// `OpenParenLineComments::Normalize`, the same `)`-or-test-end fallback for the
+    /// `OpenParenLineBlockComment::JoinsRun`, the same `)`-or-test-end fallback for the
     /// anchor. Two printers spelling it twice is the shape this module has already paid
     /// for once — the `if` printer's own two halves drifted three separate times before
     /// they were merged ([`Self::build_if_statement_doc`]) — and `while` additionally
@@ -499,7 +507,7 @@ impl<'a> Printer<'a> {
             test,
             open_paren,
             close_paren,
-            OpenParenLineComments::Normalize,
+            OpenParenLineBlockComment::JoinsRun,
         );
 
         let mut parts = DocBuf::new();
@@ -1065,7 +1073,7 @@ impl<'a> Printer<'a> {
     /// group wraps it. Prettier re-exports that one function under three names —
     /// `printIfStatementCondition`, `printWhileStatementCondition` and
     /// `printDoWhileStatementCondition` — so all three constructs share this entry point
-    /// too, parting only on `open_paren_line` ([`OpenParenLineComments`]). `switch`
+    /// too, parting only on `open_paren_line` ([`OpenParenLineBlockComment`]). `switch`
     /// builds its condition group directly and is deliberately excluded.
     ///
     /// ⚠️ **The group is not optional for the do-while, it is what makes its condition
@@ -1082,7 +1090,7 @@ impl<'a> Printer<'a> {
         test: &Expression<'_>,
         open_paren: Option<u32>,
         close_paren: Option<u32>,
-        open_paren_line: OpenParenLineComments,
+        open_paren_line: OpenParenLineBlockComment,
     ) -> DocId {
         if self.condition_should_inline_negation(test) {
             let no_comments = match (open_paren, close_paren) {
@@ -1111,7 +1119,7 @@ impl<'a> Printer<'a> {
         test: &Expression<'_>,
         open_paren: Option<u32>,
         close_paren: Option<u32>,
-        open_paren_line: OpenParenLineComments,
+        open_paren_line: OpenParenLineBlockComment,
     ) -> DocId {
         match (open_paren, close_paren) {
             (Some(open), Some(close)) => {
@@ -1139,12 +1147,19 @@ impl<'a> Printer<'a> {
     /// Emit do-while's `(`-line bucket and return what is left for the shared leading run,
     /// plus whether the bucket holds the `(` line open.
     ///
-    /// The whole of [`OpenParenLineComments::Preserve`]: a comment the author wrote on the
-    /// `(` line stays there, ahead of the opening separator, rather than joining the run
-    /// below it. [`OpenParenLineComments::Normalize`] — every other construct — leaves the
-    /// bucket empty and hands the whole gap to the run, so this is the one place the five
-    /// constructs' shared layout is not shared, and it lives apart from that layout for
-    /// exactly that reason.
+    /// The whole of [`OpenParenLineBlockComment::Preserve`]: a **block** comment the author
+    /// wrote on the `(` line stays there, ahead of the opening separator, rather than joining
+    /// the run below it. [`OpenParenLineBlockComment::JoinsRun`] — every other construct —
+    /// leaves the bucket empty and hands the whole gap to the run, so this is the one place
+    /// the five constructs' shared layout is not shared, and it lives apart from that layout
+    /// for exactly that reason.
+    ///
+    /// ⚠️ **A glued `//` never reaches here** — [`Printer::split_open_delimiter_glued_run`]
+    /// claims it one step earlier, for every one of the five constructs, so the bucket sees
+    /// only what that split left. A `//` is what the bucket's own arms were mostly about
+    /// before the statement headers joined the opening-delimiter rule; what remains is the
+    /// block half, which is genuinely do-while's alone. The table below therefore describes
+    /// a **block** run, and `paren_line_breaks` an arm the caller now ORs the split into.
     ///
     /// The gap's comments are in source order, so the `(`-line ones are a PREFIX and the
     /// bucket is a split POSITION, not a pair of filters the two emitters could drift
@@ -1168,7 +1183,9 @@ impl<'a> Printer<'a> {
     /// prettier relocates it out of the parens entirely and says nothing, so tsv's own
     /// convention governs — and everywhere else it keeps a comment on an opening
     /// delimiter's line it writes `fn( // c` / `new Foo( /* paren */`, a space, whatever the
-    /// author wrote (`expressions/calls/open_paren_comment_prettier_divergence`).
+    /// author wrote (`expressions/calls/open_paren_comment_prettier_divergence`). The split
+    /// above writes that same space, which is what keeps the two emitters' output at this
+    /// position indistinguishable.
     ///
     /// ⚠️ That is why the space is keyed on `paren_line_breaks` and the INDEX, never on the
     /// source. Reading the author's spacing gave the two arms one answer each authoring
@@ -1191,12 +1208,12 @@ impl<'a> Printer<'a> {
         leading_comments: &'c [&'c Comment],
         open_paren_pos: u32,
         test_start: u32,
-        open_paren_line: OpenParenLineComments,
+        open_paren_line: OpenParenLineBlockComment,
     ) -> (&'c [&'c Comment], bool) {
         let d = self.d();
         let bucket_len = match open_paren_line {
-            OpenParenLineComments::Normalize => 0,
-            OpenParenLineComments::Preserve => leading_comments
+            OpenParenLineBlockComment::JoinsRun => 0,
+            OpenParenLineBlockComment::Preserve => leading_comments
                 .partition_point(|c| self.is_same_line(open_paren_pos, c.span.start)),
         };
         let (bucket, run_comments) = leading_comments.split_at(bucket_len);
@@ -1285,13 +1302,13 @@ impl<'a> Printer<'a> {
     /// rule (the sanctioned split that doc names).
     ///
     /// `open_paren_line` is the one axis the constructs part on
-    /// ([`OpenParenLineComments`], both values pinned).
+    /// ([`OpenParenLineBlockComment`], both values pinned).
     fn build_condition_group_with_comments(
         &self,
         test_expr: &Expression<'_>,
         open_paren_pos: u32,
         close_paren_pos: u32,
-        open_paren_line: OpenParenLineComments,
+        open_paren_line: OpenParenLineBlockComment,
     ) -> DocId {
         let d = self.d();
         let test_start = test_expr.span().start;
@@ -1318,16 +1335,36 @@ impl<'a> Printer<'a> {
         };
         let mut inner_parts = DocBuf::new();
 
-        let leading_comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, open_paren_pos + 1, test_start).collect();
+        // The opening-delimiter rule: a `//` the author glued to the `(` keeps that line,
+        // as at `fn(`, `[`, `{`, `Array<` and a retained type paren shell's `(`
+        // ([`Printer::split_open_delimiter_glued_run`]). Asked AHEAD of the bucket so all
+        // five paren-headed constructs share one answer — what is left on
+        // [`OpenParenLineBlockComment`] is then a `(`-line **block** and nothing else,
+        // which is do-while's own sanction rather than a rule about `//`s.
+        //
+        // The doc goes inside the caller's `indent` with every other part, which costs
+        // nothing: no break precedes it, so the indent has no line to act on, and the
+        // `hardline` below is the one that places the condition.
+        let (glued, resume) = self.split_open_delimiter_glued_run(
+            open_paren_pos + 1,
+            test_start,
+            DelimiterGluedBlank::Keep,
+        );
+        inner_parts.extend(glued);
 
-        let (run_comments, paren_line_breaks) = self.push_paren_line_comment_bucket(
+        let leading_comments: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, resume, test_start).collect();
+
+        let (run_comments, bucket_breaks) = self.push_paren_line_comment_bucket(
             &mut inner_parts,
             &leading_comments,
             open_paren_pos,
             test_start,
             open_paren_line,
         );
+        // A glued `//` holds the `(` line open exactly as a bucket run does — it ends its
+        // own line, so the condition can never pull up beside it.
+        let paren_line_breaks = glued.is_some() || bucket_breaks;
 
         // The shared leading run — prettier's `printLeadingComment`, which picks the
         // separator after each comment from the source right after *that* comment's

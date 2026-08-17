@@ -55,9 +55,9 @@ pub(crate) use analysis::{
     object_pattern_should_expand, statement_gap_floor, template_literal_has_newlines,
 };
 pub(crate) use comments::{
-    ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
-    MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberGap, MemberSeam,
-    OwnedCommentEffect, RunLeadingBlank, StandaloneGlue,
+    ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, DelimiterGluedBlank,
+    HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
+    MemberGap, MemberSeam, OwnedCommentEffect, RunLeadingBlank, ShellLeadingRun, StandaloneGlue,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
