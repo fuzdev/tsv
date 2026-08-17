@@ -20,11 +20,12 @@ separate case because that layout is built from the *already-unwrapped* inner ty
 so the paren's own `(`→inner gap is invisible to it and the comment has to be
 threaded in explicitly — without that it is silently **dropped**, which no
 prettier comparison catches (the two forms differ anyway) and only the print-once
-comment ledger reports. Its comment hugs the `(` rather than taking its own line
-below it, matching the other default-paren member shapes (function, constructor,
-conditional, plain intersection); the paren-union `First` above is the one that
-puts `(` and the comment on separate lines, because its layout gives `(` its own
-line whenever the group breaks.
+comment ledger reports. Its comment hugs the `(` because the author glued it there
+— `FirstIntersectionOwnLine` is the same shell with the comment on its own line,
+which it keeps. That is the opening-delimiter rule, and it is the whole rule at
+every member here: **which line the comment takes is the author's, and the shape
+around it is fixed** — one normalizing space after the `(` when it hugs, the value
+indented into the shell, the `)` on its own line.
 
 This mirrors the trailing-comment sibling
 [union_intersection_retained_paren_line_comment](../union_intersection_retained_paren_line_comment_prettier_divergence/),
@@ -42,7 +43,18 @@ the member inline (`| (() => B)`). Because tsv keeps the comment inside, the lin
 comment forces the paren group open — but only the paren: the conditional or
 intersection inside stays inline when it fits, the same as the union arms above
 (the comment's own line is supplied by the paren, so breaking the inner type too
-would be a break its reparse has no cause to reproduce). Whether the paren
+would be a break its reparse has no cause to reproduce). All three are written with
+the comment **glued** to the `(`, and keep that line — the same authorship
+`FirstIntersection` above records — but the shape around it is the shared opener's:
+one normalizing space, the value indented into the shell, the `)` on its own line.
+They used to weld instead (`| (// c⏎↹↹  () => B)` — no space, the value never
+indented, the `)` on its tail), which is the third form the shared opener exists to
+prevent, and which made the own-line authoring of the same comment collapse onto it
+rather than stand as its own fixed point. The gate that chose between the two shapes
+stopped reading the caller's `ShellLeadingRun`: that licence is granted on an
+upstream emitter having already placed the run, which is true of an intersection's
+FIRST member and of a redundant member, and false of every later retained one.
+Whether the paren
 is *retained* is decided exactly as it is comment-free; only a **redundant** paren
 (stripped) can't host the comment, and there it leads the member on its own line
 instead — see
@@ -53,12 +65,16 @@ than inside a following member's parens) is a different case and stays trailing 
 both formatters — see
 [union_paren_member_long_line_comment](../comments/union_paren_member_long_line_comment/).
 
-`unformatted_ours_inside_parens.svelte` writes each comment on its own line inside the
-parens, which tsv normalizes to `input`; `variant_inside_parens.svelte` is prettier's
-answer from that source — the comment hoisted out in front of the pair (`| // c⏎  (A | B)`)
-— which both formatters then hold stable, since it is a different tree rather than a
-different layout of this one. A comment the author *glues* to the `(` is a third thing
-again: tsv keeps it on that line, per
+`unformatted_ours_inside_parens.svelte` writes each comment inside the parens on the line
+`input` gives it — its own for `First`, `FirstIntersectionOwnLine` and `Mid`, glued for
+`FirstIntersection` and the three `Mid*` shells — with the surrounding layout flattened;
+tsv normalizes it to `input`. It has to carry the same glue as `input`, because glue is
+authorship: re-spelling a case here would send it to the *other* fixed point rather than
+back to this one.
+`variant_inside_parens.svelte` is prettier's answer from that source — the comment hoisted
+out in front of the pair (`| // c⏎  (A | B)`) — which both formatters then hold stable,
+since it is a different tree rather than a different layout of this one. The glue itself is
+authorship, not layout, and every delimiter answers it the same way, per
 [paren_shell_glued_leading_line_comment](../paren_shell_glued_leading_line_comment_prettier_divergence/).
 
 See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

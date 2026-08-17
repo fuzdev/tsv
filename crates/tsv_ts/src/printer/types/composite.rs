@@ -123,18 +123,29 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         let extends_type_end = c.extends_type.span().end;
+        let true_type_end = c.true_type.span().end;
+        // An alone-on-line format-ignore directive in either branch gap (previous node's
+        // span end → branch span start, the `?`/`:` inside the window) forces the broken
+        // layout: the own-line-preserving emission + freeze live there, and the flat
+        // path's trailing emitters would relocate the directive to an inert placement. A
+        // block-spelling directive is the only shape the comment terms below miss (a line
+        // directive already breaks as a line comment). Resolved FIRST — before the branch
+        // starts widen — and handed to the broken builder, which routes each branch on it:
+        // the window a freeze is read on is the branch's OWN, never the widened one, so an
+        // in-shell directive stays the shell's business.
+        let routes = BranchRoutes {
+            true_route: self.member_gap_frozen(extends_type_end, c.true_type.span().start),
+            false_route: self.member_gap_frozen(true_type_end, c.false_type.span().start),
+        };
         // A redundant shell at a branch's leading printed EDGE strips, so its `//` lands in
         // the `?`/`:`→branch gap and the reparse finds it there. Widening the branch START
         // over it is what puts it in every window below — this builder bounds each of its
         // comment scans off these two positions — and the branch doc then declines the
-        // shell's own copy ([`Printer::leading_edge_shell_claim`]).
-        let true_claim = self.leading_edge_shell_claim(c.true_type);
-        let false_claim = self.leading_edge_shell_claim(c.false_type);
-        let true_type_start =
-            true_claim.map_or_else(|| c.true_type.span().start, |shell| shell.end);
-        let true_type_end = c.true_type.span().end;
-        let false_type_start =
-            false_claim.map_or_else(|| c.false_type.span().start, |shell| shell.end);
+        // shell's own copy ([`Printer::leading_edge_claim_and_start`]).
+        let (true_claim, true_type_start) =
+            self.leading_edge_claim_and_start(routes.true_route, c.true_type);
+        let (false_claim, false_type_start) =
+            self.leading_edge_claim_and_start(routes.false_route, c.false_type);
 
         // Find ? and : token positions for comment categorization. These positions only
         // bound the comment scans below, so a conditional type with no comment anywhere in
@@ -201,18 +212,6 @@ impl<'a> Printer<'a> {
         // Trailing line comments on true_type also force breaking (they end the line)
         let has_trailing_line_comment_on_true =
             colon_pos.is_some_and(|c| self.has_line_comments_between(true_type_end, c));
-
-        // An alone-on-line format-ignore directive in either branch gap (previous
-        // node's span end → branch span start, the `?`/`:` inside the window) forces
-        // the broken layout: the own-line-preserving emission + freeze live there,
-        // and the flat path's trailing emitters would relocate the directive to an
-        // inert placement. A block-spelling directive is the only shape the terms
-        // above miss (a line directive already breaks as a line comment). Resolved
-        // once and handed to the broken builder, which routes each branch on it.
-        let routes = BranchRoutes {
-            true_route: self.member_gap_frozen(extends_type_end, true_type_start),
-            false_route: self.member_gap_frozen(true_type_end, false_type_start),
-        };
 
         let needs_breaking = has_breaking_comments_around_question
             || has_breaking_comments_after_colon
@@ -816,7 +815,15 @@ impl<'a> Printer<'a> {
             return d.concat(&parts);
         }
 
-        if let TSType::Union(union) = c.extends_type {
+        // A redundant, comment-free paren LAYER around the union is stripped by
+        // `build_type_doc` anyway, so the bare and layered authorings must reach this arm
+        // alike — [`Printer::unwrap_redundant_parens`] is the same strip the `=>` return
+        // site applies for the same reason. Matching `c.extends_type` directly sent the
+        // layered form (`extends ((⏎// c⏎C) | D)`) to the general arm below, where the
+        // union rendered flush after `extends ` with no break and no indent: one program,
+        // two fixed points, and the one an author is most likely to write is the one that
+        // lost the layout.
+        if let TSType::Union(union) = self.unwrap_redundant_parens(c.extends_type) {
             if union.types.is_empty() {
                 d.text(" ")
             } else {
@@ -890,16 +897,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         let extends_type_end = c.extends_type.span().end;
-        // The branch starts widen over a leading-edge shell's run exactly as in the flat
-        // builder above, and for the same reason: every window here is bounded off them,
-        // and the branch doc declines the shell's own copy of what they now cover.
-        let true_claim = self.leading_edge_shell_claim(c.true_type);
-        let false_claim = self.leading_edge_shell_claim(c.false_type);
-        let true_type_start =
-            true_claim.map_or_else(|| c.true_type.span().start, |shell| shell.end);
         let true_type_end = c.true_type.span().end;
-        let false_type_start =
-            false_claim.map_or_else(|| c.false_type.span().start, |shell| shell.end);
 
         // An alone-on-line format-ignore directive in a branch gap (previous node's
         // span end → branch span start, the `?`/`:` inside the window) ROUTES that
@@ -922,6 +920,16 @@ impl<'a> Printer<'a> {
             true_route,
             false_route,
         } = routes;
+
+        // The branch starts widen over a leading-edge shell's run exactly as in the flat
+        // builder above, and for the same reason: every window here is bounded off them,
+        // and the branch doc declines the shell's own copy of what they now cover. A
+        // ROUTED branch takes neither — it is the verbatim slice, which already carries
+        // the shell (see the ⚠️ on `Printer::leading_edge_claim_and_start`).
+        let (true_claim, true_type_start) =
+            self.leading_edge_claim_and_start(true_route, c.true_type);
+        let (false_claim, false_type_start) =
+            self.leading_edge_claim_and_start(false_route, c.false_type);
 
         // Detect leading line comments inside parens around true_type / false_type
         // for relocation: prettier moves them to trail extends_type / true_type
@@ -1908,7 +1916,6 @@ impl<'a> Printer<'a> {
 
         for (i, raw_elem) in t.element_types.iter().enumerate() {
             let elem = unwrap_parenthesized(raw_elem); // pairs with `tuple_elem_span`
-            let elem_start = elem.span().start;
             let elem_end = elem.span().end;
             let is_last = i == t.element_types.len() - 1;
 
@@ -1923,15 +1930,9 @@ impl<'a> Printer<'a> {
             // A redundant shell at the element's leading printed EDGE strips, so its `//`
             // is in this element's own gap and the reparse finds it here; the shell's own
             // emitter would print it at the shell's indent and force a `flush_break` this
-            // list cannot reproduce ([`Printer::leading_edge_shell_claim`]).
-            let claim = (!frozen)
-                .then(|| self.leading_edge_shell_claim(elem))
-                .flatten();
-            let leading = self.build_leading_comments_multiline(
-                prev_end,
-                claim.map_or(elem_start, |shell| shell.end),
-                skip_delim,
-            );
+            // list cannot reproduce ([`Printer::leading_edge_claim_and_start`]).
+            let (claim, gap_end) = self.leading_edge_claim_and_start(frozen, elem);
+            let leading = self.build_leading_comments_multiline(prev_end, gap_end, skip_delim);
             let elem_doc = if frozen {
                 self.build_frozen_list_member_doc(elem)
             } else {

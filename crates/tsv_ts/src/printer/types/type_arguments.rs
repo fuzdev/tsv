@@ -161,8 +161,14 @@ impl<'a> Printer<'a> {
         // edge (`Foo<A, (⏎// c⏎B) & C>`), where the argument node itself is not the shell:
         // [`Self::list_item_printed_span`] starts the argument past that run, so the run is
         // in this list's own gap here and at every emitter below.
+        //
+        // `false` for the widening's decline: a FROZEN argument's run rides inside its
+        // verbatim slice rather than this list's gaps, but a freeze implies an
+        // alone-on-line directive in that same gap, which is itself an expanding comment
+        // — so both readings force expansion and the router cannot disagree with the
+        // emitter (which does hold the per-item verdict).
         let arg_span =
-            |ty: &TSType<'_>| self.list_item_printed_span(self.leading_paren_unwrapped(ty));
+            |ty: &TSType<'_>| self.list_item_printed_span(false, self.leading_paren_unwrapped(ty));
         self.has_expanding_comments_in_bracket_list(args.span, args.params, arg_span)
     }
 
@@ -262,12 +268,21 @@ impl<'a> Printer<'a> {
         args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let is_multi = args.params.len() > 1;
+        let param_at = |i: usize| self.leading_paren_unwrapped(&args.params[i]);
+        // Rule A, asked on each argument's OWN span. It decides whether the printed span
+        // may widen over a leading-edge shell, so it is resolved here rather than inside
+        // the list core — reading it from the widened span would let a frozen argument
+        // both slice its shell verbatim and hand the same run to this list's gap emitter
+        // ([`Printer::leading_edge_claim_and_start`]).
+        let raw_span = |i: usize| param_at(i).span();
+        let frozen_at = |i: usize| self.list_item_frozen(args.span.start + 1, &raw_span, i);
         self.build_angle_list_with_line_comments(
             args.span,
             args.params.len(),
-            |i| self.list_item_printed_span(self.leading_paren_unwrapped(&args.params[i])),
+            frozen_at,
+            |i| self.list_item_printed_span(frozen_at(i), param_at(i)),
             |i, frozen| {
-                let param = self.leading_paren_unwrapped(&args.params[i]);
+                let param = param_at(i);
                 if frozen {
                     return self.build_frozen_list_member_doc(param);
                 }

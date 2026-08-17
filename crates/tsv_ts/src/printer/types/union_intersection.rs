@@ -101,7 +101,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether a union member's paren shell holds a `//` the multiline layout must own —
-    /// the router's question and the member loop's, asked once so they cannot disagree.
+    /// the ROUTER's question, asked through the same two predicates the member loop below
+    /// emits from, so the routing and the emission cannot disagree.
     ///
     /// Two shapes, one question. The shell may BE the member (retained, or redundant and
     /// hoisted), or it may sit at the member's leading printed **edge** one link down
@@ -116,13 +117,8 @@ impl<'a> Printer<'a> {
         // whose own gap is empty and still carry a leading-edge shell inside it
         // (`A | ((⏎// c⏎B)[])`, the author's extra layer), so returning the shallow answer
         // early routed that to the width path and left the shell printing its own run.
-        if matches!(t, TSType::Parenthesized(_))
-            && self
-                .has_line_comments_between(t.span().start + 1, unwrap_parenthesized(t).span().start)
-        {
-            return true;
-        }
-        self.leading_edge_shell_line_comment(t)
+        self.stripped_paren_hang_has_leading_line_comment(t)
+            || self.leading_edge_shell_line_comment(t)
     }
 
     /// Push a comment run that leads a union member from ABOVE its `| ` separator —
@@ -895,19 +891,6 @@ impl<'a> Printer<'a> {
             let type_start = t.span().start;
             let type_end = t.span().end;
 
-            // The **first** member's leading-comment run, built here rather than at the
-            // `| ` prefix below so the arm that emits it decides whether it takes the
-            // per-member offset — the paren-union arm declines it, the general arm takes
-            // it. Both block and line comments are emitted from here; a line comment
-            // requires multiline and places the member on the next line (`| // c⏎  A`).
-            //
-            // ⚠️ Empty for every later member, and the arm chain below consumes it by
-            // move — an arm that neither extends nor inspects it is a **dropped comment**
-            // (`comments:audit` is the corpus-wide guard).
-            //
-            // `None` for `skip_delim`: the union's leading `|` is not run through
-            // `delimiter_line_comment_prefix`, unlike the bracket/angle/paren lists, so
-            // no comment was pulled onto a delimiter line to exclude here.
             // A LATER member that is a REDUNDANT parenthesized type (`a | (// c⏎ b)`): its
             // leading line comment can't stay "inside" parens the comment-free rule strips,
             // so it leads the member on its own line before the `| ` (emitted below,
@@ -945,12 +928,11 @@ impl<'a> Printer<'a> {
             // author wrote between the `|` and the shell's `(`. See the ⚠️ on
             // [`Printer::head_stripped_paren_shell`], which is why a union's first member is
             // not one of its descent links.
-            let edge_claim = if frozen_member || !stripped_paren_leading.is_empty() {
-                None
-            } else {
-                self.leading_edge_shell_claim(t)
-            };
-            let gap_end = edge_claim.map_or(type_start, |claim| claim.end);
+            // Declined for a FROZEN member (whose verbatim slice already carries the
+            // shell) and for one whose redundant-paren run was hoisted above — either
+            // way another emitter owns those bytes.
+            let run_owned_above = frozen_member || !stripped_paren_leading.is_empty();
+            let (edge_claim, gap_end) = self.leading_edge_claim_and_start(run_owned_above, t);
 
             // The **first** member's leading-comment run, built here rather than at the
             // `| ` prefix below so the arm that emits it decides whether it takes the
@@ -1550,8 +1532,27 @@ impl<'a> Printer<'a> {
         // line BEFORE the intersection so the intersection content itself can still fit
         // inline. The deep window scans the whole stripped shell, not just the outer
         // paren's own gap, so a comment nested one paren deeper still hoists.
+        //
+        // ⚠️ Suppressed for a FROZEN first member, whose shell comments ride inside its
+        // verbatim slice — hoisting them too is a DOUBLE-PRINT, and hoisting them
+        // *instead* strips the shell the freeze was meant to preserve. The rule this
+        // module states (`ignore.rs` header) is that comment preservation outranks
+        // redundant-paren removal under a freeze, and the union's member loop already
+        // suppresses its own stripped-paren run the same way; this path was the one place
+        // the hoist still won, so a `//` in the shell lost the freeze outright while the
+        // block spelling kept it. `build_intersection_leading_gap_line_comment_doc` states
+        // the identical suppression for the leading-gap route.
         if has_comments && let Some(first_member) = intersection.types.first() {
-            let first_paren_leading = self.intersection_first_member_hoist_comments(first_member);
+            let first_paren_leading = if self.list_member_frozen(
+                intersection.span.start,
+                intersection.types,
+                0,
+                freeze_first,
+            ) {
+                smallvec![]
+            } else {
+                self.intersection_first_member_hoist_comments(first_member)
+            };
             if !first_paren_leading.is_empty() {
                 // The compact inline body can't represent an *isolated* between-member
                 // comment (a line/own-line comment forces multiline); route those through

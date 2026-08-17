@@ -121,10 +121,14 @@ impl<'a> Printer<'a> {
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
+        // Type parameters are declarations, never types, so no leading-edge paren shell
+        // can widen an item span here — Rule A reads the params' own spans directly.
+        let item_span = |i: usize| decl.params[i].span;
         self.build_angle_list_with_line_comments(
             decl.span,
             decl.params.len(),
-            |i| decl.params[i].span,
+            |i| self.list_item_frozen(decl.span.start + 1, &item_span, i),
+            item_span,
             |i, frozen| self.build_type_parameter_item_doc(&decl.params[i], frozen),
         )
     }
@@ -831,6 +835,7 @@ impl<'a> Printer<'a> {
         &self,
         span: Span,
         count: usize,
+        item_frozen: impl Fn(usize) -> bool,
         item_span: impl Fn(usize) -> Span,
         item_doc: impl Fn(usize, bool) -> DocId,
     ) -> DocId {
@@ -864,8 +869,10 @@ impl<'a> Printer<'a> {
             // Rule A: an alone-on-line directive in this item's gap freezes the
             // item; the directive itself was just emitted by the leading run above.
             // No must-break question here — this layout is already all-hardline.
-            let frozen = self.list_item_frozen(span.start + 1, &item_span, i);
-            inner_parts.push(item_doc(i, frozen));
+            // The verdict is the CALLER's because `item_span` may already have widened
+            // over a leading-edge paren shell, and the window a freeze is read on is the
+            // item's own ([`Printer::leading_edge_claim_and_start`]).
+            inner_parts.push(item_doc(i, item_frozen(i)));
 
             if !is_last {
                 let next_start = item_span(i + 1).start;
