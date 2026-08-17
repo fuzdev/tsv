@@ -131,7 +131,7 @@ pub struct VariantAuditCommand {
 /// Private rather than shared: this audit's denominator is *variants*, not the
 /// formatted-file count [`crate::audit::vacuity::FIXTURES_FORMATTED_MIN`] pins, so
 /// sharing that constant would compare two different populations.
-const VARIANTS_GRADED_MIN: usize = 1_951;
+const VARIANTS_GRADED_MIN: usize = 1_989;
 
 /// The whitespace-direction claim a variant's name makes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
