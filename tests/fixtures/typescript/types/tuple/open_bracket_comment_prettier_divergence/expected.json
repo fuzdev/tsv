@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 324,
+	"end": 532,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -121,24 +121,72 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+			"start": 316,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
+			"start": 401,
+			"end": 489,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 502,
+			"end": 507,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 12
+				},
+				"end": {
+					"line": 21,
+					"column": 17
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 323,
+		"end": 531,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 314,
+			"end": 522,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 18,
+					"line": 25,
 					"column": 9
 				}
 			},
@@ -398,6 +446,91 @@
 							"value": " block comment trailing `[`, then own-line leading comment",
 							"start": 203,
 							"end": 263
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 491,
+					"end": 521,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 496,
+						"end": 497,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 500,
+						"end": 520,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 10
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSStringKeyword",
+								"start": 511,
+								"end": 517,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 502,
+										"end": 507
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+							"start": 316,
+							"end": 399
+						},
+						{
+							"type": "Line",
+							"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
+							"start": 401,
+							"end": 489
 						}
 					]
 				}

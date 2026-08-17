@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 206,
+	"end": 677,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -89,24 +89,184 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+			"start": 198,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the container's leading gap",
+			"start": 283,
+			"end": 313,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 324,
+			"end": 329,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 10
+				},
+				"end": {
+					"line": 15,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
+			"start": 340,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `{` line)",
+			"start": 426,
+			"end": 442,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " brace2 ",
+			"start": 453,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 10
+				},
+				"end": {
+					"line": 22,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 469,
+			"end": 476,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
+			"start": 486,
+			"end": 567,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " against the delimiter, where both formatters drop it at every bracket",
+			"start": 569,
+			"end": 641,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 654,
+			"end": 659,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 205,
+		"end": 676,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 196,
+			"end": 667,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 12,
+					"line": 34,
 					"column": 9
 				}
 			},
@@ -274,6 +434,270 @@
 							"value": " block comment trailing the body `{`, then own-line leading comment",
 							"start": 87,
 							"end": 156
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 315,
+					"end": 337,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 320,
+						"end": 321,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 333,
+							"end": 334,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 333,
+								"end": 334,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"name": "C"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 324,
+									"end": 329
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+							"start": 198,
+							"end": 281
+						},
+						{
+							"type": "Line",
+							"value": " the container's leading gap",
+							"start": 283,
+							"end": 313
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 444,
+					"end": 483,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 449,
+						"end": 450,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 479,
+							"end": 480,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 2
+								},
+								"end": {
+									"line": 25,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 479,
+								"end": 480,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 3
+									}
+								},
+								"name": "D"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " brace2 ",
+									"start": 453,
+									"end": 465
+								},
+								{
+									"type": "Line",
+									"value": " lead",
+									"start": 469,
+									"end": 476
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
+							"start": 340,
+							"end": 424
+						},
+						{
+							"type": "Line",
+							"value": " the `{` line)",
+							"start": 426,
+							"end": 442
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 643,
+					"end": 666,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 648,
+						"end": 649,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 6
+							},
+							"end": {
+								"line": 30,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 662,
+							"end": 663,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 2
+								},
+								"end": {
+									"line": 32,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 662,
+								"end": 663,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 3
+									}
+								},
+								"name": "E"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 654,
+									"end": 659
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
+							"start": 486,
+							"end": 567
+						},
+						{
+							"type": "Line",
+							"value": " against the delimiter, where both formatters drop it at every bracket",
+							"start": 569,
+							"end": 641
 						}
 					]
 				}

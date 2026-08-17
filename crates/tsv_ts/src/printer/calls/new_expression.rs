@@ -642,6 +642,13 @@ impl<'a> Printer<'a> {
             {
                 let mut paren_line_prefix = DocBuf::new();
                 gap_pc.emit_trailing_comments(&mut paren_line_prefix, self);
+                if let Some(pulled_end) = gap_pc.trailing_end() {
+                    self.push_delimiter_glued_blank(
+                        &mut paren_line_prefix,
+                        pulled_end,
+                        first_arg_start,
+                    );
+                }
 
                 let mut inner = DocBuf::new();
                 for comment in &gap_pc.leading {

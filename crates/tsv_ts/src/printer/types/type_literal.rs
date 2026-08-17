@@ -14,9 +14,7 @@ use super::{Printer, StandaloneGlue};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
-use crate::printer::{
-    DelimiterGluedBlank, MemberBlankScan, MemberBody, MemberFreeze, MemberSeam, ShellLeadingRun,
-};
+use crate::printer::{MemberBlankScan, MemberBody, MemberFreeze, MemberSeam, ShellLeadingRun};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -564,11 +562,8 @@ impl<'a> Printer<'a> {
         let glued = paren
             .filter(|_| shell_leading_run == ShellLeadingRun::Here)
             .and_then(|p| {
-                let (doc, resume) = self.split_open_delimiter_glued_run(
-                    p.span.start + 1,
-                    union.span.start,
-                    DelimiterGluedBlank::Keep,
-                );
+                let (doc, resume) =
+                    self.split_open_delimiter_glued_run(p.span.start + 1, union.span.start);
                 doc.map(|doc| (doc, resume))
             });
         needs_break |= glued.is_some();
@@ -660,11 +655,8 @@ impl<'a> Printer<'a> {
             // so both authorings are fixed points here as at every other bracket. It used
             // to glue either way — the run rode directly behind the `(` with no break in
             // front of it.
-            let (glued, resume) = self.split_open_delimiter_glued_run(
-                p.span.start + 1,
-                intersection.span.start,
-                DelimiterGluedBlank::Keep,
-            );
+            let (glued, resume) =
+                self.split_open_delimiter_glued_run(p.span.start + 1, intersection.span.start);
             let glued_here = glued.is_some();
             opening_parts.extend(glued);
             let mut lead: DocBuf = DocBuf::new();

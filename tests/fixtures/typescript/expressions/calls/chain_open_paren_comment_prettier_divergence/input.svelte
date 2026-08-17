@@ -30,4 +30,11 @@
 			b();
 		}
 	);
+
+	// an author blank BELOW the pulled comment survives — the blank is authorship, not
+	// the container's leading gap (the blank ABOVE one stays erased, against the delimiter)
+	obj.method( // c4
+
+		a
+	);
 </script>

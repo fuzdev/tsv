@@ -55,9 +55,9 @@ pub(crate) use analysis::{
     object_pattern_should_expand, statement_gap_floor, template_literal_has_newlines,
 };
 pub(crate) use comments::{
-    ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, DelimiterGluedBlank,
-    HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
-    MemberGap, MemberSeam, OwnedCommentEffect, RunLeadingBlank, ShellLeadingRun, StandaloneGlue,
+    ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
+    MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberGap, MemberSeam,
+    OwnedCommentEffect, RunLeadingBlank, ShellLeadingRun, StandaloneGlue,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
@@ -358,6 +358,23 @@ pub struct Printer<'a> {
     /// a chain's inner arrows — which is what makes the suppression a de-duplication rather
     /// than a DROP (`docs/comments.md` hazard 1).
     pub(crate) claimed_owned_comment_start: Cell<Option<u32>>,
+    /// The span of a redundant paren shell whose LEADING run an enclosing keyword→value
+    /// gap already claims, so the shell's own emitter
+    /// ([`Printer::build_parenthesized_type_unwrap_doc`]) must not print it a second time.
+    ///
+    /// Set only where the shell sits at the value's leading EDGE rather than being the
+    /// value — `: (⏎// c⏎A)[]` and its indexed-access / conditional-check siblings — since
+    /// there the seam has no node to substitute and the shell is still built
+    /// ([`types::StrippedParenHang::claimed_shell`]). Where the shell IS the value it is
+    /// substituted away and never reached, so no mark is needed.
+    ///
+    /// A **span**, not a position, because `unwrap_parenthesized` peels every layer: the
+    /// claim covers `((⏎// c⏎A))`'s inner shell too, which holds the comment while the
+    /// outer holds nothing. Save/restored around the build like
+    /// [`Printer::claimed_owned_comment_start`] — a mark that outlived its emitter would
+    /// suppress a run nothing else prints, which is a DROP
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 1).
+    pub(crate) claimed_shell_leading_run: Cell<Option<Span>>,
     /// The parent context for a curried arrow-chain value, set by the enclosing
     /// printer (assignment chokepoint, call-argument printer, binary-operand
     /// printer) just before the chain is built. The arrow printer reads and
@@ -469,6 +486,7 @@ impl<'a> Printer<'a> {
             jsdoc_cast_value_gap_target: Cell::new(None),
             jsdoc_cast_cannot_hang_target: Cell::new(None),
             claimed_owned_comment_start: Cell::new(None),
+            claimed_shell_leading_run: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
             chain_arg_share_active: Cell::new(false),

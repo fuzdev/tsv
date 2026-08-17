@@ -50,7 +50,11 @@ impl<'a> Printer<'a> {
         // too — the leading run via the continuation indent, the trailing comment via
         // `with_stripped_paren_trailing`. A shell with no leading line comment is returned
         // unchanged, so the block-comment / no-comment paths below preserve it in place.
-        let (type_start, ty) = self.keyword_value_stripped_paren_hang(annotation.type_annotation);
+        // A shell one SUFFIX down (`: (⏎// c⏎A)[]`) widens the window too, but hands the
+        // value back whole — there is nothing to substitute — and names its own leading
+        // run as this gap's to emit (`hang.claimed_shell`).
+        let hang = self.keyword_value_stripped_paren_hang(annotation.type_annotation);
+        let (type_start, ty) = (hang.value_start, hang.value_type);
 
         // Zero-comment gate over the `:`→type gap, computed once and reused by every
         // arm below (the union arm and the simple fall-through ask for this exact
@@ -96,8 +100,9 @@ impl<'a> Printer<'a> {
             // (annotation_leading_block_prettier_divergence).
             // Type position: a trailing block lifted from the shell trails the type
             // inline before the terminator.
-            let type_doc =
-                self.build_hang_value_doc(annotation.type_annotation, ty, TrailingBlock::Inline);
+            let type_doc = self.with_claimed_shell_leading_run(hang.claimed_shell, || {
+                self.build_hang_value_doc(annotation.type_annotation, ty, TrailingBlock::Inline)
+            });
             d.concat(&[
                 d.text(":"),
                 self.build_continuation_indent(colon_end, type_start, type_doc),
@@ -340,8 +345,9 @@ impl<'a> Printer<'a> {
         // probe to the unwrapped inner's start so the outer paren doesn't hide the comment
         // (build_type_annotation_doc strips the shell and hangs the type; without this the
         // wrapping logic below would relocate the comment non-idempotently).
-        let (line_comment_probe_end, _) =
-            self.keyword_value_stripped_paren_hang(annotation.type_annotation);
+        let line_comment_probe_end = self
+            .keyword_value_stripped_paren_hang(annotation.type_annotation)
+            .value_start;
         if has_comments && self.has_line_comments_between(colon_end, line_comment_probe_end) {
             return self.build_type_annotation_doc(annotation);
         }

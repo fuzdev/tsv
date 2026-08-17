@@ -13,3 +13,10 @@ type Fn2 = ( // c
 type Ctor = new ( // c
 	p: T
 ) => void;
+
+// an author blank BELOW the pulled comment survives — the blank is authorship, not
+// the container's leading gap (the blank ABOVE one stays erased, against the delimiter)
+type Fn3 = ( // c
+
+	p: T
+) => void;

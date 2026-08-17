@@ -593,6 +593,13 @@ fn build_chain_args_force_expand(
                 // then leads the first arg (source order preserved — see
                 // conformance_prettier_ts_comments.md §Comment relocation, Call open paren `(`).
                 first_pc.emit_trailing_comments(&mut paren_line_prefix_parts, printer);
+                if let Some(pulled_end) = first_pc.trailing_end() {
+                    printer.push_delimiter_glued_blank(
+                        &mut paren_line_prefix_parts,
+                        pulled_end,
+                        arg_start,
+                    );
+                }
             }
             // The own-line leading comments (everything not on the `(` line): a block
             // hugging the arg stays inline (`/* b */ a`), an own-line block / line

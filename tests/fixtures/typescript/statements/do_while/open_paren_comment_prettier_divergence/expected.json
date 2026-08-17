@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 178,
+	"end": 402,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,72 @@
 					"column": 28
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+			"start": 170,
+			"end": 253,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
+			"start": 255,
+			"end": 343,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank below",
+			"start": 368,
+			"end": 382,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 11
+				},
+				"end": {
+					"line": 24,
+					"column": 25
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 177,
+		"end": 401,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 168,
+			"end": 392,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 19,
+					"line": 28,
 					"column": 9
 				}
 			},
@@ -412,6 +460,124 @@
 							}
 						]
 					}
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 345,
+					"end": 391,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 348,
+						"end": 359,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 4
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 352,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 352,
+									"end": 355,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 352,
+										"end": 353,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 386,
+						"end": 387,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 2
+							},
+							"end": {
+								"line": 26,
+								"column": 3
+							}
+						},
+						"name": "x",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " blank below",
+								"start": 368,
+								"end": 382
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+							"start": 170,
+							"end": 253
+						},
+						{
+							"type": "Line",
+							"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
+							"start": 255,
+							"end": 343
+						}
+					]
 				}
 			],
 			"sourceType": "module"

@@ -254,7 +254,15 @@ impl<'a> Printer<'a> {
                 // is left to the comment-driven arm below, where a trailing-`//`-only
                 // operand is already pinned not to hug (`required_paren_shell_line_comment`
                 // cases A / F).
-                self.comments_force_own_line_between(kw_end, o.type_annotation.span().start)
+                //
+                // The window is the seam's, not the operand's own start, so a shell one
+                // SUFFIX down (`keyof (// c⏎ T)[]`) is inside it too — that shell strips
+                // into this same gap and hangs the operand, so reading the operand's start
+                // here made the `=` break for a value that had already broken beneath it.
+                let hang_start = self
+                    .keyword_value_stripped_paren_hang(o.type_annotation)
+                    .value_start;
+                self.comments_force_own_line_between(kw_end, hang_start)
                     || self.stripped_paren_hang_has_leading_line_comment(o.type_annotation)
             }
             TSType::TypeQuery(q) => {

@@ -62,4 +62,9 @@
 
 	// A block comment does not end its line, so it stays inline without parens.
 	const i = x /* c11 */ as A;
+
+	// an author blank BELOW the pulled comment survives — the blank is authorship, not
+	// the container's leading gap (the blank ABOVE one stays erased, against the delimiter)
+	const o = // c19
+		x as A;
 </script>

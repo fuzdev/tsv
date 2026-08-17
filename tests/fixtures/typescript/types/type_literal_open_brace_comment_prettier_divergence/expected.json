@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 357,
+	"end": 865,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -121,24 +121,184 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+			"start": 349,
+			"end": 432,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the container's leading gap",
+			"start": 434,
+			"end": 464,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 477,
+			"end": 482,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 12
+				},
+				"end": {
+					"line": 21,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
+			"start": 503,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `{` line)",
+			"start": 589,
+			"end": 605,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " brace2 ",
+			"start": 618,
+			"end": 630,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 12
+				},
+				"end": {
+					"line": 28,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 634,
+			"end": 641,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
+			"start": 661,
+			"end": 742,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " against the delimiter, where both formatters drop it at every bracket",
+			"start": 744,
+			"end": 816,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 831,
+			"end": 836,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 356,
+		"end": 864,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 347,
+			"end": 855,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 18,
+					"line": 40,
 					"column": 9
 				}
 			},
@@ -586,6 +746,408 @@
 							"value": " block comment trailing the `{`, then own-line leading comment",
 							"start": 230,
 							"end": 294
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 466,
+					"end": 500,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 471,
+						"end": 472,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 475,
+						"end": 499,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 10
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 486,
+								"end": 496,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 12
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 486,
+									"end": 487,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"name": "e"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 487,
+									"end": 495,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 3
+										},
+										"end": {
+											"line": 23,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 489,
+										"end": 495,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 5
+											},
+											"end": {
+												"line": 23,
+												"column": 11
+											}
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 477,
+										"end": 482
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+							"start": 349,
+							"end": 432
+						},
+						{
+							"type": "Line",
+							"value": " the container's leading gap",
+							"start": 434,
+							"end": 464
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 607,
+					"end": 658,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 612,
+						"end": 613,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 6
+							},
+							"end": {
+								"line": 28,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 616,
+						"end": 657,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 10
+							},
+							"end": {
+								"line": 32,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 644,
+								"end": 654,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 12
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 644,
+									"end": 645,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 3
+										}
+									},
+									"name": "f"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 645,
+									"end": 653,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 3
+										},
+										"end": {
+											"line": 31,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 647,
+										"end": 653,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 5
+											},
+											"end": {
+												"line": 31,
+												"column": 11
+											}
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " brace2 ",
+										"start": 618,
+										"end": 630
+									},
+									{
+										"type": "Line",
+										"value": " lead",
+										"start": 634,
+										"end": 641
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
+							"start": 503,
+							"end": 587
+						},
+						{
+							"type": "Line",
+							"value": " the `{` line)",
+							"start": 589,
+							"end": 605
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 818,
+					"end": 854,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 823,
+						"end": 824,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 6
+							},
+							"end": {
+								"line": 36,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 827,
+						"end": 853,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 10
+							},
+							"end": {
+								"line": 39,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 839,
+								"end": 850,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 13
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 839,
+									"end": 840,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 3
+										}
+									},
+									"name": "g"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 840,
+									"end": 849,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 3
+										},
+										"end": {
+											"line": 38,
+											"column": 12
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSBooleanKeyword",
+										"start": 842,
+										"end": 849,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 5
+											},
+											"end": {
+												"line": 38,
+												"column": 12
+											}
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 831,
+										"end": 836
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
+							"start": 661,
+							"end": 742
+						},
+						{
+							"type": "Line",
+							"value": " against the delimiter, where both formatters drop it at every bracket",
+							"start": 744,
+							"end": 816
 						}
 					]
 				}

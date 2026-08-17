@@ -768,8 +768,8 @@ impl<'a> Printer<'a> {
         // keyword→value seam (mirroring the prefix-operator site). `value_hang_start !=`
         // the shell start means the wide seam stripped it; pure-line already returned
         // above, so only mixed/trailing reach here.
-        let (value_hang_start, value_hang_type) =
-            self.keyword_value_stripped_paren_hang(c.extends_type);
+        let hang = self.keyword_value_stripped_paren_hang(c.extends_type);
+        let (value_hang_start, value_hang_type) = (hang.value_start, hang.value_type);
         if value_hang_start != extends_type_start
             && self.comments_force_own_line_between(extends_kw_end, value_hang_start)
         {
@@ -777,15 +777,17 @@ impl<'a> Printer<'a> {
             // depth (`build_type_doc_maybe_parens`), matching this builder's other arms —
             // not the prefix operator's bare `d.parens`. Type position, so a trailing block
             // lifted from the shell trails the inner inline.
-            let value_doc = self.with_stripped_paren_trailing(
-                self.build_type_doc_maybe_parens(
+            let value_doc = self.with_claimed_shell_leading_run(hang.claimed_shell, || {
+                self.with_stripped_paren_trailing(
+                    self.build_type_doc_maybe_parens(
+                        value_hang_type,
+                        type_needs_parens_for_conditional_extends,
+                    ),
+                    c.extends_type,
                     value_hang_type,
-                    type_needs_parens_for_conditional_extends,
-                ),
-                c.extends_type,
-                value_hang_type,
-                TrailingBlock::Inline,
-            );
+                    TrailingBlock::Inline,
+                )
+            });
             let mut parts: DocBuf = smallvec![];
             self.append_keyword_value_line_comments(
                 &mut parts,

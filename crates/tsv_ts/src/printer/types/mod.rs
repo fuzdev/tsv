@@ -43,11 +43,14 @@ pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::layout::hang_after_operator;
-use crate::printer::{CommentVec, DelimiterGluedBlank, ShellLeadingRun};
+use crate::printer::{CommentVec, ShellLeadingRun};
+use helpers::type_needs_parens_for_array_element;
+use helpers::type_needs_parens_for_conditional_check;
 use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -66,6 +69,30 @@ pub(in crate::printer) enum TrailingBlock {
     /// position (an `as`/`satisfies` cast), matching the declarator's own
     /// value→`;` trailing-comment handling.
     Deferred,
+}
+
+/// What the shared paren-strip hang seam made of a keyword→value's value — see
+/// [`Printer::keyword_value_stripped_paren_hang`].
+///
+/// The three fields answer one question each and must be read together: `value_start` is
+/// both the caller's gate window and its emitter's claim end, `value_type` is what it
+/// builds, and `claimed_shell` names the shell whose own leading run that claim covers.
+/// Deriving any of them separately is how a gate comes to measure one window while the
+/// emitter claims another — a dropped or double-printed comment.
+pub(in crate::printer) struct StrippedParenHang<'t> {
+    /// Where the gap's emitter claim ends: the fully-unwrapped inner's start when the
+    /// hang fires, the value's own start otherwise.
+    pub(in crate::printer) value_start: u32,
+    /// The type to build — the unwrapped inner where the shell WAS the value, the value
+    /// unchanged where the shell sits at its leading edge (nothing to substitute) or
+    /// where no hang fires at all.
+    pub(in crate::printer) value_type: &'t TSType<'t>,
+    /// The comment region of a leading-edge shell that the claim above covers — from the
+    /// shell's `(` to `value_start` — so the caller can suppress the shell's own copy of
+    /// that run for the duration of the build
+    /// ([`Printer::with_claimed_shell_leading_run`]). `None` where the shell was
+    /// substituted away, and where no hang fired.
+    pub(in crate::printer) claimed_shell: Option<Span>,
 }
 
 /// A resolved keyword→value head — see [`Printer::keyword_value_head`].
@@ -87,6 +114,9 @@ pub(in crate::printer) struct KeywordValueHead<'t> {
     /// The type to build: the child itself under a freeze, else the hang seam's
     /// (possibly paren-stripped) inner.
     pub(in crate::printer) value_type: &'t TSType<'t>,
+    /// The hang seam's [`StrippedParenHang::claimed_shell`], carried so the value
+    /// builders that emit this gap's run suppress the shell's own copy of it.
+    pub(in crate::printer) claimed_shell: Option<Span>,
 }
 
 impl<'t> KeywordValueHead<'t> {
@@ -103,6 +133,7 @@ impl<'t> KeywordValueHead<'t> {
             value_start: child.span().start,
             child,
             value_type: child,
+            claimed_shell: None,
         }
     }
 }
@@ -310,23 +341,26 @@ impl<'a> Printer<'a> {
                 // measure is `keyof`→`(`, which holds nothing, so the inline path below
                 // runs and `build_required_paren_operand_doc` hands the shell to its own
                 // builder.
-                let (operand_hang_start, operand_hang_type) =
-                    self.keyword_value_stripped_paren_hang(o.type_annotation);
+                let hang = self.keyword_value_stripped_paren_hang(o.type_annotation);
+                let (operand_hang_start, operand_hang_type) = (hang.value_start, hang.value_type);
                 if self.comments_force_own_line_between(keyword_end, operand_hang_start) {
-                    let operand_doc = self.build_type_doc(operand_hang_type);
-                    let value_doc = if type_needs_parens_for_prefix_operator(operand_hang_type) {
-                        d.parens(operand_doc)
-                    } else {
-                        operand_doc
-                    };
                     // Type position: a trailing block lifted from the shell trails the
                     // operand inline.
-                    let value_doc = self.with_stripped_paren_trailing(
-                        value_doc,
-                        o.type_annotation,
-                        operand_hang_type,
-                        TrailingBlock::Inline,
-                    );
+                    let value_doc = self.with_claimed_shell_leading_run(hang.claimed_shell, || {
+                        let operand_doc = self.build_type_doc(operand_hang_type);
+                        let value_doc = if type_needs_parens_for_prefix_operator(operand_hang_type)
+                        {
+                            d.parens(operand_doc)
+                        } else {
+                            operand_doc
+                        };
+                        self.with_stripped_paren_trailing(
+                            value_doc,
+                            o.type_annotation,
+                            operand_hang_type,
+                            TrailingBlock::Inline,
+                        )
+                    });
                     let mut parts = smallvec![d.text(o.operator.as_str())];
                     self.append_keyword_value_line_comments(
                         &mut parts,
@@ -880,18 +914,139 @@ impl<'a> Printer<'a> {
     /// construct it was written in"), and this seam is where it used to be lost: the hang
     /// fires on a LEADING `//`, so a shell carrying both satisfied the retain rule while
     /// already being gone.
+    ///
+    /// ⚠️ The shell need not BE the value: it can sit at the value's leading printed
+    /// **edge** — an array type's element, an indexed access's object, a conditional's
+    /// check type ([`Self::head_stripped_paren_shell`]). The shell strips there just the
+    /// same, so its `//` lands in this very gap; what it cannot get on its own is the
+    /// gap's continuation INDENT, which is the enclosing construct's fact and not the
+    /// shell's. The seam therefore widens `value_start` over the shell for those too and
+    /// hands the value back **unchanged** — there is no node to substitute — naming the
+    /// shell in `claimed_shell` so the caller can suppress its leading run while it
+    /// builds. Left to itself the shell emitted a bare `hardline` at whatever indent it
+    /// was built at, and the reparse — which finds the comment right here — applied the
+    /// indent, so the two passes disagreed (an F1 violation at every site this seam
+    /// serves).
     pub(in crate::printer) fn keyword_value_stripped_paren_hang<'t>(
         &self,
         value: &'t TSType<'t>,
-    ) -> (u32, &'t TSType<'t>) {
+    ) -> StrippedParenHang<'t> {
         if self.stripped_paren_hang_has_leading_line_comment(value)
             && !self.paren_retains_for_trailing_run(value)
         {
             let inner = unwrap_parenthesized(value);
-            (inner.span().start, inner)
-        } else {
-            (value.span().start, value)
+            return StrippedParenHang {
+                value_start: inner.span().start,
+                value_type: inner,
+                claimed_shell: None,
+            };
         }
+        if let Some(shell) = self.head_stripped_paren_shell(value) {
+            let inner_start = unwrap_parenthesized(shell).span().start;
+            return StrippedParenHang {
+                value_start: inner_start,
+                value_type: value,
+                claimed_shell: Some(Span::new(shell.span().start, inner_start)),
+            };
+        }
+        StrippedParenHang {
+            value_start: value.span().start,
+            value_type: value,
+            claimed_shell: None,
+        }
+    }
+
+    /// The redundant paren shell at a value's leading printed **edge**, where the shell is
+    /// not the value itself — the shape [`Self::keyword_value_stripped_paren_hang`] widens
+    /// over so the enclosing gap owns the run.
+    ///
+    /// Three links descend, and they are exactly the type constructors that print their
+    /// head FIRST and at the enclosing gap's own indent, so a `//` in the head reaches
+    /// that gap unchanged: an array type's element (`(⏎// c⏎A)[]`), an indexed access's
+    /// object (`(⏎// c⏎A)['k']`), and a conditional's check type
+    /// (`(⏎// c⏎A) extends B ? C : D`). They compose, so `(⏎// c⏎A)[][]` descends twice.
+    ///
+    /// ⚠️ Each link declines where its own position REQUIRES the pair
+    /// (`type_needs_parens_for_*`): a required pair is emitted OPEN around the run by
+    /// [`Self::build_open_required_paren_doc`], which is a second emitter for the same
+    /// comments — claiming it here would print them twice, or (with the suppression) leave
+    /// an empty pair. A shell the trailing-run rule retains, and one holding a routed
+    /// format-ignore directive, decline for the reasons the seam above and
+    /// [`Self::paren_interior_routed_inner`] give.
+    fn head_stripped_paren_shell<'t>(&self, ty: &'t TSType<'t>) -> Option<&'t TSType<'t>> {
+        match ty {
+            TSType::Array(a) => {
+                self.leading_edge_shell(a.element_type, type_needs_parens_for_array_element)
+            }
+            TSType::IndexedAccess(i) => {
+                self.leading_edge_shell(i.object_type, type_needs_parens_for_indexed_access_object)
+            }
+            TSType::Conditional(c) => {
+                self.leading_edge_shell(c.check_type, type_needs_parens_for_conditional_check)
+            }
+            _ => None,
+        }
+    }
+
+    /// One link of [`Self::head_stripped_paren_shell`]'s descent: `head` is the leading
+    /// operand of a suffixed/composite type, and `needs_parens` is that position's own
+    /// pair rule.
+    fn leading_edge_shell<'t>(
+        &self,
+        head: &'t TSType<'t>,
+        needs_parens: fn(&TSType<'_>) -> bool,
+    ) -> Option<&'t TSType<'t>> {
+        if needs_parens(head) || self.paren_interior_routed_inner(head).is_some() {
+            return None;
+        }
+        if self.stripped_paren_hang_has_leading_line_comment(head)
+            && !self.paren_retains_for_trailing_run(head)
+        {
+            return Some(head);
+        }
+        self.head_stripped_paren_shell(head)
+    }
+
+    /// Build `value` with `shell`'s leading run marked as ALREADY CLAIMED by the
+    /// keyword→value gap around it, so [`Self::build_parenthesized_type_unwrap_doc`]
+    /// declines to print it a second time. A no-op for `None`, which is every head whose
+    /// shell was substituted away and every head with no shell at all.
+    ///
+    /// Save/restored rather than set-and-leave: the mark is read by position, so a stale
+    /// one can only match the same shell — but a shell built outside any emitter's window
+    /// would then print nothing at all, and a suppression with no counterpart emitter is a
+    /// DROP, not a de-duplication ([`comments.md`](../../../../docs/comments.md) hazard 1).
+    /// Pairs with [`Self::shell_leading_run_claimed`], the read side.
+    pub(in crate::printer) fn with_claimed_shell_leading_run(
+        &self,
+        shell: Option<Span>,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        if shell.is_none() {
+            return build();
+        }
+        let saved = self.claimed_shell_leading_run.replace(shell);
+        let doc = build();
+        self.claimed_shell_leading_run.set(saved);
+        doc
+    }
+
+    /// Whether the leading gap of the shell at `paren_open` wrapping a type at
+    /// `inner_start` falls inside the comment region an enclosing keyword→value gap
+    /// claimed ([`Self::with_claimed_shell_leading_run`]).
+    ///
+    /// Containment, not equality: the claim names the OUTERMOST shell while the comment
+    /// may sit in an inner layer (`((⏎// c⏎A))`), and `unwrap_parenthesized` peels to the
+    /// same inner from either, so both layers must decline. The claimed region ENDS at
+    /// that fully-unwrapped inner's start, which is what keeps a shell deeper inside the
+    /// value out (`(⏎// c⏎Array<(⏎// d⏎B)>)[]` — `// d`'s shell wraps a type starting past
+    /// the region, so only `// c`'s is suppressed). Bounding the region by the outer
+    /// shell's `)` instead would swallow it, and a suppressed run nobody else emits is a
+    /// DROP.
+    fn shell_leading_run_claimed(&self, paren_open: u32, inner_start: u32) -> bool {
+        self.claimed_shell_leading_run
+            .get()
+            .is_some_and(|claim| paren_open >= claim.start && inner_start <= claim.end)
     }
 
     /// Append the trailing comment lifted out of a stripped redundant-paren shell to an
@@ -1029,17 +1184,22 @@ impl<'a> Printer<'a> {
         child: &'t TSType<'t>,
     ) -> KeywordValueHead<'t> {
         let frozen = self.single_child_frozen(gap_start, child);
-        let (value_start, value_type) = if frozen {
-            (child.span().start, child)
+        let hang = if frozen {
+            StrippedParenHang {
+                value_start: child.span().start,
+                value_type: child,
+                claimed_shell: None,
+            }
         } else {
             self.keyword_value_stripped_paren_hang(child)
         };
         KeywordValueHead {
             gap_start: Some(gap_start),
             frozen,
-            value_start,
+            value_start: hang.value_start,
             child,
-            value_type,
+            value_type: hang.value_type,
+            claimed_shell: hang.claimed_shell,
         }
     }
 
@@ -1055,7 +1215,9 @@ impl<'a> Printer<'a> {
         if head.frozen {
             self.build_frozen_single_child_doc(head.child)
         } else {
-            self.build_hang_value_doc(head.child, head.value_type, trailing_block)
+            self.with_claimed_shell_leading_run(head.claimed_shell, || {
+                self.build_hang_value_doc(head.child, head.value_type, trailing_block)
+            })
         }
     }
 
@@ -1356,8 +1518,7 @@ impl<'a> Printer<'a> {
         // A `//` the author glued to the `(` keeps that line, as at every other opening
         // delimiter (`split_open_delimiter_glued_run`); the rest of the run resumes
         // below it, inside the shell.
-        let (glued, resume) =
-            self.split_open_delimiter_glued_run(paren_open, inner_start, DelimiterGluedBlank::Keep);
+        let (glued, resume) = self.split_open_delimiter_glued_run(paren_open, inner_start);
         let mut body: DocBuf = DocBuf::new();
         self.push_paren_shell_leading_run(&mut body, resume, inner_start, ShellLeadingRun::Here);
         body.push(inner_doc);
@@ -1520,7 +1681,16 @@ impl<'a> Printer<'a> {
         let inner_start = p.type_annotation.span().start;
         let inner_end = p.type_annotation.span().end;
         let paren_close = p.span.end;
-        let (has_leading, has_trailing) = self.paren_inner_comment_flags(p);
+        let (mut has_leading, has_trailing) = self.paren_inner_comment_flags(p);
+        // The enclosing keyword→value gap already claims this shell's leading run: the
+        // shell sits at the value's leading EDGE, so the run belongs to that gap's
+        // emitter — which is also where the reparse finds it. Emitting it here as well
+        // would print it twice; emitting it here INSTEAD gave it a bare `hardline` at this
+        // shell's own indent, never the gap's continuation indent, so the two passes
+        // disagreed (`Printer::with_claimed_shell_leading_run`).
+        if has_leading && self.shell_leading_run_claimed(paren_open, inner_start) {
+            has_leading = false;
+        }
         if !has_leading && !has_trailing {
             return self.build_type_doc(p.type_annotation);
         }

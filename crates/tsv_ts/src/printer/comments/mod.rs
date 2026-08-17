@@ -151,38 +151,6 @@ pub(crate) enum ShellLeadingRun {
     Here,
 }
 
-/// Whether the author blank BELOW a delimiter-glued comment survives the pull onto the
-/// delimiter's line — the one axis [`Printer::split_open_delimiter_glued_run`]'s callers
-/// part on.
-///
-/// ⚠️ **Two values, THREE groups of callers, and the split is unresolved** — see
-/// [`comments.md`](../../../../docs/comments.md) §The delimiter-line question. It is a
-/// named axis rather than a per-caller `if` for exactly that reason: which shells keep the
-/// blank is a *decision*, and encoding it as the emitter you happened to call is how the
-/// third group arose in the first place (the restricted-production and ASI shells landed on
-/// `Drop` by having no blank arm at all, not by the argument the list family makes for it).
-/// A future resolution changes values here, not code at each site.
-///
-/// A blank between the delimiter and the comment is a different question and is never
-/// this one: it sits against the delimiter, where tsv and prettier drop it at every
-/// bracket alike.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DelimiterGluedBlank {
-    /// The blank rides along: which line the comment sits on and how far the author
-    /// separated it from the value are two facts, and claiming the delimiter's line for
-    /// the comment must not cost the blank underneath it. Prettier keeps it too, at its
-    /// own un-glued placement. The type paren shells, the statement headers and the unary
-    /// comment-holder.
-    Keep,
-    /// The blank is discarded — the reading the list and call families argue
-    /// ([`Printer::delimiter_line_comment_prefix`]): a blank directly under a container's
-    /// opening line is the container's own LEADING-GAP blank, which both formatters
-    /// discard when no comment sits there at all. The restricted-production hang
-    /// (`return (` / `throw (` / `yield (`) and the ASI operand shell, which have always
-    /// dropped it.
-    Drop,
-}
-
 /// How a leading-comment run decides whether a *block* comment hugs the token
 /// that follows it (a trailing space, `/* c */ X`) rather than dropping to its
 /// own line. The rest of the run is identical across sites — one
@@ -1120,12 +1088,13 @@ impl<'a> Printer<'a> {
     /// `"( "` itself is the rule spelled a second time, which is how the two shells that
     /// used to own a copy of this function came to disagree with it.
     ///
-    /// `blank` is the one axis callers part on ([`DelimiterGluedBlank`]).
+    /// The author blank BELOW the pulled comment rides with it, for every caller — see
+    /// [`Self::push_delimiter_glued_blank`], which this pushes and the list / call families
+    /// push for their own pull.
     pub(crate) fn split_open_delimiter_glued_run(
         &self,
         start: u32,
         end: u32,
-        blank: DelimiterGluedBlank,
     ) -> (Option<DocId>, u32) {
         let d = self.d();
         let Some(comment) = comments_to_emit_in_range(self.comments, start, end).next() else {
@@ -1141,18 +1110,80 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         parts.push(d.text(" "));
         parts.push(self.build_comment_doc(comment));
-        // An author blank below the glued comment, where the caller keeps it: the caller's
-        // own break opens the next line, so this hardline is the blank itself. The run
-        // emitter below never sees this one, because the comment left its range.
-        let next_start = comments_to_emit_in_range(self.comments, comment.span.end, end)
-            .next()
-            .map_or(end, |c| c.span.start);
-        if blank == DelimiterGluedBlank::Keep
-            && self.has_blank_line_between(comment.span.end, next_start)
-        {
-            parts.push(d.hardline());
-        }
+        // The run emitter below never sees this blank, because the comment left its range.
+        self.push_delimiter_glued_blank(&mut parts, comment.span.end, end);
         (Some(d.concat(&parts)), comment.span.end)
+    }
+
+    /// The author blank BELOW the comment(s) a pull moved onto an opening delimiter's line
+    /// — one `hardline` on top of the caller's own break, which is the blank itself.
+    ///
+    /// **One rule for the whole family**, and the second half of the opening-delimiter rule
+    /// ([`comments.md`](../../../../docs/comments.md) §The delimiter-line question): a blank
+    /// between a comment and what follows it is authorship, and the pull moves the comment's
+    /// LINE, not its membership. Every leading-run emitter in the printer already keeps this
+    /// blank ([`Self::push_leading_comment_run`],
+    /// [`Self::push_paren_shell_leading_run`]) and prettier keeps it at every construct —
+    /// call, `new`, `[`, `{`, `if`, `return (`, `yield` — from its own un-glued placement.
+    ///
+    /// ⚠️ It used to be a two-valued axis (`DelimiterGluedBlank`, now gone), the list and call
+    /// families dropping the blank on the reading that a blank directly under a container's
+    /// opening line is that container's LEADING-GAP blank. Two things sank it. The null
+    /// control it rested on (`fn(⏎⏎a)`, no comment) measures a different gap — delimiter→
+    /// content, which both formatters clear here too — while the blank in question is
+    /// comment→content, which tsv itself keeps from the un-glued authoring of the same
+    /// comment. And the premise was true only *after* tsv's own pull put the comment on that
+    /// line, so the blank's fate turned on whether the author had glued the comment to the
+    /// delimiter: `fn(⏎// c⏎⏎a)` kept it and `fn( // c⏎⏎a)` did not, one authored blank with
+    /// two fates.
+    ///
+    /// A blank between the delimiter and the FIRST comment is not this question and stays
+    /// erased: it sits against the delimiter, where tsv and prettier drop it at every
+    /// bracket alike.
+    ///
+    /// `pulled_end` is the end of the last comment the pull emitted; `gap_end` the first
+    /// item's start. The scan stops at the next comment, so a blank further down the run
+    /// belongs to that comment's own leading rule rather than to the pull.
+    pub(crate) fn push_delimiter_glued_blank(
+        &self,
+        parts: &mut DocBuf,
+        pulled_end: u32,
+        gap_end: u32,
+    ) {
+        let next_start = comments_to_emit_in_range(self.comments, pulled_end, gap_end)
+            .next()
+            .map_or(gap_end, |c| c.span.start);
+        // ⚠️ The scan measures a DISTANCE, so it must not span a delimiter glyph the
+        // author put on a line of its own. At most sites the delimiter precedes the
+        // comment (`fn( // c`), but the unary comment-holder's gap opens at the OPERATOR
+        // (`!! // c⏎(⏎x`), so the `(`'s own line break lands inside the range and the two
+        // newlines read as an author blank — a fabricated blank line, which is its own
+        // fixed point and reparses, so only a prettier `compare` or the fabrication audit
+        // over real code finds it (`docs/comments.md` hazard 5). Ending the scan at the
+        // glyph also gives the right answer for a blank BELOW it: that one sits against
+        // the delimiter, where every bracket in both formatters drops it.
+        // `blank_scan_end` first, because the scan must not span comment BYTES either —
+        // an owned comment in this gap is skipped by the emit axis but still occupies its
+        // interior newlines (hazard 5's other half). It also makes the byte scan below
+        // comment-free by construction.
+        let scan_end = self.blank_scan_end(pulled_end, next_start);
+        let scan_end = self.first_open_delimiter_in(pulled_end, scan_end);
+        if self.has_blank_line_between(pulled_end, scan_end) {
+            parts.push(self.d().hardline());
+        }
+    }
+
+    /// The first `(` / `[` / `{` physically in `[start, end)`, or `end` — the bound a
+    /// blank-line scan across a delimiter-glued gap takes
+    /// ([`Self::push_delimiter_glued_blank`]).
+    ///
+    /// A raw byte scan is sound because the caller hands a comment-free range
+    /// ([`Self::blank_scan_end`]), so no `(` inside a comment's text can be reached.
+    fn first_open_delimiter_in(&self, start: u32, end: u32) -> u32 {
+        self.source.as_bytes()[start as usize..end as usize]
+            .iter()
+            .position(|b| matches!(b, b'(' | b'[' | b'{'))
+            .map_or(end, |i| start + i as u32)
     }
 
     /// [`Self::split_open_delimiter_glued_run`] for a shell whose `(` is **located** by a
@@ -1188,7 +1219,7 @@ impl<'a> Printer<'a> {
         if open_paren.is_none() {
             return (None, gap_start);
         }
-        self.split_open_delimiter_glued_run(gap_start, value_start, DelimiterGluedBlank::Drop)
+        self.split_open_delimiter_glued_run(gap_start, value_start)
     }
 
     /// Emit a retained-paren SHELL's leading run — the comments in `[start, end)`

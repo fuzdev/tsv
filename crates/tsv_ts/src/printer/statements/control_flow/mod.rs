@@ -17,7 +17,7 @@ mod try_jump;
 use smallvec::SmallVec;
 
 use crate::ast::internal::{Expression, Statement, UnaryOperator};
-use crate::printer::{CommentVec, DelimiterGluedBlank, LeadingGlue, Printer};
+use crate::printer::{CommentVec, LeadingGlue, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -1345,11 +1345,7 @@ impl<'a> Printer<'a> {
         // The doc goes inside the caller's `indent` with every other part, which costs
         // nothing: no break precedes it, so the indent has no line to act on, and the
         // `hardline` below is the one that places the condition.
-        let (glued, resume) = self.split_open_delimiter_glued_run(
-            open_paren_pos + 1,
-            test_start,
-            DelimiterGluedBlank::Keep,
-        );
+        let (glued, resume) = self.split_open_delimiter_glued_run(open_paren_pos + 1, test_start);
         inner_parts.extend(glued);
 
         let leading_comments: CommentVec<'_> =

@@ -6,7 +6,7 @@
 
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use crate::printer::comments::CommentSpacing;
-use crate::printer::{CommentVec, DelimiterGluedBlank, ParenContext, Printer, RunLeadingBlank};
+use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -205,11 +205,8 @@ impl<'a> Printer<'a> {
         // The gap opens at the OPERATOR's end because the parser strips the source `(` — so
         // the region spans it, and "no newline before the comment" is exactly "the author
         // wrote it on the line this shell's re-added `(` will sit on".
-        let (paren_glued, leading_run_start) = self.split_open_delimiter_glued_run(
-            operator_end,
-            argument_start,
-            DelimiterGluedBlank::Keep,
-        );
+        let (paren_glued, leading_run_start) =
+            self.split_open_delimiter_glued_run(operator_end, argument_start);
         let leading_comments_opt = self.build_rhs_comments_opt(leading_run_start, argument_start);
         // Whether a leading comment is *present* — the gate for re-adding the parens — as
         // opposed to whether this emitter has to print it. A **forward-binding** comment (a

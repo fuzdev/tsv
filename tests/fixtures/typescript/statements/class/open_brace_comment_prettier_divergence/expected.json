@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 218,
+	"end": 707,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -89,24 +89,184 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+			"start": 210,
+			"end": 293,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the container's leading gap",
+			"start": 295,
+			"end": 325,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 337,
+			"end": 342,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 11
+				},
+				"end": {
+					"line": 15,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
+			"start": 358,
+			"end": 442,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `{` line)",
+			"start": 444,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " brace2 ",
+			"start": 472,
+			"end": 484,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 11
+				},
+				"end": {
+					"line": 22,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 488,
+			"end": 495,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
+			"start": 510,
+			"end": 591,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " against the delimiter, where both formatters drop it at every bracket",
+			"start": 593,
+			"end": 665,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 679,
+			"end": 684,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 217,
+		"end": 706,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 208,
+			"end": 697,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 12,
+					"line": 34,
 					"column": 9
 				}
 			},
@@ -344,6 +504,375 @@
 							"value": " block comment trailing the body `{`, then own-line leading comment",
 							"start": 93,
 							"end": 162
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 327,
+					"end": 355,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 333,
+						"end": 334,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 7
+							},
+							"end": {
+								"line": 15,
+								"column": 8
+							}
+						},
+						"name": "E"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 335,
+						"end": 355,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 9
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 346,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 346,
+									"end": 347,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 350,
+									"end": 351,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 6
+										},
+										"end": {
+											"line": 17,
+											"column": 7
+										}
+									},
+									"value": 3,
+									"raw": "3"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 337,
+										"end": 342
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+							"start": 210,
+							"end": 293
+						},
+						{
+							"type": "Line",
+							"value": " the container's leading gap",
+							"start": 295,
+							"end": 325
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 462,
+					"end": 507,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 468,
+						"end": 469,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 7
+							},
+							"end": {
+								"line": 22,
+								"column": 8
+							}
+						},
+						"name": "F"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 470,
+						"end": 507,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 9
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 498,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 498,
+									"end": 499,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 3
+										}
+									},
+									"name": "d"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 502,
+									"end": 503,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 6
+										},
+										"end": {
+											"line": 25,
+											"column": 7
+										}
+									},
+									"value": 4,
+									"raw": "4"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " brace2 ",
+										"start": 472,
+										"end": 484
+									},
+									{
+										"type": "Line",
+										"value": " lead",
+										"start": 488,
+										"end": 495
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
+							"start": 358,
+							"end": 442
+						},
+						{
+							"type": "Line",
+							"value": " the `{` line)",
+							"start": 444,
+							"end": 460
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 667,
+					"end": 696,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 673,
+						"end": 674,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 7
+							},
+							"end": {
+								"line": 30,
+								"column": 8
+							}
+						},
+						"name": "G"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 675,
+						"end": 696,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 9
+							},
+							"end": {
+								"line": 33,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 687,
+								"end": 693,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 687,
+									"end": 688,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 2
+										},
+										"end": {
+											"line": 32,
+											"column": 3
+										}
+									},
+									"name": "e"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 691,
+									"end": 692,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 6
+										},
+										"end": {
+											"line": 32,
+											"column": 7
+										}
+									},
+									"value": 5,
+									"raw": "5"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 679,
+										"end": 684
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
+							"start": 510,
+							"end": 591
+						},
+						{
+							"type": "Line",
+							"value": " against the delimiter, where both formatters drop it at every bracket",
+							"start": 593,
+							"end": 665
 						}
 					]
 				}

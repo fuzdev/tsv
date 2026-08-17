@@ -30,4 +30,14 @@
 				d: D;
 		  }
 		| E;
+
+	// an author blank BELOW the pulled comment survives — the blank is authorship, not
+	// the container's leading gap (the blank ABOVE one stays erased, against the delimiter)
+	type X =
+		| {
+				// c5
+
+				e: E;
+		  }
+		| F;
 </script>

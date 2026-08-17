@@ -1014,6 +1014,12 @@ impl<'a> Printer<'a> {
         let mut prefix = DocBuf::new();
         if pull {
             pc.emit_trailing_comments(&mut prefix, self);
+            // The author blank below the pulled run rides with it, as at every other
+            // opening delimiter (`Printer::push_delimiter_glued_blank` carries the rule and
+            // why this family used to drop it).
+            if let Some(pulled_end) = pc.trailing_end() {
+                self.push_delimiter_glued_blank(&mut prefix, pulled_end, first_elem_start);
+            }
         }
         (prefix, pull.then_some(delim_pos))
     }

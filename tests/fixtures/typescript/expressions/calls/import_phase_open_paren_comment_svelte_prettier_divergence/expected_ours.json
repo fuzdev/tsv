@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 275,
+	"end": 496,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,72 @@
 					"column": 30
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+			"start": 267,
+			"end": 350,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
+			"start": 352,
+			"end": 440,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 467,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 26
+				},
+				"end": {
+					"line": 14,
+					"column": 31
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 274,
+		"end": 495,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 265,
+			"end": 486,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 11,
+					"line": 18,
 					"column": 9
 				}
 			},
@@ -288,6 +336,110 @@
 							"value": " a `defer`-phased one likewise — the phase only changes the head, not the gap",
 							"start": 142,
 							"end": 221
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 442,
+					"end": 485,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 448,
+							"end": 484,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 17,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 448,
+								"end": 449,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 452,
+								"end": 484,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 17,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 476,
+									"end": 481,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 7
+										}
+									},
+									"value": "./c",
+									"raw": "'./c'",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 467,
+											"end": 472
+										}
+									]
+								},
+								"phase": "source"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+							"start": 267,
+							"end": 350
+						},
+						{
+							"type": "Line",
+							"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
+							"start": 352,
+							"end": 440
 						}
 					]
 				}
