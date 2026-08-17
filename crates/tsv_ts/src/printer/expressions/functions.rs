@@ -869,11 +869,16 @@ impl<'a> Printer<'a> {
     /// prettier. Any future site that widens the context set inherits the break arm, not the
     /// refusal, unless it can point at its own owner the way the assignment does.
     ///
-    /// The `skip_arrow_chain` term below is **redundant but kept**: its two set sites fire
-    /// only for a chain that already carries a return type / type params / a non-identifier
-    /// param, which the check further down refuses anyway. It states the expand-last-arg rule
-    /// at the place a reader looks for it — see the field's own doc for where the flag is
-    /// actually load-bearing.
+    /// The `skip_arrow_chain` term below is **load-bearing**, not a restatement. Prettier's
+    /// `expandLastArg` print has no chain layout at all (`printArrowFunction`'s
+    /// `shouldPrintAsChain = !args.expandLastArg && …`), and every hug state that reads that
+    /// printing builds it through `calls::build_expand_last_arg_doc` — which sets the flag for
+    /// an **untyped** chain too, one nothing further down refuses. The context is no backstop:
+    /// only an arrow consumes `arrow_chain_context` (`build_arrow_doc_wrapping` takes it), so a
+    /// call NESTED in an argument still has the enclosing `CallArgOrBinaryish` ambient while its
+    /// own hug states build — `fn0(g1((a) => (b) => (c) => ({ … })))`, where dropping the term
+    /// gives the expanded printing a chain layout, whose own heads then break and FIT, hugging a
+    /// run prettier breaks out.
     ///
     // TODO: the context set is narrower than prettier's rule. `ArrowChainContext` is set at
     // three sites (assignment RHS, call arguments, binaryish operands), so `None` here also

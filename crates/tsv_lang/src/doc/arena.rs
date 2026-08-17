@@ -672,19 +672,23 @@ pub struct DocArena {
     /// files), like the other scratches; only ever affects allocation, never
     /// output.
     docbuf_pool: RefCell<Vec<DocBuf>>,
-    /// Parked node-keyed doc-share map: an AST-node pointer (`usize`) → the
-    /// `DocId` already built for it. Storage for the TS printer's member-chain
-    /// argument sharing, parked here — on the reused per-thread arena — so the
-    /// table's capacity warms once instead of a fresh `HashMap` resize chain
-    /// per printer/file. The consumer owns the protocol: it clears the map at
-    /// every share-scope entry AND exit, so between scopes it is logically
-    /// empty (stale `DocId`s from a prior document are unreachable — cleared
-    /// before any read) and only capacity persists across `reset()`. Only ever
-    /// affects allocation, never output (a hit is byte-identical to a rebuild
-    /// by the consumer's eligibility rules). Hashed by [`crate::hash::FxHasher`]
+    /// Parked node-keyed doc-share map: an AST-node pointer plus a consumer-owned
+    /// build tag (`(usize, u8)`) → the `DocId` already built for it. The tag is
+    /// what lets one node hold **several** entries — the same argument built
+    /// under different printer state, or by a different builder — so the
+    /// consumer's "a hit is byte-identical to a rebuild" rule is carried by the
+    /// key rather than by refusing to cache. Storage for the TS printer's
+    /// member-chain argument sharing, parked here — on the reused per-thread
+    /// arena — so the table's capacity warms once instead of a fresh `HashMap`
+    /// resize chain per printer/file. The consumer owns the protocol: it clears
+    /// the map at every share-scope entry AND exit, so between scopes it is
+    /// logically empty (stale `DocId`s from a prior document are unreachable —
+    /// cleared before any read) and only capacity persists across `reset()`. Only
+    /// ever affects allocation, never output (a hit is byte-identical to a rebuild
+    /// by construction of the consumer's key). Hashed by [`crate::hash::FxHasher`]
     /// rather than SipHash — the consumer only ever does `get`/`insert`/`clear`,
     /// never iterates, so the hasher is unobservable (see `hash`'s module docs).
-    share_map_scratch: RefCell<FxHashMap<usize, DocId>>,
+    share_map_scratch: RefCell<FxHashMap<(usize, u8), DocId>>,
     /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
@@ -2585,13 +2589,14 @@ impl DocArena {
         }
     }
 
-    /// The parked node-keyed doc-share map (see the field doc). Returned as the
+    /// The parked node-keyed doc-share map (see the field doc), keyed by
+    /// `(node pointer, consumer build tag)`. Returned as the
     /// `RefCell` itself — the consumer's share scope spans many interleaved
     /// arena calls, so it borrows point-wise per lookup/insert/clear rather
     /// than holding a `RefMut` open. The consumer owns the clear-at-scope-
     /// entry/exit protocol; this accessor deliberately does NOT clear.
     #[inline]
-    pub fn share_map_scratch(&self) -> &RefCell<FxHashMap<usize, DocId>> {
+    pub fn share_map_scratch(&self) -> &RefCell<FxHashMap<(usize, u8), DocId>> {
         &self.share_map_scratch
     }
 

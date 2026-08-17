@@ -15,10 +15,11 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    ArgItem, ChainArgKind, arrow_body_tail_has_comments, arrow_hug_refused_by_comments,
-    build_args_split_last, build_arrow_sig_doc, build_break_body_state,
-    build_chain_expand_all_args, build_own_line_post_arrow_state, build_printed_argument_doc,
-    classify_chain_arg, first_arg_signature_refuses_expand_first,
+    ArgItem, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
+    arrow_hug_refused_by_comments, arrow_terminal_expression_body, build_args_split_last,
+    build_arrow_hug_arg_docs, build_arrow_sig_doc, build_break_body_state,
+    build_chain_expand_all_args, build_expand_last_arg_doc, build_own_line_post_arrow_state,
+    build_printed_argument_doc, classify_chain_arg, first_arg_signature_refuses_expand_first,
     last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
@@ -899,11 +900,7 @@ fn build_chain_args_single(
     // Leading comments block expand-last (prettier's shouldExpandLastArg).
     // See also: call_formatting.rs's parallel non-chain implementation.
     if let Expression::ArrowFunctionExpression(arrow) = arg
-        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-        && matches!(
-            &**body_expr,
-            Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
-        )
+        && arrow_body_expands_internally(arrow)
         // `has_any_comment_text` (on page), not `has_any_comments` (to emit): an owned
         // leading comment defeats the expand-last hug just like an ordinary one, so the
         // hug must refuse it too — a to-emit gate would hug blind.
@@ -914,24 +911,28 @@ fn build_chain_args_single(
         && !(has_any_comment_text
             && arrow_signature_has_breaking_comments(printer, arrow))
     {
-        // Render the arrow with flat params (prettier's expandLastArg
-        // `removeLines`) so the force-broken state breaks the body, not the
-        // destructuring param — letting it fall through to all-args-broken-out.
-        printer.expand_last_arg_flat_params.set(true);
-        let arrow_doc = printer.build_arg_expression_doc(arg);
-        printer.expand_last_arg_flat_params.set(false);
-        let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
+        // Prettier's two printings, and which state reads each — the same builder the
+        // non-chain and `new` sites use, differing only in the chain's argument builder.
+        // A curried chain's terminal object/array is reached here too
+        // ([`arrow_body_expands_internally`]), and for it the two genuinely differ: the
+        // `expandLastArg` print has no chain layout, so a run of heads too wide to hug
+        // fails on width instead of breaking its own heads and fitting.
+        let docs = build_arrow_hug_arg_docs(printer, arg, arrow, || {
+            printer.build_arg_expression_doc(arg)
+        })
+        .with_leading(d, leading_comment_doc);
 
-        // State 0: hugged flat — (arrow_doc)
-        let state_hug = d.concat(&[d.text(prefix), arrow_doc, d.text(")")]);
+        // State 0: hugged flat — (lastArg)
+        let state_hug = d.concat(&[d.text(prefix), docs.expanded, d.text(")")]);
 
-        // State 1: arrow forced to break — (group_break(arrow_doc))
-        let state_arrow_break = d.concat(&[d.text(prefix), d.group_break(arrow_doc), d.text(")")]);
+        // State 1: arrow forced to break — (group(lastArg, { shouldBreak: true }))
+        let state_arrow_break =
+            d.concat(&[d.text(prefix), d.group_break(docs.expanded), d.text(")")]);
 
-        // State 2: all args broken out — (\n  arrow_doc,\n)
+        // State 2: all args broken out — (\n  printedArguments,\n)
         let state_all_broken = d.group_break(d.concat(&[
             d.text(prefix),
-            d.indent(d.concat(&[d.line(), arrow_doc])),
+            d.indent(d.concat(&[d.line(), docs.printed])),
             d.line(),
             d.text(")"),
         ]));
@@ -1292,69 +1293,62 @@ fn build_chain_args_multi(
         return d.concat(&parts);
     }
 
-    // Expression arrow with object/array body
+    // Expression arrow with an object/array terminal
     // Prettier keeps preceding args inline and expands object/array internally
     // e.g., `a.b(c, (x) => ({\n  y: x,\n}));`
-    // couldExpandArg keys only on the body type — a typed arrow expands the same
-    // way (its full signature is emitted via build_arrow_sig_doc).
+    // couldExpandArg keys only on the terminal's type — a typed arrow expands the same
+    // way, and so does a curried run of heads, since both states below render the
+    // argument's own `expandLastArg` printing rather than a reassembled signature.
     if call.arguments.len() >= 2
         && !comments_force_expansion
         && !(has_any_comments && last_arg_commented)
-        && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
-        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-        && matches!(
-            &**body_expr,
-            Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
-        )
-        // The same refusal pair, whose body-tail half is here the grammar-required parens the
-        // hug state synthesizes around an object body (`arrow_hug_refused_by_comments`).
+        && let Some(last_arg) = call.arguments.last()
+        && let Expression::ArrowFunctionExpression(arrow) = last_arg
+        && arrow_body_expands_internally(arrow)
+        && let Some(body_expr) = arrow_terminal_expression_body(arrow)
+        // A break forced inside the signature, or a comment on the terminal body's tail —
+        // the hug renders the prefix and the signature run on one line, and the states below
+        // read a printing that ends at the body (`arrow_hug_refused_by_comments`).
         && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
     {
-        // Expand-last arrow with an object/array body: build the body ONCE and inject it so
-        // the whole-arrow arg doc reuses it (the hug state below reuses it too) — building it
-        // in both places recurses into itself → O(2^depth).
-        let obj_reuse =
-            prebuild_expand_last_obj_array_body(printer, call.arguments.last(), has_any_comments);
-        let inject_prev =
-            obj_reuse.map(|(span, inject_doc, _)| printer.inject_arrow_body(span, inject_doc));
+        // Expand-last arrow with an object/array terminal: build the terminal body ONCE and
+        // inject it so BOTH printings of the argument reuse it — building it per printing
+        // recurses into itself → O(2^depth). Re-armed around each printing, the same shape
+        // the non-chain twin uses.
+        let obj_reuse = prebuild_expand_last_obj_array_body(printer, Some(last_arg));
 
-        let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
+        let (head_parts, _printed_last_arg_doc, all_args_broken) = printer
+            .with_arrow_body_inject(obj_reuse, || {
+                build_args_split_last(call.arguments, printer, paren_open, has_any_comments)
+            });
 
-        if let Some(prev) = inject_prev {
-            printer.restore_arrow_body_inject(prev);
-        }
-
-        // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
+        // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut() — asked before the
+        // second printing below, which only the two states past this bail read.
         if head_parts.iter().any(|&id| d.will_break(id)) {
             parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
             return d.concat(&parts);
         }
 
-        let sig_doc = build_arrow_sig_doc(printer, arrow);
-        // Reuse the pre-built object/array body (see above); `(x) => ({ ... })` parens included.
-        let body_doc = obj_reuse.map_or_else(
-            || d.parens(printer.build_expression_doc(body_expr)),
-            |(_, _, hug)| hug,
-        );
-        let body_doc =
-            prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+        // Prettier's `lastArg` — the `expandLastArg` print, which has no chain layout, so a
+        // curried run of heads too wide to hug fails on width instead of breaking its own
+        // heads and fitting.
+        let expanded_doc = printer.with_arrow_body_inject(obj_reuse, || {
+            build_expand_last_arg_doc(printer, || printer.build_arg_expression_doc(last_arg))
+        });
 
         // State 0: all inline
         let state_inline = d.concat(&[
             d.text(prefix),
             d.concat(&head_parts),
-            last_arg_doc,
+            expanded_doc,
             d.text(")"),
         ]);
 
-        // State 1: hug - head inline, object/array expands internally
+        // State 1: hug — heads inline, the terminal object/array expands internally
         let state_hug = d.concat(&[
             d.text(prefix),
             d.concat(&head_parts),
-            sig_doc,
-            d.text(" => "),
-            d.group_break(body_doc),
+            d.group_break(expanded_doc),
             d.text(")"),
         ]);
 

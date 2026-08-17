@@ -4,8 +4,8 @@
 
 use super::arg_comments::{any_arg_empty_line, first_arg_has_any_comments};
 use super::arg_wrapping::{
-    append_type_args_with_gap_comments, arrow_body_expands_internally,
-    build_arrow_arg_doc_for_hug_states, build_call_args_with_blank_lines, build_empty_args_doc,
+    append_type_args_with_gap_comments, arrow_body_expands_internally, build_arrow_hug_arg_docs,
+    build_arrow_hug_printed_doc, build_call_args_with_blank_lines, build_empty_args_doc,
     build_expand_first_arg_doc, build_own_line_post_arrow_state, build_single_arrow_arg_states,
     build_single_container_arg_doc, first_arg_signature_refuses_expand_first,
     last_arg_has_own_line_post_arrow_comment, should_expand_first_arg, try_hook_deps_args_doc,
@@ -26,7 +26,9 @@ use crate::printer::calls::{
     should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
     wrap_call_with_will_break_guard,
 };
-use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
+use crate::printer::expressions::functions::{
+    arrow_signature_has_breaking_comments, prepend_leading,
+};
 use crate::printer::{
     ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
 };
@@ -205,11 +207,8 @@ impl<'a> Printer<'a> {
                 internal::Expression::ArrowFunctionExpression(arrow)
                     if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) =>
                 {
-                    // Which of prettier's two renderings this ONE doc is —
-                    // [`build_arrow_arg_doc_for_hug_states`] owns that rule, shared with the plain
-                    // call's `build_block_arrow_hug_states`.
                     let arg0 = &new_expr.arguments[0];
-                    let mut arrow_doc = build_arrow_arg_doc_for_hug_states(self, arg0, arrow);
+                    let build = || self.build_expression_doc(arg0);
 
                     // Prepend leading comments (e.g., /** @param {any} x */ before arrow)
                     // and force wrapped state when present (prettier expands args with leading comments)
@@ -222,12 +221,9 @@ impl<'a> Printer<'a> {
                     } else {
                         None
                     };
-                    if let Some(leading) = glued {
-                        arrow_doc = d.concat(&[leading, arrow_doc]);
-                    }
                     // **on page**: a leading comment forces the wrapped (expanded) state,
-                    // owned or not — an owned comment rides inside `arrow_doc` (so it's
-                    // not in `glued`) but still defeats the hug, exactly as prettier
+                    // owned or not — an owned comment rides inside the argument's doc (so
+                    // it's not in `glued`) but still defeats the hug, exactly as prettier
                     // expands a block-arrow arg whose leading comment precedes it. A
                     // to-emit gate here would go blind to it and wrongly hug.
                     let has_leading_comment = new_has_comments
@@ -238,11 +234,19 @@ impl<'a> Printer<'a> {
                     let has_trailing_param_comments =
                         new_has_comments && arrow_signature_has_breaking_comments(self, arrow);
 
+                    // ⚠️ All three refusals are asked BEFORE the printing pair below and read
+                    // only the `printedArguments` one — the pair is a second build of the
+                    // argument ([`build_arrow_hug_printed_doc`]).
                     if has_trailing_param_comments || has_leading_comment {
+                        let printed = prepend_leading(
+                            d,
+                            glued,
+                            build_arrow_hug_printed_doc(self, arg0, arrow, build),
+                        );
                         return d.concat(&[
                             callee_with_types,
                             d.text("("),
-                            d.indent(d.concat(&[d.softline(), arrow_doc])),
+                            d.indent(d.concat(&[d.softline(), printed])),
                             d.softline(),
                             d.text(")"),
                         ]);
@@ -252,21 +256,32 @@ impl<'a> Printer<'a> {
                     // onto its own line — the rule is the gap's and not the body's, see
                     // [`last_arg_has_own_line_post_arrow_comment`].
                     if new_has_comments && last_arg_has_own_line_post_arrow_comment(self, arg0) {
+                        let printed = prepend_leading(
+                            d,
+                            glued,
+                            build_arrow_hug_printed_doc(self, arg0, arrow, build),
+                        );
                         return d.concat(&[
                             callee_with_types,
-                            build_own_line_post_arrow_state(d, d.text("("), &[], arrow_doc),
+                            build_own_line_post_arrow_state(d, d.text("("), &[], printed),
                         ]);
                     }
 
+                    // Prettier's two printings of the argument and which state reads each —
+                    // [`build_arrow_hug_arg_docs`] owns that rule, shared with the plain call's
+                    // `build_block_arrow_hug_states`.
+                    let docs =
+                        build_arrow_hug_arg_docs(self, arg0, arrow, build).with_leading(d, glued);
+
                     // The same state ladder the plain call's single-argument hug selects among
-                    // (`build_block_arrow_hug_states`) — an object/array body takes the middle
-                    // state, which expands the body internally while the arrow stays hugged to
-                    // `new A(`. The hand-rolled two-state copy here had no such state, so a
-                    // FLAT-written body broke the argument out where prettier hugs.
+                    // (`build_block_arrow_hug_states`) — an object/array terminal takes the
+                    // middle state, which expands the body internally while the arrow stays
+                    // hugged to `new A(`. The hand-rolled two-state copy here had no such state,
+                    // so a FLAT-written body broke the argument out where prettier hugs.
                     return build_single_arrow_arg_states(
                         d,
                         callee_with_types,
-                        arrow_doc,
+                        docs,
                         arrow_body_expands_internally(arrow),
                     );
                 }
