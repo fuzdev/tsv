@@ -1000,26 +1000,21 @@ impl<'a> Printer<'a> {
             first_elem_start,
         );
         // The base rule gates the pull on forced expansion (a line comment, or a
-        // block standalone on its own line). `pull_expanding_block` adds the
-        // object case: a block on the delimiter line with the first element on a
-        // later line — the object will break, so the block trails the `{`.
-        let pull = pc.has_trailing_comments()
-            && (super::calls::should_force_expansion_for_comments(
-                self,
-                delim_pos,
-                first_elem_start,
-            ) || (pull_expanding_block
+        // block standalone on its own line) — the call family's own predicate, so the
+        // two families cannot drift. `pull_expanding_block` adds the object case: a
+        // block on the delimiter line with the first element on a later line — the
+        // object will break, so the block trails the `{`. (Its `has_trailing_block`
+        // implies the base rule's `has_trailing_comments`, which is why the added arm
+        // sits beside the predicate rather than inside its conjunction.)
+        let pull = pc.pulls_to_delimiter_line(self)
+            || (pull_expanding_block
                 && pc.has_trailing_block()
-                && !self.is_same_line(delim_pos, first_elem_start)));
+                && !self.is_same_line(delim_pos, first_elem_start));
         let mut prefix = DocBuf::new();
         if pull {
-            pc.emit_trailing_comments(&mut prefix, self);
-            // The author blank below the pulled run rides with it, as at every other
-            // opening delimiter (`Printer::push_delimiter_glued_blank` carries the rule and
-            // why this family used to drop it).
-            if let Some(pulled_end) = pc.trailing_end() {
-                self.push_delimiter_glued_blank(&mut prefix, pulled_end, first_elem_start);
-            }
+            // The run, plus the author blank below it — one emitter for every
+            // delimiter-line pull in both families.
+            pc.emit_delimiter_line_pull(&mut prefix, self);
         }
         (prefix, pull.then_some(delim_pos))
     }

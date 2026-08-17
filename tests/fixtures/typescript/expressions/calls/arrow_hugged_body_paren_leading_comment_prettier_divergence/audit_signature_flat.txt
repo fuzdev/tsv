@@ -1,0 +1,72 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script>
+	// A block comment the author wrote INSIDE an arrow's object-body parens stays inside
+	// them, in every printer that hugs such a body: sole argument, `new`, member chain.
+
+	const b1 = fn((item) => /* c */ ({
+		prop1: 'value1value1value1value1',
+		prop2: 'value2value2value2value2',
+		prop3: 'value3'
+	}));
+	const b2 = new Fn((item) => /* c */ ({
+		prop1: 'value1value1value1value1',
+		prop2: 'value2value2value2value2',
+		prop3: 'val'
+	}));
+	const b3 = obj
+		.fn1()
+		.map((item) => /* c */ ({
+			prop1: 'value1value1value1value1',
+			prop2: 'value2value2value2value2',
+			prop3: 'v3'
+		}));
+
+	// Control: written outside the parens, it stays outside — the two positions are
+	// dual-stable, and each formatter keeps the one the author picked.
+	const b4 = obj
+		.fn1()
+		.map((item) => /* c */ ({
+			prop1: 'value1value1value1value1',
+			prop2: 'value2value2value2value2',
+			prop3: 'v3'
+		}));
+</script>
+
+%%PASS=2 (fixed point)%%
+<script>
+	// A block comment the author wrote INSIDE an arrow's object-body parens stays inside
+	// them, in every printer that hugs such a body: sole argument, `new`, member chain.
+
+	const b1 = fn((item) => /* c */ ({
+		prop1: 'value1value1value1value1',
+		prop2: 'value2value2value2value2',
+		prop3: 'value3'
+	}));
+	const b2 = new Fn((item) => /* c */ ({
+		prop1: 'value1value1value1value1',
+		prop2: 'value2value2value2value2',
+		prop3: 'val'
+	}));
+	const b3 = obj.fn1().map((item) => /* c */ ({
+		prop1: 'value1value1value1value1',
+		prop2: 'value2value2value2value2',
+		prop3: 'v3'
+	}));
+
+	// Control: written outside the parens, it stays outside — the two positions are
+	// dual-stable, and each formatter keeps the one the author picked.
+	const b4 = obj.fn1().map((item) => /* c */ ({
+		prop1: 'value1value1value1value1',
+		prop2: 'value2value2value2value2',
+		prop3: 'v3'
+	}));
+</script>
