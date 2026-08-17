@@ -16,6 +16,7 @@
 // - **arg_predicates.rs**: Call-argument and arrow shape predicates
 // - **arg_wrapping.rs**: Argument classification and wrapping utilities
 // - **call_formatting.rs**: Main call expression formatting logic
+// - **expand_last.rs**: Prettier's `shouldExpandLastArg` layout, shared by calls and `new`
 // - **new_expression.rs**: `new` expression formatting (shares the call wrapping patterns)
 // - **import_expr.rs**: Import expression and meta property handling
 // - **chain_args.rs**: Chain-specific argument building
@@ -25,6 +26,7 @@ pub(in crate::printer) mod arg_predicates;
 mod arg_wrapping;
 mod call_formatting;
 mod chain_args;
+mod expand_last;
 mod import_expr;
 mod module_paths;
 mod new_expression;
@@ -38,12 +40,9 @@ pub(crate) use arg_comments::{
 };
 pub(crate) use arg_wrapping::{
     ArgItem, ArgsJoin, arrow_hug_refused_by_comments, build_args_joined_with_comments,
-    build_args_split_last, build_arrow_call_body_states, build_arrow_sig_doc,
-    build_break_body_state, build_call_args_expanded, build_expand_all_args, build_inline_args,
-    build_inline_hug_or_expand_all, build_inline_or_expand_all, build_printed_argument_doc,
-    could_expand_arrow_chain, last_two_args_same_type, prebuild_expand_last_break_body,
-    prepend_arrow_body_comments, wrap_call_with_hard_breaks_paren_line,
-    wrap_call_with_will_break_guard,
+    build_arrow_call_body_states, build_arrow_sig_doc, build_call_args_expanded,
+    build_printed_argument_doc, could_expand_arrow_chain, prepend_arrow_body_comments,
+    wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
 };
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
@@ -52,6 +51,7 @@ use super::chain;
 use crate::ast::internal;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
+use arg_wrapping::build_args_split_last;
 use tsv_lang::doc::arena::DocId;
 
 /// The position the call's `(` follows — the end of the type-argument list when the call
