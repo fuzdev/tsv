@@ -9,7 +9,6 @@ use super::arg_comments::{
     PartitionedComments, any_arg_empty_line, any_comment_forces_expansion, build_arg_gap_docs,
     emit_last_arg_trailing_comments, first_arg_has_any_comments, has_inter_argument_comments,
     has_trailing_comments_on_args, last_arg_has_comments, push_empty_args,
-    should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_concise_numeric_array,
@@ -60,6 +59,10 @@ fn get_call_type_arguments<'a>(
 /// author left on the `(`'s line, then the rest of the gap through the shared leading
 /// emitter ([`PartitionedComments::emit_leading_comments_inline_aware`]).
 ///
+/// The force-expanded builder takes it too, for the gap its own delimiter-line pull declined
+/// ([`PartitionedComments::pulls_to_delimiter_line`]) — the whole gap leads the argument
+/// there, which is exactly this doc.
+///
 /// ⚠️ **Emitting a FILTERED subset here is a DROP waiting for its gate to move.** The loop
 /// this replaces kept only the comments an item-boundary predicate called inline with the
 /// argument and discarded the rest, on the standing promise that anything else had already
@@ -74,7 +77,8 @@ fn get_call_type_arguments<'a>(
 /// the shape rather than the rules: that emitter has a second output channel for the
 /// `(`-**line** run (a `//` trailing the `(` stays on it), while this one returns a single
 /// doc its callers splice into the argument body. Callers that can reach such a comment
-/// place it themselves and consume this doc only under `!comments_force_expansion` — but
+/// place it themselves first (the body-line arms under `!comments_force_expansion`, the
+/// force-expanded builder under a declined pull) and consume this doc for the rest — but
 /// `build_call_args_doc_for_chain_impl` builds it EAGERLY, for arms that then never run, so
 /// "no `(`-line comment reaches here" is false as an invariant on this function even though
 /// it holds at every use. Asserting it fails on `calls/chain_open_paren_comment`, which is
@@ -610,41 +614,22 @@ fn build_chain_args_force_expand(
             // `has_trailing_comments()` alone made this the one builder in the family that
             // pulled a lone block, and a `(`-line block is not even a fixed point where the
             // argument's own layout is what expanded the list.
-            let has_paren_line = first_pc.has_trailing_comments()
-                && should_force_expansion_for_comments(printer, paren_open, arg_start);
-
-            if has_paren_line {
-                // Comments trailing the `(` stay on the `(` line; the own-line set
-                // then leads the first arg (source order preserved — see
+            if first_pc.pulls_to_delimiter_line(printer) {
+                // Comments trailing the `(` stay on the `(` line, author blank included;
+                // the own-line set then leads the first arg (source order preserved — see
                 // conformance_prettier_ts_comments.md §Comment relocation, Call open paren `(`).
-                first_pc.emit_trailing_comments(&mut paren_line_prefix_parts, printer);
-                if let Some(pulled_end) = first_pc.trailing_end() {
-                    printer.push_delimiter_glued_blank(
-                        &mut paren_line_prefix_parts,
-                        pulled_end,
-                        arg_start,
-                    );
-                }
-            } else if let Some(run) = printer.opener_trailing_broke_after_run(paren_open, arg_start)
+                // A block hugging the arg stays inline (`/* b */ a`), an own-line block /
+                // line comment takes its own line with author blanks preserved.
+                first_pc.emit_delimiter_line_pull(&mut paren_line_prefix_parts, printer);
+                first_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
+            } else if let Some(doc) = build_inline_leading_comments(printer, paren_open, arg_start)
             {
-                // A block-only run glued to `(` that the author broke after takes its
-                // newline-after soft `line` instead of the glue below.
-                printer.push_leading_run_with_soft_line(&mut arg_parts, &run);
-            } else {
-                // Not pulled, so the run leads the first argument, glued to it — the two
-                // arms above and this one partition the trailing half, and dropping it
-                // would leave the whole `(`-line share unclaimed.
-                for comment in &first_pc.trailing_block {
-                    arg_parts.push(printer.build_comment_doc(comment));
-                    arg_parts.push(d.text(" "));
-                }
+                // Nothing pulled, so the WHOLE gap leads the first argument — which is the
+                // chain's own body-line emitter, asked here rather than re-derived: a
+                // broke-after run takes its soft `line`, anything else glues to the
+                // argument. Emitting only part of the gap is the DROP its doc warns about.
+                arg_parts.push(doc);
             }
-            // The own-line leading comments (everything not on the `(` line): a block
-            // hugging the arg stays inline (`/* b */ a`), an own-line block / line
-            // comment takes its own line with author blanks preserved. The shared
-            // emitter's backward-walk keeps a non-hugging own-line block on its own
-            // line even when a later block hugs the arg.
-            first_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
         }
 
         // Check for blank line before this arg (from previous arg)
