@@ -262,7 +262,9 @@ pub(super) fn collapse_single_member_type<'t>(ts_type: &'t TSType<'t>) -> &'t TS
 
 /// Check if a type needs parentheses when used as the object in indexed access (`T[K]`).
 /// Without parens: `A | B[K]` parses as `A | (B[K])`, not `(A | B)[K]`
-pub(super) fn type_needs_parens_for_indexed_access_object(ts_type: &TSType<'_>) -> bool {
+pub(in crate::printer) fn type_needs_parens_for_indexed_access_object(
+    ts_type: &TSType<'_>,
+) -> bool {
     let inner = collapse_single_member_type(ts_type);
     // TypeOperator included: `(keyof T)[K]` is valid and different from `keyof T[K]`
     matches!(
@@ -280,7 +282,7 @@ pub(super) fn type_needs_parens_for_indexed_access_object(ts_type: &TSType<'_>) 
 
 /// Check if a type needs parentheses when used as the element type in an array (`T[]`).
 /// Without parens: `A | B[]` parses as `A | (B[])`, not `(A | B)[]`
-pub(super) fn type_needs_parens_for_array_element(ts_type: &TSType<'_>) -> bool {
+pub(in crate::printer) fn type_needs_parens_for_array_element(ts_type: &TSType<'_>) -> bool {
     let inner = collapse_single_member_type(ts_type);
     // TypeOperator included: `(keyof T)[]` differs from `keyof T[]`, and
     // `(readonly string[])[]` differs from `readonly string[][]`.

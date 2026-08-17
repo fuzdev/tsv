@@ -1941,13 +1941,10 @@ impl<'a> Printer<'a> {
         let suffix_doc = self.build_array_suffix_doc(arr);
         // The `[]` suffix rides OUTSIDE the required-pair decision — the shell may already
         // print the pair, but the suffix is the array type's own and always emits.
-        let element_doc = if type_needs_parens_for_array_element(arr.element_type) {
-            self.build_required_paren_operand_doc(arr.element_type, |element| {
-                d.concat(&[d.text("("), element, d.text(")")])
-            })
-        } else {
-            self.build_type_doc(arr.element_type)
-        };
+        let element_doc = self.build_required_paren_pair_operand_doc(
+            arr.element_type,
+            type_needs_parens_for_array_element,
+        );
         d.concat(&[element_doc, suffix_doc])
     }
 

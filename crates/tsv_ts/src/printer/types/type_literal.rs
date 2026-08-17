@@ -536,6 +536,19 @@ impl<'a> Printer<'a> {
         let union_doc = self.build_union_type_doc(union);
 
         let mut needs_break = false;
+        // A `//` the author glued to the `(` keeps that line, as at every other opening
+        // delimiter (`split_paren_shell_glued_leading_run`); the `softline` below is then
+        // the break that ends the comment's line. The doc and the position the rest of the
+        // run resumes at travel together, so there is no resume value to read when nothing
+        // was glued.
+        let glued = paren
+            .filter(|_| emit_inner_leading_line_comments)
+            .and_then(|p| {
+                let (doc, resume) =
+                    self.split_paren_shell_glued_leading_run(p.span.start + 1, union.span.start);
+                doc.map(|doc| (doc, resume))
+            });
+        needs_break |= glued.is_some();
         let mut indented: DocBuf = smallvec![d.softline()];
         if let Some(p) = paren {
             // Leading comments between `(` and the union. Block comments stay inline
@@ -546,7 +559,7 @@ impl<'a> Printer<'a> {
             // line, so it forces the paren group to break.
             needs_break |= self.push_paren_shell_leading_run(
                 &mut indented,
-                p.span.start + 1,
+                glued.map_or(p.span.start + 1, |(_, resume)| resume),
                 union.span.start,
                 emit_inner_leading_line_comments,
             );
@@ -571,7 +584,10 @@ impl<'a> Printer<'a> {
             inner_parts.push(d.break_parent());
         }
         let inner = d.group(d.concat(&inner_parts));
-        d.parens(inner)
+        match glued {
+            Some((doc, _)) => d.concat(&[d.text("("), doc, inner, d.text(")")]),
+            None => d.parens(inner),
+        }
     }
 
     //
@@ -615,20 +631,34 @@ impl<'a> Printer<'a> {
         // `build_union_type_doc_with_line_comments`, which then builds the inner type
         // directly and never routes here — so there is no double-print to guard against.
         if let Some(p) = paren {
+            // The opening-delimiter rule, at the one shell whose `(` is this builder's own
+            // text rather than a wrapper's: the author's glued `//` claims that line
+            // (`split_paren_shell_glued_leading_run`) and an own-line run keeps its own,
+            // so both authorings are fixed points here as at every other bracket. It used
+            // to glue either way — the run rode directly behind the `(` with no break in
+            // front of it.
+            let (glued, resume) =
+                self.split_paren_shell_glued_leading_run(p.span.start + 1, intersection.span.start);
+            let glued_here = glued.is_some();
+            opening_parts.extend(glued);
             let mut lead: DocBuf = DocBuf::new();
-            self.push_paren_shell_leading_run(
-                &mut lead,
-                p.span.start + 1,
-                intersection.span.start,
-                true,
-            );
-            if !lead.is_empty() {
+            let has_line =
+                self.push_paren_shell_leading_run(&mut lead, resume, intersection.span.start, true);
+            // A `//` on the `(` line — the author's, or the first this run emits — has to
+            // end that line before anything else goes on it, and this builder supplies no
+            // break of its own (the `A & {` follows immediately). A **block**-only run
+            // stays inline (`(/* c */ A & {`) and takes neither.
+            let mut run: DocBuf = DocBuf::new();
+            if glued_here || has_line {
+                run.push(d.hardline());
+            }
+            run.extend(lead);
+            if !run.is_empty() {
                 // `indent`, because that break places the intersection's own first line:
                 // it belongs one level in from the `(`, matching the default-paren path
                 // (`d.indent(self.build_type_doc(…))` above) that every other paren-retained
-                // member shape takes. A block comment carries no break, so the indent is
-                // inert for it.
-                opening_parts.push(d.indent(d.concat(&lead)));
+                // member shape takes.
+                opening_parts.push(d.indent(d.concat(&run)));
             }
         }
 
