@@ -528,6 +528,13 @@ async fn update_intermediate_files(
     remove_orphan_chain_signatures(fixture, input_ext, &files, &mut results);
     remove_orphan_intermediates(fixture, input_ext, &files, &mut results);
 
+    // The unstable forms already written for this fixture. Two `unformatted_ours_*` sources
+    // whose first passes coincide share one chain from that point on, so the form is
+    // recorded once and the later suffix keeps no file of its own — S22 in
+    // `validation/structure.rs` forbids the byte-copy, and N10 reads the sharing off the
+    // content it already verified.
+    let mut written_forms: Vec<String> = Vec::new();
+
     for variant_name in &files.unformatted_ours {
         let suffix = unformatted_ours_suffix(variant_name, input_ext).unwrap_or("");
 
@@ -608,6 +615,38 @@ async fn update_intermediate_files(
                     fixture.relative_path
                 )));
             }
+        }
+
+        // Only the three converging shapes write an intermediate, so only they can share
+        // one. Read before the match below, which moves out of `shape`.
+        let records_form = matches!(
+            shape,
+            ChainShape::UnstableConvergesToInput
+                | ChainShape::UnstableConvergesToVariant
+                | ChainShape::UnstableConvergesToDivergentVariant
+        );
+
+        // Written by an earlier suffix: drop this one's own copies and say so, rather than
+        // regenerating a file S22 rejects.
+        if records_form && written_forms.contains(&formatted) {
+            results.push(IntermediateOutput::Note(format!(
+                "- {}/{variant_name}: prettier's first pass is a form a sibling suffix already pins — sharing that file",
+                fixture.relative_path
+            )));
+            remove_stale_intermediates(
+                &[
+                    (&plain_path, &plain_filename),
+                    (&to_variant_path, &to_variant_filename),
+                    (&to_divergent_variant_path, &to_divergent_variant_filename),
+                ],
+                &mut results,
+            );
+            remove_signature_if_present(
+                &chain_signature_path,
+                chain_signature_filename,
+                &mut results,
+            );
+            continue;
         }
 
         match shape {
@@ -698,6 +737,9 @@ async fn update_intermediate_files(
                     &mut results,
                 );
             }
+        }
+        if records_form {
+            written_forms.push(formatted.clone());
         }
 
         let signature_result = if needs_chain_pin {
@@ -846,6 +888,20 @@ async fn classify_variant_chain(
 }
 
 /// Remove any intermediate files that exist; append a `Removed`/`Failed` result for each.
+/// Drop a per-variant chain signature when the variant is not the one pinning the chain.
+/// The sharing arm needs it as a statement rather than as the `else` of the signature
+/// ladder below, which it skips entirely.
+fn remove_signature_if_present(
+    path: &std::path::Path,
+    filename: String,
+    results: &mut Vec<IntermediateOutput>,
+) {
+    let result = remove_signature(path);
+    if !matches!(result, FormattedResult::NotNeeded) {
+        results.push(IntermediateOutput::File(filename, result));
+    }
+}
+
 fn remove_stale_intermediates(
     paths: &[(&std::path::Path, &String)],
     results: &mut Vec<IntermediateOutput>,

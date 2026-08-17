@@ -9,6 +9,7 @@ use super::arg_comments::{
     PartitionedComments, any_arg_empty_line, any_comment_forces_expansion, build_arg_gap_docs,
     emit_last_arg_trailing_comments, first_arg_has_any_comments, has_inter_argument_comments,
     has_trailing_comments_on_args, last_arg_has_comments, push_empty_args,
+    should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_concise_numeric_array,
@@ -456,6 +457,7 @@ fn build_chain_args_force_expand(
         paren_open,
         prefix,
         has_leading_comments,
+        has_leading_comment_on_page,
         last_arg_commented,
         has_trailing_block_comments,
         comments_force_expansion,
@@ -475,7 +477,19 @@ fn build_chain_args_force_expand(
     // Exception: when there are trailing comments, we use the full expansion
     // path which produces the extra-indented style that Prettier uses:
     // `fn(\n  {...} /* comment */,\n)` not `fn({...} /* comment */)`
-    if call.arguments.len() == 1 && !has_trailing_block_comments && !comments_force_expansion {
+    //
+    // …and the leading half of that same refusal, which this arm is the last builder in the
+    // family to ask. It reassembles the call from `prefix` + the argument's doc + `)`, so the
+    // whole `callee`→argument gap reaches no emitter here (`docs/comments.md` hazard 4) — and
+    // the hug is not tsv's to keep anyway: prettier's `shouldExpandLastArg` refuses on
+    // `hasComment(lastArg, Leading)`, which `call_formatting.rs`'s `try_single_arg_comment_paths`
+    // and `new_expression.rs` both honor. **on page**, not to-emit: a comment the argument owns
+    // and prints itself still defeats the hug, and the gate that cannot see it hugs blind.
+    if call.arguments.len() == 1
+        && !has_leading_comment_on_page
+        && !has_trailing_block_comments
+        && !comments_force_expansion
+    {
         let arg = &call.arguments[0];
         if matches!(
             arg,
@@ -587,7 +601,17 @@ fn build_chain_args_force_expand(
                 arg_start,
             );
 
-            let has_paren_line = first_pc.has_trailing_comments();
+            // The delimiter-line question, in the conjunction the force-expanded builders
+            // spell (`docs/comments.md`; `emit_first_arg_leading_comments`' rustdoc names
+            // this caller): pull onto the `(` line only when a comment in the gap is what
+            // forces the container open. A block-only run forces nothing, so it leads the
+            // argument — which is prettier's answer and the plain call's
+            // (`build_call_with_arg_comments` asks the same pair). Asking
+            // `has_trailing_comments()` alone made this the one builder in the family that
+            // pulled a lone block, and a `(`-line block is not even a fixed point where the
+            // argument's own layout is what expanded the list.
+            let has_paren_line = first_pc.has_trailing_comments()
+                && should_force_expansion_for_comments(printer, paren_open, arg_start);
 
             if has_paren_line {
                 // Comments trailing the `(` stay on the `(` line; the own-line set
@@ -600,6 +624,19 @@ fn build_chain_args_force_expand(
                         pulled_end,
                         arg_start,
                     );
+                }
+            } else if let Some(run) = printer.opener_trailing_broke_after_run(paren_open, arg_start)
+            {
+                // A block-only run glued to `(` that the author broke after takes its
+                // newline-after soft `line` instead of the glue below.
+                printer.push_leading_run_with_soft_line(&mut arg_parts, &run);
+            } else {
+                // Not pulled, so the run leads the first argument, glued to it — the two
+                // arms above and this one partition the trailing half, and dropping it
+                // would leave the whole `(`-line share unclaimed.
+                for comment in &first_pc.trailing_block {
+                    arg_parts.push(printer.build_comment_doc(comment));
+                    arg_parts.push(d.text(" "));
                 }
             }
             // The own-line leading comments (everything not on the `(` line): a block
