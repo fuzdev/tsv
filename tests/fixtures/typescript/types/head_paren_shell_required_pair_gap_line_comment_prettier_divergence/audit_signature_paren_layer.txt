@@ -1,0 +1,62 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// an optional tuple element's required pair, over a conditional's check type
+	type A = [
+		(// c1
+		B extends C
+			? D
+			: E)?
+	];
+
+	// the same position over an intersection head
+	type F = [
+		(// c2
+		G &
+			H)?
+	];
+
+	// an intersection's non-first member, over a conditional's check type
+	type I = J &
+		(// c3
+		K extends L
+			? M
+			: N);
+
+	// the same member position over an intersection head
+	type O = P &
+		(// c4
+		Q &
+			R);
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// an optional tuple element's required pair, over a conditional's check type
+	type A = [
+		// c1
+		(B extends C ? D : E)?
+	];
+
+	// the same position over an intersection head
+	type F = [
+		// c2
+		(G & H)?
+	];
+
+	// an intersection's non-first member, over a conditional's check type
+	type I = J & // c3
+		(K extends L ? M : N);
+
+	// the same member position over an intersection head
+	type O = P & // c4
+		(Q & R);
+</script>

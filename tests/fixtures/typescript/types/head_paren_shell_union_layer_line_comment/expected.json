@@ -1,0 +1,757 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 350,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a conditional's `extends` gap, over a union whose FIRST member is the shell",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 123,
+			"end": 128,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 4
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: the same union at a `?` branch gap",
+			"start": 156,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 231,
+			"end": 236,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 6
+				},
+				"end": {
+					"line": 12,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: the same union as a type-alias RHS",
+			"start": 260,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 321,
+			"end": 326,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 4
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 349,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 340,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 100,
+					"end": 153,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 105,
+						"end": 106,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 109,
+						"end": 152,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 5
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 109,
+							"end": 110,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 11
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 109,
+								"end": 110,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"name": "B"
+							}
+						},
+						"extendsType": {
+							"type": "TSUnionType",
+							"start": 121,
+							"end": 140,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 5
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 133,
+									"end": 134,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 133,
+										"end": 134,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 4
+											},
+											"end": {
+												"line": 5,
+												"column": 5
+											}
+										},
+										"name": "C"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 123,
+											"end": 128
+										}
+									]
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 139,
+									"end": 140,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 4
+										},
+										"end": {
+											"line": 6,
+											"column": 5
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 139,
+										"end": 140,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 4
+											},
+											"end": {
+												"line": 6,
+												"column": 5
+											}
+										},
+										"name": "D"
+									}
+								}
+							]
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 145,
+							"end": 146,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 4
+								},
+								"end": {
+									"line": 7,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 145,
+								"end": 146,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 4
+									},
+									"end": {
+										"line": 7,
+										"column": 5
+									}
+								},
+								"name": "E"
+							}
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 151,
+							"end": 152,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 4
+								},
+								"end": {
+									"line": 8,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 151,
+								"end": 152,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 4
+									},
+									"end": {
+										"line": 8,
+										"column": 5
+									}
+								},
+								"name": "F"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a conditional's `extends` gap, over a union whose FIRST member is the shell",
+							"start": 20,
+							"end": 98
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 204,
+					"end": 257,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 209,
+						"end": 210,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 6
+							},
+							"end": {
+								"line": 11,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 213,
+						"end": 256,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 15,
+								"column": 5
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 213,
+							"end": 214,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 10
+								},
+								"end": {
+									"line": 11,
+									"column": 11
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 213,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 10
+									},
+									"end": {
+										"line": 11,
+										"column": 11
+									}
+								},
+								"name": "H"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 223,
+							"end": 224,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 20
+								},
+								"end": {
+									"line": 11,
+									"column": 21
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 223,
+								"end": 224,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 20
+									},
+									"end": {
+										"line": 11,
+										"column": 21
+									}
+								},
+								"name": "I"
+							}
+						},
+						"trueType": {
+							"type": "TSUnionType",
+							"start": 229,
+							"end": 250,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 4
+								},
+								"end": {
+									"line": 14,
+									"column": 6
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 242,
+									"end": 243,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 5
+										},
+										"end": {
+											"line": 13,
+											"column": 6
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 242,
+										"end": 243,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 5
+											},
+											"end": {
+												"line": 13,
+												"column": 6
+											}
+										},
+										"name": "J"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 231,
+											"end": 236
+										}
+									]
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 249,
+									"end": 250,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 5
+										},
+										"end": {
+											"line": 14,
+											"column": 6
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 249,
+										"end": 250,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 5
+											},
+											"end": {
+												"line": 14,
+												"column": 6
+											}
+										},
+										"name": "K"
+									}
+								}
+							]
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 255,
+							"end": 256,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 4
+								},
+								"end": {
+									"line": 15,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 255,
+								"end": 256,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 4
+									},
+									"end": {
+										"line": 15,
+										"column": 5
+									}
+								},
+								"name": "L"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: the same union at a `?` branch gap",
+							"start": 156,
+							"end": 202
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 308,
+					"end": 339,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 313,
+						"end": 314,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 7
+							}
+						},
+						"name": "M"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 319,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 2
+							},
+							"end": {
+								"line": 21,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 331,
+								"end": 332,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 4
+									},
+									"end": {
+										"line": 20,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 331,
+									"end": 332,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 4
+										},
+										"end": {
+											"line": 20,
+											"column": 5
+										}
+									},
+									"name": "N"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 321,
+										"end": 326
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 337,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 4
+									},
+									"end": {
+										"line": 21,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 337,
+									"end": 338,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 4
+										},
+										"end": {
+											"line": 21,
+											"column": 5
+										}
+									},
+									"name": "O"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: the same union as a type-alias RHS",
+							"start": 260,
+							"end": 306
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

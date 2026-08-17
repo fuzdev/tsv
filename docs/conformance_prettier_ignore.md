@@ -218,6 +218,19 @@ precede:
   [predicate](../tests/fixtures/typescript/types/type_predicate_prettier_ignore_type_prettier_divergence/),
   [as/satisfies](../tests/fixtures/typescript/expressions/as_satisfies_prettier_ignore_type_prettier_divergence/),
   [indexed index](../tests/fixtures/typescript/types/indexed_access_prettier_ignore_index_prettier_divergence/)
+- Frozen item over a **leading-edge paren shell** — ◆comment_preservation — the gaps that
+  hand a stripped shell's leading `//` to their own emitter
+  ([§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s
+  leading-EDGE entries) do it by widening their comment window over that run. A **frozen**
+  item is the one place that must not happen: it is emitted as a verbatim source slice over
+  its own span, shell and comment included, and the suppression the widened window is paired
+  with reaches only a doc the printer BUILDS. Against a slice there is no emitter to
+  suppress, so the run prints twice. The window — and the freeze verdict itself — are
+  therefore taken on the item's unwidened span. tsv and prettier agree on the whole form at
+  the type-argument list, type-alias `=` RHS, tuple element and union member; at the
+  conditional's `?` · `:` branches and the function type's `=>` return the directive
+  relocation of the bullet above applies unchanged —
+  [frozen gap shell](../tests/fixtures/typescript/types/head_paren_shell_frozen_gap_line_comment_prettier_divergence/)
 - Mapped-type key: in-bracket directive freezes the binding only — ◆design_choice — an
   own-line directive inside the bracket, before `K in ...`, freezes only the binding in
   tsv, while prettier's mapped-type handler freezes the whole mapped type — including

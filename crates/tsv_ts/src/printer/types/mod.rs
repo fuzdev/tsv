@@ -49,6 +49,7 @@ use helpers::type_needs_parens_for_conditional_check;
 use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
+use helpers::type_needs_parens_in_union_or_intersection;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -93,6 +94,19 @@ pub(in crate::printer) struct StrippedParenHang<'t> {
     /// ([`Printer::with_claimed_shell_leading_run`]). `None` where the shell was
     /// substituted away, and where no hang fired.
     pub(in crate::printer) claimed_shell: Option<Span>,
+}
+
+/// Which shell supplies the leading `//` run a **required** paren pair opens over — see
+/// [`Printer::required_paren_open_run`], which resolves it, and
+/// [`Printer::build_open_required_paren_doc`], which emits from it.
+#[derive(Clone, Copy)]
+pub(in crate::printer) enum RequiredParenRun {
+    /// The operand IS a redundant shell: the required pair collapses onto it and renders
+    /// the shell's own deep interior gaps.
+    Shell,
+    /// The shell sits at the operand's leading printed EDGE, and this is its claim: the
+    /// pair opens over that region and the operand prints whole inside it.
+    Edge(Span),
 }
 
 /// A resolved keyword→value head — see [`Printer::keyword_value_head`].
@@ -941,30 +955,156 @@ impl<'a> Printer<'a> {
                 claimed_shell: None,
             };
         }
-        if let Some(shell) = self.head_stripped_paren_shell(value) {
-            let inner_start = unwrap_parenthesized(shell).span().start;
-            return StrippedParenHang {
-                value_start: inner_start,
-                value_type: value,
-                claimed_shell: Some(Span::new(shell.span().start, inner_start)),
-            };
-        }
+        // `false`: a frozen head never reaches here — [`Self::keyword_value_head`] is the
+        // freeze-aware resolver every such head goes through, and it substitutes its own
+        // unwidened window. The three sites that call this seam directly (the annotation
+        // `:`, the prefix operator, the conditional `extends`) each route a directive in
+        // their gap to an own-line-preserving emitter before the claim is read.
+        let (claimed_shell, value_start) = self.leading_edge_claim_and_start(false, value);
         StrippedParenHang {
-            value_start: value.span().start,
+            value_start,
             value_type: value,
-            claimed_shell: None,
+            claimed_shell,
         }
+    }
+
+    /// The comment region of the leading-edge shell inside `ty` that the ENCLOSING gap
+    /// must own — from the shell's `(` to the fully-unwrapped inner's start. `None` where
+    /// there is no such shell.
+    ///
+    /// One span answers both halves, and that is the point: `end` is the gap emitter's
+    /// widened window end *and* the suppression key
+    /// ([`Self::with_claimed_shell_leading_run`]), so a caller cannot come to measure one
+    /// window while the emitter claims another — a dropped or double-printed comment.
+    ///
+    /// The **list and branch** gaps — a union member's `|` gap, a tuple element's and a
+    /// type argument's list gap, a conditional's `?` / `:` branch gap, a function type's
+    /// `=>` gap — take this narrow form rather than the whole
+    /// [`Self::keyword_value_stripped_paren_hang`]: each already has its own answer for a
+    /// shell that IS the item (a union member hoists it, a retained one keeps its parens),
+    /// so only the leading-EDGE half is theirs to claim.
+    pub(in crate::printer) fn leading_edge_shell_claim(&self, ty: &TSType<'_>) -> Option<Span> {
+        let shell = self.head_stripped_paren_shell(ty)?;
+        Some(Span::new(
+            shell.span().start,
+            unwrap_parenthesized(shell).span().start,
+        ))
+    }
+
+    /// The pair every gap that can hold a leading-edge shell's run needs, in one call: the
+    /// claim to hand [`Self::with_claimed_shell_leading_run`], and the printed start of
+    /// `ty` under it — the gap's widened window end.
+    ///
+    /// The two are one answer, and taking them separately is how they drift: the window
+    /// moves the run into this gap and the claim silences the shell that would otherwise
+    /// print it, so a site with one and not the other is a DROP or a DOUBLE-PRINT. Every
+    /// caller destructures both here rather than re-deriving the start from the claim.
+    ///
+    /// `declined` is the caller's "some other emitter already owns these bytes" answer,
+    /// and it takes away BOTH halves — no widening, no claim — for the same reason they
+    /// come together. Two facts say it:
+    ///
+    /// - ⚠️ the item is **frozen**, and so is emitted as a verbatim source slice over its
+    ///   OWN span, which physically contains the shell and its run: widening the window
+    ///   makes the gap emitter print that run a second time, beside the copy inside the
+    ///   slice. The verdict is the caller's because the predicate differs per family
+    ///   (`member_gap_frozen`, `list_item_frozen`, `single_child_frozen`), but it must be
+    ///   the SAME bool the caller then routes its verbatim slice on, and it must be read
+    ///   on `ty`'s OWN start, never on the widened one — the rule
+    ///   [`Self::single_child_frozen`] states for its own window, since an in-shell
+    ///   directive belongs to the shell's interior seam
+    ///   ([`Self::paren_interior_routed_inner`]) and never to the gap above it;
+    /// - the run was already **hoisted** by an upstream emitter (a union member's
+    ///   redundant-paren leading run, emitted ahead of its `| `).
+    ///
+    /// The freeze a gap CANNOT see — a composite's own Rule A leading-run freeze over the
+    /// member the shell sits in — is declined one level down, in
+    /// [`Self::head_stripped_paren_shell`]'s intersection link.
+    pub(in crate::printer) fn leading_edge_claim_and_start(
+        &self,
+        declined: bool,
+        ty: &TSType<'_>,
+    ) -> (Option<Span>, u32) {
+        let claim = if declined {
+            None
+        } else {
+            self.leading_edge_shell_claim(ty)
+        };
+        (
+            claim,
+            claim.map_or_else(|| ty.span().start, |shell| shell.end),
+        )
+    }
+
+    /// A list item's **printed** span: its own, or — where a leading-edge shell's run is
+    /// the LIST's to emit — one starting past that run.
+    ///
+    /// A list bounds every gap window off its item spans, so widening the span here is how
+    /// the run lands in the item's own leading gap, which is exactly where the reparse
+    /// finds it once the shell is gone. Pairs with
+    /// [`Self::with_claimed_shell_leading_run`] around the item's doc: the span moves the
+    /// window, the claim silences the shell, and one without the other is a drop or a
+    /// double-print. `declined` declines the widening, per that seam.
+    pub(in crate::printer) fn list_item_printed_span(
+        &self,
+        declined: bool,
+        ty: &TSType<'_>,
+    ) -> Span {
+        let (_, start) = self.leading_edge_claim_and_start(declined, ty);
+        Span::new(start, ty.span().end)
+    }
+
+    /// Whether that claim holds a `//` — the ROUTER half of the question, for the list
+    /// builders that pick an all-hardline layout from "is there a line comment in here?".
+    /// Asked through the same claim the emitter uses, so a list cannot route on one window
+    /// and emit on another: routing to the width path left the shell printing its own run
+    /// at its own indent, which is the defect the claim exists to fix.
+    pub(in crate::printer) fn leading_edge_shell_line_comment(&self, ty: &TSType<'_>) -> bool {
+        self.leading_edge_shell_line_comment_claim(ty).is_some()
+    }
+
+    /// [`Self::leading_edge_shell_line_comment`] with the claim it answered about — for
+    /// the caller that must then EMIT that run rather than only route on it.
+    pub(in crate::printer) fn leading_edge_shell_line_comment_claim(
+        &self,
+        ty: &TSType<'_>,
+    ) -> Option<Span> {
+        self.leading_edge_shell_claim(ty)
+            .filter(|claim| self.has_line_comments_between(claim.start, claim.end))
     }
 
     /// The redundant paren shell at a value's leading printed **edge**, where the shell is
     /// not the value itself — the shape [`Self::keyword_value_stripped_paren_hang`] widens
     /// over so the enclosing gap owns the run.
     ///
-    /// Three links descend, and they are exactly the type constructors that print their
+    /// Four links descend, and they are exactly the type constructors that print their
     /// head FIRST and at the enclosing gap's own indent, so a `//` in the head reaches
     /// that gap unchanged: an array type's element (`(⏎// c⏎A)[]`), an indexed access's
-    /// object (`(⏎// c⏎A)['k']`), and a conditional's check type
-    /// (`(⏎// c⏎A) extends B ? C : D`). They compose, so `(⏎// c⏎A)[][]` descends twice.
+    /// object (`(⏎// c⏎A)['k']`), a conditional's check type
+    /// (`(⏎// c⏎A) extends B ? C : D`), and an **intersection's** first member
+    /// (`(⏎// c⏎A) & B`). They compose, so `(⏎// c⏎A)[][]` descends twice.
+    ///
+    /// ⚠️ A **union's** first member is not a fifth link, though it reads like the
+    /// intersection's twin. The union owns its whole leading region — the gap from its own
+    /// start to its first member — and reads it from four emitters across three layout
+    /// paths, so an enclosing claim over any part of it double-printed every comment the
+    /// author wrote between the leading `|` and the shell's `(`. The union's own member
+    /// loop claims that member's shell instead (its `edge_claim`, routed to the multiline
+    /// layout by `union_member_paren_leading_line_comment`), which is where the indent
+    /// question belongs anyway. The residual
+    /// is that a union's FIRST member reaches the union's own first-member form
+    /// (`| // c⏎  L[]`) where the paren-free authoring of the same comment lands ahead of
+    /// the union (`// c⏎L[] | N`) — two authorings, two fixed points, both stable. The
+    /// intersection needs no such carve-out: its hoist relocates only where nothing above
+    /// it claims (`intersection_first_member_hoist_comments`).
+    ///
+    /// A redundant paren **layer** is the sixth arm and the odd one: not a constructor at
+    /// all, but a shell the comment-free rule strips, so the head it wraps is still at the
+    /// leading edge. Leaving it out meant one extra pair from the author
+    /// (`((⏎// c⏎A)[])`) suppressed the whole rule — the descent stopped at a node that
+    /// prints nothing. It peels only a layer with no comments of its own: one carrying a
+    /// leading run is the seam's FIRST branch (the shell IS the value), and one carrying a
+    /// trailing run is retained by its own emitter.
     ///
     /// ⚠️ Each link declines where its own position REQUIRES the pair
     /// (`type_needs_parens_for_*`): a required pair is emitted OPEN around the run by
@@ -984,6 +1124,29 @@ impl<'a> Printer<'a> {
             TSType::Conditional(c) => {
                 self.leading_edge_shell(c.check_type, type_needs_parens_for_conditional_check)
             }
+            TSType::Intersection(i) => {
+                // ⚠️ The intersection's OWN Rule A leading-run freeze slices its first
+                // member verbatim, shell and all — so widening an enclosing gap over that
+                // shell prints its run beside the copy riding inside the slice. The
+                // freeze is the intersection's own fact and no enclosing gap can see it:
+                // a head's `single_child_frozen` declines for a composite child precisely
+                // so the member rules apply one level down, which leaves this link as the
+                // only place that can ask. Every other freeze is the enclosing gap's and
+                // arrives as `frozen` at [`Self::leading_edge_claim_and_start`].
+                if self
+                    .composite_leading_run_freeze(i.span.start, i.types)
+                    .is_some()
+                {
+                    return None;
+                }
+                self.leading_edge_shell(
+                    i.types.first()?,
+                    type_needs_parens_in_union_or_intersection,
+                )
+            }
+            TSType::Parenthesized(p) if self.paren_inner_comment_flags(p) == (false, false) => {
+                self.head_stripped_paren_shell(p.type_annotation)
+            }
             _ => None,
         }
     }
@@ -991,12 +1154,23 @@ impl<'a> Printer<'a> {
     /// One link of [`Self::head_stripped_paren_shell`]'s descent: `head` is the leading
     /// operand of a suffixed/composite type, and `needs_parens` is that position's own
     /// pair rule.
+    ///
+    /// ⚠️ The pair question is whether the required pair **opens around the run**, not
+    /// whether the position requires a pair. A required pair that stays CLOSED
+    /// (`(⏎// c⏎A) & B` as a union member — the pair is the intersection's, the shell one
+    /// link inside it) prints its `(` at the enclosing gap's own indent and leaves the run
+    /// where the gap can own it; only a pair required around the SHELL is emitted open
+    /// around the run by [`Self::build_open_required_paren_doc`] and is that run's own
+    /// emitter. Asking the coarser question declined every composite head that needs its
+    /// own parens, which is most of them.
     fn leading_edge_shell<'t>(
         &self,
         head: &'t TSType<'t>,
         needs_parens: fn(&TSType<'_>) -> bool,
     ) -> Option<&'t TSType<'t>> {
-        if needs_parens(head) || self.paren_interior_routed_inner(head).is_some() {
+        if self.required_paren_pair_opens_for_leading_run(head, needs_parens)
+            || self.paren_interior_routed_inner(head).is_some()
+        {
             return None;
         }
         if self.stripped_paren_hang_has_leading_line_comment(head)
@@ -1043,7 +1217,11 @@ impl<'a> Printer<'a> {
     /// the region, so only `// c`'s is suppressed). Bounding the region by the outer
     /// shell's `)` instead would swallow it, and a suppressed run nobody else emits is a
     /// DROP.
-    fn shell_leading_run_claimed(&self, paren_open: u32, inner_start: u32) -> bool {
+    pub(in crate::printer) fn shell_leading_run_claimed(
+        &self,
+        paren_open: u32,
+        inner_start: u32,
+    ) -> bool {
         self.claimed_shell_leading_run
             .get()
             .is_some_and(|claim| paren_open >= claim.start && inner_start <= claim.end)
@@ -1427,8 +1605,10 @@ impl<'a> Printer<'a> {
         if !needs_parens(ty) {
             return self.build_type_doc(ty);
         }
-        if self.required_paren_pair_opens_for_leading_run(ty, needs_parens) {
-            return self.build_open_required_paren_doc(ty);
+        if !self.paren_retains_for_trailing_run(ty)
+            && let Some(run) = self.required_paren_open_run(ty)
+        {
+            return self.build_open_required_paren_doc(ty, run);
         }
         // The other half — a shell RETAINED for its trailing run — opens downstream:
         // `build_required_paren_operand_doc` hands it to its own emitter untouched.
@@ -1468,11 +1648,41 @@ impl<'a> Printer<'a> {
     ) -> bool {
         !self.paren_retains_for_trailing_run(ty)
             && needs_parens(ty)
-            && self.stripped_paren_hang_has_leading_line_comment(ty)
+            && self.required_paren_open_run(ty).is_some()
     }
 
-    /// Emit a **required** pair OPEN around its operand, with the shell's own deep
-    /// interior gaps rendered inside it: `(⏎↹// c⏎↹T⏎)`.
+    /// Which shell supplies the leading `//` run a **required** pair around `ty` opens
+    /// over — the whole question [`Self::build_open_required_paren_doc`] then emits from.
+    ///
+    /// Both answers are the same fact one link apart: a redundant shell strips, so its
+    /// run lands where the required pair's own `(` now sits, and the pair is therefore
+    /// that run's only emitter. The shell is not always `ty` itself — it can sit at
+    /// `ty`'s leading printed EDGE (`(⏎// c⏎B) extends C ? D : E` as an optional tuple
+    /// element or a later intersection member), where the run still lands just inside the
+    /// pair. Reading only the first spelling left the edge case in the glued third form
+    /// `build_open_required_paren_doc` exists to prevent, at exactly the positions that
+    /// have no enclosing gap to widen instead.
+    ///
+    /// ⚠️ "no enclosing gap" is the whole licence for the EDGE arm, so it declines
+    /// wherever a gap above already claimed that run — a union member's `|` gap does
+    /// exactly this for an intersection member whose own first member is the shell, and
+    /// opening the pair as well printed the comment twice
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 3). The gates that ask this
+    /// question all run BEFORE any claim is set, so the filter is inert for them and
+    /// decides only at emission, which is the only place two emitters could collide. The
+    /// SHELL arm needs none: [`Self::leading_edge_shell`] declines the descent outright
+    /// where the pair around the shell opens, so no gap can have claimed it.
+    fn required_paren_open_run(&self, ty: &TSType<'_>) -> Option<RequiredParenRun> {
+        if self.stripped_paren_hang_has_leading_line_comment(ty) {
+            return Some(RequiredParenRun::Shell);
+        }
+        self.leading_edge_shell_line_comment_claim(ty)
+            .filter(|claim| !self.shell_leading_run_claimed(claim.start, claim.end))
+            .map(RequiredParenRun::Edge)
+    }
+
+    /// Emit a **required** pair OPEN around its operand, with the shell's leading run
+    /// rendered inside it: `(⏎↹// c⏎↹T⏎)`.
     ///
     /// The shape [`Self::build_parenthesized_type_unwrap_doc`]'s retain arm produces, and
     /// the one a parenthesized **union** operand already reaches through
@@ -1481,18 +1691,44 @@ impl<'a> Printer<'a> {
     /// comment's line and the `)` on the type's, which is a third form neither the union
     /// spelling of the same position nor prettier produces.
     ///
-    /// The gaps are the **deep** ones — outermost `(` to fully-unwrapped inner, and back
-    /// — so a doubly-nested shell (`((// c⏎T))`) still collapses to the one pair and its
-    /// comment, which falls between the two `(`s, is still found.
-    pub(in crate::printer) fn build_open_required_paren_doc(&self, shell: &TSType<'_>) -> DocId {
-        let inner = unwrap_parenthesized(shell);
-        self.build_open_paren_shell_doc(
-            shell.span().start + 1,
-            inner.span().start,
-            self.build_type_doc(inner),
-            inner.span().end,
-            shell.span().end - 1,
-        )
+    /// `run` names which shell the comments come from ([`Self::required_paren_open_run`]):
+    ///
+    /// - [`RequiredParenRun::Shell`] — the operand IS the shell, so the required pair
+    ///   collapses onto it and the **deep** gaps are rendered (outermost `(` to
+    ///   fully-unwrapped inner, and back), which is what keeps a doubly-nested shell
+    ///   (`((// c⏎T))`) at one pair with its comment — sitting between the two `(`s —
+    ///   still found;
+    /// - [`RequiredParenRun::Edge`] — the shell is one link inside, so the pair opens over
+    ///   its claim and the operand prints WHOLE inside, with that run claimed
+    ///   ([`Self::with_claimed_shell_leading_run`]) so the shell declines its own copy.
+    ///   There is no trailing gap: the `)` is synthesized directly after the operand.
+    pub(in crate::printer) fn build_open_required_paren_doc(
+        &self,
+        ty: &TSType<'_>,
+        run: RequiredParenRun,
+    ) -> DocId {
+        match run {
+            RequiredParenRun::Shell => {
+                let inner = unwrap_parenthesized(ty);
+                self.build_open_paren_shell_doc(
+                    ty.span().start + 1,
+                    inner.span().start,
+                    self.build_type_doc(inner),
+                    inner.span().end,
+                    ty.span().end - 1,
+                )
+            }
+            RequiredParenRun::Edge(claim) => {
+                let end = ty.span().end;
+                self.build_open_paren_shell_doc(
+                    claim.start + 1,
+                    claim.end,
+                    self.with_claimed_shell_leading_run(Some(claim), || self.build_type_doc(ty)),
+                    end,
+                    end,
+                )
+            }
+        }
     }
 
     /// The retained-shell OPEN shape, in one place: `(` + the author's glued `//` if any +
