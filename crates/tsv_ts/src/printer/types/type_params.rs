@@ -551,8 +551,9 @@ impl<'a> Printer<'a> {
                 // and keeps `<…>` collapsed (the fall-through below). Type position: a
                 // trailing block lifted from a stripped shell trails the value inline
                 // before the `,`/`>`.
-                let value_doc =
-                    self.build_hang_value_doc(head.child, value_type, TrailingBlock::Inline);
+                let value_doc = self.with_claimed_shell_leading_run(head.claimed_shell, || {
+                    self.build_hang_value_doc(head.child, value_type, TrailingBlock::Inline)
+                });
                 self.append_keyword_value_line_comments(
                     parts,
                     keyword_end,

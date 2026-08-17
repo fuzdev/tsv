@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 576,
+	"end": 798,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,72 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+			"start": 568,
+			"end": 651,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
+			"start": 653,
+			"end": 741,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 758,
+			"end": 763,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 6
+				},
+				"end": {
+					"line": 34,
+					"column": 11
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 575,
+		"end": 797,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 566,
+			"end": 788,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 30,
+					"line": 39,
 					"column": 9
 				}
 			},
@@ -975,6 +1023,202 @@
 							"value": " prettier agrees",
 							"start": 498,
 							"end": 516
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 743,
+					"end": 787,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 748,
+						"end": 749,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 6
+							},
+							"end": {
+								"line": 33,
+								"column": 7
+							}
+						},
+						"name": "X"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 754,
+						"end": 786,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 2
+							},
+							"end": {
+								"line": 38,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeLiteral",
+								"start": 756,
+								"end": 780,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 4
+									},
+									"end": {
+										"line": 37,
+										"column": 5
+									}
+								},
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 769,
+										"end": 774,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 4
+											},
+											"end": {
+												"line": 36,
+												"column": 9
+											}
+										},
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 769,
+											"end": 770,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 4
+												},
+												"end": {
+													"line": 36,
+													"column": 5
+												}
+											},
+											"name": "e"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 770,
+											"end": 773,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 5
+												},
+												"end": {
+													"line": 36,
+													"column": 8
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 772,
+												"end": 773,
+												"loc": {
+													"start": {
+														"line": 36,
+														"column": 7
+													},
+													"end": {
+														"line": 36,
+														"column": 8
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 772,
+													"end": 773,
+													"loc": {
+														"start": {
+															"line": 36,
+															"column": 7
+														},
+														"end": {
+															"line": 36,
+															"column": 8
+														}
+													},
+													"name": "E"
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c5",
+												"start": 758,
+												"end": 763
+											}
+										]
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 785,
+								"end": 786,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 4
+									},
+									"end": {
+										"line": 38,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 785,
+									"end": 786,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 4
+										},
+										"end": {
+											"line": 38,
+											"column": 5
+										}
+									},
+									"name": "F"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+							"start": 568,
+							"end": 651
+						},
+						{
+							"type": "Line",
+							"value": " the container's leading gap (the blank ABOVE one stays erased, against the delimiter)",
+							"start": 653,
+							"end": 741
 						}
 					]
 				}

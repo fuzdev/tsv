@@ -46,4 +46,22 @@
 	// Control - a run of blocks the author glued owns no line, so the parens
 	// still decide their own width
 	const i = !(/* c11 */ /* c12 */ x);
+
+	// The comment-holder's gap opens at the OPERATOR, so the author may put the `(` on a
+	// line of its own; the break it takes there is structure, and no blank is invented
+	const j = !!( // c13
+		x || y
+	);
+
+	// The same, from an authoring that also left a blank BELOW that `(` — that one sits
+	// against the delimiter and stays erased
+	const k = !!( // c14
+		x || y
+	);
+
+	// A blank the author wrote between the comment and the `(` is authorship and rides
+	const l = !!( // c15
+
+		x || y
+	);
 </script>

@@ -61,3 +61,12 @@ and
 - **c11–c12** — the second control: a run of blocks the author glued owns no line, so the
   parens still decide their own width and the whole thing stays inline in both formatters
   ([operand_leading_comment_run](../operand_leading_comment_run/)).
+- **c13–c15** — the comment-holder's gap opens at the **operator**, not at the `(`, so the
+  author may leave the `(` on a line of its own — the one delimiter site where a glyph can
+  sit between the pulled comment and the content. The line break that glyph takes is
+  structure: the blank scan stops at it (`Printer::push_delimiter_glued_blank`), so **c13**
+  invents nothing and **c14**'s blank *below* the `(` stays erased, the delimiter-adjacent
+  answer every bracket gives. **c15**'s blank, written between the comment and the `(`, is
+  authorship and rides. Scanning the whole gap read the `(`'s own newline as an author blank
+  and fabricated one — output that reparses and is its own fixed point, so only a prettier
+  `compare` or the fabrication audit over real code sees it.

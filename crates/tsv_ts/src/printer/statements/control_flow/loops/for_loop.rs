@@ -6,8 +6,8 @@
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
-    CommentVec, DelimiterGluedBlank, LeadingGlue, OwnedCommentEffect, ParenContext, Printer,
-    RunLeadingBlank, needs_parens,
+    CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer, RunLeadingBlank,
+    needs_parens,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -532,8 +532,7 @@ impl<'a> Printer<'a> {
         let (paren_glued, init_region_start) =
             match (spans.init_region_start(), spans.init_region_end()) {
                 (Some(start), Some(end)) => {
-                    let (glued, resume) =
-                        self.split_open_delimiter_glued_run(start, end, DelimiterGluedBlank::Keep);
+                    let (glued, resume) = self.split_open_delimiter_glued_run(start, end);
                     (glued, Some(resume))
                 }
                 // No locatable region — a degenerate header with no `(`, or one whose init
@@ -1347,11 +1346,7 @@ impl<'a> Printer<'a> {
         let (leading_run, leading_glued) = if let Some(open) = spans.open_paren {
             // The doc and the position the rest of the run resumes at travel together, so
             // the two emitters cannot disagree about where the claim ended.
-            let (glued, resume) = self.split_open_delimiter_glued_run(
-                open + 1,
-                spans.left_start,
-                DelimiterGluedBlank::Keep,
-            );
+            let (glued, resume) = self.split_open_delimiter_glued_run(open + 1, spans.left_start);
             parts.extend(glued);
             self.split_glued_comments(comments_to_emit_in_range(
                 self.comments,

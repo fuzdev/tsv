@@ -596,6 +596,9 @@ fn try_single_arg_comment_paths(
 
         let mut paren_line_prefix = DocBuf::new();
         gap_pc.emit_trailing_comments(&mut paren_line_prefix, printer);
+        if let Some(pulled_end) = gap_pc.trailing_end() {
+            printer.push_delimiter_glued_blank(&mut paren_line_prefix, pulled_end, arg_start);
+        }
 
         let mut inner = DocBuf::new();
         // Own-line comments each take their own line (author blanks preserved); a
@@ -1037,6 +1040,13 @@ fn build_call_with_arg_comments(
                 // the arg stays inline, own-line/line comments break, author blanks
                 // preserved).
                 gap_pc.emit_trailing_comments(&mut paren_line_prefix_parts, printer);
+                if let Some(pulled_end) = gap_pc.trailing_end() {
+                    printer.push_delimiter_glued_blank(
+                        &mut paren_line_prefix_parts,
+                        pulled_end,
+                        first_arg_start,
+                    );
+                }
                 gap_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
             } else if !has_paren_line {
                 // No comment on the `(` line → every gap comment leads the first

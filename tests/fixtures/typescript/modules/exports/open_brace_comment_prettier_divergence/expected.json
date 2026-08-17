@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 428,
+	"end": 935,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -153,24 +153,184 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+			"start": 420,
+			"end": 503,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the container's leading gap",
+			"start": 505,
+			"end": 535,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 546,
+			"end": 551,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 10
+				},
+				"end": {
+					"line": 27,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
+			"start": 574,
+			"end": 658,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `{` line)",
+			"start": 660,
+			"end": 676,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " brace2 ",
+			"start": 687,
+			"end": 699,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 10
+				},
+				"end": {
+					"line": 34,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " lead",
+			"start": 703,
+			"end": 710,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 2
+				},
+				"end": {
+					"line": 36,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
+			"start": 732,
+			"end": 813,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " against the delimiter, where both formatters drop it at every bracket",
+			"start": 815,
+			"end": 887,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 900,
+			"end": 905,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 2
+				},
+				"end": {
+					"line": 43,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 427,
+		"end": 934,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 418,
+			"end": 925,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 24,
+					"line": 46,
 					"column": 9
 				}
 			},
@@ -676,6 +836,330 @@
 							"value": " block comment trailing `{`, then own-line leading comment",
 							"start": 306,
 							"end": 366
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 537,
+					"end": 571,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 14
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 555,
+							"end": 556,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 2
+								},
+								"end": {
+									"line": 29,
+									"column": 3
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 555,
+								"end": 556,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"name": "f"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 555,
+								"end": 556,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"name": "f"
+							},
+							"exportKind": "value",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 546,
+									"end": 551
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 565,
+						"end": 570,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 8
+							},
+							"end": {
+								"line": 30,
+								"column": 13
+							}
+						},
+						"value": "./f",
+						"raw": "'./f'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank BELOW the pulled comment survives — the blank is authorship, not",
+							"start": 420,
+							"end": 503
+						},
+						{
+							"type": "Line",
+							"value": " the container's leading gap",
+							"start": 505,
+							"end": 535
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 678,
+					"end": 729,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 14
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 713,
+							"end": 714,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 2
+								},
+								"end": {
+									"line": 37,
+									"column": 3
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 713,
+								"end": 714,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 3
+									}
+								},
+								"name": "g"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 713,
+								"end": 714,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 3
+									}
+								},
+								"name": "g"
+							},
+							"exportKind": "value",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " brace2 ",
+									"start": 687,
+									"end": 699
+								},
+								{
+									"type": "Line",
+									"value": " lead",
+									"start": 703,
+									"end": 710
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 723,
+						"end": 728,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 8
+							},
+							"end": {
+								"line": 38,
+								"column": 13
+							}
+						},
+						"value": "./g",
+						"raw": "'./g'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same, with the block spelling (an own-line comment is what pulls a block onto",
+							"start": 574,
+							"end": 658
+						},
+						{
+							"type": "Line",
+							"value": " the `{` line)",
+							"start": 660,
+							"end": 676
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 889,
+					"end": 924,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 45,
+							"column": 14
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 908,
+							"end": 909,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 2
+								},
+								"end": {
+									"line": 44,
+									"column": 3
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 908,
+								"end": 909,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 3
+									}
+								},
+								"name": "h"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 908,
+								"end": 909,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 3
+									}
+								},
+								"name": "h"
+							},
+							"exportKind": "value",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c5",
+									"start": 900,
+									"end": 905
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 918,
+						"end": 923,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 8
+							},
+							"end": {
+								"line": 45,
+								"column": 13
+							}
+						},
+						"value": "./h",
+						"raw": "'./h'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the blank ABOVE the comment is a different question and stays erased — it sits",
+							"start": 732,
+							"end": 813
+						},
+						{
+							"type": "Line",
+							"value": " against the delimiter, where both formatters drop it at every bracket",
+							"start": 815,
+							"end": 887
 						}
 					]
 				}

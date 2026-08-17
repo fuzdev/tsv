@@ -1150,6 +1150,21 @@ impl<'a> PartitionedComments<'a> {
     /// Line comments go through `line_suffix` (zero width) so they never count against
     /// the argument's own group — flushing at the caller's following hardline (every
     /// caller is a forced-multiline context). Prettier's `lineSuffix`.
+    /// The end of the last comment [`Self::emit_trailing_comments`] would emit — the anchor
+    /// a delimiter-line pull measures its author blank from
+    /// ([`Printer::push_delimiter_glued_blank`]). `None` when there is no trailing run.
+    ///
+    /// The max of both buckets, not the last of either: they are emitted blocks-then-lines
+    /// but partition one source-ordered run, so a block written after the `//` still ends
+    /// later in the source and is what the blank sits under.
+    pub fn trailing_end(&self) -> Option<u32> {
+        self.trailing_block
+            .iter()
+            .chain(self.trailing_line.iter())
+            .map(|c| c.span.end)
+            .max()
+    }
+
     pub fn emit_trailing_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         let d = printer.d();
         for comment in &self.trailing_block {

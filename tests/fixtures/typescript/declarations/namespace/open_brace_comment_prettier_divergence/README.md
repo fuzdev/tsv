@@ -38,17 +38,19 @@ function/constructor-type `(` cases.
 
 ## Author blank after the pulled comment
 
-An author blank line between the pulled comment and the first statement does not
-survive — tsv prints the statement directly under the `{` line. That is a
-*consequence* of the position above, not a second choice: both formatters
-discard a blank in the **leading gap** (an opening delimiter's line → the first
-item) and both preserve one *between* items. Keeping the comment on the `{`
-line leaves the blank in the leading gap, so tsv's own leading-gap rule drops
-it; Prettier makes the comment the first body item, which moves the blank into
-an inter-item gap it then keeps. The derivation runs both ways — hand tsv
-Prettier's relocated form and tsv preserves the blank itself, which is why
-`variant_blank_after_comment.svelte` is dual-stable while
-`unformatted_ours_blank_after_comment.svelte` (the authored shape) normalizes
-back to `input.svelte`.
+An author blank line between the pulled comment and the first statement **survives** — the pull
+moves the comment's LINE, not its membership, and a blank between a comment and what follows
+it is authorship. Prettier keeps it too, from its own un-glued placement, so this half is a
+plain match: `variant_blank_after_comment.svelte` (Prettier's relocated form) is dual-stable
+under tsv, and the blank case in `input.svelte` is the same blank read from the authored
+shape.
+
+A blank *above* the comment is a different question and stays erased in both — it sits
+against the delimiter, where every bracket drops it. That control is in `input.svelte` too.
+
+tsv used to drop the blank here, on the reading that a blank directly under a container's
+opening line is that container's **leading-gap** blank. The full derivation of why that
+reading did not hold — and why the answer is now one value for the whole delimiter family —
+is in [comments.md](../../../../../../docs/comments.md) §The delimiter-line question.
 
 See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.
