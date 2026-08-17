@@ -140,11 +140,17 @@ pub(crate) enum RunLeadingBlank {
 /// wherever the run is emitted, so every value emits it and only the `//` is claimed.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ShellLeadingRun {
-    /// An upstream emitter already placed the run — the union / intersection member
-    /// callers ([`Printer::build_union_type_doc_with_line_comments`]), the conditional
-    /// check / `extends` callers (the stripped-shell relocation), and a nested-conditional
-    /// branch whose run was relocated above the operator. Emitting here would
-    /// double-print it.
+    /// An upstream emitter already placed the run — the union's own member path
+    /// ([`Printer::build_union_type_doc_with_line_comments`]), the conditional check /
+    /// `extends` callers (the stripped-shell relocation), and a nested-conditional branch
+    /// whose run was relocated above the operator. Emitting here would double-print it.
+    ///
+    /// ⚠️ **Scope**: the axis reaches the parenthesized-**union** rendering only. The
+    /// required pair around every other operand kind opens over its own leading run
+    /// without consulting it, because the licence is granted on an upstream emitter
+    /// EXISTING — true of an intersection's FIRST member and of a redundant member, false
+    /// of every later retained one, where reading the flag left the run welded to the `(`
+    /// ([`Printer::build_type_doc_maybe_parens_impl`]).
     Upstream,
     /// This site is the run's only emitter, so it renders inside the pair. True of an
     /// optional tuple element, which has no upstream at all: its run was simply DROPPED.

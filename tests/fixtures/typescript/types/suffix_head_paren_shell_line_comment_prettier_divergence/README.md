@@ -35,10 +35,16 @@ disagreed — an F1 violation at every site below. The comment is authored in on
 be emitted by one emitter, the enclosing gap's, on both passes; the shell declines its own
 copy for the duration of the build.
 
-The three links are exactly the type constructors that print their head first and at the
-enclosing gap's own indent. A position that **requires** the pair is not one of them: there
-the pair is emitted open around the run by its own emitter, which would be a second emitter
-for the same comments — `(⏎// c⏎A | B)[]` keeps its parens and is unaffected.
+The links are exactly the type constructors that print their head first and at the enclosing
+gap's own indent — plus a redundant paren layer, which is not a constructor at all but does
+strip, so the descent peels it (c16–c17). A position that **requires** the pair is not one of
+them: there the pair is emitted open around the run by its own emitter, which would be a
+second emitter for the same comments — `(⏎// c⏎A | B)[]` keeps its parens and is unaffected.
+
+The same rule at the gaps this seam does not serve is
+[head_paren_shell_member_gap_line_comment](../head_paren_shell_member_gap_line_comment_prettier_divergence/)
+and
+[head_paren_shell_hang_gap_line_comment](../head_paren_shell_hang_gap_line_comment_prettier_divergence/).
 
 The shell is stripped, not retained: a **leading** run leaves nothing behind the type for a
 later comment to weld onto, so hoisting it into the keyword→value gap is lossless. The
@@ -62,6 +68,11 @@ absent here on purpose — their emitter trails the first comment unconditionall
 
 **c14–c15** — the conditional **check** type, the third descent link, with and without an
 array suffix between it and the shell (the links compose, so `(⏎// c⏎A)[][]` descends twice).
+
+**c16–c17** — a redundant paren **layer** between the gap and the shell (`((⏎// c⏎A)[])`),
+in both placements. The layer is itself a shell the comment-free rule strips, so it is a
+descent link like the three above; leaving it out of the descent meant one extra pair from
+the author suppressed the whole rule at every gap here.
 
 ## Files
 

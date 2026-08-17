@@ -153,6 +153,51 @@ impl<'a> Printer<'a> {
         return_type: &internal::TSTypeAnnotation<'_>,
         leading_space: bool,
     ) -> DocId {
+        // The **effective** return type: a redundant paren shell holding only leading
+        // comments is stripped here, so those comments belong to the `=>` gap below and
+        // are emitted by it (see `leading_paren_unwrapped`) — that is what makes
+        // `() => // c⏎T` and `() => (// c⏎T)` reach the same fixed point instead of the
+        // shell's own flush hang.
+        let return_ty = self.leading_paren_unwrapped(return_type.type_annotation);
+        // The `=>`→return freeze verdict, read on the return type's OWN start — it
+        // decides the widening below, so it can never be read from the widened window it
+        // decides ([`Printer::leading_edge_claim_and_start`]).
+        let frozen = self.member_gap_frozen(
+            return_type.span.start + "=>".len() as u32,
+            return_ty.span().start,
+        );
+        // A redundant shell at the return type's leading printed EDGE — an array suffix
+        // over it, an indexed access, a conditional's check type — strips too, so its `//`
+        // lands in THIS gap and the reparse finds it here; the widened window end is what
+        // makes this gap's emitter print it. Claim it once, around the whole tail, so
+        // every layout below builds with the shell's own copy suppressed; left to itself
+        // the shell emitted a bare `hardline` at its own indent (flush, where this gap
+        // hangs one level) and a `flush_break` that opened a conditional the reparse then
+        // printed flat.
+        let (claim, type_start) = self.leading_edge_claim_and_start(frozen, return_ty);
+        self.with_claimed_shell_leading_run(claim, || {
+            self.build_function_type_return_doc_claimed(
+                return_type,
+                leading_space,
+                return_ty,
+                type_start,
+                frozen,
+            )
+        })
+    }
+
+    /// [`Self::build_function_type_return_doc`]'s body, built under its claim. `return_ty`
+    /// (the effective return type), `frozen` (the `=>` gap's freeze verdict) and
+    /// `type_start` (that gap's window end) are all derived there, beside the claim they
+    /// pair with, so the verdict, the window and the suppression cannot drift apart.
+    fn build_function_type_return_doc_claimed<'t>(
+        &self,
+        return_type: &internal::TSTypeAnnotation<'_>,
+        leading_space: bool,
+        return_ty: &'t TSType<'t>,
+        type_start: u32,
+        frozen: bool,
+    ) -> DocId {
         let d = self.d();
         // `=>` with the optional leading space, as static text — the leading-space
         // flag selects among four fixed strings, so no per-call String alloc.
@@ -161,13 +206,6 @@ impl<'a> Printer<'a> {
         // Comments between `=>` and the return type (e.g., `() => /* c */ string`)
         // For function types, the annotation span starts at `=` in `=>`
         let arrow_end = return_type.span.start + "=>".len() as u32;
-        // The **effective** return type: a redundant paren shell holding only leading
-        // comments is stripped here, so those comments belong to the `=>` gap below and
-        // are emitted by it (see `leading_paren_unwrapped`) — that is what makes
-        // `() => // c⏎T` and `() => (// c⏎T)` reach the same fixed point instead of the
-        // shell's own flush hang.
-        let return_ty = self.leading_paren_unwrapped(return_type.type_annotation);
-        let type_start = return_ty.span().start;
         // An alone-on-line format-ignore directive in the `=>`→return gap stays
         // OWN-LINE — the trailing-hang emitter below would relocate it to trail the
         // `=>` (`=> // prettier-ignore`), an inert placement that loses the freeze on
@@ -175,7 +213,7 @@ impl<'a> Printer<'a> {
         // (`single_child_frozen`; a composite return declines and freezes via its own
         // leading-run walk, which reaches the directive across the gap's whitespace).
         // Covers function, constructor, and abstract-constructor types (all route here).
-        if self.member_gap_frozen(arrow_end, type_start) {
+        if frozen {
             let value_doc = self.build_routed_child_doc(return_ty);
             let mut parts: DocBuf = smallvec![d.text(arrow)];
             self.append_keyword_value_line_comments(&mut parts, arrow_end, type_start, value_doc);

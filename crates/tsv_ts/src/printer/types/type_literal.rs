@@ -360,6 +360,11 @@ impl<'a> Printer<'a> {
     /// no upstream at all — its run was simply DROPPED (`[(// c⏎T | U)?]` → `[(T | U)?]`)
     /// — so it asks for [`ShellLeadingRun::Here`]. A licence stops where its argument
     /// stops.
+    ///
+    /// The flag reaches only the parenthesized-**union** arm now; the required pair around
+    /// every other operand kind opens over its own leading run unconditionally, since the
+    /// licence's argument fails at a LATER union / intersection member exactly as it fails
+    /// here. See [`Self::build_type_doc_maybe_parens_impl`]'s ⚠️.
     pub(super) fn build_optional_element_type_doc(
         &self,
         ts_type: &TSType<'_>,
@@ -453,13 +458,26 @@ impl<'a> Printer<'a> {
             // The union arm above renders a shell's own leading LINE run inside the
             // required pair, opening it. Every other operand kind reaches the same
             // position through the default arm below, where the run would render GLUED to
-            // the `(` — so the caller that asked for the union treatment gets it here too,
-            // and one position stops having two spellings. Only a `//` asks: a block
-            // stays inline in both.
-            if shell_leading_run == ShellLeadingRun::Here
-                && self.stripped_paren_hang_has_leading_line_comment(ts_type)
-            {
-                return self.build_open_required_paren_doc(ts_type);
+            // the `(` — a `(` with no space before the `//`, the operand never indented
+            // into the shell, and the `)` welded onto its tail. That third form is what
+            // [`Self::build_open_required_paren_doc`] exists to prevent, so every operand
+            // kind gets the union treatment here and one position stops having two
+            // spellings. Only a `//` asks: a block stays inline in both.
+            //
+            // ⚠️ Asked of the SHELL, never of the caller's [`ShellLeadingRun`]. That
+            // licence is granted on the argument that an emitter above already placed the
+            // run — true of an intersection's FIRST member (whose hoist reaches the union
+            // arm above, not here) and of a union's REDUNDANT member (whose pair is not
+            // required, so it never enters this branch at all), and false of every LATER
+            // member, where nothing upstream claims it. Reading the flag here left those
+            // members welded while their first-member and array/indexed-access siblings
+            // opened — one question with two answers at sibling positions.
+            //
+            // The shell need not BE the operand: it can sit at the operand's leading
+            // printed edge, where its run lands just inside this same pair
+            // ([`Printer::required_paren_open_run`]).
+            if let Some(run) = self.required_paren_open_run(ts_type) {
+                return self.build_open_required_paren_doc(ts_type, run);
             }
 
             // Default case: parenthesize the inner type. The inner `d.indent`

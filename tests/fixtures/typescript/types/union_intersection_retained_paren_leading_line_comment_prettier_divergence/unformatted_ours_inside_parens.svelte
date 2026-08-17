@@ -44,8 +44,7 @@
 	// previous member and keeps the member inline)
 	type MidFunction =
 		| A
-		| (
-		// c
+		| (// c
 		() => B)
 		| D;
 
@@ -54,8 +53,7 @@
 	// hoists the comment out and keeps the member inline
 	type MidConditional =
 		| A
-		| (
-		// c
+		| (// c
 		B extends C ? D : E)
 		| F;
 
@@ -63,8 +61,7 @@
 	// intersection likewise staying inline when it fits
 	type MidIntersection =
 		| A
-		| (
-		// c
+		| (// c
 		B & C)
 		| D;
 </script>

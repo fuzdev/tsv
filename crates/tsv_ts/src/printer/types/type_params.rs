@@ -121,10 +121,14 @@ impl<'a> Printer<'a> {
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
+        // Type parameters are declarations, never types, so no leading-edge paren shell
+        // can widen an item span here — Rule A reads the params' own spans directly.
+        let item_span = |i: usize| decl.params[i].span;
         self.build_angle_list_with_line_comments(
             decl.span,
             decl.params.len(),
-            |i| decl.params[i].span,
+            |i| self.list_item_frozen(decl.span.start + 1, &item_span, i),
+            item_span,
             |i, frozen| self.build_type_parameter_item_doc(&decl.params[i], frozen),
         )
     }
@@ -512,20 +516,30 @@ impl<'a> Printer<'a> {
             // Building the pair by hand without that lift DROPPED the trailing comment
             // ([`comments.md`](../../../../docs/comments.md) hazard 1).
             let inner = unwrap_parenthesized(head.value_type);
-            let paren_doc = d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")]);
+            // The re-emitted pair is a THIRD emitter for a leading-edge shell's run
+            // (`K extends (⏎// c⏎L) extends M ? N : O`): the run belongs to the `extends`
+            // gap, which the emitter below owns, so the shell declines its copy for the
+            // duration of this build and the pair closes around the bare conditional.
+            let paren_doc = self.with_claimed_shell_leading_run(head.claimed_shell, || {
+                d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")])
+            });
             // The clarity parens are re-emitted around the conditional, so the
             // keyword→value gap follows the same protocol as the unparenthesized
             // arms below: a line comment (or own-line multiline block) hangs the
             // parenthesized value on its own indented line, an inline block trails
             // the keyword before the `(`.
+            //
+            // The window ends where the conditional's own printed content begins: the
+            // inner's start normally — which is what covers a leading BLOCK in the
+            // author's own shell, a comment this arm's hand-built pair bypasses the
+            // shell's emitter for — or, where the seam claimed a leading-edge shell one
+            // link inside the check type, at that claim's end.
+            let value_start = head
+                .claimed_shell
+                .map_or_else(|| inner.span().start, |shell| shell.end);
             let mut hung: DocBuf = smallvec![];
             if let Some(keyword_end) = head.gap_start {
-                self.push_hang_or_inline_value(
-                    &mut hung,
-                    keyword_end,
-                    inner.span().start,
-                    paren_doc,
-                );
+                self.push_hang_or_inline_value(&mut hung, keyword_end, value_start, paren_doc);
             } else {
                 hung.push(d.text(" "));
                 hung.push(paren_doc);
@@ -821,6 +835,7 @@ impl<'a> Printer<'a> {
         &self,
         span: Span,
         count: usize,
+        item_frozen: impl Fn(usize) -> bool,
         item_span: impl Fn(usize) -> Span,
         item_doc: impl Fn(usize, bool) -> DocId,
     ) -> DocId {
@@ -854,8 +869,10 @@ impl<'a> Printer<'a> {
             // Rule A: an alone-on-line directive in this item's gap freezes the
             // item; the directive itself was just emitted by the leading run above.
             // No must-break question here — this layout is already all-hardline.
-            let frozen = self.list_item_frozen(span.start + 1, &item_span, i);
-            inner_parts.push(item_doc(i, frozen));
+            // The verdict is the CALLER's because `item_span` may already have widened
+            // over a leading-edge paren shell, and the window a freeze is read on is the
+            // item's own ([`Printer::leading_edge_claim_and_start`]).
+            inner_parts.push(item_doc(i, item_frozen(i)));
 
             if !is_last {
                 let next_start = item_span(i + 1).start;
