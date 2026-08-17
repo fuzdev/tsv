@@ -1,7 +1,8 @@
 <script>
 	try {
 		a();
-	} catch (// before error
+	} catch (
+// before error
 		e // inline with error
 	) {
 		b();

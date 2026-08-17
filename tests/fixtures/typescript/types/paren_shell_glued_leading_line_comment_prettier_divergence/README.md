@@ -26,12 +26,20 @@ place tsv followed prettier instead, so a `(` answered the question differently 
 (`Printer::push_paren_shell_leading_run`) decided its separator from the comment's *kind*
 rather than from what follows it — the last leading-run site in the printer that did.
 
-An author **blank line** below the comment rides along under the same rule, and for the same
-reason it does at `fn(` / `[` / `{`, where prettier keeps it too: which line the comment sits
-on and how far the author separated it from the type are two different facts, and claiming
-the `(` line for the comment must not cost the blank underneath it. A blank between the `(`
-and the comment is a different question and stays erased — it sits against the delimiter,
-where tsv and prettier drop it at every bracket alike.
+An author **blank line** below the comment rides along under the same rule: which line the
+comment sits on and how far the author separated it from the type are two different facts,
+and claiming the `(` line for the comment must not cost the blank underneath it. Prettier
+keeps that blank too, at its own un-glued placement. A blank between the `(` and the comment
+is a different question and stays erased — it sits against the delimiter, where tsv and
+prettier drop it at every bracket alike.
+
+⚠️ The blank half is **not** the family's shared answer. The list and call families
+(`fn(`, `[`, `{`) deliberately DROP it, on the reading that a pulled comment leaves the blank
+in the container's own leading gap — which both formatters discard when no comment sits there
+at all; the `return (` / `throw (` / `yield (` hang and the ASI operand shell drop it too, by
+omission rather than by that argument. Both readings are pinned, in opposite directions, and
+the split is unresolved — it is the `DelimiterGluedBlank` axis; see
+[comments.md §The delimiter-line question](../../../../../docs/comments.md).
 
 See
 [conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy)

@@ -330,8 +330,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let arg_start = arg.span().start;
 
-        // Split a same-line-as-`(` line comment off the leading run so it can trail the
-        // `(`; the rest lead the argument below.
+        // The opening-delimiter rule at the hang's `(`: a `//` the author glued to it keeps
+        // that line ([`Printer::split_located_paren_glued_run`]), as at every other opening
+        // delimiter; the rest of the run leads the argument below. The doc carries its own
+        // leading space.
         let open_paren = find_char_skipping_comments(
             self.source.as_bytes(),
             keyword_end as usize,
@@ -340,7 +342,7 @@ impl<'a> Printer<'a> {
         )
         .map(|p| p as u32);
         let (paren_trailing, leading_start) =
-            self.split_paren_line_trailing_comment(keyword_end, open_paren, arg_start);
+            self.split_located_paren_glued_run(keyword_end, open_paren, arg_start);
         let inline_comments = self.build_rhs_comments_opt(leading_start, arg_start);
 
         // Rule: an own-line directive in the grouping `(`→operand gap freezes the operand
@@ -460,8 +462,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let open = match paren_trailing {
             // `kw ( // c` — the line comment runs to end-of-line; the indent's hardline
-            // supplies the break, so nothing is swallowed.
-            Some(comment) => d.concat(&[d.text(keyword), d.text(" ( "), comment]),
+            // supplies the break, so nothing is swallowed. The space is the split's.
+            Some(comment) => d.concat(&[d.text(keyword), d.text(" ("), comment]),
             None => d.concat(&[d.text(keyword), d.text(" (")]),
         };
         d.concat(&[open, d.indent_hardline(body), d.hardline(), d.text(")")])

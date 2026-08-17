@@ -127,6 +127,62 @@ pub(crate) enum RunLeadingBlank {
     Drop,
 }
 
+/// Who emits a retained paren SHELL's leading **line**-comment run — the one axis
+/// [`Printer::push_paren_shell_leading_run`] and its callers part on.
+///
+/// An ownership question, so it is a named axis rather than a bare `bool`: a region two
+/// emitters each believe the other owns is a DROP or a DOUBLE-PRINT, and neither is
+/// visible to the print-once ledger when the two spellings sit in different modules
+/// ([`comments.md`](../../../../docs/comments.md) hazards 1 and 3). One type means a call
+/// site states which emitter owns the run in the same vocabulary the emitter reads it in.
+///
+/// The **block** arm is not on this axis: a block comment renders inline inside the shell
+/// wherever the run is emitted, so every value emits it and only the `//` is claimed.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ShellLeadingRun {
+    /// An upstream emitter already placed the run — the union / intersection member
+    /// callers ([`Printer::build_union_type_doc_with_line_comments`]), the conditional
+    /// check / `extends` callers (the stripped-shell relocation), and a nested-conditional
+    /// branch whose run was relocated above the operator. Emitting here would
+    /// double-print it.
+    Upstream,
+    /// This site is the run's only emitter, so it renders inside the pair. True of an
+    /// optional tuple element, which has no upstream at all: its run was simply DROPPED.
+    Here,
+}
+
+/// Whether the author blank BELOW a delimiter-glued comment survives the pull onto the
+/// delimiter's line — the one axis [`Printer::split_open_delimiter_glued_run`]'s callers
+/// part on.
+///
+/// ⚠️ **Two values, THREE groups of callers, and the split is unresolved** — see
+/// [`comments.md`](../../../../docs/comments.md) §The delimiter-line question. It is a
+/// named axis rather than a per-caller `if` for exactly that reason: which shells keep the
+/// blank is a *decision*, and encoding it as the emitter you happened to call is how the
+/// third group arose in the first place (the restricted-production and ASI shells landed on
+/// `Drop` by having no blank arm at all, not by the argument the list family makes for it).
+/// A future resolution changes values here, not code at each site.
+///
+/// A blank between the delimiter and the comment is a different question and is never
+/// this one: it sits against the delimiter, where tsv and prettier drop it at every
+/// bracket alike.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DelimiterGluedBlank {
+    /// The blank rides along: which line the comment sits on and how far the author
+    /// separated it from the value are two facts, and claiming the delimiter's line for
+    /// the comment must not cost the blank underneath it. Prettier keeps it too, at its
+    /// own un-glued placement. The type paren shells, the statement headers and the unary
+    /// comment-holder.
+    Keep,
+    /// The blank is discarded — the reading the list and call families argue
+    /// ([`Printer::delimiter_line_comment_prefix`]): a blank directly under a container's
+    /// opening line is the container's own LEADING-GAP blank, which both formatters
+    /// discard when no comment sits there at all. The restricted-production hang
+    /// (`return (` / `throw (` / `yield (`) and the ASI operand shell, which have always
+    /// dropped it.
+    Drop,
+}
+
 /// How a leading-comment run decides whether a *block* comment hugs the token
 /// that follows it (a trailing space, `/* c */ X`) rather than dropping to its
 /// own line. The rest of the run is identical across sites — one
@@ -1034,47 +1090,105 @@ impl<'a> Printer<'a> {
         has_line_comment
     }
 
-    /// Split a retained paren SHELL's leading run at the author's GLUE: a **line** comment
-    /// written on the `(`'s own line is returned separately, for the caller to emit right
-    /// after the `(` (`( // c`), and the rest of the run resumes below it inside the
-    /// shell. Returns `(glued, resume)`, where `resume` is where the remaining run starts
-    /// — `start` unchanged when nothing was glued.
+    /// Split an OPENING DELIMITER's leading run at the author's GLUE: a **line** comment
+    /// written on the delimiter's own line is returned separately, for the caller to emit
+    /// right after it (`( // c`), and the rest of the run resumes below, inside the
+    /// construct. Returns `(glued, resume)`, where `resume` is where the remaining run
+    /// starts — `start` unchanged when nothing was glued.
     ///
-    /// This is the opening-delimiter rule every other bracket already follows: what the
-    /// author put on the `(`/`[`/`{`/`<` line stays there, and what they put on its own
-    /// line keeps its own line, so both authorings are fixed points
+    /// This is the opening-delimiter rule, in one place: what the author put on the
+    /// `(`/`[`/`{`/`<` line stays there, and what they put on its own line keeps its own
+    /// line, so both authorings are fixed points
     /// (`Printer::push_leading_comment_run`'s glue test, asked here of the delimiter
     /// rather than of the item). Only a `//` can claim the line and only one can — it runs
     /// to end of line — and only a comment the author actually glued; a **block** is
-    /// untouched, since it already renders inline inside the shell.
-    pub(crate) fn split_paren_shell_glued_leading_run(
+    /// untouched, since it already renders inline inside the construct.
+    ///
+    /// The retained type paren shells were the first callers and a **statement header's**
+    /// `(` the last — `if` / `while` / do-while / `switch` / `catch` and all three `for`
+    /// spellings, which followed prettier here long after every other delimiter in the
+    /// printer had stopped. Prettier is no coherent oracle for the position: it un-glues at
+    /// `if`-like heads and the C-style `for`, **glues** at for-in / for-of (emitting the
+    /// rest of the head unindented at column zero), and relocates the comment out of the
+    /// parens entirely at do-while. See
+    /// [conformance_prettier_ts_comments.md §Comment relocation](../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
+    ///
+    /// The leading `" "` is the PRINTER's and rides in the returned doc, never the
+    /// author's — `fn(// c` and `fn(   // c` both normalize to one space
+    /// ([`comments.md`](../../../../docs/comments.md) §The delimiter-line question). A
+    /// caller therefore emits its bare delimiter text and concatenates this; writing
+    /// `"( "` itself is the rule spelled a second time, which is how the two shells that
+    /// used to own a copy of this function came to disagree with it.
+    ///
+    /// `blank` is the one axis callers part on ([`DelimiterGluedBlank`]).
+    pub(crate) fn split_open_delimiter_glued_run(
         &self,
         start: u32,
         end: u32,
+        blank: DelimiterGluedBlank,
     ) -> (Option<DocId>, u32) {
         let d = self.d();
         let Some(comment) = comments_to_emit_in_range(self.comments, start, end).next() else {
             return (None, start);
         };
+        // ⚠️ The COMMENT line-break table, never the layout one: this is a comment-adjacency
+        // classification, so it must stay real under `Printer::set_canonical` — read against
+        // the emptied layout table it calls every own-line comment glued and relocates it
+        // onto the delimiter's line in the canonical reprint.
         if comment.is_block || self.comment_has_newline_between(start, comment.span.start) {
             return (None, start);
         }
         let mut parts = DocBuf::new();
         parts.push(d.text(" "));
         parts.push(self.build_comment_doc(comment));
-        // An author blank below the glued comment survives it, exactly as it does below an
-        // own-line one ([`Self::push_paren_shell_leading_run`]) — the caller's own break
-        // opens the next line, so this hardline is the blank itself. Claiming the comment
-        // for the `(` line must not cost the blank underneath it: which line the comment
-        // sits on and how far the author separated it from the type are two facts, and the
-        // run emitter below never sees this one because the comment left its range.
+        // An author blank below the glued comment, where the caller keeps it: the caller's
+        // own break opens the next line, so this hardline is the blank itself. The run
+        // emitter below never sees this one, because the comment left its range.
         let next_start = comments_to_emit_in_range(self.comments, comment.span.end, end)
             .next()
             .map_or(end, |c| c.span.start);
-        if self.has_blank_line_between(comment.span.end, next_start) {
+        if blank == DelimiterGluedBlank::Keep
+            && self.has_blank_line_between(comment.span.end, next_start)
+        {
             parts.push(d.hardline());
         }
         (Some(d.concat(&parts)), comment.span.end)
+    }
+
+    /// [`Self::split_open_delimiter_glued_run`] for a shell whose `(` is **located** by a
+    /// scan rather than known from the AST — the restricted-production hang
+    /// ([`Printer::build_restricted_production_paren_doc`]) and the ASI-gap operand shell
+    /// ([`Self::build_asi_operand_shell_doc`]). A gap with no `(` in it has no delimiter
+    /// line for a comment to claim, so the whole gap stays the leading run's.
+    ///
+    /// The guard is all this adds: the rule itself is the one function above, so the two
+    /// shells cannot answer differently about the same authoring — and no longer differ
+    /// from every other delimiter either, which they did on all three of the space, the
+    /// blank and the line-break table.
+    ///
+    /// ⚠️ `gap_start` is the gap's own start, NOT `open_paren + 1`, and it is both the scan
+    /// start and the glue anchor. The two coincide, but for different reasons per caller and
+    /// neither is a free choice:
+    /// - Scanning from `gap_start` is required. The restricted-production gap opens at the
+    ///   KEYWORD, so a comment before the `(` (`return /* c */ (x)`) is in it and has no
+    ///   other emitter; starting the scan at the `(` would drop it, and gluing past it would
+    ///   reorder it.
+    /// - Measuring from `gap_start` is safe. It differs from `open_paren + 1` only if a
+    ///   newline sits between the two, and all three restricted productions forbid one
+    ///   (`return` / `throw` / `yield` + a line terminator is ASI, so the argument is gone);
+    ///   the ASI shell's `gap_start` IS `open + 1`. A multi-line *block* in that region
+    ///   cannot reach the measurement either — it is the gap's first comment, and a block
+    ///   declines the glue outright.
+    pub(crate) fn split_located_paren_glued_run(
+        &self,
+        gap_start: u32,
+        open_paren: Option<u32>,
+        value_start: u32,
+    ) -> (Option<DocId>, u32) {
+        if open_paren.is_none() {
+            return (None, gap_start);
+        }
+        self.split_open_delimiter_glued_run(gap_start, value_start, DelimiterGluedBlank::Drop)
     }
 
     /// Emit a retained-paren SHELL's leading run — the comments in `[start, end)`
@@ -1083,16 +1197,16 @@ impl<'a> Printer<'a> {
     /// comment, which must end its line or it would swallow the type after it.
     /// Returns whether a line comment was emitted, i.e. whether the shell must break.
     ///
-    /// `emit_line_comments` is false where an upstream emitter has already placed the
-    /// line comment (the later-member paren-union arms of
-    /// `build_union_type_doc_with_line_comments`), so emitting here would double-print
-    /// it; the block arm always emits.
+    /// `line_comments` names who owns them ([`ShellLeadingRun`]):
+    /// [`ShellLeadingRun::Upstream`] where an emitter above already placed them (the
+    /// later-member paren-union arms of `build_union_type_doc_with_line_comments`), so
+    /// emitting here would double-print them; the block arm always emits.
     ///
     /// ⚠️ Still not [`Self::push_leading_comment_run`], the canonical leading emitter —
     /// a shell's separator is the delimiter's question, not the item's — but no longer
     /// keyed on the comment's own KIND alone, which was the whole of the difference. Both
     /// of that emitter's what-follows rules now hold here too: the **glue** test (asked
-    /// one step earlier, by [`Self::split_paren_shell_glued_leading_run`], since a glued
+    /// one step earlier, by [`Self::split_open_delimiter_glued_run`], since a glued
     /// comment belongs to the `(` line the caller owns) and **blank-line preservation**
     /// below. The shells were the last leading-run sites deciding a separator without
     /// asking what follows, and each half was a real difference from every other opening
@@ -1103,7 +1217,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         start: u32,
         end: u32,
-        emit_line_comments: bool,
+        line_comments: ShellLeadingRun,
     ) -> bool {
         let d = self.d();
         let mut has_line_comment = false;
@@ -1112,7 +1226,7 @@ impl<'a> Printer<'a> {
             if comment.is_block {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
-            } else if emit_line_comments {
+            } else if line_comments == ShellLeadingRun::Here {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.hardline());
                 has_line_comment = true;

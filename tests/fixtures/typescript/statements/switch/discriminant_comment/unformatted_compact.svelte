@@ -1,5 +1,6 @@
 <script>
-	switch (// before discriminant
+	switch (
+// before discriminant
 		x// inline with discriminant
 	) {
 		case 1:

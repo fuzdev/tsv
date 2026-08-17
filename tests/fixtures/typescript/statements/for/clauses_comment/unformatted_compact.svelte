@@ -1,5 +1,6 @@
 <script>
-	for (// before init
+	for (
+// before init
 		let i = 0; // inline with init
 		// before test
 		i < 10; // inline with test

@@ -1,5 +1,6 @@
 <script>
-	while (// before condition
+	while (
+// before condition
 		x // inline with condition
 		// trailing after condition
 	) {
