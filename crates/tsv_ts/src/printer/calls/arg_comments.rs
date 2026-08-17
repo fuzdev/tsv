@@ -1113,9 +1113,41 @@ impl<'a> PartitionedComments<'a> {
     /// Conjoined with `should_force_expansion_for_comments` at every force-expanded call
     /// site, this **is** `Printer::delimiter_line_comment_prefix`'s `pull` — the list
     /// family's spelling of the same rule (`docs/comments.md` §The delimiter-line
-    /// question). Keep the two in step.
+    /// question). That conjunction is [`Self::pulls_to_delimiter_line`], so the two stay in
+    /// step by construction rather than by review.
     pub fn has_trailing_comments(&self) -> bool {
         self.has_trailing_block() || self.has_trailing_line()
+    }
+
+    /// The delimiter-line PULL as one predicate: something sits on the delimiter's line
+    /// ([`Self::has_trailing_comments`]) AND a comment in this gap is what forces the
+    /// container open (`should_force_expansion_for_comments`). Asked by the force-expanded
+    /// builders (`new`, the member chain) so the two halves cannot be spelled over
+    /// different ranges — both read the gap this partition was already built over, leaving
+    /// the caller nothing to pass and so nothing to pass inconsistently.
+    ///
+    /// The plain call's builder spells the same conjunction with the `force_expansion` flag
+    /// it independently needs, and the list family's
+    /// `Printer::delimiter_line_comment_prefix` ORs the object literal's extra arm onto
+    /// this one. The collapse-capable path ([`emit_first_arg_leading_comments`]) asks the
+    /// narrower [`Self::has_trailing_line`] instead — load-bearing, not drift; see its doc.
+    pub fn pulls_to_delimiter_line(&self, printer: &Printer<'_>) -> bool {
+        self.has_trailing_comments()
+            && should_force_expansion_for_comments(printer, self.start, self.end)
+    }
+
+    /// Emit a fired pull: the delimiter-line run, then the author blank that sat BELOW it.
+    ///
+    /// The two are one step. The pull moves the comment's line, not its membership, so the
+    /// blank the author left under it rides along ([`Printer::push_delimiter_glued_blank`]
+    /// carries that rule and why the families used to drop it) — and every delimiter-line
+    /// pull in the call and list families emits through here rather than re-deriving half
+    /// of it.
+    pub fn emit_delimiter_line_pull(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
+        self.emit_trailing_comments(parts, printer);
+        if let Some(pulled_end) = self.trailing_end() {
+            printer.push_delimiter_glued_blank(parts, pulled_end, self.end);
+        }
     }
 
     /// Whether the author left a blank line in this inter-argument gap.

@@ -349,6 +349,7 @@ All fixtures use `input.svelte` as canonical source.
 16. **S19**: `prettier_rejects.txt` follows the same claim-file rules as S18 (prettier throws, so no prettier-anchored claim is expressible; `unformatted_ours_*` stays allowed) AND is mutually exclusive with `prettier_nonconvergent.txt` (prettier either throws or oscillates, never both). Both markers also exclude `audit_signature_<suffix>.txt` — a pinned chain is a prettier-anchored claim
 17. **S20**: `tsv_rejects.txt` (tsv over-rejects an input the canonical parser accepts) requires the `_svelte_divergence` suffix + a README + `expected_svelte.json` (the canonical AST); FORBIDS `expected.json` / `expected_ours.json` (tsv emits no AST); and is mutually exclusive with every format-claim file, `input_invalid_*`, and the prettier no-oracle markers (`prettier_rejects.txt` / `prettier_nonconvergent.txt`). An `expected_svelte.json` holding the parse-failure marker is rejected (the canonical parser must *accept* — else convert to `input_invalid_*`)
 18. **S21**: `audit_signature_<suffix>.txt` requires its same-suffix `unformatted_ours_<suffix>.*` source — the chain it pins is anchored there, so an orphan pins nothing (`fixtures:update:formatted` deletes orphans)
+19. **S22**: no two `prettier_intermediate*_*.*` files may hold identical content. Each pins ONE unstable prettier form, so a byte-copy under a second suffix pins one chain twice while the file count reads as two distinct chains. Two `unformatted_ours_*` sources whose first passes coincide share the ONE file that records the form — the sharing is what N10 reads (see N7's note below), and `fixtures:update:formatted` writes it that way, keeping the first suffix's file and removing the later one's. To split them instead, give one source an authoring prettier's first pass answers differently, or fold the two into one variant
 
 Per-input-type parser/formatter oracles and variant extensions: see
 [Standalone Fixture Differences](#standalone-fixture-differences) above (`input.svelte.ts`
@@ -422,6 +423,7 @@ pass here. That is a separate gate —
   - `prettier(unformatted_ours_X) == prettier_intermediate_X` (matches first-pass output)
   - `prettier(prettier_intermediate_X) != prettier_intermediate_X` (verifies it's unstable)
   - `prettier(prettier_intermediate_X) == input` (converges to stable form)
+  - a suffix with no file of its own is pinned when its first-pass output equals a **verified sibling intermediate's** — two chains that coincide at pass 1 are one chain from there on, so the form is recorded once (S22 forbids the byte-copy). This holds across all three families below
 - **N7b**: `prettier_intermediate_to_variant_*.*` captures prettier's unstable first-pass output when it converges to a documented variant instead of `input`:
   - `prettier(unformatted_ours_X) == prettier_intermediate_to_variant_X` (matches first-pass output)
   - `prettier(prettier_intermediate_to_variant_X) != prettier_intermediate_to_variant_X` (verifies it's unstable)

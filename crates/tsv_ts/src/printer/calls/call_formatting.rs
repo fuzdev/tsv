@@ -596,10 +596,7 @@ fn try_single_arg_comment_paths(
         );
 
         let mut paren_line_prefix = DocBuf::new();
-        gap_pc.emit_trailing_comments(&mut paren_line_prefix, printer);
-        if let Some(pulled_end) = gap_pc.trailing_end() {
-            printer.push_delimiter_glued_blank(&mut paren_line_prefix, pulled_end, arg_start);
-        }
+        gap_pc.emit_delimiter_line_pull(&mut paren_line_prefix, printer);
 
         let mut inner = DocBuf::new();
         // Own-line comments each take their own line (author blanks preserved); a
@@ -1054,19 +1051,15 @@ fn build_call_with_arg_comments(
             );
             let has_paren_line = gap_pc.has_trailing_comments();
 
+            // `PartitionedComments::pulls_to_delimiter_line`, spelled with the flag this
+            // builder independently needs (it must record the forced expansion even where
+            // nothing sits on the `(` line).
             if force_expansion && has_paren_line {
-                // Comments trailing the `(` stay on the `(` line; the own-line set
-                // then leads the first arg via the shared emitter (a block hugging
-                // the arg stays inline, own-line/line comments break, author blanks
+                // Comments trailing the `(` stay on the `(` line, author blank included;
+                // the own-line set then leads the first arg via the shared emitter (a block
+                // hugging the arg stays inline, own-line/line comments break, author blanks
                 // preserved).
-                gap_pc.emit_trailing_comments(&mut paren_line_prefix_parts, printer);
-                if let Some(pulled_end) = gap_pc.trailing_end() {
-                    printer.push_delimiter_glued_blank(
-                        &mut paren_line_prefix_parts,
-                        pulled_end,
-                        first_arg_start,
-                    );
-                }
+                gap_pc.emit_delimiter_line_pull(&mut paren_line_prefix_parts, printer);
                 gap_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
             } else if !has_paren_line {
                 // No comment on the `(` line → every gap comment leads the first

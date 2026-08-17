@@ -45,6 +45,9 @@ use crate::fixtures::{
 /// S21: `audit_signature_<suffix>.txt` requires its same-suffix
 ///      `unformatted_ours_<suffix>` source — the chain it pins is anchored there,
 ///      so an orphan pins nothing
+/// S22: no two `prettier_intermediate*_*` files may hold identical content — each
+///      pins one unstable prettier form, so a byte-copy under a second suffix pins
+///      nothing its twin does not while reading as a second chain
 ///
 /// D1 — README.md required for divergences — is deliberately **not** here: it is the
 /// one rule that says nothing about the file set, so it must not short-circuit the
@@ -219,6 +222,37 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 - Delete {signature_name} (run: deno task fixtures:update:formatted)."
             ));
         }
+    }
+
+    // S22: an intermediate pins one unstable prettier form. Two of them holding the
+    // same bytes is one claim written twice: the second suffix's chain passes through
+    // a form its twin already pins, so nothing is asserted that deleting the copy
+    // would lose — while the file count reads as two distinct chains. All three
+    // families share the check, since they differ only in where the chain lands.
+    let mut intermediate_contents: Vec<(&String, String)> = Vec::new();
+    for name in files
+        .prettier_intermediate
+        .iter()
+        .chain(&files.prettier_intermediate_to_variant)
+        .chain(&files.prettier_intermediate_to_divergent_variant)
+    {
+        let content = read_file(&fixture_dir.join(name))?;
+        if let Some((twin, _)) = intermediate_contents
+            .iter()
+            .find(|(_, seen)| *seen == content)
+        {
+            return Err(format!(
+                "{name} is byte-identical to {twin}.\n\
+                Each prettier_intermediate*_* file pins ONE unstable prettier form; two copies\n\
+                of the same form pin one chain twice, so the second asserts nothing its twin\n\
+                does not. Either:\n\
+                - Fold the two unformatted_ours_* sources into one variant (their prettier\n\
+                  chains are the same chain), or\n\
+                - Give one source an authoring prettier's first pass answers differently,\n\
+                then run: deno task fixtures:update:formatted"
+            ));
+        }
+        intermediate_contents.push((name, content));
     }
 
     // S19: the two prettier no-oracle markers make incompatible claims and cannot

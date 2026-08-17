@@ -528,6 +528,13 @@ async fn update_intermediate_files(
     remove_orphan_chain_signatures(fixture, input_ext, &files, &mut results);
     remove_orphan_intermediates(fixture, input_ext, &files, &mut results);
 
+    // The unstable forms already written for this fixture. Two `unformatted_ours_*` sources
+    // whose first passes coincide share one chain from that point on, so the form is
+    // recorded once and the later suffix keeps no file of its own — S22 in
+    // `validation/structure.rs` forbids the byte-copy, and N10 reads the sharing off the
+    // content it already verified.
+    let mut written_forms: Vec<String> = Vec::new();
+
     for variant_name in &files.unformatted_ours {
         let suffix = unformatted_ours_suffix(variant_name, input_ext).unwrap_or("");
 
@@ -557,6 +564,19 @@ async fn update_intermediate_files(
                 continue;
             }
         };
+
+        // The three mutually exclusive intermediate kinds as one set: a shape that pins one
+        // of them writes it and clears the other two, and every shape that pins none clears
+        // the set. Spelling the set once is what keeps those two readings in step.
+        let intermediates: [(&std::path::Path, &String); 3] = [
+            (plain_path.as_path(), &plain_filename),
+            (to_variant_path.as_path(), &to_variant_filename),
+            (
+                to_divergent_variant_path.as_path(),
+                &to_divergent_variant_filename,
+            ),
+        ];
+        let [plain, to_variant, to_divergent] = intermediates;
 
         let chain_signature_filename = audit_signature_variant_filename(suffix);
         let chain_signature_path = fixture.audit_signature_variant_path(suffix);
@@ -610,93 +630,94 @@ async fn update_intermediate_files(
             }
         }
 
-        match shape {
-            ChainShape::NormalizesToInput | ChainShape::StableFirstPass => {
-                remove_stale_intermediates(
-                    &[
-                        (&plain_path, &plain_filename),
-                        (&to_variant_path, &to_variant_filename),
-                        (&to_divergent_variant_path, &to_divergent_variant_filename),
-                    ],
-                    &mut results,
-                );
+        // Only the three converging shapes write an intermediate, so only they can share
+        // one. Read before the match below, which moves out of `shape`.
+        let records_form = matches!(
+            shape,
+            ChainShape::UnstableConvergesToInput
+                | ChainShape::UnstableConvergesToVariant
+                | ChainShape::UnstableConvergesToDivergentVariant
+        );
+        // Written by an earlier suffix: two sources whose first passes coincide are one
+        // chain from there on, so the form stays recorded once and this suffix keeps no file
+        // of its own — S22 rejects the byte-copy, and N10 reads the sharing off the
+        // sibling's content.
+        let shares_written_form = records_form && written_forms.contains(&formatted);
+
+        if shares_written_form {
+            // Say so, then clear this suffix's own copies — which is what every
+            // non-writing shape below does, and what the signature ladder further down
+            // already does for a converging shape (`needs_chain_pin` is false for all
+            // three, so it removes rather than pins).
+            results.push(IntermediateOutput::Note(format!(
+                "- {}/{variant_name}: prettier's first pass is a form a sibling suffix already pins — sharing that file",
+                fixture.relative_path
+            )));
+            remove_stale_intermediates(&intermediates, &mut results);
+        } else {
+            match shape {
+                ChainShape::NormalizesToInput | ChainShape::StableFirstPass => {
+                    remove_stale_intermediates(&intermediates, &mut results);
+                }
+                ChainShape::UnstableNotConverging => {
+                    // Make the routing visible — silently doing nothing here masks the
+                    // (intentional) handoff from prettier_intermediate_* to whatever pins the
+                    // chain instead.
+                    let captor = if needs_chain_pin {
+                        chain_signature_filename.clone()
+                    } else {
+                        format!(
+                            "{AUDIT_SIGNATURE_FILENAME} (first pass lands on a documented form)"
+                        )
+                    };
+                    results.push(IntermediateOutput::Note(format!(
+                        "- {}/{}: chain doesn't converge to input or any variant — captured by {captor} instead",
+                        fixture.relative_path, variant_name
+                    )));
+                    remove_stale_intermediates(&intermediates, &mut results);
+                }
+                ChainShape::FirstPassUnparseable(prettier_err) => {
+                    // Prettier produced syntactically invalid output on the first pass — a known
+                    // prettier bug (e.g., `{@const x = expr) /* c */}`). Document the bug in the
+                    // fixture's README and clean up any stale intermediate files. Not a failure:
+                    // there's no chain to record, and `fixtures:validate` is the authoritative
+                    // green-light for the fixture as a whole.
+                    results.push(IntermediateOutput::Note(format!(
+                        "- {}/{}: prettier produced invalid syntax on first pass (prettier bug, see README): {prettier_err}",
+                        fixture.relative_path, variant_name
+                    )));
+                    remove_stale_intermediates(&intermediates, &mut results);
+                }
+                ChainShape::UnstableConvergesToInput => {
+                    write_intermediate_target(
+                        &plain_path,
+                        &plain_filename,
+                        &[to_variant, to_divergent],
+                        &formatted,
+                        &mut results,
+                    );
+                }
+                ChainShape::UnstableConvergesToVariant => {
+                    write_intermediate_target(
+                        &to_variant_path,
+                        &to_variant_filename,
+                        &[plain, to_divergent],
+                        &formatted,
+                        &mut results,
+                    );
+                }
+                ChainShape::UnstableConvergesToDivergentVariant => {
+                    write_intermediate_target(
+                        &to_divergent_variant_path,
+                        &to_divergent_variant_filename,
+                        &[plain, to_variant],
+                        &formatted,
+                        &mut results,
+                    );
+                }
             }
-            ChainShape::UnstableNotConverging => {
-                // Make the routing visible — silently doing nothing here masks the
-                // (intentional) handoff from prettier_intermediate_* to whatever pins the
-                // chain instead.
-                let captor = if needs_chain_pin {
-                    chain_signature_filename.clone()
-                } else {
-                    format!("{AUDIT_SIGNATURE_FILENAME} (first pass lands on a documented form)")
-                };
-                results.push(IntermediateOutput::Note(format!(
-                    "- {}/{}: chain doesn't converge to input or any variant — captured by {captor} instead",
-                    fixture.relative_path, variant_name
-                )));
-                remove_stale_intermediates(
-                    &[
-                        (&plain_path, &plain_filename),
-                        (&to_variant_path, &to_variant_filename),
-                        (&to_divergent_variant_path, &to_divergent_variant_filename),
-                    ],
-                    &mut results,
-                );
-            }
-            ChainShape::FirstPassUnparseable(prettier_err) => {
-                // Prettier produced syntactically invalid output on the first pass — a known
-                // prettier bug (e.g., `{@const x = expr) /* c */}`). Document the bug in the
-                // fixture's README and clean up any stale intermediate files. Not a failure:
-                // there's no chain to record, and `fixtures:validate` is the authoritative
-                // green-light for the fixture as a whole.
-                results.push(IntermediateOutput::Note(format!(
-                    "- {}/{}: prettier produced invalid syntax on first pass (prettier bug, see README): {prettier_err}",
-                    fixture.relative_path, variant_name
-                )));
-                remove_stale_intermediates(
-                    &[
-                        (&plain_path, &plain_filename),
-                        (&to_variant_path, &to_variant_filename),
-                        (&to_divergent_variant_path, &to_divergent_variant_filename),
-                    ],
-                    &mut results,
-                );
-            }
-            ChainShape::UnstableConvergesToInput => {
-                write_intermediate_target(
-                    &plain_path,
-                    plain_filename,
-                    &[
-                        (&to_variant_path, &to_variant_filename),
-                        (&to_divergent_variant_path, &to_divergent_variant_filename),
-                    ],
-                    &formatted,
-                    &mut results,
-                );
-            }
-            ChainShape::UnstableConvergesToVariant => {
-                write_intermediate_target(
-                    &to_variant_path,
-                    to_variant_filename,
-                    &[
-                        (&plain_path, &plain_filename),
-                        (&to_divergent_variant_path, &to_divergent_variant_filename),
-                    ],
-                    &formatted,
-                    &mut results,
-                );
-            }
-            ChainShape::UnstableConvergesToDivergentVariant => {
-                write_intermediate_target(
-                    &to_divergent_variant_path,
-                    to_divergent_variant_filename,
-                    &[
-                        (&plain_path, &plain_filename),
-                        (&to_variant_path, &to_variant_filename),
-                    ],
-                    &formatted,
-                    &mut results,
-                );
+            if records_form {
+                written_forms.push(formatted.clone());
             }
         }
 
@@ -866,7 +887,7 @@ fn remove_stale_intermediates(
 /// mutually exclusive intermediate kinds — plain / to_variant / to_divergent_variant).
 fn write_intermediate_target(
     target_path: &std::path::Path,
-    target_filename: String,
+    target_filename: &str,
     opposite_paths: &[(&std::path::Path, &String)],
     formatted: &str,
     results: &mut Vec<IntermediateOutput>,
@@ -897,5 +918,8 @@ fn write_intermediate_target(
             Err(e) => FormattedResult::Failed(e),
         }
     };
-    results.push(IntermediateOutput::File(target_filename, result));
+    results.push(IntermediateOutput::File(
+        target_filename.to_string(),
+        result,
+    ));
 }
