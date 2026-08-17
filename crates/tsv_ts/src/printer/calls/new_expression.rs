@@ -5,12 +5,11 @@
 use super::arg_comments::{any_arg_empty_line, first_arg_has_any_comments};
 use super::arg_wrapping::{
     ArgOpener, append_type_args_with_gap_comments, arrow_body_expands_internally,
-    build_arrow_hug_arg_docs, build_arrow_hug_printed_doc, build_call_args_with_blank_lines,
-    build_empty_args_doc, build_expand_first_arg_doc, build_own_line_post_arrow_arg_docs,
-    build_own_line_post_arrow_doc, build_single_arrow_arg_states, build_single_container_arg_doc,
-    first_arg_signature_refuses_expand_first, last_arg_has_own_line_post_arrow_comment,
-    should_expand_first_arg, try_hook_deps_args_doc, try_hug_multiline_template_arg,
-    wrap_call_with_soft_breaks,
+    build_arrow_gap_break_single_arg_doc, build_arrow_hug_arg_docs, build_arrow_hug_printed_doc,
+    build_call_args_with_blank_lines, build_empty_args_doc, build_expand_first_arg_doc,
+    build_single_arrow_arg_states, build_single_container_arg_doc,
+    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break, should_expand_first_arg,
+    try_hook_deps_args_doc, try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
@@ -252,18 +251,19 @@ impl<'a> Printer<'a> {
                         ]);
                     }
 
-                    // An own-line comment between `=>` and the body forces the closing paren
-                    // onto its own line — the rule is the gap's and not the body's, see
-                    // [`last_arg_has_own_line_post_arrow_comment`].
-                    if new_has_comments && last_arg_has_own_line_post_arrow_comment(self, arg0) {
-                        let docs = build_own_line_post_arrow_arg_docs(self, arg0, build)
-                            .with_leading(d, glued);
-                        return build_own_line_post_arrow_doc(
-                            d,
+                    // A broken `=>`→body gap forces the closing paren onto its own line — the
+                    // rule is the gap's and not the body's, see
+                    // [`last_arg_arrow_gap_break`].
+                    if new_has_comments
+                        && let Some(gap_break) = last_arg_arrow_gap_break(self, arg0)
+                    {
+                        return build_arrow_gap_break_single_arg_doc(
+                            self,
                             ArgOpener::Callee(callee_with_types),
-                            &[],
-                            docs.expanded,
-                            docs.printed,
+                            arg0,
+                            &gap_break,
+                            glued,
+                            build,
                         );
                     }
 
