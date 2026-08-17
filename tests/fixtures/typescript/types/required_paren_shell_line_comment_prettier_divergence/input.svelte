@@ -38,11 +38,10 @@
 		E1 extends F1 ? G1 : H1 // c
 	)[];
 
-	// Indexed-access object
-	type I1 =
-		(
-			J1 extends K1 ? L1 : M1 // c
-		)[N1];
+	// Indexed-access object, hugging the `=` like its array twin above
+	type I1 = (
+		J1 extends K1 ? L1 : M1 // c
+	)[N1];
 
 	// The same pair with a LEADING run as well. The prefix operator is the one
 	// required-pair position that also has a keyword→value hang seam, and taking that

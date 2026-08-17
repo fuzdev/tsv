@@ -26,7 +26,7 @@
 	// Array element, where the `[]` suffix rides outside the pair
 	type D1 = (E1 extends F1 ? G1 : H1)[]; // c
 
-	// Indexed-access object
+	// Indexed-access object, hugging the `=` like its array twin above
 	type I1 = (J1 extends K1 ? L1 : M1)[N1]; // c
 
 	// The same pair with a LEADING run as well. The prefix operator is the one

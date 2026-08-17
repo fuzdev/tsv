@@ -296,10 +296,7 @@ impl<'a> Printer<'a> {
                     .expect("extends keyword must exist when constraint is present");
 
                 line_gap = self.route_pre_keyword_gap(&mut parts, prev_end, extends_pos);
-                self.keyword_value_head_required_pair(
-                    extends_pos + "extends".len() as u32,
-                    constraint,
-                )
+                self.keyword_value_head(extends_pos + "extends".len() as u32, constraint)
             } else {
                 KeywordValueHead::without_gap(constraint)
             };
@@ -493,14 +490,14 @@ impl<'a> Printer<'a> {
         // for a trailing line comment: stripping here and lifting the `//` out would give
         // that one gap a third answer, neither prettier's nor tsv's own.
         //
-        // ⚠️ And the shell always DOES reach it here, because the constraint's head is
-        // resolved by [`Printer::keyword_value_head_required_pair`], which declines the
-        // paren-strip hang for exactly the shells this rule retains. Asking without that
-        // guarantee was a trap: the hang strips a shell whose leading gap holds a line
-        // comment, so one carrying BOTH (`(// c⏎ A extends B ? C : D // t)`) satisfied the
-        // retain rule while already being gone, and deferring to an emitter that never
-        // runs printed the constraint bare — for the `infer` case not a layout difference
-        // but output the canonical parser REJECTS (the `?` rebinds).
+        // ⚠️ And the shell always DOES reach it here, because the paren-strip hang seam
+        // ([`Printer::keyword_value_stripped_paren_hang`]) declines exactly the shells this
+        // rule retains. Asking without that guarantee was a trap: the hang strips a shell
+        // whose leading gap holds a line comment, so one carrying BOTH
+        // (`(// c⏎ A extends B ? C : D // t)`) satisfied the retain rule while already
+        // being gone, and deferring to an emitter that never runs printed the constraint
+        // bare — for the `infer` case not a layout difference but output the canonical
+        // parser REJECTS (the `?` rebinds).
         let conditional_constraint = matches!(
             unwrap_parenthesized(head.value_type),
             TSType::Conditional(_)
@@ -534,7 +531,8 @@ impl<'a> Printer<'a> {
                 hung.push(paren_doc);
             }
             // The trailing gap holds only BLOCKS here — a `//` in it retains the shell,
-            // which never reaches this arm ([`Printer::keyword_value_head_required_pair`])
+            // which never reaches this arm
+            // ([`Printer::keyword_value_stripped_paren_hang`] declines the hang for it)
             // — so the lift is inline and takes no break of its own.
             parts.push(self.with_stripped_paren_trailing(
                 d.concat(&hung),

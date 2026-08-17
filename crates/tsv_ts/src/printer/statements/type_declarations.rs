@@ -6,6 +6,9 @@ use crate::ast::internal::{self, TSType};
 use crate::printer::ignore::is_freeze_target;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::function::FunctionHeadModifier;
+use crate::printer::types::helpers::{
+    type_needs_parens_for_array_element, type_needs_parens_for_indexed_access_object,
+};
 use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, MemberBlankScan,
@@ -237,12 +240,22 @@ impl<'a> Printer<'a> {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
-                // Same deep-window paren handling as the operator's own builder: a
-                // `keyof (// c\n T)` hangs the operand via the unwrapped inner's start, so
-                // this gate must widen the same way or it disagrees with the builder about
+                // Same deep window the operator's own builder measures: a
+                // `keyof (// c\n T)` puts the leading run in the operand's head, so this
+                // gate has to see through the shell or it disagrees with the builder about
                 // whether the value breaks (the `=` would then break too, non-idempotently).
-                let (operand_start, _) = self.keyword_value_stripped_paren_hang(o.type_annotation);
-                self.comments_force_own_line_between(kw_end, operand_start)
+                //
+                // Asked as the hang PREDICATE rather than through the hang seam, because
+                // the seam now declines a shell the trailing-run rule RETAINS
+                // (`paren_retains_for_trailing_run`) and would hand back the unwidened
+                // start. The leading run is what makes the operand's head own the break;
+                // whether the parens survive underneath it does not change that, and the
+                // retained shell breaks internally either way. A shell with NO leading run
+                // is left to the comment-driven arm below, where a trailing-`//`-only
+                // operand is already pinned not to hug (`required_paren_shell_line_comment`
+                // cases A / F).
+                self.comments_force_own_line_between(kw_end, o.type_annotation.span().start)
+                    || self.stripped_paren_hang_has_leading_line_comment(o.type_annotation)
             }
             TSType::TypeQuery(q) => {
                 let kw_end = q.span.start + "typeof".len() as u32;
@@ -252,18 +265,31 @@ impl<'a> Printer<'a> {
             // inside the brackets: `= A[⏎⇥// prettier-ignore⏎⇥K⏎]`) keeps the `[` on
             // the `=` line — the brackets own the break. Gated on `has_format_ignore`
             // so the directive-free common case pays no bracket scan.
-            TSType::IndexedAccess(i) if self.has_format_ignore => {
-                let index_start = i.index_type.span().start;
-                self.find_char_outside_comments(i.object_type.span().end, index_start, b'[')
-                    .is_some_and(|bp| self.member_gap_frozen(bp + 1, index_start))
+            TSType::IndexedAccess(i) => {
+                // The object's own required pair opening is the array twin's question one
+                // construct over, so it is asked the same way — the arm used to hold only
+                // the frozen-bracket route below and the two positions then disagreed.
+                self.required_paren_pair_opens(
+                    i.object_type,
+                    type_needs_parens_for_indexed_access_object,
+                ) || (self.has_format_ignore && {
+                    let index_start = i.index_type.span().start;
+                    self.find_char_outside_comments(i.object_type.span().end, index_start, b'[')
+                        .is_some_and(|bp| self.member_gap_frozen(bp + 1, index_start))
+                })
             }
             // The paren-interior frozen-route array element
             // (`= (⏎⇥// prettier-ignore⏎⇥T⏎)[]`) expands its own parens around the
             // run — the shell owns the break (`paren_interior_routed_inner` self-gates
-            // on `has_format_ignore`).
+            // on `has_format_ignore`). The required pair opening over a leading `//` or a
+            // retained trailing run is the same fact, asked through the seam that decides
+            // it (`required_paren_pair_opens`) rather than restated here.
             TSType::Array(a) => {
                 self.paren_interior_routed_inner(a.element_type).is_some()
-                    || self.paren_retains_for_trailing_run(a.element_type)
+                    || self.required_paren_pair_opens(
+                        a.element_type,
+                        type_needs_parens_for_array_element,
+                    )
             }
             // A redundant paren shell whose comments are ALL in its trailing gap
             // (`= (U // c)[]`, `= (A // c)`): with no separator following, the shell

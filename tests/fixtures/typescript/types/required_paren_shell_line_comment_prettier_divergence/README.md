@@ -53,7 +53,11 @@ only where it renders once they are.*
 - **D1** — array element, where the `[]` suffix rides *outside* the pair decision: the
   shell may already print the parens, but the suffix is the array type's own and always
   emits.
-- **I1** — indexed-access object.
+- **I1** — indexed-access object, hugging the `=` like **D1**'s array twin above: the
+  retained shell breaks internally, so the alias keeps its head on the `=` line rather than
+  also breaking. The enclosing `=`'s gate asks the seam that decides the pair
+  (`Printer::required_paren_pair_opens`), so the two positions cannot answer one question
+  two ways.
 - **Z2** — the same pair carrying a **leading** run as well. Two of the seven positions
   have a keyword→value hang seam in front of the pair
   (`Printer::keyword_value_stripped_paren_hang`), and a leading `//` used to take it —

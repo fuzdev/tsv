@@ -53,4 +53,12 @@ than inside a following member's parens) is a different case and stays trailing 
 both formatters — see
 [union_paren_member_long_line_comment](../comments/union_paren_member_long_line_comment/).
 
+`unformatted_ours_inside_parens.svelte` writes each comment on its own line inside the
+parens, which tsv normalizes to `input`; `variant_inside_parens.svelte` is prettier's
+answer from that source — the comment hoisted out in front of the pair (`| // c⏎  (A | B)`)
+— which both formatters then hold stable, since it is a different tree rather than a
+different layout of this one. A comment the author *glues* to the `(` is a third thing
+again: tsv keeps it on that line, per
+[paren_shell_glued_leading_line_comment](../paren_shell_glued_leading_line_comment_prettier_divergence/).
+
 See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

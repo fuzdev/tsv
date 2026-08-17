@@ -41,5 +41,8 @@ and
   the parting its own inconsistency rather than a blanket tsv preference. The plain fixture
   [optional_element_paren_comment](../optional_element_paren_comment/) pins that case and
   the block spellings of both gaps.
-- `unformatted_ours_shell.svelte` — the authoring as written, which tsv normalizes to
-  `input.svelte` and prettier does not.
+- `unformatted_ours_shell.svelte` — the compact authoring, which tsv normalizes to
+  `input.svelte` and prettier does not. It writes each comment on its own line inside the
+  shell, because a comment the author *glues* to the `(` keeps that line instead of
+  reaching this form — see
+  [paren_shell_glued_leading_line_comment](../../paren_shell_glued_leading_line_comment_prettier_divergence/).
