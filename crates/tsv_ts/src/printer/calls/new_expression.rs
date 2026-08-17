@@ -2,37 +2,33 @@
 //
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
-use super::arg_comments::{
-    any_arg_empty_line, any_comment_forces_expansion_slice, first_arg_has_any_comments,
-    last_arg_has_comments,
-};
+use super::arg_comments::{any_arg_empty_line, first_arg_has_any_comments};
 use super::arg_wrapping::{
-    append_type_args_with_gap_comments, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_expand_first_arg_doc, build_own_line_post_arrow_state,
-    first_arg_signature_refuses_expand_first, last_arg_has_own_line_post_arrow_comment,
-    should_expand_first_arg, try_hook_deps_args_doc, try_hug_multiline_template_arg,
-    wrap_call_with_soft_breaks,
+    append_type_args_with_gap_comments, arrow_body_expands_internally,
+    build_arrow_arg_doc_for_hug_states, build_call_args_with_blank_lines, build_empty_args_doc,
+    build_expand_first_arg_doc, build_own_line_post_arrow_state, build_single_arrow_arg_states,
+    build_single_container_arg_doc, first_arg_signature_refuses_expand_first,
+    last_arg_has_own_line_post_arrow_comment, should_expand_first_arg, try_hook_deps_args_doc,
+    try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
 };
+use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
 use crate::printer::calls::arg_predicates::{
-    arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_concise_numeric_array,
+    arrow_body_is_call_through_non_null, is_array_or_object_unwrapped,
     is_function_composition_args, is_ternary_arrow_body,
 };
 use crate::printer::calls::{
     ArgItem, ArgsJoin, PartitionedComments, arrow_hug_refused_by_comments,
-    build_args_joined_with_comments, build_args_split_last, build_arrow_call_body_states,
-    build_arrow_sig_doc, build_break_body_state, build_call_args_expanded, build_expand_all_args,
-    build_inline_args, build_inline_hug_or_expand_all, build_inline_or_expand_all,
-    build_printed_argument_doc, could_expand_arrow_chain, has_inter_argument_comments_slice,
-    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
-    prebuild_expand_last_break_body, prepend_arrow_body_comments,
+    build_args_joined_with_comments, build_arrow_call_body_states, build_arrow_sig_doc,
+    build_call_args_expanded, build_printed_argument_doc, could_expand_arrow_chain,
+    has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice, prepend_arrow_body_comments,
     should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
     wrap_call_with_will_break_guard,
 };
 use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
 use crate::printer::{
-    ParenContext, Printer, arrow_chain_should_break, container_may_have_multiline_content,
-    has_multiline_content, is_curried_arrow_chain,
+    ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
 };
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -187,13 +183,15 @@ impl<'a> Printer<'a> {
             && !single_arg_leading_emit_comment
         {
             match &new_expr.arguments[0] {
-                // Object / array / function-expression argument: hug it — the
-                // argument's own doc expands internally. An on-page leading
-                // comment declines the hug (see the guard's comment above);
-                // prettier expands all three the same way.
-                internal::Expression::ObjectExpression(_)
-                | internal::Expression::ArrayExpression(_)
-                | internal::Expression::FunctionExpression(_)
+                // Object / array container argument, cast or not: the shared hug, which also
+                // owns the truly-empty softline case ([`build_single_container_arg_doc`]). An
+                // on-page leading comment declines it (see the guard's comment above);
+                // prettier expands the same way.
+                arg if is_array_or_object_unwrapped(arg) && !single_arg_leading_on_page_comment => {
+                    return build_single_container_arg_doc(self, callee_with_types, arg);
+                }
+                // Function-expression argument: hug it — the body handles its own formatting.
+                internal::Expression::FunctionExpression(_)
                     if !single_arg_leading_on_page_comment =>
                 {
                     return d.concat(&[
@@ -207,25 +205,11 @@ impl<'a> Printer<'a> {
                 internal::Expression::ArrowFunctionExpression(arrow)
                     if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) =>
                 {
-                    // Which of prettier's two renderings this ONE doc is — see
-                    // `call_formatting.rs`'s `build_block_arrow_hug_states`, which states the
-                    // rule (a chain with no forced break → the progressive layout, whose flat
-                    // rendering the hug state measures identically; one that
-                    // `arrow_chain_should_break` forces → `skip_arrow_chain`, whose
-                    // nested-arrow-break suppression is what the expand-last hug wants). One
-                    // doc, deliberately: a second build recurses into a nested call, and
-                    // paying it here would make the doc-node count 2^depth.
+                    // Which of prettier's two renderings this ONE doc is —
+                    // [`build_arrow_arg_doc_for_hug_states`] owns that rule, shared with the plain
+                    // call's `build_block_arrow_hug_states`.
                     let arg0 = &new_expr.arguments[0];
-                    let mut arrow_doc = if is_curried_arrow_chain(arg0)
-                        && arrow_chain_should_break(arrow)
-                    {
-                        self.skip_arrow_chain.set(true);
-                        let doc = self.build_expression_doc(arg0);
-                        self.skip_arrow_chain.set(false);
-                        doc
-                    } else {
-                        build_printed_argument_doc(self, arg0, || self.build_expression_doc(arg0))
-                    };
+                    let mut arrow_doc = build_arrow_arg_doc_for_hug_states(self, arg0, arrow);
 
                     // Prepend leading comments (e.g., /** @param {any} x */ before arrow)
                     // and force wrapped state when present (prettier expands args with leading comments)
@@ -274,18 +258,17 @@ impl<'a> Printer<'a> {
                         ]);
                     }
 
-                    return d.conditional_group(&[
-                        // State 1: hugged - new Callee((arrow) => { body })
-                        d.concat(&[callee_with_types, d.text("("), arrow_doc, d.text(")")]),
-                        // State 2: wrapped - new Callee(\n\t(arrow) => { body },\n)
-                        d.concat(&[
-                            callee_with_types,
-                            d.text("("),
-                            d.indent(d.concat(&[d.softline(), arrow_doc])),
-                            d.softline(),
-                            d.text(")"),
-                        ]),
-                    ]);
+                    // The same state ladder the plain call's single-argument hug selects among
+                    // (`build_block_arrow_hug_states`) — an object/array body takes the middle
+                    // state, which expands the body internally while the arrow stays hugged to
+                    // `new A(`. The hand-rolled two-state copy here had no such state, so a
+                    // FLAT-written body broke the argument out where prettier hugs.
+                    return build_single_arrow_arg_states(
+                        d,
+                        callee_with_types,
+                        arrow_doc,
+                        arrow_body_expands_internally(arrow),
+                    );
                 }
                 // Expression-body arrow: break at => not at (
                 // Mirrors call_formatting.rs expression arrow handling
@@ -600,235 +583,20 @@ impl<'a> Printer<'a> {
             return wrap_call_with_soft_breaks(d, callee_with_types, arg_parts);
         }
 
-        // "Expand last arg" pattern — matches call_formatting.rs logic.
-        // Split into function/arrow last arg and array/object last arg paths.
-        // NOTE: This must come AFTER the trailing comment check above.
-        {
-            let last_arg = new_expr.arguments.last();
-            let last_is_function = matches!(
-                last_arg,
-                Some(
-                    internal::Expression::ArrowFunctionExpression(_)
-                        | internal::Expression::FunctionExpression(_)
-                )
-            );
-            let last_is_expandable_collection = last_arg.is_some_and(|arg| {
-                is_array_or_object_unwrapped(arg) && !is_concise_numeric_array(arg)
-            });
-            // Prettier's `couldExpandArg` for the last argument — the classification the
-            // plain-call twin closes with (`try_expand_last_function_arg`'s
-            // `is_non_expandable_expr_arrow`) and this printer never had. Spelled as
-            // **reachability over this printer's own arms** rather than as a second body-kind
-            // list, so the two cannot drift: an arrow argument is hug-eligible when
-            // `could_expand_arrow_chain` claims it (a block body, an object/array body, or an
-            // arrow chain ending in one — all of which the `build_inline_or_expand_all` tail
-            // hugs whole), or when the break-body arm claims it (a call through a trailing `!`,
-            // or a ternary) and that arm's own refusal stays silent — the SAME
-            // `arrow_hug_refused_by_comments` the arm guards itself with, so the gate and the
-            // arm cannot drift apart. Anything else — a template, a binary, a member, a `new`
-            // body — no state below can hug, and the general path prints it whole.
-            //
-            // ⚠️ The gap was invisible without a FORCED break, because the general path and the
-            // ladder below agree whenever `fits()` can see the whole argument. A break inside
-            // such a body — a multiline template, a source-multiline object under a binary
-            // operator, the body-tail comment the break-body arm declines for — truncates that
-            // walk (tsv has no `propagateBreaks`, so a `conditional_group` measures a state flat
-            // to its first hardline), so `state_inline` reported itself as fitting and `new`
-            // hugged where every sibling printer expands. Prettier expands all three shapes at
-            // its fixed point, `new` included.
-            //
-            // Asked HERE rather than where the twin asks it — after the argument docs are built —
-            // because reaching it and then declining would build every argument TWICE, once here
-            // and once on the general path, which recurses into any call nested in the body:
-            // `new A(lead, p => new B(lead, q => …))` went 2^depth doc nodes (`fanout:audit`'s
-            // `ts_nested_arrow_multiarg_new`). Every predicate it asks is a pure AST/comment
-            // question, so none of them needs a doc.
-            let last_arg_hug_eligible = match last_arg {
-                Some(internal::Expression::ArrowFunctionExpression(arrow)) => {
-                    could_expand_arrow_chain(arrow)
-                        || match &arrow.body {
-                            internal::ArrowFunctionBody::Expression(body_expr) => {
-                                (arrow_body_is_call_through_non_null(body_expr)
-                                    || is_ternary_arrow_body(body_expr))
-                                    && !(new_has_comments
-                                        && arrow_hug_refused_by_comments(self, arrow, body_expr))
-                            }
-                            internal::ArrowFunctionBody::BlockStatement(_) => false,
-                        }
-                }
-                _ => true,
-            };
-            // …with one exception, which is why the twin can ask this late: an own-line comment
-            // after `=>` selects its own state ([`last_arg_has_own_line_post_arrow_comment`])
-            // ahead of any body-kind question, for a non-eligible body too. That state needs
-            // the argument docs, so it must keep the block — and it returns from inside it, so no
-            // second build follows.
-            let last_arg_takes_own_line_post_arrow_state = new_has_comments
-                && last_arg
-                    .is_some_and(|last| last_arg_has_own_line_post_arrow_comment(self, last));
-
-            if new_expr.arguments.len() >= 2
-                && (last_is_function || last_is_expandable_collection)
-                && (last_arg_hug_eligible || last_arg_takes_own_line_post_arrow_state)
-                // The same question both twins ask (`any_comment_forces_expansion`), over a
-                // slice: a comment that needs a line of its own defeats the hug, an inline
-                // block glued between an argument and its comma does not. Asking "is there
-                // ANY inter-argument comment" instead broke out `new A(a /* c */, () => …)`,
-                // a list prettier keeps hugged — and asked nothing about the `(`→first-argument
-                // gap or a spread's stripped-paren interior, which the shared predicate covers.
-                && !(new_has_comments
-                    && any_comment_forces_expansion_slice(
-                        new_expr.arguments,
-                        self,
-                        paren_open,
-                        new_expr.span.end,
-                    ))
-                // On-page: a leading comment on the last argument defeats the expand-last
-                // hug (prettier's `shouldExpandLastArg`), owned or not — an owned comment
-                // rides inside the argument's doc, so this must count it (on page), not just
-                // the emit-keyed ones, or it hugs blind. Mirrors the call/chain paths.
-                && !(new_has_comments
-                    && last_arg_has_comments(new_expr.arguments, self, new_expr.span.end, paren_open))
-            {
-                // Expand-last arrow with a call body: build the body ONCE and inject it so
-                // the whole-arrow arg doc reuses it (the break-body state below reuses it
-                // too) — building it in both places recurses into itself → O(2^depth).
-                let body_reuse = prebuild_expand_last_break_body(
-                    self,
-                    new_expr.arguments.last(),
-                    new_has_comments,
-                );
-                let inject_prev = body_reuse.map(|(span, doc)| self.inject_arrow_body(span, doc));
-
-                let (head_parts, last_arg_doc, all_args_broken) =
-                    build_args_split_last(new_expr.arguments, self, paren_open, new_has_comments);
-
-                if let Some(prev) = inject_prev {
-                    self.restore_arrow_body_inject(prev);
-                }
-
-                // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
-                if head_parts.iter().any(|&id| d.will_break(id)) {
-                    return build_expand_all_args(d, callee_with_types, all_args_broken);
-                }
-
-                // The multi-argument twin of the single-argument arm above: an own-line
-                // comment after `=>` drops the closing paren to its own line, asked above
-                // every body-kind arm for the reason
-                // [`last_arg_has_own_line_post_arrow_comment`] gives.
-                if new_has_comments
-                    && let Some(last) = new_expr.arguments.last()
-                    && last_arg_has_own_line_post_arrow_comment(self, last)
-                {
-                    return d.concat(&[
-                        callee_with_types,
-                        build_own_line_post_arrow_state(d, d.text("("), &head_parts, last_arg_doc),
-                    ]);
-                }
-
-                if last_is_function {
-                    // Function/arrow last arg path (matches call_formatting.rs's expand-last function path)
-                    // Expression arrows with call/conditional body get break-body state
-                    if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
-                        new_expr.arguments.last()
-                        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-                        && (arrow_body_is_call_through_non_null(body_expr)
-                            || matches!(
-                                &**body_expr,
-                                internal::Expression::ConditionalExpression(_)
-                            ))
-                        // The multi-argument twin of the single-argument refusal above, and the
-                        // same question `last_arg_hug_eligible` already answered to let this
-                        // block be entered at all (`arrow_hug_refused_by_comments`).
-                        && !(new_has_comments
-                            && arrow_hug_refused_by_comments(self, arrow, body_expr))
-                    {
-                        let sig_doc = build_arrow_sig_doc(self, arrow);
-                        // Reuse the pre-built call body (see above); conditional bodies build fresh.
-                        let body_doc = body_reuse
-                            .map_or_else(|| self.build_expression_doc(body_expr), |(_, doc)| doc);
-                        let body_doc = prepend_arrow_body_comments(
-                            self,
-                            arrow,
-                            body_expr.span().start,
-                            body_doc,
-                        );
-
-                        let prefix = d.concat(&[callee_with_types, d.text("(")]);
-                        let state_break_body =
-                            build_break_body_state(d, prefix, &head_parts, sig_doc, body_doc);
-
-                        let state_expand_all =
-                            build_expand_all_args(d, callee_with_types, all_args_broken);
-
-                        // Prettier: when willBreak(lastArg), skip flat state
-                        if d.will_break(last_arg_doc) {
-                            return d.conditional_group(&[state_break_body, state_expand_all]);
-                        }
-
-                        let state_inline =
-                            build_inline_args(d, callee_with_types, &head_parts, last_arg_doc);
-
-                        return d.conditional_group(&[
-                            state_inline,
-                            state_break_body,
-                            state_expand_all,
-                        ]);
-                    }
-
-                    // Block-body arrow/function: inline vs expand-all (no hug state).
-                    //
-                    // A break forced inside the last argument's signature invalidates
-                    // `state_inline`, as it does at every other hug state — but the question is
-                    // asked of an **arrow only**, deliberately. Prettier hugs a `function`
-                    // argument under `new` uniformly, so there is nothing incoherent to correct
-                    // there and tsv matches it; see
-                    // `functions::function_signature_has_breaking_comments`.
-                    if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
-                        new_expr.arguments.last()
-                        && arrow_signature_has_breaking_comments(self, arrow)
-                    {
-                        return build_expand_all_args(d, callee_with_types, all_args_broken);
-                    }
-                    return build_inline_or_expand_all(
-                        d,
-                        callee_with_types,
-                        &head_parts,
-                        last_arg_doc,
-                        all_args_broken,
-                    );
-                }
-
-                // Array/object last arg path (matches call_formatting.rs's expand-last array/object path)
-                // Same outer type: skip hug, use expand-all
-                if last_two_args_same_type(new_expr.arguments) {
-                    // Same type: Prettier uses expand-all when last arg will break
-                    if d.will_break(last_arg_doc) {
-                        return build_expand_all_args(d, callee_with_types, all_args_broken);
-                    }
-                    return build_inline_or_expand_all(
-                        d,
-                        callee_with_types,
-                        &head_parts,
-                        last_arg_doc,
-                        all_args_broken,
-                    );
-                }
-
-                // Different types: the 3-state ladder (inline → hug → expand all), the same
-                // helper the plain-call twin uses. Prettier's printCallArguments is shared
-                // by `new` (its header comment lists NewExpression), and for a breaking
-                // last arg it keeps the hug: `[breakParent, conditionalGroup([hug,
-                // allArgsBrokenOut])]` — there is no forced-break → inline-or-expand-all
-                // form.
-                return build_inline_hug_or_expand_all(
-                    d,
-                    callee_with_types,
-                    &head_parts,
-                    last_arg_doc,
-                    all_args_broken,
-                );
-            }
+        // Prettier's `shouldExpandLastArg`, shared with the plain call — one
+        // `printCallArguments` prints both spellings, so the layout is not a copy of the
+        // call's, it IS the call's (`expand_last.rs`). Must come AFTER the trailing-comment
+        // paths above, which own the gaps these states cannot express.
+        if let Some(doc) = try_expand_last_arg(
+            self,
+            new_expr.arguments,
+            callee_with_types,
+            paren_open,
+            new_expr.span.end,
+            new_has_comments,
+            ArgOwner::New,
+        ) {
+            return doc;
         }
 
         // Check for leading comments or inter-argument block comments

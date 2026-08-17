@@ -1,0 +1,957 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 934,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " exactly 100 - the whole call fits, so the deps array stays inline",
+			"start": 10,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 - a two-argument arrow-then-array call declines the hug, every argument breaks out",
+			"start": 181,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: the plain call declines the same shape identically",
+			"start": 381,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: a third argument is not the shape, so the array still hugs",
+			"start": 554,
+			"end": 624,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: a non-arrow first argument is not the shape, so the array still hugs",
+			"start": 735,
+			"end": 815,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 81
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 933,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 924,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 80,
+					"end": 178,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 80,
+						"end": 177,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 98
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 84,
+							"end": 85,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 86,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 18
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 92,
+									"end": 97,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 13
+										},
+										"end": {
+											"line": 3,
+											"column": 18
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 92,
+										"end": 94,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 13
+											},
+											"end": {
+												"line": 3,
+												"column": 15
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 95,
+											"end": 96,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 16
+												},
+												"end": {
+													"line": 3,
+													"column": 17
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 99,
+								"end": 176,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 20
+									},
+									"end": {
+										"line": 3,
+										"column": 97
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 100,
+										"end": 101,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 21
+											},
+											"end": {
+												"line": 3,
+												"column": 22
+											}
+										},
+										"name": "b"
+									},
+									{
+										"type": "Identifier",
+										"start": 103,
+										"end": 175,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 24
+											},
+											"end": {
+												"line": 3,
+												"column": 96
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " exactly 100 - the whole call fits, so the deps array stays inline",
+							"start": 10,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 272,
+					"end": 378,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 272,
+						"end": 377,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 276,
+							"end": 277,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 5
+								},
+								"end": {
+									"line": 6,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 281,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 13
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 287,
+									"end": 292,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 8
+										},
+										"end": {
+											"line": 7,
+											"column": 13
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 287,
+										"end": 289,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 8
+											},
+											"end": {
+												"line": 7,
+												"column": 10
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 290,
+											"end": 291,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 11
+												},
+												"end": {
+													"line": 7,
+													"column": 12
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 296,
+								"end": 374,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 80
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 297,
+										"end": 298,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 4
+											}
+										},
+										"name": "b"
+									},
+									{
+										"type": "Identifier",
+										"start": 300,
+										"end": 373,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 6
+											},
+											"end": {
+												"line": 8,
+												"column": 79
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 - a two-argument arrow-then-array call declines the hug, every argument breaks out",
+							"start": 181,
+							"end": 270
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 445,
+					"end": 551,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 445,
+						"end": 550,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 445,
+							"end": 448,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 452,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 13
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 458,
+									"end": 463,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 8
+										},
+										"end": {
+											"line": 13,
+											"column": 13
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 458,
+										"end": 460,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 8
+											},
+											"end": {
+												"line": 13,
+												"column": 10
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 461,
+											"end": 462,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 11
+												},
+												"end": {
+													"line": 13,
+													"column": 12
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 467,
+								"end": 547,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 82
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 468,
+										"end": 469,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 4
+											}
+										},
+										"name": "b"
+									},
+									{
+										"type": "Identifier",
+										"start": 471,
+										"end": 546,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 6
+											},
+											"end": {
+												"line": 14,
+												"column": 81
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: the plain call declines the same shape identically",
+							"start": 381,
+							"end": 443
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 626,
+					"end": 732,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 626,
+						"end": 731,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 630,
+							"end": 631,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 5
+								},
+								"end": {
+									"line": 18,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 632,
+								"end": 633,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 635,
+								"end": 646,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 10
+									},
+									"end": {
+										"line": 18,
+										"column": 21
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 641,
+									"end": 646,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 16
+										},
+										"end": {
+											"line": 18,
+											"column": 21
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 641,
+										"end": 643,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 16
+											},
+											"end": {
+												"line": 18,
+												"column": 18
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 644,
+											"end": 645,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 19
+												},
+												"end": {
+													"line": 18,
+													"column": 20
+												}
+											},
+											"name": "a"
+										}
+									],
+									"optional": false
+								}
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 648,
+								"end": 730,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 23
+									},
+									"end": {
+										"line": 21,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 652,
+										"end": 653,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 3
+											}
+										},
+										"name": "c"
+									},
+									{
+										"type": "Identifier",
+										"start": 657,
+										"end": 727,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 72
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a third argument is not the shape, so the array still hugs",
+							"start": 554,
+							"end": 624
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 817,
+					"end": 923,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 817,
+						"end": 922,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 821,
+							"end": 822,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 5
+								},
+								"end": {
+									"line": 24,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 823,
+								"end": 824,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 826,
+								"end": 921,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 10
+									},
+									"end": {
+										"line": 27,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 830,
+										"end": 831,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 25,
+												"column": 3
+											}
+										},
+										"name": "c"
+									},
+									{
+										"type": "Identifier",
+										"start": 835,
+										"end": 918,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 85
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a non-arrow first argument is not the shape, so the array still hugs",
+							"start": 735,
+							"end": 815
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -6,7 +6,7 @@
 // - Building argument lists split into head/last patterns
 
 use super::super::{
-    ArrowChainContext, CommentSpacing, Printer, is_curried_arrow_chain,
+    ArrowChainContext, CommentSpacing, Printer, arrow_chain_should_break, is_curried_arrow_chain,
     is_multiline_template_expression,
 };
 use super::arg_comments::{
@@ -451,6 +451,18 @@ pub(crate) fn prebuild_expand_last_break_body(
     None
 }
 
+/// Whether the parens an arrow's object/array body is rendered inside are the GRAMMAR's.
+///
+/// Only an **object** body needs them — a brace-less `{` after `=>` would parse as a block —
+/// and an array body needs none, which is what prettier emits (`(x) => [`). Parenthesizing an
+/// array's hug slot fabricated a pair prettier never writes (`fn(a, (x) => ([⏎…⏎]))`), and
+/// because the fabricated form is its own fixed point, F1, the fuzzer, the round-trip and every
+/// comment gate were blind to it — only a prettier compare could see it. One site, so the
+/// inject doc and the hug doc cannot drift apart on it.
+pub(crate) fn arrow_hug_body_needs_parens(body_expr: &internal::Expression<'_>) -> bool {
+    matches!(body_expr, internal::Expression::ObjectExpression(_))
+}
+
 /// Pre-build an expand-last-arg arrow's **object/array** body once (the sibling of
 /// `prebuild_expand_last_break_body` for the object/array hug path). Returns
 /// `(body span, inject doc, hug body doc)`:
@@ -458,8 +470,8 @@ pub(crate) fn prebuild_expand_last_break_body(
 ///   `d.parens(obj)` for an object (the leftmost-object parens: `build_arrow_body_doc` wraps
 ///   the whole-body object in `d.parens` exactly as this does), or the bare array doc for an
 ///   array — and is injected so the whole-arrow arg doc reuses it;
-/// - `hug body doc` is `d.parens(body)`, matching the previous inline
-///   `d.parens(build_expression_doc(body))` the hug state wraps in `group_break`.
+/// - `hug body doc` is what the hug state wraps in `group_break` — the same doc, since it
+///   renders the same body in the same position ([`arrow_hug_body_needs_parens`]).
 ///
 /// Both share the single body build, so `f(lead, x => ({{ k: f(lead, y => …) }}))` stays
 /// linear. Returns `None` (unchanged) when the last arg isn't an object/array-body arrow or
@@ -476,18 +488,21 @@ pub(crate) fn prebuild_expand_last_obj_array_body(
     if let Some(internal::Expression::ArrowFunctionExpression(arrow)) = last_arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
     {
-        match &**body_expr {
-            internal::Expression::ObjectExpression(_) => {
-                let raw = build_arrow_body_like_arrow(printer, body_expr);
-                let parens = d.parens(raw);
-                Some((body_expr.span().start, parens, parens))
-            }
-            internal::Expression::ArrayExpression(_) => {
-                let raw = build_arrow_body_like_arrow(printer, body_expr);
-                Some((body_expr.span().start, raw, d.parens(raw)))
-            }
-            _ => None,
+        if !matches!(
+            &**body_expr,
+            internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
+        ) {
+            return None;
         }
+        let raw = build_arrow_body_like_arrow(printer, body_expr);
+        // One paren rule, one site ([`arrow_hug_body_needs_parens`]) — the inject doc and the
+        // hug doc render the same body in the same position, so they cannot answer differently.
+        let doc = if arrow_hug_body_needs_parens(body_expr) {
+            d.parens(raw)
+        } else {
+            raw
+        };
+        Some((body_expr.span().start, doc, doc))
     } else {
         None
     }
@@ -832,6 +847,162 @@ pub(crate) fn build_own_line_post_arrow_state(
         d.softline(),
         d.text(")"),
     ]))
+}
+
+/// The lone **container** argument's hug — an object or array literal, including one behind a
+/// type cast (`callee({ … })`, `callee([ … ])`, `callee({ … } as T)`). Shared by the plain-call
+/// and `new` single-argument printers.
+///
+/// Two things the `new` twin's hand-rolled arm answered differently, both of them here:
+///
+/// - **The cast is looked through** ([`super::arg_predicates::is_array_or_object_unwrapped`],
+///   prettier's `couldExpandArg` reading past `as` / `satisfies` / `<T>x`). Matching the raw
+///   node kind instead left `new A({ … } as T)` off the hug entirely, so it broke out where
+///   the plain call expanded the object inside the cast.
+/// - **A truly empty container keeps the call's softlines** instead of hugging. The hug has no
+///   break point of its own, so an enclosing fluid assignment measures the whole flat width and
+///   breaks at `=`; with softlines the call breaks its own parens instead
+///   (`const a: T =⏎\tnew A({});` vs prettier's `… = new A(⏎\t{}⏎);`). "Truly" empty means no
+///   elements or properties AND no comments inside — a comment-only container produces
+///   hardlines, which already give the enclosing layout its break point, so it hugs like a
+///   non-empty one. The emptiness question is asked of the RAW node, so a cast container is
+///   never "empty" and always hugs, exactly as before.
+pub(crate) fn build_single_container_arg_doc(
+    printer: &Printer<'_>,
+    callee: DocId,
+    arg: &internal::Expression<'_>,
+) -> DocId {
+    let d = printer.d();
+    let is_truly_empty = match arg {
+        internal::Expression::ArrayExpression(arr) => {
+            arr.elements.is_empty()
+                && !printer.has_comments_to_emit_between(arr.span.start, arr.span.end)
+        }
+        internal::Expression::ObjectExpression(obj) => {
+            obj.properties.is_empty()
+                && !printer.has_comments_to_emit_between(obj.span.start, obj.span.end)
+        }
+        _ => false,
+    };
+    let arg_doc = printer.build_expression_doc(arg);
+    if is_truly_empty {
+        return wrap_call_with_soft_breaks(d, callee, arg_doc);
+    }
+    d.concat(&[callee, d.text("("), arg_doc, d.text(")")])
+}
+
+/// Build the ONE argument doc a lone huggable arrow's hug states share, choosing which of
+/// prettier's two renderings it is.
+///
+/// Prettier prints such an argument TWICE — `printedArguments` with no `expandLastArg` (so
+/// `shouldPrintAsChain` holds and a curried chain takes the progressive layout), feeding
+/// `allArgsBrokenOut()`, and a separate `lastArg` with `expandLastArg: true`, feeding the hug
+/// states. tsv builds only one, and which one is the whole question:
+///
+/// - **Untyped chain** — the progressive layout ([`build_printed_argument_doc`]). Its FLAT
+///   rendering is byte-identical to the hugged one, so the hug state (measured flat) still
+///   selects identically; the two diverge only once the argument is broken out, which is what
+///   the broken states want.
+/// - **Break-forcing chain** ([`arrow_chain_should_break`]: a return type with params, type
+///   params, or a non-identifier param anywhere) — this position wants prettier's
+///   `expandLastArg` print, which has no chain at all, so the argument is built OUTSIDE
+///   `build_printed_argument_doc` (no `ArrowChainContext` in scope, so the chain layout declines
+///   on the context) with `skip_arrow_chain` set for its *other* job: suppressing the
+///   nested-arrow break so the body still hugs `=>`. `calls/curried_arrow_chain` pins it.
+///
+/// One doc, deliberately: a second build recurses into any call nested in the body, so paying
+/// for one here would make the doc-node count 2^depth.
+pub(crate) fn build_arrow_arg_doc_for_hug_states(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+) -> DocId {
+    if is_curried_arrow_chain(arg) && arrow_chain_should_break(arrow) {
+        printer.skip_arrow_chain.set(true);
+        let doc = printer.build_expression_doc(arg);
+        printer.skip_arrow_chain.set(false);
+        return doc;
+    }
+    build_printed_argument_doc(printer, arg, || printer.build_expression_doc(arg))
+}
+
+/// The state ladder a **lone** huggable arrow argument selects among (`callee((x) => …)`),
+/// shared by the plain-call and `new` single-argument printers.
+///
+/// Two shapes, keyed on whether the arrow's body **expands internally** — an object or array
+/// literal body, whose own doc can break while the arrow stays hugged to `callee(`:
+///
+/// - such a body gets three states — hug flat, hug with the body broken
+///   (`group_break(arrow_doc)`), then the argument on its own line;
+/// - every other huggable body (a block, an expandable arrow chain) has only the outer two,
+///   since there is nothing between "hugged" and "broken out".
+///
+/// ⚠️ **The middle state is what a hand-rolled two-state copy loses, and its absence cannot be
+/// seen from a formatted source.** A source-multiline object carries its own `group_break`, so
+/// `state_hug` — measured only to that first forced break — already renders as the hug; the
+/// ladder is reached as a *width* question only when the body is written FLAT. So the `new`
+/// twin printed `new A(⏎\t(x) => ({ … })⏎)` where prettier hugs, and every fixed-point gate
+/// agreed with it. Pinning that needs an `unformatted_*` variant
+/// (`expressions/new/single_arg_arrow_body_long`), not an input-level case.
+pub(crate) fn build_single_arrow_arg_states(
+    d: &DocArena,
+    callee: DocId,
+    arrow_doc: DocId,
+    body_expands_internally: bool,
+) -> DocId {
+    let state_hug = d.concat(&[callee, d.text("("), arrow_doc, d.text(")")]);
+    let state_broken_out = d.concat(&[
+        callee,
+        d.text("("),
+        d.indent(d.concat(&[d.softline(), arrow_doc])),
+        d.softline(),
+        d.text(")"),
+    ]);
+    if !body_expands_internally {
+        return d.conditional_group(&[state_hug, state_broken_out]);
+    }
+    let state_body_break = d.concat(&[callee, d.text("("), d.group_break(arrow_doc), d.text(")")]);
+    // The broken-out state uses hard `line`s inside a `group_break` here rather than the
+    // softlines above: it is the last state, so it must render broken rather than re-measure.
+    let state_all_broken = d.concat(&[
+        callee,
+        d.group_break(d.concat(&[
+            d.text("("),
+            d.indent(d.concat(&[d.line(), arrow_doc])),
+            d.line(),
+            d.text(")"),
+        ])),
+    ]);
+    d.conditional_group(&[state_hug, state_body_break, state_all_broken])
+}
+
+/// Whether an arrow's body **expands internally** — an object or array literal, whose own doc
+/// breaks while the arrow itself stays hugged to the callee's `(`.
+///
+/// The single-argument counterpart of the body-kind test the expand-last object/array arm
+/// makes, named once so the ladder above and its callers cannot drift on what "expands" means.
+///
+/// ⚠️ **The body is read DIRECTLY — deliberately not through a curried chain.** A chain whose
+/// terminal is an object or array (`(x) => () => ({ … })`) does expand internally in prettier's
+/// output, and tsv breaks the whole argument out instead, so widening this to recurse looks like
+/// the fix. It is not: tsv's argument doc for a chain **is** the progressive chain layout, so the
+/// extra `group_break` state breaks the chain's own heads onto separate lines and then FITS —
+/// hugging a many-head chain prettier breaks out
+/// (`expressions/arrow/curried_untyped_call_arg_long` catches exactly that, in both the lone-
+/// and last-argument positions). Prettier can offer the state because its `expandLastArg` print
+/// has no chain layout at all, so a long chain simply does not fit and the state is rejected on
+/// width. Matching it needs that second, chain-free rendering of the argument — a second build,
+/// which recurses into any call nested in the body (2^depth, `fanout:audit`) — so the shape is
+/// left diverging rather than papered over here. TODO: close it if that rendering ever becomes
+/// cheap enough to build (a cached `skip_arrow_chain` doc would do it).
+pub(crate) fn arrow_body_expands_internally(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
+    match &arrow.body {
+        internal::ArrowFunctionBody::Expression(body_expr) => matches!(
+            &**body_expr,
+            internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
+        ),
+        internal::ArrowFunctionBody::BlockStatement(_) => false,
+    }
 }
 
 /// Build a conditional group that tries inline first, then expands all args.

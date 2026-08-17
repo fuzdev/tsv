@@ -1,0 +1,668 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 582,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " exactly 100 - the whole call fits, so the array body stays inline",
+			"start": 10,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 - the array body hugs the callee line and expands internally, with no added parens",
+			"start": 181,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 - an object body hugs the same way, keeping the parens the grammar requires",
+			"start": 383,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 83
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 581,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 572,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 80,
+					"end": 178,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 80,
+						"end": 177,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 98
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 80,
+							"end": 83,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 84,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 79
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 160,
+								"end": 176,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 81
+									},
+									"end": {
+										"line": 3,
+										"column": 97
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 161,
+										"end": 162,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 82
+											},
+											"end": {
+												"line": 3,
+												"column": 83
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ArrayExpression",
+									"start": 167,
+									"end": 176,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 88
+										},
+										"end": {
+											"line": 3,
+											"column": 97
+										}
+									},
+									"elements": [
+										{
+											"type": "Identifier",
+											"start": 168,
+											"end": 169,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 89
+												},
+												"end": {
+													"line": 3,
+													"column": 90
+												}
+											},
+											"name": "c"
+										},
+										{
+											"type": "Identifier",
+											"start": 171,
+											"end": 172,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 92
+												},
+												"end": {
+													"line": 3,
+													"column": 93
+												}
+											},
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 174,
+											"end": 175,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 95
+												},
+												"end": {
+													"line": 3,
+													"column": 96
+												}
+											},
+											"name": "e"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " exactly 100 - the whole call fits, so the array body stays inline",
+							"start": 10,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 272,
+					"end": 380,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 272,
+						"end": 379,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 272,
+							"end": 275,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 276,
+								"end": 351,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 80
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 353,
+								"end": 378,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 82
+									},
+									"end": {
+										"line": 10,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 354,
+										"end": 355,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 83
+											},
+											"end": {
+												"line": 6,
+												"column": 84
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ArrayExpression",
+									"start": 360,
+									"end": 378,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 89
+										},
+										"end": {
+											"line": 10,
+											"column": 2
+										}
+									},
+									"elements": [
+										{
+											"type": "Identifier",
+											"start": 364,
+											"end": 365,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 7,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										{
+											"type": "Identifier",
+											"start": 369,
+											"end": 370,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 3
+												}
+											},
+											"name": "d"
+										},
+										{
+											"type": "Identifier",
+											"start": 374,
+											"end": 375,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 2
+												},
+												"end": {
+													"line": 9,
+													"column": 3
+												}
+											},
+											"name": "e"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 - the array body hugs the callee line and expands internally, with no added parens",
+							"start": 181,
+							"end": 270
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 467,
+					"end": 571,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 467,
+						"end": 570,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 4
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 467,
+							"end": 470,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 13,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 471,
+								"end": 539,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 5
+									},
+									"end": {
+										"line": 13,
+										"column": 73
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 541,
+								"end": 569,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 75
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 542,
+										"end": 543,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 76
+											},
+											"end": {
+												"line": 13,
+												"column": 77
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 549,
+									"end": 568,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 83
+										},
+										"end": {
+											"line": 16,
+											"column": 2
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 553,
+											"end": 557,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 2
+												},
+												"end": {
+													"line": 14,
+													"column": 6
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 553,
+												"end": 554,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 2
+													},
+													"end": {
+														"line": 14,
+														"column": 3
+													}
+												},
+												"name": "f"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 556,
+												"end": 557,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 5
+													},
+													"end": {
+														"line": 14,
+														"column": 6
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											},
+											"kind": "init"
+										},
+										{
+											"type": "Property",
+											"start": 561,
+											"end": 565,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 6
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 561,
+												"end": 562,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 2
+													},
+													"end": {
+														"line": 15,
+														"column": 3
+													}
+												},
+												"name": "g"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 564,
+												"end": 565,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 5
+													},
+													"end": {
+														"line": 15,
+														"column": 6
+													}
+												},
+												"value": 2,
+												"raw": "2"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 - an object body hugs the same way, keeping the parens the grammar requires",
+							"start": 383,
+							"end": 465
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
