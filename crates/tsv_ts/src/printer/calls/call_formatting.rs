@@ -16,15 +16,16 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body,
 };
 use super::arg_wrapping::{
-    ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap,
+    ArgItem, ArgOpener, append_type_args_with_gap_comments, arg_needs_soft_wrap,
     arrow_body_expands_internally, arrow_hug_refused_by_comments, build_arrow_call_body_states,
     build_arrow_hug_arg_docs, build_arrow_hug_printed_doc, build_arrow_sig_doc,
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_expand_first_arg_doc, build_own_line_post_arrow_state, build_printed_argument_doc,
-    build_single_arrow_arg_states, build_single_container_arg_doc, could_expand_arrow_chain,
-    first_arg_signature_refuses_expand_first, last_arg_has_own_line_post_arrow_comment,
-    prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
-    try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
+    build_expand_first_arg_doc, build_own_line_post_arrow_arg_docs, build_own_line_post_arrow_doc,
+    build_printed_argument_doc, build_single_arrow_arg_states, build_single_container_arg_doc,
+    could_expand_arrow_chain, first_arg_signature_refuses_expand_first,
+    last_arg_has_own_line_post_arrow_comment, prepend_arrow_body_comments, should_expand_first_arg,
+    try_hook_deps_args_doc, try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
+    wrap_call_with_will_break_guard,
 };
 use super::call_paren_open;
 use super::expand_last::{ArgOwner, try_expand_last_arg};
@@ -698,6 +699,32 @@ fn try_single_arg_hug(
         return Some(wrap_call_with_soft_breaks(d, callee, arg_doc));
     }
 
+    // An own-line comment between `=>` and the body keeps the arrow start on the `callee(`
+    // line and breaks the closing paren onto its own. **Above the match**, because the rule is
+    // the gap's and not the body's ([`last_arg_has_own_line_post_arrow_comment`]) — asking it
+    // inside the block-arrow arm left every other body kind to the arms below, which are
+    // body-keyed and answer this gap not at all: a call or ternary body took its own
+    // reassembling layout and printed the signature past the print width with no state to
+    // fall through to (`calls/arrow_object_body_own_line_comment_long`).
+    //
+    // A break forced inside the SIGNATURE still wins, as it did when this lived one level
+    // down: that layout renders the signature's head on the callee's line, which the break
+    // makes impossible, so the block-arrow arm's own refusal keeps it.
+    if let internal::Expression::ArrowFunctionExpression(arrow) = arg
+        && !arrow_signature_has_breaking_comments(printer, arrow)
+        && last_arg_has_own_line_post_arrow_comment(printer, arg)
+    {
+        let docs =
+            build_own_line_post_arrow_arg_docs(printer, arg, || printer.build_expression_doc(arg));
+        return Some(build_own_line_post_arrow_doc(
+            d,
+            ArgOpener::Callee(callee),
+            &[],
+            docs.expanded,
+            docs.printed,
+        ));
+    }
+
     match arg {
         // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap
         //
@@ -856,17 +883,10 @@ fn build_block_arrow_hug_states(
         ]);
     }
 
-    // An own-line comment between `=>` and the body keeps the arrow start on the `callee(`
-    // line and breaks the closing paren onto its own. Above the body-kind arms below,
-    // because the rule is the gap's and not the body's — see
-    // [`last_arg_has_own_line_post_arrow_comment`].
-    if last_arg_has_own_line_post_arrow_comment(printer, arg) {
-        let printed = build_arrow_hug_printed_doc(printer, arg, arrow, build);
-        return d.concat(&[
-            callee,
-            build_own_line_post_arrow_state(d, d.text("("), &[], printed),
-        ]);
-    }
+    // ⚠️ An own-line comment between `=>` and the body is NOT asked here — `try_single_arg_hug`
+    // answers it above its whole body-kind match, because the rule is the gap's and not the
+    // body's and the arms past this builder never asked it at all. The only way such a comment
+    // reaches here is behind the signature-break refusal above, which returns first.
 
     // Prettier's two printings of the argument, and which of them each state reads:
     // [`build_arrow_hug_arg_docs`], shared with the `new` twin.

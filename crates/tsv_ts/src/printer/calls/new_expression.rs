@@ -4,12 +4,13 @@
 
 use super::arg_comments::{any_arg_empty_line, first_arg_has_any_comments};
 use super::arg_wrapping::{
-    append_type_args_with_gap_comments, arrow_body_expands_internally, build_arrow_hug_arg_docs,
-    build_arrow_hug_printed_doc, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_expand_first_arg_doc, build_own_line_post_arrow_state, build_single_arrow_arg_states,
-    build_single_container_arg_doc, first_arg_signature_refuses_expand_first,
-    last_arg_has_own_line_post_arrow_comment, should_expand_first_arg, try_hook_deps_args_doc,
-    try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
+    ArgOpener, append_type_args_with_gap_comments, arrow_body_expands_internally,
+    build_arrow_hug_arg_docs, build_arrow_hug_printed_doc, build_call_args_with_blank_lines,
+    build_empty_args_doc, build_expand_first_arg_doc, build_own_line_post_arrow_arg_docs,
+    build_own_line_post_arrow_doc, build_single_arrow_arg_states, build_single_container_arg_doc,
+    first_arg_signature_refuses_expand_first, last_arg_has_own_line_post_arrow_comment,
+    should_expand_first_arg, try_hook_deps_args_doc, try_hug_multiline_template_arg,
+    wrap_call_with_soft_breaks,
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
@@ -256,15 +257,15 @@ impl<'a> Printer<'a> {
                     // onto its own line — the rule is the gap's and not the body's, see
                     // [`last_arg_has_own_line_post_arrow_comment`].
                     if new_has_comments && last_arg_has_own_line_post_arrow_comment(self, arg0) {
-                        let printed = prepend_leading(
+                        let docs = build_own_line_post_arrow_arg_docs(self, arg0, build)
+                            .with_leading(d, glued);
+                        return build_own_line_post_arrow_doc(
                             d,
-                            glued,
-                            build_arrow_hug_printed_doc(self, arg0, arrow, build),
+                            ArgOpener::Callee(callee_with_types),
+                            &[],
+                            docs.expanded,
+                            docs.printed,
                         );
-                        return d.concat(&[
-                            callee_with_types,
-                            build_own_line_post_arrow_state(d, d.text("("), &[], printed),
-                        ]);
                     }
 
                     // Prettier's two printings of the argument and which state reads each —

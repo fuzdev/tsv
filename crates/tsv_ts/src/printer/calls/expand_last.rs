@@ -12,13 +12,13 @@ use super::arg_predicates::{
     is_ternary_arrow_body,
 };
 use super::arg_wrapping::{
-    arrow_body_expands_internally, arrow_hug_refused_by_comments, arrow_terminal_expression_body,
-    build_args_split_last, build_arrow_sig_doc, build_break_body_state, build_expand_all_args,
-    build_expand_last_arg_doc, build_inline_args, build_inline_hug_or_expand_all,
-    build_inline_or_expand_all, build_own_line_post_arrow_state, could_expand_arrow_chain,
-    last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
+    ArgOpener, arrow_body_expands_internally, arrow_hug_refused_by_comments, build_args_split_last,
+    build_arrow_sig_doc, build_break_body_state, build_expand_all_args,
+    build_expand_last_obj_array_doc, build_inline_args, build_inline_hug_or_expand_all,
+    build_inline_or_expand_all, build_own_line_post_arrow_doc, build_own_line_post_arrow_expanded,
+    could_expand_arrow_chain, last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
-    prepend_arrow_body_comments,
+    prebuild_own_line_post_arrow_body, prepend_arrow_body_comments,
 };
 use crate::ast::internal;
 use crate::printer::Printer;
@@ -184,7 +184,17 @@ pub(super) fn try_expand_last_arg(
     } else {
         None
     };
-    let inject = body_reuse.or(obj_reuse);
+    // The own-line-post-arrow state builds a SECOND printing of the last argument, so the
+    // shapes its ladder reaches but the two prebuilds above do not — a block terminal, a plain
+    // expression body — want an injection of their own, armed here so the body is built ONCE
+    // and shared with the `printedArguments` docs below.
+    let own_line_reuse =
+        if body_reuse.is_none() && obj_reuse.is_none() && takes_own_line_post_arrow_state {
+            prebuild_own_line_post_arrow_body(printer, last_arg)
+        } else {
+            None
+        };
+    let inject = body_reuse.or(obj_reuse).or(own_line_reuse);
 
     let (head_parts, last_arg_doc, all_args_broken) = printer
         .with_arrow_body_inject(inject, || {
@@ -202,10 +212,19 @@ pub(super) fn try_expand_last_arg(
         && let Some(last) = last_arg
         && last_arg_has_own_line_post_arrow_comment(printer, last)
     {
-        return Some(d.concat(&[
-            callee,
-            build_own_line_post_arrow_state(d, d.text("("), &head_parts, last_arg_doc),
-        ]));
+        // The state reads the `expandLastArg` printing (flat parameters) and the fallback the
+        // `printedArguments` one — see [`build_own_line_post_arrow_doc`] for why neither can
+        // stand in for the other.
+        let expanded = build_own_line_post_arrow_expanded(printer, inject, last_arg_doc, || {
+            printer.build_expression_doc(last)
+        });
+        return Some(build_own_line_post_arrow_doc(
+            d,
+            ArgOpener::Callee(callee),
+            &head_parts,
+            expanded,
+            all_args_broken,
+        ));
     }
 
     if last_is_function {
@@ -250,33 +269,23 @@ pub(super) fn try_expand_last_arg(
         if let Some(arg) = last_arg
             && let internal::Expression::ArrowFunctionExpression(arrow) = arg
             && arrow_body_expands_internally(arrow)
-            && let Some(body_expr) = arrow_terminal_expression_body(arrow)
-            // A break forced inside the signature, or a comment on the terminal body's tail —
-            // the hug renders the callee and the signature run on one line, and the states
-            // below read a printing that ends at the body.
-            && !(has_comments && arrow_hug_refused_by_comments(printer, arrow, body_expr))
+            // A break forced inside the signature — the hug renders the callee and the
+            // signature run on one line. NOT the body-tail question its reassembling
+            // siblings ask ([`arrow_hug_refused_by_comments`]): these states render the
+            // argument's own `expandLastArg` printing, so the body-end→arrow-end gap has an
+            // emitter here. See [`arrow_body_tail_has_comments`] for why refusing it was a
+            // bug rather than conservatism.
+            && !(has_comments && arrow_signature_has_breaking_comments(printer, arrow))
         {
-            // Prettier composes both hug states out of `lastArg` — its `expandLastArg` print,
-            // which has no chain layout — rather than out of a signature and a body doc:
-            // `[..headArgs, lastArg]` and `[..headArgs, group(lastArg, { shouldBreak: true })]`.
-            // The pre-built terminal body is re-injected around it, so the second printing costs
-            // signatures rather than the whole subtree — without that it recurses into any call
-            // nested in the body and the doc-node count goes 2^depth (`fanout:audit`).
-            let expanded_doc = printer.with_arrow_body_inject(obj_reuse, || {
-                build_expand_last_arg_doc(printer, || printer.build_expression_doc(arg))
-            });
-
-            let state_inline = build_inline_args(d, callee, &head_parts, expanded_doc);
-            let state_hug = d.concat(&[
-                callee,
-                d.text("("),
-                d.concat(&head_parts),
-                d.group_break(expanded_doc),
-                d.text(")"),
-            ]);
-            let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
-
-            return Some(d.conditional_group(&[state_inline, state_hug, state_expand_all]));
+            // The ladder, shared with the member chain's spelling of this same layout.
+            return Some(build_expand_last_obj_array_doc(
+                printer,
+                ArgOpener::Callee(callee),
+                obj_reuse,
+                &head_parts,
+                all_args_broken,
+                || printer.build_expression_doc(arg),
+            ));
         }
 
         // Block-body arrows, block-terminal arrow chains, and function expressions: inline vs
