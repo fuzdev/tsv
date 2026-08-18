@@ -14,9 +14,17 @@
 //! segments, the line-suffix flush). A swallow is a property of the physical
 //! output *line*, and a sub-render appends to the same line, so all of them drive
 //! one per-thread state machine (the `PENDING` thread-local below), reached through
-//! one [`SwallowTracker`] handle each. A `line_suffix` comment is not exempt: two of
-//! them flushed at the same line break land back-to-back on one line
-//! (`x; // c1 // c2`), and the first `//` swallows the second.
+//! one [`SwallowTracker`] handle each. A `line_suffix` comment is not exempt, and the
+//! coverage is deliberate rather than hypothetical: two of them flushed at one line break
+//! would land back-to-back (`x; // c1 // c2`, the first `//` swallowing the second) if
+//! `doc::arena_render_suffix` did not separate the run. This check is what proves it does
+//! — the guard and its witness are separate on purpose.
+//!
+//! The "line ended" half of the state machine hangs off [`note_line_end`], called from
+//! `render_line_break` — the one function every break in the renderer passes through. It
+//! is a free function rather than a [`SwallowTracker`] method because a break emitted
+//! outside a render policy's reach (the run separator is one) would otherwise leave
+//! `PENDING` armed and report a swallow that no longer happens.
 //!
 //! **Only a `//` (and the hashbang) can swallow** — `/* */` and `<!-- -->` close at
 //! their own delimiter, so they need no tag and reach the tracker as ordinary text,
@@ -120,8 +128,8 @@ impl SwallowTracker {
     /// Join the enclosing render from a **sub-render** (fill segment, line-suffix
     /// flush). Deliberately does *not* clear `PENDING`: the sub-render continues the
     /// same physical output line, so a comment pending from the main loop must stay
-    /// pending — clearing it here is exactly how the line-suffix flush used to hide
-    /// `x; // c1 // c2`.
+    /// pending — clearing it here is exactly how the line-suffix flush once hid
+    /// `x; // c1 // c2` from this check.
     pub(crate) fn join_render() -> Self {
         Self {
             enabled: swallow_check_enabled(),
@@ -165,17 +173,21 @@ impl SwallowTracker {
             }
         });
     }
+}
 
-    /// Observe a line break: a real newline (`emitted`) ends the comment's line.
-    ///
-    /// `&mut self` for the same reason as [`Self::on_text`] — the mutation is real,
-    /// it just lands in the `thread_local!`.
-    #[allow(clippy::needless_pass_by_ref_mut)]
-    #[inline]
-    pub(crate) fn on_newline(&mut self, emitted: bool) {
-        if emitted {
-            PENDING.with(|p| *p.borrow_mut() = None);
-        }
+/// Observe a real newline in the output: it ends the pending comment's line.
+///
+/// A free function rather than a [`SwallowTracker`] method because the newline seam is
+/// **not** the per-render handle's — every break the renderer emits goes through one
+/// function (`render_line_break`), including the line-suffix run separator, which runs
+/// outside any policy's reach. Keying the hook to that seam makes the coupling
+/// structural: a newline cannot be emitted without clearing `PENDING`, so a break the
+/// renderer takes can never be mistaken for a swallow. (The state is thread-local, so a
+/// handle would carry nothing anyway.)
+#[inline]
+pub(crate) fn note_line_end() {
+    if swallow_check_enabled() {
+        PENDING.with(|p| *p.borrow_mut() = None);
     }
 }
 

@@ -84,7 +84,7 @@ Every line is a **known bug**, and the file shrinking is the goal.
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
 DROPPED	import⟨⟩.	block
 DOUBLE-PRINTED	IDENT⟨⟩=	block,line
-SWALLOW	()⟨⟩;	line
+SWALLOW	␣⟨⟩);	line
 ```
 
 The gate fails on:

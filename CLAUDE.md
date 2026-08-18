@@ -953,7 +953,11 @@ and both then emit the newline (prettier pushes `hardlineWithoutBreakParent` the
 that ends inline lets the deferred `//` swallow the code after it, output that doesn't
 reparse. Because the boundary breaks on its own, planting one in front of a doc's own forced
 break renders a blank line instead. `arena_fits` answers the same question at measure time:
-a boundary reached with a suffix pending doesn't fit.
+a boundary reached with a suffix pending doesn't fit. And the flush is itself a **run** —
+two suffixes drain onto one line, so it owes the separator every other run owes
+(`doc::arena_render_suffix`, the renderer-level floor under the build-time askers, and the
+only one that can see whether the two actually share a line: the same source welds or does
+not depending on print width). Prettier's flush is a bare push with no separator at all.
 
 ⚠️ **A comma-separated list asks about one gap TWICE** — the previous element's trailing
 run and the next element's leading run — and the two must **partition** it: unclaimed is a
