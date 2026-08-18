@@ -521,7 +521,7 @@ impl<'a> Printer<'a> {
             .map(|v| v.span().end)
             .or_else(|| prop.type_annotation.as_ref().map(|ta| ta.span.end))
             .unwrap_or(after_modifier);
-        self.push_semicolon_with_gap_comments(&mut parts, content_end, prop.span.end, true);
+        self.push_semicolon_with_gap_comments(&mut parts, content_end, prop.span.end, true, None);
 
         d.concat(&parts)
     }
@@ -753,7 +753,13 @@ impl<'a> Printer<'a> {
                 },
                 |rt| rt.span.end,
             );
-            self.push_semicolon_with_gap_comments(&mut parts, content_end, method.span.end, true);
+            self.push_semicolon_with_gap_comments(
+                &mut parts,
+                content_end,
+                method.span.end,
+                true,
+                None,
+            );
         } else {
             self.append_body_with_sig_comments(&mut parts, sig_end, &method.value.body);
         }

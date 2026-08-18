@@ -711,7 +711,7 @@ pub fn build_variable_declaration_doc_with_comments(
     emit_semicolon: bool,
 ) -> DocId {
     let printer = make_doc_printer(arena, inputs, *embed);
-    printer.build_variable_declaration_doc(decl, emit_semicolon)
+    printer.build_variable_declaration_doc(decl, emit_semicolon, None)
 }
 
 /// Build a DocId for a TypeScript expression with comments in the caller's arena.

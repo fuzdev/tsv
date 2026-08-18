@@ -5,6 +5,7 @@
 use super::OpenParenLineBlockComment;
 use crate::ast::internal::{self, Statement};
 use crate::printer::expressions::blocks::StatementBlankScan;
+use crate::printer::statements::StatementContext;
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer, next_printed_stmt_start,
 };
@@ -538,7 +539,7 @@ impl<'a> Printer<'a> {
                 // A SwitchCase consequent isn't a Program/BlockStatement, so a
                 // bare string statement here is never directive-prologue
                 // eligible — see `Printer::needs_avoid_directive_parens`.
-                parts.push(self.build_statement_doc(stmt, false));
+                parts.push(self.build_statement_doc(stmt, StatementContext::OTHER_LIST));
                 parts.extend(trailing);
             } else {
                 // Build the indented content for this statement
@@ -579,7 +580,7 @@ impl<'a> Printer<'a> {
                     // The freeze emitter claims the glued block comment the statement
                     // owns — the leading run above skips it (docs/comments.md hazard 1).
                     Some(span) => self.build_frozen_node_doc(span),
-                    None => self.build_statement_doc(stmt, false),
+                    None => self.build_statement_doc(stmt, StatementContext::OTHER_LIST),
                 });
                 stmt_parts.extend(trailing);
 

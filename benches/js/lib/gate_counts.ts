@@ -370,14 +370,35 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// change, well above `CORPUS_FORMAT_MATCH_MIN`'s 2335 — a pre-existing slack in that
 	// floor, unrelated to this entry and deliberately not folded into it.
 	//
-	// 104 → 103: `js/function/issue-12967.js` leaves for **match** — a fix, not a
+	// 104 → 111: SEVEN files ARRIVE from `partial` in one step — a reclassification, not a
+	// loss. The clause-body statement tail now defers its own-line pre-`;` comment run
+	// through `line_suffix` (dedented to the flushing construct's level), so a collapsed
+	// head hoists the comment past the whole statement exactly as prettier does
+	// (`if (1) foo;⏎// c`) — the six `js/no-semi/*-statement.js` files and
+	// `js/for/continue-and-break-comment-without-blocks.js` lose the clause hunks the
+	// detector used to explain, leaving only a pre-existing residue no detector matches:
+	// for the no-semi six, a `// prettier-ignore` freeze's `;` binding; for the for/continue
+	// file, prettier reordering the hoisted comment past the author's blank line (tsv keeps
+	// the authored order: comment, then blank — knowingly left uncataloged for now; a
+	// candidate `_prettier_divergence` fixture). `js/comments/break-continue-statements-2.js`
+	// leaves `partial` for **match** outright in the same step. Measured by byte-diffing the
+	// formatted prettier suites against a pre-change binary: these eight are the only moves
+	// in any bucket, and `safety` / `errors` / `expected_errors` are unchanged.
+	//
+	// −1: `js/function/issue-12967.js` leaves for **match** — a fix, not a
 	// reclassification. A JSDoc-annotated arrow as an IIFE callee had its leading run
 	// hoisted out of the pair the callee is required to carry; the run now stays inside
 	// it, which is prettier's own answer at that position. Measured by diffing the
 	// `unknown` lists against a reverse-patched build over the whole corpus: this file
 	// and `js/function/iife.js` (see `CORPUS_FORMAT_PARTIAL_PIN`) are the only moves in
 	// any bucket, and `safety` / `errors` / `expected_errors` are byte-identical.
-	typescript: 103,
+	//
+	// ⚠️ The two entries above landed on SEPARATE branches, each measured against 104 in its
+	// own tree, so their deltas are NOT composable in general. **110 is the re-measurement on
+	// the merged tip**, not a sum — it happens to equal 111 − 1 because the two movers are
+	// disjoint (the clause-tail seven are `js/no-semi/*` and `js/for/*`, the IIFE mover is
+	// `js/function/*`), and that was verified per file rather than assumed.
+	typescript: 110,
 	css: 23
 };
 
@@ -411,7 +432,12 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// the family uniform. `CORPUS_FORMAT_UNKNOWN_PIN` does not move: this file left `partial`
 	// by matching outright.
 	//
-	// 31 → 32: `js/function/iife.js` arrives from `known` — prettier's own IIFE-comment
+	// 31 → 23: the eight clause-tail movers above — seven reclassify to `unknown` (their
+	// explained hunks became matches; only an unexplained residue remains) and
+	// `js/comments/break-continue-statements-2.js` leaves by matching outright. Reasoning on
+	// `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step.
+	//
+	// +1: `js/function/iife.js` arrives from `known` — prettier's own IIFE-comment
 	// test file, and a reclassification rather than a loss. The same fix that moved
 	// `issue-12967.js` to `match` (see `CORPUS_FORMAT_UNKNOWN_PIN`) re-cuts this file's
 	// hunks: the leading and trailing runs now stay inside the callee's pair, which
@@ -419,7 +445,12 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// neighbouring `comment_position` ones — the UNHONORED `prettier-ignore` at a callee
 	// (pinned in `ignore_audit_known.txt`) and the own-line block prettier pulls up to
 	// the `(` line. 16 of the file's 17 hunks are still explained.
-	typescript: 32,
+	//
+	// ⚠️ **24 is the re-measurement on the merged tip**, not 23 + 1: the two deltas above are
+	// off different bases. It agrees with the sum only because the movers are disjoint, which
+	// was checked per file (`js/function/iife.js` is in `partial`, `issue-12967.js` in
+	// neither bucket) rather than inferred from the arithmetic.
+	typescript: 24,
 	css: 9
 };
 
