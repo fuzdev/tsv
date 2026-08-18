@@ -152,7 +152,10 @@ run and the native `tests/discovery_parity.rs`). Runs per OS in CI (the
 `platforms` job).
 
 **Release**: `.github/workflows/release_napi.yml`, triggered by the v\* tag
-`scripts/publish.ts` pushes (or `workflow_dispatch` as a dry-run rehearsal).
+`scripts/publish.ts` pushes, by `workflow_dispatch` (dry-run by default — the
+pre-tag rehearsal; `dry_run=false` is the tagless recovery path for a failed
+tag run), and by a weekly cron that builds and gates the whole matrix as a
+forced dry-run, so a container/runner breakage surfaces within a week.
 Per target: container-pinned builds of **both** shipped binaries — the addon
 (`napi` profile) and the `tsv_cli` binary (plain `release`: abort + LTO, the
 same artifact the hyperfine benches measure; a standalone process owns its

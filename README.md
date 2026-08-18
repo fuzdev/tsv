@@ -5,7 +5,7 @@
 > precise language tools for TypeScript/JS, CSS, and Svelte in Rust - [tsv.fuz.dev](https://tsv.fuz.dev/)
 
 tsv is a toolchain for TypeScript/JS, CSS, and Svelte in Rust.
-The first release has a formatter that closely follows [Prettier](https://prettier.io/) +
+It ships a formatter that closely follows [Prettier](https://prettier.io/) +
 [prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
 and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
@@ -48,7 +48,7 @@ It's a high-effort project that prioritizes quality.
 
 ## About
 
-> **status**: pre-alpha - not for production use; the published WASM packages are for feedback
+> **status**: pre-alpha - not for production use; the published packages are for feedback
 
 tsv derives its tools from:
 
@@ -187,7 +187,7 @@ the format build excludes the JSON-AST conversion layer, and a TypeScript-only
 build would exclude Svelte and CSS entirely (lang-specific builds aren't published yet) -
 see [docs/architecture.md](docs/architecture.md)
 
-tsv currently has no support JS plugins or JS/WASM runtime integration.
+tsv currently has no support for JS plugins or JS/WASM runtime integration.
 JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
 but the current lean is against, mainly for performance and simplicity.
 Forks could maintain custom extensible APIs on some of tsv's crates today

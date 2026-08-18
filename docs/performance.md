@@ -457,7 +457,7 @@ variant histogram** (which node kind dominates the `Vec` the render/`fits`/build
 loops linearly scan), and the **DocText sub-histogram** (`Static` / `Pooled` /
 `SourceSpan` / `VerbatimSpan` share of `Text`). `--reuse` instead reports the
 **`reset()`-reuse high-water** — the peak retained node/children capacity across one
-shared arena (as the CLI/FFI/WASM batch drivers use), the number that shows a lower
+shared arena (as the CLI/FFI/NAPI/WASM batch drivers use), the number that shows a lower
 pre-size hint doesn't grow the batch footprint (it's bounded by actual max-file usage,
 not the hint). The static, load-independent counterpart to the timing/allocation
 tools — "what is the arena made of and how over-reserved is it" rather than "where
@@ -641,8 +641,9 @@ a result here:
 **A lever that makes a hot leaf smaller or simpler gets inlined at more call
 sites, and pays for itself in bytes at every one of them.** The instruction
 counter cannot see that, and neither can any gate in `deno task check` — the size
-bounds live in `scripts/validate_artifacts.ts`, which runs at **publish** time
-(`deno task publish` Step 3), not in `check`.
+bounds live in `scripts/validate_artifacts.ts` (the WASM bundles, at `deno task
+publish` Step 3) and `deno task validate:napi` (the native artifacts, in the
+tag-triggered release workflow), not in `check`.
 
 The worked case: rewriting the wire writer's integer emitter to end in a
 fixed-width copy instead of a runtime-length one removed a libc `memmove` call
