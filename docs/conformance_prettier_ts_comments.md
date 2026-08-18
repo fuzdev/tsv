@@ -518,6 +518,35 @@ tsv's rule is therefore about the **comment**, not the node: a comment glued to 
 
 **Ownership makes a comment invisible to emit-decisions, NOT to layout.** This is the rule for anyone extending the mechanism. An owned comment is skipped by the *to-emit* lookups (`comments_to_emit_in_range`) — the owning node prints it — so any gate deciding *who emits* must use them (`has_comments_to_emit_in_range`). But the comment is still on the page, still occupies width, and still means to prettier's rules exactly what an ordinary comment means. So any gate deciding *layout* must use the *on-page* lookups (`has_comments_on_page_in_range`), which count it. Get this backwards and the comment silently disappears from a layout decision: a unary operand loses the parens that keep the comment bound to the operand rather than the operator (`!(/* @__PURE__ */ f())` → `!/* @__PURE__ */ f()`), and a last argument loses the leading comment that refuses the expand-last hug. Both were real bugs. The unary wrap is decided **positionally** — the comment sits in the operator→operand gap, so `build_unary_doc` sees it there and adds the parens itself; `needs_parens` deliberately does *not* (it would double-wrap), and needs no left-spine walk, which is why an instantiation-expression operand (`!(/** @type {A} */ (x)<T>)`) gets the wrap for free.
 
+**Three before-separator gaps that are deliberately NOT fixed.** Each is internally
+inconsistent with a rule stated elsewhere in this catalog, and in each case the
+"consistent" answer would manufacture a divergence or move a position no real code
+writes. Recorded so the inconsistency is not re-derived from the code and closed by
+someone who only sees one side of it.
+
+- **Mapped-type modifier→`[`** — `readonly /* c */ [K in T]`, and the same across a
+  sign (`+readonly`, `-readonly`, and the interior `+/* c */ readonly`): **both**
+  formatters hoist the comment ahead of the whole modifier (`/* c */ readonly [K in T]`),
+  and tsv follows. That is the opposite of the answer one construct away, where tsv
+  preserves after the keyword and prettier relocates into the brackets
+  ([index_signature_readonly_comment](../tests/fixtures/typescript/types/type_members/index_signature_readonly_comment_prettier_divergence/)).
+  The inconsistency is between two tsv sites, not between tsv and prettier — closing it
+  would open a new divergence here.
+- **Mapped-type sign interior** — a comment between the two tokens of a `+?` / `-?`
+  marker (`[K in T]+/* c */?: V`). tsv folds it ahead of the whole marker
+  (`[K in T] /* c */+?: V`), so the sign gap loses the authored-side distinction the
+  mapped optional-marker entry above preserves for the marker's two *outer* gaps, and it
+  is not what [§Comments inside a multi-word keyword](#comments-inside-a-multi-word-keyword)
+  would give a two-token operator. Prettier instead relocates it into the brackets
+  (`[K in T /* c */]+?: V`), so this is a real divergence and it is **unpinned**:
+  prettier's landing is dual-stable (tsv preserves it in place), while tsv's fold is
+  stable under tsv alone. Lossless and idempotent on both sides; left as-is.
+- **Labeled statement name→`:`** — `lbl /* c */: stmt`. A MATCH in all three spellings:
+  both formatters keep an inline block comment in the gap, and both hoist a line comment
+  or an own-line block comment to lead the whole statement. Internally inconsistent with
+  the trailing-collapse family, and the consistent answer would be a divergence against a
+  prettier position that is not wrong.
+
 ### Comments inside a multi-word keyword
 
 A comment can sit **inside** a keyword that spans two or more words — `await /* c */ using`,

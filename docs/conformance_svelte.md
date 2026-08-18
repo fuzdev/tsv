@@ -177,6 +177,19 @@ Where the two goals conflict on conformant input, Svelte-parity wins for now.
   **end of input**, by contrast, is rejected by both parsers — pinned by the
   `input_invalid_escape_eof_*` files in
   [css/tokens/escapes/escape_eof](../tests/fixtures/css/tokens/escapes/escape_eof/input.svelte).)
+- **`::part()`'s ident-run model makes one over-rejection load-bearing for the
+  WIRE.** tsv models `::part( <ident>+ )` per CSS Shadow Parts — an ident run,
+  not selectors — so it rejects the comma form `::part(a, b)` that `parseCss`
+  accepts. That acceptance is incidental: `parseCss` reads *every* pseudo-element
+  argument with `read_selector_list`, so the comma list falls out of the generic
+  reader rather than out of a `::part` grammar, and tsv's rejection is
+  spec-correct. What makes revisiting it more than a verdict change is the public
+  AST: `write_part_args` **projects** the internal ident run onto `parseCss`'s
+  `PseudoElementSelector.args` selector-list shape (see [§CSS Compat
+  Behaviors](#css-compat-behaviors)), and that projection can synthesize only
+  descendant-combinator chains of `TypeSelector`s. Widening the parser to accept
+  the comma form without widening the projection would emit a **wrong AST**, not
+  merely a different accept/reject — the two move together or not at all.
 
 **Explicit non-goals.** Preprocessor and vendor dialects — SCSS/Sass, LESS, CSS
 Modules, PostCSS plugin syntax, YAML front-matter, and IE hacks (`*zoom`,
@@ -950,7 +963,7 @@ Implementation oddities in Svelte's parser that tsv replicates for AST compatibi
 - Block-comment stripping in declaration value — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
 - Block-comment stripping in at-rule prelude — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
 - :dir()/:lang()/::highlight() identifier wrapping — `crates/tsv_css/src/ast/convert/mod.rs`
-- ::part() ident run re-projected onto parseCss's selector-list arg shape — `write_part_args` in `crates/tsv_css/src/ast/convert/write.rs`
+- ::part() ident run re-projected onto parseCss's selector-list arg shape — `write_part_args` in `crates/tsv_css/src/ast/convert/write.rs` (the projection synthesizes descendant-combinator `TypeSelector` chains only, which is what binds it to the parser's ident-run model — see [§CSS Parser Scope & Error Model](#css-parser-scope--error-model))
 - Selector-name half-decoding (class/id/type, pseudo-class/element, **and** attribute names) — `raw_selector_name` in `crates/tsv_css/src/ast/convert/mod.rs`
 - HTML comment (CDO/CDC) `<!-- ... -->` swallow at statement/selector-list boundaries — `skip_html_comment_markers` in `crates/tsv_css/src/parser/mod.rs`
 

@@ -10,6 +10,25 @@
 
 **No code changes without a failing fixture first.** Even "obvious" fixes need a fixture proving the divergence exists. The fixture is the proof and the regression guard. Exception: pure comment/doc updates that don't change behavior.
 
+## When a fixture is the wrong tool
+
+A fixture defines *correct formatting*, with prettier as the source of truth. That is the
+right instrument for a formatting conformance bug — our output differing from prettier's,
+which is the bulk of the work: SAFETY violations, unknowns, partials, sanctioned
+divergences. Where the bug is not about formatting output, a fixture adds ceremony without
+a claim, and a **unit test at the failure site** is the instrument:
+
+- **Parser crashes** — a panic, a stack overflow, an unbounded scan. These are internal
+  bugs, not formatting disagreements; the fix is a guard, and the test belongs on the
+  guarded function. (A `ValueCursor` state update that didn't guard parens inside quotes
+  overflowed the stack; two lines and cursor-level unit tests closed it — no fixture.)
+- **Infrastructure** — FFI, CLI argument parsing, serialization.
+- **Lexer/parser correctness where the AST is wrong but formatting is incidentally right**
+  — test at the parser level, where the wrong node is observable.
+
+The two are not exclusive: a parser fix that also changes output still wants the fixture.
+The question is what the bug *is*, not which test is cheaper to write.
+
 ## TDD Steps
 
 These steps match CLAUDE.md's numbered list. Each is expanded in a section below.

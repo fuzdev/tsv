@@ -133,6 +133,22 @@ unexpected over-rejections, stale ledgers, SAFETY — catch tsv-side regressions
 independently, but the glance is cheap.) Never re-pin to absorb an unexplained move:
 that is the regression the pin exists to catch.
 
+**Attribute the move before you re-pin, even when the cause is archaeological.** A
+deliberate change explains itself; a move nobody can name still can be attributed by
+re-running an older tree — `git archive` it into a scratch checkout, point it at the
+*same* oracle checkouts, and diff the **per-file bucket sets**, not the totals. Which
+files changed bucket, and in which direction, is the attribution; totals can offset and
+say nothing. ⚠️ `git archive` stamps commit-time mtimes, so a scratch tree sharing a
+`CARGO_TARGET_DIR` with the live one reuses the newer binary and measures nothing —
+`touch` the extracted tree, or give it its own target dir, and confirm the binary is
+actually fresh rather than trusting cargo's exit code.
+
+**Re-measure at re-pin time.** The corpus legs read live working trees, so their counts
+drift with ordinary work in the scanned repos and a number cited from an earlier run is
+already a guess. Take the reading in the same change that writes the constant, and
+re-pin as one deliberate corpus refresh — the checkout commits, the counts, and the
+attribution note landing together.
+
 ## Why both the pins AND the checkout alignment exist
 
 They guard different granularities. Checkout alignment
