@@ -14,7 +14,7 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 
 ## Local build & CI
 
-A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --profile napi`) drives the **Node** benchmark runner (`benches/js/lib/napi.ts` loads the built cdylib from `target/napi/` directly via `process.dlopen` — no `.node` rename). CI builds and boundary-tests the addon per OS (the `platforms` job runs `deno task test:napi` on macOS + Windows). The cross-platform publish is the tag-triggered matrix workflow (see §The npm packages, **Release**), decoupled from the WASM releases — never bolted onto the single-machine `deno task publish`. The native set is expected to eventually **subsume** the WASM path as tsv's primary native distribution.
+A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --profile napi`) drives the **Node** benchmark runner (`benches/js/lib/napi.ts` loads the built cdylib from `target/napi/` directly via `process.dlopen` — no `.node` rename). CI builds and boundary-tests the addon per OS (the `platforms` job runs `deno task test:napi` on macOS + Windows; the `artifacts` job runs `deno task test:napi:npm` on Linux — the only PR runner that reaches `platform.js`'s `is_musl()` branch). The cross-platform publish is the tag-triggered matrix workflow (see §The npm packages, **Release**), decoupled from the WASM releases — never bolted onto the single-machine `deno task publish`. The native set is expected to eventually **subsume** the WASM path as tsv's primary native distribution.
 
 ## Features
 
@@ -149,12 +149,14 @@ entries: `bin.js` (native discovery via the shim — the real `npx tsv` path)
 and `cli.js` directly (the fallback JS loop over the native `IgnoreStack`,
 the table's standing third consumer beside `scripts/test_npm.ts`'s wasm CLI
 run and the native `tests/discovery_parity.rs`). Runs per OS in CI (the
-`platforms` job).
+`platforms` job on macOS + Windows, the `artifacts` job on Linux).
 
 **Release**: `.github/workflows/release_napi.yml`, triggered by the v\* tag
 `scripts/publish.ts` pushes, by `workflow_dispatch` (dry-run by default — the
-pre-tag rehearsal; `dry_run=false` is the tagless recovery path for a failed
-tag run), and by a weekly cron that builds and gates the whole matrix as a
+pre-tag rehearsal; `dry_run=false` is the recovery path for a failed tag run,
+dispatched **on the tag** so the tag↔version assertion still applies — it keys
+on the ref, and a branch dispatch publishes without it and logs that it did),
+and by a weekly cron that builds and gates the whole matrix as a
 forced dry-run, so a container/runner breakage surfaces within a week.
 Per target: container-pinned builds of **both** shipped binaries — the addon
 (`napi` profile) and the `tsv_cli` binary (plain `release`: abort + LTO, the
