@@ -802,6 +802,17 @@ impl<'a> Printer<'a> {
     /// genuinely trailing runs and keep it; the operator→operand gap is a **leading** run
     /// of the right operand that borrows this emitter for its anchor rule, and prettier's
     /// `printLeadingComment` has no emitter for such a blank at all.
+    ///
+    /// ⚠️ **Caller invariant: an unconditional break must IMMEDIATELY follow the run.**
+    /// The own-line arms emit each comment as REAL text, so a run-final `//` leaves its
+    /// line open until the caller's next break — and a later gap's `line_suffix` flushing
+    /// at that break lands welded onto it, invisible to the render-time run separator
+    /// (`doc/arena_render_suffix.rs`), which compares suffix against suffix, never
+    /// suffix against emitted text. Every current caller closes the line at once (a
+    /// `hardline`, or a `group_break`-forced `softline`) with nothing between that could
+    /// queue a suffix; a new call site that cannot guarantee that must defer the run
+    /// through the suffix machinery instead (the clause-body statement tail does —
+    /// `GapDeferral::LineSuffix` in `Printer::push_gap_comments`).
     pub(crate) fn push_anchored_trailing_run(
         &self,
         parts: &mut DocBuf,

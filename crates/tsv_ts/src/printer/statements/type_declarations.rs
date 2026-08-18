@@ -118,6 +118,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_type_alias_declaration_doc(
         &self,
         decl: &internal::TSTypeAliasDeclaration<'_>,
+        clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![];
@@ -210,7 +211,13 @@ impl<'a> Printer<'a> {
         // disagreeing with every other `;` in the language (docs/comments.md §Trailing
         // and dangling runs).
         let value_end = decl.type_annotation.span().end;
-        self.push_semicolon_with_gap_comments(&mut parts, value_end, decl.span.end, false);
+        self.push_semicolon_with_gap_comments(
+            &mut parts,
+            value_end,
+            decl.span.end,
+            false,
+            clause_tail,
+        );
 
         d.concat(&parts)
     }
@@ -861,6 +868,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_declare_function_doc(
         &self,
         decl: &internal::TSDeclareFunction<'_>,
+        clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -943,6 +951,7 @@ impl<'a> Printer<'a> {
             paren_pos,
             decl.span.end,
             &mut deferred,
+            clause_tail,
         );
 
         tail.push(d.text(";"));
@@ -1330,8 +1339,9 @@ impl<'a> Printer<'a> {
     pub(super) fn build_module_declaration_doc(
         &self,
         decl: &internal::TSModuleDeclaration<'_>,
+        clause_tail: Option<u8>,
     ) -> DocId {
-        self.build_module_declaration_doc_inner(decl, true)
+        self.build_module_declaration_doc_inner(decl, true, clause_tail)
     }
 
     /// Inner helper for module declaration doc building
@@ -1340,6 +1350,7 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::TSModuleDeclaration<'_>,
         is_root: bool,
+        clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
@@ -1407,7 +1418,7 @@ impl<'a> Printer<'a> {
                     let name_end = decl.id.span().end;
                     parts.push(self.build_dotted_pair_doc(
                         name_doc,
-                        self.build_module_declaration_doc_inner(nested, false),
+                        self.build_module_declaration_doc_inner(nested, false, None),
                         name_end,
                         nested.span.start,
                     ));
@@ -1509,6 +1520,7 @@ impl<'a> Printer<'a> {
                     decl.id.span().end,
                     decl.span.end,
                     false,
+                    clause_tail,
                 );
             }
         }

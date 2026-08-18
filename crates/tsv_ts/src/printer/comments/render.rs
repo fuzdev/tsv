@@ -245,4 +245,41 @@ impl<'a> Printer<'a> {
         let d = self.d();
         d.line_suffix(d.concat(&[d.hardline(), d.hardline(), self.build_comment_doc(comment)]))
     }
+
+    /// The clause-tail spelling of
+    /// [`Self::build_trailing_comment_doc_own_line_blank`]: the break still rides
+    /// inside the `line_suffix`, wrapped in `dedent` levels of `DocArena::dedent`.
+    ///
+    /// A clause body sits `dedent` `indent` wraps inside the construct whose break
+    /// flushes its tail (`StatementContext::clause_body`'s count), and a suffix's
+    /// interior break renders at the indent it was QUEUED at — the body's — so the
+    /// freed comment would land one construct too deep and settle only on the second
+    /// pass, when the reparse reads it from the construct's own gap. The dedent bakes
+    /// the settled level into the payload at build time; the renderer's flush-indent
+    /// policy is untouched (neither the queued nor the flush indent generalizes —
+    /// see `doc/arena_render_suffix.rs`).
+    ///
+    /// Precondition: the suffix must not be queued inside a sub-tab `align` run —
+    /// `RenderIndent::dedented` debug-asserts on pending aligns. Statement positions
+    /// never sit inside one today (`align` is type-printing-only), which is what makes
+    /// the wrap safe here.
+    pub(crate) fn build_clause_tail_comment_doc(
+        &self,
+        comment: &internal::Comment,
+        blank_above: bool,
+        dedent: u8,
+    ) -> DocId {
+        let d = self.d();
+        let mut inner = if blank_above {
+            // The blank is a second hardline, not a `literalline` — the deferred
+            // sites' rule (see the sibling above).
+            d.concat(&[d.hardline(), d.hardline(), self.build_comment_doc(comment)])
+        } else {
+            d.concat(&[d.hardline(), self.build_comment_doc(comment)])
+        };
+        for _ in 0..dedent {
+            inner = d.dedent(inner);
+        }
+        d.line_suffix(inner)
+    }
 }
