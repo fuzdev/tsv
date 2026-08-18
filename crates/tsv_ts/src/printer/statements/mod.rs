@@ -114,10 +114,25 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
+        let expr_end = stmt.expression.span().end;
+        // A `//` the author wrote inside the value's own grouping parens keeps those
+        // parens, and everything up to their `)` is the VALUE's share of the gap rather
+        // than the terminator's — the terminator gap would defer the comment past the `;`,
+        // onto a line that may already hold a `//`, where the two MERGE into one. The
+        // statement value positions that re-parenthesize (declarator initializer,
+        // assignment RHS, ternary branch) already answer this way through the shared shell
+        // builder; a bare expression statement was the holdout.
+        let shell_close = (!stmt.is_directive)
+            .then(|| self.value_paren_line_comment_close(expr_end, stmt.span.end))
+            .flatten();
         let mut parts: DocBuf = if stmt.is_directive {
             smallvec![self.build_directive_doc(stmt)]
         } else {
-            smallvec![self.build_expression_statement_value_doc(stmt, in_program_or_block)]
+            smallvec![self.build_expression_statement_value_doc(
+                stmt,
+                in_program_or_block,
+                shell_close
+            )]
         };
 
         // Comments between the expression and the `;`, with the `;` bound to the
@@ -126,8 +141,10 @@ impl<'a> Printer<'a> {
         // (`fn() // c` → `fn(); // c`), an own-line comment drops to its own line after it
         // (emitting a line comment before the `;` would swallow it). See
         // `push_semicolon_with_gap_comments`.
-        let expr_end = stmt.expression.span().end;
-        self.push_semicolon_with_gap_comments(&mut parts, expr_end, stmt.span.end, true);
+        let gap_start = shell_close.map_or(expr_end, |close| {
+            Self::past_grouping_close(close, stmt.span.end)
+        });
+        self.push_semicolon_with_gap_comments(&mut parts, gap_start, stmt.span.end, true);
         d.concat(&parts)
     }
 
@@ -164,6 +181,7 @@ impl<'a> Printer<'a> {
         &self,
         stmt: &internal::ExpressionStatement<'_>,
         in_program_or_block: bool,
+        shell_close: Option<u32>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -281,6 +299,35 @@ impl<'a> Printer<'a> {
             parts.push(d.text(")"));
         } else if decorated_class_expr {
             parts.push(self.build_break_open_parens(expr_doc));
+        } else if let Some(close) = shell_close {
+            // The value's authored parens are RETAINED around a `//` that would otherwise
+            // escape them (see [`Self::build_expression_statement_doc`]). This pair is the
+            // position's pair — a shell whose `(` leads the statement already discharges
+            // what `needs_parens` wraps for, so adding the clarity pair too would double
+            // it. The leading run is the plain branch's, unchanged: a dropped source `(`
+            // is what strands it, and here the `(` is kept, so only the expression's own
+            // owned comments ride inside `expr_doc`.
+            let mut inner = DocBuf::new();
+            if !needs_parens && source_paren {
+                self.push_leading_comment_run(
+                    &mut inner,
+                    paren_gap(),
+                    expr_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
+            }
+            inner.push(expr_doc);
+            self.push_anchored_trailing_run(
+                &mut inner,
+                stmt.expression.span().end,
+                close,
+                crate::printer::RunLeadingBlank::Keep,
+            );
+            parts.push(d.text("("));
+            parts.push(d.indent_hardline(d.concat(&inner)));
+            parts.push(d.hardline());
+            parts.push(d.text(")"));
         } else {
             if needs_parens {
                 parts.push(d.text("("));

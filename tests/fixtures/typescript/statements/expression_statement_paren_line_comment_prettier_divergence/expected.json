@@ -1,0 +1,597 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 661,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` written inside the value's own grouping parens keeps those parens, rather",
+			"start": 10,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " than deferring past the `;` onto a line that may already hold one — two `//`s",
+			"start": 95,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " sharing an output line merge into a single comment.",
+			"start": 177,
+			"end": 231,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 239,
+			"end": 244,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 4
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 249,
+			"end": 254,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 4
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the parens the statement would print anyway are the same single pair",
+			"start": 257,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 343,
+			"end": 347,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 11
+				},
+				"end": {
+					"line": 11,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 373,
+			"end": 377,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 17
+				},
+				"end": {
+					"line": 15,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a comment past the closing paren is outside the parens, so it trails the `;`",
+			"start": 384,
+			"end": 463,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 471,
+			"end": 475,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 4
+				},
+				"end": {
+					"line": 20,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 480,
+			"end": 487,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 4
+				},
+				"end": {
+					"line": 21,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control: a trailing block needs no shell — it does not end its line, so its",
+			"start": 490,
+			"end": 568,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " placement past the `;` is lossless and stable in both formatters.",
+			"start": 570,
+			"end": 638,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 643,
+			"end": 650,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 4
+				},
+				"end": {
+					"line": 25,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 660,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 651,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 233,
+					"end": 248,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 237,
+						"end": 238,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 3
+							}
+						},
+						"name": "x",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 239,
+								"end": 244
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` written inside the value's own grouping parens keeps those parens, rather",
+							"start": 10,
+							"end": 93
+						},
+						{
+							"type": "Line",
+							"value": " than deferring past the `;` onto a line that may already hold one — two `//`s",
+							"start": 95,
+							"end": 175
+						},
+						{
+							"type": "Line",
+							"value": " sharing an output line merge into a single comment.",
+							"start": 177,
+							"end": 231
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 249,
+							"end": 254
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 330,
+					"end": 351,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 334,
+						"end": 342,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 10
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 336,
+								"end": 340,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 4
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 336,
+									"end": 337,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 4
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 339,
+									"end": 340,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 7
+										},
+										"end": {
+											"line": 11,
+											"column": 8
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"kind": "init"
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 343,
+								"end": 347
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the parens the statement would print anyway are the same single pair",
+							"start": 257,
+							"end": 328
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 354,
+					"end": 381,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "FunctionExpression",
+						"start": 358,
+						"end": 372,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 2
+							},
+							"end": {
+								"line": 15,
+								"column": 16
+							}
+						},
+						"id": null,
+						"expression": false,
+						"generator": false,
+						"async": false,
+						"params": [],
+						"body": {
+							"type": "BlockStatement",
+							"start": 370,
+							"end": 372,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 14
+								},
+								"end": {
+									"line": 15,
+									"column": 16
+								}
+							},
+							"body": []
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 373,
+								"end": 377
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 465,
+					"end": 479,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 469,
+						"end": 470,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 2
+							},
+							"end": {
+								"line": 20,
+								"column": 3
+							}
+						},
+						"name": "x",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 471,
+								"end": 475
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment past the closing paren is outside the parens, so it trails the `;`",
+							"start": 384,
+							"end": 463
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 480,
+							"end": 487
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 640,
+					"end": 642,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 640,
+						"end": 641,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 25,
+								"column": 2
+							}
+						},
+						"name": "x"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a trailing block needs no shell — it does not end its line, so its",
+							"start": 490,
+							"end": 568
+						},
+						{
+							"type": "Line",
+							"value": " placement past the `;` is lossless and stable in both formatters.",
+							"start": 570,
+							"end": 638
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 643,
+							"end": 650
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
