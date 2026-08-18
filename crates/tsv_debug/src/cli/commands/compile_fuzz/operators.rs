@@ -586,9 +586,9 @@ fn splice_donor(
 }
 
 /// Inject a comment where a rewrite may mint a synthetic span around it. Comments
-/// are the arc's recurring hazard class (a comment can be dropped, double-printed,
-/// or re-bound by a rewrite that gives the surrounding node a fresh span), and the
-/// payloads cover the distinct ownership paths.
+/// are the compiler work's recurring hazard class (a comment can be dropped,
+/// double-printed, or re-bound by a rewrite that gives the surrounding node a fresh
+/// span), and the payloads cover the distinct ownership paths.
 fn inject_comment(source: &str, anchors: &Anchors, rng: &mut Rng) -> Option<String> {
     let &(text, kind) = pick(rng, COMMENTS)?;
     let at = match kind {

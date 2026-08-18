@@ -2,7 +2,7 @@
 name = "tsv_napi"
 version.workspace = true
 edition.workspace = true
-description = "TypeScript and Svelte tools - N-API bindings (Node.js/Bun)"
+description = "precise language tools for TypeScript/JS, CSS, and Svelte - N-API bindings (Node.js/Bun)"
 license.workspace = true
 repository.workspace = true
 

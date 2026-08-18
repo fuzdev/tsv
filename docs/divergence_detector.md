@@ -87,8 +87,8 @@ interface DiffHunk {
 
 ```bash
 # Compare corpus against Prettier (uses divergence detection)
-deno task corpus:compare:format ~/dev/some-project
-deno task corpus:compare:format ~/dev/some-project --explain         # Show which patterns matched
+deno task corpus:compare:format ../some-project
+deno task corpus:compare:format ../some-project --explain         # Show which patterns matched
 deno task corpus:compare:format --all --audit-patterns               # Per-pattern coverage with samples
 
 # Audit: runs every pattern against every documented fixture's committed prettier
@@ -208,7 +208,7 @@ Four buckets, in rough priority order:
    keyed on the construct head *above* the hunk carrying the comment that forced the
    break: an ordinary indentation defect has no such comment and is never claimed, so
    the detector cannot mask the tsv defect class it most resembles.
-   Of the remainder, the **11 that some pattern also LISTS** are ratcheted by
+   Of the remainder, the **13 that some pattern also LISTS** are ratcheted by
    `KNOWN_PARTIAL` in `fixture_coverage_test.ts` — a listed fixture going partial fails
    the gate, and an entry that stops firing fails too, so the list mirrors the live set
    and can only shrink.
@@ -237,11 +237,16 @@ language/feature pattern claims a hunk before the broad `fill_101_boundary` /
 1. **Language-specific narrow patterns** — BOM stripping, self-closing normalization,
    empty-statement removal, …
 2. **CSS patterns** — at-rule spacing/wrapping, selectors, comments, SCSS directives, …
+   (followed by `format_ignore_preserved` — directive-driven suppression, the most
+   specific signal there is, placed ahead of every layout heuristic)
 3. **Feature patterns** — template-literal width, member-expression call,
-   return-type generic union, …
+   return-type generic union, `block_expression_logical`, …
 4. **Svelte element/block patterns** — `inline_content_hug`, `short_expr_100`,
-   `block_expression_logical`, `comment_preserved`, …
-5. **Broad fallbacks, run last** — `css_value_wrap`, `fill_101_boundary`,
+   `comment_preserved`, …
+5. **Semantic preservation patterns** — `instantiation_parens`,
+   `single_type_param_comma`, `block_comment_computed_member`, `block_comment_chain`,
+   `jsdoc_type_cast_parens`
+6. **Broad fallbacks, run last** — `css_value_wrap`, `fill_101_boundary`,
    `comment_position`
 
 `patterns.ts` is the source of truth for the full list and each pattern's

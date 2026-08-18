@@ -126,7 +126,7 @@ and package READMEs for the full API and CLI flags:
 
 - focused on reducing complexity
   - supports Svelte, TypeScript/JS, CSS and planned HTML/JSON - but no JSX/SCSS/etc
-  - formater is non-configurable: formatting style is hardcoded to
+  - formatter is non-configurable: formatting style is hardcoded to
     Prettier's defaults with Svelte's official repo config
     (`printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
     `trailingComma: 'none'`),

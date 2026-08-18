@@ -209,30 +209,23 @@ cargo run -p tsv_cli parse --content 'a /* comment */ => x' --parser typescript 
 cargo run -p tsv_debug canonical_parse --content 'a /* comment */ => x' --parser typescript
 ```
 
-### 4.2 Create Fixture
+### 4.2 Create Fixture with `fixture_init`
+
+Follow the standard TDD workflow ([fixture_workflow.md](./fixture_workflow.md) — read it
+plus [fixture_naming.md](./fixture_naming.md) first). `fixture_init` prettier-formats the
+input and generates `expected.json` in one step, so the input is format-stable by
+construction — never hand-write `input.*` with `mkdir` + a text editor, which yields
+fixtures that fail F1.
+
+**Prefer `.svelte`** (exercises the same parser, has canonical source). Use `.ts` only for
+file-level features that can't exist inside `<script>` (e.g., hashbang at byte 0).
 
 ```bash
-mkdir -p tests/fixtures/typescript/[category]/[pattern_name]
+cargo run -p tsv_debug fixture_init tests/fixtures/typescript/[category]/[pattern_name] \
+  --content '<script lang="ts">const f = (a) /* comment */ => x;</script>'
 ```
 
-### 4.3 Write input.ts (or input.svelte)
-
-**Prefer `.svelte` for most cases** (exercises same parser, has canonical source). Use `.ts` only for file-level features that can't exist inside `<script>` (e.g., hashbang at byte 0).
-
-```svelte
-<script lang="ts">
-// Minimal reproduction of the pattern
-const f = a /* comment */ => x;
-</script>
-```
-
-### 4.4 Generate expected.json
-
-```bash
-deno task fixtures:update:parsed [pattern]
-```
-
-### 4.5 Validate Structure
+### 4.3 Validate Structure
 
 ```bash
 # First, verify fixture structure (skip our parser/formatter)
@@ -301,10 +294,13 @@ Confirm:
 Then refresh [conformance_test262.md §Current Results](./conformance_test262.md#current-results)
 with the new counts.
 
-### Run Full Test Suite
+### Run the Gates
 
 ```bash
-deno task check
+deno task check                # the standing gate suite (no test262 leg)
+deno task conformance:test262  # the test262 release gate: `test262 --gate`, enforcing
+                               # POSITIVE_PASSED_PIN — a fixed positive-parse count, so a
+                               # fix that moves it also re-pins the count in test262.rs
 ```
 
 ---

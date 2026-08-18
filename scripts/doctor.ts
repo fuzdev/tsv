@@ -113,12 +113,22 @@ const cargo_version = run_version('cargo');
 if (cargo_version === null) fail('cargo missing — nothing Rust builds without it');
 else ok(cargo_version);
 
+// The one version the repo otherwise records only in CI (`check.yml` pins the
+// same): the published wasm sizes are produced by wasm-pack's bundled wasm-opt,
+// and `validate_artifacts.ts`'s ±8% bounds are calibrated against this version —
+// a different wasm-pack can move the bytes into failing bounds at publish time.
+const WASM_PACK_PIN = '0.15.0';
 const wasm_pack_version = run_version('wasm-pack');
 if (wasm_pack_version === null) {
 	warn(
 		'wasm-pack missing — WASM builds (build:wasm:*, bench, publish) unavailable: cargo install wasm-pack'
 	);
-} else ok(wasm_pack_version);
+} else if (!wasm_pack_version.includes(WASM_PACK_PIN)) {
+	warn(
+		`${wasm_pack_version} — differs from the pinned ${WASM_PACK_PIN} (check.yml + the ` +
+			`validate_artifacts.ts size-bound calibration); sizes may drift into failing bounds at publish`
+	);
+} else ok(`${wasm_pack_version} (matches pin)`);
 
 const npm_version = run_version('npm');
 if (npm_version === null) warn('npm missing — deno task bench:install unavailable');

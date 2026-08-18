@@ -902,7 +902,7 @@ fn build_chain_args_single(
         // moves zero bytes over ~23k files, so the two agree on every shape real code and the
         // fixture suite write; but that is a render-side reading, and a `conditional_group`
         // state measured under an outer FLAT `fits` is exactly where such a claim has been
-        // wrong before (TODO.md §The fits flat-walk is not render). Collapsing it is a
+        // wrong before (the fits flat-walk is not render). Collapsing it is a
         // fanout win with its own probe to run, not part of this dedup.
         parts.push(build_ternary_arrow_hug_ladder(
             d, opener, sig_doc, body_doc, arrow_doc,

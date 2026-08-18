@@ -79,7 +79,7 @@ jobs:
           # Pinned to match local: deno drives the prettier/svelte fixture oracle
           # and `deno test`, so a floating minor could shift behavior the pinned
           # Rust toolchain can't guard. Bump deliberately.
-          deno-version: 2.8.0
+          deno-version: 2.9.4
           # Round-trips DENO_DIR across runs — captures the sidecar's runtime
           # npm fetches (prettier/svelte/acorn) since those land in DENO_DIR.
           cache: true
@@ -143,7 +143,7 @@ jobs:
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           # Pinned to match the check job / local. Bump deliberately.
-          deno-version: 2.8.0
+          deno-version: 2.9.4
           cache: true
 
       - name: Install Node
@@ -218,7 +218,7 @@ jobs:
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           # Pinned to match the check job / local. Bump deliberately.
-          deno-version: 2.8.0
+          deno-version: 2.9.4
           cache: true
           cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
 

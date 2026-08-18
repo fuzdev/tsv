@@ -50,10 +50,18 @@ const ast = parse_typescript('const x = 1;'); // acorn-typescript-shaped JSON AS
 
 Formatting: `format_svelte` / `format_typescript` / `format_css` take a source `string` and return the formatted `string`, throwing on a parse error. Formatting itself is non-configurable; the only option is `format_typescript(source, {goal: 'script' | 'module'})` — the parse goal, where `'script'` makes `await` an ordinary identifier and turns `import`/`export`/`import.meta` into syntax errors.
 
-Parsing: `parse_svelte` / `parse_typescript` / `parse_css` return the language's public JSON AST as an object; the `parse_*_json` siblings return the JSON string itself for consumers that forward the wire format without paying `JSON.parse`. All take an optional `{locations?, goal?}` bag: `locations: false` emits the span-only wire (~46% smaller; `loc` stays derivable from `start`/`end` plus the source, via the bundled `reconstruct_locations` / `create_locator` / `loc_of`), and `goal` is TypeScript-only.
+Parsing: `parse_svelte` / `parse_typescript` / `parse_css` return the language's public JSON AST as an object; the `parse_*_json` siblings return the JSON string itself for consumers that forward the wire format without paying `JSON.parse`. All take an optional `{locations?, goal?}` bag: `locations: false` emits the span-only wire (~46% smaller; `loc` stays derivable from `start`/`end` plus the source, via the bundled `reconstruct_locations` / `create_locator` / `loc_of`), and `goal` is TypeScript-only. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the package (`import type {...} from '@fuzdev/tsv'`).
 
 Option semantics (identical to the WASM package): unknown keys throw whatever their value; a supported key set to `undefined` means its default — including the TypeScript-only `goal` on the other languages, so one bag forwards to whichever function; a non-object options argument throws, arrays included, which makes `sources.map(format_typescript)` an error — write `sources.map((s) => format_typescript(s))`.
 
 File scoping: `IgnoreStack` is tsv's own hierarchical, git-faithful matcher plus its discovery policy, exported so tooling can reproduce exactly which files `tsv format` would touch — the same class `@fuzdev/tsv_wasm` exports.
 
 Errors: parse errors and engine errors are thrown JS errors. A Rust panic — always a tsv bug, please report it — is also thrown rather than aborting the process; stack overflow is the one crash that still aborts.
+
+## Status
+
+0.x — pre-release. API may change.
+
+## License
+
+[MIT](LICENSE)

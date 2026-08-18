@@ -23,7 +23,7 @@
  * --multibyte-only for fast iteration on it.
  *
  * Usage:
- *   deno task corpus:compare:parse ~/dev/some-project
+ *   deno task corpus:compare:parse ../some-project
  *   deno task corpus:compare:parse --all
  *   deno task corpus:compare:parse --all --multibyte-only
  *   deno task corpus:compare:parse --all --filter typescript --limit 100
@@ -742,7 +742,7 @@ Options:
 Examples:
   deno task corpus:compare:parse --all
   deno task corpus:compare:parse --all --multibyte-only
-  deno task corpus:compare:parse ~/dev/zzz --filter typescript --limit 100
+  deno task corpus:compare:parse ../zzz --filter typescript --limit 100
   deno task corpus:compare:parse --all --json 2>/dev/null | jq '.stats.total'
 `);
 }
