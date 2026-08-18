@@ -81,13 +81,39 @@ enum GapCommentRun {
     /// the same authoring is one line at the other two gaps and two here. A blank above
     /// the first comment survives, measured from `blank_seed` — there is no body `{` to
     /// sit below it, so it separates two branches of a chain.
-    Dangling { blank_seed: u32 },
+    ///
+    /// `defer_inline` is the kind-agnostic deferral rule at this gap's anchor line: the
+    /// previous construct's doc ENDS in a deferred run (a non-block clause body's
+    /// `;`-relocated tail — `Printer::terminator_defers_comment`, the caller's fact),
+    /// so an anchor-line comment emitted INLINE would render ahead of that pending
+    /// buffer and the flush would reorder the pair. `true` routes every anchor-line
+    /// comment — a block included — through `line_suffix`, each with its break inside
+    /// (this gap's own split-glued-pairs policy), so the two runs meet the flush in
+    /// source order, every member on a line of its own. Sound only because
+    /// the caller's own unconditional hardline follows the gap. With nothing pending it
+    /// stays `false` — an inline block then renders inline, keeping its width on the
+    /// line (a zero-width suffix would let a long block overflow the print width
+    /// unseen) — and the keyword-hugs-`}` arm keeps `false` too, since its keyword
+    /// continues inline and a deferred block would float past it.
+    Dangling { blank_seed: u32, defer_inline: bool },
 }
 
 impl GapCommentRun {
     /// Whether a pair the author glued onto one line keeps that line.
     fn glues(self) -> bool {
         !matches!(self, Self::Dangling { .. })
+    }
+
+    /// Whether the anchor-line comments ride in `line_suffix` docs regardless of kind
+    /// (the `defer_inline` rule above); the other runs emit an inline block inline.
+    fn defers_inline(self) -> bool {
+        matches!(
+            self,
+            Self::Dangling {
+                defer_inline: true,
+                ..
+            }
+        )
     }
 
     /// The position an author blank *between the anchor and the run* is measured from, or
@@ -107,7 +133,7 @@ impl GapCommentRun {
     fn blank_seed(self) -> Option<u32> {
         match self {
             Self::Leading => None,
-            Self::Trailing { blank_seed } | Self::Dangling { blank_seed } => Some(blank_seed),
+            Self::Trailing { blank_seed } | Self::Dangling { blank_seed, .. } => Some(blank_seed),
         }
     }
 
@@ -557,15 +583,19 @@ impl<'a> Printer<'a> {
     /// oracle there and tsv's own stance governs. The mirror of
     /// [`Self::push_header_to_body_gap`], which drops it.
     ///
-    /// `prev_is_block` is false only for an `if` with a non-block consequent
-    /// (`if (a) expr;⏎else …`); a `try`/`catch` block and a do-while body block are
-    /// always blocks.
+    /// `prev_is_block` is false for an `if` with a non-block consequent
+    /// (`if (a) expr;⏎else …`) and for a do-while with a brace-less body
+    /// (`do expr;⏎while …`) — the two callers whose previous part can end in a
+    /// deferred `;`-tail run, which is why they also pass `prev_tail_defers`
+    /// ([`Printer::terminator_defers_comment`]); a `try`/`catch`/`finally` clause
+    /// always follows a block and passes `false` there.
     fn push_block_to_keyword_gap(
         &self,
         parts: &mut DocBuf,
         gap_start: u32,
         keyword_start: u32,
         prev_is_block: bool,
+        prev_tail_defers: bool,
     ) {
         let d = self.d();
         if !self.has_comments_to_emit_between(gap_start, keyword_start) {
@@ -588,6 +618,10 @@ impl<'a> Printer<'a> {
             &all_own_line,
             GapCommentRun::Dangling {
                 blank_seed: gap_start,
+                // Only a non-block previous part can end in a deferred `;`-tail run
+                // (the block arm's keyword may hug the `}` inline, so it keeps the
+                // inline emission either way).
+                defer_inline: !prev_is_block && prev_tail_defers,
             },
         );
 
@@ -872,7 +906,22 @@ impl<'a> Printer<'a> {
         // (`if (a) expr; // c1 // inj`); deferred, they meet the flush in source order
         // and the run separator breaks between them (`doc/arena_render_suffix.rs`).
         for comment in inline_prev {
-            parts.push(self.build_trailing_comment_doc(comment));
+            parts.push(if run.defers_inline() {
+                // Kind-agnostic deferral (a clause-tail suffix IS pending — the
+                // variant's gate): an inline block emitted as real text would render
+                // ahead of the pending buffer and the flush would reorder the pair.
+                // Each comment carries its break INSIDE the suffix — this run is the
+                // gap's own Dangling policy (every comment takes a line of its own),
+                // and a space-joined suffix instead would weld onto a pending member
+                // that already broke (an own-line block tail), a fact the renderer's
+                // run separator deliberately does not decide
+                // (`doc/arena_render_suffix.rs`). The suffix is queued at this gap's
+                // own doc position, so its interior break renders at the settled
+                // level.
+                self.build_trailing_comment_doc_own_line(comment)
+            } else {
+                self.build_trailing_comment_doc(comment)
+            });
         }
 
         // Where a blank above the next comment is measured FROM: whatever this emitter

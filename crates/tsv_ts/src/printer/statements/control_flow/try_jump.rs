@@ -56,7 +56,7 @@ impl<'a> Printer<'a> {
         clause_end: u32,
     ) -> bool {
         // A `try`/`catch` body is always a block, so the keyword can hug `}`.
-        self.push_block_to_keyword_gap(parts, gap_start, keyword_pos, true);
+        self.push_block_to_keyword_gap(parts, gap_start, keyword_pos, true, false);
         match self.gap_frozen_span(gap_start, Span::new(keyword_pos, clause_end)) {
             Some(frozen) => {
                 parts.push(self.build_frozen_span_doc(frozen));
@@ -194,8 +194,15 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_throw_statement_doc(
         &self,
         stmt: &internal::ThrowStatement<'_>,
+        clause_tail: Option<u8>,
     ) -> DocId {
-        self.build_keyword_argument_doc("throw", stmt.span.start, stmt.span.end, &stmt.argument)
+        self.build_keyword_argument_doc(
+            "throw",
+            stmt.span.start,
+            stmt.span.end,
+            &stmt.argument,
+            clause_tail,
+        )
     }
 
     pub(in crate::printer::statements) fn build_break_statement_doc(
