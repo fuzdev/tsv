@@ -33,20 +33,26 @@ The IIFE position of the required-pair comment rule: the parens a function calle
   So no comment leaves the pair on either side; the divergence is the rendering,
   plus that one relocation.
 
+With **both** gaps commented (c14–c17) the pair takes ONE expanded shell — the
+leading run above the function, the trailing run beside it, the `)` back out —
+and there tsv and prettier agree byte-for-byte. Two shells, or a fold with no
+shell at all, are the two ways to get this wrong; the fold was what a leading
+shell that declined on a commented trailing gap produced, leaving the `//` glued
+to a `(` that never broke and the function at the *enclosing* indent.
+
 The claim is the **function** callee/tag position, which is where prettier keeps
 the runs inside. A required pair around any other callee hoists a leading run out
 in front and leaves a trailing one past the `)`, and tsv matches — pinned here as
-the controls: a `new` callee (`new // c6⏎(function () {})();`), a class expression
+the controls: a `new` callee (`new // c6⏎\t(function () {})();`), a class expression
 (`// c7⏎(class A {})();`), and a ternary callee (`(a ? b : c) /* c13 */();`).
 
 ⚠️ Those controls claim **where the run lands** — outside the pair — and nothing
-about the *indent* of the continuation under it. The `new`→callee gap's flush
-continuation is an open question of its own: every other gap a `//` forces open
-indents it one level ([§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent)),
-including this keyword's own other gap one token over
-(`return new // c⏎\t.target;`,
-[meta_property/dot_gap_line_comment](../../misc/meta_property/dot_gap_line_comment_prettier_divergence/)).
-Filed, not decided here.
+about the *indent* of the continuation under it. That indent is the `new`→callee
+gap's own rule, not this fixture's: the run lands outside the pair (matching
+prettier) and the tail under it drops one level
+([§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent)),
+where prettier keeps it flush — see
+[await_new_operand_line_comment](../../await_new_operand_line_comment_prettier_divergence/).
 
 See
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -33,4 +33,10 @@
 
 	// An inline block run leads the base flat here too.
 	const o = (/* c9 */ a?.b)!.ccc;
+
+	// The template tag is required with or without the `!` as well, and takes the
+	// same shell — `(a?.b)`tpl`` seals the chain on its own.
+	( // c10
+		a?.b
+	)`tpl`;
 </script>

@@ -345,7 +345,10 @@ impl<'a> Printer<'a> {
     /// pre-separator gaps — a pattern property's key→`:` and every binding default's
     /// head→`=` ([`Self::route_pre_separator_gap`], `expressions/patterns.rs`) — the
     /// index-signature `]`→value-`:` gap (`build_index_signature_member_doc`), the
-    /// callee→empty argument list gap (`push_empty_args`), and the switch case label's
+    /// callee→empty argument list gap (`push_empty_args`), the two expression-level
+    /// keyword→operand gaps — `new`→callee (`build_new_doc_with_wrapping`) and
+    /// `await`→operand (`build_await_doc`), whose tail is the WHOLE operand so a broken
+    /// argument list renders at the continuation's indent — and the switch case label's
     /// **two** gaps (`build_switch_case_doc_inner`, both gated on line comments only):
     /// `case`→test, where the tail is the test *and* the `:` after it, and head→`:`,
     /// where it is the bare `:`. Adding a site means calling this, never re-deriving

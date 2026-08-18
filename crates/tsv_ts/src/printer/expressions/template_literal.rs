@@ -4,8 +4,8 @@
 // interpolation comments) and tagged template expressions.
 
 use crate::ast::internal::Expression;
+use crate::printer::chain::tag_paren_leading_start;
 use crate::printer::comments::CommentSpacing;
-use crate::printer::comments::paren_pair_keeps_leading_run;
 use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::smallvec;
@@ -392,26 +392,27 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
-        // A function/arrow tag is the one tag kind whose required pair keeps BOTH its
-        // gaps inside it — the template half of prettier's IIFE-callee-or-tag rule
-        // (`paren_pair_keeps_leading_run` feeding its `printCommentsForFunction`). The
+        // Two tag positions print a required pair that keeps BOTH its gaps inside it: a
+        // function/arrow tag — the template half of prettier's IIFE-callee-or-tag rule
+        // (`paren_pair_keeps_leading_run` feeding its `printCommentsForFunction`) — and a
+        // sealed optional chain, where the pair is what stops the chain. ⚠️ ONE variable
+        // answers it: a `trailing_gap` this doc does not emit is a DROPPED comment, which
+        // is exactly what a tag-kind test paired with a position-keyed gap produced. The
         // pair must be the author's own for a trailing gap to exist at all
         // (`paren_shell_close_after`).
-        let owned_pair = self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
-            && paren_pair_keeps_leading_run(tagged.tag);
-        let trailing_gap =
-            self.owned_pair_trailing_gap(tagged.tag, ParenContext::TaggedTemplateTag);
+        let pair_open = tag_paren_leading_start(tagged);
+        let trailing_gap = self.owned_pair_trailing_gap(tagged.tag.span().end, pair_open.is_some());
         // Every window downstream — the type-argument gap, the tag→`` ` `` gap — opens
         // PAST the pair's `)`, so a comment this doc emitted inside the parens is not
         // emitted a second time outside them.
         let tag_gap_start =
             Printer::gap_start_after_owned_pair(tagged.tag.span().end, trailing_gap);
 
-        let tag_doc = if owned_pair {
+        let tag_doc = if let Some(pair_open) = pair_open {
             // The tag has one rendering, so both layouts take the same body.
             let inner = self.build_expression_doc(tagged.tag);
             self.build_owned_required_pair_doc(
-                (tagged.span.start, tagged.tag.span().start),
+                (pair_open, tagged.tag.span().start),
                 trailing_gap,
                 inner,
                 inner,

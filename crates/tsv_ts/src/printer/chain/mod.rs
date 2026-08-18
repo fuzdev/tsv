@@ -43,9 +43,10 @@ mod types;
 
 // Re-export public API
 pub use analysis::{
-    chain_paren_leading_gap, group_chain_nodes, linearize_chain_from_call,
+    LinearizeInput, chain_paren_leading_gap, group_chain_nodes, linearize_chain_from_call,
     linearize_chain_from_member, linearize_chain_from_non_null,
 };
+pub(crate) use analysis::{call_callee_paren_leading_start, tag_paren_leading_start};
 pub use builder::build_chain_doc;
 pub(crate) use printing::find_bracket_position;
 pub use types::ChainNode;
