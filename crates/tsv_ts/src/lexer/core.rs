@@ -791,14 +791,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    // TODO: Expand token support for:
-    // - Operators: +, -, *, /, %, ==, !=, <, >, <=, >=, &&, ||, !, &, |, ^, ~, <<, >>, >>>, ?, ?.
-    // - Delimiters: ( ) { } [ ] , . ...
-    // - String literals: "..." '...' `...` (with escapes)
-    // - Comments: // and /* */
-    // - More number formats: floats (1.5), hex (0x10), binary (0b10), octal (0o10)
-    // - Template literals: `hello ${world}`
-    // - Regular expressions: /pattern/flags
     /// Lex the next token directly into `*dst` — the hot advance path. Writing
     /// through the caller's slot (`&mut self.current`) instead of returning a
     /// `Result<Token>` keeps the 16-byte token in registers and elides the sret

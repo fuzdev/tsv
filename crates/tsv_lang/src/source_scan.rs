@@ -262,21 +262,19 @@ pub fn rfind_char_skipping_comments(
 /// keyword.len() <= bytes.len()`.
 #[inline]
 fn whole_word_at(bytes: &[u8], i: usize, keyword: &[u8]) -> bool {
-    let kw_len = keyword.len();
-    if &bytes[i..i + kw_len] != keyword {
-        return false;
-    }
-    let before_ok = i == 0 || !is_identifier_byte(bytes[i - 1]);
-    let after_ok = i + kw_len >= bytes.len() || !is_identifier_byte(bytes[i + kw_len]);
-    before_ok && after_ok
+    &bytes[i..i + keyword.len()] == keyword && word_boundaries_ok(bytes, i, keyword.len())
 }
 
 /// Like [`whole_word_at`], but matching `keyword` ASCII-case-insensitively.
 fn whole_word_at_ignore_ascii_case(bytes: &[u8], i: usize, keyword: &[u8]) -> bool {
-    let kw_len = keyword.len();
-    if !bytes[i..i + kw_len].eq_ignore_ascii_case(keyword) {
-        return false;
-    }
+    bytes[i..i + keyword.len()].eq_ignore_ascii_case(keyword)
+        && word_boundaries_ok(bytes, i, keyword.len())
+}
+
+/// The shared boundary half of the whole-word tests: neither flank of
+/// `[i, i + kw_len)` is an identifier byte.
+#[inline]
+fn word_boundaries_ok(bytes: &[u8], i: usize, kw_len: usize) -> bool {
     let before_ok = i == 0 || !is_identifier_byte(bytes[i - 1]);
     let after_ok = i + kw_len >= bytes.len() || !is_identifier_byte(bytes[i + kw_len]);
     before_ok && after_ok

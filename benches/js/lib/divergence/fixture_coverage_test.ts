@@ -37,24 +37,6 @@ import {
 } from './fixture_cases.ts';
 
 /**
- * Acknowledged ratchet exceptions: (pattern, fixture) pairs where the detector
- * does NOT claim a hunk in a fixture it lists. EMPTY — every pattern now detects
- * every fixture it claims, so any drift hard-fails below.
- *
- * Do NOT add a pair here to silence a regression from tightening a guard — fix
- * the guard. And do not list a fixture under a pattern that cannot detect it:
- * the "Prettier drops the comment" preservation divergences (Svelte
- * `expr_trailing` / `debug_comment`) are intentionally NOT claimed by
- * `comment_position` — its content guard requires the comment in both outputs,
- * so a dropped comment can't (and mustn't) match. Such fixtures stay unclaimed
- * and surface in `divergence:audit` as honestly uncovered rather than being
- * forced into this allowlist.
- *
- * Each entry is `${pattern_id}\t${fixture_path}`.
- */
-const PRE_EXISTING_DRIFT = new Set<string>([]);
-
-/**
  * Whether the runner granted `--allow-read`. The wired `test:deno` task grants it,
  * so the audit runs. If you invoke `deno test` manually without `--allow-read`,
  * every test announces (loudly) that it was skipped for lack of read access rather
@@ -454,25 +436,13 @@ for (const pattern of PATTERNS) {
 				if (match !== null && match.hunk_indices.length > 0) claimed.push(detection_case.label);
 			}
 
-			const key = `${pattern.id}\t${fixture_path}`;
-			if (PRE_EXISTING_DRIFT.has(key)) {
-				// TODO: pre-existing drift — pattern does not detect claimed fixture.
-				// Soft warning keeps the suite green while the drift stays visible.
-				if (claimed.length === 0) {
-					console.warn(
-						`[fixture coverage] PRE-EXISTING DRIFT: ${pattern.id} does not detect ` +
-							`its claimed fixture ${fixture_path}`
-					);
-				} else {
-					// The drift was fixed elsewhere — flag so the entry can be removed.
-					console.warn(
-						`[fixture coverage] ${pattern.id} now DETECTS ${fixture_path} ` +
-							`(via ${claimed.join(', ')}); remove it from PRE_EXISTING_DRIFT`
-					);
-				}
-				continue;
-			}
-
+			// A miss here hard-fails — fix the pattern's guard, never allowlist the
+			// pair. And never list a fixture under a pattern that cannot detect it:
+			// the "Prettier drops the comment" preservation divergences (Svelte
+			// `expr_trailing` / `debug_comment`) are intentionally NOT claimed by
+			// `comment_position` — its content guard requires the comment in both
+			// outputs, so a dropped comment can't (and mustn't) match. Such fixtures
+			// stay unclaimed and surface in `divergence:audit` as honestly uncovered.
 			assert(
 				claimed.length > 0,
 				`${pattern.id} claims no hunk in any prettier form its own fixture ` +

@@ -18,6 +18,8 @@
 
 import { parseArgs } from 'node:util';
 
+import { format_size } from './size.ts';
+
 const { values: args } = parseArgs({
 	options: {
 		triple: { type: 'string' }
@@ -66,7 +68,6 @@ if (!triple) {
 }
 
 const cli_binary_name = triple!.startsWith('win32-') ? 'tsv.exe' : 'tsv';
-const mb = (n: number) => `${(n / 1024 / 1024).toFixed(2)} MB`;
 
 const validate = (filename: string, bounds: [number, number] | undefined): void => {
 	if (!bounds) {
@@ -86,12 +87,14 @@ const validate = (filename: string, bounds: [number, number] | undefined): void 
 	const [min, max] = bounds;
 	if (size < min || size > max) {
 		console.error(
-			`FAIL: ${triple} ${filename} is ${size} bytes (${mb(size)}) — outside [${min}, ${max}]. ` +
+			`FAIL: ${triple} ${filename} is ${size} bytes (${format_size(size)}) — outside [${min}, ${max}]. ` +
 				`A deliberate size change must move the bound in scripts/validate_napi_artifact.ts.`
 		);
 		Deno.exit(1);
 	}
-	console.log(`OK: ${triple} ${filename} ${size} bytes (${mb(size)}) within [${min}, ${max}]`);
+	console.log(
+		`OK: ${triple} ${filename} ${size} bytes (${format_size(size)}) within [${min}, ${max}]`
+	);
 };
 
 validate('tsv_napi.node', BOUNDS[triple!]);

@@ -19,7 +19,7 @@
  *   where sub-100% coverage is the metric. The per-tool parse coverage surface
  *   (`deno task bench:conformance`).
  *
- * - DevReposLoader: loads one view of CORPUS_ENTRIES (hardcoded ~/dev/ repos)
+ * - DevReposLoader: loads one view of CORPUS_ENTRIES (hardcoded ../ sibling repos)
  * - DirectoryLoader: loads from a single directory path
  *
  * Both support `load()` (collect all) and `stream()` (async generator for GC).
@@ -299,7 +299,7 @@ export type CorpusTier = 'real' | 'framework' | 'prettier_fixture' | 'suite';
  * gate); SAFETY still gates over every tier. Kept in lockstep with
  * `GATE_CHECKOUT_COMMITS` (the `pins:audit`-tracked checkouts).
  */
-export const REPRODUCIBLE_TIERS: readonly CorpusTier[] = ['framework', 'prettier_fixture'];
+const REPRODUCIBLE_TIERS: readonly CorpusTier[] = ['framework', 'prettier_fixture'];
 
 /** A named subset of `CORPUS_ENTRIES` — see the module doc for what each view is for. */
 export type CorpusView = 'perf' | 'gates' | 'conformance';

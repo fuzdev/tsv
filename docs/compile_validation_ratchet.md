@@ -40,7 +40,7 @@ compiler ships in no artifact.
 
 ⚠️ Always a **separate invocation** from `compile:corpus:compare`, never extra roots on
 it. Folding a ~2/3-invalid corpus into that run would corrupt its
-`parity / achievable` denominator, which is the arc's headline number.
+`parity / achievable` denominator, the compile-parity effort's headline number.
 
 ## The snapshot
 

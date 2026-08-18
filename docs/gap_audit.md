@@ -33,7 +33,7 @@ deno task gaps:audit           # the gate: tests/fixtures, ~17 s
 deno task gaps:audit:update    # regenerate the snapshot after fixing a shape
 
 # Directly, against a real codebase — where the real yield is:
-cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits gap_audit ../zzz/src
 ```
 
 Build with **`--profile corpus`** (optimized + `panic = "unwind"`). Plain `--release` is
@@ -49,7 +49,7 @@ reported as the finding it is.
 | `--payload <one>` | `block` \| `line` \| `jsdoc_cast` \| `annotation` \| `multiline` |
 | `--all-bytes` | also inject strictly inside words — a diagnostic, not a stricter mode (comment interiors stay excluded) |
 | `--by-node` | also print the coarse by-`(node, edge)` rollup after the run (report-only; see [Reading a finding](#reading-a-finding)) |
-| `--rank` | print the top-N `(node, edge)` clusters as a paste-ready **markdown table** for `TODO_GAPS` §Status (report-only; `deno task gaps:audit:rank`) |
+| `--rank` | print the top-N `(node, edge)` clusters as a paste-ready **markdown table** — the ranked burn-down work-list (report-only; `deno task gaps:audit:rank`) |
 | `--since <baseline.json>` | print the **delta** vs a prior `--json` output: the per-cluster ranking diff, the per-shape `(kind, shape) → (count, payloads)` diff, and the seed-eligibility change (report-only) |
 | `--top N` | with `--rank`, how many clusters the table shows (default 12); a `--since` diff always lists every changed cluster |
 | `--update` | rewrite the committed snapshot (prints a `# shapes: N` stamp + a RETIRED/RE-PINNED yield line) |
@@ -242,10 +242,10 @@ consumes directly instead of parsing `--json` and hand-transcribing (all report-
 byte-identical to the gate):
 
 - **`deno task gaps:audit:rank`** (`--rank`, `--top N`) prints the top-N clusters as a
-  **paste-ready markdown table** for `TODO_GAPS` §Status — rank, `` `(node, edge)` ``, edge
+  **paste-ready markdown table** — rank, `` `(node, edge)` ``, edge
   class, distinct gaps, hits, shapes, kind composition, gap share (sorted by distinct gaps;
   see the by-node section above) — so
-  the fattest-first work-list stays current by paste, not by re-transcription (which rots as
+  a burn-down's fattest-first work-list stays current by paste, not by re-transcription (which rots as
   slices land).
 - **`--since <baseline.json>`** diffs this run against a prior `--json` output, in three
   report-only sections. The **ranking diff** lists the clusters whose hit count **changed** —

@@ -58,7 +58,6 @@ Every `◆prettier_bug` — cases where Prettier produces output that is non-ide
 
 **Prose-only** (no `output_prettier.*` oracle — Prettier drops or throws, so the bug can't be pinned as a fixture):
 
-- `import defer * as ns from 'm'` — silently deletes the `defer` phase (information loss) — [§Import-phase proposals](./conformance_prettier_ts.md#import-phase-proposals)
 - `import source x from 'm'` — Prettier's TS printer throws (`'=' expected`) — [§Import-phase proposals](./conformance_prettier_ts.md#import-phase-proposals)
 - `{@const y = /** @type {T} */ (z)}` — Prettier emits invalid `(z}` then throws on its own output — [§JSDoc / paren semantics](./conformance_prettier_ts_comments.md#jsdoc--paren-semantics)
 
@@ -476,7 +475,7 @@ than repeating three times.
 
 ```bash
 deno task corpus:compare:format --all --explain           # The gates corpus view (~6,200 files: real repos + prettier suites)
-deno task corpus:compare:format ~/dev/project --explain  # Single project (scans all files recursively)
+deno task corpus:compare:format ../project --explain  # Single project (scans all files recursively)
 ```
 
 **Divergence audit** (static check) verifies all documented divergences have registered detectors:
@@ -487,7 +486,7 @@ deno task divergence:audit  # Cross-refs pattern fixture lists vs this doc (no r
 
 Every pattern in `benches/js/lib/divergence/patterns.ts` links to:
 
-- `conformance_sections` — Section names from this document
+- `conformance_sections` — Section names from this document family (the shared frame here plus the per-language catalogs its §Catalogs table indexes)
 - `fixtures` — Fixture paths the pattern detects (enforced by the behavioral
   fixture-coverage audit in `deno task test:deno`)
 

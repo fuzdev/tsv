@@ -164,7 +164,7 @@ Review your fixture against these checklists. **If gaps found**: add to `input.s
 
 **Comments describe formatting, not bugs.** Fixture comments should explain what the correct output IS (e.g., "array expands to multi-line"), never how our formatter differs. Fixtures define correct behavior — they are not bug reports.
 
-**For major features**: Create a feature-specific checklist in the TODO document with comprehensive edge cases.
+**For major features**: build a feature-specific edge-case checklist first — extend the relevant language checklist below.
 
 **For comprehensive feature matrices**: See ./checklist_css.md, ./checklist_svelte.md, ./checklist_typescript.md.
 
@@ -300,7 +300,7 @@ If errors exist:
 
 1. Fix the implementation (parser, printer, converter)
 2. **Never modify fixtures to work around bugs** — fix the code
-3. If a feature genuinely can't be implemented yet, document in TODO and defer the fixture
+3. If a feature genuinely can't be implemented yet, leave a `// TODO:` at the site (and note it in the language checklist) and defer the fixture
 
 ---
 
@@ -370,7 +370,7 @@ diff .../input.svelte /tmp/s.svelte && echo "✓ spaces normalizes"
 
 ### 6.4 Mark Complete
 
-Update the relevant TODO document if applicable. State: **"Completed: [item] - N fixtures in [paths]"**
+Update the relevant language checklist if applicable. State: **"Completed: [item] - N fixtures in [paths]"**
 
 ---
 
@@ -490,7 +490,7 @@ cargo run -p tsv_debug compare --content "<script>import {} from 'x';</script>" 
 - Formatter bug (output differs) — Keep — fix the formatter
 - Parser bug (parse error on valid code) — Keep — fix the parser
 - Feature reveals OTHER unrelated bugs — Keep — fix those bugs too
-- Parser genuinely can't parse (not impl) — Document in TODO, defer fixture until parser works
+- Parser genuinely can't parse (not impl) — Note it in the language checklist, defer fixture until parser works
 
 Only defer when the parser can't parse the syntax yet (use `--prettier-only` until ready).
 

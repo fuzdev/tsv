@@ -162,11 +162,15 @@ pub enum SimpleSelector<'arena> {
         /// verbatim. The name carries no decoded copy: the printer emits it raw from source
         /// (escapes preserved — `[f\oo]` stays `[f\oo]`, never `[foo]`) and convert
         /// half-decodes it via `raw_selector_name`, matching Svelte's `read_identifier`
-        /// (see convert/mod.rs). `value`/`flags` stay owned strings — they are
-        /// processed/re-quoted, not verbatim source slices.
+        /// (see convert/mod.rs). The value is likewise a raw span (`value_span`); only
+        /// `flags` stays an owned string.
         name_span: Span,
         matcher: Option<AttributeMatcher>,
-        value: Option<&'arena str>,
+        /// Raw span of the value token (`None` for bare `[attr]`): a string keeps its
+        /// delimiting quotes, an identifier its escapes (`[a=x\27]` stays `x\27`). The
+        /// wire and the scoping compiler derive their text via [`attribute_value_text`];
+        /// the printer re-quotes from the raw form.
+        value_span: Option<Span>,
         flags: Option<&'arena str>, // i (case-insensitive), s (case-sensitive)
         span: Span,
     },
@@ -232,6 +236,29 @@ impl SimpleSelector<'_> {
             | SimpleSelector::Invalid { span } => *span,
         }
     }
+}
+
+/// The quote-aware split of an attribute selector's raw value token: the delimiting
+/// quote (`None` for a bare identifier value) and the text inside it (the whole raw
+/// token when bare). The single statement of "a raw value whose first byte is a quote
+/// is a string; its interior is `raw[1..len-1]`" — the wire, the scoping compiler, and
+/// the printer's re-quoting all read this split rather than re-deriving it. The slice
+/// is safe: a `TokenKind::String` span always carries both delimiters (the lexer
+/// errors on an unterminated string).
+pub fn attribute_value_quote_and_text(source: &str, value_span: Span) -> (Option<char>, &str) {
+    let raw = value_span.extract(source);
+    match raw.as_bytes().first() {
+        Some(&q @ (b'\'' | b'"')) => (Some(q as char), &raw[1..raw.len() - 1]),
+        _ => (None, raw),
+    }
+}
+
+/// The public-AST text of an attribute selector's value (`AttributeSelector.value` on
+/// the wire, and what the scoping compiler matches against): the raw token with a
+/// string's delimiting quotes stripped. Escapes stay encoded in both forms — Svelte's
+/// `parseCss` emits `[a=x\27]` as `x\27` and `[a='it\'s']` as `it\'s`, never decoding.
+pub fn attribute_value_text(source: &str, value_span: Span) -> &str {
+    attribute_value_quote_and_text(source, value_span).1
 }
 
 /// Pseudo-class/pseudo-element argument types (semantic representation)
