@@ -44,9 +44,13 @@ then agrees with at every container tail (block, method, object, and a case foll
 by a sibling case). The **last** case of a switch is the one shape where it is not:
 there the next break is the switch's `}`, one level out from where a dangling comment
 in a case settles, so `h() // c⏎; // t` inside a final case reaches its fixed point on
-the second pass rather than the first. Not fixturable while that is true, and left out
-of `input.svelte` deliberately — the alternative at that site is the weld, which is
-content loss rather than a position that settles.
+the second pass rather than the first. A bracketed type list's closer after a deferred
+item run is the same bound from the other side — the run separated behind the last
+item's own `//` (`Foo<⏎A,⏎a | b // c⏎// inj⏎>`) breaks at the `>`'s indent, one level
+out from where the own-line comment settles on pass 2. Neither shape is fixturable
+while that is true, and both are left out of `input.svelte` deliberately — the
+alternative at those sites is the weld, which is content loss rather than a position
+that settles.
 
 Reason: comment position preserved over prettier's merge, and print-once over the
 weld. See

@@ -2194,12 +2194,14 @@ pub(super) fn try_hug_multiline_template_arg(
     }
     let d = printer.d();
     let arg_doc = printer.build_expression_doc(&args[0]);
-    let mut parts: DocBuf = smallvec![callee, d.text("("), arg_doc, d.text(")")];
-    if let Some(suffix) =
-        printer.build_trailing_comments_line_suffix(args[0].span().end, paren_close)
-    {
-        parts.push(suffix);
-    }
+    let mut parts: DocBuf = smallvec![callee, d.text("("), arg_doc];
+    // The template→`)` gap, per the canonical trailing-run rule: a block inline before
+    // the `)`, a `//` deferred past it (the hug keeps the call flat, so the suffix
+    // flushes at the statement's own break — `` fn(`…`); // c ``, matching prettier),
+    // an own-line comment keeping its own line inside the suffix. Must-break ignored:
+    // the hug is the point of this path.
+    printer.push_trailing_comments_in_range(&mut parts, args[0].span().end, paren_close);
+    parts.push(d.text(")"));
     Some(d.concat(&parts))
 }
 

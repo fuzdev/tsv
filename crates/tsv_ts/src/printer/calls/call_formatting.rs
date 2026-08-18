@@ -195,19 +195,16 @@ pub(super) fn build_call_doc_with_wrapping(
             .collect();
         printer.test_call_flat_params.set(false);
 
-        let mut parts: DocBuf = smallvec![
-            callee,
-            d.text("("),
-            d.join_doc(arg_docs, d.text(", ")),
-            d.text(")"),
-        ];
+        let mut parts: DocBuf = smallvec![callee, d.text("("), d.join_doc(arg_docs, d.text(", "))];
 
-        // Add trailing comments as line suffix (stays on same line)
-        if let Some(suffix) =
-            printer.build_trailing_comments_line_suffix(last_arg.span().end, paren_close)
-        {
-            parts.push(suffix);
-        }
+        // The last-arg→`)` gap, per the canonical trailing-run rule: a block inline
+        // before the `)`, a `//` deferred past it (the flat test-call quirk — prettier
+        // relocates it to `}); // c` too, pinned by `calls/trailing_comment_edge_cases`),
+        // an own-line comment keeping its own line inside the suffix. The returned
+        // must-break is deliberately ignored: the deferred run escapes the flat call by
+        // design here, and the flush at the statement's own break ends its line.
+        printer.push_trailing_comments_in_range(&mut parts, last_arg.span().end, paren_close);
+        parts.push(d.text(")"));
 
         return d.concat(&parts);
     }
@@ -1192,16 +1189,12 @@ fn build_call_with_arg_comments(
                 arg_parts.push(printer.build_comment_doc(comment));
             }
 
-            // (2) Same-line line comment after the last arg, via `line_suffix`.
-            // No trailing comma precedes it (trailingComma: 'none').
+            // (2) Same-line line comment after the last arg, via `line_suffix`. At most
+            // one — the trailing run ends at the first `//`
+            // (`Printer::closer_trailing_comment_run`); anything past it is own-line and
+            // sits in `pc.leading` below. No trailing comma precedes it
+            // (trailingComma: 'none').
             if pc.has_trailing_line() {
-                // Build comment docs: " // comment" for each
-                let comment_docs: DocBuf = pc
-                    .trailing_line
-                    .iter()
-                    .flat_map(|c| [d.text(" "), printer.build_comment_doc(c)])
-                    .collect();
-
                 // Line comments always force the CALL to expand - the newline after the
                 // comment means the call must break to multiple lines. A trailing line
                 // comment never counts toward width (prettier's `lineSuffix`), so the
@@ -1209,7 +1202,9 @@ fn build_call_with_arg_comments(
                 // inline even when the comment exceeds print_width; force_expansion
                 // ensures the call expands.
                 force_expansion = true;
-                arg_parts.push(d.line_suffix(d.concat(&comment_docs)));
+                if let Some(comment) = pc.trailing_line {
+                    arg_parts.push(printer.build_trailing_line_comment_doc(comment));
+                }
             }
 
             // (3) Own-line comments (block or line) after the last arg, before the
