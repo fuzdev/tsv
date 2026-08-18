@@ -354,6 +354,7 @@ impl<'a> Printer<'a> {
                 consequent_end,
                 before_else_end,
                 matches!(stmt.consequent, Statement::BlockStatement(_)),
+                self.terminator_defers_comment(stmt.consequent.span().start, consequent_end),
             );
             self.append_else_clause(&mut parts, alternate, else_end, false, ctx);
         }

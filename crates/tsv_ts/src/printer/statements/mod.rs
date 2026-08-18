@@ -168,7 +168,9 @@ impl<'a> Printer<'a> {
             Statement::DoWhileStatement(stmt) => self.build_do_while_statement_doc(stmt, ctx),
             Statement::SwitchStatement(stmt) => self.build_switch_statement_doc(stmt),
             Statement::TryStatement(stmt) => self.build_try_statement_doc(stmt),
-            Statement::ThrowStatement(stmt) => self.build_throw_statement_doc(stmt),
+            Statement::ThrowStatement(stmt) => {
+                self.build_throw_statement_doc(stmt, ctx.clause_tail())
+            }
             Statement::BreakStatement(stmt) => {
                 self.build_break_statement_doc(stmt, ctx.clause_tail())
             }
@@ -472,9 +474,9 @@ impl<'a> Printer<'a> {
         Some(close)
     }
 
-    /// Build a Doc for a return statement. `clause_tail` reaches only the bare
-    /// form's terminator gap — an argument's gap goes through the restricted
-    /// production's own emitters, which already defer.
+    /// Build a Doc for a return statement. `clause_tail` reaches both terminator
+    /// gaps — the bare form's keyword→`;` gap and the argument form's operand→`;`
+    /// gap (threaded through the restricted production's own emitters).
     fn build_return_statement_doc(
         &self,
         ret: &internal::ReturnStatement<'_>,
@@ -486,7 +488,7 @@ impl<'a> Printer<'a> {
             return self.build_bare_keyword_terminator_doc("return", ret.span, clause_tail);
         };
 
-        self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg)
+        self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg, clause_tail)
     }
 
     /// Build a Doc for a "bare" keyword-terminator statement — a keyword that takes

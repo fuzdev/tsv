@@ -244,6 +244,15 @@ impl<'a> Printer<'a> {
     /// `parts`); the caller must force the group to break so the line comment never lands
     /// on the flat `expr // c;` path (which would swallow the `;`). Callers that render the
     /// operand bare (no parens) leave the flag `false` — there's nothing to keep it inside.
+    ///
+    /// `clause_tail` is the statement CONTAINER's deferral fact
+    /// (`StatementContext::clause_tail`): `Some(dedent)` when the statement is a
+    /// non-block clause body, whose tail line stays open to the enclosing construct —
+    /// there each own-line member's interior break is wrapped in `dedent` levels
+    /// ([`Printer::build_clause_tail_comment_doc`]), so the freed comment renders at
+    /// the flushing construct's level in one pass instead of settling on the reparse.
+    /// The same-line arms are indent-free (no interior break), so only the own-line
+    /// arm reads it.
     pub(crate) fn split_terminator_gap_comments(
         &self,
         parts: &mut DocBuf,
@@ -251,6 +260,7 @@ impl<'a> Printer<'a> {
         span_end: u32,
         keep_operand_line_inline: bool,
         operand_parens_printed: bool,
+        clause_tail: Option<u8>,
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
@@ -296,7 +306,10 @@ impl<'a> Printer<'a> {
                 // render ahead of an already-buffered line comment and reorder the pair,
                 // and it dropped an author blank the terminator's own line survives.
                 let blank = self.has_blank_line_between(prev_end, comment.span.start);
-                deferred.push(self.build_trailing_comment_doc_own_line_blank(comment, blank));
+                deferred.push(match clause_tail {
+                    Some(dedent) => self.build_clause_tail_comment_doc(comment, blank, dedent),
+                    None => self.build_trailing_comment_doc_own_line_blank(comment, blank),
+                });
                 run_deferred = true;
             }
             prev_end = comment.span.end;

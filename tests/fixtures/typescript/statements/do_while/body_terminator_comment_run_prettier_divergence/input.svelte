@@ -4,4 +4,9 @@
 	// c2
 	// c3
 	while (a);
+	// a block in the `;`→`while` gap flushes behind the deferred tail, in source order
+	do expr2;
+	// c4
+	/* c5 */
+	while (b);
 </script>

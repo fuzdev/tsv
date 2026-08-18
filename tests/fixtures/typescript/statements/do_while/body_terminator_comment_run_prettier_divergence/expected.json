@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 137,
+	"end": 262,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,72 @@
 					"column": 6
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a block in the `;`→`while` gap flushes behind the deferred tail, in source order",
+			"start": 128,
+			"end": 211,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 224,
+			"end": 229,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 231,
+			"end": 239,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 136,
+		"end": 261,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 127,
+			"end": 252,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 7,
+					"line": 12,
 					"column": 9
 				}
 			},
@@ -184,6 +232,90 @@
 							"value": " the body tail's comments keep their lines and order at the `do`'s level",
 							"start": 10,
 							"end": 84
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 213,
+					"end": 251,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 216,
+						"end": 222,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 4
+							},
+							"end": {
+								"line": 8,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 216,
+							"end": 221,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 4
+								},
+								"end": {
+									"line": 8,
+									"column": 9
+								}
+							},
+							"name": "expr2"
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 248,
+						"end": 249,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 8
+							},
+							"end": {
+								"line": 11,
+								"column": 9
+							}
+						},
+						"name": "b",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c4",
+								"start": 224,
+								"end": 229
+							},
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 231,
+								"end": 239
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block in the `;`→`while` gap flushes behind the deferred tail, in source order",
+							"start": 128,
+							"end": 211
 						}
 					]
 				}
