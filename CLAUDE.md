@@ -840,7 +840,7 @@ A comment can be asked about along exactly **three** axes, and the lookup API
 
 | axis | question | owned comments | who asks |
 | --- | --- | --- | --- |
-| **to emit** | "which comments must *I* print here?" | **skipped** | gap emitters (~200 sites) |
+| **to emit** | "which comments must *I* print here?" | **skipped** | gap emitters (~400 sites) |
 | **on page** | "does any comment OCCUPY THE PAGE here?" | **counted** | layout gates — break / expand / hug / paren / fast-path |
 | **in source** | "what comment BYTES are physically here?" | **counted** | cursors — blank-line scans, offsets, `prev_end` |
 

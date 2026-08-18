@@ -47,6 +47,7 @@ pub use analysis::{
     linearize_chain_from_non_null,
 };
 pub use builder::build_chain_doc;
+pub(crate) use printing::find_bracket_position;
 pub use types::ChainNode;
 #[cfg(feature = "buffer_stats")]
 pub use types::{ChainGroupNodesVec, ChainGroupVec, ChainNodeVec};

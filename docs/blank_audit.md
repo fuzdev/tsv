@@ -175,7 +175,7 @@ behavior pin whose lines are mostly sanctioned; see
 ```
 # Format: KIND<TAB>SHAPE
 NON-IDEMPOTENT	IDENT⟨⟩,
-STRUCTURAL-DIVERGENCE	␣⟨⟩/*
+DROPPED	␣⟨⟩/*
 ```
 
 The gate fails on:

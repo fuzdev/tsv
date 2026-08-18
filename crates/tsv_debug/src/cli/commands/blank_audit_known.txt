@@ -19,7 +19,7 @@
 # deleted, the blank-DROP class every invariant above is blind to.
 #
 # Format: KIND<TAB>SHAPE
-# shapes: 75
+# shapes: 73
 NON-IDEMPOTENT	')⟨⟩.
 NON-IDEMPOTENT	(){⟨⟩}).
 NON-IDEMPOTENT	(){⟨⟩});
@@ -93,5 +93,3 @@ NON-IDEMPOTENT	␣⟨⟩[
 NON-IDEMPOTENT	␣⟨⟩`
 NON-IDEMPOTENT	␣⟨⟩␣
 DROPPED	?.⟨⟩[
-DROPPED	IDENT⟨⟩␣
-DROPPED	␣⟨⟩/*

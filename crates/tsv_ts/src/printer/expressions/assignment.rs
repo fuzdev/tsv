@@ -680,8 +680,36 @@ fn is_poorly_breakable_chain_recursive(
             false
         }
 
-        // MemberExpression: continue down the chain
+        // MemberExpression: a TRAILING comment in the member's own gap — glued to the
+        // line the object (or a previous comment) ends on, in the object→`.` gap or a
+        // computed member's object→`[` gap (bracket-INTERIOR comments render inline
+        // and don't count) — makes the chain printer break the chain there while the
+        // chain's HEAD still fits the operator line, so the chain is not poorly
+        // breakable and the operator break is withheld (`const c = foo /* c */⏎.b();`).
+        // Prettier lands the same way: the comment-carrying chain skips
+        // printMemberChain's unlabeled short-chain return, the labeled doc opts out of
+        // isPoorlyBreakableMemberOrCallChain (member-chain.js `nodeHasComment`), and
+        // fluid keeps the fittable head on the operator line. An OWN-LINE gap comment
+        // is deliberately not counted: it makes the head multi-line from its first
+        // token, and there prettier's operator break stands
+        // (`member/prettier_ignore_base_comment` pins that side). **On page**, because
+        // this is a layout gate. Otherwise continue down.
         Expression::MemberExpression(member) => {
+            let object_end = member.object.span().end;
+            let gap_end = if member.computed {
+                crate::printer::chain::find_bracket_position(
+                    source,
+                    object_end,
+                    member.property.span().start,
+                )
+            } else {
+                member.property.span().start
+            };
+            if tsv_lang::comments_on_page_in_range(comments, object_end, gap_end)
+                .any(|c| !tsv_lang::source_scan::has_newline_before_position(source, c.span.start))
+            {
+                return false;
+            }
             is_poorly_breakable_chain_recursive(member.object, true, source, print_width, comments)
         }
 

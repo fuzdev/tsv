@@ -6,6 +6,7 @@
 // their only implementor.
 
 use crate::ast::internal;
+use crate::printer::comments::CommentVec;
 use crate::printer::{CommentSpacing, Printer, comments_to_emit_in_range};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -53,15 +54,10 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
         spacing: CommentSpacing,
-        same_line_only: bool,
     ) -> DocId {
-        let block_comments = if same_line_only {
-            self.filter_block_comments(start, end)
-        } else {
-            comments_to_emit_in_range(self.comments, start, end)
-                .filter(|c| c.is_block)
-                .collect()
-        };
+        let block_comments: CommentVec<'_> = comments_to_emit_in_range(self.comments, start, end)
+            .filter(|c| c.is_block)
+            .collect();
         self.format_block_comments(&block_comments, spacing)
     }
 
@@ -138,8 +134,19 @@ impl<'a> Printer<'a> {
         self.chain_has_comments.set(prev);
     }
 
+    /// The chain gaps' one classification seam — every chain consumer (the builder's
+    /// gap ownership, the dot/computed print paths, `push_gap_comments_and_break`)
+    /// classifies through here, so they take the ADVANCING trailing anchor together
+    /// and the gap's two sides cannot drift into a double-print
+    /// (`ClassifiedComments::from_range_advancing` — see its ⚠️ for why the advance
+    /// is not `from_range`'s one behavior).
     pub(crate) fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_> {
-        ClassifiedComments::from_range(self.comments, start, end, self.comment_line_breaks)
+        ClassifiedComments::from_range_advancing(
+            self.comments,
+            start,
+            end,
+            self.comment_line_breaks,
+        )
     }
 
     /// A gap's same-line block run, each comment behind a space
