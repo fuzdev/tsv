@@ -227,7 +227,12 @@ impl<'a> Printer<'a> {
             None => {
                 self.expr_stmt_paren_target.set(nested_paren);
                 self.is_expression_statement.set(true);
-                self.in_top_level_assignment.set(true);
+                // Saved rather than set: an expression statement nested inside this one's
+                // expression (a function body) runs the same pair, and restoring the
+                // constant `false` left the outer statement's remaining work in the wrong
+                // context. Reached 16,391× over ~23k real files, neutral at every one — see
+                // `build_variable_declaration_doc`, which carries the same pair.
+                let prev_top_level_assignment = self.in_top_level_assignment.replace(true);
                 let doc = match &stmt.expression {
                     // One of prettier's two `printSequenceExpression` parent arms (the `for`
                     // head is the other): the operands after the first take a continuation
@@ -239,7 +244,7 @@ impl<'a> Printer<'a> {
                     }
                     expr => self.build_expression_doc(expr),
                 };
-                self.in_top_level_assignment.set(false);
+                self.in_top_level_assignment.set(prev_top_level_assignment);
                 self.is_expression_statement.set(false);
                 self.expr_stmt_paren_target.set(None);
                 doc

@@ -234,12 +234,12 @@ pub struct Printer<'a> {
     /// tsv's spelling of prettier's `expandLastArg` — the argument is being printed for an
     /// expand-last **hug** state, so it must render as prettier's `lastArg` rather than as
     /// its `printedArguments` (the counterpart is
-    /// [`calls::build_printed_argument_doc`], which every broken-out argument goes through).
+    /// `calls::build_printed_argument_doc`, which every broken-out argument goes through).
     ///
     /// ⚠️ **Its live job is the nested-arrow break, not the chain-layout bail.** Two readers
     /// name it: `should_use_arrow_chain_layout`, where it is redundant only because the two
     /// sites that set it (`build_block_arrow_hug_states` and its `new` twin) build the
-    /// argument WITHOUT going through [`calls::build_printed_argument_doc`], so no
+    /// argument WITHOUT going through `calls::build_printed_argument_doc`, so no
     /// `ArrowChainContext` is in scope and that predicate declines on the context alone — and
     /// `build_arrow_body`'s `chain_should_break`, where it suppresses the break so the hugged
     /// body stays on the `=>` line. That second reader is the whole reason the flag still

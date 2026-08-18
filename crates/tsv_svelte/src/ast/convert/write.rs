@@ -1792,7 +1792,6 @@ mod tests {
     fn convert_svelte(source: &str) -> Value {
         let arena = bumpalo::Bump::new();
         // Test inputs are hardcoded valid sources; a parse failure should panic
-        #[allow(clippy::expect_used)]
         let root = crate::parse(source, &arena).expect("parse");
         crate::convert_ast_json(&root, source)
     }

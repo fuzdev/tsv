@@ -301,7 +301,7 @@ pub(super) fn has_inter_argument_comments(
 }
 
 /// Check if there are comments between arguments in a slice
-pub(crate) fn has_inter_argument_comments_slice(
+pub(super) fn has_inter_argument_comments_slice(
     arguments: &[internal::Expression<'_>],
     printer: &Printer<'_>,
 ) -> bool {
@@ -336,7 +336,7 @@ pub(crate) fn has_inter_argument_comments_slice(
 /// itself: a **test call** is joined by `printCallExpression` directly, so it has no
 /// `anyArgEmptyLine` at all (see `call_formatting.rs`, which asks `is_test_call` — the callee, not
 /// the layout).
-pub(crate) fn any_arg_empty_line(
+pub(super) fn any_arg_empty_line(
     arguments: &[internal::Expression<'_>],
     printer: &Printer<'_>,
 ) -> bool {
@@ -402,7 +402,7 @@ fn is_comment_inline_with_next(printer: &Printer<'_>, comment_end: u32, next_pos
 /// stripped-paren arm requires the `(` on the comment's line, which is the hug reading
 /// already. It stays the anchor where a RUN is walked backwards comment by comment (the
 /// emitters), a different question with a different next.
-pub(crate) fn should_force_expansion_for_comments(
+pub(super) fn should_force_expansion_for_comments(
     printer: &Printer<'_>,
     start: u32,
     next_code_pos: u32,
@@ -640,7 +640,7 @@ pub(super) fn has_trailing_comments_on_args(
 /// Check if there are trailing line comments on any arguments (generic version)
 ///
 /// Used by both CallExpression and NewExpression.
-pub(crate) fn has_trailing_line_comments_slice(
+pub(super) fn has_trailing_line_comments_slice(
     arguments: &[internal::Expression<'_>],
     call_span_end: u32,
     printer: &Printer<'_>,
@@ -692,7 +692,7 @@ pub(crate) fn has_trailing_line_comments_slice(
 /// the call may still collapse, so the only thing that can force the break is a `//` in
 /// the run itself — and a block-only run must NOT be pulled, or a call that would have fit
 /// is broken by the pull.
-pub(crate) fn emit_first_arg_leading_comments(
+pub(super) fn emit_first_arg_leading_comments(
     printer: &Printer<'_>,
     paren_line: &mut DocBuf,
     parts: &mut DocBuf,
@@ -752,7 +752,7 @@ pub(crate) fn emit_first_arg_leading_comments(
 /// of its own to keep. The delimiter-line reading calls it own-line and dangles it below
 /// the argument, force-opening a call that fits (`docs/comments.md` §Own-line-ness is a
 /// SOURCE question).
-pub(crate) fn emit_last_arg_trailing_comments(
+pub(super) fn emit_last_arg_trailing_comments(
     printer: &Printer<'_>,
     parts: &mut DocBuf,
     last_arg: &internal::Expression<'_>,
@@ -783,7 +783,7 @@ pub(crate) fn emit_last_arg_trailing_comments(
 /// Used when we need to detect ALL trailing comments, not just line comments.
 /// This is important for new expressions where block comments after arguments
 /// can also be lost if not handled properly.
-pub(crate) fn has_trailing_comments_slice(
+pub(super) fn has_trailing_comments_slice(
     arguments: &[internal::Expression<'_>],
     call_span_end: u32,
     printer: &Printer<'_>,
@@ -888,7 +888,7 @@ impl<'a> PartitionedComments<'a> {
     /// reading dangled it below the argument and split a pair written as one. Every gap
     /// past a `(` now takes an item constructor, which leaves this one purely the
     /// **delimiter**-gap reading its name describes.
-    pub fn new(
+    pub(crate) fn new(
         comments: &'a [internal::Comment],
         line_breaks: &[u32],
         start: u32,
@@ -961,7 +961,7 @@ impl<'a> PartitionedComments<'a> {
     /// Every argument gap that HOLDS A COMMA takes this. The comma-less spellings — a last
     /// argument's gap to the `)`, a single argument — take [`Self::for_closer_gap`], whose
     /// trailing run follows the closer's own rule.
-    pub fn for_routed_arg_gap(printer: &Printer<'a>, start: u32, end: u32) -> Self {
+    pub(super) fn for_routed_arg_gap(printer: &Printer<'a>, start: u32, end: u32) -> Self {
         let mut pc = Self::for_item_gap(printer, start, end);
         pc.route_after_comma_hugging_to_leading(printer);
         pc
@@ -982,7 +982,7 @@ impl<'a> PartitionedComments<'a> {
     /// and a `import(…)` with no options. The comma is not what makes the source reading
     /// necessary, only the loudest byte that needs it: a preceding comment's `*/` is text no
     /// argument span covers too, and a comment glued behind one is exactly as mis-read.
-    pub fn for_closer_gap(printer: &Printer<'a>, item_end: u32, end: u32) -> Self {
+    pub(crate) fn for_closer_gap(printer: &Printer<'a>, item_end: u32, end: u32) -> Self {
         Self::from_trailing_run(
             printer.closer_trailing_comment_run(item_end, end),
             printer,
@@ -1053,7 +1053,7 @@ impl<'a> PartitionedComments<'a> {
         self.trailing_block = kept;
     }
 
-    pub fn has_trailing_line(&self) -> bool {
+    pub(crate) fn has_trailing_line(&self) -> bool {
         !self.trailing_line.is_empty()
     }
 
@@ -1068,7 +1068,7 @@ impl<'a> PartitionedComments<'a> {
     /// One question, one predicate: the gate and the emitter partition the same gap, so a
     /// gate that opened the parens around a comment the emitter puts back on the item's
     /// line would open them around nothing.
-    pub fn forces_closer_break(&self) -> bool {
+    pub(super) fn forces_closer_break(&self) -> bool {
         self.has_trailing_line() || !self.leading.is_empty()
     }
 
@@ -1089,7 +1089,7 @@ impl<'a> PartitionedComments<'a> {
     /// consumers (the shared [`emit_last_arg_trailing_comments`] and
     /// `call_formatting`'s own loop, which needs its `force_expansion` feedback) get the
     /// rule from one place.
-    pub fn demote_trailing_line_after_deferred(&mut self, prev_defers_line: bool) {
+    pub(super) fn demote_trailing_line_after_deferred(&mut self, prev_defers_line: bool) {
         if self.trailing_line.is_empty() || !prev_defers_line {
             return;
         }
@@ -1098,7 +1098,7 @@ impl<'a> PartitionedComments<'a> {
         }
     }
 
-    pub fn has_trailing_block(&self) -> bool {
+    pub(crate) fn has_trailing_block(&self) -> bool {
         !self.trailing_block.is_empty()
     }
 
@@ -1115,7 +1115,7 @@ impl<'a> PartitionedComments<'a> {
     /// family's spelling of the same rule (`docs/comments.md` §The delimiter-line
     /// question). That conjunction is [`Self::pulls_to_delimiter_line`], so the two stay in
     /// step by construction rather than by review.
-    pub fn has_trailing_comments(&self) -> bool {
+    pub(super) fn has_trailing_comments(&self) -> bool {
         self.has_trailing_block() || self.has_trailing_line()
     }
 
@@ -1131,7 +1131,7 @@ impl<'a> PartitionedComments<'a> {
     /// `Printer::delimiter_line_comment_prefix` ORs the object literal's extra arm onto
     /// this one. The collapse-capable path ([`emit_first_arg_leading_comments`]) asks the
     /// narrower [`Self::has_trailing_line`] instead — load-bearing, not drift; see its doc.
-    pub fn pulls_to_delimiter_line(&self, printer: &Printer<'_>) -> bool {
+    pub(crate) fn pulls_to_delimiter_line(&self, printer: &Printer<'_>) -> bool {
         self.has_trailing_comments()
             && should_force_expansion_for_comments(printer, self.start, self.end)
     }
@@ -1143,7 +1143,7 @@ impl<'a> PartitionedComments<'a> {
     /// carries that rule and why the families used to drop it) — and every delimiter-line
     /// pull in the call and list families emits through here rather than re-deriving half
     /// of it.
-    pub fn emit_delimiter_line_pull(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
+    pub(crate) fn emit_delimiter_line_pull(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         self.emit_trailing_comments(parts, printer);
         if let Some(pulled_end) = self.trailing_end() {
             printer.push_delimiter_glued_blank(parts, pulled_end, self.end);
@@ -1167,7 +1167,7 @@ impl<'a> PartitionedComments<'a> {
     /// `is_next_line_empty` is that predicate, and it already steps over a trailing
     /// comment on the argument's own line, which is what the hand-rolled `check_start`
     /// below used to do by hand.
-    pub fn has_blank_line_in_gap(&self, printer: &Printer<'_>) -> bool {
+    pub(super) fn has_blank_line_in_gap(&self, printer: &Printer<'_>) -> bool {
         let check_end = if !self.leading.is_empty() {
             self.leading[0].span.start
         } else {
@@ -1189,7 +1189,7 @@ impl<'a> PartitionedComments<'a> {
     /// The max of both buckets, not the last of either: they are emitted blocks-then-lines
     /// but partition one source-ordered run, so a block written after the `//` still ends
     /// later in the source and is what the blank sits under.
-    pub fn trailing_end(&self) -> Option<u32> {
+    pub(super) fn trailing_end(&self) -> Option<u32> {
         self.trailing_block
             .iter()
             .chain(self.trailing_line.iter())
@@ -1197,7 +1197,7 @@ impl<'a> PartitionedComments<'a> {
             .max()
     }
 
-    pub fn emit_trailing_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
+    fn emit_trailing_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         let d = printer.d();
         for comment in &self.trailing_block {
             parts.push(d.text(" "));
@@ -1218,7 +1218,11 @@ impl<'a> PartitionedComments<'a> {
     /// its authored position. Shared by the `new`-argument non-last paths
     /// (`build_new_doc_with_wrapping` and `build_call_args_with_blank_lines`) so they
     /// can't drift — both used to relocate the block past the comma.
-    pub fn emit_trailing_comments_around_comma(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
+    pub(super) fn emit_trailing_comments_around_comma(
+        &self,
+        parts: &mut DocBuf,
+        printer: &Printer<'_>,
+    ) {
         let d = printer.d();
         let comma_pos = find_comma_pos(printer.source, self.start, self.end);
         if let Some(cpos) = comma_pos {
@@ -1271,7 +1275,7 @@ impl<'a> PartitionedComments<'a> {
     /// question was named, and that is the spelling
     /// [`Printer::trailing_run_hugs_previous`] adopted; the "what follows the `*/`" one is
     /// the paraphrase that breaks on a deleted comma.
-    pub fn emit_dangling_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
+    pub(super) fn emit_dangling_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         // The run's own cursor is the gap's `start`, so the first comment's blank scan
         // preserves an author blank line before an own-line trailing comment
         // (`arg⏎⏎/* c */` before the closing `)`), matching prettier.
@@ -1288,7 +1292,7 @@ impl<'a> PartitionedComments<'a> {
     /// gap): shared by the `new` and member-chain last-arg paths so the ordering lives in
     /// one place. (`call_formatting` keeps its own same-line loop, feeding
     /// `force_expansion`, and calls only [`Self::emit_dangling_comments`] directly.)
-    pub fn emit_last_arg_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
+    pub(crate) fn emit_last_arg_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         // `emit_trailing_comments` already no-ops when there are no trailing comments,
         // so no presence guard is needed.
         self.emit_trailing_comments(parts, printer);
@@ -1309,7 +1313,11 @@ impl<'a> PartitionedComments<'a> {
     /// two states (space or hardline) are right only at an already-broken site: it forced
     /// an argument list open around a glued pair the author gave its own line
     /// (`fn(a,⏎/* c1 */ /* c2 */⏎b)`), which prettier keeps flat.
-    pub fn emit_leading_comments_inline_aware(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
+    pub(super) fn emit_leading_comments_inline_aware(
+        &self,
+        parts: &mut DocBuf,
+        printer: &Printer<'_>,
+    ) {
         printer.push_leading_comment_run(
             parts,
             self.leading.iter().copied(),

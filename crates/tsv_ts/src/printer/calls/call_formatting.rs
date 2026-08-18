@@ -17,11 +17,11 @@ use super::arg_predicates::{
 };
 use super::arg_wrapping::{
     ArgItem, ArgOpener, append_type_args_with_gap_comments, arg_needs_soft_wrap,
-    arrow_body_expands_internally, arrow_hug_refused_by_comments, build_arrow_call_body_states,
-    build_arrow_gap_break_single_arg_doc, build_arrow_hug_arg_docs, build_arrow_hug_printed_doc,
-    build_arrow_sig_doc, build_call_args_expanded, build_call_args_with_blank_lines,
-    build_empty_args_doc, build_expand_first_arg_doc, build_printed_argument_doc,
-    build_single_arrow_arg_states, build_single_container_arg_doc, could_expand_arrow_chain,
+    arrow_hug_refused_by_comments, build_arrow_call_body_states,
+    build_arrow_gap_break_single_arg_doc, build_arrow_hug_printed_doc, build_arrow_sig_doc,
+    build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
+    build_expand_first_arg_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
+    build_single_container_arg_doc, build_ternary_arrow_hug_ladder, could_expand_arrow_chain,
     first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
@@ -883,19 +883,18 @@ fn build_block_arrow_hug_states(
     // body's and the arms past this builder never asked it at all. The only way such a comment
     // reaches here is behind the signature-break refusal above, which returns first.
 
-    // Prettier's two printings of the argument, and which of them each state reads:
-    // [`build_arrow_hug_arg_docs`], shared with the `new` twin.
-    let docs = build_arrow_hug_arg_docs(printer, arg, arrow, build);
-
-    // The state ladder, shared with the `new` single-argument arm — an object/array terminal
-    // gets the middle state that expands it internally while the arrow stays hugged.
-    // See also: chain_args.rs's parallel chain-context implementation.
-    build_single_arrow_arg_states(d, callee, docs, arrow_body_expands_internally(arrow))
+    // The two printings and the state ladder they feed, shared with the `new` and
+    // member-chain single-argument arms — an object/array terminal gets the middle state that
+    // expands it internally while the arrow stays hugged.
+    build_single_arrow_hug_doc(printer, ArgOpener::Callee(callee), arg, arrow, None, build)
 }
 
 /// Build the 3-state expand-last layout for a single expression arrow with a
 /// ternary body: `map((x) => (cond ? a : b))`. Flat keeps the parens; the break
 /// states drop them and indent the body after `=>` (no trailing comma).
+///
+/// The ladder itself is [`build_ternary_arrow_hug_ladder`], shared with the `new` and
+/// member-chain spellings of this same layout.
 fn build_ternary_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
@@ -909,62 +908,9 @@ fn build_ternary_arrow_hug_states(
     let body_doc = printer.build_expression_doc(body_expr);
     let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
-    // Build state 1: break version with params on call line, body breaks
-    // Structure: callee + "(" + sig + " =>" + indent([hardline, body]) + hardline + ")"
-    // First hardline: breaks after "=>"
-    // Second hardline: breaks before ")" to put closing paren on its own line
-    // No trailing comma (trailingComma: 'none').
-    let state_break = d.concat(&[
-        callee,
-        d.text("("),
-        sig_doc,
-        d.text(" =>"),
-        d.indent_hardline(body_doc),
-        d.hardline(),
-        d.text(")"),
-    ]);
-
-    // If body has hardlines (e.g., ternary branches with block arrow bodies),
-    // state 0 (flat with parens) would be incorrectly selected by fits()
-    // because hardlines truncate the fit check. Use state_break directly.
-    // (Matches the will_break guard in chain_args.rs)
-    if d.will_break(body_doc) {
-        return state_break;
-    }
-
-    // Build state 0: fully flat version including call wrapping
-    // Structure: callee + "(" + sig + " => (" + body + ")" + ")"
-    // This includes the full context so conditional_group can measure correctly
-    let state_flat = d.concat(&[
-        callee,
-        d.text("("),
-        sig_doc,
-        d.text(" => ("),
-        body_doc,
-        d.text("))"), // Close both arrow body and call
-    ]);
-
-    // Build state 2: all args broken out (fallback for Break mode)
-    // This is used when the parent group breaks and we need maximum expansion
-    // Structure: callee + "(\n" + indent([sig + " =>" + indent([hardline, body, ","]) + softline]) + "\n)"
-    let state_all_broken = d.concat(&[
-        callee,
-        d.text("("),
-        d.indent(d.concat(&[
-            d.hardline(),
-            sig_doc,
-            d.text(" =>"),
-            d.indent_hardline(body_doc),
-        ])),
-        d.hardline(),
-        d.text(")"),
-    ]);
-
-    // Use conditional_group with 3 states to match Prettier
-    // State 0: fully flat
-    // State 1: arrow breaks (checked during fits())
-    // State 2: all broken (only used in Break mode)
-    d.conditional_group(&[state_flat, state_break, state_all_broken])
+    // A forced break collapses the ladder to its break state alone — asked here of the BODY,
+    // where the member-chain spelling asks it of the whole arrow.
+    build_ternary_arrow_hug_ladder(d, ArgOpener::Callee(callee), sig_doc, body_doc, body_doc)
 }
 
 /// Build the argument-list doc when the arguments carry comments (leading,

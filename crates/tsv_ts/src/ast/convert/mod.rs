@@ -104,14 +104,12 @@ fn radix_digits_to_decimal(digits: &str, radix: u32) -> String {
         let mut carry = d;
         for slot in &mut dec {
             let v = u32::from(*slot) * radix + carry;
-            #[allow(clippy::cast_possible_truncation)]
             {
                 *slot = (v % 10) as u8;
             }
             carry = v / 10;
         }
         while carry > 0 {
-            #[allow(clippy::cast_possible_truncation)]
             dec.push((carry % 10) as u8);
             carry /= 10;
         }

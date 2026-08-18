@@ -152,7 +152,7 @@ fn gen_ts_nested_arrow(depth: usize) -> String {
 
 /// MULTI-arg last-arg arrow whose body is another such call — a leading arg at every
 /// level routes through `try_expand_last_function_arg` (the `build_args_split_last` /
-/// `build_break_body_state` expand-last path). The multi-arg twin of `gen_ts_nested_arrow`:
+/// `build_break_body_ladder` expand-last path). The multi-arg twin of `gen_ts_nested_arrow`:
 /// with a leading argument the whole-arrow arg doc and the break-body state each recurse
 /// into the body unless the body build is shared.
 fn gen_ts_nested_arrow_multiarg(depth: usize) -> String {
@@ -393,7 +393,7 @@ fn gen_svelte_key_nested(depth: usize) -> String {
 
 /// MULTI-arg last-arg arrow whose body is a CONDITIONAL (ternary) that recurses in a
 /// branch (`f(lead, x => (c ? f(lead, y => …) : z))`) — the expand-last conditional-body
-/// sub-branch (the sibling of the call-body branch, sharing `build_break_body_state`).
+/// sub-branch (the sibling of the call-body branch, sharing `build_break_body_ladder`).
 fn gen_ts_nested_arrow_cond_multiarg(depth: usize) -> String {
     let mut expr = String::from("done");
     for i in 0..depth {
@@ -414,7 +414,7 @@ fn gen_ts_nested_arrow_cond_single(depth: usize) -> String {
 
 /// MULTI-arg last-arg FUNCTION expression (block body) that recurses in its `return`
 /// (`f(lead, function (x) {{ return f(lead, function (y) {{ … }}); }})`) — the block-body
-/// last-arg path (`build_inline_or_expand_all`).
+/// last-arg path (`ArgOpener::inline_or_expand_all`).
 fn gen_ts_nested_fn_expr_multiarg(depth: usize) -> String {
     let mut expr = String::from("done");
     for i in 0..depth {
