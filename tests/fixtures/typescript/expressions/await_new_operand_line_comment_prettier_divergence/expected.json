@@ -1,0 +1,1095 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1020,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` in the `new`→callee gap forces the break, so the callee — and the whole",
+			"start": 45,
+			"end": 126,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tail after it — continues one level down.",
+			"start": 129,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 180,
+			"end": 185,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 6
+				},
+				"end": {
+					"line": 5,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 203,
+			"end": 208,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 6
+				},
+				"end": {
+					"line": 8,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The `await`→operand gap is the same gap one keyword over, and takes the same",
+			"start": 226,
+			"end": 305,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " continuation.",
+			"start": 308,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 333,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 8
+				},
+				"end": {
+					"line": 13,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An operand whose parens are REQUIRED keeps the run OUTSIDE the pair: the gap",
+			"start": 352,
+			"end": 431,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " belongs to the keyword, not to the parens the printer emits.",
+			"start": 434,
+			"end": 497,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 506,
+			"end": 511,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 8
+				},
+				"end": {
+					"line": 18,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run keeps one comment per line, and the whole run rides the continuation.",
+			"start": 527,
+			"end": 605,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 612,
+			"end": 617,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 6
+				},
+				"end": {
+					"line": 22,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 621,
+			"end": 626,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 3
+				},
+				"end": {
+					"line": 23,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line multiline block hangs for the same reason and takes the same indent.",
+			"start": 640,
+			"end": 723,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7\nc7b ",
+			"start": 730,
+			"end": 744,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 6
+				},
+				"end": {
+					"line": 28,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " In value position the continuation sits one level under the statement.",
+			"start": 758,
+			"end": 831,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 850,
+			"end": 855,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 18
+				},
+				"end": {
+					"line": 32,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control: a single-line block forces nothing, so it collapses inline and there is",
+			"start": 869,
+			"end": 952,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " no continuation to indent.",
+			"start": 955,
+			"end": 984,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 2
+				},
+				"end": {
+					"line": 36,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 991,
+			"end": 999,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 6
+				},
+				"end": {
+					"line": 37,
+					"column": 14
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1019,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1010,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 20,
+					"end": 1009,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 35,
+						"end": 38,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 19
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 41,
+						"end": 1009,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 22
+							},
+							"end": {
+								"line": 38,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 176,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "NewExpression",
+									"start": 176,
+									"end": 194,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 8
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 189,
+										"end": 192,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 3
+											},
+											"end": {
+												"line": 6,
+												"column": 6
+											}
+										},
+										"name": "Foo",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c1",
+												"start": 180,
+												"end": 185
+											}
+										]
+									},
+									"arguments": []
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A `//` in the `new`→callee gap forces the break, so the callee — and the whole",
+										"start": 45,
+										"end": 126
+									},
+									{
+										"type": "Line",
+										"value": " tail after it — continues one level down.",
+										"start": 129,
+										"end": 173
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 199,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 13
+									}
+								},
+								"expression": {
+									"type": "NewExpression",
+									"start": 199,
+									"end": 221,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 212,
+										"end": 215,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 3
+											},
+											"end": {
+												"line": 9,
+												"column": 6
+											}
+										},
+										"name": "Foo",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 203,
+												"end": 208
+											}
+										]
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 216,
+											"end": 217,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 7
+												},
+												"end": {
+													"line": 9,
+													"column": 8
+												}
+											},
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 219,
+											"end": 220,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 10
+												},
+												"end": {
+													"line": 9,
+													"column": 11
+												}
+											},
+											"name": "b"
+										}
+									]
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 327,
+								"end": 348,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 327,
+									"end": 347,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 8
+										}
+									},
+									"argument": {
+										"type": "CallExpression",
+										"start": 342,
+										"end": 347,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 8
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 342,
+											"end": 345,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 3
+												},
+												"end": {
+													"line": 14,
+													"column": 6
+												}
+											},
+											"name": "fn2"
+										},
+										"arguments": [],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c3",
+												"start": 333,
+												"end": 338
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The `await`→operand gap is the same gap one keyword over, and takes the same",
+										"start": 226,
+										"end": 305
+									},
+									{
+										"type": "Line",
+										"value": " continuation.",
+										"start": 308,
+										"end": 324
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 500,
+								"end": 523,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 500,
+									"end": 522,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 10
+										}
+									},
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 516,
+										"end": 521,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 4
+											},
+											"end": {
+												"line": 19,
+												"column": 9
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 516,
+											"end": 517,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 4
+												},
+												"end": {
+													"line": 19,
+													"column": 5
+												}
+											},
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 520,
+											"end": 521,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 8
+												},
+												"end": {
+													"line": 19,
+													"column": 9
+												}
+											},
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c4",
+												"start": 506,
+												"end": 511
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " An operand whose parens are REQUIRED keeps the run OUTSIDE the pair: the gap",
+										"start": 352,
+										"end": 431
+									},
+									{
+										"type": "Line",
+										"value": " belongs to the keyword, not to the parens the printer emits.",
+										"start": 434,
+										"end": 497
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 608,
+								"end": 636,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "NewExpression",
+									"start": 608,
+									"end": 635,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 8
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 630,
+										"end": 633,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 3
+											},
+											"end": {
+												"line": 24,
+												"column": 6
+											}
+										},
+										"name": "Foo",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c5",
+												"start": 612,
+												"end": 617
+											},
+											{
+												"type": "Line",
+												"value": " c6",
+												"start": 621,
+												"end": 626
+											}
+										]
+									},
+									"arguments": []
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A run keeps one comment per line, and the whole run rides the continuation.",
+										"start": 527,
+										"end": 605
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 726,
+								"end": 754,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "NewExpression",
+									"start": 726,
+									"end": 753,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 8
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 748,
+										"end": 751,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 3
+											},
+											"end": {
+												"line": 29,
+												"column": 6
+											}
+										},
+										"name": "Foo",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c7\nc7b ",
+												"start": 730,
+												"end": 744
+											}
+										]
+									},
+									"arguments": []
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " An own-line multiline block hangs for the same reason and takes the same indent.",
+										"start": 640,
+										"end": 723
+									}
+								]
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 834,
+								"end": 865,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 33,
+										"column": 9
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 840,
+										"end": 864,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 8
+											},
+											"end": {
+												"line": 33,
+												"column": 8
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 840,
+											"end": 841,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 8
+												},
+												"end": {
+													"line": 32,
+													"column": 9
+												}
+											},
+											"name": "c"
+										},
+										"init": {
+											"type": "AwaitExpression",
+											"start": 844,
+											"end": 864,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 12
+												},
+												"end": {
+													"line": 33,
+													"column": 8
+												}
+											},
+											"argument": {
+												"type": "CallExpression",
+												"start": 859,
+												"end": 864,
+												"loc": {
+													"start": {
+														"line": 33,
+														"column": 3
+													},
+													"end": {
+														"line": 33,
+														"column": 8
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 859,
+													"end": 862,
+													"loc": {
+														"start": {
+															"line": 33,
+															"column": 3
+														},
+														"end": {
+															"line": 33,
+															"column": 6
+														}
+													},
+													"name": "fn2"
+												},
+												"arguments": [],
+												"optional": false,
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " c8",
+														"start": 850,
+														"end": 855
+													}
+												]
+											}
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " In value position the continuation sits one level under the statement.",
+										"start": 758,
+										"end": 831
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 987,
+								"end": 1006,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 21
+									}
+								},
+								"expression": {
+									"type": "NewExpression",
+									"start": 987,
+									"end": 1005,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 2
+										},
+										"end": {
+											"line": 37,
+											"column": 20
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 1000,
+										"end": 1003,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 15
+											},
+											"end": {
+												"line": 37,
+												"column": 18
+											}
+										},
+										"name": "Foo",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c9 ",
+												"start": 991,
+												"end": 999
+											}
+										]
+									},
+									"arguments": []
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Control: a single-line block forces nothing, so it collapses inline and there is",
+										"start": 869,
+										"end": 952
+									},
+									{
+										"type": "Line",
+										"value": " no continuation to indent.",
+										"start": 955,
+										"end": 984
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

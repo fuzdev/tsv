@@ -68,6 +68,46 @@ pub(crate) fn paren_pair_keeps_leading_run(expr: &internal::Expression<'_>) -> b
     )
 }
 
+/// The index of the next byte in `source` that is neither whitespace nor trivia, at or
+/// after `start` and before `end`; `None` when the range holds nothing else.
+///
+/// The "what actually comes next in the source?" step every shell question asks. A
+/// comment occupies bytes even where nothing emits it, so a walk that stepped over
+/// whitespace alone would stop on the `/` and answer about the wrong token.
+///
+/// A free function over the source because the chain LINEARIZER asks it too, before any
+/// `Printer` method is reached — [`paren_shell_close_after`].
+pub(crate) fn next_significant_byte(source: &str, start: u32, end: u32) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let end = end as usize;
+    let mut i = start as usize;
+    while i < end {
+        if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+            i = next;
+        } else if bytes[i].is_ascii_whitespace() {
+            i += 1;
+        } else {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// The index just past the `)` that closes a REQUIRED pair around an operand ending at
+/// `operand_end`, when the author wrote that pair — `None` when the next thing in the
+/// source is something else (a `(` of an argument list, a `` ` ``, a `.`), which means
+/// the pair this position prints is tsv's own and the source has no trailing gap inside
+/// it.
+///
+/// The distinction is load-bearing: `(fn /* t */)()` writes the pair around the callee
+/// and the comment is INSIDE it, while `(/* t */ fn())` writes it around the whole call
+/// and the comment belongs to the call, not to a pair the callee prints.
+pub(crate) fn paren_shell_close_after(source: &str, operand_end: u32) -> Option<u32> {
+    let bytes = source.as_bytes();
+    let pos = next_significant_byte(source, operand_end, bytes.len() as u32)?;
+    (bytes[pos] == b')').then_some(pos as u32 + 1)
+}
+
 impl<'a> Printer<'a> {
     /// Split the comments between an opening `(` and the value that follows into the run
     /// the `(` LINE keeps and the run that LEADS the value, and report whether the caller
@@ -752,19 +792,7 @@ impl<'a> Printer<'a> {
     /// where nothing emits it, so a walk that stepped over whitespace alone would stop
     /// on the `/` and answer about the wrong token.
     fn next_significant_byte(&self, start: u32, end: u32) -> Option<usize> {
-        let bytes = self.source.as_bytes();
-        let end = end as usize;
-        let mut i = start as usize;
-        while i < end {
-            if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
-                i = next;
-            } else if bytes[i].is_ascii_whitespace() {
-                i += 1;
-            } else {
-                return Some(i);
-            }
-        }
-        None
+        next_significant_byte(self.source, start, end)
     }
 
     /// Whether a comment in `[expr_end, boundary_end)` forces the operand's grouping
@@ -915,10 +943,20 @@ impl<'a> Printer<'a> {
     /// ([`Self::build_shell_operand_doc`]), the non-null's needs-parens arm, and
     /// the sealed optional chain (both `build_ts_non_null_doc` /
     /// `build_sealed_non_null_paren_doc`, whose `close` is `")!"`).
+    ///
+    /// A commented TRAILING gap rides the SAME shell rather than a second one — the
+    /// pair is already expanded, so the operand→`)` run simply follows the operand
+    /// inside it ([`Self::push_shell_trailing_run`]). Declining instead and folding both
+    /// runs flat, which is what a shell that bailed on a commented trailing gap forced,
+    /// left the one authoring that commented both gaps rendering with no shell at all:
+    /// the `//` glued to a `(` that never broke, the operand at the ENCLOSING indent,
+    /// and the `)` welded to it — the family's shape at neither gap, and prettier's at
+    /// neither either.
     pub(in crate::printer) fn build_leading_run_expanded_shell_doc(
         &self,
         gap_start: u32,
         operand_start: u32,
+        trailing_gap: Option<(u32, u32)>,
         inner_doc: DocId,
         close: &'static str,
     ) -> DocId {
@@ -929,7 +967,25 @@ impl<'a> Printer<'a> {
             body.push(run);
         }
         body.push(inner_doc);
+        if let Some((start, end)) = trailing_gap {
+            self.push_shell_trailing_run(&mut body, start, end);
+        }
         self.compose_expanded_shell_doc(paren_trailing, &body, close)
+    }
+
+    /// The operand→`)` run inside a pair the LEADING run already expanded — the same
+    /// two arms [`Self::build_paren_operand_comment_doc`] takes when it builds the shell
+    /// itself, minus the shell (this body is already inside one).
+    ///
+    /// A `//` takes the anchored emitter, since every comment here was authored AFTER
+    /// the operand and the closer's hardline below ends the line the run defers onto; a
+    /// block-only run trails the operand inline.
+    fn push_shell_trailing_run(&self, body: &mut DocBuf, start: u32, end: u32) {
+        if self.has_line_comments_between(start, end) {
+            self.push_anchored_trailing_run(body, start, end, RunLeadingBlank::Keep);
+        } else if self.has_comments_to_emit_between(start, end) {
+            body.push(self.build_chain_block_comments_doc(start, end, CommentSpacing::Leading));
+        }
     }
 
     /// The family's answer for a REQUIRED pair's LEADING gap — the one rule every
@@ -938,13 +994,12 @@ impl<'a> Printer<'a> {
     /// `Some` is the expanded shell ([`Self::build_leading_run_expanded_shell_doc`]):
     /// the run occupies a line, so the `(`-glued `//` keeps the `(` line, the operand
     /// takes one indent and `close` comes back out. `None` says this gap does not take
-    /// the shell and the caller folds the run flat above the operand instead — either
-    /// because the run fits on one line (a glued single-line block run), or because the
-    /// pair's TRAILING gap holds comments too, where the shell is the trailing emitter's
-    /// to build and a second one here would nest two.
+    /// the shell and the caller folds the run flat above the operand instead — the run
+    /// fits on one line (a glued single-line block run), which is the only reason left.
     ///
     /// `trailing_gap` is `[operand_end, boundary_end)`, `None` at a position whose pair
-    /// has no trailing gap of its own.
+    /// has no trailing gap of its own. A commented one does NOT decline the shell: it
+    /// rides inside it, after the operand.
     pub(in crate::printer) fn build_required_pair_leading_shell_doc(
         &self,
         gap_start: u32,
@@ -958,12 +1013,13 @@ impl<'a> Printer<'a> {
         {
             return None;
         }
-        if let Some((start, end)) = trailing_gap
-            && self.has_comments_to_emit_between(start, end)
-        {
-            return None;
-        }
-        Some(self.build_leading_run_expanded_shell_doc(gap_start, operand_start, inner, close))
+        Some(self.build_leading_run_expanded_shell_doc(
+            gap_start,
+            operand_start,
+            trailing_gap,
+            inner,
+            close,
+        ))
     }
 
     /// The index just past the `)` that closes a REQUIRED pair around an operand
@@ -976,32 +1032,40 @@ impl<'a> Printer<'a> {
     /// callee and the comment is INSIDE it, while `(/* t */ fn())` writes it around the
     /// whole call and the comment belongs to the call, not to a pair the callee prints.
     pub(in crate::printer) fn paren_shell_close_after(&self, operand_end: u32) -> Option<u32> {
-        let bytes = self.source.as_bytes();
-        let pos = self.next_significant_byte(operand_end, bytes.len() as u32)?;
-        (bytes[pos] == b')').then_some(pos as u32 + 1)
+        paren_shell_close_after(self.source, operand_end)
     }
 
-    /// The operand→`)` gap a REQUIRED pair owns, when the pair is one that keeps its
-    /// comments inside ([`paren_pair_keeps_leading_run`]) **and** the author wrote it.
+    /// The operand→`)` gap a REQUIRED pair owns, when the pair KEEPS ITS INTERIOR at
+    /// this position **and** the author wrote it.
     ///
-    /// Both halves matter. Only a function/arrow callee or tag keeps a trailing comment
-    /// within the parens (prettier's `printCommentsForFunction` covers leading and
-    /// trailing alike); and the pair must be the author's own, since
-    /// `(fn /* t */)()` writes it around the callee while `(/* t */ fn())` writes it
-    /// around the whole call, where the comment belongs to the call and to no pair
-    /// printed here ([`Self::paren_shell_close_after`]).
+    /// Both halves matter. `keeps_interior` is the **position's** answer — a pair keeps
+    /// its interior at a function/arrow callee or tag (prettier's
+    /// `printCommentsForFunction` covers leading and trailing alike) and at a **sealed
+    /// optional chain**, where the pair is what stops the chain and both formatters keep
+    /// the comment between the operand and the `)`. It is deliberately a parameter and
+    /// never re-derived from the operand's KIND here: a kind is a property of the
+    /// subtree and holds wherever that subtree appears, while a gap belongs to exactly
+    /// one seam, which is a property of the position — `(() => 1 /* c */).p` prints the
+    /// same pair as an IIFE callee but its trailing gap is the member seam's, and
+    /// claiming it here double-printed the comment. The position-shaped predicates are
+    /// [`chain_paren_leading_gap`](crate::printer::chain::chain_paren_leading_gap)'s
+    /// family, and the leading half reads the same ones.
+    /// The second half is the author's pair, since `(fn /* t */)()` writes it around the
+    /// callee while `(/* t */ fn())` writes it around the whole call, where the comment
+    /// belongs to the call and to no pair printed here
+    /// ([`paren_shell_close_after`]).
     ///
     /// Every window that opens AFTER the operand — the type-argument gap, an argument
-    /// list's own leading scan, a tag→`` ` `` gap — takes its start from the returned
-    /// `)` rather than from the operand's span end, so a comment emitted inside the
-    /// parens is not emitted a second time outside them (`docs/comments.md` hazard 3).
+    /// list's own leading scan, a tag→`` ` `` gap, a member seam's `object_end` — takes
+    /// its start from the returned `)` rather than from the operand's span end, so a
+    /// comment emitted inside the parens is not emitted a second time outside them
+    /// (`docs/comments.md` hazard 3).
     pub(in crate::printer) fn owned_pair_trailing_gap(
         &self,
-        operand: &internal::Expression<'_>,
-        context: ParenContext,
+        operand_end: u32,
+        keeps_interior: bool,
     ) -> Option<(u32, u32)> {
-        let operand_end = operand.span().end;
-        (paren_pair_keeps_leading_run(operand) && self.needs_parens(operand, context))
+        keeps_interior
             .then(|| self.paren_shell_close_after(operand_end))
             .flatten()
             .map(|close| (operand_end, close))
@@ -1031,11 +1095,16 @@ impl<'a> Printer<'a> {
     /// Layering, which is the family's convention rather than this function's choice:
     ///
     /// - a leading run that occupies a line takes the expanded shell
-    ///   ([`Self::build_required_pair_leading_shell_doc`]);
+    ///   ([`Self::build_required_pair_leading_shell_doc`]) — and a commented TRAILING
+    ///   gap rides that SAME shell, after the operand, rather than declining it;
     /// - otherwise the leading run folds flat above the operand, and a commented
     ///   TRAILING gap then builds the shell around that
     ///   ([`Self::build_paren_operand_comment_doc`]);
     /// - with neither, the pair is bare.
+    ///
+    /// So exactly ONE shell is built however many of the two gaps hold comments. Two
+    /// nest; none leaves the `//` glued to a `(` that never breaks and the operand at
+    /// the enclosing indent.
     ///
     /// `flat_body` and `broken_body` are the operand's two renderings, which differ
     /// only where a caller shapes the flat one (the chain base's hang / ternary
@@ -1639,29 +1708,6 @@ impl<'a> Printer<'a> {
         } else {
             doc
         }
-    }
-
-    /// [`Self::prepend_removed_paren_comments`] for a **keyword→operand** gap, routing
-    /// through [`Printer::build_keyword_operand_comments_opt`] so a single-line block
-    /// trails inline instead of keeping the author's break. Used for `new`→callee;
-    /// `await` calls the emitter directly. The other `prepend_removed_paren_comments`
-    /// callers (call/member chains, binary chains, conditionals, tagged templates) are
-    /// deliberately NOT routed here — each is its own gap with its own gate, and the
-    /// same cycle at those sites wants its own fixture first.
-    #[inline]
-    pub(crate) fn prepend_keyword_operand_comments(
-        &self,
-        outer_start: u32,
-        inner_start: u32,
-        doc: DocId,
-    ) -> DocId {
-        if outer_start < inner_start
-            && let Some(comments) =
-                self.build_keyword_operand_comments_opt(outer_start, inner_start)
-        {
-            return self.d().concat(&[comments, doc]);
-        }
-        doc
     }
 
     /// The retained-shell form for a **statement value** whose authored grouping parens

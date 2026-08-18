@@ -1035,6 +1035,15 @@ impl<'a> Printer<'a> {
     /// comment genuinely own its line, which this one never asks; use that variant
     /// only at the one carve-out site where prettier *keeps* that break
     /// (binary/logical operands).
+    /// What the chain linearizer reads off the input — the source and the comment table
+    /// as one value, so the two cannot be handed over separately at a call site.
+    pub(crate) fn linearize_input(&self) -> chain::LinearizeInput<'_> {
+        chain::LinearizeInput {
+            source: self.source,
+            comments: self.comments,
+        }
+    }
+
     pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| self.comment_hangs_next(c, next))
     }

@@ -25,6 +25,7 @@ use super::arg_wrapping::{
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
+use crate::printer::comments::KeywordOperandGap;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
@@ -35,10 +36,48 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
-    /// Build a Doc for a new expression with argument wrapping
+    /// Build a Doc for a new expression with argument wrapping.
+    ///
+    /// The `new`→callee gap is one of the two expression-level keyword→operand gaps
+    /// (`await`'s is the other) that take the [uniform forced-continuation
+    /// indent](Printer::build_continuation_indent): a `//` there runs to end-of-line, so
+    /// the callee cannot stay on the keyword's line, and the whole tail — callee, type
+    /// arguments **and** argument list — drops one level rather than landing flush, where
+    /// it would read as a sibling statement. The tail is built keyword-less for that
+    /// reason: indenting the callee alone would leave a broken argument list rendering at
+    /// the outer column.
     pub(super) fn build_new_doc_with_wrapping(
         &self,
         new_expr: &internal::NewExpression<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let keyword_end = new_expr.span.start + "new".len() as u32;
+        let callee_start = new_expr.callee.span().start;
+        match self.keyword_operand_gap(keyword_end, callee_start) {
+            KeywordOperandGap::Continuation => {
+                let tail = self.build_new_doc_after_keyword(new_expr, d.empty());
+                d.concat(&[
+                    d.text("new"),
+                    self.build_continuation_indent(keyword_end, callee_start, tail),
+                ])
+            }
+            KeywordOperandGap::Inline(run) => {
+                let keyword = match run {
+                    Some(run) => d.concat(&[d.text("new "), run]),
+                    None => d.text("new "),
+                };
+                self.build_new_doc_after_keyword(new_expr, keyword)
+            }
+        }
+    }
+
+    /// [`Self::build_new_doc_with_wrapping`] past the keyword, which it emits as
+    /// `keyword` — `new ` on the ordinary path, and `empty()` where the caller has
+    /// already emitted `new` and the gap's continuation supplies the separator.
+    fn build_new_doc_after_keyword(
+        &self,
+        new_expr: &internal::NewExpression<'_>,
+        keyword: DocId,
     ) -> DocId {
         let d = self.d();
         // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`,
@@ -73,16 +112,6 @@ impl<'a> Printer<'a> {
             self.build_expression_doc(new_expr.callee)
         };
 
-        // Check for comments between removed parentheses and callee
-        // e.g., new (/* comment */ Foo)() has comments in the gap between 'new ' and 'Foo'
-        // The keyword→operand gap, shared with `await` — see
-        // `prepend_keyword_operand_comments`.
-        let callee = self.prepend_keyword_operand_comments(
-            new_expr.span.start,
-            new_expr.callee.span().start,
-            callee,
-        );
-
         // Combine callee with type arguments (`new Foo<K, V>`), preserving comments
         // in the gap, e.g. `new Foo/* c */ <string>()` — comment between callee and `<`
         let callee_with_types_base = append_type_args_with_gap_comments(
@@ -103,7 +132,7 @@ impl<'a> Printer<'a> {
         if new_expr.arguments.is_empty() {
             return build_empty_args_doc(
                 self,
-                d.concat(&[d.text("new "), callee_with_types_base]),
+                d.concat(&[keyword, callee_with_types_base]),
                 paren_open,
                 new_expr.span.end,
                 false,
@@ -111,7 +140,7 @@ impl<'a> Printer<'a> {
         }
 
         // Build callee with type args: `new Foo<K, V>`
-        let callee_with_types = d.concat(&[d.text("new "), callee_with_types_base]);
+        let callee_with_types = d.concat(&[keyword, callee_with_types_base]);
         // Zero-comment fast gate: one binary search over the whole argument window
         // (`(` … `)`) short-circuits every per-branch argument-comment predicate
         // below (trailing-line / trailing-block / inter-argument / leading), each of
