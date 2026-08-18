@@ -1336,6 +1336,50 @@ impl<'a> Printer<'a> {
         doc
     }
 
+    /// The retained-shell form for a **statement value** whose authored grouping parens
+    /// hold a `//` — `export default (⏎\tx // c⏎)`, `export = (⏎\tx // c⏎)`.
+    ///
+    /// These positions print no pair of their own around the value, so without this the
+    /// comment falls to the statement's terminator gap and defers past the `)` and the
+    /// `;`, onto a line that may already hold a `//` — where the two merge into one
+    /// comment. Only a **line** comment needs the shell: a block trails without ending
+    /// its line, so its relocation past the `;` is lossless and stable, and tsv matches
+    /// prettier there.
+    ///
+    /// Returns the shell and the position just past the retained `)`, which is where the
+    /// caller's terminator-gap scan resumes. `None` leaves the caller's plain path alone —
+    /// no authored paren, or no `//` inside one.
+    pub(crate) fn build_value_paren_line_comment_shell(
+        &self,
+        value_doc: DocId,
+        value_end: u32,
+        span_end: u32,
+    ) -> Option<(DocId, u32)> {
+        let close = self.value_paren_line_comment_close(value_end, span_end)?;
+        let shell =
+            self.build_paren_operand_comment_doc(value_end, close, value_doc, value_doc, ")")?;
+        Some((shell, Self::past_grouping_close(close, span_end)))
+    }
+
+    /// Where the shell above closes, when it applies — the value's authored grouping `)`
+    /// with a `//` inside it. Split out for the caller that must know the close *before*
+    /// it can build the value doc (`export =` builds its value inside a keyword-header
+    /// closure), so the two answer one question rather than two.
+    pub(crate) fn value_paren_line_comment_close(
+        &self,
+        value_end: u32,
+        span_end: u32,
+    ) -> Option<u32> {
+        let close = self.retained_grouping_close(value_end, span_end)?;
+        self.has_line_comments_between(value_end, close)
+            .then_some(close)
+    }
+
+    /// Where a caller's terminator-gap scan resumes: just past the retained `)`.
+    pub(crate) fn past_grouping_close(close: u32, span_end: u32) -> u32 {
+        close.saturating_add(1).min(span_end)
+    }
+
     /// The one emitter for a comment the author wrote between a **parenthesized**
     /// operand and the `)` that closes its shell — `(x + y /* c */)!`,
     /// `(a?.b // c⏎)!`, `<T>(x /* c */)`.

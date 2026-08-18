@@ -14,8 +14,10 @@ doing so: a trailing comment first moves after the parens (`await (x + y) /* c
 (`await /* c */ (x + y)`).
 
 `yield` is **not** here: `yield` binds looser than `+`, so its parens are
-redundant and both formatters strip them (`yield x + y /* c */`) — a match,
-not a divergence.
+*redundant* rather than required, which puts it in the twin fixture
+[redundant_operand_paren_comment](../redundant_operand_paren_comment_prettier_divergence/) —
+tsv retains a redundant shell holding a comment for the same reason it keeps
+this one, and prettier strips it.
 
 Reason: comment preservation. See
 [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)

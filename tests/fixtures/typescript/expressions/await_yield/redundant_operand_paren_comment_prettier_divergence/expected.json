@@ -1,0 +1,1283 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1161,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The parens are redundant here, and retained for the comment's sake.",
+			"start": 35,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 117,
+			"end": 124,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 11
+				},
+				"end": {
+					"line": 4,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A line comment keeps its own line inside the retained shell.",
+			"start": 130,
+			"end": 193,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 209,
+			"end": 213,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 5
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Deferring the `//` past the `;` would merge it with the one already there.",
+			"start": 222,
+			"end": 299,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 315,
+			"end": 320,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 5
+				},
+				"end": {
+					"line": 13,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 326,
+			"end": 331,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 5
+				},
+				"end": {
+					"line": 14,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run the author wrote on its own line inside the parens: the block pair",
+			"start": 335,
+			"end": 410,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " collapses onto the operand's line (a trailing block's line is pure layout).",
+			"start": 413,
+			"end": 491,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 503,
+			"end": 511,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 11
+				},
+				"end": {
+					"line": 18,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 512,
+			"end": 520,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 20
+				},
+				"end": {
+					"line": 18,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two own-line line comments keep two lines - gluing them would make the second",
+			"start": 526,
+			"end": 606,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " one text inside the first.",
+			"start": 609,
+			"end": 638,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 657,
+			"end": 662,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 3
+				},
+				"end": {
+					"line": 24,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 666,
+			"end": 671,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 3
+				},
+				"end": {
+					"line": 25,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line block and the line comment glued to it keep one line.",
+			"start": 680,
+			"end": 748,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 767,
+			"end": 775,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 3
+				},
+				"end": {
+					"line": 31,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 776,
+			"end": 781,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 12
+				},
+				"end": {
+					"line": 31,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `yield` binds looser than `+`, so even a binary operand's parens are redundant.",
+			"start": 812,
+			"end": 894,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 2
+				},
+				"end": {
+					"line": 36,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 910,
+			"end": 917,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 15
+				},
+				"end": {
+					"line": 37,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The line spelling, likewise retained.",
+			"start": 923,
+			"end": 963,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 2
+				},
+				"end": {
+					"line": 39,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 979,
+			"end": 983,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 5
+				},
+				"end": {
+					"line": 41,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The delegate form answers alike.",
+			"start": 992,
+			"end": 1027,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 2
+				},
+				"end": {
+					"line": 44,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1040,
+			"end": 1047,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 12
+				},
+				"end": {
+					"line": 45,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An assignment operand's clarity parens are the same single pair.",
+			"start": 1053,
+			"end": 1120,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 2
+				},
+				"end": {
+					"line": 47,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1138,
+			"end": 1145,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 17
+				},
+				"end": {
+					"line": 48,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1160,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1151,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 50,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 789,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 28,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 19
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 31,
+						"end": 789,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 22
+							},
+							"end": {
+								"line": 33,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 108,
+								"end": 126,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 108,
+									"end": 125,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 19
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 115,
+										"end": 116,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 9
+											},
+											"end": {
+												"line": 4,
+												"column": 10
+											}
+										},
+										"name": "x",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 117,
+												"end": 124
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The parens are redundant here, and retained for the comment's sake.",
+										"start": 35,
+										"end": 105
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 196,
+								"end": 218,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 196,
+									"end": 217,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 3
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 207,
+										"end": 208,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 4
+											}
+										},
+										"name": "y",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 209,
+												"end": 213
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A line comment keeps its own line inside the retained shell.",
+										"start": 130,
+										"end": 193
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 302,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 302,
+									"end": 324,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 3
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 313,
+										"end": 314,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 3
+											},
+											"end": {
+												"line": 13,
+												"column": 4
+											}
+										},
+										"name": "z",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c1",
+												"start": 315,
+												"end": 320
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Deferring the `//` past the `;` would merge it with the one already there.",
+										"start": 222,
+										"end": 299
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 326,
+										"end": 331
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 494,
+								"end": 522,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 30
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 494,
+									"end": 521,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 29
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 501,
+										"end": 502,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 9
+											},
+											"end": {
+												"line": 18,
+												"column": 10
+											}
+										},
+										"name": "x",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 503,
+												"end": 511
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A run the author wrote on its own line inside the parens: the block pair",
+										"start": 335,
+										"end": 410
+									},
+									{
+										"type": "Line",
+										"value": " collapses onto the operand's line (a trailing block's line is pure layout).",
+										"start": 413,
+										"end": 491
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 641,
+								"end": 676,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 641,
+									"end": 675,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 26,
+											"column": 3
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 652,
+										"end": 653,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 3
+											},
+											"end": {
+												"line": 23,
+												"column": 4
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 512,
+										"end": 520
+									},
+									{
+										"type": "Line",
+										"value": " Two own-line line comments keep two lines - gluing them would make the second",
+										"start": 526,
+										"end": 606
+									},
+									{
+										"type": "Line",
+										"value": " one text inside the first.",
+										"start": 609,
+										"end": 638
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 751,
+								"end": 786,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 751,
+									"end": 785,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 32,
+											"column": 3
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 762,
+										"end": 763,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 3
+											},
+											"end": {
+												"line": 30,
+												"column": 4
+											}
+										},
+										"name": "x"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 657,
+										"end": 662
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 666,
+										"end": 671
+									},
+									{
+										"type": "Line",
+										"value": " An own-line block and the line comment glued to it keep one line.",
+										"start": 680,
+										"end": 748
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 767,
+										"end": 775
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 776,
+										"end": 781
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 792,
+					"end": 1150,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 49,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 802,
+						"end": 805,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 11
+							},
+							"end": {
+								"line": 35,
+								"column": 14
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 808,
+						"end": 1150,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 17
+							},
+							"end": {
+								"line": 49,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 897,
+								"end": 919,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 24
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 897,
+									"end": 918,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 2
+										},
+										"end": {
+											"line": 37,
+											"column": 23
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 904,
+										"end": 909,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 9
+											},
+											"end": {
+												"line": 37,
+												"column": 14
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 904,
+											"end": 905,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 9
+												},
+												"end": {
+													"line": 37,
+													"column": 10
+												}
+											},
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 908,
+											"end": 909,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 13
+												},
+												"end": {
+													"line": 37,
+													"column": 14
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 910,
+												"end": 917
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " `yield` binds looser than `+`, so even a binary operand's parens are redundant.",
+										"start": 812,
+										"end": 894
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 966,
+								"end": 988,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 2
+									},
+									"end": {
+										"line": 42,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 966,
+									"end": 987,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 2
+										},
+										"end": {
+											"line": 42,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 977,
+										"end": 978,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 3
+											},
+											"end": {
+												"line": 41,
+												"column": 4
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 979,
+												"end": 983
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The line spelling, likewise retained.",
+										"start": 923,
+										"end": 963
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 1030,
+								"end": 1049,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 2
+									},
+									"end": {
+										"line": 45,
+										"column": 21
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 1030,
+									"end": 1048,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 2
+										},
+										"end": {
+											"line": 45,
+											"column": 20
+										}
+									},
+									"delegate": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 1038,
+										"end": 1039,
+										"loc": {
+											"start": {
+												"line": 45,
+												"column": 10
+											},
+											"end": {
+												"line": 45,
+												"column": 11
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 1040,
+												"end": 1047
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The delegate form answers alike.",
+										"start": 992,
+										"end": 1027
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 1123,
+								"end": 1147,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 2
+									},
+									"end": {
+										"line": 48,
+										"column": 26
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 1123,
+									"end": 1146,
+									"loc": {
+										"start": {
+											"line": 48,
+											"column": 2
+										},
+										"end": {
+											"line": 48,
+											"column": 25
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "AssignmentExpression",
+										"start": 1130,
+										"end": 1137,
+										"loc": {
+											"start": {
+												"line": 48,
+												"column": 9
+											},
+											"end": {
+												"line": 48,
+												"column": 16
+											}
+										},
+										"operator": "??=",
+										"left": {
+											"type": "Identifier",
+											"start": 1130,
+											"end": 1131,
+											"loc": {
+												"start": {
+													"line": 48,
+													"column": 9
+												},
+												"end": {
+													"line": 48,
+													"column": 10
+												}
+											},
+											"name": "a"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 1136,
+											"end": 1137,
+											"loc": {
+												"start": {
+													"line": 48,
+													"column": 15
+												},
+												"end": {
+													"line": 48,
+													"column": 16
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 1138,
+												"end": 1145
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " An assignment operand's clarity parens are the same single pair.",
+										"start": 1053,
+										"end": 1120
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
