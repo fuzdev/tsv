@@ -24,6 +24,7 @@ pub(super) use super::{Printer, build_entity_name_doc, is_effectively_empty_body
 
 use super::LeadingGlue;
 use super::ParenContext;
+use super::RunLeadingBlank;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
 use super::expressions::operators::SeqLayout;
@@ -114,11 +115,17 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
-        let mut parts: DocBuf = if stmt.is_directive {
-            smallvec![self.build_directive_doc(stmt)]
+        let expr_end = stmt.expression.span().end;
+        // The value reports which grouping `)` — if any — it retained and emitted the gap
+        // up to, because that region is then the VALUE's share rather than the
+        // terminator's. Asking the source a second time here instead would DROP whatever
+        // the value declined to claim: the two must be one answer.
+        let (value_doc, consumed_close) = if stmt.is_directive {
+            (self.build_directive_doc(stmt), None)
         } else {
-            smallvec![self.build_expression_statement_value_doc(stmt, in_program_or_block)]
+            self.build_expression_statement_value_doc(stmt, in_program_or_block)
         };
+        let mut parts: DocBuf = smallvec![value_doc];
 
         // Comments between the expression and the `;`, with the `;` bound to the
         // statement: a same-line block trails *after* it (`fn() /* c */;` → `fn(); /* c */`,
@@ -126,8 +133,10 @@ impl<'a> Printer<'a> {
         // (`fn() // c` → `fn(); // c`), an own-line comment drops to its own line after it
         // (emitting a line comment before the `;` would swallow it). See
         // `push_semicolon_with_gap_comments`.
-        let expr_end = stmt.expression.span().end;
-        self.push_semicolon_with_gap_comments(&mut parts, expr_end, stmt.span.end, true);
+        let gap_start = consumed_close.map_or(expr_end, |close| {
+            Self::past_grouping_close(close, stmt.span.end)
+        });
+        self.push_semicolon_with_gap_comments(&mut parts, gap_start, stmt.span.end, true);
         d.concat(&parts)
     }
 
@@ -160,13 +169,25 @@ impl<'a> Printer<'a> {
     ///
     /// `in_program_or_block` is threaded from [`Printer::build_statement_doc`] for the
     /// "avoid becoming a directive" rule (see [`Printer::needs_avoid_directive_parens`]).
+    ///
+    /// Returns the doc and the grouping `)` this print RETAINED and emitted the
+    /// expression→`)` gap inside, if any — the caller's terminator scan resumes past it.
+    /// Reported rather than re-derived, because only the branch that ran knows whether it
+    /// claimed that region; re-asking the source would drop what it declined to claim.
     fn build_expression_statement_value_doc(
         &self,
         stmt: &internal::ExpressionStatement<'_>,
         in_program_or_block: bool,
-    ) -> DocId {
+    ) -> (DocId, Option<u32>) {
         let d = self.d();
         let mut parts = DocBuf::new();
+        // A `//` the author wrote inside the value's own grouping parens keeps those
+        // parens: the terminator gap would defer it past the `)` and the `;`, onto a line
+        // that may already hold a `//`, where the two MERGE into one comment. The
+        // statement's other value positions (declarator initializer, assignment RHS,
+        // ternary branch) already answer this way through the shared shell builder.
+        let expr_end = stmt.expression.span().end;
+        let shell_close = self.value_paren_line_comment_close(expr_end, stmt.span.end);
         // A comment between a source `(` and the expression (`(// c⏎ expr)` /
         // `(/* c */⏎ expr)` — e.g. a bare parenthesized decorated class
         // expression) is preserved inside the parens, breaking them open; the flat
@@ -261,6 +282,10 @@ impl<'a> Printer<'a> {
                 Expression::ClassExpression(c) if class_expr_has_decorators(c)
             );
 
+        // Which grouping `)` this print retains and emits the expression→`)` gap inside.
+        // The two paren-KEEPING branches below claim it; the decorated one does not (its
+        // layout has no seam for a trailing run), so there the terminator gap keeps it.
+        let mut consumed_close = None;
         if paren_open_comments {
             // The parens break open around the run. Only the first `hardline` is
             // the site's own — the run's internal separators come from the shared
@@ -275,12 +300,39 @@ impl<'a> Printer<'a> {
                 d.empty(),
             );
             inner.push(expr_doc);
+            // The parens are already open, so a `//` before the `)` stays inside them
+            // rather than deferring past the `;` — the same claim the retained-shell
+            // branch below makes, at the branch that got here for the leading run.
+            consumed_close = self.push_retained_gap_trailing_run(&mut inner, expr_end, shell_close);
             parts.push(d.text("("));
             parts.push(d.indent(d.concat(&inner)));
             parts.push(d.hardline());
             parts.push(d.text(")"));
         } else if decorated_class_expr {
             parts.push(self.build_break_open_parens(expr_doc));
+        } else if let Some(close) = shell_close {
+            // The value's authored parens are RETAINED around a `//` that would otherwise
+            // escape them. This pair is the position's pair — a shell whose `(` leads the
+            // statement already discharges what `needs_parens` wraps for, so adding the
+            // clarity pair too would double it. The leading run is the plain branch's,
+            // unchanged: a dropped source `(` is what strands it, and here the `(` is
+            // kept, so only the expression's own owned comments ride inside `expr_doc`.
+            let mut inner = DocBuf::new();
+            if !needs_parens && source_paren {
+                self.push_leading_comment_run(
+                    &mut inner,
+                    paren_gap(),
+                    expr_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
+            }
+            inner.push(expr_doc);
+            consumed_close = self.push_retained_gap_trailing_run(&mut inner, expr_end, Some(close));
+            parts.push(d.text("("));
+            parts.push(d.indent_hardline(d.concat(&inner)));
+            parts.push(d.hardline());
+            parts.push(d.text(")"));
         } else {
             if needs_parens {
                 parts.push(d.text("("));
@@ -306,7 +358,26 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
             }
         }
-        d.concat(&parts)
+        (d.concat(&parts), consumed_close)
+    }
+
+    /// Emit the expression→`)` gap's trailing run inside a retained grouping pair, and
+    /// report the `)` claimed — `None` when there is nothing to retain, which leaves the
+    /// gap to the caller's terminator scan.
+    ///
+    /// One seam so the two paren-keeping branches of
+    /// [`Self::build_expression_statement_value_doc`] cannot claim different ranges: a
+    /// region claimed here and re-read there is a DOUBLE-PRINT, and one claimed at
+    /// neither is a DROP.
+    fn push_retained_gap_trailing_run(
+        &self,
+        inner: &mut DocBuf,
+        expr_end: u32,
+        close: Option<u32>,
+    ) -> Option<u32> {
+        let close = close?;
+        self.push_anchored_trailing_run(inner, expr_end, close, RunLeadingBlank::Keep);
+        Some(close)
     }
 
     /// Build a Doc for a return statement.

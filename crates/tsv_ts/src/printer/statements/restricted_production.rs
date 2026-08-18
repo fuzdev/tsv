@@ -72,7 +72,17 @@ impl<'a> Printer<'a> {
         // break legal; there the comment keeps the line the author gave it. That layout
         // owns its own trailing gap (the parens are retained, so the `)` — not the span
         // end — divides inside from outside), so it returns before the shared scan below.
-        if self.argument_has_own_line_comment(keyword_start, arg) {
+        //
+        // A `//` the author wrote inside the operand's own grouping parens forces the same
+        // form, with nothing leading it: the terminator gap below would carry it past the
+        // `)` and the `;`, onto a line that may already hold a `//` — and two `//`s sharing
+        // an output line MERGE into one (the second delimiter becomes text). The binaryish
+        // and sequence arms already keep such a comment inside their parens
+        // (`keep_operand_line_inline`); asking here is what makes every operand answer alike.
+        if self.argument_has_own_line_comment(keyword_start, arg)
+            || (!self.operand_arm_keeps_line_comment_inside(keyword, arg)
+                && self.operand_parens_hold_line_comment(arg.span().end, span_end))
+        {
             return self.build_comment_paren_doc(keyword, keyword_end, arg, span_end);
         }
 
@@ -424,7 +434,53 @@ impl<'a> Printer<'a> {
     /// The returned position doubles as both bounds: the `)` byte itself can't start a
     /// comment, so the in-paren scan (end-inclusive) and the past-paren scan
     /// (start-inclusive) split the gap at it without overlapping.
-    fn retained_grouping_close(&self, argument_end: u32, span_end: u32) -> Option<u32> {
+    /// Whether the operand's own arm below already keeps a `//` inside the parens it
+    /// prints, so the hanging form must not preempt it.
+    ///
+    /// Two do. The **binaryish** arm renders its operand inside `ifBreak` parens and sets
+    /// `keep_operand_line_inline`; the **`return` sequence** arm builds through the
+    /// value-position sequence printer, which takes the grouping `)` and emits the comment
+    /// inside it — and breaks per operand, a layout the hanging form does not reproduce.
+    /// `throw`'s sequence is not one of them: it falls through to the generic arm, whose
+    /// `build_sequence_doc` pair the terminator gap floats the comment past.
+    ///
+    // TODO: the two sequence layouts disagree — per operand here, one line inside the
+    // hanging parens (every keyword, including `return` once a *leading* own-line comment
+    // forces that form). One construct, one question, two answers; worth a verdict.
+    fn operand_arm_keeps_line_comment_inside(
+        &self,
+        keyword: &'static str,
+        arg: &Expression<'_>,
+    ) -> bool {
+        match arg {
+            Expression::BinaryExpression(_) => true,
+            Expression::SequenceExpression(_) => keyword == "return",
+            _ => false,
+        }
+    }
+
+    /// Whether the operand's authored grouping parens hold a `//` — the trailing-edge
+    /// question the terminator gap cannot answer.
+    ///
+    /// A line comment ends its output line, so carrying it past the `)` welds it to
+    /// whatever already trails the statement; keeping it inside the parens is what makes
+    /// the two survive as two. The paren must be **authored** — with no grouping shell
+    /// there is nothing to keep the comment inside, and the terminator gap is its only
+    /// home (`return x // c⏎;` → `return x; // c`).
+    pub(in crate::printer) fn operand_parens_hold_line_comment(
+        &self,
+        argument_end: u32,
+        span_end: u32,
+    ) -> bool {
+        self.retained_grouping_close(argument_end, span_end)
+            .is_some_and(|close| self.has_line_comments_between(argument_end, close))
+    }
+
+    pub(in crate::printer) fn retained_grouping_close(
+        &self,
+        argument_end: u32,
+        span_end: u32,
+    ) -> Option<u32> {
         rfind_char_skipping_comments(
             self.source.as_bytes(),
             argument_end as usize,

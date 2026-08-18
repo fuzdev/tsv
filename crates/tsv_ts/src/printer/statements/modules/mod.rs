@@ -49,6 +49,12 @@ impl<'a> Printer<'a> {
         // value is built from the keyword's end and an own-line directive there claims it
         // whole. (The `export`→`=` gap one delimiter earlier is not a head — a `=` begins
         // no node — and cannot reach this window either.)
+        let argument_end = value_span.end;
+        // A `//` inside the value's own grouping parens keeps them, for the reason
+        // `export default`'s twin arm gives: deferring it past the `)` and the `;` merges
+        // it with whatever already trails that line. Decided ahead of the header, because
+        // the shell wraps the VALUE and the value is built inside the closure below.
+        let shell_close = self.value_paren_line_comment_close(argument_end, decl.span.end);
         let head = self.build_keyword_header_doc_with(
             &["export", "="],
             decl.span.start,
@@ -59,21 +65,30 @@ impl<'a> Printer<'a> {
                 // answer every other value position gives (`ParenContext::ExportAssignment`).
                 // Inside the freeze closure so a frozen value keeps the position's pair,
                 // exactly as `export default` does.
-                if needs_parens(&decl.expression, ParenContext::ExportAssignment, false) {
+                let value = if needs_parens(&decl.expression, ParenContext::ExportAssignment, false)
+                {
                     d.parens(value)
                 } else {
                     value
+                };
+                match shell_close {
+                    Some(close) => self
+                        .build_paren_operand_comment_doc(argument_end, close, value, value, ")")
+                        .unwrap_or(value),
+                    None => value,
                 }
             },
         );
-        let argument_end = value_span.end;
-        let has_trailing_comments = self.has_comments_to_emit_between(argument_end, decl.span.end);
+        let gap_start = shell_close.map_or(argument_end, |close| {
+            Self::past_grouping_close(close, decl.span.end)
+        });
+        let has_trailing_comments = self.has_comments_to_emit_between(gap_start, decl.span.end);
         if has_trailing_comments {
             // `export =` keeps a same-line trailing block comment *before* the `;`
             // (operand-attached — prettier 3.9 does not move it, unlike `export default`
             // / named exports). A line comment still floats after the `;` via `line_suffix`.
             let mut parts = smallvec![head];
-            self.append_trailing_paren_comments(&mut parts, argument_end, decl.span.end);
+            self.append_trailing_paren_comments(&mut parts, gap_start, decl.span.end);
             parts.push(d.text(";"));
             d.concat(&parts)
         } else {
@@ -422,6 +437,26 @@ impl<'a> Printer<'a> {
                 let argument_end = value_span.end;
                 if !self.has_comments_to_emit_between(argument_end, decl.span.end) {
                     return d.concat(&[expr_doc, d.text(";")]);
+                }
+                // A `//` the author wrote inside the value's own grouping parens keeps
+                // those parens: the terminator split below would carry it past the `)`
+                // and the `;`, onto a line that may already hold a `//`, where the two
+                // MERGE into one comment. The retained shell is the same answer the
+                // `return`/`throw` operand and the `await`/`yield` operand shell give.
+                if let Some((shell, after_close)) =
+                    self.build_value_paren_line_comment_shell(expr_doc, argument_end, decl.span.end)
+                {
+                    let mut parts = smallvec![shell];
+                    let after = self.split_terminator_gap_comments(
+                        &mut parts,
+                        after_close,
+                        decl.span.end,
+                        false,
+                        false,
+                    );
+                    parts.push(d.text(";"));
+                    parts.extend(after);
+                    return d.concat(&parts);
                 }
                 let mut parts = smallvec![expr_doc];
                 // `operand_parens_printed: false` — this position's pair closes at the

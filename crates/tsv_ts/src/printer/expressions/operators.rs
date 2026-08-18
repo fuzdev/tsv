@@ -1179,24 +1179,32 @@ impl<'a> Printer<'a> {
         let argument_doc = if comments_opt.is_some() || has_trailing_comments {
             // The grouping parens are required when the operand needs them (`await`
             // binds tighter than a binary/ternary operand, so `await x + y` is
-            // `(await x) + y`). Keep them, and keep the comment INSIDE them where the
-            // author wrote it — prettier relocates it past `)` (and floats it past `;`
-            // on the next pass); tsv preserves the position. Mirrors `build_spread_doc`.
+            // `(await x) + y`) — and a comment in the operand→`)` gap RETAINS them even
+            // where they were redundant, through the shared operand-shell emitter. The
+            // comment stays INSIDE them where the author wrote it; prettier relocates it
+            // past `)` and, on the next pass, past the `;`. That second pass is why the
+            // shell is not optional here: `await`'s own span covers the `)`, so a stripped
+            // form hands the comment to the enclosing terminator gap on reparse and the
+            // authoring has no fixed point at all. Mirrors `build_spread_doc`.
             let needs_parens = self.needs_parens(await_expr.argument, ParenContext::AwaitArgument);
             let inner = self.build_expression_doc(await_expr.argument);
-            let mut parts = DocBuf::new();
-            if needs_parens {
-                parts.push(d.text("("));
+            let body = match comments_opt {
+                Some(comments) => d.concat(&[comments, inner]),
+                None => inner,
+            };
+            if let Some(shell) = self.build_paren_operand_comment_doc(
+                argument_end,
+                await_expr.span.end,
+                body,
+                body,
+                ")",
+            ) {
+                shell
+            } else if needs_parens {
+                d.parens(body)
+            } else {
+                body
             }
-            if let Some(comments) = comments_opt {
-                parts.push(comments);
-            }
-            parts.push(inner);
-            self.append_trailing_paren_comments(&mut parts, argument_end, await_expr.span.end);
-            if needs_parens {
-                parts.push(d.text(")"));
-            }
-            d.concat(&parts)
         } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
             d.concat(&[
                 d.text("("),
@@ -1272,11 +1280,26 @@ impl<'a> Printer<'a> {
         let leading_comments_opt = self.build_rhs_comments_glued_opt(keyword_end, argument_start);
 
         if leading_comments_opt.is_some() || has_trailing_comments {
-            if let Some(comments) = leading_comments_opt {
-                parts.push(comments);
-            }
-            parts.push(self.build_expression_doc(arg));
-            self.append_trailing_paren_comments(&mut parts, argument_end, yield_expr.span.end);
+            let inner = self.build_expression_doc(arg);
+            let body = match leading_comments_opt {
+                Some(comments) => d.concat(&[comments, inner]),
+                None => inner,
+            };
+            // The operand→`)` gap retains its shell, exactly as `await`'s does and for the
+            // same reason: `yield`'s span covers the `)`, so a stripped form hands the
+            // comment to the enclosing terminator gap on reparse — a block comment lands
+            // past the `;` on pass 2, and a `//` merges with whatever already trails that
+            // line. An assignment operand's clarity parens are the same pair.
+            parts.push(
+                self.build_paren_operand_comment_doc(
+                    argument_end,
+                    yield_expr.span.end,
+                    body,
+                    body,
+                    ")",
+                )
+                .unwrap_or(body),
+            );
         } else if self.needs_parens(arg, ParenContext::YieldArgument) {
             // Assignment needs parens: `yield (x ??= y)`
             parts.push(d.text("("));

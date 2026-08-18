@@ -1,0 +1,214 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 287,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The `export =` twin of `default_operand_paren_line_comment`: a `//` written inside",
+			"start": 20,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the exported value's own grouping parens stays inside them, rather than merging with",
+			"start": 107,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " whatever already trails the statement's line.",
+			"start": 196,
+			"end": 244,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 261,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 4
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 271,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 4
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 286,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 277,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSExportAssignment",
+					"start": 246,
+					"end": 270,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 259,
+						"end": 260,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 3
+							}
+						},
+						"name": "x",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 261,
+								"end": 266
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `export =` twin of `default_operand_paren_line_comment`: a `//` written inside",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " the exported value's own grouping parens stays inside them, rather than merging with",
+							"start": 107,
+							"end": 194
+						},
+						{
+							"type": "Line",
+							"value": " whatever already trails the statement's line.",
+							"start": 196,
+							"end": 244
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 271,
+							"end": 276
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
