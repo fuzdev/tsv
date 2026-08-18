@@ -2,7 +2,10 @@
 
 A brace-less `do` body whose pre-`;` gap holds a same-line trailer and an own-line
 line comment, with a third comment in the `;`→`while` gap — three comments reach one
-flush at the break before `while`.
+flush at the break before `while`. The second case puts a **block** comment in the
+`;`→`while` gap behind a deferred own-line tail: the anchor-line block rides the same
+`line_suffix` machinery (an inline emission would render ahead of the buffer), so the
+two flush in source order, the block on its own line at the `do`'s level.
 
 **tsv**: collapses the body onto `do` (its standing do-while landing) and keeps each
 comment on its own line, in authored order, at the `do`'s level:

@@ -454,6 +454,7 @@ impl<'a> Printer<'a> {
                         decl.span.end,
                         false,
                         false,
+                        None,
                     );
                     parts.push(d.text(";"));
                     parts.extend(after);
@@ -475,6 +476,7 @@ impl<'a> Printer<'a> {
                     decl.span.end,
                     false,
                     false,
+                    None,
                 );
                 parts.push(d.text(";"));
                 parts.extend(after);

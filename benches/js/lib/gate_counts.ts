@@ -379,8 +379,8 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// detector used to explain, leaving only a pre-existing residue no detector matches:
 	// for the no-semi six, a `// prettier-ignore` freeze's `;` binding; for the for/continue
 	// file, prettier reordering the hoisted comment past the author's blank line (tsv keeps
-	// the authored order: comment, then blank — knowingly left uncataloged for now; a
-	// candidate `_prettier_divergence` fixture). `js/comments/break-continue-statements-2.js`
+	// the authored order: comment, then blank — cataloged, pinned by
+	// `for/clause_terminator_comment_then_blank_prettier_divergence`). `js/comments/break-continue-statements-2.js`
 	// leaves `partial` for **match** outright in the same step. Measured by byte-diffing the
 	// formatted prettier suites against a pre-change binary: these eight are the only moves
 	// in any bucket, and `safety` / `errors` / `expected_errors` are unchanged.

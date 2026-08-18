@@ -7,6 +7,15 @@
 //! comment whose text happens to contain the second): [`push_run_separator`] breaks
 //! first, at the indent of the break the flush is happening at.
 //!
+//! The `//` case is deliberately the separator's WHOLE scope. A follower gluing onto a
+//! member that merely BROKE (an own-line block's payload) is lossless, and whether the
+//! glued pair survives the reparse depends on where it lands — a statement gap's
+//! leading run KEEPS a glued pair, the dangling `}`→keyword gap SPLITS it — a fact only
+//! the builder that owns the gap has, so a renderer-side break here turned a stable
+//! prettier match (the mid-list pair) into a divergence. Builders whose gap splits
+//! emit each member with its break inside the suffix instead
+//! (`GapCommentRun::Dangling`'s `defer_inline` arm in `tsv_ts`).
+//!
 //! This is the renderer-level FLOOR under the build-time askers in `tsv_ts`
 //! (`Printer::trailer_follows_through_closers` and friends), which keep a comment where
 //! the author wrote it but read the *source* and so cannot see a trailer past a further
@@ -30,7 +39,10 @@ use super::types::{LineKind, Mode, resolve_text};
 /// followed by a sibling case) and the queued one does not. The known counterexample is a
 /// switch's LAST case, where the next break is the switch's `}`, a level out from where a
 /// dangling comment in a case settles; the settled value there is neither indent, and no
-/// renderer-visible value equals it. Prettier's nearest construction picks the other way —
+/// renderer-visible value equals it — which is why that shape is answered on the BUILDER
+/// side (the case's last-statement `;`-line comments defer own-line, dedented to the
+/// case's level — `tsv_ts` `statements/control_flow/switch.rs`) and no longer meets this
+/// separator. Prettier's nearest construction picks the other way —
 /// `printTrailingComment`'s own-line arm is `lineSuffix([hardline, …])`, breaking at the
 /// queued indent — but that break is chosen by the *builder*, which meant the indent it
 /// captured. Cataloged in

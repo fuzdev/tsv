@@ -121,7 +121,13 @@ impl<'a> Printer<'a> {
         // Emitted here, ahead of the paren bookkeeping below, which computes without
         // pushing; the `while` keyword itself follows it.
         if let Some(while_start) = while_pos {
-            self.push_block_to_keyword_gap(&mut parts, body_end, while_start, is_block);
+            self.push_block_to_keyword_gap(
+                &mut parts,
+                body_end,
+                while_start,
+                is_block,
+                self.terminator_defers_comment(stmt.body.span().start, body_end),
+            );
         } else {
             parts.push(if is_block { d.text(" ") } else { d.hardline() });
         }

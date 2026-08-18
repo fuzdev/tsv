@@ -357,21 +357,88 @@ impl<'a> Printer<'a> {
     /// walk). Keyed on a **line** comment because only a `//` runs to end of line; a
     /// deferred block leaves the line open.
     pub(crate) fn terminator_defers_line_comment(&self, span_start: u32, span_end: u32) -> bool {
+        self.terminator_gap_last_comment(span_start, span_end)
+            .is_some_and(|last| !last.is_block)
+    }
+
+    /// Whether the construct's doc ends with ANY deferred comment — the widened kind
+    /// axis of [`Self::terminator_defers_line_comment`]: a same-line `//` defers, and
+    /// so does an **own-line** comment of either kind (the terminator gap floats those
+    /// out through `line_suffix` — [`Self::push_gap_comments`],
+    /// [`Printer::split_terminator_gap_comments`]). Only a same-line **block** stays
+    /// out: it prints as real text after the `;`, closing nothing.
+    ///
+    /// Asked by a FOLLOWING gap that must decide whether its own anchor-line comments
+    /// can render inline (nothing pending — an inline block keeps its width and its
+    /// line) or must ride `line_suffix` too, so the two runs meet the flush in source
+    /// order (`GapCommentRun::Dangling` in `statements/control_flow`).
+    pub(crate) fn terminator_defers_comment(&self, span_start: u32, span_end: u32) -> bool {
+        self.terminator_gap_last_comment(span_start, span_end)
+            .is_some_and(|last| {
+                !last.is_block || !self.comment_on_gap_anchor_line(span_start, last)
+            })
+    }
+
+    /// Whether `comment` sits on its gap's ANCHOR line — the line the construct's last
+    /// content token ends on, the one line a same-line block prints inline on.
+    ///
+    /// The one-step source reading (`comment_follows_content_on_its_line`) cannot
+    /// answer this: it counts a preceding COMMENT as content, so a block glued behind
+    /// an own-line comment (`expr⏎/* c1 */ /* c2 */⏎;`) read as anchor-line while the
+    /// gap emitter's hug arm defers it. The walk mirrors the emitter's anchor-line
+    /// split instead: follow same-line predecessors comment by comment until the line
+    /// bottoms out at real content (anchor line) or at an own-line / multiline
+    /// predecessor (not).
+    fn comment_on_gap_anchor_line(&self, span_start: u32, comment: &internal::Comment) -> bool {
+        let mut c = comment;
+        loop {
+            if !self.comment_follows_content_on_its_line(c) {
+                // Nothing non-whitespace precedes on the line: own-line.
+                return false;
+            }
+            // What precedes c on its line — the nearest comment (in SOURCE: this is a
+            // cursor question, so owned comments count), or real content.
+            let Some(prev) =
+                comments_in_source_range(self.comments, span_start, c.span.start).last()
+            else {
+                return true;
+            };
+            let gap = &self.source.as_bytes()[prev.span.end as usize..c.span.start as usize];
+            if gap.iter().any(|b| !b.is_ascii_whitespace()) || gap.contains(&b'\n') {
+                // Real content sits between them on c's line (the newline case is
+                // unreachable behind the follows-content check, and reads the same
+                // way: whatever precedes c on its line is content, not a comment).
+                return true;
+            }
+            if prev.span.extract(self.source).contains('\n') {
+                // Glued to a MULTILINE predecessor: c is on its end line, which is
+                // not the line the content ended on.
+                return false;
+            }
+            c = prev;
+        }
+    }
+
+    /// The LAST comment in the construct's terminator gap, if the construct ends in a
+    /// re-printed separator (`;` / `,`) and only whitespace sits between the comment
+    /// and it — the shared fact behind both `terminator_defers_*` predicates. Anything
+    /// non-whitespace after the comment means it is interior to the construct, not in
+    /// its terminator gap.
+    fn terminator_gap_last_comment(
+        &self,
+        span_start: u32,
+        span_end: u32,
+    ) -> Option<&'a internal::Comment> {
         let bytes = self.source.as_bytes();
         if span_end == 0 || !matches!(bytes.get(span_end as usize - 1), Some(b';' | b',')) {
-            return false;
+            return None;
         }
         let separator = span_end - 1;
-        let Some(last) = comments_to_emit_in_range(self.comments, span_start, separator).last()
-        else {
-            return false;
-        };
-        // Only whitespace may sit between the deferred comment and the separator — anything
-        // else means the comment is interior to the construct, not in its terminator gap.
-        !last.is_block
-            && bytes[last.span.end as usize..separator as usize]
-                .iter()
-                .all(u8::is_ascii_whitespace)
+        let last = comments_to_emit_in_range(self.comments, span_start, separator).last()?;
+        bytes[last.span.end as usize..separator as usize]
+            .iter()
+            .all(u8::is_ascii_whitespace)
+            .then_some(last)
     }
 
     /// Whether a gap comment LEADS the next printed item rather than trailing the
@@ -640,6 +707,27 @@ impl<'a> Printer<'a> {
         let mut docs = DocBuf::new();
         for comment in self.trailing_same_line_comments(after_pos, upper_bound) {
             docs.push(self.build_trailing_comment_doc(comment));
+        }
+        docs
+    }
+
+    /// The clause-tail spelling of [`Self::build_trailing_same_line_comment_docs`] —
+    /// the same claim, each comment emitted own-line with its break inside the suffix,
+    /// dedented `dedent` levels ([`Printer::build_clause_tail_comment_doc`]). For a
+    /// statement whose own terminator gap already deferred a `//`
+    /// ([`Self::terminator_defers_line_comment`]), nothing may share the flush line, so
+    /// the `;`-line run lands one comment per line at the enclosing construct's level
+    /// — the switch case's last statement is the caller (dedent 1, consequent →
+    /// case-label level).
+    pub(crate) fn build_deferred_tail_same_line_comment_docs(
+        &self,
+        after_pos: u32,
+        upper_bound: u32,
+        dedent: u8,
+    ) -> DocBuf {
+        let mut docs = DocBuf::new();
+        for comment in self.trailing_same_line_comments(after_pos, upper_bound) {
+            docs.push(self.build_clause_tail_comment_doc(comment, false, dedent));
         }
         docs
     }
@@ -1302,10 +1390,7 @@ impl<'a> Printer<'a> {
         // `clause_tail` reaches only the statement caller (`declare function` — the
         // canonical parser accepts it as a clause body, where the gap must defer like
         // every other `;` tail there); the type members are always list-joined.
-        let deferral = clause_tail.map_or_else(
-            || GapDeferral::Break(self.d().hardline()),
-            GapDeferral::LineSuffix,
-        );
+        let deferral = self.terminator_gap_deferral(clause_tail);
         deferred.extend(self.push_gap_comments(
             parts,
             content_end,
@@ -1398,6 +1483,20 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// The `;`-terminator family's deferral axis, from the statement CONTAINER's fact
+    /// (`StatementContext::clause_tail`): in a statement LIST the joiner's break
+    /// immediately follows the statement doc, so the gap's own-line run takes real
+    /// breaks; a non-block CLAUSE body's tail line stays open to the enclosing
+    /// construct, so the run rides in `line_suffix` docs (dedented to the flushing
+    /// construct's level) and meets any later gap's suffix at the flush in source
+    /// order.
+    fn terminator_gap_deferral(&self, clause_tail: Option<u8>) -> GapDeferral {
+        clause_tail.map_or_else(
+            || GapDeferral::Break(self.d().hardline()),
+            GapDeferral::LineSuffix,
+        )
+    }
+
     /// The gap-split caller idiom for a **`;` terminator**, in one call: the gap's pre-`;` comments, the `;`,
     /// then the comments that belong after it.
     ///
@@ -1443,15 +1542,7 @@ impl<'a> Printer<'a> {
         } else {
             content_end
         };
-        // The deferral axis is the CONTAINER's (`StatementContext`): in a list the
-        // joiner's break immediately follows, so the run takes real breaks; a clause
-        // body's tail line stays open to the enclosing construct, so the run rides in
-        // `line_suffix` docs and meets any later gap's suffix at the flush in source
-        // order.
-        let deferral = clause_tail.map_or_else(
-            || GapDeferral::Break(self.d().hardline()),
-            GapDeferral::LineSuffix,
-        );
+        let deferral = self.terminator_gap_deferral(clause_tail);
         let after = self.push_gap_comments(
             parts,
             content_end,
