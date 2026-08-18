@@ -1123,15 +1123,13 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
-        let needs_parens =
-            self.needs_parens(inst_expr.expression, ParenContext::InstantiationExpression);
-        if needs_parens {
-            parts.push(d.text("("));
-        }
-        parts.push(self.build_expression_doc(inst_expr.expression));
-        if needs_parens {
-            parts.push(d.text(")"));
-        }
+        // The shared operand-shell seam also emits the `^`→expression gap — the
+        // authored `(`'s interior, which no other emitter reaches.
+        parts.push(self.build_shell_operand_doc(
+            inst_expr.span.start,
+            inst_expr.expression,
+            ParenContext::InstantiationExpression,
+        ));
         // Preserve comments between expression and type args: `fn/* c */ <string>`
         let expr_end = inst_expr.expression.span().end;
         let ta_start = inst_expr.type_arguments.span.start;
@@ -1172,10 +1170,13 @@ impl<'a> Printer<'a> {
                 non_null_expr.span.end,
             );
 
-        // A leading comment from the stripped grouping parens, before the operand
-        // (`(/* b */ x + y)!`), is emitted before the operand/`(`, matching prettier
-        // (`/* b */ (x + y)!`) — tsv previously dropped it. None of the branches below
-        // emit it, so it is prepended once here.
+        // The leading run from the operand's authored grouping parens. Where the
+        // parens are STRIPPED (`(/* b */ x)!`) it is prepended before the operand,
+        // matching prettier (`/* b */ x!`); where they are KEPT, the compact
+        // fallback folds it inside the pair (`(/* b */ x + y)!`, where prettier
+        // relocates it out front — a cataloged divergence). The expanded arm below
+        // re-emits the range itself, with the `(`-glued split, and reads only this
+        // doc's presence.
         let argument_start = non_null_expr.expression.span().start;
         let leading = self.build_rhs_comments_opt(non_null_expr.span.start, argument_start);
 
@@ -1189,12 +1190,31 @@ impl<'a> Printer<'a> {
             let expands = self.ternary_takes_extra_indent(non_null_expr.expression);
             let inner_doc =
                 self.build_expression_doc_with_indent_on_break(non_null_expr.expression);
+            let argument_end = non_null_expr.expression.span().end;
+            // A leading run that occupies a line — a `//`, an own-line block — takes
+            // the family's expanded shell: `( // c` glue, the operand one indent in,
+            // the `)!` back out (prettier glues the comment to the `(` and keeps the
+            // continuation flush — a rendering-only divergence, the run stays inside
+            // the pair in both). A shell whose TRAILING gap also holds comments keeps
+            // the anchored-run layout below, the leading run folded above the operand.
+            // The shell is hard-expanded, so the ternary's width-driven expanding
+            // parens have nothing left to decide and stay out of the body.
+            if leading.is_some()
+                && !self.has_comments_to_emit_between(argument_end, non_null_expr.span.end)
+                && self.has_newline_between(non_null_expr.span.start, argument_start)
+            {
+                return self.build_leading_run_expanded_shell_doc(
+                    non_null_expr.span.start,
+                    argument_start,
+                    inner_doc,
+                    ")!",
+                );
+            }
             let inner_doc = if expands {
                 self.build_expanding_parens_body_doc(inner_doc)
             } else {
                 inner_doc
             };
-            let argument_end = non_null_expr.expression.span().end;
             // Keep comments from the stripped grouping parens INSIDE them, where the
             // author wrote them — leading before the operand (`(/* b */ x + y)!`),
             // trailing before the `)` (`(x + y /* c */)!`). Prettier relocates them
@@ -1274,11 +1294,37 @@ impl<'a> Printer<'a> {
         if non_null.seals_optional_chain() {
             let d = self.d();
             let inner_doc = self.build_expression_doc_with_indent_on_break(non_null.expression);
+            let expr_start = non_null.expression.span().start;
+            let inner_start = non_null.expression.span().end;
+            // The shell's LEADING gap — the seal's span covers the `(`, so the
+            // comments between it and the chain (`new ( // c⏎a?.b)!()`) are this
+            // doc's to print too; nothing else can reach them. A run that occupies
+            // a line takes the family's expanded shell — the `( // c` glue, the
+            // chain one indent in, the `)!` back out — where prettier glues the
+            // comment to the `(` and keeps the continuation flush: both keep the
+            // run inside the pair, so the divergence is the rendering alone. An
+            // inline block run leads the chain flat, matching prettier. A shell
+            // whose TRAILING gap also holds comments keeps the anchored-run layout
+            // below, the run folded above the chain.
+            if self.has_comments_to_emit_between(non_null.span.start, expr_start)
+                && !self.has_comments_to_emit_between(inner_start, non_null.span.end)
+                && self.has_newline_between(non_null.span.start, expr_start)
+            {
+                return Some(self.build_leading_run_expanded_shell_doc(
+                    non_null.span.start,
+                    expr_start,
+                    inner_doc,
+                    ")!",
+                ));
+            }
+            let inner_doc = match self.build_rhs_comments_opt(non_null.span.start, expr_start) {
+                Some(lead) => d.concat(&[lead, inner_doc]),
+                None => inner_doc,
+            };
             // These positions never enter a chain, so nothing else scans the
             // operand→`!` gap — the comment the author wrote inside the parens
             // (`new (a?.b /* c */)!()`) is this doc's to print, on the same seam the
             // chain's parenthesized base uses.
-            let inner_start = non_null.expression.span().end;
             Some(
                 self.build_paren_operand_comment_doc(
                     inner_start,

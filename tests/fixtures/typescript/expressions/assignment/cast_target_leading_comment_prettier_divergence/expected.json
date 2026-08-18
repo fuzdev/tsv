@@ -1,0 +1,804 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 422,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A glued block leads the operand inline; the shell stays flat.",
+			"start": 20,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 87,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Every block in a leading run survives, not only the operand-glued one.",
+			"start": 111,
+			"end": 184,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 187,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 196,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 11
+				},
+				"end": {
+					"line": 6,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same gap inside a destructuring default's target.",
+			"start": 220,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 285,
+			"end": 293,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 8
+				},
+				"end": {
+					"line": 9,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line block keeps its own line and expands the shell.",
+			"start": 318,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 386,
+			"end": 394,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 421,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 412,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 86,
+					"end": 108,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 86,
+						"end": 107,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 22
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "TSAsExpression",
+							"start": 96,
+							"end": 102,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 11
+								},
+								"end": {
+									"line": 3,
+									"column": 17
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 96,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 12
+									}
+								},
+								"name": "x"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 101,
+								"end": 102,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 16
+									},
+									"end": {
+										"line": 3,
+										"column": 17
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 101,
+									"end": 102,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 16
+										},
+										"end": {
+											"line": 3,
+											"column": 17
+										}
+									},
+									"name": "T"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 87,
+									"end": 95
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 106,
+							"end": 107,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 21
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued block leads the operand inline; the shell stays flat.",
+							"start": 20,
+							"end": 84
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 186,
+					"end": 217,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 186,
+						"end": 216,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 31
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "TSAsExpression",
+							"start": 205,
+							"end": 211,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 20
+								},
+								"end": {
+									"line": 6,
+									"column": 26
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 205,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 20
+									},
+									"end": {
+										"line": 6,
+										"column": 21
+									}
+								},
+								"name": "y"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 210,
+								"end": 211,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 25
+									},
+									"end": {
+										"line": 6,
+										"column": 26
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 210,
+									"end": 211,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 25
+										},
+										"end": {
+											"line": 6,
+											"column": 26
+										}
+									},
+									"name": "T"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 187,
+									"end": 195
+								},
+								{
+									"type": "Block",
+									"value": " c3 ",
+									"start": 196,
+									"end": 204
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 215,
+							"end": 216,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 30
+								},
+								"end": {
+									"line": 6,
+									"column": 31
+								}
+							},
+							"value": 2,
+							"raw": "2"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Every block in a leading run survives, not only the operand-glued one.",
+							"start": 111,
+							"end": 184
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 278,
+					"end": 315,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 38
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 279,
+						"end": 313,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 2
+							},
+							"end": {
+								"line": 9,
+								"column": 36
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 279,
+							"end": 307,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 30
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 281,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 4
+										},
+										"end": {
+											"line": 9,
+											"column": 28
+										}
+									},
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 281,
+										"end": 282,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 4
+											},
+											"end": {
+												"line": 9,
+												"column": 5
+											}
+										},
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 284,
+										"end": 305,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 7
+											},
+											"end": {
+												"line": 9,
+												"column": 28
+											}
+										},
+										"left": {
+											"type": "TSAsExpression",
+											"start": 294,
+											"end": 300,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 17
+												},
+												"end": {
+													"line": 9,
+													"column": 23
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 294,
+												"end": 295,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 17
+													},
+													"end": {
+														"line": 9,
+														"column": 18
+													}
+												},
+												"name": "b"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 299,
+												"end": 300,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 22
+													},
+													"end": {
+														"line": 9,
+														"column": 23
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 299,
+													"end": 300,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 22
+														},
+														"end": {
+															"line": 9,
+															"column": 23
+														}
+													},
+													"name": "T"
+												}
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c4 ",
+													"start": 285,
+													"end": 293
+												}
+											]
+										},
+										"right": {
+											"type": "Literal",
+											"start": 304,
+											"end": 305,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 27
+												},
+												"end": {
+													"line": 9,
+													"column": 28
+												}
+											},
+											"value": 3,
+											"raw": "3"
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 310,
+							"end": 313,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 33
+								},
+								"end": {
+									"line": 9,
+									"column": 36
+								}
+							},
+							"name": "obj"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same gap inside a destructuring default's target.",
+							"start": 220,
+							"end": 276
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 382,
+					"end": 411,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 382,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 6
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "TSAsExpression",
+							"start": 397,
+							"end": 403,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 14,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 397,
+								"end": 398,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"name": "z"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 402,
+								"end": 403,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 402,
+									"end": 403,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 7
+										},
+										"end": {
+											"line": 14,
+											"column": 8
+										}
+									},
+									"name": "T"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c5 ",
+									"start": 386,
+									"end": 394
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 409,
+							"end": 410,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 5
+								},
+								"end": {
+									"line": 15,
+									"column": 6
+								}
+							},
+							"value": 4,
+							"raw": "4"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line block keeps its own line and expands the shell.",
+							"start": 318,
+							"end": 380
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
