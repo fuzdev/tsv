@@ -17,18 +17,36 @@ use super::arena::{ArenaCommand, DocId, DocNode, LineSuffixBuf, RenderIndent};
 use super::arena_render::{RenderCtx, render_line_break, render_single_doc_inner};
 use super::types::{LineKind, Mode, resolve_text};
 
-/// Flush pending line suffix content, in the order it was queued, at `run_indent` —
-/// the indent of the break this flush is happening at (the caller's line node), which
-/// is the document's own answer for "what indent starts the next line here". A suffix
-/// carries the indent it was *queued* at, deep inside a construct that has since
-/// closed, so a run separator taken at that indent lands a comment where a reformat
-/// would not put it (the run indent is what keeps the broken run a fixed point).
+/// Flush pending line suffix content, in the order it was queued, at `run_indent` — the
+/// indent of the break this flush is happening at (the caller's line node), which a
+/// separator taken by [`push_run_separator`] uses in place of the suffix's own.
+///
+/// ⚠️ **That choice is EMPIRICAL, not a law, and the difference is idempotency.** A suffix
+/// carries the indent it was *queued* at, deep inside a construct that has since closed, so
+/// a separator taken there lands a comment where a reformat does not put it: over the gap
+/// audit's SWALLOW examples the queued indent left 6 of 31 non-idempotent and this one
+/// leaves 1 of 31. It is not that the flush indent is *right* — it is that it agrees with
+/// the builder at every container tail measured (block, method, object, a switch case
+/// followed by a sibling case) and the queued one does not. The known counterexample is a
+/// switch's LAST case, where the next break is the switch's `}`, a level out from where a
+/// dangling comment in a case settles; the settled value there is neither indent, and no
+/// renderer-visible value equals it. Prettier's nearest construction picks the other way —
+/// `printTrailingComment`'s own-line arm is `lineSuffix([hardline, …])`, breaking at the
+/// queued indent — but that break is chosen by the *builder*, which meant the indent it
+/// captured. Cataloged in
+/// `tests/fixtures/typescript/syntax/comments/deferred_comment_run_separator_prettier_divergence`.
 ///
 /// Prettier flushes by re-pushing the buffer onto its command *stack*
 /// (`commands.push(line, ...lineSuffix.reverse())`, `printer.js`) — the `reverse()`
 /// there exists only to cancel the stack's LIFO pop, so the net emission order is
 /// FIFO. This renderer drives the suffixes directly, so it must iterate forward:
-/// reversing here would emit two suffixes queued on one line back-to-front.
+/// reversing here would emit two suffixes queued on one line back-to-front. Prettier's
+/// flush is that push and nothing else — it has **no separator here at all**, which is why
+/// it welds; the sequencing rule it does have (`printTrailingComment` threading
+/// `previousComment.hasLineSuffix`) is per-gap, and `push_trailing_comments_in_range`
+/// already mirrors it. The hole is strictly ACROSS gaps, and only the renderer can see it:
+/// the same source welds or does not depending on print width (`foo(fn() // c⏎.bar, x); //
+/// c1` collapses and welds; widen the second argument and the call expands and it cannot).
 pub(super) fn flush_line_suffix(
     ctx: &RenderCtx<'_>,
     line_suffix: &mut LineSuffixBuf,
