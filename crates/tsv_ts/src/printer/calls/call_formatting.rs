@@ -16,13 +16,13 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body,
 };
 use super::arg_wrapping::{
-    ArgItem, ArgOpener, append_type_args_with_gap_comments, arg_needs_soft_wrap,
+    ArgOpener, append_type_args_with_gap_comments, arg_needs_soft_wrap,
     arrow_hug_refused_by_comments, build_arrow_call_body_states,
     build_arrow_gap_break_single_arg_doc, build_arrow_hug_printed_doc, build_arrow_sig_doc,
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
-    build_expand_first_arg_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
-    build_single_container_arg_doc, build_ternary_arrow_hug_ladder, could_expand_arrow_chain,
-    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
+    build_expand_first_arg_doc, build_joined_argument_doc, build_printed_argument_doc,
+    build_single_arrow_hug_doc, build_single_container_arg_doc, build_ternary_arrow_hug_ladder,
+    could_expand_arrow_chain, first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
@@ -388,11 +388,10 @@ pub(super) fn build_call_doc_with_wrapping(
         // Force expansion with hardlines for multiline content
         return build_call_args_expanded(
             printer,
-            callee,
+            ArgOpener::Callee(callee),
             call.arguments,
             paren_open,
             call.span.end,
-            ArgItem::ArgContext,
         );
     }
 
@@ -403,11 +402,10 @@ pub(super) fn build_call_doc_with_wrapping(
     if is_function_composition_args(call.arguments) && !arg_trailing_line_comment {
         return build_call_args_expanded(
             printer,
-            callee,
+            ArgOpener::Callee(callee),
             call.arguments,
             paren_open,
             call.span.end,
-            ArgItem::ArgContext,
         );
     }
 
@@ -423,7 +421,7 @@ pub(super) fn build_call_doc_with_wrapping(
     if should_expand_first_arg(printer, call.arguments) && !expand_first_blocked {
         return build_expand_first_arg_doc(
             printer,
-            callee,
+            ArgOpener::Callee(callee),
             call.arguments,
             paren_open,
             call.span.end,
@@ -607,7 +605,12 @@ fn try_single_arg_comment_paths(
         // (flush continuation), losing the indent prettier applies here.
         // An own-line directive in the gap freezes the argument verbatim (Rule A);
         // this branch already keeps such a comment on its own line.
-        inner.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0));
+        inner.push(build_joined_argument_doc(
+            printer,
+            paren_open,
+            call.arguments,
+            0,
+        ));
         push_lone_arg_trailing_comments(printer, &mut inner, arg_end, paren_close);
 
         return Some(d.concat(&[
@@ -643,7 +646,12 @@ fn try_single_arg_comment_paths(
         if let Some(run) = printer.opener_trailing_broke_after_run(paren_open, arg_start) {
             let mut parts: DocBuf = DocBuf::new();
             printer.push_leading_run_with_soft_line(&mut parts, &run);
-            parts.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0));
+            parts.push(build_joined_argument_doc(
+                printer,
+                paren_open,
+                call.arguments,
+                0,
+            ));
             push_lone_arg_trailing_comments(printer, &mut parts, arg_end, paren_close);
             return Some(wrap_call_with_soft_breaks(d, callee, d.concat(&parts)));
         }
@@ -653,7 +661,7 @@ fn try_single_arg_comment_paths(
         // line-comment branch above for the same reasoning. A directive alone on its
         // line freezes the argument (Rule A) — only the BLOCK spelling reaches here
         // (a line comment routes to the branch above).
-        let arg_doc = ArgItem::ArgContext.build(printer, paren_open, call.arguments, 0);
+        let arg_doc = build_joined_argument_doc(printer, paren_open, call.arguments, 0);
 
         // Leading run, argument, trailing run — `build_rhs_comments_glued_opt` already
         // adds the trailing space after each comment it emits.
@@ -1070,7 +1078,12 @@ fn build_call_with_arg_comments(
         // no-comment path (the single-arg comment path does the same via
         // build_arg_expression_doc). An own-line format-ignore directive in this
         // argument's gap freezes it verbatim (Rule A).
-        arg_parts.push(ArgItem::ArgContext.build(printer, paren_open, call.arguments, i));
+        arg_parts.push(build_joined_argument_doc(
+            printer,
+            paren_open,
+            call.arguments,
+            i,
+        ));
 
         // Check for comments after this argument (before next arg or closing paren)
         if i < call.arguments.len() - 1 {

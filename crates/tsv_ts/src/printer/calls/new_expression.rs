@@ -12,8 +12,8 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body,
 };
 use super::arg_wrapping::{
-    ArgItem, ArgOpener, ArgsJoin, append_type_args_with_gap_comments,
-    arrow_hug_refused_by_comments, build_args_joined_with_comments, build_arrow_call_body_states,
+    ArgOpener, ArgsJoin, append_type_args_with_gap_comments, arrow_hug_refused_by_comments,
+    build_args_joined_with_comments, build_arrow_call_body_states,
     build_arrow_gap_break_single_arg_doc, build_arrow_hug_printed_doc, build_arrow_sig_doc,
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
     build_expand_first_arg_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
@@ -382,11 +382,10 @@ impl<'a> Printer<'a> {
         {
             return build_call_args_expanded(
                 self,
-                callee_with_types,
+                ArgOpener::Callee(callee_with_types),
                 new_expr.arguments,
                 paren_open,
                 new_expr.span.end,
-                ArgItem::ArgContext,
             );
         }
 
@@ -413,11 +412,10 @@ impl<'a> Printer<'a> {
             // Force expansion with hardlines for multiline content
             return build_call_args_expanded(
                 self,
-                callee_with_types,
+                ArgOpener::Callee(callee_with_types),
                 new_expr.arguments,
                 paren_open,
                 new_expr.span.end,
-                ArgItem::ArgContext,
             );
         }
 
@@ -438,7 +436,7 @@ impl<'a> Printer<'a> {
         if should_expand_first_arg(self, new_expr.arguments) && !expand_first_blocked {
             return build_expand_first_arg_doc(
                 self,
-                callee_with_types,
+                ArgOpener::Callee(callee_with_types),
                 new_expr.arguments,
                 paren_open,
                 new_expr.span.end,
@@ -468,7 +466,6 @@ impl<'a> Printer<'a> {
                 paren_open,
                 new_expr.span.end,
                 ArgsJoin::Hardline,
-                ArgItem::ArgContext,
                 &mut paren_line,
             );
             return wrap_call_with_hard_breaks_paren_line(
@@ -550,7 +547,6 @@ impl<'a> Printer<'a> {
                 } else {
                     ArgsJoin::SoftLine
                 },
-                ArgItem::ArgContext,
                 &mut paren_line,
             );
             if hard {
@@ -621,7 +617,6 @@ impl<'a> Printer<'a> {
                     paren_open,
                     new_expr.span.end,
                     ArgsJoin::HardlineLeadingGapEmitted,
-                    ArgItem::ArgContext,
                     &mut unused_paren_line,
                 ));
                 debug_assert!(unused_paren_line.is_empty());
@@ -645,7 +640,6 @@ impl<'a> Printer<'a> {
                 paren_open,
                 new_expr.span.end,
                 ArgsJoin::SoftLine,
-                ArgItem::ArgContext,
                 &mut paren_line,
             );
             // Both trailing-comment arms above return before this one, so the last
