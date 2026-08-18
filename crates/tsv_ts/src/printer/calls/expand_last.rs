@@ -13,11 +13,10 @@ use super::arg_predicates::{
 };
 use super::arg_wrapping::{
     ArgOpener, arrow_body_expands_internally, arrow_hug_refused_by_comments, build_args_split_last,
-    build_arrow_gap_break_multi_arg_doc, build_arrow_sig_doc, build_break_body_state,
-    build_expand_all_args, build_expand_last_obj_array_doc, build_inline_args,
-    build_inline_hug_or_expand_all, build_inline_or_expand_all, could_expand_arrow_chain,
-    last_arg_arrow_gap_break, last_two_args_same_type, prebuild_expand_last_break_body,
-    prebuild_expand_last_obj_array_body, prepend_arrow_body_comments,
+    build_arrow_gap_break_multi_arg_doc, build_arrow_sig_doc, build_break_body_ladder,
+    build_expand_last_obj_array_doc, could_expand_arrow_chain, last_arg_arrow_gap_break,
+    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    prepend_arrow_body_comments,
 };
 use crate::ast::internal;
 use crate::printer::Printer;
@@ -100,6 +99,7 @@ pub(super) fn try_expand_last_arg(
     if arguments.len() < 2 {
         return None;
     }
+    let opener = ArgOpener::Callee(callee);
 
     let last_arg = arguments.last();
     let last_is_function = matches!(
@@ -209,8 +209,8 @@ pub(super) fn try_expand_last_arg(
         });
 
     // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
-    if head_parts.iter().any(|&id| d.will_break(id)) {
-        return Some(build_expand_all_args(d, callee, all_args_broken));
+    if let Some(bail) = opener.expand_all_if_head_breaks(d, &head_parts, all_args_broken) {
+        return Some(bail);
     }
 
     // A broken `=>`→body gap drops the closing paren to its own line, asked above every
@@ -220,7 +220,7 @@ pub(super) fn try_expand_last_arg(
     {
         return Some(build_arrow_gap_break_multi_arg_doc(
             printer,
-            ArgOpener::Callee(callee),
+            opener,
             inject,
             &head_parts,
             last_arg_doc,
@@ -248,20 +248,16 @@ pub(super) fn try_expand_last_arg(
             let body_doc =
                 prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
-            let prefix = d.concat(&[callee, d.text("(")]);
-            let state_break_body =
-                build_break_body_state(d, prefix, &head_parts, sig_doc, body_doc);
-            let state_expand_all = build_expand_all_args(d, callee, all_args_broken);
-
-            // Prettier: when willBreak(lastArg) is true, skip the flat state. It would be
-            // selected by fits() (the first line is short) but produces the wrong closing
-            // brackets (`}));` instead of `}),⏎)`).
-            if d.will_break(last_arg_doc) {
-                return Some(d.conditional_group(&[state_break_body, state_expand_all]));
-            }
-
-            let state_inline = build_inline_args(d, callee, &head_parts, last_arg_doc);
-            return Some(d.conditional_group(&[state_inline, state_break_body, state_expand_all]));
+            // The ladder, shared with the member chain's spelling of this same layout.
+            return Some(build_break_body_ladder(
+                d,
+                opener,
+                &head_parts,
+                sig_doc,
+                body_doc,
+                last_arg_doc,
+                all_args_broken,
+            ));
         }
 
         // Expression arrow with an object / array terminal: the head arguments stay inline and
@@ -282,7 +278,7 @@ pub(super) fn try_expand_last_arg(
             // The ladder, shared with the member chain's spelling of this same layout.
             return Some(build_expand_last_obj_array_doc(
                 printer,
-                ArgOpener::Callee(callee),
+                opener,
                 obj_reuse,
                 &head_parts,
                 all_args_broken,
@@ -293,15 +289,9 @@ pub(super) fn try_expand_last_arg(
         // Block-body arrows, block-terminal arrow chains, and function expressions: inline vs
         // expand-all, since the argument's own doc expands.
         if last_arg.is_some_and(|arg| owner.callback_signature_refuses_hug(printer, arg)) {
-            return Some(build_expand_all_args(d, callee, all_args_broken));
+            return Some(opener.expand_all(d, all_args_broken));
         }
-        return Some(build_inline_or_expand_all(
-            d,
-            callee,
-            &head_parts,
-            last_arg_doc,
-            all_args_broken,
-        ));
+        return Some(opener.inline_or_expand_all(d, &head_parts, last_arg_doc, all_args_broken));
     }
 
     // Array / object last argument. Prettier disables the hug state when the last two arguments
@@ -309,25 +299,13 @@ pub(super) fn try_expand_last_arg(
     // argument expands everything instead.
     if last_two_args_same_type(arguments) {
         if d.will_break(last_arg_doc) {
-            return Some(build_expand_all_args(d, callee, all_args_broken));
+            return Some(opener.expand_all(d, all_args_broken));
         }
-        return Some(build_inline_or_expand_all(
-            d,
-            callee,
-            &head_parts,
-            last_arg_doc,
-            all_args_broken,
-        ));
+        return Some(opener.inline_or_expand_all(d, &head_parts, last_arg_doc, all_args_broken));
     }
 
     // Different types: the 3-state ladder (inline → hug → expand all). For a breaking last
     // argument prettier keeps the hug — `[breakParent, conditionalGroup([hug,
     // allArgsBrokenOut])]` — there is no forced-break → inline-or-expand-all form.
-    Some(build_inline_hug_or_expand_all(
-        d,
-        callee,
-        &head_parts,
-        last_arg_doc,
-        all_args_broken,
-    ))
+    Some(opener.inline_hug_or_expand_all(d, &head_parts, last_arg_doc, all_args_broken))
 }
