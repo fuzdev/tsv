@@ -111,10 +111,9 @@ enum ParseErrorKind {
         position: usize,
         context: Option<ErrorContext>,
     },
-    // TODO: never constructed yet — no parse entry point enforces the 4 GB source cap,
-    // so a >4 GB source silently overflows the `u32` span offsets instead of erroring
-    // here. `Token`/`Span` assume the cap holds (see `tsv_ts/src/lexer/token.rs`); wire
-    // this check into each crate's `parse` before that assumption can be violated.
+    // Constructed only by `ensure_source_fits`, which every public parse entry point
+    // calls before touching the source — that guard is what makes `Token`/`Span`'s
+    // `u32` offsets sound (see `tsv_ts/src/lexer/token.rs`).
     #[error("File too large: {size} bytes (maximum: {max} bytes / 4GB)")]
     FileTooLarge { size: usize, max: usize },
 }
@@ -216,6 +215,17 @@ impl ParseError {
     /// Source exceeds the 4 GB cap the `u32` span offsets assume.
     pub fn file_too_large(size: usize, max: usize) -> Self {
         ParseError::new(ParseErrorKind::FileTooLarge { size, max })
+    }
+
+    /// Reject a source longer than the `u32` span offsets can index (> 4 GiB − 1).
+    /// Every public parse entry point calls this before touching the source; the
+    /// lexers and `Span`/`Token` assume the cap holds rather than re-checking.
+    pub fn ensure_source_fits(source: &str) -> Result<()> {
+        const MAX: usize = u32::MAX as usize;
+        if source.len() > MAX {
+            return Err(ParseError::file_too_large(source.len(), MAX));
+        }
+        Ok(())
     }
 
     /// Lift a position out of a lexer's own coordinates into the document's.

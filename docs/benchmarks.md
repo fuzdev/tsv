@@ -360,7 +360,7 @@ prettier. Load-bearing on two axes:
   native `jsTextToDoc`. So `tsv` vs `oxfmt` is a native-vs-native engine race on
   **TypeScript AND CSS**; only the **svelte** oxfmt row is (mostly) a
   prettier-pipeline number in oxfmt packaging — read that one ratio accordingly.
-  The report corroborates: oxfmt ≈ prettier on svelte (~1x), but ~6x prettier on
+  The report corroborates: oxfmt ≈ prettier on svelte (~1x), but ~28x prettier on
   css and ~14x on TS.
 - **biome (WASM)** — formatter/linter; TypeScript, JS, CSS, and Svelte (via
   biome's experimental HTML-superset support, `html.experimentalFullSupportEnabled`;

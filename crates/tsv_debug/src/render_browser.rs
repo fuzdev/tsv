@@ -45,7 +45,7 @@ use crate::render_normalize::{
 /// Block-level tags for the **browser render** model.
 ///
 /// Membership asks one question — does this tag's **UA-stylesheet display**
-/// (`~/dev/html/source`, rendering section) make adjacent collapsible whitespace
+/// (`../html/source`, rendering section) make adjacent collapsible whitespace
 /// non-rendering? — and it must be answered UNCONDITIONALLY. That is a different
 /// question from `tsv_html::is_block_element`, the *formatting* set, and the two
 /// differ in **both** directions rather than one being a subset of the other:

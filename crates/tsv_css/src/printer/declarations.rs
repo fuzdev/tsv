@@ -10,7 +10,7 @@ use super::{Printer, value_normalization};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
-use tsv_lang::printing::visual_width;
+use tsv_lang::printing::{format_string_literal, visual_width};
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 /// How a declaration's broken comma list lays out, decided once.
@@ -535,7 +535,7 @@ impl<'a> Printer<'a> {
         {
             self.write(&formatted);
         } else {
-            let formatted = value_normalization::format_string_value("", quote);
+            let formatted = format_string_literal("", quote);
             self.write(&formatted);
         }
         self.write_declaration_end(decl);

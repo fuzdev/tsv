@@ -36,6 +36,7 @@ use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::doc::{DocBuf, arena::DocId};
+use tsv_lang::printing::format_string_literal;
 use tsv_lang::source_scan;
 use tsv_lang::{Span, has_comments_to_emit_in_range};
 
@@ -491,15 +492,17 @@ impl<'a> Printer<'a> {
         self.d().text_pooled(text)
     }
 
-    /// Reconstruct an attribute selector (`[ns|name op 'value' flags]`) verbatim
-    /// from source. The name is emitted raw (escapes preserved — `[f\oo]` stays
-    /// `[f\oo]`).
+    /// Reconstruct an attribute selector (`[ns|name op 'value' flags]`) from source.
+    /// The name is emitted raw (escapes preserved — `[f\oo]` stays `[f\oo]`); the value
+    /// is re-quoted from its raw token like a declaration string (the delimiter that
+    /// needs fewer escapes wins, ties prefer single — matches prettier), except that a
+    /// bare value stays bare when quoting it would force a re-escape.
     fn build_attribute_selector_text(
         &self,
         namespace: Option<&str>,
         name_span: Span,
         matcher: Option<internal::AttributeMatcher>,
-        value: Option<&str>,
+        value_span: Option<Span>,
         flags: Option<&str>,
     ) -> String {
         let mut result = String::from("[");
@@ -510,11 +513,26 @@ impl<'a> Printer<'a> {
         result.push_str(name_span.extract(self.source));
         if let Some(m) = matcher {
             result.push_str(m.as_str());
-            if let Some(v) = value {
-                // TODO: Determine if value needs quotes
-                result.push('\'');
-                result.push_str(v);
-                result.push('\'');
+            if let Some(vs) = value_span {
+                match internal::attribute_value_quote_and_text(self.source, vs) {
+                    (Some(quote), interior) => {
+                        // Quoted value: optimal-quote re-quoting over the raw interior,
+                        // swapping only the quote escapes (`[a="it's"]` keeps its double
+                        // quotes, `[a='it\'s']` becomes `[a="it's"]`).
+                        result.push_str(&format_string_literal(interior, quote));
+                    }
+                    (None, raw) if raw.bytes().any(|b| b == b'\'' || b == b'"') => {
+                        // A quote character reaches a bare value only via an escape
+                        // (`[a=x\']`); wrapping it in quotes would need re-escaping, so
+                        // it stays bare (matches prettier).
+                        result.push_str(raw);
+                    }
+                    (None, raw) => {
+                        result.push('\'');
+                        result.push_str(raw);
+                        result.push('\'');
+                    }
+                }
             }
         }
         if let Some(f) = flags {
@@ -609,14 +627,16 @@ impl<'a> Printer<'a> {
                 namespace,
                 name_span,
                 matcher,
-                value,
+                value_span,
                 flags,
                 ..
-            } => {
-                d.text_pooled(&self.build_attribute_selector_text(
-                    *namespace, *name_span, *matcher, *value, *flags,
-                ))
-            }
+            } => d.text_pooled(&self.build_attribute_selector_text(
+                *namespace,
+                *name_span,
+                *matcher,
+                *value_span,
+                *flags,
+            )),
             internal::SimpleSelector::PseudoClass { args, span } => {
                 self.build_pseudo_doc(*span, args.as_ref(), is_last_in_compound)
             }

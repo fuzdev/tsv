@@ -581,8 +581,11 @@ static KEYWORDS: &[(&str, KeywordKind)] = &[
     ("debugger", KeywordKind::Debugger),
     // Sloppy-mode-only statement — a `ReservedWord`, so it can never be a name
     ("with", KeywordKind::With),
-    // TODO: Expand keyword list for:
-    // - Type keywords: interface, type, namespace, etc.
+    // Deliberately NOT listed: the contextual keywords (`interface`, `type`, `namespace`,
+    // `declare`, `abstract`, `async`, …) lex as plain identifiers and the parser
+    // recognizes them by value at the sites where they can begin a construct (see
+    // `parser/statement`). Minting keyword tokens for them would break every
+    // Identifier-expecting site (`x.type`, `const namespace = 1`).
 ];
 
 /// Shortest reserved word (`as`/`in`/`if`/`do`) is 2 bytes; longest (`instanceof`) is 10.

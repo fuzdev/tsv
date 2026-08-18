@@ -33,7 +33,7 @@ grades); the reference halves live in `docs/`:
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `conformance:audit` · `conformance:audit:compiler` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save `roundtrip:audit:prettier`, which gates the pinned `../prettier` format suites when that checkout is present (a loud skip when not; ~0.1 s) | every commit; the CI `check` job |
+| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save `roundtrip:audit:prettier`, which gates the pinned `../prettier` format suites when that checkout is present (a loud skip when not; ~0.1 s) | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `pins:audit:checkouts` + `compile:fixtures:validate` preflights, then `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
@@ -170,7 +170,7 @@ deno task corpus:compare:format --all
 
 # Single project (scans <path> recursively — NO srcDir filtering)
 # ⚠ For monorepos like svelte/, use --all instead to avoid scanning test fixtures
-deno task corpus:compare:format ~/dev/some-project
+deno task corpus:compare:format ../some-project
 
 # Flags (any invocation): --explain (list known divergences + patterns), --summary
 # (compact, no diffs), --limit N (per language), --filter <lang>, --strict (fail on
@@ -179,7 +179,7 @@ deno task corpus:compare:format ~/dev/some-project
 
 # Run without rebuilding FFI — guarded against a stale binary (§Artifact Freshness
 # Guard); BENCH_STALE_OK=1 overrides
-deno task corpus:compare:format:run ~/dev/some-project
+deno task corpus:compare:format:run ../some-project
 ```
 
 **`TSV_FFI_PROFILE=corpus` lives on the `:run` task, not the wrapper.** Every
@@ -283,7 +283,7 @@ canonical-parser comparison at corpus scale.
 ```bash
 deno task corpus:compare:parse --all                    # full corpus
 deno task corpus:compare:parse --all --multibyte-only   # offset-translation slice (riskiest machinery)
-deno task corpus:compare:parse ~/dev/zzz --filter typescript --limit 100
+deno task corpus:compare:parse ../zzz --filter typescript --limit 100
 deno task corpus:compare:parse --all --json 2>/dev/null > report.json
 deno task corpus:compare:parse:run --all                # skip rebuild (freshness-guarded)
 ```
@@ -582,6 +582,7 @@ BENCH_WARMUP=10         # warmup iterations (default: 3; slow >5s-per-sweep task
 BENCH_MODE=union        # per-impl iteration (default: intersection)
 BENCH_CORPUS=conformance  # corpus/surface selector (default: perf)
 BENCH_STALE_OK=1        # run despite stale artifacts (default: off)
+BENCH_COVERAGE_ONLY=1   # coverage-only run, no timed phase (what bench:conformance:run sets)
 BENCH_FORCED_ASYNC=1    # add the tsv-forced-async control row (diagnostic; default: off)
 BENCH_GC=1              # call globalThis.gc() between iterations (default: off — not a
                         # uniform bias; see docs/benchmarks.md)
@@ -651,7 +652,7 @@ Each runtime saves to `benches/js/results/` as timestamped files plus a committe
 `report.conformance.node.{json,md}` instead — a separate committed surface that
 never clobbers the perf reports and is invisible to `bench:compose` (which globs the
 exact perf filenames). To publish to tsv.fuz.dev, run `npm run update-benchmarks` in
-`~/dev/tsv.fuz.dev` — its copy list names these files exactly, so renaming a report
+`../tsv.fuz.dev` — its copy list names these files exactly, so renaming a report
 artifact means updating that script in the same change. Its
 `src/routes/docs/benchmarks/benchmark_data.ts` likewise MIRRORS the JSON shape
 below, field for field and version note for version note, so a new top-level field
@@ -745,8 +746,10 @@ run warns and drops that line instead of failing.
 
 ## Artifact Freshness Guard
 
-The rebuild-skipping tasks (`bench:{deno,node,bun}:run`,
-`corpus:compare:format:run`, and `smoke`) skip the rebuild so you can iterate on the
+The rebuild-skipping tasks (`bench:{deno,node,bun}:run`, `bench:conformance:run`,
+`corpus:compare:{format,parse}:run`,
+`conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`, and `smoke`) skip the
+rebuild so you can iterate on the
 harness without paying the wasm-pack cost — at the risk of silently measuring a
 binary older than current source (a CSS run once reported `146/183` against a stale
 `.so` that should have been `155/183`). `lib/check_artifact_freshness.ts` guards

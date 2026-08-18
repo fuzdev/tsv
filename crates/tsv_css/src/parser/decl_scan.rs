@@ -33,7 +33,11 @@
 // on the verdict because paren depth evolves identically in each.
 
 use super::CssParser;
-use crate::lexer::{IDENT_CONTINUE_LUT, Lexer, TokenKind, is_ascii_css_whitespace};
+use crate::comments::comment_end_checked;
+use crate::lexer::{
+    IDENT_CONTINUE_LUT, Lexer, TokenKind, is_ascii_css_whitespace, string_end, url_arg_is_quoted,
+    url_token_close,
+};
 use tsv_lang::ParseError;
 
 /// The token that closes a declaration's value. Exactly three can, so the scan reports
@@ -198,7 +202,7 @@ fn scan_rule_or_declaration_and_value_bytes(source: &str, from: usize) -> Option
                 i += 1;
                 break;
             }
-            b'/' if bytes.get(i + 1) == Some(&b'*') => i = comment_end(bytes, i)?,
+            b'/' if bytes.get(i + 1) == Some(&b'*') => i = comment_end_checked(bytes, i)?,
             // The caller settled that a `:` follows; anything else means the bytes disagree
             // with the token lookahead, so decline to the reference walk rather than guess.
             _ => return None,
@@ -314,7 +318,7 @@ fn peek_significant_kind_bytes(bytes: &[u8], from: usize) -> Option<TokenKind> {
         }
         match bytes.get(i)? {
             b':' => return Some(TokenKind::Colon),
-            b'/' if bytes.get(i + 1) == Some(&b'*') => i = comment_end(bytes, i)?,
+            b'/' if bytes.get(i + 1) == Some(&b'*') => i = comment_end_checked(bytes, i)?,
             _ => return None,
         }
     }
@@ -480,10 +484,11 @@ fn scan_value_core<const WANT_VERDICT: bool>(
                     i += 1;
                 }
             },
-            b'"' | b'\'' => i = string_end(bytes, i)?,
+            // A string the lexer would reject (unterminated / trailing `\`) declines.
+            b'"' | b'\'' => i = string_end(bytes, i).ok()?,
             b'/' if bytes.get(i + 1) == Some(&b'*') => {
                 has_comment = true;
-                i = comment_end(bytes, i)?;
+                i = comment_end_checked(bytes, i)?;
             }
             // A lone `/` is an ordinary token (`font: 1rem/1.5 sans`).
             b'/' => i += 1,
@@ -537,51 +542,6 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     }))
 }
 
-/// End of the string opened at `open` (past its closing quote), or `None` when the lexer
-/// would reject it — unterminated, or a trailing backslash at end-of-source.
-///
-/// Mirrors `lexer::strings::read_string`: the quote and `\` are ASCII, so a multi-byte
-/// char's continuation bytes (all `>= 0x80`) match neither and the run passes over them.
-fn string_end(bytes: &[u8], open: usize) -> Option<usize> {
-    let quote = bytes[open];
-    let len = bytes.len();
-    let mut p = open + 1;
-    loop {
-        while p < len && bytes[p] != quote && bytes[p] != b'\\' {
-            p += 1;
-        }
-        if p >= len {
-            return None; // unterminated
-        }
-        if bytes[p] == quote {
-            return Some(p + 1);
-        }
-        if p + 1 >= len {
-            return None; // backslash at end of source
-        }
-        p += 2;
-    }
-}
-
-/// End of the comment opened at `open` (past its `*/`), or `None` when it is unterminated.
-/// Mirrors `lexer::comments::read_comment`.
-fn comment_end(bytes: &[u8], open: usize) -> Option<usize> {
-    let len = bytes.len();
-    let mut p = open + 2;
-    loop {
-        while p < len && bytes[p] != b'*' {
-            p += 1;
-        }
-        if p >= len {
-            return None; // unterminated
-        }
-        if bytes.get(p + 1) == Some(&b'/') {
-            return Some(p + 2);
-        }
-        p += 1;
-    }
-}
-
 /// If the `(` at `open` closes a `url` **identifier token**, the end of the opaque
 /// url-token it opens; `None` for an ordinary nesting paren.
 ///
@@ -611,48 +571,23 @@ fn url_token_end(source: &str, bytes: &[u8], value_start: usize, open: usize) ->
         }
     }
     // A quoted argument makes it a function-token (`url("…")` lexes as ident + `(` +
-    // string), not a url-token. `char::is_whitespace`, matching the lexer.
-    let mut i = open + 1;
-    while let Some(ch) = source[i..].chars().next() {
-        if ch.is_whitespace() {
-            i += ch.len_utf8();
-        } else {
-            break;
-        }
-    }
-    if matches!(source[i..].chars().next(), Some('"' | '\'')) {
+    // string), not a url-token — the lexer's own fork, shared.
+    if url_arg_is_quoted(source, open + 1) {
         return None;
     }
-    // Opaque to the matching unescaped `)`.
+    // Opaque to the matching unescaped `)`, via the lexer's own scan.
     //
-    // An **unterminated** url-token declines to the reference walk. The lexer takes it
-    // as-is (it models no bad-url recovery), so the token runs to end-of-source and can
-    // therefore *end in whitespace* — and `value_end`'s trailing-whitespace trim assumes
-    // the value's last token does not, which is why the trim is exact everywhere else.
-    // Reachable only on malformed CSS (`url(x\)` — the `\)` escapes the closing paren, so
-    // nothing ever closes the url), where the parse fails regardless; declining costs
-    // nothing and keeps the byte scan and the walk agreeing fact-for-fact. The other way a
-    // last token can end in whitespace — an escape's payload or a hex escape's terminator —
-    // is already declined by the main loop's `\` arm, which this helper is what hides.
-    let len = bytes.len();
-    let mut j = open + 1;
-    loop {
-        while j < len && bytes[j] != b'\\' && bytes[j] != b')' {
-            j += 1;
-        }
-        if j >= len {
-            return None; // unterminated
-        }
-        if bytes[j] == b')' {
-            j += 1;
-            break;
-        }
-        j += 1;
-        if j < len {
-            j += 1;
-        }
-    }
-    Some(j)
+    // An **unterminated** url-token (`None`) declines to the reference walk. The lexer
+    // takes it as-is (it models no bad-url recovery), so the token runs to end-of-source
+    // and can therefore *end in whitespace* — and `value_end`'s trailing-whitespace trim
+    // assumes the value's last token does not, which is why the trim is exact everywhere
+    // else. Reachable only on malformed CSS (`url(x\)` — the `\)` escapes the closing
+    // paren, so nothing ever closes the url), where the parse fails regardless; declining
+    // costs nothing and keeps the byte scan and the walk agreeing fact-for-fact. The
+    // other way a last token can end in whitespace — an escape's payload or a hex
+    // escape's terminator — is already declined by the main loop's `\` arm, which this
+    // helper is what hides.
+    url_token_close(bytes, open + 1)
 }
 
 /// First offset in `[from, to)` that is neither whitespace nor inside a comment, or `to`.
@@ -663,7 +598,7 @@ fn skip_trivia(bytes: &[u8], from: usize, to: usize) -> usize {
         if is_ascii_css_whitespace(bytes[i]) {
             i += 1;
         } else if bytes[i] == b'/' && bytes.get(i + 1) == Some(&b'*') {
-            match comment_end(bytes, i) {
+            match comment_end_checked(bytes, i) {
                 Some(end) => i = end,
                 None => return to,
             }

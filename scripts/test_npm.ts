@@ -120,7 +120,7 @@ describe(`package metadata: ${pkg_dir}`, () => {
 	});
 
 	it('all variant ships the tsv bin', { skip: variant !== 'all' }, () => {
-		assert.deepEqual(pkg.bin, { tsv: './cli.js' });
+		assert.deepEqual(pkg.bin, { tsv: 'cli.js' });
 		assert.ok(pkg.files.includes('cli.js'));
 	});
 

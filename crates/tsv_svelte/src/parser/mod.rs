@@ -178,7 +178,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         comments.append(&mut self.expression_comments);
         // Sort by position for consistent lookup via comments_to_emit_in_range()
         comments.sort_by_key(|c| c.span.start);
-        // TODO: Consider extracting CSS comments if needed for public AST
+        // CSS comments deliberately stay on the `css` island — the wire emits them under
+        // the style node via `write_css_comments`, matching where parseCss puts them —
+        // so they are never merged into `Root.comments`.
 
         Ok(Root {
             fragment,

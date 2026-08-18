@@ -31,6 +31,7 @@ pub use tsv_lang::{ParseError, Result};
 /// let ast = tsv_svelte::parse("<div>Hello</div>", &arena)?;
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<'arena>> {
+    ParseError::ensure_source_fits(source)?;
     parser::parse_svelte(source, arena).map_err(|e| e.with_context(source))
 }
 

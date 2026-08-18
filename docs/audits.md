@@ -43,17 +43,20 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `deno task check` |
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
 
-⚠️ **Editing whitespace in a fixture is never local to that fixture.** The four
+⚠️ **Editing whitespace in a fixture is never local to that fixture.** The three
 injection ratchets — [gaps](#gap-injection-audit-gapsaudit),
 [blanks](#blank-line-injection-audit-blanksaudit),
-[fabrication](#blank-fabrication-audit-fabricationaudit),
 [ignore](#ignore-directive-honoring-audit-ignoreaudit) — enumerate their sites **from
-the seed text**, and the seeds are every fixture file, variants included. Whitespace
+the seed text**, and the seeds are every fixture file, variants included (the
+[fabrication](#blank-fabrication-audit-fabricationaudit) sweep injects nothing — it
+grades the pristine seeds — but its pinned shapes are seed-dependent the same way).
+Whitespace
 you delete is a site they can no longer probe, so a pinned bug whose only reproducer
 lived in that spelling stops firing and its ratchet fails **STALE**. The fix is to
 restore the shape, never to re-pin: a `known.txt` line is a real bug on a work list,
 and dropping it retires a bug nobody fixed. Find what was lost by running the audit
-with `--report` against an unmodified checkout — that also answers "did I cause this
+with `--report` (gaps/blanks/ignore; fabrication reports via `--json`) against an
+unmodified checkout — that also answers "did I cause this
 or inherit it?" — and re-home the shape in a variant whose name describes it. A shape
 that is *bidirectional* (a space before a bracket, the identifier glued after) fits
 neither bare `_compact` nor `_spaces` and needs its own qualified variant. After any
@@ -67,7 +70,7 @@ whitespace edit across many fixtures, run all four.
 # content loss). Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files
 # to audit real code. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug --features audits swallow_audit                # audit all fixtures
-cargo run --profile corpus -p tsv_debug --features audits swallow_audit ~/dev/zzz/src  # audit a real codebase
+cargo run --profile corpus -p tsv_debug --features audits swallow_audit ../zzz/src  # audit a real codebase
 # Also: --json. The check lives in tsv_lang::doc::swallow behind the `swallow_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND
 # default tsv_debug builds (profile/perf sessions measure production-shaped render
@@ -117,7 +120,7 @@ The print-once comment ledger: every comment a document PARSES must be EMITTED e
 # DOUBLE-PRINTED. Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to
 # audit real code. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug --features audits comment_audit                # audit all fixtures
-cargo run --profile corpus -p tsv_debug --features audits comment_audit ~/dev/zzz/src  # audit a real codebase
+cargo run --profile corpus -p tsv_debug --features audits comment_audit ../zzz/src  # audit a real codebase
 # Also: --json. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
 # tsv_debug builds (profile/perf sessions measure production-shaped code). The
@@ -145,7 +148,7 @@ Full reference — flags, the ratchet, reading a finding, triage + re-pin workfl
 # AUTHORED, so a gap no fixture puts a comment in is one it never checks (eight such
 # drops were found BY HAND, all green on every gate). Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits gap_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits gap_audit ../zzz/src
 # Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update.
 # Build with `--profile corpus` (optimized + panic=unwind): plain `--release` is
 # panic=abort, so a formatter panic kills the process instead of being caught + reported.
@@ -178,7 +181,7 @@ Full reference — flags, the ratchet, the absorb pin, reading a finding, the si
 # 1-4 are the shared `f1_check` (also driving `fuzz`); 5 is the print-once ledger;
 # 6 is a region-scoped output scan. Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits blank_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits blank_audit ../zzz/src
 # Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile
 # corpus` (optimized + panic=unwind) so a formatter panic is caught + reported.
 #
@@ -224,7 +227,7 @@ Why it needs its own gate. A fabricated blank is indistinguishable from an autho
 # holds that the input did not, minus two structurally sanctioned layout rules.
 # Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to audit real code.
 cargo run --profile corpus -p tsv_debug --features audits fabrication_audit
-cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../zzz/src
 # Also: --json, --update. ~0.2 s over tests/fixtures.
 #
 # GATED as a RATCHET over `fabrication_audit_known.txt`, keyed by the SHAPE of the two
@@ -263,7 +266,7 @@ Why it needs its own gate: every other comment instrument reads a channel the pa
 # MISSING = dropped comment; EXTRA = duplicated/fabricated one; a merge or interior
 # rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
 cargo run --profile corpus -p tsv_debug --features audits census_audit                # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits census_audit ~/dev/zzz/src  # a real codebase
+cargo run --profile corpus -p tsv_debug --features audits census_audit ../zzz/src  # a real codebase
 # Also: --json, --update. ~0.35 s over tests/fixtures.
 #
 # GATED as a RATCHET over `census_audit_known.txt`, keyed (path, bucket, direction) —
@@ -309,7 +312,7 @@ Two real bugs (the mid-run comment weld and its leading twin) shipped an over-wi
 # width_audit - format each seed and report every output line over PRINT_WIDTH,
 # rolled up by shape. Pure Rust, no Deno, no instrumentation feature.
 cargo run --profile corpus -p tsv_debug --features audits width_audit
-cargo run --profile corpus -p tsv_debug --features audits width_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits width_audit ../zzz/src
 # Also: --json, --verbose (every line, not the per-shape rollup), --limit N, --update.
 # A narrowed run (explicit paths / --limit) reports and exits 0 without grading — the
 # snapshot pins the full default run — and says so, so it cannot read as a green gate.
@@ -328,7 +331,7 @@ cargo run --profile corpus -p tsv_debug --features audits width_audit ~/dev/zzz/
 
 **A third component, `inner`, keeps a weld out of the fattest shapes.** The two ends put a whole comment and two comments *welded onto one line* in the same bucket: `<!-- a -->` and `<!-- a --><!-- b -->` both open `<!--` and end `-->`. That matters because the fattest shape is exactly that one — measured over `tests/fixtures`, `<!--…-->` carries 218 of the 480 over-width lines (45%, across 134 files), and **every one of them is a single whole comment**. So its members are all *forced* overruns (tsv never rewraps a comment interior), and a weld is the only bug the silhouette could ever hide — the same class the trailing-run comment emitters have produced before, and one the ledger, census, F1 and round-trip are all blind to. `inner` records whether a `-->` or `*/` closes before the line does (`-` when none), rendered spliced (`head…-->…tail`). It costs **one** shape over `tests/fixtures` (32 → 33): the three `IDENT…WORD` lines that were mid-line comment glue split off from the 43 ordinary ones, and `<!--…WORD` becomes `<!--…-->…WORD` outright. Neither marker can occur inside the comment it closes, so a whole comment never reads as a weld.
 
-⚠️ **What a non-`-` `inner` means over real code is NOT what it means over `tests/fixtures`, and the difference was mis-stated here before it was triaged.** Over `tests/fixtures` there are **zero** interior closers at all. Over real code (`../svelte/packages/svelte/src` + `~/dev/zzz/src`: 1,255 overruns, 91 shapes) they mint 13 shapes / 24 lines, and reading every one of those lines splits them two ways:
+⚠️ **What a non-`-` `inner` means over real code is NOT what it means over `tests/fixtures`, and the difference was mis-stated here before it was triaged.** Over `tests/fixtures` there are **zero** interior closers at all. Over real code (`../svelte/packages/svelte/src` + `../zzz/src`: 1,255 overruns, 91 shapes) they mint 13 shapes / 24 lines, and reading every one of those lines splits them two ways:
 
 - **9 shapes / 13 lines are minted by a genuine interior comment that is not a weld** — overwhelmingly the JSDoc cast (`… /** @type {T} */ (expr) …`), which really does close a block comment mid-line. `inner` is reporting the truth; it just isn't reporting a bug.
 - **4 shapes / 11 lines are the mirror false positive** — a `-->` or `*/` inside a *string*, *template*, *regex*, or the text of a `//` comment, read as interior with no comment involved. Only one of the four is the template-literal case (Svelte's migrator building `<!-- @migration-task … -->` text); string literals, regex literals and comment text produce it too.
@@ -374,7 +377,7 @@ The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` pos
 # would grade that decided wider freeze as a finding. Honoring stays per-candidate.
 # A cheaper per-injection battery (<= 4 formats) than blank_audit's F1. Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits ignore_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits ignore_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits ignore_audit ../zzz/src
 # Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile corpus`
 # (optimized + panic=unwind) so a formatter panic is caught + reported.
 #
@@ -732,9 +735,9 @@ expectations that oracle produces are still fresh.
 # The element expansion a mutation may trigger is the property under test. Svelte only.
 # Gated in `deno task check` via the `authoring:audit` task — which scans tests/fixtures
 # ONLY, so point it at a real codebase too: findings live there (a non-idempotent fill
-# 2-cycle was green on fixtures while failing on ~/dev/zzz).
+# 2-cycle was green on fixtures while failing on ../zzz).
 cargo run -p tsv_debug authoring_audit                  # audit tests/fixtures (pure Rust)
-cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
+cargo run -p tsv_debug authoring_audit ../zzz/src    # audit a real codebase
 # Pure-Rust verdict per site: converge / diverge (dual-stable) / diverge
 # (NON-IDEMPOTENT); exits 1 on any non-idempotency — site-level, and also a
 # base-non-idempotent FILE (one whose own format isn't a fixed point). Such a file
@@ -748,7 +751,7 @@ cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
 # diverge (sanctioned, e.g. Tier-2 element expansion). --dump-dir writes byte-exact
 # repro artifacts per hard finding — the basis for a fixtures-first fix.
 # Also: --json, --verbose, --limit N (sites/file), --examples N.
-cargo run -p tsv_debug authoring_audit ~/dev/zzz/src --prettier --dump-dir /tmp/audit
+cargo run -p tsv_debug authoring_audit ../zzz/src --prettier --dump-dir /tmp/audit
 ```
 
 ## Print-Width Razor Sweep (`razor:audit`)
@@ -759,7 +762,7 @@ cargo run -p tsv_debug authoring_audit ~/dev/zzz/src --prettier --dump-dir /tmp/
 # seeds only. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug razor_audit                 # sweep all fixtures
 cargo run --profile corpus -p tsv_debug razor_audit --width 8       # cheaper/narrower sweep
-cargo run --profile corpus -p tsv_debug razor_audit ~/dev/zzz/src   # sweep a real codebase
+cargo run --profile corpus -p tsv_debug razor_audit ../zzz/src   # sweep a real codebase
 # Also: --json, --limit N.
 ```
 
@@ -926,7 +929,7 @@ cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 # the very whitespace that carries the meaning, and authoring_audit asks the
 # CONVERGENCE question (do two authorings reach one fixed point), never whether that
 # fixed point renders like the input.
-cargo run --profile corpus -p tsv_debug --quiet render_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --quiet render_audit ../zzz/src
 deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
 # Also: --gate (exit 1 on findings), --json, --limit N (0 = unlimited, as in every
 # other audit). Needs the Deno sidecar, so
@@ -1012,7 +1015,7 @@ cargo run -p tsv_debug neutrality_audit ../svelte/packages/svelte/src
 # unmutated file on disk), so it is listed rather than dumped. HARD verdicts fail.
 cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
 cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --evolve --minimize --dump-dir /tmp/fz  # discovery
-cargo run -p tsv_debug fuzz --iterations 0 ~/dev/zzz/src       # pristine pass only = an F1 sweep
+cargo run -p tsv_debug fuzz --iterations 0 ../zzz/src       # pristine pass only = an F1 sweep
 # HARD findings (exit 1): panic / unreparseable / non_idempotent / format_error —
 # always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
 # render-model-noisy bucket that needs canonical confirmation (roundtrip_audit
@@ -1060,8 +1063,8 @@ deno task audit:corpus
 # (.ts/.mts/.cts/.js/.mjs/.cjs, .svelte.ts and .d.ts included — the whole family
 # dispatches to one lexer) plus .css.
 # Pure Rust, no Deno.
-cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden --write  # capture golden
-cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          # check against it
+cargo run -p tsv_debug lex_diff ../zzz/src --golden /tmp/lex.golden --write  # capture golden
+cargo run -p tsv_debug lex_diff ../zzz/src --golden /tmp/lex.golden          # check against it
 # Options: --write (capture instead of check), --verbose (first divergent line per file)
 ```
 
@@ -1236,10 +1239,11 @@ cargo run -p tsv_debug conformance_audit
 # direction GATES — that is the claim being false where a reader is misled. The reverse (a
 # producible key with no bullet) is REPORT-ONLY: a variant covered by a prose paragraph rather than
 # its own bullet is fine, so gating it would be born red and would push the doc toward a mechanical
-# key dump. ⚠️ `Refusal::every_variant` (the oracle behind that check) is hand-maintained and NOT
-# compiler-enforced — a new variant compiles fine while missing from it, silently narrowing the
-# oracle; a pinned-count unit test is the only backstop. Pure Rust (no Deno). Exits non-zero on any
-# finding. Gated in `deno task check`.
+# key dump. `Refusal::every_variant` (the oracle behind that check) is hand-maintained rather than
+# compiler-enforced, but drift is loud: a unit test scans the enum's source for the declared variant
+# names and asserts each is present (`refusal_buckets.rs`), and `all_bucket_keys_covers_the_catalog`
+# pins the produced key set — a missing variant is two named `cargo test` failures, not silence.
+# Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.
 cargo run -p tsv_debug compile_conformance_audit
 # Also: --json
 ```
@@ -1257,7 +1261,7 @@ cargo run -p tsv_debug compile_conformance_audit
 # tests/fixtures_compile (fast); point it at real corpora for the full sweep.
 cargo run -p tsv_debug canonicalize_audit                              # default scope (tests/fixtures only)
 cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile  # the check-gate scope
-cargo run -p tsv_debug canonicalize_audit ~/dev/zzz/src ~/dev/gro/src  # real-corpus sweep
+cargo run -p tsv_debug canonicalize_audit ../zzz/src ../gro/src  # real-corpus sweep
 # Also: --json
 ```
 

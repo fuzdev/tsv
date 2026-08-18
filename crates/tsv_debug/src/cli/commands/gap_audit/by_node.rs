@@ -271,9 +271,9 @@ fn tenths_pct(n: usize, d: usize) -> String {
     format!("{}.{}", permille / 10, permille % 10)
 }
 
-/// Print the top-`top` by-(node, edge) clusters as a **paste-ready markdown table** for
-/// TODO_GAPS §Status — the ranked emitter work-list Phase 1 reads fattest-first, so a session can
-/// refresh §Status by pasting instead of parsing `--json` and hand-transcribing. Report-only:
+/// Print the top-`top` by-(node, edge) clusters as a **paste-ready markdown table** — the
+/// ranked emitter work-list, fattest-first, so a burn-down effort can refresh its tracking
+/// table by pasting instead of parsing `--json` and hand-transcribing. Report-only:
 /// computed after grading, it feeds neither the gate nor the exit code. Under `--json` it prints to
 /// stderr, leaving the JSON document on stdout the sole parseable output.
 pub(super) fn report_rank(rollup: &ByNodeRollup, top: usize, json: bool) {

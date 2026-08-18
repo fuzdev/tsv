@@ -35,8 +35,6 @@ import { SwcImplementation } from './swc.ts';
 import type { AlternativeVersionInfo } from './report.ts';
 import { type AllVersions, load_all_versions } from './versions.ts';
 
-export type { TsvImplementation };
-
 /**
  * One optional implementation that failed to initialize on this machine — an
  * uninstalled package, a missing platform binding, a runtime that can't load a
