@@ -1103,9 +1103,14 @@ impl<'a> Printer<'a> {
     /// ")"])` and let the leading run's own soft `line` decide. Reach for a gate only
     /// where the layout genuinely cannot express both forms.
     pub(crate) fn comment_hangs_binary_operand(&self, start: u32, end: u32) -> bool {
-        self.any_comment_on_page_with_next(start, end, |c, next| {
-            !c.is_block
-                || (self.has_newline_between(c.span.end, next) && self.is_own_line_comment(c))
+        // The glue half asks the comment's own neighbours ([`Self::comment_hugs_next`]),
+        // never the distance to `next` — for the last comment that is the operand's span
+        // start, which sits inside any grouping paren the author wrote, so a break they
+        // put after the `(` read as a break after the comment
+        // ([`Self::comment_hangs_value_after_operator`] carries the family-wide note). It
+        // subsumes the `!c.is_block` arm too: a line comment never hugs what follows.
+        self.any_comment_on_page(start, end, |c| {
+            !self.comment_hugs_next(c) && self.is_own_line_comment(c)
         })
     }
 
@@ -1122,8 +1127,51 @@ impl<'a> Printer<'a> {
     /// **on page**: an owned member of the run (`/* x⏎y */` glued to the value) is
     /// part of the glue geometry even though the gap emits nothing for it.
     pub(crate) fn comment_run_glued_through(&self, start: u32, end: u32) -> bool {
-        !self.any_comment_on_page_with_next(start, end, |c, next| {
-            self.has_newline_between(c.span.end, next)
+        // Per comment, against its OWN neighbours ([`Self::comment_hugs_next`]) rather
+        // than against a boundary: measuring the last comment's glue by the distance to
+        // `end` reads whatever the printer erases or the value's shell contributes. A
+        // grouping paren between the run and the value (`= /* c */ (⏎v)`) put the
+        // author's break INSIDE the shell and reported the run as not-glued, which hung a
+        // value prettier keeps on the operator's line — and, once the sibling gate
+        // stopped agreeing with it, made the pair non-idempotent.
+        !self.any_comment_on_page(start, end, |c| !self.comment_hugs_next(c))
+    }
+
+    /// Whether a comment in the **operator→value** gap hangs the value under the
+    /// operator — the one rule, for the one family that asks it.
+    ///
+    /// Two conjuncts, and neither is sufficient alone:
+    ///
+    /// - the comment does not glue to what follows it ([`Self::comment_hugs_next`],
+    ///   prettier's `hasNewline(text, locEnd(comment))`), **and**
+    /// - it is a kind that cannot glue to the operator behind it either
+    ///   ([`Self::comment_cannot_glue_to_operator`] — a line comment, a multiline block,
+    ///   or an own-line block).
+    ///
+    /// Dropping the first hangs the head of a run whose glue chain reaches the value
+    /// (`= /* c */ /* x⏎y */ v` and `=⏎/* c */ /* x⏎y */ v` both collapse inline in both
+    /// formatters). Dropping the second hangs a single-line block the author merely broke
+    /// after (`= /* c */⏎v`), which prettier keeps on the operator's line.
+    ///
+    /// ⚠️ **The glue half asks each comment's own NEIGHBOURS, never a boundary.** Every
+    /// site that spelled it as a distance to the value's span start was blind to a
+    /// grouping paren standing between them: the author's break sits INSIDE the shell
+    /// (`= /* c */ (⏎v)`), the printer does not reproduce it, and the gate read it as a
+    /// break after the comment and hung a value prettier hugs. Six sites shared that one
+    /// defect, which is why the question is stated here once rather than at each of them;
+    /// the enumeration and the fixtures live in `docs/comments.md` §Own-line-ness is a
+    /// SOURCE question, so this doc does not keep a second copy of the list to drift.
+    ///
+    /// The **operator→value** rule. Contrast [`Self::comments_force_own_line_between`],
+    /// the keyword→value rule, which collapses an authored own-line single-line block
+    /// where this one preserves it — each is right for its family, and prettier agrees
+    /// with both.
+    ///
+    /// The **on-page** axis: an owned comment glued to the value is printed by the
+    /// value's own doc, but it still occupies the page and still decides this layout.
+    pub(crate) fn comment_hangs_value_after_operator(&self, start: u32, end: u32) -> bool {
+        self.any_comment_on_page(start, end, |c| {
+            !self.comment_hugs_next(c) && self.comment_cannot_glue_to_operator(c)
         })
     }
 
@@ -1143,6 +1191,29 @@ impl<'a> Printer<'a> {
         self.any_comment_on_page_with_next(start, end, |c, next| {
             self.has_blank_line_between_strict(c.span.end, next)
         })
+    }
+
+    /// Scan the comments in `(start, end)`, returning true if `pred(comment)` holds for
+    /// any — the anchor-free sibling of [`Self::any_comment_on_page_with_next`], for a
+    /// gate whose per-comment rule asks only the comment's own neighbours.
+    ///
+    /// ⚠️ **Prefer this whenever the rule does not need the anchor.** The anchor is the
+    /// distance to the NEXT comment or to `end`, and for the last comment `end` is the
+    /// value's span start — which sits inside any grouping paren the author wrote. Every
+    /// glue question spelled against it was blind to that shell
+    /// ([`Self::comment_hangs_value_after_operator`] carries the account), so a gate that
+    /// binds `next` only to ignore it is inviting the next author to re-derive glue from
+    /// the wrong thing.
+    ///
+    /// **on page**, like its sibling: an owned comment is printed by its node's doc but
+    /// still occupies the page, so a layout gate must count it.
+    fn any_comment_on_page(
+        &self,
+        start: u32,
+        end: u32,
+        pred: impl Fn(&internal::Comment) -> bool,
+    ) -> bool {
+        tsv_lang::comments_in_source_range(self.comments, start, end).any(pred)
     }
 
     /// Scan the comments in `(start, end)` with one-ahead lookahead, returning true

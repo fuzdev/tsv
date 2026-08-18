@@ -1286,7 +1286,7 @@ impl<'a> Printer<'a> {
                 // then collapses. The helper cannot drift that way: it decides the layout
                 // from the comment's authored position and emits the matching shape.
                 if let Some(rhs) =
-                    self.build_eq_comment_break_rhs(eq_pos, init_start, || init_with_indent)
+                    self.build_eq_comment_break_rhs(eq_pos, init_start, " =", || init_with_indent)
                 {
                     d.concat(&[id_doc, rhs])
                 } else if self.is_own_line_jsdoc_cast(init) {

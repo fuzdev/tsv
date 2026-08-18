@@ -393,7 +393,16 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// hunk `comment_position` matched is FIXED, and its residue is one cataloged divergence
 	// no detector recognizes. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other
 	// way in the same step.
-	typescript: 32,
+	//
+	// 32 → 31: `js/assignment-comments/call.js` leaves for **match** — a fix, not a
+	// reclassification, so nothing arrives anywhere. The assignment expression was the lone
+	// dissenter among its own siblings at the operator→value gap: a line comment the author
+	// glued to the operator (`a = // c⏎expr`) hung on its own line where the declarator and
+	// the class field both trail it, and prettier trails at all three. Routing the
+	// assignment's line arm through the shared `build_eq_comment_break_rhs` partition made
+	// the family uniform. `CORPUS_FORMAT_UNKNOWN_PIN` does not move: this file left `partial`
+	// by matching outright.
+	typescript: 31,
 	css: 9
 };
 

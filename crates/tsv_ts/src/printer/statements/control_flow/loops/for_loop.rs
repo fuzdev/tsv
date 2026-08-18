@@ -1863,9 +1863,12 @@ impl<'a> Printer<'a> {
                             // non-idempotent). A single-line block glued inline to `=` still
                             // hugs the value across a source newline (`i = /* c */⏎0` →
                             // `i = /* c */ 0`) and keeps the header flat.
-                            if let Some(rhs) =
-                                self.build_eq_comment_break_rhs(eq_pos, init_start, build_value)
-                            {
+                            if let Some(rhs) = self.build_eq_comment_break_rhs(
+                                eq_pos,
+                                init_start,
+                                " =",
+                                build_value,
+                            ) {
                                 one.push(rhs);
                             } else if self.owned_leading_comment_effect(init)
                                 == Some(OwnedCommentEffect::Hangs)

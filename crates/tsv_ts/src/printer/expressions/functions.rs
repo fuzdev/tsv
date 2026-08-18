@@ -1733,23 +1733,24 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Check if any comment between `=>` and body is on its own line.
+    /// Whether a comment between `=>` and the body forces the body onto its own line —
+    /// the arrow's name for [`Printer::comment_hangs_value_after_operator`], which states
+    /// the rule and the reasoning for both of its conjuncts.
     ///
-    /// Matches Prettier's `hasLeadingOwnLineComment` which checks `hasNewline(text, locEnd(comment))`
-    /// — whether there's a newline after each comment. Inline block comments like
-    /// `=> /* c */ expr` have no newline after them (returns false). Own-line comments
-    /// and line comments have a newline after (returns true).
+    /// A named delegate rather than three inlined calls: the three readers here ask *the
+    /// arrow's* question, and the name is what makes them legible next to the arrow's own
+    /// geometry half ([`Self::arrow_gap_broke_after_run`]).
+    ///
+    /// ⚠️ **The `=>` gap is why the shared predicate has its glue conjunct at all.** The
+    /// arrow once asked `comment_cannot_glue_to_operator` alone, whose bare `multiline`
+    /// fires whether or not the author broke, so a multiline block the author GLUED to
+    /// the body (`=> /* line1⏎line2 */ ({ b: 1 })`) read as own-line and dropped the body
+    /// below `=>` — tsv moving a comment the author glued, which its own position doctrine
+    /// forbids, and alone among the sibling value seams. The rule is body-kind independent
+    /// here by construction: a body that does not hug opens below `=>` through the layout,
+    /// comment or no comment, so this only ever decides a body that *could* have hugged.
     pub(crate) fn has_own_line_post_arrow_comment(&self, sig_end: u32, body_start: u32) -> bool {
-        for comment in comments_to_emit_in_range(self.comments, sig_end, body_start) {
-            // A line comment, a multiline block, or a block that starts on its own
-            // line (a newline precedes it) forces the body onto its own line. A
-            // single-line block glued to `=>` keeps the body hugged even when the
-            // body follows on the next source line (`=> /* c */⏎expr` → `=> /* c */ expr`).
-            if self.comment_cannot_glue_to_operator(comment) {
-                return true;
-            }
-        }
-        false
+        self.comment_hangs_value_after_operator(sig_end, body_start)
     }
 
     /// The hug arm's half of "does the `=>`→body gap break": `Some(run)` when a block run

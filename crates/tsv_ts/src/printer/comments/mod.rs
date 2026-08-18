@@ -1912,10 +1912,15 @@ impl<'a> Printer<'a> {
                 | LeadingGlue::AdjacentValueGap
                 | LeadingGlue::AdjacentAnchorLine => self.comment_hugs_next(comment),
                 // A glued (not own-line) single-line block hugs across a source
-                // newline; the same-line-as-next case still hugs as in `Adjacent`.
+                // newline; the hugs-what-follows case still hugs as in `Adjacent`.
+                // ⚠️ That first half asks the comment's own neighbours, never the
+                // distance to `next`: for the LAST comment `next` is the value's span
+                // start, which sits INSIDE any grouping paren the author wrote, so a
+                // break they put after the `(` read as a break after the comment and
+                // un-glued a run prettier keeps glued (`= /* c */ (⏎v)`).
                 LeadingGlue::AdjacentGlued => {
                     comment.is_block
-                        && (self.is_same_line(comment.span.end, next)
+                        && (self.comment_hugs_next(comment)
                             || !self.comment_cannot_glue_to_operator(comment))
                 }
                 // `Adjacent`, plus the stripped grouping paren the author glued the
@@ -2199,7 +2204,23 @@ impl<'a> Printer<'a> {
     /// the emitted run's tail reads as broken-after when the author glued the whole
     /// run, and the owned multiline block's own newlines answer `will_break` for a
     /// value prettier keeps flat (its `fits` stops at the first newline in comment
-    /// text). Any owned comment between the run and the value therefore declines.
+    /// text). Any owned comment between the run and the value therefore declines —
+    /// via the blank scan's in-source ceiling, which stops at the owned comment, not
+    /// via the glue test below.
+    ///
+    /// ⚠️ **The glue test asks the comment's own NEIGHBOURS, never the distance to the
+    /// value** ([`Self::comment_hugs_next`], prettier's `hasNewline(text,
+    /// locEnd(comment))` — spaces and tabs skipped, nothing else). The distance
+    /// reading (`is_same_line(last.end, value_start)`) is blind to anything the printer
+    /// erases or the value's own shell contributes: a **paren** standing between the run
+    /// and the value took the author's break INSIDE those parens (`= /* c */ (⏎v)`) and
+    /// reported it as a break after the comment, so the seam broke a value prettier
+    /// hugs. It reached three seams off this one predicate — the arrow `=>`, the
+    /// declarator/assignment `=`, and `await` — because the paren need not even be
+    /// stripped: an object arrow body keeps its required parens and the inner node's
+    /// span still starts past the `(`
+    /// (`docs/comments.md`, and the standing rule that a bound derived from a node span
+    /// is not the printed edge).
     pub(crate) fn broke_after_value_leading_run(
         &self,
         gap_start: u32,
@@ -2210,7 +2231,7 @@ impl<'a> Printer<'a> {
         let last = comments.last()?;
         if !comments.iter().all(|c| c.is_block)
             || self.blank_scan_end(last.span.end, value_start) != value_start
-            || self.is_same_line(last.span.end, value_start)
+            || self.comment_hugs_next(last)
         {
             return None;
         }
@@ -2322,12 +2343,14 @@ impl<'a> Printer<'a> {
     /// (`eq_pos + 1 .. value_start`) holds a comment that forces break handling,
     /// or `None` when the caller should emit its normal inline `= value` form (no
     /// comment, or a single inline block that glues to the value). The returned doc
-    /// begins at `" ="`; the caller emits the LHS (name/pattern) before it.
+    /// begins at `operator` (`" ="`, or an assignment expression's `" +="` and
+    /// friends); the caller emits the LHS (name/pattern) before it.
     /// `build_value` is called only when a break is forced, so a comment-free
     /// initializer never pays to build the value doc here.
     ///
-    /// Shared by variable declarators, for-loop init clauses, and enum members so all
-    /// three place a comment after `=` identically. That sharing is the point: the enum
+    /// Shared by variable declarators, for-loop init clauses, enum members, and the
+    /// assignment expression's line-comment arm so they all place a comment after the
+    /// operator identically. That sharing is the point: the enum
     /// member emitted its own positional run instead, and drifted twice over — it
     /// preserved a break the others reflow, and relocated an own-line comment onto the
     /// `=` line, which is not idempotent (the moved comment reads as glued next pass).
@@ -2350,6 +2373,7 @@ impl<'a> Printer<'a> {
         &self,
         eq_pos: u32,
         value_start: u32,
+        operator: &'static str,
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
         let d = self.d();
@@ -2377,35 +2401,21 @@ impl<'a> Printer<'a> {
                 }
             }
             Some(d.concat(&[
-                d.text(" ="),
+                d.text(operator),
                 d.concat(&trailing),
                 d.indent_hardline(d.concat(&[d.concat(&leading), build_value()])),
             ]))
-        } else if self.any_comment_on_page_with_next(eq_pos + 1, value_start, |c, next| {
-            // A block the author broke AFTER (a newline toward the next comment, or
-            // the value for the last) — provided it is multiline (the authored-break
-            // rule, conformance_prettier_ts_comments.md §Pre-separator multiline
-            // block) or own-line (`=⏎/* c */⏎v`, prettier's
-            // `hasLeadingOwnLineComment`, which keys on that same trailing newline).
-            // A comment whose glue chain reaches the value hangs nothing, wherever
-            // its own line starts and however many lines its interior spans:
-            // `= /* c */ /* x⏎y */ v` and `=⏎/* c */ /* x⏎y */ v` both collapse
-            // inline, the way prettier keeps them. The bare per-comment `c.multiline`
-            // reading ([`Self::comment_cannot_glue_to_operator`]) hung the run's
-            // head; that spelling stays right only at the arrow-body and unary
-            // sites, where prettier genuinely hangs on any multiline block in the
-            // gap. A glued single-line block trailing the `=` (`= /* c */⏎v`) stays
-            // with the `=` (the `None` arm), not hanging — so the newline test alone
-            // is not the rule either.
-            self.has_newline_between(c.span.end, next)
-                && (c.multiline || self.is_own_line_comment(c))
-        }) {
+        } else if self.comment_hangs_value_after_operator(eq_pos + 1, value_start) {
+            // The operator→value rule — both conjuncts, and the reasoning for each,
+            // live on [`Self::comment_hangs_value_after_operator`]. A glued single-line
+            // block trailing the `=` (`= /* c */⏎v`) stays with the `=` (the `None`
+            // arm below), and a run whose glue chain reaches the value hangs nothing.
             // Own-line / multiline block → break-after-operator hang.
             let comments_doc = self
                 .build_rhs_comments_opt(eq_pos + 1, value_start)
                 .unwrap_or_else(|| d.empty());
             Some(d.concat(&[
-                d.text(" ="),
+                d.text(operator),
                 layout::hang_after_operator(d, d.concat(&[comments_doc, build_value()])),
             ]))
         } else {

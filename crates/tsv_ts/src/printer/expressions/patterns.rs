@@ -268,6 +268,37 @@ impl<'a> Printer<'a> {
             // NOT take this rule — prettier relocates there and tsv preserves the
             // authored position (conformance_prettier_ts_comments.md §Comment
             // normalization, the `value_block_comment_break` family).
+            // A LINE comment in the gap: route to the shared `=`→value partition rather
+            // than letting `RhsCommentInfo::has_line_comment` hang the whole run under
+            // the operator. That hang made the assignment expression the lone dissenter
+            // among its own siblings — the declarator and the class field both trail a
+            // comment the author glued to the operator (`a = // c⏎expr`), and prettier
+            // trails at all three — so it was tsv disagreeing with itself, not a
+            // divergence tsv had chosen. Only the line arm routes here: the block arms
+            // already agree with prettier through the assignment layout below
+            // (`operator_value_glued_multiline_block_comment`).
+            if rhs_frozen.is_none()
+                && let Some(op_pos) = op_pos
+                && self.has_line_comments_between(effective_rhs_start, rhs_comment_end)
+                // The partition anchors on the operator's LAST character, since that is
+                // the line a comment shares to count as trailing the operator — one char
+                // back from its end, and not the same thing for a compound operator
+                // (`+=`) as for `=`.
+                && let Some(rhs) = self.build_eq_comment_break_rhs(
+                    op_pos + assign.operator.as_str().len() as u32 - 1,
+                    rhs_comment_end,
+                    assign.operator.as_str_with_leading_space(),
+                    || {
+                        self.build_expression_doc_with_paren_comments(
+                            assign.right,
+                            assign.span.end,
+                            false,
+                        )
+                    },
+                )
+            {
+                return d.concat(&[left_doc, rhs]);
+            }
             if rhs_frozen.is_none()
                 && rhs_comments.is_some()
                 && let Some(rhs_doc) =
@@ -300,6 +331,13 @@ impl<'a> Printer<'a> {
             );
         }
 
+        // TODO: the line-comment partition above stops at the 2-segment chain. A 3+
+        // segment chain's innermost `=` (`a = b = c = // c1⏎expr`) still hangs the comment
+        // on its own line where the shallower spellings — and prettier — trail it. The
+        // predicate is not what differs: this tail's layout is owned by `build_chain_doc`,
+        // which decides the breaks and indents across every segment, so routing the
+        // partition here is a layout change rather than the gap fix, and no corpus file
+        // reaches the shape. Take it with the chain layout, not as a patch.
         // Build right doc for paths that handle layout directly
         let right_doc = if let Some(frozen) = rhs_frozen {
             self.build_frozen_expression_doc(assign.right, frozen)
