@@ -369,7 +369,15 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// ⚠️ That same measurement puts the reproducible-subset `match` at 2394 BEFORE this
 	// change, well above `CORPUS_FORMAT_MATCH_MIN`'s 2335 — a pre-existing slack in that
 	// floor, unrelated to this entry and deliberately not folded into it.
-	typescript: 104,
+	//
+	// 104 → 103: `js/function/issue-12967.js` leaves for **match** — a fix, not a
+	// reclassification. A JSDoc-annotated arrow as an IIFE callee had its leading run
+	// hoisted out of the pair the callee is required to carry; the run now stays inside
+	// it, which is prettier's own answer at that position. Measured by diffing the
+	// `unknown` lists against a reverse-patched build over the whole corpus: this file
+	// and `js/function/iife.js` (see `CORPUS_FORMAT_PARTIAL_PIN`) are the only moves in
+	// any bucket, and `safety` / `errors` / `expected_errors` are byte-identical.
+	typescript: 103,
 	css: 23
 };
 
@@ -402,7 +410,16 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// assignment's line arm through the shared `build_eq_comment_break_rhs` partition made
 	// the family uniform. `CORPUS_FORMAT_UNKNOWN_PIN` does not move: this file left `partial`
 	// by matching outright.
-	typescript: 31,
+	//
+	// 31 → 32: `js/function/iife.js` arrives from `known` — prettier's own IIFE-comment
+	// test file, and a reclassification rather than a loss. The same fix that moved
+	// `issue-12967.js` to `match` (see `CORPUS_FORMAT_UNKNOWN_PIN`) re-cuts this file's
+	// hunks: the leading and trailing runs now stay inside the callee's pair, which
+	// leaves two long-standing behaviours in hunks of their own instead of folded into
+	// neighbouring `comment_position` ones — the UNHONORED `prettier-ignore` at a callee
+	// (pinned in `ignore_audit_known.txt`) and the own-line block prettier pulls up to
+	// the `(` line. 16 of the file's 17 hunks are still explained.
+	typescript: 32,
 	css: 9
 };
 

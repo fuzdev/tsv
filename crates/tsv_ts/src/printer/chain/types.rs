@@ -46,6 +46,16 @@ pub enum ChainNode<'a> {
     Base {
         expr: &'a internal::Expression<'a>,
         needs_parens: bool,
+        /// Where the pair this base prints OPENS, when the base owns its own
+        /// leading gap — the `(`→base run is this node's to emit rather than the
+        /// enclosing chain's (`prepend_removed_paren_comments`, which would hoist it
+        /// out in front of a pair that survives). `Some` only where the pair is
+        /// REQUIRED *and* prettier keeps the run inside it: a sealed optional chain
+        /// (`( // c⏎a?.b)!.ccc`) and a function/arrow IIFE callee
+        /// (`( // c⏎() => {})().p`). Every other required pair here — a cast, a
+        /// sequence, a ternary, an instantiation — hoists the run in both formatters
+        /// and stays `None`.
+        paren_leading_start: Option<u32>,
         paren_comment_end: Option<u32>,
         /// A non-null `!` applies to this base before the chain continues, so the base
         /// expression's immediate parent is that `!` and not the member access after it.
@@ -138,6 +148,21 @@ impl<'a> ChainNode<'a> {
         Self::Base {
             expr,
             needs_parens,
+            paren_leading_start: None,
+            paren_comment_end: None,
+            followed_by_non_null: false,
+        }
+    }
+
+    /// A base whose REQUIRED pair keeps its own leading run inside it — the sealed
+    /// optional chain reached without a `!` (`( // c⏎a?.b).ddd`,
+    /// `( // c⏎a?.b)()`). `paren_leading_start` is the `(`, i.e. the enclosing
+    /// member/call node's own start.
+    pub fn sealed_base(expr: &'a internal::Expression<'a>, paren_leading_start: u32) -> Self {
+        Self::Base {
+            expr,
+            needs_parens: true,
+            paren_leading_start: Some(paren_leading_start),
             paren_comment_end: None,
             followed_by_non_null: false,
         }
@@ -152,11 +177,13 @@ impl<'a> ChainNode<'a> {
     /// chain), in which case the printer renders bare parens.
     pub fn paren_base_before_non_null(
         expr: &'a internal::Expression<'a>,
+        paren_leading_start: u32,
         paren_comment_end: u32,
     ) -> Self {
         Self::Base {
             expr,
             needs_parens: true,
+            paren_leading_start: Some(paren_leading_start),
             paren_comment_end: Some(paren_comment_end),
             followed_by_non_null: true,
         }

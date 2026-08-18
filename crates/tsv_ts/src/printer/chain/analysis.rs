@@ -7,6 +7,7 @@
 
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, IdentName};
+use crate::printer::comments::paren_pair_keeps_leading_run;
 use crate::printer::{ParenContext, Printer, needs_parens};
 use tsv_lang::{Comment, TAB_WIDTH, has_line_comments_in_range};
 
@@ -177,6 +178,62 @@ fn child_stops_optional_chain(
     !parent_optional && parent_start < child.span().start && child.has_optional_in_chain()
 }
 
+/// The `(`→base gap a chain-forming node's own REQUIRED pair keeps INSIDE it —
+/// `[node.span.start, base.span().start)` — or `None` where the node prints no such
+/// pair, or prints one whose leading run is hoisted out in front (a cast, a
+/// sequence, a ternary, an instantiation: prettier hoists there and tsv matches).
+///
+/// **One spelling of the question, read by three consumers**, which is the point of
+/// its existing at all: the linearizer, which records it on the base node
+/// (`ChainNode::Base`'s `paren_leading_start`); the chain's head, whose
+/// `prepend_removed_paren_comments` must NOT claim a gap the base emits; and the
+/// assignment layout gate, which must know the chain breaks INTERNALLY at that run
+/// rather than leading the whole value with it. The three disagreeing is how the run
+/// gets dropped, doubled, or double-indented.
+pub fn chain_paren_leading_gap(expr: &Expression<'_>, comments: &[Comment]) -> Option<(u32, u32)> {
+    match expr {
+        Expression::MemberExpression(member) => member_object_paren_leading_start(member)
+            .map(|start| (start, member.object.span().start)),
+        Expression::CallExpression(call) => {
+            call_callee_paren_leading_start(call).map(|start| (start, call.callee.span().start))
+        }
+        Expression::TSNonNullExpression(non_null) => {
+            non_null_operand_paren_leading_start(non_null, comments)
+                .map(|start| (start, non_null.expression.span().start))
+        }
+        _ => None,
+    }
+}
+
+/// A member's object keeps the pair — and with it the leading run — when the object
+/// is a parenthesized optional chain this access seals (`( // c⏎a?.b).ddd`).
+fn member_object_paren_leading_start(member: &internal::MemberExpression<'_>) -> Option<u32> {
+    child_stops_optional_chain(member.span.start, member.optional, member.object)
+        .then_some(member.span.start)
+}
+
+/// A callee keeps the pair two ways: the sealed optional chain (`( // c⏎a?.b)()`),
+/// and the IIFE — a function or arrow, the one callee kind prettier prints the run
+/// inside the parens for ([`paren_pair_keeps_leading_run`]).
+fn call_callee_paren_leading_start(call: &internal::CallExpression<'_>) -> Option<u32> {
+    (child_stops_optional_chain(call.span.start, call.optional, call.callee)
+        || (call.span.start < call.callee.span().start
+            && paren_pair_keeps_leading_run(call.callee)))
+    .then_some(call.span.start)
+}
+
+/// The two authorings that keep a non-null's operand a parenthesized base: a sealed
+/// optional chain, and a shell RETAINED for a `//` in the operand→`!` gap — see the
+/// linearizer's arm, whose condition this is.
+fn non_null_operand_paren_leading_start(
+    non_null: &internal::TSNonNullExpression<'_>,
+    comments: &[Comment],
+) -> Option<u32> {
+    (non_null.seals_optional_chain()
+        || has_line_comments_in_range(comments, non_null.expression.span().end, non_null.span.end))
+    .then_some(non_null.span.start)
+}
+
 /// Push a sealed parenthesized-optional-chain object/callee as a base node.
 ///
 /// The whole sealed child becomes the parenthesized base, preserving the author's
@@ -189,8 +246,16 @@ fn child_stops_optional_chain(
 /// preserving the author's form keeps tsv's output AST-faithful to the input.
 /// The `!`-outside source (`(a?.b)!.c`) takes the `seals_optional_chain` arm in
 /// `linearize_recursive` instead (it never reaches here), so it stays as written too.
-fn push_sealed_chain_base<'a>(child: &'a Expression<'_>, nodes: &mut ChainNodeVec<'a>) {
-    nodes.push(ChainNode::base(child, true));
+///
+/// `parent_start` is the `(` this pair prints — the enclosing member/call node's own
+/// start — so the base carries its leading gap and emits it inside the parens
+/// ([`chain_paren_leading_gap`]).
+fn push_sealed_chain_base<'a>(
+    child: &'a Expression<'_>,
+    parent_start: u32,
+    nodes: &mut ChainNodeVec<'a>,
+) {
+    nodes.push(ChainNode::sealed_base(child, parent_start));
 }
 
 fn linearize_recursive<'a>(
@@ -237,11 +302,10 @@ fn linearize_recursive<'a>(
             //   whose emitter is block-only — the `//` would be dropped, with nothing
             //   left to parenthesize at print time.
             let inner = &non_null.expression;
-            if non_null.seals_optional_chain()
-                || has_line_comments_in_range(comments, inner.span().end, non_null.span.end)
-            {
+            if let Some(start) = non_null_operand_paren_leading_start(non_null, comments) {
                 nodes.push(ChainNode::paren_base_before_non_null(
                     inner,
+                    start,
                     non_null.span.end,
                 ));
                 nodes.push(ChainNode::non_null_after_paren_operand());
@@ -307,8 +371,8 @@ fn linearize_member_object<'a>(
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     let object: &Expression<'_> = member.object;
-    if child_stops_optional_chain(member.span.start, member.optional, object) {
-        push_sealed_chain_base(object, nodes);
+    if let Some(start) = member_object_paren_leading_start(member) {
+        push_sealed_chain_base(object, start, nodes);
     } else if matches!(object, Expression::TSInstantiationExpression(_)) {
         nodes.push(ChainNode::base(object, true));
     } else {
@@ -328,9 +392,22 @@ fn linearize_call_callee<'a>(
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     if child_stops_optional_chain(call.span.start, call.optional, call.callee) {
-        push_sealed_chain_base(call.callee, nodes);
-    } else {
-        linearize_recursive(call.callee, comments, nodes, paren_gaps);
+        push_sealed_chain_base(call.callee, call.span.start, nodes);
+        return;
+    }
+    linearize_recursive(call.callee, comments, nodes, paren_gaps);
+    // An IIFE callee reached through the chain (`( // c⏎() => {})().p`) owns its own
+    // leading gap, exactly as the bare-callee path does: the pair is required and
+    // prettier keeps the run inside it. A function or arrow is never itself a chain,
+    // so `linearize_recursive` pushed exactly one node for it and that node is the
+    // base this call's `(` belongs to.
+    if let Some(start) = call_callee_paren_leading_start(call)
+        && let Some(ChainNode::Base {
+            paren_leading_start,
+            ..
+        }) = nodes.last_mut()
+    {
+        *paren_leading_start = Some(start);
     }
 }
 
