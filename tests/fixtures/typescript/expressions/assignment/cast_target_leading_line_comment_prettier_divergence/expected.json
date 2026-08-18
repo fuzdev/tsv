@@ -1,0 +1,1324 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 651,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` glued to the target shell's `(` keeps that line; the shell expands.",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 101,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 3
+				},
+				"end": {
+					"line": 3,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line comment keeps its own line inside the shell; a compound",
+			"start": 126,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " operator takes the same rule.",
+			"start": 198,
+			"end": 230,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 236,
+			"end": 241,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The angle-bracket assertion target.",
+			"start": 269,
+			"end": 307,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 311,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 3
+				},
+				"end": {
+					"line": 15,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A leading run: each comment keeps its line.",
+			"start": 334,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 384,
+			"end": 389,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 3
+				},
+				"end": {
+					"line": 20,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 392,
+			"end": 397,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An author blank below the pulled comment survives.",
+			"start": 417,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 474,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 3
+				},
+				"end": {
+					"line": 26,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same gap inside destructuring-default targets.",
+			"start": 500,
+			"end": 553,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 565,
+			"end": 570,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 7
+				},
+				"end": {
+					"line": 33,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 607,
+			"end": 612,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 4
+				},
+				"end": {
+					"line": 38,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 650,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 641,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 42,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 99,
+					"end": 123,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 99,
+						"end": 122,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 6
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "TSAsExpression",
+							"start": 109,
+							"end": 115,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 109,
+								"end": 110,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "x"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 114,
+								"end": 115,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 114,
+									"end": 115,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 7
+										},
+										"end": {
+											"line": 4,
+											"column": 8
+										}
+									},
+									"name": "T"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 101,
+									"end": 106
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 121,
+							"end": 122,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 5
+								},
+								"end": {
+									"line": 5,
+									"column": 6
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` glued to the target shell's `(` keeps that line; the shell expands.",
+							"start": 20,
+							"end": 97
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 232,
+					"end": 266,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 232,
+						"end": 265,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"operator": "+=",
+						"left": {
+							"type": "TSSatisfiesExpression",
+							"start": 244,
+							"end": 257,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 15
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 244,
+								"end": 245,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "y"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 256,
+								"end": 257,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 14
+									},
+									"end": {
+										"line": 11,
+										"column": 15
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 256,
+									"end": 257,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 14
+										},
+										"end": {
+											"line": 11,
+											"column": 15
+										}
+									},
+									"name": "T"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 236,
+									"end": 241
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 264,
+							"end": 265,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 6
+								},
+								"end": {
+									"line": 12,
+									"column": 7
+								}
+							},
+							"value": 2,
+							"raw": "2"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line comment keeps its own line inside the shell; a compound",
+							"start": 126,
+							"end": 196
+						},
+						{
+							"type": "Line",
+							"value": " operator takes the same rule.",
+							"start": 198,
+							"end": 230
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 309,
+					"end": 331,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 309,
+						"end": 330,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 6
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "TSTypeAssertion",
+							"start": 319,
+							"end": 323,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 6
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 320,
+								"end": 321,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 3
+									},
+									"end": {
+										"line": 16,
+										"column": 4
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 320,
+									"end": 321,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 3
+										},
+										"end": {
+											"line": 16,
+											"column": 4
+										}
+									},
+									"name": "T"
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 322,
+								"end": 323,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 5
+									},
+									"end": {
+										"line": 16,
+										"column": 6
+									}
+								},
+								"name": "z"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 311,
+									"end": 316
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 329,
+							"end": 330,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 5
+								},
+								"end": {
+									"line": 17,
+									"column": 6
+								}
+							},
+							"value": 3,
+							"raw": "3"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The angle-bracket assertion target.",
+							"start": 269,
+							"end": 307
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 382,
+					"end": 414,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 382,
+						"end": 413,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 1
+							},
+							"end": {
+								"line": 23,
+								"column": 6
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "TSAsExpression",
+							"start": 400,
+							"end": 406,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 400,
+								"end": 401,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"name": "v"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 405,
+								"end": 406,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 8
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 405,
+									"end": 406,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 7
+										},
+										"end": {
+											"line": 22,
+											"column": 8
+										}
+									},
+									"name": "T"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 384,
+									"end": 389
+								},
+								{
+									"type": "Line",
+									"value": " c5",
+									"start": 392,
+									"end": 397
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 412,
+							"end": 413,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 5
+								},
+								"end": {
+									"line": 23,
+									"column": 6
+								}
+							},
+							"value": 4,
+							"raw": "4"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A leading run: each comment keeps its line.",
+							"start": 334,
+							"end": 380
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 472,
+					"end": 497,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 472,
+						"end": 496,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 1
+							},
+							"end": {
+								"line": 29,
+								"column": 6
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "TSAsExpression",
+							"start": 483,
+							"end": 489,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 483,
+								"end": 484,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 3
+									}
+								},
+								"name": "w"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 488,
+								"end": 489,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 7
+									},
+									"end": {
+										"line": 28,
+										"column": 8
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 488,
+									"end": 489,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 7
+										},
+										"end": {
+											"line": 28,
+											"column": 8
+										}
+									},
+									"name": "T"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c8",
+									"start": 474,
+									"end": 479
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 495,
+							"end": 496,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 5
+								},
+								"end": {
+									"line": 29,
+									"column": 6
+								}
+							},
+							"value": 7,
+							"raw": "7"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An author blank below the pulled comment survives.",
+							"start": 417,
+							"end": 470
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 555,
+					"end": 599,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 556,
+						"end": 597,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 2
+							},
+							"end": {
+								"line": 36,
+								"column": 8
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 556,
+							"end": 591,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 2
+								},
+								"end": {
+									"line": 36,
+									"column": 2
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 560,
+									"end": 588,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 2
+										},
+										"end": {
+											"line": 35,
+											"column": 7
+										}
+									},
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 560,
+										"end": 561,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 2
+											},
+											"end": {
+												"line": 33,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"value": {
+										"type": "AssignmentPattern",
+										"start": 563,
+										"end": 588,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 5
+											},
+											"end": {
+												"line": 35,
+												"column": 7
+											}
+										},
+										"left": {
+											"type": "TSAsExpression",
+											"start": 574,
+											"end": 580,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 3
+												},
+												"end": {
+													"line": 34,
+													"column": 9
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 574,
+												"end": 575,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 3
+													},
+													"end": {
+														"line": 34,
+														"column": 4
+													}
+												},
+												"name": "b"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 579,
+												"end": 580,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 8
+													},
+													"end": {
+														"line": 34,
+														"column": 9
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 579,
+													"end": 580,
+													"loc": {
+														"start": {
+															"line": 34,
+															"column": 8
+														},
+														"end": {
+															"line": 34,
+															"column": 9
+														}
+													},
+													"name": "T"
+												}
+											},
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c6",
+													"start": 565,
+													"end": 570
+												}
+											]
+										},
+										"right": {
+											"type": "Literal",
+											"start": 587,
+											"end": 588,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 6
+												},
+												"end": {
+													"line": 35,
+													"column": 7
+												}
+											},
+											"value": 5,
+											"raw": "5"
+										}
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 594,
+							"end": 597,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 5
+								},
+								"end": {
+									"line": 36,
+									"column": 8
+								}
+							},
+							"name": "obj"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same gap inside destructuring-default targets.",
+							"start": 500,
+							"end": 553
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 601,
+					"end": 640,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 9
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 601,
+						"end": 639,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 1
+							},
+							"end": {
+								"line": 41,
+								"column": 8
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ArrayPattern",
+							"start": 601,
+							"end": 633,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 1
+								},
+								"end": {
+									"line": 41,
+									"column": 2
+								}
+							},
+							"elements": [
+								{
+									"type": "AssignmentPattern",
+									"start": 605,
+									"end": 630,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 40,
+											"column": 7
+										}
+									},
+									"left": {
+										"type": "TSAsExpression",
+										"start": 616,
+										"end": 622,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 3
+											},
+											"end": {
+												"line": 39,
+												"column": 9
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 616,
+											"end": 617,
+											"loc": {
+												"start": {
+													"line": 39,
+													"column": 3
+												},
+												"end": {
+													"line": 39,
+													"column": 4
+												}
+											},
+											"name": "c"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 621,
+											"end": 622,
+											"loc": {
+												"start": {
+													"line": 39,
+													"column": 8
+												},
+												"end": {
+													"line": 39,
+													"column": 9
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 621,
+												"end": 622,
+												"loc": {
+													"start": {
+														"line": 39,
+														"column": 8
+													},
+													"end": {
+														"line": 39,
+														"column": 9
+													}
+												},
+												"name": "T"
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c7",
+												"start": 607,
+												"end": 612
+											}
+										]
+									},
+									"right": {
+										"type": "Literal",
+										"start": 629,
+										"end": 630,
+										"loc": {
+											"start": {
+												"line": 40,
+												"column": 6
+											},
+											"end": {
+												"line": 40,
+												"column": 7
+											}
+										},
+										"value": 6,
+										"raw": "6"
+									}
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 636,
+							"end": 639,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 5
+								},
+								"end": {
+									"line": 41,
+									"column": 8
+								}
+							},
+							"name": "arr"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

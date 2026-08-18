@@ -147,16 +147,14 @@ impl<'a> Printer<'a> {
         // A type-assertion target (`as` / `satisfies` / `<T>`) must be parenthesized
         // to round-trip (`(x as T) = …`); non-null `x!` stays bare. The cast is kept
         // in the internal AST so the formatter reproduces prettier's output, even
-        // though the public AST drops it from a simple `=` left.
-        let left_doc = if self.needs_parens(assign.left, ParenContext::AssignmentTarget) {
-            d.concat(&[
-                d.text("("),
-                self.build_expression_doc(assign.left),
-                d.text(")"),
-            ])
-        } else {
-            self.build_expression_doc(assign.left)
-        };
+        // though the public AST drops it from a simple `=` left. The shared target
+        // seam also emits the `^`→left gap — the authored `(`'s interior, which no
+        // other emitter reaches.
+        let left_doc = self.build_shell_operand_doc(
+            assign.span.start,
+            assign.left,
+            ParenContext::AssignmentTarget,
+        );
 
         // Extract inline comments between operator and RHS
         // Uses line-comment-safe spacing: block comments get trailing space,
@@ -1398,10 +1396,12 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // A type-assertion target keeps its required parens (`{ a: (b as T) =
         // 1 }` — bare `b as T = 1` is a TS parse error); non-null `b!` stays
-        // bare. Same rule as an assignment expression's left.
-        let left_doc = if self.needs_parens(pattern.left, ParenContext::AssignmentTarget) {
-            d.parens(self.build_expression_doc(pattern.left))
-        } else if let Expression::ObjectPattern(obj) = pattern.left {
+        // bare. Same rule as an assignment expression's left, through the same
+        // seam, which also emits the `^`→left gap — the authored `(`'s interior.
+        // The object-pattern arm is asked first: it never takes the pair
+        // (`needs_parens` matches only the three type assertions), and its
+        // reassembled doc keeps its own owned-comment claim below.
+        let left_doc = if let Expression::ObjectPattern(obj) = pattern.left {
             // A destructuring default's left object pattern does NOT expand on nesting
             // — prettier's shouldBreak excludes an AssignmentPattern parent (object.js),
             // so `{ a: { b } = {} }` (and deeper) stays inline. Width-based breaking
@@ -1416,7 +1416,11 @@ impl<'a> Printer<'a> {
                 self.build_object_pattern_doc_with_context(obj, PatternContext::AssignmentDefault);
             self.prepend_owned_leading_comment_at(obj.span.start, obj_doc)
         } else {
-            self.build_expression_doc(pattern.left)
+            self.build_shell_operand_doc(
+                pattern.span.start,
+                pattern.left,
+                ParenContext::AssignmentTarget,
+            )
         };
 
         let left_end = pattern.left.span().end;
