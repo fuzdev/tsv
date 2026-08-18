@@ -193,7 +193,6 @@ pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
 /// Returns f64 (BigInt suffix 'n' is ignored for value, preserved in raw)
 ///
 /// Note: Precision loss for large integers (>2^52) matches JS behavior.
-#[allow(clippy::cast_precision_loss)]
 pub(crate) fn parse_number_literal(raw: &str) -> Result<f64, std::num::ParseFloatError> {
     // Numeric separators (`_`) are uncommon; only allocate to strip them when
     // they're actually present. The common literal (`42`, `0xff`, `3.14`) carries

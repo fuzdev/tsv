@@ -2,29 +2,29 @@
 //
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
-use super::arg_comments::{any_arg_empty_line, first_arg_has_any_comments};
-use super::arg_wrapping::{
-    ArgOpener, append_type_args_with_gap_comments, arrow_body_expands_internally,
-    build_arrow_gap_break_single_arg_doc, build_arrow_hug_arg_docs, build_arrow_hug_printed_doc,
-    build_call_args_with_blank_lines, build_empty_args_doc, build_expand_first_arg_doc,
-    build_single_arrow_arg_states, build_single_container_arg_doc,
-    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break, should_expand_first_arg,
-    try_hook_deps_args_doc, try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
+use super::arg_comments::{
+    PartitionedComments, any_arg_empty_line, first_arg_has_any_comments,
+    has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice,
 };
-use super::expand_last::{ArgOwner, try_expand_last_arg};
-use crate::ast::internal;
-use crate::printer::calls::arg_predicates::{
+use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_array_or_object_unwrapped,
     is_function_composition_args, is_ternary_arrow_body,
 };
-use crate::printer::calls::{
-    ArgItem, ArgsJoin, PartitionedComments, arrow_hug_refused_by_comments,
-    build_args_joined_with_comments, build_arrow_call_body_states, build_arrow_sig_doc,
-    build_call_args_expanded, build_printed_argument_doc, could_expand_arrow_chain,
-    has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, prepend_arrow_body_comments,
-    wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
+use super::arg_wrapping::{
+    ArgItem, ArgOpener, ArgsJoin, append_type_args_with_gap_comments,
+    arrow_hug_refused_by_comments, build_args_joined_with_comments, build_arrow_call_body_states,
+    build_arrow_gap_break_single_arg_doc, build_arrow_hug_printed_doc, build_arrow_sig_doc,
+    build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
+    build_expand_first_arg_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
+    build_single_container_arg_doc, build_ternary_arrow_hug_ladder, could_expand_arrow_chain,
+    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
+    prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
+    try_hug_multiline_template_arg, wrap_call_with_hard_breaks_paren_line,
+    wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
+use super::expand_last::{ArgOwner, try_expand_last_arg};
+use crate::ast::internal;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
@@ -36,7 +36,7 @@ use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a new expression with argument wrapping
-    pub(in crate::printer) fn build_new_doc_with_wrapping(
+    pub(super) fn build_new_doc_with_wrapping(
         &self,
         new_expr: &internal::NewExpression<'_>,
     ) -> DocId {
@@ -267,22 +267,19 @@ impl<'a> Printer<'a> {
                         );
                     }
 
-                    // Prettier's two printings of the argument and which state reads each —
-                    // [`build_arrow_hug_arg_docs`] owns that rule, shared with the plain call's
-                    // `build_block_arrow_hug_states`.
-                    let docs =
-                        build_arrow_hug_arg_docs(self, arg0, arrow, build).with_leading(d, glued);
-
-                    // The same state ladder the plain call's single-argument hug selects among
-                    // (`build_block_arrow_hug_states`) — an object/array terminal takes the
-                    // middle state, which expands the body internally while the arrow stays
-                    // hugged to `new A(`. The hand-rolled two-state copy here had no such state,
-                    // so a FLAT-written body broke the argument out where prettier hugs.
-                    return build_single_arrow_arg_states(
-                        d,
-                        callee_with_types,
-                        docs,
-                        arrow_body_expands_internally(arrow),
+                    // The same two printings and state ladder the plain call's and the member
+                    // chain's single-argument hugs take ([`build_single_arrow_hug_doc`]) — an
+                    // object/array terminal takes the middle state, which expands the body
+                    // internally while the arrow stays hugged to `new A(`. The hand-rolled
+                    // two-state copy here had no such state, so a FLAT-written body broke the
+                    // argument out where prettier hugs.
+                    return build_single_arrow_hug_doc(
+                        self,
+                        ArgOpener::Callee(callee_with_types),
+                        arg0,
+                        arrow,
+                        glued,
+                        build,
                     );
                 }
                 // Expression-body arrow: break at => not at (
@@ -312,47 +309,16 @@ impl<'a> Printer<'a> {
                                 body_doc,
                             );
 
-                            let state_break = d.concat(&[
-                                callee_with_types,
-                                d.text("("),
+                            // The ladder, shared with the plain call's
+                            // `build_ternary_arrow_hug_states` and the member chain's arm —
+                            // asked, like the call's, of the BODY.
+                            return build_ternary_arrow_hug_ladder(
+                                d,
+                                ArgOpener::Callee(callee_with_types),
                                 sig_doc,
-                                d.text(" =>"),
-                                d.indent_hardline(body_doc),
-                                d.hardline(),
-                                d.text(")"),
-                            ]);
-
-                            if d.will_break(body_doc) {
-                                return state_break;
-                            }
-
-                            let state_flat = d.concat(&[
-                                callee_with_types,
-                                d.text("("),
-                                sig_doc,
-                                d.text(" => ("),
                                 body_doc,
-                                d.text("))"),
-                            ]);
-
-                            let state_all_broken = d.concat(&[
-                                callee_with_types,
-                                d.text("("),
-                                d.indent(d.concat(&[
-                                    d.hardline(),
-                                    sig_doc,
-                                    d.text(" =>"),
-                                    d.indent_hardline(body_doc),
-                                ])),
-                                d.hardline(),
-                                d.text(")"),
-                            ]);
-
-                            return d.conditional_group(&[
-                                state_flat,
-                                state_break,
-                                state_all_broken,
-                            ]);
+                                body_doc,
+                            );
                         }
 
                         // Simple call body: 2-state break at =>
@@ -712,10 +678,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a new expression (for nested contexts)
-    pub(in crate::printer) fn build_new_doc(
-        &self,
-        new_expr: &internal::NewExpression<'_>,
-    ) -> DocId {
+    pub(crate) fn build_new_doc(&self, new_expr: &internal::NewExpression<'_>) -> DocId {
         self.build_new_doc_with_wrapping(new_expr)
     }
 }

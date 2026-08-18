@@ -32,16 +32,12 @@ mod module_paths;
 mod new_expression;
 mod test_patterns;
 
-// Re-export items needed by other printer modules
+// The module's public surface: exactly what OTHER printer modules consume. A name used only
+// inside `calls/` does not belong here — re-exporting it makes a module-internal helper look
+// like crate API and blocks its visibility from being narrowed. (A sibling reaching a helper
+// through this list rather than through `super::<file>` is what kept nine dead entries alive.)
 pub(crate) use arg_comments::{
-    PartitionedComments, has_inter_argument_comments_slice, has_stripped_paren_gap,
-    has_trailing_comments_slice, has_trailing_line_comments_slice, skip_stripped_open_paren,
-};
-pub(crate) use arg_wrapping::{
-    ArgItem, ArgsJoin, arrow_hug_refused_by_comments, build_args_joined_with_comments,
-    build_arrow_call_body_states, build_arrow_sig_doc, build_call_args_expanded,
-    build_printed_argument_doc, could_expand_arrow_chain, prepend_arrow_body_comments,
-    wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
+    PartitionedComments, has_stripped_paren_gap, skip_stripped_open_paren,
 };
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 

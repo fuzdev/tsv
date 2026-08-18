@@ -43,7 +43,7 @@ fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
 
 /// Check if an expression is an object that could expand (has properties)
 /// Used for "expand last arg" pattern in import expressions
-pub(in crate::printer) fn is_expandable_object(expr: &Expression<'_>) -> bool {
+pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
     matches!(expr, Expression::ObjectExpression(obj) if !obj.properties.is_empty())
 }
 
@@ -53,7 +53,7 @@ pub(in crate::printer) fn is_expandable_object(expr: &Expression<'_>) -> bool {
 /// expand-last-arg pattern from working (the expanded doc has different
 /// break characteristics). When true, the array should NOT use expand-last-arg
 /// and instead falls through to the normal inline-or-expand-all path.
-pub(in crate::printer) fn is_concise_numeric_array(expr: &Expression<'_>) -> bool {
+pub(super) fn is_concise_numeric_array(expr: &Expression<'_>) -> bool {
     if let Expression::ArrayExpression(arr) = expr {
         !arr.elements.is_empty()
             && arr
@@ -86,10 +86,7 @@ fn is_numeric_expression(expr: &Expression<'_>) -> bool {
 ///
 /// The `has_comments_to_emit_between` closure checks for comments inside empty containers
 /// (typically `printer.has_comments_to_emit_between`).
-pub(in crate::printer) fn is_short_second_arg_for_expand_first<F>(
-    arg: &Expression<'_>,
-    has_comments: F,
-) -> bool
+pub(super) fn is_short_second_arg_for_expand_first<F>(arg: &Expression<'_>, has_comments: F) -> bool
 where
     F: Fn(u32, u32) -> bool,
 {
@@ -148,7 +145,7 @@ where
 /// Matches prettier's `isCallExpression(stripChainElementWrappers(body))` in
 /// `couldExpandArg`: `(x) => fn()` and `(x) => fn()!` are both call bodies, so the
 /// arrow hugs the call's open paren rather than breaking at it.
-pub(in crate::printer) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool {
+pub(super) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool {
     matches!(
         crate::printer::needs_parens::strip_non_null_wrappers(body),
         Expression::CallExpression(_)
@@ -164,18 +161,18 @@ pub(in crate::printer) fn arrow_body_is_call_through_non_null(body: &Expression<
 /// - Break: `(x) =>\n  x ? y : z,` - no parens needed, clearly arrow body
 ///
 /// Call expressions, objects, and arrays are handled by other code paths.
-pub(in crate::printer) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
+pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
     matches!(body, Expression::ConditionalExpression(_))
 }
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
 #[inline]
-pub(in crate::printer) fn last_arg_is_array_or_object(arguments: &[Expression<'_>]) -> bool {
+pub(super) fn last_arg_is_array_or_object(arguments: &[Expression<'_>]) -> bool {
     arguments.last().is_some_and(is_array_or_object_unwrapped)
 }
 
 /// Check if an expression is an array or object, unwrapping TS type wrappers
-pub(in crate::printer) fn is_array_or_object_unwrapped(expr: &Expression<'_>) -> bool {
+pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>) -> bool {
     matches!(
         unwrap_ts_type_wrappers(expr),
         Expression::ArrayExpression(_) | Expression::ObjectExpression(_)
@@ -214,7 +211,7 @@ fn get_ts_type_wrapper_inner<'a>(expr: &'a Expression<'a>) -> Option<&'a Express
 /// Matches arrow functions with block bodies (`() => { ... }`) and
 /// function expressions (`function() { ... }`). These contain hardlines.
 #[inline]
-pub(in crate::printer) fn is_block_function(expr: &Expression<'_>) -> bool {
+pub(super) fn is_block_function(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
         Expression::ArrowFunctionExpression(arrow)
@@ -241,7 +238,7 @@ pub(in crate::printer) fn is_block_function(expr: &Expression<'_>) -> bool {
 /// of the gaps around the arguments — `(`→first, each inter-argument gap, last→`)` — on the
 /// ON-PAGE axis, since an owned annotation glued to an argument is a comment prettier's
 /// `hasComment` sees.
-pub(in crate::printer) fn is_react_hook_call_with_deps_array<F>(
+pub(super) fn is_react_hook_call_with_deps_array<F>(
     args: &[Expression<'_>],
     arg_gap_has_comment: F,
 ) -> bool
@@ -264,10 +261,7 @@ where
 /// Split out for `import(…)`, whose AST carries `source` + `options` rather than an argument
 /// slice; prettier reaches it through the same `printCallArguments` (`ImportExpression` is in
 /// that printer's header list), so the shape question must have one answer for both.
-pub(in crate::printer) fn is_hook_callback_with_deps(
-    callback: &Expression<'_>,
-    deps: &Expression<'_>,
-) -> bool {
+pub(super) fn is_hook_callback_with_deps(callback: &Expression<'_>, deps: &Expression<'_>) -> bool {
     matches!(
         callback,
         Expression::ArrowFunctionExpression(arrow)
@@ -291,7 +285,7 @@ pub(in crate::printer) fn is_hook_callback_with_deps(
 /// - Unary/update expressions with simple arguments
 ///
 /// Reference: prettier/src/language-js/utils/index.js `isSimpleCallArgument`
-pub fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
+pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
     if depth == 0 {
         return false;
     }
@@ -414,7 +408,7 @@ pub fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
 ///   any argument is a call expression containing a function/arrow argument
 ///
 /// This triggers `allArgsBrokenOut()` in Prettier to expand all arguments.
-pub(in crate::printer) fn is_function_composition_args(arguments: &[Expression<'_>]) -> bool {
+pub(super) fn is_function_composition_args(arguments: &[Expression<'_>]) -> bool {
     if arguments.len() <= 1 {
         return false;
     }
