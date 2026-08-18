@@ -1,0 +1,201 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 122,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " the body's pre-`;` own-line comment lands past the whole statement",
+			"start": 10,
+			"end": 79,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 98,
+			"end": 103,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 121,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 112,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 81,
+					"end": 96,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 16
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 90,
+						"end": 96,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 16
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 90,
+							"end": 95,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 15
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 90,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"name": "fn1"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the body's pre-`;` own-line comment lands past the whole statement",
+							"start": 10,
+							"end": 79
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 105,
+					"end": 111,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 105,
+						"end": 110,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 105,
+							"end": 108,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 4
+								}
+							},
+							"name": "fn2"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 98,
+							"end": 103
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

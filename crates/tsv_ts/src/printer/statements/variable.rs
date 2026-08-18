@@ -148,6 +148,7 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::VariableDeclaration<'_>,
         emit_semicolon: bool,
+        clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
         let mut prefix: DocBuf = DocBuf::new();
@@ -898,6 +899,7 @@ impl<'a> Printer<'a> {
                     last.span.end,
                     decl.span.end,
                     true,
+                    clause_tail,
                 );
             } else {
                 parts.push(d.text(";"));

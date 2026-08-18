@@ -35,29 +35,107 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
-impl<'a> Printer<'a> {
-    /// Build a Doc for a statement.
+/// Where a statement sits — the two container facts its builders read.
+///
+/// `in_program_or_block` is Prettier's own-terms grandparent check for the
+/// "avoid becoming a directive" rule ([`Printer::needs_avoid_directive_parens`]) —
+/// `true` when the statement's immediate container is a `Program` or
+/// `BlockStatement`, `false` for the containers that use a different AST node
+/// (`SwitchCase`, `StaticBlock`, `TSModuleBlock`) and for every clause body.
+///
+/// `clause_tail_dedent` is the `;`-terminator gap's deferral axis. In a statement
+/// LIST the joiner's own break immediately follows the statement doc, so the gap's
+/// own-line run can take real breaks — the emission is closed on its own line before
+/// anything else can queue a `line_suffix` (`None`). A non-block CLAUSE body's last
+/// line instead stays open to the enclosing construct — an `else`, a do-while
+/// `while`, or just the construct's end — where a later gap's deferred `//` would
+/// flush onto a real-text `//` and weld irreversibly (`x; // c1 // c2` reparses as
+/// ONE comment). There the run defers through the suffix machinery
+/// ([`Printer::push_semicolon_with_gap_comments`]), and the value is how many indent
+/// levels sit between the statement's doc position and the break that flushes its
+/// tail: each body site adds one per `indent` wrap it emits, and a construct that
+/// CONTINUES on the tail's flush line (`else`, `while`) restarts the count at its own
+/// gap ([`StatementContext::clause_body`]).
+#[derive(Clone, Copy)]
+pub(in crate::printer) struct StatementContext {
+    pub(in crate::printer) in_program_or_block: bool,
+    clause_tail_dedent: Option<u8>,
+}
+
+impl StatementContext {
+    /// A statement joined into a `Program` or `BlockStatement` list.
+    pub(in crate::printer) const PROGRAM_OR_BLOCK: Self = Self {
+        in_program_or_block: true,
+        clause_tail_dedent: None,
+    };
+    /// A statement list whose container is not one of those AST nodes
+    /// (`SwitchCase`, `StaticBlock`, `TSModuleBlock`).
+    pub(in crate::printer) const OTHER_LIST: Self = Self {
+        in_program_or_block: false,
+        clause_tail_dedent: None,
+    };
+
+    /// The context for a non-block clause BODY built from `self`'s position.
     ///
-    /// `in_program_or_block` is Prettier's own-terms grandparent check for the
-    /// "avoid becoming a directive" rule (see
-    /// [`Printer::needs_avoid_directive_parens`]) — `true` when `statement`'s
-    /// immediate container is a `Program` or `BlockStatement` (plain blocks,
-    /// control-flow bodies, function/catch bodies), `false` for the containers
-    /// that use a different AST node (`SwitchCase`, `StaticBlock`,
-    /// `TSModuleBlock`). Only the `ExpressionStatement` arm consults it.
+    /// `continues` — the construct emits more on the line the body's tail flushes at
+    /// (an `if` with an `else`, a do-while's `while`), so the flush is that
+    /// construct's own gap break; otherwise the tail falls through to whatever
+    /// flushes `self`'s. `indented` — this body site wraps the body in one `indent`
+    /// (prettier's `adjustClause`); an inline body (an `else`'s inline arm) adds
+    /// none. The dedent must mirror the wraps exactly: a collapsed clause CHAIN
+    /// stacks its indents even though no break renders them, and the freed comment
+    /// settles at the flushing construct's level, not the innermost body's.
+    pub(in crate::printer) fn clause_body(self, continues: bool, indented: bool) -> Self {
+        let base = if continues {
+            0
+        } else {
+            self.clause_tail_dedent.unwrap_or(0)
+        };
+        Self {
+            in_program_or_block: false,
+            clause_tail_dedent: Some(base.saturating_add(u8::from(indented))),
+        }
+    }
+
+    /// The context for a labeled statement's BODY: a label adds no indent and ends
+    /// with its body, so the body's tail is the label's tail — only the
+    /// directive-prologue fact changes (a labeled string is never a directive).
+    pub(in crate::printer) fn labeled_body(self) -> Self {
+        Self {
+            in_program_or_block: false,
+            ..self
+        }
+    }
+
+    /// The clause-tail deferral: `Some(dedent)` when the `;`-terminator gap's
+    /// own-line run must ride in `line_suffix` docs, dedented this many levels.
+    pub(in crate::printer) fn clause_tail(self) -> Option<u8> {
+        self.clause_tail_dedent
+    }
+}
+
+impl<'a> Printer<'a> {
+    /// Build a Doc for a statement. `ctx` is the container's two facts
+    /// ([`StatementContext`]); only the arms whose statement ends in a
+    /// `;`-terminator gap (and the clause-bearing control flow that must thread it)
+    /// consult it.
     pub(super) fn build_statement_doc(
         &self,
         statement: &Statement<'_>,
-        in_program_or_block: bool,
+        ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
         match statement {
-            Statement::ExpressionStatement(stmt) => {
-                self.build_expression_statement_doc(stmt, in_program_or_block)
+            Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt, ctx),
+            Statement::VariableDeclaration(decl) => {
+                self.build_variable_declaration_doc(decl, true, ctx.clause_tail())
             }
-            Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl, true),
-            Statement::TSTypeAliasDeclaration(decl) => self.build_type_alias_declaration_doc(decl),
-            Statement::ReturnStatement(ret) => self.build_return_statement_doc(ret),
+            Statement::TSTypeAliasDeclaration(decl) => {
+                self.build_type_alias_declaration_doc(decl, ctx.clause_tail())
+            }
+            Statement::ReturnStatement(ret) => {
+                self.build_return_statement_doc(ret, ctx.clause_tail())
+            }
             // A statement-position block (bare `{ }`, a labeled block's body, or a
             // block nested directly in another block) expands its empty form to `{\n}`,
             // matching prettier. Only control-flow *bodies* (while/for/do/catch) and
@@ -82,26 +160,34 @@ impl<'a> Printer<'a> {
                 self.build_import_equals_declaration_doc(decl)
             }
             // Control flow statements - use simple doc building
-            Statement::IfStatement(stmt) => self.build_if_statement_doc(stmt),
-            Statement::ForStatement(stmt) => self.build_for_statement_doc(stmt),
-            Statement::ForInStatement(stmt) => self.build_for_in_statement_doc(stmt),
-            Statement::ForOfStatement(stmt) => self.build_for_of_statement_doc(stmt),
-            Statement::WhileStatement(stmt) => self.build_while_statement_doc(stmt),
-            Statement::DoWhileStatement(stmt) => self.build_do_while_statement_doc(stmt),
+            Statement::IfStatement(stmt) => self.build_if_statement_doc(stmt, ctx),
+            Statement::ForStatement(stmt) => self.build_for_statement_doc(stmt, ctx),
+            Statement::ForInStatement(stmt) => self.build_for_in_statement_doc(stmt, ctx),
+            Statement::ForOfStatement(stmt) => self.build_for_of_statement_doc(stmt, ctx),
+            Statement::WhileStatement(stmt) => self.build_while_statement_doc(stmt, ctx),
+            Statement::DoWhileStatement(stmt) => self.build_do_while_statement_doc(stmt, ctx),
             Statement::SwitchStatement(stmt) => self.build_switch_statement_doc(stmt),
             Statement::TryStatement(stmt) => self.build_try_statement_doc(stmt),
             Statement::ThrowStatement(stmt) => self.build_throw_statement_doc(stmt),
-            Statement::BreakStatement(stmt) => self.build_break_statement_doc(stmt),
-            Statement::ContinueStatement(stmt) => self.build_continue_statement_doc(stmt),
-            Statement::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt),
+            Statement::BreakStatement(stmt) => {
+                self.build_break_statement_doc(stmt, ctx.clause_tail())
+            }
+            Statement::ContinueStatement(stmt) => {
+                self.build_continue_statement_doc(stmt, ctx.clause_tail())
+            }
+            Statement::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt, ctx),
             Statement::EmptyStatement(_) => d.text(";"),
             Statement::DebuggerStatement(stmt) => {
-                self.build_bare_keyword_terminator_doc("debugger", stmt.span)
+                self.build_bare_keyword_terminator_doc("debugger", stmt.span, ctx.clause_tail())
             }
             Statement::TSInterfaceDeclaration(decl) => self.build_interface_declaration_doc(decl),
-            Statement::TSDeclareFunction(decl) => self.build_declare_function_doc(decl),
+            Statement::TSDeclareFunction(decl) => {
+                self.build_declare_function_doc(decl, ctx.clause_tail())
+            }
             Statement::TSEnumDeclaration(decl) => self.build_enum_declaration_doc(decl),
-            Statement::TSModuleDeclaration(decl) => self.build_module_declaration_doc(decl),
+            Statement::TSModuleDeclaration(decl) => {
+                self.build_module_declaration_doc(decl, ctx.clause_tail())
+            }
         }
     }
 
@@ -111,7 +197,7 @@ impl<'a> Printer<'a> {
     fn build_expression_statement_doc(
         &self,
         stmt: &internal::ExpressionStatement<'_>,
-        in_program_or_block: bool,
+        ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
 
@@ -123,7 +209,7 @@ impl<'a> Printer<'a> {
         let (value_doc, consumed_close) = if stmt.is_directive {
             (self.build_directive_doc(stmt), None)
         } else {
-            self.build_expression_statement_value_doc(stmt, in_program_or_block)
+            self.build_expression_statement_value_doc(stmt, ctx.in_program_or_block)
         };
         let mut parts: DocBuf = smallvec![value_doc];
 
@@ -136,7 +222,13 @@ impl<'a> Printer<'a> {
         let gap_start = consumed_close.map_or(expr_end, |close| {
             Self::past_grouping_close(close, stmt.span.end)
         });
-        self.push_semicolon_with_gap_comments(&mut parts, gap_start, stmt.span.end, true);
+        self.push_semicolon_with_gap_comments(
+            &mut parts,
+            gap_start,
+            stmt.span.end,
+            true,
+            ctx.clause_tail(),
+        );
         d.concat(&parts)
     }
 
@@ -380,12 +472,18 @@ impl<'a> Printer<'a> {
         Some(close)
     }
 
-    /// Build a Doc for a return statement.
-    fn build_return_statement_doc(&self, ret: &internal::ReturnStatement<'_>) -> DocId {
+    /// Build a Doc for a return statement. `clause_tail` reaches only the bare
+    /// form's terminator gap — an argument's gap goes through the restricted
+    /// production's own emitters, which already defer.
+    fn build_return_statement_doc(
+        &self,
+        ret: &internal::ReturnStatement<'_>,
+        clause_tail: Option<u8>,
+    ) -> DocId {
         let Some(arg) = &ret.argument else {
             // No argument: a bare keyword closed by `;` (interior comments handled
             // there) — `return; /* c */` etc.
-            return self.build_bare_keyword_terminator_doc("return", ret.span);
+            return self.build_bare_keyword_terminator_doc("return", ret.span, clause_tail);
         };
 
         self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg)
@@ -410,11 +508,12 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         span: Span,
+        clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
         let keyword_end = span.start + keyword.len() as u32;
         let mut parts: DocBuf = smallvec![d.text(keyword)];
-        self.push_semicolon_with_gap_comments(&mut parts, keyword_end, span.end, true);
+        self.push_semicolon_with_gap_comments(&mut parts, keyword_end, span.end, true, clause_tail);
         d.concat(&parts)
     }
 }

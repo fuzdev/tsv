@@ -15,6 +15,25 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// How a separator gap's deferred (own-line) run renders — the axis
+/// [`Printer::push_gap_comments`]'s callers name.
+#[derive(Clone, Copy)]
+pub(crate) enum GapDeferral {
+    /// Real breaks into and inside the run — sound only where the caller's own break
+    /// immediately follows the returned docs (a list joiner's hardline, the for
+    /// header's `line`), closing the run's last line before anything else can queue a
+    /// `line_suffix`. The doc is the break INTO the run; breaks within it are the
+    /// shared site's `hardline`.
+    Break(DocId),
+    /// The run rides in `line_suffix` docs, each own-line member carrying its break
+    /// inside, dedented this many levels to the flushing construct's level
+    /// ([`Printer::build_clause_tail_comment_doc`]) — the clause-body statement tail,
+    /// whose last line stays open to the enclosing construct, where a later gap's
+    /// deferred `//` must meet the run in source order at the flush
+    /// (`doc/arena_render_suffix.rs` owes the separator between them).
+    LineSuffix(u8),
+}
+
 /// Which blank-line rule a comma-separated list's separator follows.
 ///
 /// Prettier asks two different questions here, and a list belongs to exactly one of them —
@@ -1270,6 +1289,7 @@ impl<'a> Printer<'a> {
         paren_pos: Option<u32>,
         span_end: u32,
         deferred: &mut DocBuf,
+        clause_tail: Option<u8>,
     ) {
         let content_end = return_type.map_or_else(
             || {
@@ -1279,7 +1299,21 @@ impl<'a> Printer<'a> {
             },
             |rt| rt.span.end,
         );
-        deferred.extend(self.split_member_terminator_gap_comments(parts, content_end, span_end));
+        // `clause_tail` reaches only the statement caller (`declare function` — the
+        // canonical parser accepts it as a clause body, where the gap must defer like
+        // every other `;` tail there); the type members are always list-joined.
+        let deferral = clause_tail.map_or_else(
+            || GapDeferral::Break(self.d().hardline()),
+            GapDeferral::LineSuffix,
+        );
+        deferred.extend(self.push_gap_comments(
+            parts,
+            content_end,
+            span_end,
+            false,
+            true,
+            deferral,
+        ));
     }
 
     /// Partition the comments in a content→separator gap `[start, sep_pos)`, binding
@@ -1320,7 +1354,14 @@ impl<'a> Printer<'a> {
         start: u32,
         sep_pos: u32,
     ) -> DocBuf {
-        self.push_gap_comments(parts, start, sep_pos, false, false, self.d().hardline())
+        self.push_gap_comments(
+            parts,
+            start,
+            sep_pos,
+            false,
+            false,
+            GapDeferral::Break(self.d().hardline()),
+        )
     }
 
     /// The **for-header `;`** variant of
@@ -1347,7 +1388,14 @@ impl<'a> Printer<'a> {
         start: u32,
         sep_pos: u32,
     ) -> DocBuf {
-        self.push_gap_comments(parts, start, sep_pos, false, false, self.d().line())
+        self.push_gap_comments(
+            parts,
+            start,
+            sep_pos,
+            false,
+            false,
+            GapDeferral::Break(self.d().line()),
+        )
     }
 
     /// The gap-split caller idiom for a **`;` terminator**, in one call: the gap's pre-`;` comments, the `;`,
@@ -1388,19 +1436,29 @@ impl<'a> Printer<'a> {
         content_end: u32,
         span_end: u32,
         block_after_separator: bool,
+        clause_tail: Option<u8>,
     ) {
         let semicolon_pos = if span_end > content_end {
             span_end - 1
         } else {
             content_end
         };
+        // The deferral axis is the CONTAINER's (`StatementContext`): in a list the
+        // joiner's break immediately follows, so the run takes real breaks; a clause
+        // body's tail line stays open to the enclosing construct, so the run rides in
+        // `line_suffix` docs and meets any later gap's suffix at the flush in source
+        // order.
+        let deferral = clause_tail.map_or_else(
+            || GapDeferral::Break(self.d().hardline()),
+            GapDeferral::LineSuffix,
+        );
         let after = self.push_gap_comments(
             parts,
             content_end,
             semicolon_pos,
             block_after_separator,
             true,
-            self.d().hardline(),
+            deferral,
         );
         parts.push(self.d().text(";"));
         parts.extend(after);
@@ -1419,7 +1477,14 @@ impl<'a> Printer<'a> {
         start: u32,
         sep_pos: u32,
     ) -> DocBuf {
-        self.push_gap_comments(parts, start, sep_pos, false, true, self.d().hardline())
+        self.push_gap_comments(
+            parts,
+            start,
+            sep_pos,
+            false,
+            true,
+            GapDeferral::Break(self.d().hardline()),
+        )
     }
 
     /// Where a separator gap's ANCHOR-LINE run ENDS — the split
@@ -1509,7 +1574,7 @@ impl<'a> Printer<'a> {
         sep_pos: u32,
         block_after: bool,
         preserve_blank: bool,
-        first_break: DocId,
+        deferral: GapDeferral,
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
@@ -1539,23 +1604,47 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_trailing_comment_doc(comment));
                 }
             } else {
-                // The separator, BEFORE the comment — a space where the author glued the
-                // pair, otherwise a break: the caller's onto the run's first line, this
-                // site's own after that (the caller owns the blank rule).
-                if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
-                    deferred.push(d.text(" "));
-                } else {
-                    if preserve_blank && self.has_blank_line_between(prev, comment.span.start) {
-                        deferred.push(d.literalline());
+                match deferral {
+                    GapDeferral::Break(first_break) => {
+                        // The separator, BEFORE the comment — a space where the author
+                        // glued the pair, otherwise a break: the caller's onto the run's
+                        // first line, this site's own after that (the caller owns the
+                        // blank rule).
+                        if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
+                            deferred.push(d.text(" "));
+                        } else {
+                            if preserve_blank
+                                && self.has_blank_line_between(prev, comment.span.start)
+                            {
+                                deferred.push(d.literalline());
+                            }
+                            deferred.push(if deferred_open {
+                                d.hardline()
+                            } else {
+                                first_break
+                            });
+                        }
+                        deferred_open = true;
+                        deferred.push(self.build_comment_doc(comment));
                     }
-                    deferred.push(if deferred_open {
-                        d.hardline()
-                    } else {
-                        first_break
-                    });
+                    GapDeferral::LineSuffix(dedent) => {
+                        // Deferred spelling of the same two arms: a glued follower rides
+                        // in its own suffix behind the previous one (kind-agnostic — an
+                        // inline block would render ahead of the buffer and reorder),
+                        // an own-line comment carries its break INSIDE the suffix, at
+                        // the flushing construct's level, with an author blank as the
+                        // second hardline the deferred sites use.
+                        deferred.push(
+                            if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
+                                self.build_trailing_line_comment_doc(comment)
+                            } else {
+                                let blank = preserve_blank
+                                    && self.has_blank_line_between(prev, comment.span.start);
+                                self.build_clause_tail_comment_doc(comment, blank, dedent)
+                            },
+                        );
+                    }
                 }
-                deferred_open = true;
-                deferred.push(self.build_comment_doc(comment));
             }
             prev = comment.span.end;
             prev_comment = Some(comment);

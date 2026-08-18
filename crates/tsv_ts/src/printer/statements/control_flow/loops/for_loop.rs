@@ -5,6 +5,7 @@
 
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
+use crate::printer::statements::StatementContext;
 use crate::printer::{
     CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer, RunLeadingBlank,
     needs_parens,
@@ -162,11 +163,12 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         paren_end: u32,
         body: &Statement<'_>,
+        body_ctx: StatementContext,
     ) {
         let d = self.d();
         let body_start = body.span().start;
         let body_doc = self.build_statement_head_doc(paren_end, body.span(), || {
-            self.build_statement_doc(body, false)
+            self.build_statement_doc(body, body_ctx)
         });
 
         if !self.has_comments_to_emit_between(paren_end, body_start) {
@@ -221,12 +223,17 @@ impl<'a> Printer<'a> {
         &self,
         stmt: &internal::ForStatement<'_>,
         parens: ForParens,
+        ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
         let header_doc = self.build_for_header_doc(stmt, parens, None);
         if matches!(stmt.body, Statement::EmptyStatement(_)) {
-            // No space before empty statement: `for (...);`
-            d.concat(&[header_doc, self.build_statement_doc(stmt.body, false)])
+            // No space before empty statement: `for (...);` (the ctx is inert — an
+            // EmptyStatement is bare `";"` with no terminator gap)
+            d.concat(&[
+                header_doc,
+                self.build_statement_doc(stmt.body, ctx.clause_body(false, true)),
+            ])
         } else if let Statement::BlockStatement(block) = stmt.body {
             // Block body: `for (...) { ... }`
             // Note: Unlike for-in/for-of, standard for loops keep empty blocks inline `{}`
@@ -250,7 +257,9 @@ impl<'a> Printer<'a> {
             let body_doc = self.build_statement_head_doc(
                 self.get_for_header_end(stmt, parens),
                 stmt.body.span(),
-                || self.build_statement_doc(stmt.body, false),
+                // `adjustClause` wraps the body in one indent; nothing continues on
+                // the tail's line.
+                || self.build_statement_doc(stmt.body, ctx.clause_body(false, true)),
             );
             d.group(d.concat(&[header_doc, d.indent_line(body_doc)]))
         }
@@ -1046,6 +1055,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_for_in_statement_doc(
         &self,
         stmt: &internal::ForInStatement<'_>,
+        ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
             &stmt.left,
@@ -1054,6 +1064,7 @@ impl<'a> Printer<'a> {
             stmt.span.start,
             "in",
             false,
+            ctx,
         )
     }
 
@@ -1061,6 +1072,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_for_of_statement_doc(
         &self,
         stmt: &internal::ForOfStatement<'_>,
+        ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
             &stmt.left,
@@ -1069,6 +1081,7 @@ impl<'a> Printer<'a> {
             stmt.span.start,
             "of",
             stmt.r#await,
+            ctx,
         )
     }
 
@@ -1081,6 +1094,7 @@ impl<'a> Printer<'a> {
     /// `for (` opening is built in split form (`" "` + `"("`) so the optional
     /// `await` keyword slots in between — render-identical to for-in's fused
     /// `" ("`.
+    #[allow(clippy::too_many_arguments)] // one cohesive for-in/of assembly; a bundle would re-thread the same values
     fn build_for_in_of_statement_with_body_doc(
         &self,
         left: &internal::ForInOfLeft<'_>,
@@ -1089,9 +1103,14 @@ impl<'a> Printer<'a> {
         stmt_start: u32,
         keyword: &'static str, // `"in"` or `"of"` — a literal, so it doubles as the emitted token
         is_await: bool,        // for-of `for await`; always false for for-in
+        ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
         let spans = self.for_in_of_spans(left, right, keyword, stmt_start);
+        // Every non-block body arm below wraps the body in one `adjustClause` indent
+        // (the empty statement, which ignores it, aside); nothing continues on the
+        // tail's line.
+        let body_ctx = ctx.clause_body(false, true);
 
         // The keyword as a static literal (`d.text` needs `&'static str`), carrying the
         // separator that precedes it — the inline layout's gap emitter writes none.
@@ -1146,7 +1165,7 @@ impl<'a> Printer<'a> {
         if breaks_for_gap_comment {
             let left_doc = self.build_for_in_of_left_doc(left, async_lhs_paren, &spans);
             return self.build_for_in_of_with_line_comments(
-                right, body, keyword, &spans, left_doc, &mut parts,
+                right, body, keyword, &spans, left_doc, &mut parts, body_ctx,
             );
         }
 
@@ -1178,7 +1197,13 @@ impl<'a> Printer<'a> {
         }
 
         // `)` + comments + body (shared with the breaking layout)
-        self.push_for_close_paren_and_body(&mut parts, body, spans.right_end, spans.close_paren);
+        self.push_for_close_paren_and_body(
+            &mut parts,
+            body,
+            spans.right_end,
+            spans.close_paren,
+            body_ctx,
+        );
 
         // Group so a non-block body's `adjustClause` line breaks on overflow
         // (matches Prettier's `printForXStatement`).
@@ -1308,6 +1333,7 @@ impl<'a> Printer<'a> {
     /// hand-rolled `hardline` per comment there split a run the author glued and erased
     /// an author blank between two own-line comments, which is that twin's rustdoc
     /// verbatim.
+    #[allow(clippy::too_many_arguments)] // the breaking layout shares the inline one's prebuilt parts; a bundle would re-thread them
     fn build_for_in_of_with_line_comments(
         &self,
         right: &Expression<'_>,
@@ -1325,6 +1351,7 @@ impl<'a> Printer<'a> {
         // `await` from the AST) — shared with the inline layout. Filled in place
         // (a pooled buffer owned by the caller) rather than taken by value.
         parts: &mut DocBuf,
+        body_ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
 
@@ -1410,7 +1437,13 @@ impl<'a> Printer<'a> {
         parts.push(d.hardline());
 
         // `)` + comments + body (shared with the inline layout)
-        self.push_for_close_paren_and_body(parts, body, spans.right_end, spans.close_paren);
+        self.push_for_close_paren_and_body(
+            parts,
+            body,
+            spans.right_end,
+            spans.close_paren,
+            body_ctx,
+        );
 
         // Group so the non-block body's `adjustClause` line breaks (the
         // hardline-broken header forces this group open via `will_break`).
@@ -1472,6 +1505,7 @@ impl<'a> Printer<'a> {
         body: &Statement<'_>,
         right_end: u32,
         close_paren: Option<u32>,
+        body_ctx: StatementContext,
     ) {
         let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
         if let Statement::BlockStatement(block) = body {
@@ -1486,7 +1520,7 @@ impl<'a> Printer<'a> {
             // did not, so its run took the indented non-block path instead.
             self.append_close_paren_empty_stmt_with_comments(parts, paren_end, body.span().start);
         } else {
-            self.append_close_paren_with_non_block_body(parts, paren_end, body);
+            self.append_close_paren_with_non_block_body(parts, paren_end, body, body_ctx);
         }
     }
 
@@ -1550,6 +1584,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_for_statement_doc(
         &self,
         stmt: &internal::ForStatement<'_>,
+        ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
 
@@ -1583,7 +1618,9 @@ impl<'a> Printer<'a> {
             // A C-style `for` collapses its empty block body (`for (…) {}`) — unless an
             // own-line directive in the `)`→body gap freezes it.
             let body_doc = self.build_statement_head_doc(header_end, stmt.body.span(), || {
-                self.build_collapsing_body_doc(stmt.body)
+                // Every arm below that prints a non-block body wraps it in one indent
+                // (`adjustClause`); nothing continues on the tail's line.
+                self.build_collapsing_body_doc(stmt.body, ctx.clause_body(false, true))
             });
 
             let gap_breaks = self.header_to_body_gap_breaks(header_end, body_start);
@@ -1656,7 +1693,7 @@ impl<'a> Printer<'a> {
             }
         } else {
             // Delegate to the sophisticated version that handles all edge cases
-            self.build_for_statement_with_body_doc(stmt, parens)
+            self.build_for_statement_with_body_doc(stmt, parens, ctx)
         }
     }
 

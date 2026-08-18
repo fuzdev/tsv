@@ -369,7 +369,21 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// ⚠️ That same measurement puts the reproducible-subset `match` at 2394 BEFORE this
 	// change, well above `CORPUS_FORMAT_MATCH_MIN`'s 2335 — a pre-existing slack in that
 	// floor, unrelated to this entry and deliberately not folded into it.
-	typescript: 104,
+	// 104 → 111: SEVEN files ARRIVE from `partial` in one step — a reclassification, not a
+	// loss. The clause-body statement tail now defers its own-line pre-`;` comment run
+	// through `line_suffix` (dedented to the flushing construct's level), so a collapsed
+	// head hoists the comment past the whole statement exactly as prettier does
+	// (`if (1) foo;⏎// c`) — the six `js/no-semi/*-statement.js` files and
+	// `js/for/continue-and-break-comment-without-blocks.js` lose the clause hunks the
+	// detector used to explain, leaving only a pre-existing residue no detector matches:
+	// for the no-semi six, a `// prettier-ignore` freeze's `;` binding; for the for/continue
+	// file, prettier reordering the hoisted comment past the author's blank line (tsv keeps
+	// the authored order: comment, then blank — knowingly left uncataloged for now; a
+	// candidate `_prettier_divergence` fixture). `js/comments/break-continue-statements-2.js`
+	// leaves `partial` for **match** outright in the same step. Measured by byte-diffing the
+	// formatted prettier suites against a pre-change binary: these eight are the only moves
+	// in any bucket, and `safety` / `errors` / `expected_errors` are unchanged.
+	typescript: 111,
 	css: 23
 };
 
@@ -402,7 +416,11 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// assignment's line arm through the shared `build_eq_comment_break_rhs` partition made
 	// the family uniform. `CORPUS_FORMAT_UNKNOWN_PIN` does not move: this file left `partial`
 	// by matching outright.
-	typescript: 31,
+	// 31 → 23: the eight clause-tail movers above — seven reclassify to `unknown` (their
+	// explained hunks became matches; only an unexplained residue remains) and
+	// `js/comments/break-continue-statements-2.js` leaves by matching outright. Reasoning on
+	// `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step.
+	typescript: 23,
 	css: 9
 };
 

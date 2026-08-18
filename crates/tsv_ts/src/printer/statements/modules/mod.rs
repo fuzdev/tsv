@@ -20,6 +20,7 @@ pub(super) use super::{Printer, build_entity_name_doc};
 use crate::ast::internal;
 use crate::printer::calls::PartitionedComments;
 use crate::printer::needs_parens::export_default_needs_parens;
+use crate::printer::statements::StatementContext;
 use crate::printer::{ParenContext, needs_parens};
 use smallvec::SmallVec;
 use smallvec::smallvec;
@@ -139,7 +140,7 @@ impl<'a> Printer<'a> {
             // ExpressionStatement), so `in_program_or_block` is never consulted here.
             let continuation = match frozen {
                 Some(span) => self.build_frozen_node_doc(span),
-                None => self.build_statement_doc(declaration, true),
+                None => self.build_statement_doc(declaration, StatementContext::PROGRAM_OR_BLOCK),
             };
             let tail = self.build_keyword_to_name_continuation(
                 export_keyword_end,
@@ -485,7 +486,7 @@ impl<'a> Printer<'a> {
                 }),
             internal::ExportDefaultValue::TSDeclareFunction(func) => {
                 self.build_statement_head_doc(keyword_end, value_span, || {
-                    self.build_declare_function_doc(func)
+                    self.build_declare_function_doc(func, None)
                 })
             }
             internal::ExportDefaultValue::ClassDeclaration(class) => {
@@ -1028,7 +1029,7 @@ impl<'a> Printer<'a> {
         // *before* the `;` (operand-attached — prettier 3.9 keeps it), while a same-line
         // **line** comment floats after the `;` via `line_suffix`. So this uses the
         // comma-style `block_after_separator: false`, not `finish_with_pre_semi`.
-        self.push_semicolon_with_gap_comments(&mut parts, ref_end, decl.span.end, false);
+        self.push_semicolon_with_gap_comments(&mut parts, ref_end, decl.span.end, false, None);
         d.concat(&parts)
     }
 
@@ -1141,7 +1142,13 @@ impl<'a> Printer<'a> {
         ));
         // Trailing comment between the name and `;` (mirrors `export =` / import-equals):
         // a same-line block comment stays before `;`, a line comment floats after it.
-        self.push_semicolon_with_gap_comments(&mut parts, decl.id.span.end, decl.span.end, false);
+        self.push_semicolon_with_gap_comments(
+            &mut parts,
+            decl.id.span.end,
+            decl.span.end,
+            false,
+            None,
+        );
         d.concat(&parts)
     }
 }

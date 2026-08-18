@@ -11,6 +11,7 @@
 // expressions/ and statements/ modules.
 
 use crate::ast::internal;
+use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -488,7 +489,14 @@ impl<'a> Printer<'a> {
             if body_has_comments && self.member_gap_frozen(prev_end, stmt_start) {
                 body_parts.push(self.build_frozen_node_doc(stmt.span()));
             } else {
-                body_parts.push(self.build_statement_doc(stmt, in_program_or_block));
+                body_parts.push(self.build_statement_doc(
+                    stmt,
+                    if in_program_or_block {
+                        StatementContext::PROGRAM_OR_BLOCK
+                    } else {
+                        StatementContext::OTHER_LIST
+                    },
+                ));
             }
 
             // Handle trailing same-line comments after this statement, and advance

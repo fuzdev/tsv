@@ -277,6 +277,7 @@ impl<'a> Printer<'a> {
             paren_pos,
             method.span.end,
             deferred,
+            None,
         );
         d.group(d.concat(&parts))
     }
@@ -406,7 +407,14 @@ impl<'a> Printer<'a> {
             sig_doc,
         );
         // Comments between return type (or params) and `;`
-        self.append_signature_end_comments(&mut parts, return_type, paren_pos, span.end, deferred);
+        self.append_signature_end_comments(
+            &mut parts,
+            return_type,
+            paren_pos,
+            span.end,
+            deferred,
+            None,
+        );
         d.group(d.concat(&parts))
     }
 

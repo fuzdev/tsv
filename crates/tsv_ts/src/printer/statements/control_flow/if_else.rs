@@ -5,6 +5,7 @@
 
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
+use crate::printer::statements::StatementContext;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::skip_comment;
@@ -40,9 +41,11 @@ impl<'a> Printer<'a> {
     /// consequent uses (see `build_adjust_clause_with_comments`), never a bare hardline. The
     /// caller emits the bare `else` (no trailing space); the leading `line` supplies the
     /// separator when flat.
-    fn build_else_adjust_clause(&self, alternate: &Statement<'_>) -> DocId {
+    fn build_else_adjust_clause(&self, alternate: &Statement<'_>, ctx: StatementContext) -> DocId {
         let d = self.d();
-        d.group(d.indent_line(self.build_statement_doc(alternate, false)))
+        // One indent wrap; nothing continues after the alternate, so its tail falls
+        // through to whatever flushes the if's own position.
+        d.group(d.indent_line(self.build_statement_doc(alternate, ctx.clause_body(false, true))))
     }
 
     /// The doc for one BRANCH of an `if` — a consequent or an alternate. A block body expands
@@ -53,19 +56,28 @@ impl<'a> Printer<'a> {
     /// Callers that introduce the branch across a gap want [`Self::build_branch_body_doc`],
     /// the freeze-aware wrapper; this bare form is for the gaps that provably hold no comment
     /// (and so no directive).
-    fn build_branch_statement_doc(&self, body: &Statement<'_>) -> DocId {
+    fn build_branch_statement_doc(
+        &self,
+        body: &Statement<'_>,
+        body_ctx: StatementContext,
+    ) -> DocId {
         match body {
             Statement::BlockStatement(block) => self.build_block_statement_expand_empty_doc(block),
-            _ => self.build_statement_doc(body, false),
+            _ => self.build_statement_doc(body, body_ctx),
         }
     }
 
     /// [`Self::build_branch_statement_doc`] with the introducing gap's format-ignore freeze
     /// applied: an own-line directive in `[gap_start, body.start)` freezes the branch whole,
     /// over its own span, so a block's braces ride inside the slice.
-    fn build_branch_body_doc(&self, gap_start: u32, body: &Statement<'_>) -> DocId {
+    fn build_branch_body_doc(
+        &self,
+        gap_start: u32,
+        body: &Statement<'_>,
+        body_ctx: StatementContext,
+    ) -> DocId {
         self.build_statement_head_doc(gap_start, body.span(), || {
-            self.build_branch_statement_doc(body)
+            self.build_branch_statement_doc(body, body_ctx)
         })
     }
 
@@ -104,6 +116,7 @@ impl<'a> Printer<'a> {
         alternate: &Statement<'_>,
         else_end: u32,
         leading_space: bool,
+        ctx: StatementContext,
     ) {
         let d = self.d();
         let alt_start = alternate.span().start;
@@ -115,7 +128,13 @@ impl<'a> Printer<'a> {
             _ => false,
         };
         parts.push(d.text(if leading_space { " else" } else { "else" }));
-        let body_doc = self.build_branch_body_doc(else_end, alternate);
+        // Only the indented arm below wraps the body; the flush arm prints it on the
+        // `else`'s own line.
+        let body_doc = self.build_branch_body_doc(
+            else_end,
+            alternate,
+            ctx.clause_body(false, !flush_with_else),
+        );
         if flush_with_else {
             self.push_header_to_body_gap(parts, else_end, alt_start);
             parts.push(body_doc);
@@ -136,14 +155,16 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         alternate: &Statement<'_>,
         leading_space: bool,
+        ctx: StatementContext,
     ) {
         let d = self.d();
         if is_inline_alternate(alternate) {
+            // Inline alternate: on the `else`'s line with no indent wrap.
             parts.push(d.text(if leading_space { " else " } else { "else " }));
-            parts.push(self.build_branch_statement_doc(alternate));
+            parts.push(self.build_branch_statement_doc(alternate, ctx.clause_body(false, false)));
         } else {
             parts.push(d.text(if leading_space { " else" } else { "else" }));
-            parts.push(self.build_else_adjust_clause(alternate));
+            parts.push(self.build_else_adjust_clause(alternate, ctx));
         }
     }
 
@@ -170,6 +191,7 @@ impl<'a> Printer<'a> {
         alternate: &Statement<'_>,
         else_end: Option<u32>,
         leading_space: bool,
+        ctx: StatementContext,
     ) {
         let d = self.d();
         let alt_start = alternate.span().start;
@@ -187,9 +209,9 @@ impl<'a> Printer<'a> {
         } else if let Some(else_end) = else_end
             && self.has_comments_to_emit_between(else_end, alt_start)
         {
-            self.append_else_gap_and_body(parts, alternate, else_end, leading_space);
+            self.append_else_gap_and_body(parts, alternate, else_end, leading_space, ctx);
         } else {
-            self.append_else_keyword_body(parts, alternate, leading_space);
+            self.append_else_keyword_body(parts, alternate, leading_space, ctx);
         }
     }
 
@@ -237,14 +259,21 @@ impl<'a> Printer<'a> {
     ///
     /// The caller owns what follows: the `else` clause (which differs) and whether the
     /// whole statement is grouped.
-    fn build_if_head_and_consequent(&self, stmt: &internal::IfStatement<'_>) -> DocBuf {
+    fn build_if_head_and_consequent(
+        &self,
+        stmt: &internal::IfStatement<'_>,
+        ctx: StatementContext,
+    ) -> DocBuf {
         let (mut parts, paren_end) =
             self.build_paren_condition_head("if", stmt.span.start, &stmt.test);
+        // The consequent is always one `adjustClause` indent in, and an `else`
+        // CONTINUES on the line its tail flushes at (a block consequent ignores this).
+        let body_ctx = ctx.clause_body(stmt.alternate.is_some(), true);
         match stmt.consequent {
             // Block consequent: `if (` + condition + `) ` + block.
             Statement::BlockStatement(block) => {
                 self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-                parts.push(self.build_branch_body_doc(paren_end, stmt.consequent));
+                parts.push(self.build_branch_body_doc(paren_end, stmt.consequent, body_ctx));
             }
             // `if (cond);` or `if (cond) /* c */ ;`
             Statement::EmptyStatement(_) => {
@@ -261,7 +290,8 @@ impl<'a> Printer<'a> {
             // adjustClause groups with the body.
             _ => {
                 let body_start = stmt.consequent.span().start;
-                let consequent_doc = self.build_branch_body_doc(paren_end, stmt.consequent);
+                let consequent_doc =
+                    self.build_branch_body_doc(paren_end, stmt.consequent, body_ctx);
                 let head = std::mem::take(&mut parts);
                 parts.push(self.build_adjust_clause_with_comments(
                     &head,
@@ -305,9 +335,10 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_if_statement_doc(
         &self,
         stmt: &internal::IfStatement<'_>,
+        ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
-        let mut parts = self.build_if_head_and_consequent(stmt);
+        let mut parts = self.build_if_head_and_consequent(stmt, ctx);
 
         if let Some(alternate) = &stmt.alternate {
             let consequent_end = stmt.consequent.span().end;
@@ -324,7 +355,7 @@ impl<'a> Printer<'a> {
                 before_else_end,
                 matches!(stmt.consequent, Statement::BlockStatement(_)),
             );
-            self.append_else_clause(&mut parts, alternate, else_end, false);
+            self.append_else_clause(&mut parts, alternate, else_end, false, ctx);
         }
 
         let doc = d.concat(&parts);

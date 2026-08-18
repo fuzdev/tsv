@@ -17,6 +17,7 @@ mod try_jump;
 use smallvec::SmallVec;
 
 use crate::ast::internal::{Expression, Statement, UnaryOperator};
+use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -188,14 +189,15 @@ impl<'a> Printer<'a> {
     /// dispatch (a non-empty block is identical either way — `expand_empty` only affects the
     /// empty case). The `while` handler and `catch` inline their own block builds (extra
     /// close-paren handling / an always-block body), so they don't route through here.
-    fn build_collapsing_body_doc(&self, body: &Statement<'_>) -> DocId {
+    fn build_collapsing_body_doc(&self, body: &Statement<'_>, body_ctx: StatementContext) -> DocId {
         if let Statement::BlockStatement(block) = body {
             self.build_block_statement_doc(block)
         } else {
-            // Non-block body: its container is the control-flow statement
-            // itself, never Program/BlockStatement, so a bare string statement
-            // here is never directive-prologue eligible.
-            self.build_statement_doc(body, false)
+            // Non-block body: its container is the control-flow statement itself,
+            // never Program/BlockStatement — `body_ctx` is the caller's
+            // `clause_body` answer (whether the construct continues on the tail's
+            // flush line, and whether this arm indent-wraps the body).
+            self.build_statement_doc(body, body_ctx)
         }
     }
 
