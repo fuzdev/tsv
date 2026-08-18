@@ -2005,8 +2005,11 @@ pub(super) enum ArgItem {
     /// `build_arg_expression_doc` — argument context, so a binary/logical chain (or
     /// conditional) keeps its continuation indent and an assignment gets clarity parens.
     ArgContext,
-    /// `build_expression_doc` — the plain builder, for the arms that print their
-    /// arguments without that context (all-arrows, expand-first's broken-out fallback).
+    /// `build_expression_doc` — the plain builder. One caller, expand-first's broken-out
+    /// fallback, which is the only layout in the family that does not build its arguments
+    /// in argument context; the chain's spelling of that same fallback uses
+    /// [`Self::ArgContext`], so the two disagree on a breaking binary tail's continuation
+    /// indent.
     Plain,
 }
 
