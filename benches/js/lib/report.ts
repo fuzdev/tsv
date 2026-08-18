@@ -1178,7 +1178,7 @@ export type CoverageBySource = Map<string, Map<string, Map<string, SourceCoverag
  * deliberately kept: they read identically only while the *bindings and payloads*
  * agree, which is a claim, not a given — a wire-writer failure would show as
  * `-json` trailing `-internal`, and a broken binding error surface as a native/wasm
- * split (the oxc WASI consume-once bug, `bench.ts` `warn_variant_parity`). Folding
+ * split (the oxc WASI consume-once bug, `bench.ts` `check_variant_parity`). Folding
  * the columns per engine would erase exactly that signal, per source, where it is
  * most legible.
  */

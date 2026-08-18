@@ -1052,7 +1052,7 @@ and skip counts make it visible without `--verbose`.
   (`\uXXXX`) and literal non-ASCII identifiers are unaffected at any length, and so
   is the wasm binding (the overrun stays inside linear memory; it parses the same
   inputs cleanly — itself a variant-parity divergence, except the process dies before
-  `warn_variant_parity` can report it). test262's
+  `check_variant_parity` can report it). test262's
   `language/identifiers/part-unicode-*-{,class-}escaped.js` are exactly this shape,
   so the conformance corpus kills the whole run mid-preflight; the perf corpus has no
   such identifiers. A skip list is not a workaround: **which** files of that family
@@ -1077,11 +1077,19 @@ and skip counts make it visible without `--verbose`.
   Rule: read getter-backed napi-WASI result fields **once into a local**
   (`lib/oxc_wasm.ts` does; `lib/oxc.ts` mirrors the form defensively). Two guards
   exist: the single-read pattern at the wrappers, and `bench.ts`'s
-  `warn_variant_parity` — after pre-flight, same-engine pairs
+  `check_variant_parity` — after pre-flight, same-engine pairs
   (tsv↔tsv_wasm variants, oxc-parser↔oxc-parser-wasm, yuku-parser↔yuku-parser-wasm,
   rsvelte-parse↔rsvelte-parse-skip-expr-loc) are compared file-for-file and
   any accept-set divergence prints a `⚠ variant parity` warning (same engine ⇒ a
   divergence is a binding-boundary bug, not an engine difference).
+  ⚠️ **The tsv pair is graded on a second, STRONGER axis, and that one is FATAL**: an
+  accept set only records whether a file threw, so it is blind to two bindings of one
+  engine returning different CONTENT. For the rows `sibling_outputs_must_match` names
+  (tsv's own — the third-party pairs keep the warning, and rsvelte's option pair is
+  excluded because its variant drops payload by design), pre-flight digests each
+  output and a byte divergence over the files both accepted exits non-zero. Under Node
+  and Bun the native row IS the N-API addon on the `napi` profile, which makes this
+  the standing correctness check on the artifact the native npm packages ship.
 - **The oxc WASI binding also CAPS the `oxc-parser` pin.** It is force-fetched in
   lockstep with `oxc-parser` (§Cross-Runtime), so the pin decides which binding
   installs — and past the version named in `package.json`'s `//oxc-wasi` note the

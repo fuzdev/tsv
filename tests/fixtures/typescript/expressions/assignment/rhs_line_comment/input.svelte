@@ -24,4 +24,20 @@
 			b)
 	) {
 	}
+
+	// A comment the author GLUED to the operator trails it, and the value opens
+	// below — the same answer the declarator and the class field give.
+	a = // comment
+		expr;
+
+	a += // comment
+		expr;
+
+	const b = // comment
+		expr;
+
+	class C {
+		p = // comment
+			expr;
+	}
 </script>

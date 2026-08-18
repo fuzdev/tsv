@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 332,
+	"end": 602,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,120 @@
 					"column": 13
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment the author GLUED to the operator trails it, and the value opens",
+			"start": 324,
+			"end": 400,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " below — the same answer the declarator and the class field give.",
+			"start": 402,
+			"end": 469,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 475,
+			"end": 485,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 5
+				},
+				"end": {
+					"line": 30,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 501,
+			"end": 511,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 6
+				},
+				"end": {
+					"line": 33,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 532,
+			"end": 542,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 11
+				},
+				"end": {
+					"line": 36,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 569,
+			"end": 579,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 6
+				},
+				"end": {
+					"line": 40,
+					"column": 16
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 331,
+		"end": 601,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 322,
+			"end": 592,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 27,
+					"line": 43,
 					"column": 9
 				}
 			},
@@ -590,6 +686,341 @@
 							"end": 272
 						}
 					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 471,
+					"end": 493,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 471,
+						"end": 492,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 1
+							},
+							"end": {
+								"line": 31,
+								"column": 6
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 471,
+							"end": 472,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 1
+								},
+								"end": {
+									"line": 30,
+									"column": 2
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 488,
+							"end": 492,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 2
+								},
+								"end": {
+									"line": 31,
+									"column": 6
+								}
+							},
+							"name": "expr",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " comment",
+									"start": 475,
+									"end": 485
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment the author GLUED to the operator trails it, and the value opens",
+							"start": 324,
+							"end": 400
+						},
+						{
+							"type": "Line",
+							"value": " below — the same answer the declarator and the class field give.",
+							"start": 402,
+							"end": 469
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 496,
+					"end": 519,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 496,
+						"end": 518,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 1
+							},
+							"end": {
+								"line": 34,
+								"column": 6
+							}
+						},
+						"operator": "+=",
+						"left": {
+							"type": "Identifier",
+							"start": 496,
+							"end": 497,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 1
+								},
+								"end": {
+									"line": 33,
+									"column": 2
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 514,
+							"end": 518,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 2
+								},
+								"end": {
+									"line": 34,
+									"column": 6
+								}
+							},
+							"name": "expr",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " comment",
+									"start": 501,
+									"end": 511
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 522,
+					"end": 550,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 528,
+							"end": 549,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 7
+								},
+								"end": {
+									"line": 37,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 528,
+								"end": 529,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 7
+									},
+									"end": {
+										"line": 36,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 545,
+								"end": 549,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 6
+									}
+								},
+								"name": "expr",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " comment",
+										"start": 532,
+										"end": 542
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 553,
+					"end": 591,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 559,
+						"end": 560,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 7
+							},
+							"end": {
+								"line": 39,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 561,
+						"end": 591,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 9
+							},
+							"end": {
+								"line": 42,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 565,
+								"end": 588,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 2
+									},
+									"end": {
+										"line": 41,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 565,
+									"end": 566,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 2
+										},
+										"end": {
+											"line": 40,
+											"column": 3
+										}
+									},
+									"name": "p"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 583,
+									"end": 587,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 3
+										},
+										"end": {
+											"line": 41,
+											"column": 7
+										}
+									},
+									"name": "expr",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " comment",
+											"start": 569,
+											"end": 579
+										}
+									]
+								}
+							}
+						]
+					}
 				}
 			],
 			"sourceType": "module"
