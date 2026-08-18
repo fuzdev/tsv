@@ -97,7 +97,7 @@ The diff does NOT match any documented pattern in the `conformance_prettier*.md`
 
 1. Read `./docs/fixture_naming.md` and check existing fixtures
 2. Create a minimal fixture that demonstrates the issue
-3. **GET USER APPROVAL ON THE FIXTURE** (see [Phase 4.6](#46--get-user-approval-) for details)
+3. **GET USER APPROVAL ON THE FIXTURE** (see [Phase 4.3](#43--get-user-approval-) for details)
    - If working from an **approved plan** that specifies the fixture, approval is already satisfied — proceed directly
    - Otherwise, **STOP** and present the fixture for approval before continuing
 4. Fix the code to make the fixture pass
@@ -114,48 +114,54 @@ The diff does NOT match any documented pattern in the `conformance_prettier*.md`
 - **No guesswork**: You see exactly what's different before deciding
 - **Automatic categorization**: Known divergences are detected automatically
 
-### Anti-Patterns (Inline)
+### Priority order
 
-- Don't try to fix multiple issues at once
-- Don't skip the approval gate to "move faster" (plan-mode approval counts — interactive re-approval is redundant)
-- Don't ignore "unknown" differences - investigate them
-- **Don't implement fixes before getting fixture approval** - even if the fix is obvious
+Work the categories in this order, not in the order the report prints them:
 
-## Quick Reference
+1. **SAFETY (content loss) — always first.** Dropped comments, lost selectors, changed
+   values: the user loses code. One root cause routinely covers several files, so a
+   SAFETY fix is also the highest-yield one.
+2. **Errors (parse failures)** — usually a missing parser feature rather than a printer
+   bug. Check whether several errors share one cause before fixing them singly, and
+   expect the `unknown`/`partial` counts to **rise** as errors fall: a file that could
+   not be parsed at all now reaches the formatter and can disagree with prettier.
+3. **Unknown** (no hunk explained) — the standard fixture-first loop.
+4. **Partial** (some hunks explained) — investigate the unexplained hunks only.
 
-```bash
-# 1. Discover: Find differences (builds FFI first)
-deno task corpus:compare:format ~/dev/zzz
+### Bulk triage — the one carve-out from ONE FILE AT A TIME
 
-# 2. Isolate: Test minimal reproduction
-cargo run -p tsv_debug compare --content '<tag>...</tag>' --parser svelte
+When a corpus *expansion* surfaces dozens or hundreds of files at once (adding a suite,
+onboarding a repo), grouping comes before fixtures. The rule above governs
+**investigation**; it does not mean one fixture per corpus file.
 
-# 3. Fixture: Create or find existing
-find tests/fixtures -name "*pattern*"
-deno task fixtures:validate pattern
+1. **Scan the SAFETY / unknown lists for repeated shapes** — the `Missing:` summaries
+   cluster (e.g. many files losing comments around the same keyword pair).
+2. **Group by root cause** — take 2–3 representative files per group and bisect them with
+   `compare --content`. Same printer path ⇒ one root cause.
+3. **One fixture per root cause**, capturing the minimal pattern — not one per file. After
+   the fix, verify every file in the group resolved.
+4. **Approve at the group level** — present "15 files lose comments between `extends` and
+   `implements`; here is the fixture and the root cause", not fifteen separate gates.
 
-# 4. After fixing: Verify
-deno task fixtures:validate  # All fixtures pass
-deno task corpus:compare:format ~/dev/zzz  # Match rate improved
-```
+This is what keeps a 150-file surface from becoming 150 fixtures when 10 cover it.
 
 ## Workflow Phases
 
 ```
 DISCOVER → CATEGORIZE → CHECK FIXTURES → CREATE FIXTURE (if missing) → IMPLEMENT → VERIFY
-                                  ↓                   ↓
-                            Exists?              ★ USER APPROVAL
-                            Skip to IMPLEMENT       REQUIRED
-                                                 (satisfied by plan approval
-                                                  OR interactive approval)
+                              ↓                     ↓
+                       already covered?     ★ USER APPROVAL REQUIRED
+                       skip to IMPLEMENT    (plan-mode approval counts)
 ```
 
-**Phase 1: DISCOVER** - Run corpus:compare:format, identify patterns
-**Phase 2: CATEGORIZE** - Default output shows all unexplained diffs; use `--explain` for pattern details
-**Phase 3: CHECK FIXTURES** - Search for existing coverage
-**Phase 4: CREATE FIXTURE** - Define target behavior (★ requires approval)
-**Phase 5: IMPLEMENT** - Fix code to match fixtures
-**Phase 6: VERIFY** - Confirm improvement, no regressions
+| Phase | What it settles | Command that drives it |
+| --- | --- | --- |
+| [1 DISCOVER](#phase-1-discover) | what differs | `deno task corpus:compare:format --all` |
+| [2 CATEGORIZE](#phase-2-categorize) | known vs partial vs unknown | `deno task corpus:compare:format --all --explain` |
+| [3 CHECK FIXTURES](#phase-3-fixture-review) | is the pattern already pinned? | `find tests/fixtures -name '*pattern*' -type d` |
+| [4 CREATE FIXTURE](#phase-4-fixture-creation) | ★ the target behavior | `cargo run -p tsv_debug fixture_init …` |
+| [5 IMPLEMENT](#phase-5-implement) | the fix | `deno task fixtures:validate <pattern>` |
+| [6 VERIFY](#phase-6-verify) | improvement, no regressions | `deno task corpus:compare:format --all` |
 
 ---
 
@@ -265,54 +271,69 @@ The default output shows unexplained diffs and which patterns explain the explai
 
 ---
 
+### Common Root Causes
+
+Recurring shapes worth checking before reading the printer end to end. Each names the
+*symptom* first, because that is what the diff hands you.
+
+- **A comment is dropped at one gap.** A printer path builds its children's docs without
+  ever asking what sits between two span positions — typically a `build_*_doc(x)` call
+  reached straight from a delimiter or keyword, with no gap lookup for the region between
+  them. The gap emitters, the three lookup axes and the ownership hazards are stated in
+  [comments.md](./comments.md); read it before adding an emitter, since which lookup the
+  site needs is the part that is easy to get backwards.
+- **A blank line appears (or a comment moves) near stripped grouping parens.** When the
+  parser strips `(expr)` to `expr`, the expression's span excludes the `(` and `)`, so the
+  source between adjacent items holds bytes no node claims and a naive scan reads them as
+  an author blank. Not JSDoc-specific — any stripped grouping paren does it. Step over the
+  shell on the side you are scanning (`skip_stripped_open_paren` for the opening gap, the
+  `find_comma_pos` / `find_comma_after` family for the closing one) rather than measuring
+  from the node's own span.
+- **It diverges only when nested.** Break propagation or the indent context differs at
+  depth; the construct itself is fine. Compare the doc trees, not the outputs.
+- **It works for one variant and not its sibling.** Two paths print the same construct and
+  only one carries the fix. The frequent sub-shape is an **early-return optimization**
+  (expand-last-arg, single-argument hugging, function composition) firing ahead of the
+  general path that would have handled the comment. Bisect by varying the last argument's
+  type, the argument count, or the expression context until the path flips.
+- **The parser silently skips tokens.** An `is_*_start()` predicate doesn't recognize a
+  valid token, so the parser falls through to its skip-unexpected-token recovery and the
+  content vanishes — usually with no error, because recovery succeeded. Diagnose by
+  diffing `cargo run -p tsv_cli parse <file> --pretty` against
+  `cargo run -p tsv_debug canonical_parse <file>`: the missing nodes name the dropped
+  region.
+- **The parser uses the wrong grammar production.** A strict variant is called where a
+  permissive one is needed (nested CSS rules need relative selectors, which admit a
+  leading combinator; complex selectors forbid it). The permissive function often already
+  exists for a sibling context and only needs reusing.
+- **The disambiguation heuristic is too shallow.** A 1–2 token lookahead cannot separate
+  constructs whose difference sits far ahead — `span:hover { }` and `filter:blur(5px);`
+  both open `Identifier Colon`, and only the `{` versus `;` decides. Scan forward to a
+  definitive delimiter, skipping balanced parenthesized groups (a temporary lexer, no AST
+  allocation). Then check the *other* callers: the same decision usually has to be made in
+  at-rule block parsing too.
+- **A keyword means different things in two languages.** `as` is both a TS type assertion
+  and the `{#each}` binding separator, so a partial parser that disables it at the top
+  level works inside parens and fails outside them. Try the restricted parse, detect the
+  ambiguity, then re-parse with the keyword enabled — and use `canonical_parse` to see
+  which interpretation is correct.
+
+---
+
 ## Phase 3: Fixture Review
 
-Before creating fixtures, check if the pattern is already covered.
-
-### Search Existing Fixtures
+Before creating a fixture, check whether the pattern is already covered:
 
 ```bash
-# Find fixtures by keyword
-ls tests/fixtures/svelte/elements/
-ls tests/fixtures/typescript/expressions/
-ls tests/fixtures/css/at_rules/
-
-# Search fixture content
-grep -r "pattern" tests/fixtures/
-
-# Check for similar naming
-find tests/fixtures -name "*keyword*" -type d
+find tests/fixtures -name "*keyword*" -type d   # by name
+grep -r "pattern" tests/fixtures/               # by content
 ```
 
-### Load Naming Conventions
-
-**ALWAYS read before creating fixtures:**
-
-```bash
-cat docs/fixture_naming.md
-```
-
-Key reminders:
-
-- Generic names: `Comp`, `text`, `prop`, `a`, `b`, `expr`
-- Numeric suffixes only for multiples: `Comp1`, `Comp2` (not `Comp`, `Comp2`)
-- `_long` suffix for width-based wrapping tests
-- `_prettier_divergence` suffix for intentional differences
-
-### Study Similar Fixtures
-
-Find 2-3 similar fixtures and understand their structure:
-
-```bash
-# Example: studying element attribute fixtures
-cat tests/fixtures/svelte/elements/*/input.svelte
-```
-
-Note:
-
-- How many examples per fixture
-- What edge cases are included
-- Whether unformatted variants exist
+Then read 2–3 fixtures in the target category and match their shape — how many examples,
+which edge cases, which `unformatted_*` variants. The conventions themselves (generic
+names, the `_long` boundary rule, the divergence suffixes) live in
+[fixture_naming.md](./fixture_naming.md), which is required reading before every fixture
+and is not restated here.
 
 ---
 
@@ -329,65 +350,73 @@ Extract a minimal reproduction from the corpus file:
 cargo run -p tsv_debug compare --content '<div class="x" data-attr="y"></div>' --parser svelte
 ```
 
-Reduce to the smallest case that shows the difference.
+Reduce to the smallest case that shows the difference. Bisect in this order — each step
+narrows *what the trigger is*, not just how much text surrounds it:
 
-### 4.2 Create Fixture Directory
+1. Start from the corpus file's full diff and identify the affected construct.
+2. Extract that construct into a `--content` snippet.
+3. Simplify: drop surrounding nesting, control flow, function bodies.
+4. **Vary the construct's parent** — assignment vs declaration, chain vs standalone,
+   statement vs expression. A trigger that survives simplification but dies on a parent
+   change is a *path* bug, not a construct bug.
+5. Test the boundary: which context works and which fails.
 
-```bash
-mkdir -p tests/fixtures/[language]/[category]/[pattern_name]
-```
-
-### 4.3 Create input.svelte
-
-**Prefer `.svelte` over `.ts` or `.css`** - even for TypeScript/CSS-only patterns. The Svelte context (`<script>`/`<style>`) exercises the same code paths and has Prettier + Svelte plugin as a canonical source. Use `.ts` or `.css` only for file-level features that can't exist inside Svelte (e.g., hashbang at byte 0, BOM handling).
-
-Write the **Prettier-formatted** version (the target):
-
-```bash
-# Get Prettier's output
-cargo run -p tsv_debug format_prettier --content '<div class="x"></div>' --parser svelte
-
-# Or format a file
-cargo run -p tsv_debug format_prettier /tmp/test.svelte 2>/dev/null > tests/fixtures/.../input.svelte
-```
-
-**Verify input matches Prettier:**
+Worked example — a dropped comment in an assignment:
 
 ```bash
-cargo run -p tsv_debug format_prettier tests/fixtures/.../input.svelte 2>/dev/null > /tmp/p.svelte
-diff tests/fixtures/.../input.svelte /tmp/p.svelte && echo "✓ MATCH"
+# 1. The corpus file shows `node = (node.parentNode)` losing its cast comment
+cargo run -p tsv_debug compare /path/to/Sidebar.svelte
+
+# 2. Extract the pattern
+cargo run -p tsv_debug compare --content '<script>
+a = /** @type {T} */ (expr);
+</script>' --parser svelte  # FAILS — comment lost
+
+# 3. Vary the parent: the declaration form
+cargo run -p tsv_debug compare --content '<script>
+let a = /** @type {T} */ (expr);
+</script>' --parser svelte  # WORKS — so the trigger is the assignment path, not the cast
+
+# 4. Widen within that path
+cargo run -p tsv_debug compare --content '<script>
+a += /* comment */ expr;
+</script>' --parser svelte  # FAILS — every compound assignment too
 ```
 
-### 4.4 Generate expected.json
+For a SAFETY violation the corpus output's `Missing:` text names the lost content
+directly, which is the bisection's starting point rather than its result.
+
+### 4.2 Create the Fixture
+
+[fixture_workflow.md](./fixture_workflow.md) owns the mechanics. For an ordinary fixture
+`fixture_init` writes a prettier-formatted `input.svelte` **and** `expected.json` in one
+step, so don't hand-roll the directory, the prettier round-trip, or a separate
+`fixtures:update:parsed`:
 
 ```bash
-deno task fixtures:update:parsed [pattern]
+cargo run -p tsv_debug fixture_init tests/fixtures/<lang>/<category>/<name> --content '<code>'
+deno task fixtures:validate <name> --prettier-only   # structure only, skips our formatter
+deno task fixtures:validate <name>                   # should FAIL — that failure is the spec
 ```
 
-### 4.5 Validate Fixture Structure
+Prefer `.svelte` even for TypeScript- or CSS-only patterns
+([why](./fixture_overview.md#why-svelte-is-the-default-canonical-source)).
 
-```bash
-# First, validate with prettier only (skip our formatter)
-deno task fixtures:validate [pattern] --prettier-only
+⚠️ If the diff turns out to be a **new sanctioned divergence** rather than a bug, the
+fixture is built by hand instead — `fixture_init` formats the input *through prettier*,
+which overwrites exactly the form the divergence exists to claim. See
+[fixture_workflow.md §1.3](./fixture_workflow.md#13-manual-alternative), and catalog the
+divergence in the language's `conformance_prettier*.md` before adding a detector pattern.
 
-# Then check what fails with our formatter
-deno task fixtures:validate [pattern]
-```
+Two readings of that second run are corpus-specific:
 
-The `--prettier-only` flag validates fixture structure without running our parser/formatter. Use this to verify:
+- **It fails as expected** — good; the failing fixture defines the target behavior.
+- **It passes immediately** — either the bug was already fixed (re-check against the
+  corpus comparison) or the fixture doesn't capture the difference. The usual cause of the
+  latter is a reduction that dropped the trigger along with the context; go back to §4.1
+  and re-bisect from the last failing snippet.
 
-- input.svelte matches prettier's output (idempotent)
-- unformatted variants normalize correctly via prettier
-- Fixture files are properly structured
-
-At this point the fixture **should fail** when run without `--prettier-only` (because our formatter doesn't match yet). This is expected and correct - the failing test defines the target behavior.
-
-**If the fixture passes immediately**, either:
-
-- The issue was already fixed (verify with corpus comparison)
-- The fixture doesn't capture the actual difference (re-examine the pattern)
-
-### 4.6 ★ GET USER APPROVAL ★
+### 4.3 ★ GET USER APPROVAL ★
 
 **Do not proceed to implementation without user approval.**
 
@@ -423,6 +452,11 @@ Common locations:
 
 Fix the formatter to match Prettier's behavior (as defined by the fixture).
 
+**Test every path the construct has.** If it prints through more than one path — chain vs
+non-chain, a different parent context, an early-return optimization — exercise each. A fix
+in one path routinely reveals the identical bug in its sibling, and the fixture only
+covers the path it happens to reach.
+
 ### 5.3 Verify Fix
 
 ```bash
@@ -435,19 +469,11 @@ cargo run -p tsv_debug compare tests/fixtures/.../input.svelte
 
 ### 5.4 Add Unformatted Variants
 
-After the fix works, add normalization tests:
-
-```bash
-# Create unformatted_compact.svelte - minimal whitespace
-# Create unformatted_spaces.svelte - excessive whitespace
-```
-
-Verify variants normalize:
-
-```bash
-cargo run -p tsv_debug format_prettier tests/fixtures/.../unformatted_compact.svelte 2>/dev/null > /tmp/c.svelte
-diff tests/fixtures/.../input.svelte /tmp/c.svelte && echo "✓ compact normalizes"
-```
+Once the fix works, add the normalization variants — both formatters must reduce each to
+`input` byte-for-byte, and the `_compact` / `_spaces` pair is direction-graded by
+`variants:audit`. Rules and naming:
+[fixture_workflow.md §6.2](./fixture_workflow.md#62-add-variants),
+[fixture_naming.md](./fixture_naming.md#standard-variant-names).
 
 ---
 
@@ -542,25 +568,21 @@ cargo run -p tsv_debug line_width FILE --line N
 
 ### Never Do These
 
-1. **Change code before fixtures exist**
-   - Fixtures define correct behavior
-   - Without a fixture, there's no specification
-
-2. **Modify fixtures to make tests pass**
-   - Fixtures are the source of truth
-   - If tests fail, fix the code
-
-3. **Create fixtures for buggy behavior**
-   - `output_prettier.svelte` is for INTENTIONAL differences
-   - Not for "our formatter is wrong here"
-
-4. **Skip approval gates**
-   - User approval ensures fixtures are correct
-   - Catching errors early saves rework
-
-5. **Create fixtures without checking existing ones**
-   - May duplicate existing coverage
-   - Miss established patterns
+1. **Change code before a fixture exists** — without one there is no specification, only
+   an opinion about the diff.
+2. **Modify a fixture to make a test pass** — fixtures are the source of truth; a failure
+   means the code is wrong.
+3. **Create a fixture for buggy behavior** — `output_prettier.*` records an INTENTIONAL
+   difference, never "our formatter is wrong here".
+4. **Skip the approval gate** — including "the fix is obvious". Plan-mode approval counts;
+   interactive re-approval on top of it is redundant, but nothing else substitutes.
+5. **Create a fixture without checking existing ones** — duplicates coverage and misses
+   the established pattern for the category.
+6. **Fix several issues at once** — the corpus loop's traceability comes from one diff at
+   a time (see [Bulk triage](#bulk-triage--the-one-carve-out-from-one-file-at-a-time) for
+   the one carve-out, which groups *investigation*, not fixes).
+7. **Skip an "unknown" difference** — an unexplained diff is either a bug or a missing
+   catalog entry, and both are work.
 
 ### Red Flags
 
