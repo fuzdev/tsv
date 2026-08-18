@@ -205,26 +205,20 @@ impl<'a> Printer<'a> {
     /// ([`Self::delimiter_line_comment_prefix`]'s question, not this walk's).
     ///
     /// Used wherever such a gap is already broken across lines: the tuple, type
-    /// parameters and arguments, both parameter lists, and the angle-bracket cast.
+    /// parameters and arguments, both parameter lists, the union's leading-`|` form,
+    /// and the angle-bracket cast.
+    ///
+    /// The trailing run's **line** comment rides `line_suffix` (zero width, prettier's
+    /// `lineSuffix`), a block stays inline ([`Self::build_trailing_comment_doc`]). The
+    /// suffix flushes at the layout's own following hardline, so the bytes are identical
+    /// to an inline emission — except when the ELEMENT's doc already ends in a deferred
+    /// `//` (a stripped shell's comment): an inline `//` here landed AHEAD of that
+    /// pending suffix, which then flushed welded behind it (`a | b // inj // c2`,
+    /// reordered and reparsing as one comment). Deferred, the two meet the flush in
+    /// source order and the run separator breaks between them
+    /// (`doc/arena_render_suffix.rs`). Sound because every caller's separator lands on a
+    /// new line — the same condition the inline emission always required.
     pub(crate) fn build_trailing_gap_comments(&self, start: u32, end: u32) -> DocBuf {
-        self.build_trailing_gap_comments_ext(start, end, false)
-    }
-
-    /// As [`Self::build_trailing_gap_comments`], but when `suffix_trailing_lines` is set a
-    /// **line** comment in the trailing run is routed through `line_suffix` (zero width) so
-    /// it can't force the preceding element to break. Only safe where the following
-    /// separator lands on a *new* line (so the suffix flushes at that hardline without
-    /// crossing the separator) — true for the union's leading-`|` form and for a parameter
-    /// list this comment has already forced open, but NOT the intersection's trailing-`&`
-    /// form (a same-line `//` there would otherwise comment out the `&`; that case is
-    /// handled as a comment-position divergence instead).
-    pub(crate) fn build_trailing_gap_comments_ext(
-        &self,
-        start: u32,
-        end: u32,
-        suffix_trailing_lines: bool,
-    ) -> DocBuf {
-        let d = self.d();
         let mut parts = DocBuf::new();
         let run_end = self.closer_trailing_run_end(start, end);
         let mut prev_end = start;
@@ -232,14 +226,7 @@ impl<'a> Printer<'a> {
         let mut prev_comment: Option<&internal::Comment> = None;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             if comment.span.end <= run_end {
-                if suffix_trailing_lines {
-                    // Block → inline (width counted); line → line_suffix (zero width).
-                    parts.push(self.build_trailing_comment_doc(comment));
-                } else {
-                    // Trailing: inline, behind the item.
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
+                parts.push(self.build_trailing_comment_doc(comment));
             } else {
                 // Own line comment (block or line) — unless the author GLUED it to the
                 // previous one, which keeps that line. Otherwise an author blank line
@@ -1065,31 +1052,6 @@ impl<'a> Printer<'a> {
         let comments: CommentVec<'_> =
             comments_to_emit_in_range(self.comments, gap_start, item_start).collect();
         self.first_member_leading_comments(comments, delimiter_pull)
-    }
-
-    /// Build a line_suffix doc for all comments between two positions
-    ///
-    /// Used for trailing comments on call arguments, where comments should stay
-    /// on the same line but not affect width calculations for breaking decisions.
-    /// Returns None if no comments exist in the range.
-    ///
-    /// Example: `fn(arg // comment)` - the comment becomes a line_suffix
-    pub(crate) fn build_trailing_comments_line_suffix(
-        &self,
-        start: u32,
-        end: u32,
-    ) -> Option<DocId> {
-        let d = self.d();
-        let mut in_range = comments_to_emit_in_range(self.comments, start, end).peekable();
-        in_range.peek()?;
-
-        let mut parts = DocBuf::new();
-        for comment in in_range {
-            parts.push(d.text(" "));
-            parts.push(self.build_comment_doc(comment));
-        }
-
-        Some(d.line_suffix(d.concat(&parts)))
     }
 
     /// Build a Doc for an empty body (`{}`) that may contain comments.
