@@ -8,11 +8,12 @@ use smallvec::SmallVec;
 use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixBuf, RenderIndent};
 use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
+use super::arena_render_suffix::flush_line_suffix;
 use super::render_config::RenderConfig;
 #[cfg(feature = "comment_check")]
 use super::render_config::RenderPurpose;
 #[cfg(feature = "swallow_check")]
-use super::swallow::SwallowTracker;
+use super::swallow::{self, SwallowTracker};
 use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, resolve_text};
 #[cfg(feature = "comment_check")]
 use crate::comment_ledger;
@@ -231,7 +232,7 @@ pub(super) fn trim_trailing_whitespace(output: &mut String) {
 
 /// Render a line break.
 #[inline]
-fn render_line_break(
+pub(super) fn render_line_break(
     kind: LineKind,
     mode: Mode,
     indent: RenderIndent,
@@ -242,6 +243,11 @@ fn render_line_break(
 ) -> bool {
     let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
     if mode == Mode::Break || is_hard {
+        // The one newline seam in the renderer, so the swallow diagnostic's "the line
+        // ended" signal belongs here rather than on a per-render handle — see
+        // [`swallow::note_line_end`].
+        #[cfg(feature = "swallow_check")]
+        swallow::note_line_end();
         if kind == LineKind::Literal {
             // Literal line (template literals): preserve trailing whitespace
             output.push('\n');
@@ -279,14 +285,14 @@ fn render_line_break(
 // `render_doc_core`.
 #[allow(clippy::too_many_arguments)]
 #[inline]
-fn render_line_node<P: RenderPolicy>(
+fn render_line_node(
     ctx: &RenderCtx<'_>,
     kind: LineKind,
     mode: Mode,
     indent: RenderIndent,
     output: &mut String,
     pos: &mut usize,
-    policy: &mut P,
+    tracking_suffix: bool,
     line_suffix: &mut LineSuffixBuf,
     should_remeasure: &mut bool,
 ) {
@@ -298,46 +304,12 @@ fn render_line_node<P: RenderPolicy>(
     if is_hard && mode == Mode::Flat {
         *should_remeasure = true;
     }
-    if policy.tracking_suffix() && (mode == Mode::Break || is_hard) {
-        flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
+    if tracking_suffix && (mode == Mode::Break || is_hard) {
+        flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure, indent);
     }
-    // A real newline ends the comment's line → clears the pending swallow.
-    let emitted_newline = render_line_break(kind, mode, indent, output, pos, ctx.render, ctx.embed);
-    #[cfg(feature = "swallow_check")]
-    policy.swallow_on_newline(emitted_newline);
-    #[cfg(not(feature = "swallow_check"))]
-    let _ = emitted_newline;
-}
-
-/// Flush pending line suffix content, in the order it was queued.
-///
-/// Prettier flushes by re-pushing the buffer onto its command *stack*
-/// (`commands.push(line, ...lineSuffix.reverse())`, `printer.js`) — the `reverse()`
-/// there exists only to cancel the stack's LIFO pop, so the net emission order is
-/// FIFO. This renderer drives the suffixes directly, so it must iterate forward:
-/// reversing here would emit two suffixes queued on one line back-to-front.
-fn flush_line_suffix(
-    ctx: &RenderCtx<'_>,
-    line_suffix: &mut LineSuffixBuf,
-    output: &mut String,
-    pos: &mut usize,
-    should_remeasure: &mut bool,
-) {
-    if line_suffix.is_empty() {
-        return;
-    }
-    for suffix_cmd in std::mem::take(line_suffix) {
-        render_single_doc_inner(
-            ctx,
-            suffix_cmd.doc,
-            output,
-            pos,
-            suffix_cmd.indent,
-            suffix_cmd.mode,
-            None,
-            should_remeasure,
-        );
-    }
+    // A real newline ends the comment's line → clears the pending swallow, inside
+    // `render_line_break` itself.
+    render_line_break(kind, mode, indent, output, pos, ctx.render, ctx.embed);
 }
 
 /// Process an IndentIfBreak node.
@@ -556,8 +528,6 @@ trait RenderPolicy {
     fn swallow_enabled(&self) -> bool;
     #[cfg(feature = "swallow_check")]
     fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str);
-    #[cfg(feature = "swallow_check")]
-    fn swallow_on_newline(&mut self, emitted: bool);
 }
 
 /// Policy for [`render_doc_iterative`]: resolves keyed groups into a
@@ -605,12 +575,6 @@ impl RenderPolicy for TopLevelPolicy {
     #[inline]
     fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
         self.swallow.on_text(is_line_comment, text, output);
-    }
-
-    #[cfg(feature = "swallow_check")]
-    #[inline]
-    fn swallow_on_newline(&mut self, emitted: bool) {
-        self.swallow.on_newline(emitted);
     }
 }
 
@@ -665,12 +629,6 @@ impl RenderPolicy for SingleDocPolicy {
     fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
         self.swallow.on_text(is_line_comment, text, output);
     }
-
-    #[cfg(feature = "swallow_check")]
-    #[inline]
-    fn swallow_on_newline(&mut self, emitted: bool) {
-        self.swallow.on_newline(emitted);
-    }
 }
 
 /// Command-stack-based rendering with look-ahead — the top-level renderer
@@ -715,7 +673,14 @@ fn render_doc_iterative(
         &mut should_remeasure,
     );
 
-    flush_line_suffix(ctx, &mut line_suffix, output, pos, &mut should_remeasure);
+    flush_line_suffix(
+        ctx,
+        &mut line_suffix,
+        output,
+        pos,
+        &mut should_remeasure,
+        RenderIndent::level(start_indent_level),
+    );
 }
 
 /// The shared command-stack render loop with look-ahead — the single
@@ -827,7 +792,7 @@ fn render_doc_core<P: RenderPolicy>(
                         cmd.indent,
                         output,
                         pos,
-                        policy,
+                        policy.tracking_suffix(),
                         line_suffix,
                         should_remeasure,
                     );
@@ -849,7 +814,7 @@ fn render_doc_core<P: RenderPolicy>(
                     cmd.indent,
                     output,
                     pos,
-                    policy,
+                    policy.tracking_suffix(),
                     line_suffix,
                     should_remeasure,
                 );
@@ -1120,7 +1085,7 @@ fn render_doc_core<P: RenderPolicy>(
                         cmd.indent,
                         output,
                         pos,
-                        policy,
+                        policy.tracking_suffix(),
                         line_suffix,
                         should_remeasure,
                     );
@@ -1176,7 +1141,7 @@ pub(super) fn render_single_doc(
         Some(&mut line_suffix),
         should_remeasure,
     );
-    flush_line_suffix(ctx, &mut line_suffix, output, pos, should_remeasure);
+    flush_line_suffix(ctx, &mut line_suffix, output, pos, should_remeasure, indent);
 }
 
 /// Unified single-doc renderer with optional suffix handling — the
@@ -1195,7 +1160,7 @@ pub(super) fn render_single_doc(
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
 #[allow(clippy::too_many_arguments)]
-fn render_single_doc_inner(
+pub(super) fn render_single_doc_inner(
     ctx: &RenderCtx<'_>,
     doc: DocId,
     output: &mut String,

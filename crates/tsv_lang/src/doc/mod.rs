@@ -24,6 +24,7 @@ pub mod arena;
 mod arena_fits;
 mod arena_render;
 mod arena_render_fill;
+mod arena_render_suffix;
 mod render_config;
 #[cfg(feature = "swallow_check")]
 pub mod swallow;
