@@ -1225,18 +1225,20 @@ fn build_chain_args_multi(
     // Expression arrow with call/conditional expression body
     // Prettier keeps preceding args inline and breaks after =>
     // e.g., `a.b(c, (x) =>\n  fn(x, ...),\n);`
-    // couldExpandArg keys only on the body type — param/return type annotations
-    // don't disable the hug, so a typed arrow expands the same way (its full
-    // signature is emitted via build_arrow_sig_doc).
+    // couldExpandArg keys only on the body — param/return type annotations don't disable
+    // the hug, so a typed arrow expands the same way (its full signature is emitted via
+    // build_arrow_sig_doc).
     if call.arguments.len() >= 2
         && !comments_force_expansion
         && !(has_any_comments && last_arg_commented)
         && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-        && matches!(
-            &**body_expr,
-            Expression::CallExpression(_) | Expression::ConditionalExpression(_)
-        )
+        // …and it reads the body through prettier's `stripChainElementWrappers`, so a call
+        // reached through a trailing `!` is expandable too — the same pair the plain-call /
+        // `new` twin asks ([`try_expand_last_arg`]). Asking the bare node kind here declined
+        // the ladder for `(x) => fn(x)!` and broke every argument out, where both other
+        // spellings — and prettier — keep the head inline.
+        && (arrow_body_is_call_through_non_null(body_expr) || is_ternary_arrow_body(body_expr))
         // The reassembling arm's refusal pair, which bites here exactly as it does in the
         // single-argument arms above (`arrow_hug_refused_by_comments`).
         && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
