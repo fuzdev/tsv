@@ -13,12 +13,11 @@ use super::arg_predicates::{
 };
 use super::arg_wrapping::{
     ArgOpener, arrow_body_expands_internally, arrow_hug_refused_by_comments, build_args_split_last,
-    build_arrow_sig_doc, build_break_body_state, build_expand_all_args,
-    build_expand_last_obj_array_doc, build_inline_args, build_inline_hug_or_expand_all,
-    build_inline_or_expand_all, build_own_line_post_arrow_doc, build_own_line_post_arrow_expanded,
-    could_expand_arrow_chain, last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
-    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
-    prebuild_own_line_post_arrow_body, prepend_arrow_body_comments,
+    build_arrow_gap_break_multi_arg_doc, build_arrow_sig_doc, build_break_body_state,
+    build_expand_all_args, build_expand_last_obj_array_doc, build_inline_args,
+    build_inline_hug_or_expand_all, build_inline_or_expand_all, could_expand_arrow_chain,
+    last_arg_arrow_gap_break, last_two_args_same_type, prebuild_expand_last_break_body,
+    prebuild_expand_last_obj_array_body, prepend_arrow_body_comments,
 };
 use crate::ast::internal;
 use crate::printer::Printer;
@@ -133,14 +132,17 @@ pub(super) fn try_expand_last_arg(
         }
         _ => true,
     };
-    // …with one exception, which is why prettier can ask `couldExpandArg` late: an own-line
-    // comment after `=>` selects its own state ([`last_arg_has_own_line_post_arrow_comment`])
+    // …with one exception, which is why prettier can ask `couldExpandArg` late: a broken
+    // `=>`→body gap selects its own state ([`last_arg_arrow_gap_break`])
     // ahead of any body-kind question, for a non-eligible body too. That state needs the
     // argument docs, so it keeps the block below — and returns from inside it, so no second
     // build follows.
-    let takes_own_line_post_arrow_state = has_comments
-        && last_arg.is_some_and(|last| last_arg_has_own_line_post_arrow_comment(printer, last));
-    if !(hug_eligible || takes_own_line_post_arrow_state) {
+    let arrow_gap_break = if has_comments {
+        last_arg.and_then(|last| last_arg_arrow_gap_break(printer, last))
+    } else {
+        None
+    };
+    if !(hug_eligible || arrow_gap_break.is_some()) {
         return None;
     }
 
@@ -178,23 +180,28 @@ pub(super) fn try_expand_last_arg(
     // Expand-last arrow whose body is a call / object / array: build the body ONCE and inject it
     // so the whole-arrow arg doc reuses it (the break-body / hug state below reuses it too).
     // Building it in both places recurses into itself → O(2^depth).
-    let body_reuse = prebuild_expand_last_break_body(printer, last_arg, has_comments);
-    let obj_reuse = if body_reuse.is_none() {
-        prebuild_expand_last_obj_array_body(printer, last_arg)
+    //
+    // The gap-break gate above already built one for the state it selects — that state's ladder
+    // reaches shapes neither prebuild here covers (a block terminal, a plain expression body),
+    // and it is also what answers the gate's own width half. So when the gate fired, these two
+    // are skipped outright: the state below returns before either arm that reads them, and
+    // building the object/array one again would be the exact second build this whole
+    // pre-building exists to avoid.
+    let (body_reuse, obj_reuse) = if arrow_gap_break.is_some() {
+        (None, None)
     } else {
-        None
-    };
-    // The own-line-post-arrow state builds a SECOND printing of the last argument, so the
-    // shapes its ladder reaches but the two prebuilds above do not — a block terminal, a plain
-    // expression body — want an injection of their own, armed here so the body is built ONCE
-    // and shared with the `printedArguments` docs below.
-    let own_line_reuse =
-        if body_reuse.is_none() && obj_reuse.is_none() && takes_own_line_post_arrow_state {
-            prebuild_own_line_post_arrow_body(printer, last_arg)
+        let call_body = prebuild_expand_last_break_body(printer, last_arg, has_comments);
+        let obj_body = if call_body.is_none() {
+            prebuild_expand_last_obj_array_body(printer, last_arg)
         } else {
             None
         };
-    let inject = body_reuse.or(obj_reuse).or(own_line_reuse);
+        (call_body, obj_body)
+    };
+    let inject = match &arrow_gap_break {
+        Some(gap_break) => gap_break.inject,
+        None => body_reuse.or(obj_reuse),
+    };
 
     let (head_parts, last_arg_doc, all_args_broken) = printer
         .with_arrow_body_inject(inject, || {
@@ -206,24 +213,19 @@ pub(super) fn try_expand_last_arg(
         return Some(build_expand_all_args(d, callee, all_args_broken));
     }
 
-    // An own-line comment after `=>` drops the closing paren to its own line, asked above every
-    // body-kind arm for the reason [`last_arg_has_own_line_post_arrow_comment`] gives.
-    if has_comments
+    // A broken `=>`→body gap drops the closing paren to its own line, asked above every
+    // body-kind arm for the reason [`last_arg_arrow_gap_break`] gives.
+    if arrow_gap_break.is_some()
         && let Some(last) = last_arg
-        && last_arg_has_own_line_post_arrow_comment(printer, last)
     {
-        // The state reads the `expandLastArg` printing (flat parameters) and the fallback the
-        // `printedArguments` one — see [`build_own_line_post_arrow_doc`] for why neither can
-        // stand in for the other.
-        let expanded = build_own_line_post_arrow_expanded(printer, inject, last_arg_doc, || {
-            printer.build_expression_doc(last)
-        });
-        return Some(build_own_line_post_arrow_doc(
-            d,
+        return Some(build_arrow_gap_break_multi_arg_doc(
+            printer,
             ArgOpener::Callee(callee),
+            inject,
             &head_parts,
-            expanded,
+            last_arg_doc,
             all_args_broken,
+            || printer.build_expression_doc(last),
         ));
     }
 

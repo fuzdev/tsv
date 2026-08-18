@@ -2223,7 +2223,9 @@ impl<'a> Printer<'a> {
     /// [`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
     /// at the seams whose remaining layouts already render the width-driven case
     /// (the simple `:` annotation, the spread's dots→argument gap, the `await`
-    /// keyword→argument gap, the arrow's hug arm). A value that fits declines,
+    /// keyword→argument gap). The arrow's hug arm spells the same pair out itself
+    /// — its geometry half is [`Printer::arrow_gap_broke_after_run`], which the
+    /// enclosing call must ask too. A value that fits declines,
     /// and the caller keeps its glued path. The declarator and
     /// assignment-expression `=` instead split the gate — geometry here, the two
     /// break halves via

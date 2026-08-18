@@ -16,15 +16,14 @@ use super::arg_predicates::{
 };
 use super::arg_wrapping::{
     ArgItem, ArgOpener, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
-    arrow_hug_refused_by_comments, build_args_split_last, build_arrow_hug_arg_docs,
-    build_arrow_sig_doc, build_break_body_state, build_chain_expand_all_args,
-    build_expand_last_obj_array_doc, build_flat_params_arg_doc, build_own_line_post_arrow_arg_docs,
-    build_own_line_post_arrow_doc, build_own_line_post_arrow_expanded, build_printed_argument_doc,
-    classify_chain_arg, first_arg_signature_refuses_expand_first,
-    last_arg_has_own_line_post_arrow_comment, last_two_args_same_type,
+    arrow_hug_refused_by_comments, build_args_split_last, build_arrow_gap_break_multi_arg_doc,
+    build_arrow_gap_break_single_arg_doc, build_arrow_hug_arg_docs, build_arrow_sig_doc,
+    build_break_body_state, build_chain_expand_all_args, build_expand_last_obj_array_doc,
+    build_flat_params_arg_doc, build_printed_argument_doc, classify_chain_arg,
+    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break, last_two_args_same_type,
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
-    prebuild_own_line_post_arrow_body, prepend_arrow_body_comments, should_expand_first_arg,
-    try_hook_deps_args_doc, wrap_args_with_soft_breaks, wrap_huggable_arg,
+    prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
+    wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
 use crate::printer::expressions::functions::{
@@ -763,29 +762,26 @@ fn build_chain_args_single(
 
     let arg = &call.arguments[0];
 
-    // An own-line comment between `=>` and the body forces the closing paren onto its own
+    // A broken `=>`→body gap forces the closing paren onto its own
     // line. Above every body-kind arm below, because the rule is the gap's and not the
-    // body's — see [`last_arg_has_own_line_post_arrow_comment`]. The argument doc is built
+    // body's — see [`last_arg_arrow_gap_break`]. The argument doc is built
     // here rather than reused from an arm because the arms below never run for this shape;
     // asking the cheap comment question first keeps that build off every other path.
     if has_any_comment_text
         && !last_arg_commented
-        && last_arg_has_own_line_post_arrow_comment(printer, arg)
+        && let Some(gap_break) = last_arg_arrow_gap_break(printer, arg)
     {
         // ⚠️ This arm used to build ONE doc with flat parameters, which is right for a state
         // that can fall through and wrong for one that cannot: with no `allArgsBrokenOut()`
         // behind it, a flattened signature too wide for the line simply overflowed. The two
-        // printings and the ladder go together ([`build_own_line_post_arrow_doc`]).
-        let docs = build_own_line_post_arrow_arg_docs(printer, arg, || {
-            printer.build_arg_expression_doc(arg)
-        })
-        .with_leading(d, leading_comment_doc);
-        parts.push(build_own_line_post_arrow_doc(
-            d,
+        // printings and the ladder go together — the shared entry point owns that pairing.
+        parts.push(build_arrow_gap_break_single_arg_doc(
+            printer,
             ArgOpener::ChainPrefix(prefix),
-            &[],
-            docs.expanded,
-            docs.printed,
+            arg,
+            &gap_break,
+            leading_comment_doc,
+            || printer.build_arg_expression_doc(arg),
         ));
         return d.concat(&parts);
     }
@@ -1177,45 +1173,32 @@ fn build_chain_args_multi(
         ..
     } = ctx;
 
-    // An own-line comment between the last argument's `=>` and its body forces the closing
+    // A broken `=>`→body gap on the last argument forces the closing
     // paren onto its own line. Above every body-kind arm below, because the rule is the
-    // gap's and not the body's — see [`last_arg_has_own_line_post_arrow_comment`]. The
+    // gap's and not the body's — see [`last_arg_arrow_gap_break`]. The
     // cheap comment question gates the split-last build, so no other path pays for it.
     if call.arguments.len() >= 2
         && has_any_comment_text
         && !comments_force_expansion
         && !last_arg_commented
         && let Some(last) = call.arguments.last()
-        && last_arg_has_own_line_post_arrow_comment(printer, last)
+        && let Some(gap_break) = last_arg_arrow_gap_break(printer, last)
     {
-        // The body both printings share, armed around each — see
-        // [`prebuild_own_line_post_arrow_body`].
-        let body_reuse = prebuild_own_line_post_arrow_body(printer, Some(last));
+        // The body both printings share, armed around each — built by the gate above.
+        let body_reuse = gap_break.inject;
         let (head_parts, printed_last_arg_doc, all_args_broken) = printer
             .with_arrow_body_inject(body_reuse, || {
                 build_args_split_last(call.arguments, printer, paren_open, has_any_comments)
             });
-        // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut() — asked before the
-        // second printing below, which only the state past this bail reads.
-        if head_parts.iter().any(|&id| d.will_break(id)) {
-            parts.push(build_chain_expand_all_args(d, prefix, all_args_broken));
-        } else {
-            // The state reads the `expandLastArg` printing (flat parameters) and the fallback
-            // the `printedArguments` one — see [`build_own_line_post_arrow_doc`].
-            let expanded = build_own_line_post_arrow_expanded(
-                printer,
-                body_reuse,
-                printed_last_arg_doc,
-                || printer.build_arg_expression_doc(last),
-            );
-            parts.push(build_own_line_post_arrow_doc(
-                d,
-                ArgOpener::ChainPrefix(prefix),
-                &head_parts,
-                expanded,
-                all_args_broken,
-            ));
-        }
+        parts.push(build_arrow_gap_break_multi_arg_doc(
+            printer,
+            ArgOpener::ChainPrefix(prefix),
+            body_reuse,
+            &head_parts,
+            printed_last_arg_doc,
+            all_args_broken,
+            || printer.build_arg_expression_doc(last),
+        ));
         return d.concat(&parts);
     }
 
