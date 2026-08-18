@@ -6,6 +6,7 @@
 use super::super::OpenParenLineBlockComment;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
+use crate::printer::statements::StatementContext;
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 
@@ -17,6 +18,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_while_statement_doc(
         &self,
         stmt: &internal::WhileStatement<'_>,
+        ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
         // The head every arm below shares, built once — the same one the `if` printer
@@ -44,7 +46,10 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
             let body_start = stmt.body.span().start;
             let body_doc = self.build_statement_head_doc(paren_end, stmt.body.span(), || {
-                self.build_statement_doc(stmt.body, false)
+                // `adjustClause` wraps the body in one indent in every arm; nothing
+                // continues on the tail's line, so the tail falls through to whatever
+                // flushes the while's own position.
+                self.build_statement_doc(stmt.body, ctx.clause_body(false, true))
             });
             self.build_adjust_clause_with_comments(&parts, paren_end, body_start, body_doc)
         }
@@ -53,22 +58,30 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_do_while_statement_doc(
         &self,
         stmt: &internal::DoWhileStatement<'_>,
+        ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
         let is_block = matches!(stmt.body, Statement::BlockStatement(_));
 
         // Check for comments between `do` keyword and body
         let do_end = stmt.span.start + "do".len() as u32;
+        let body_start = stmt.body.span().start;
+        // The body's container facts: the `while` CONTINUES on the tail's flush line,
+        // and only the broken header→body arm below wraps the body in an indent — the
+        // plain `do body` spelling is inline, so its tail dedents zero levels.
+        let gap_has_comments = self.has_comments_to_emit_between(do_end, body_start);
+        let gap_breaks_body =
+            gap_has_comments && self.header_to_body_gap_breaks(do_end, body_start) && !is_block;
+        let body_ctx = ctx.clause_body(true, gap_breaks_body);
         // A loop body collapses its empty block form (`do {} while (cond)`) — unless an
         // own-line directive in the `do`→body gap freezes it.
         let body_doc = self.build_statement_head_doc(do_end, stmt.body.span(), || {
-            self.build_collapsing_body_doc(stmt.body)
+            self.build_collapsing_body_doc(stmt.body, body_ctx)
         });
 
-        let body_start = stmt.body.span().start;
-        let mut parts = if self.has_comments_to_emit_between(do_end, body_start) {
+        let mut parts = if gap_has_comments {
             let mut p = smallvec![d.text("do")];
-            if self.header_to_body_gap_breaks(do_end, body_start) && !is_block {
+            if gap_breaks_body {
                 // Non-block body whose run breaks: the run shares the body's indent, with
                 // a `//` normalized onto its own line — prettier does the same here, so
                 // there is nothing to preserve.
@@ -151,7 +164,13 @@ impl<'a> Printer<'a> {
         // `push_semicolon_with_gap_comments`.
         if let Some(close) = close_paren {
             parts.push(d.text(")"));
-            self.push_semicolon_with_gap_comments(&mut parts, close + 1, stmt.span.end, true);
+            self.push_semicolon_with_gap_comments(
+                &mut parts,
+                close + 1,
+                stmt.span.end,
+                true,
+                ctx.clause_tail(),
+            );
         } else {
             parts.push(d.text(");"));
         }
