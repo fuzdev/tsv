@@ -32,6 +32,7 @@ use super::arg_wrapping::{
     try_hook_deps_args_doc,
 };
 use crate::ast::internal::{self, Expression};
+use crate::printer::chain::call_callee_paren_leading_start;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, callback_signature_has_breaking_comments,
     function_signature_has_breaking_comments, prepend_leading,
@@ -302,9 +303,11 @@ fn build_call_args_doc_for_chain_impl(
     // Get paren_open position (after type args if present, otherwise after the callee —
     // or past the `)` of an IIFE callee's own pair, which emitted its trailing gap
     // itself, so nothing here scans through those parens a second time).
+    let callee_end = call.callee.span().end;
     let callee_gap_start = Printer::gap_start_after_owned_pair(
-        call.callee.span().end,
-        printer.owned_pair_trailing_gap(call.callee, crate::printer::ParenContext::Callee),
+        callee_end,
+        printer
+            .owned_pair_trailing_gap(callee_end, call_callee_paren_leading_start(call).is_some()),
     );
     let paren_open = type_args.map_or(callee_gap_start, |ta| ta.span.end);
 

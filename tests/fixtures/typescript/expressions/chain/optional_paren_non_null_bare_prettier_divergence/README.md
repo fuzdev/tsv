@@ -19,7 +19,14 @@ short-circuited — and both formatters keep them (see
 
 ## Reason
 
-Design choice: strip parens that carry no meaning. Matches Biome; content is identical
-(ASTs match) — only the redundant parens differ.
+Design choice: strip parens that carry no meaning. Matches Biome.
+
+⚠️ The two spellings do **not** have identical ESTree ASTs — they nest the chain
+boundary the other way round (`TSNonNull(ChainExpression(Member))` for `(a?.b)!`,
+`ChainExpression(TSNonNull(Member))` for `a?.b!`), and that difference is exactly what
+the required-paren case preserves the author's `!` placement for. The **bare** position
+is the one place it is inert: with no access following, nothing can be short-circuited,
+the `!` is erased at runtime, and the two type identically. The strip is sanctioned
+there and nowhere else.
 
 See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript.

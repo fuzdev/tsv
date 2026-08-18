@@ -10,8 +10,18 @@ A **line** comment between a control-flow keyword and its condition `(`
   (`if (⏎ // c⏎ a⏎)`), and for `for` past the header to before the body
   (`for (;;) // c⏎{`).
 
-Emitting the comment inline (the previous behavior) let the `//` run to
-end-of-line and swallow the `(` — non-idempotent content loss that failed to
-reparse. Per comment placement policy, the authored position is preserved.
+Emitting the comment inline let the `//` run to end-of-line and swallow the `(` —
+non-idempotent content loss that failed to reparse. Per comment placement policy,
+the authored position is preserved.
 
-See [conformance_prettier_ts_comments.mdNone](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation) §Comment relocation.
+⚠️ The **flush** continuation here is the family's own answer, not an unreached
+site of [§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent).
+All five statement headers agree on it (`for await` too, its extra gap pinned by
+[for_await_keyword_line_comment](../../../statements/for/for_await_keyword_line_comment_prettier_divergence/)),
+and what continues here is not a construct's tail but the whole rest of the
+statement — condition, `{`, body and closing `}` — which the body's own indent
+already positions. The expression-level keyword→operand gaps, where the tail *is*
+an operand, do take the indent
+([await_new_operand_line_comment](../../../expressions/await_new_operand_line_comment_prettier_divergence/)).
+
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

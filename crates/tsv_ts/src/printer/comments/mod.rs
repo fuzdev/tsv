@@ -44,7 +44,7 @@ pub(super) use element_comma::{block_is_before_comma, next_real_element_start, r
 pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
 pub(crate) use member_body::{MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam};
 pub(crate) use owned::OwnedCommentEffect;
-pub(crate) use paren::{ParenLeadingValue, paren_pair_keeps_leading_run};
+pub(crate) use paren::{ParenLeadingValue, paren_pair_keeps_leading_run, paren_shell_close_after};
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};
@@ -125,6 +125,19 @@ pub(crate) enum RunLeadingBlank {
     Keep,
     /// A leading run: the blank sits above the run, where prettier cannot emit one.
     Drop,
+}
+
+/// The shape a **keyword→operand** gap takes — [`Printer::keyword_operand_gap`], whose
+/// doc carries the rule. `new`→callee and `await`→operand are its two sites.
+#[derive(Clone, Copy)]
+pub(crate) enum KeywordOperandGap {
+    /// A comment in the gap ENDS A LINE, so the operand cannot stay on the keyword's
+    /// line: the caller emits its keyword bare and wraps its whole tail in
+    /// `Printer::build_continuation_indent`.
+    Continuation,
+    /// Nothing in the gap ends a line: the run — `None` when the gap holds no comment to
+    /// emit — trails the keyword inline, and the tail keeps the enclosing indent.
+    Inline(Option<DocId>),
 }
 
 /// Who emits a retained paren SHELL's leading **line**-comment run — the one axis
@@ -1730,46 +1743,58 @@ impl<'a> Printer<'a> {
         self.build_leading_comment_run_opt(start, end, LeadingGlue::Adjacent)
     }
 
-    /// The **keyword→operand** gap emitter: `await`→operand, `new`→callee.
+    /// The **keyword→operand** gap router, shared by `new`→callee
+    /// (`build_new_doc_with_wrapping`) and `await`→operand (`build_await_doc`) — the two
+    /// expression-level gaps of that shape.
     ///
-    /// One question, one predicate — the gate
-    /// ([`Printer::comments_force_own_line_between`], i.e. the shared
-    /// `comment_hangs_next`) picks the emitter, so the two cannot answer differently:
+    /// One question, one predicate ([`Printer::comments_force_own_line_between`], i.e.
+    /// the shared `comment_hangs_next`), so the two sites cannot answer differently:
     ///
     /// - It **hangs** (a line comment, or a multiline block the author broke after) →
-    ///   [`Self::build_rhs_comments_opt`], keeping the author's break and its
-    ///   authored separators.
-    /// - Otherwise — a **single-line block in ANY authored position** (glued,
-    ///   trailing the keyword, or on its own line) → the inline emitter. Nothing
-    ///   forces it off the line, so it trails inline and the author's break is
-    ///   reflowed: the keyword→value rule its `as`/`satisfies`, `export =`, and
-    ///   module-header siblings follow. See conformance_prettier.md §Authored breaks
-    ///   in value position.
+    ///   [`KeywordOperandGap::Continuation`]: the caller emits its keyword bare and wraps
+    ///   its WHOLE tail in [`Printer::build_continuation_indent`], the uniform
+    ///   forced-continuation indent (conformance_prettier.md §Uniform Forced-Continuation
+    ///   Indent). The tail is the whole operand — for `new`, callee, type arguments and
+    ///   argument list alike — so a tail that breaks internally renders at the
+    ///   continuation's indent rather than at the outer column.
+    /// - Otherwise — a **single-line block in ANY authored position** (glued, trailing the
+    ///   keyword, or on its own line) → [`KeywordOperandGap::Inline`]. Nothing forces it
+    ///   off the line, so it trails inline and the author's break is reflowed: the
+    ///   keyword→value rule its `as`/`satisfies`, `export =`, and module-header siblings
+    ///   follow. See conformance_prettier.md §Authored breaks in value position.
     ///
-    /// ⚠️ Emitting the second case through `build_rhs_comments_opt` reads as the
-    /// obvious code and is the bug this replaced: that builder picks each separator
-    /// from the comment's AUTHORED position, so an own-line comment kept a hardline
-    /// while the concat glued it to the keyword. The result — comment pulled up,
-    /// break kept — *is* the glued authoring, which reflows inline on the next pass,
-    /// so the format was not idempotent on its own output. Swapping to
-    /// [`Self::build_rhs_comments_glued_opt`] does not fix it either: no
-    /// [`LeadingGlue`] variant collapses an own-line comment, and it regresses the
-    /// authored-blank case. The routing is the fix, not the glue.
+    /// ⚠️ The inline arm must NOT go through the continuation `indent` "for uniformity".
+    /// Nothing in the gap ends a line there, so the indent is not inert — it applies to
+    /// every break the tail makes on its own WIDTH, pushing a broken argument list or
+    /// object a level over (`await /* c */ fn({…})`).
+    ///
+    /// ⚠️ Emitting the hang case through `build_rhs_comments_opt` reads as the obvious
+    /// code and was the bug this replaced: that builder picks each separator from the
+    /// comment's AUTHORED position, so an own-line comment kept a hardline while the
+    /// concat glued it to the keyword. The result — comment pulled up, break kept — *is*
+    /// the glued authoring, which reflows inline on the next pass, so the format was not
+    /// idempotent on its own output.
     ///
     /// ⚠️ **Do not merge this with `gap_comment_continuation_tail`** (the module-header
     /// gap emitter) on the strength of their matching gate→{hang, inline} shape. The
     /// resemblance is structural, not semantic — the *gates differ on purpose* for a
-    /// **glued multiline block** (`kw /* …⏎… */ v`): this gate
-    /// ([`Printer::comment_hangs_next`]) collapses it inline, while the header gap's
-    /// `has_multiline_block_comments_on_page_between` hangs *any* multiline block, glued
-    /// or not — its own doc calls that "this gap's deliberate difference from its
-    /// `build_keyword_to_name_continuation` twin". Unifying them would silently change
-    /// one family or the other.
-    pub(crate) fn build_keyword_operand_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
-        if self.comments_force_own_line_between(start, end) {
-            self.build_rhs_comments_opt(start, end)
+    /// **glued multiline block** (`kw /* …⏎… */ v`): this gate collapses it inline, while
+    /// the header gap's `has_multiline_block_comments_on_page_between` hangs *any*
+    /// multiline block, glued or not.
+    pub(crate) fn keyword_operand_gap(
+        &self,
+        keyword_end: u32,
+        operand_start: u32,
+    ) -> KeywordOperandGap {
+        if self.comments_force_own_line_between(keyword_end, operand_start) {
+            KeywordOperandGap::Continuation
         } else {
-            self.build_inline_comments_between_doc_trailing_space_opt(start, end)
+            KeywordOperandGap::Inline(
+                self.build_inline_comments_between_doc_trailing_space_opt(
+                    keyword_end,
+                    operand_start,
+                ),
+            )
         }
     }
 

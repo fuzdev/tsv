@@ -7,13 +7,25 @@
 
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, IdentName};
-use crate::printer::comments::paren_pair_keeps_leading_run;
+use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{ParenContext, Printer, needs_parens};
 use tsv_lang::{Comment, TAB_WIDTH, has_line_comments_in_range};
 
 //
 // Linearization
 //
+
+/// What the linearizer reads off the INPUT, beyond the AST it walks: the source (to
+/// locate the `)` of a pair a base owns) and the comment table (for the gates asking
+/// whether a gap holds a `//`).
+///
+/// A struct rather than two parameters because every recursive step needs both and
+/// neither is ever passed alone — the same reason `ParenLeadingValue` travels as one.
+#[derive(Clone, Copy)]
+pub struct LinearizeInput<'i> {
+    pub source: &'i str,
+    pub comments: &'i [Comment],
+}
 
 /// Linearize a chain expression into a flat list of nodes
 ///
@@ -29,10 +41,10 @@ use tsv_lang::{Comment, TAB_WIDTH, has_line_comments_in_range};
 /// for member-only chains.
 /// General-purpose entry point (used by tests; production code uses typed entry points)
 #[cfg(test)]
-fn linearize_chain<'a>(expr: &'a Expression<'_>) -> ChainNodeVec<'a> {
+fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_recursive(expr, &[], &mut nodes, &mut paren_gaps);
+    linearize_recursive(expr, input, &mut nodes, &mut paren_gaps);
     finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
@@ -40,11 +52,11 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>) -> ChainNodeVec<'a> {
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
 pub fn linearize_chain_from_call<'a>(
     call: &'a internal::CallExpression<'_>,
-    comments: &[Comment],
+    input: LinearizeInput<'_>,
 ) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_call_callee(call, comments, &mut nodes, &mut paren_gaps);
+    linearize_call_callee(call, input, &mut nodes, &mut paren_gaps);
     if call.optional {
         nodes.push(ChainNode::call_optional(call));
     } else {
@@ -57,12 +69,12 @@ pub fn linearize_chain_from_call<'a>(
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
 pub fn linearize_chain_from_member<'a>(
     member: &'a internal::MemberExpression<'_>,
-    comments: &[Comment],
+    input: LinearizeInput<'_>,
 ) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_member_object(member, comments, &mut nodes, &mut paren_gaps);
-    linearize_member_node(member, &mut nodes, &mut paren_gaps);
+    linearize_member_object(member, input, &mut nodes, &mut paren_gaps);
+    linearize_member_node(member, input.source, &mut nodes, &mut paren_gaps);
     finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
 }
@@ -76,11 +88,11 @@ pub fn linearize_chain_from_member<'a>(
 /// non-nulls go through `linearize_recursive`'s own arm, which does gate.
 pub fn linearize_chain_from_non_null<'a>(
     non_null: &'a internal::TSNonNullExpression<'_>,
-    comments: &[Comment],
+    input: LinearizeInput<'_>,
 ) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_recursive(non_null.expression, comments, &mut nodes, &mut paren_gaps);
+    linearize_recursive(non_null.expression, input, &mut nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null(non_null));
     finalize_chain_nodes(&mut nodes, &paren_gaps);
     nodes
@@ -170,7 +182,7 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>]) {
 /// we let the chain flatten (`parent_optional` skips the boundary). The public-AST
 /// converter still preserves acorn's nested `ChainExpression` for that case; this
 /// is a printer-only normalization.
-fn child_stops_optional_chain(
+pub(crate) fn child_stops_optional_chain(
     parent_start: u32,
     parent_optional: bool,
     child: &Expression<'_>,
@@ -190,6 +202,15 @@ fn child_stops_optional_chain(
 /// assignment layout gate, which must know the chain breaks INTERNALLY at that run
 /// rather than leading the whole value with it. The three disagreeing is how the run
 /// gets dropped, doubled, or double-indented.
+///
+/// The same position answer decides the pair's **trailing** gap — the per-shape
+/// predicates below (`member_object_paren_leading_start`,
+/// `call_callee_paren_leading_start`, `non_null_operand_paren_leading_start`, and
+/// [`tag_paren_leading_start`] for the tagged template, which never linearizes) feed
+/// `Printer::owned_pair_trailing_gap`, and every window that opens past the pair's `)`
+/// reads the same one. A pair whose doc emits a trailing gap the window does not skip
+/// double-prints; the reverse DROPS. It answered differently with and without a `!`
+/// for as long as the trailing half was keyed on the operand's KIND instead.
 pub fn chain_paren_leading_gap(expr: &Expression<'_>, comments: &[Comment]) -> Option<(u32, u32)> {
     match expr {
         Expression::MemberExpression(member) => member_object_paren_leading_start(member)
@@ -207,7 +228,9 @@ pub fn chain_paren_leading_gap(expr: &Expression<'_>, comments: &[Comment]) -> O
 
 /// A member's object keeps the pair — and with it the leading run — when the object
 /// is a parenthesized optional chain this access seals (`( // c⏎a?.b).ddd`).
-fn member_object_paren_leading_start(member: &internal::MemberExpression<'_>) -> Option<u32> {
+pub(crate) fn member_object_paren_leading_start(
+    member: &internal::MemberExpression<'_>,
+) -> Option<u32> {
     child_stops_optional_chain(member.span.start, member.optional, member.object)
         .then_some(member.span.start)
 }
@@ -215,11 +238,28 @@ fn member_object_paren_leading_start(member: &internal::MemberExpression<'_>) ->
 /// A callee keeps the pair two ways: the sealed optional chain (`( // c⏎a?.b)()`),
 /// and the IIFE — a function or arrow, the one callee kind prettier prints the run
 /// inside the parens for ([`paren_pair_keeps_leading_run`]).
-fn call_callee_paren_leading_start(call: &internal::CallExpression<'_>) -> Option<u32> {
+pub(crate) fn call_callee_paren_leading_start(call: &internal::CallExpression<'_>) -> Option<u32> {
     (child_stops_optional_chain(call.span.start, call.optional, call.callee)
         || (call.span.start < call.callee.span().start
             && paren_pair_keeps_leading_run(call.callee)))
     .then_some(call.span.start)
+}
+
+/// The tagged-template analog of [`call_callee_paren_leading_start`]: a tag's REQUIRED
+/// pair keeps its gaps inside it at the same two shapes — a function/arrow tag (the
+/// template half of prettier's IIFE-callee-or-tag rule) and a sealed optional chain.
+///
+/// A tagged template never enters the linearizer, so nothing records the returned `(`
+/// on a node; the tag's own printer consumes it as its leading gap's open. Spelled here
+/// beside its siblings, and in their shape, because it is the same question and the
+/// family answering it in one place is the point ([`chain_paren_leading_gap`]).
+pub(crate) fn tag_paren_leading_start(
+    tagged: &internal::TaggedTemplateExpression<'_>,
+) -> Option<u32> {
+    (child_stops_optional_chain(tagged.span.start, false, tagged.tag)
+        || (tagged.span.start < tagged.tag.span().start
+            && paren_pair_keeps_leading_run(tagged.tag)))
+    .then_some(tagged.span.start)
 }
 
 /// The two authorings that keep a non-null's operand a parenthesized base: a sealed
@@ -260,14 +300,14 @@ fn push_sealed_chain_base<'a>(
 
 fn linearize_recursive<'a>(
     expr: &'a Expression<'_>,
-    comments: &[Comment],
+    input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     match expr {
         // CallExpression: recurse into callee, then add Call node
         Expression::CallExpression(call) => {
-            linearize_call_callee(call, comments, nodes, paren_gaps);
+            linearize_call_callee(call, input, nodes, paren_gaps);
             if call.optional {
                 nodes.push(ChainNode::call_optional(call));
             } else {
@@ -277,8 +317,8 @@ fn linearize_recursive<'a>(
 
         // MemberExpression: recurse into object, then add Member node
         Expression::MemberExpression(member) => {
-            linearize_member_object(member, comments, nodes, paren_gaps);
-            linearize_member_node(member, nodes, paren_gaps);
+            linearize_member_object(member, input, nodes, paren_gaps);
+            linearize_member_node(member, input.source, nodes, paren_gaps);
         }
 
         // TSNonNullExpression: recurse into expression, then add NonNull node
@@ -302,7 +342,7 @@ fn linearize_recursive<'a>(
             //   whose emitter is block-only — the `//` would be dropped, with nothing
             //   left to parenthesize at print time.
             let inner = &non_null.expression;
-            if let Some(start) = non_null_operand_paren_leading_start(non_null, comments) {
+            if let Some(start) = non_null_operand_paren_leading_start(non_null, input.comments) {
                 nodes.push(ChainNode::paren_base_before_non_null(
                     inner,
                     start,
@@ -310,7 +350,7 @@ fn linearize_recursive<'a>(
                 ));
                 nodes.push(ChainNode::non_null_after_paren_operand());
             } else {
-                linearize_recursive(inner, comments, nodes, paren_gaps);
+                linearize_recursive(inner, input, nodes, paren_gaps);
                 // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
                 // lives between the operand and the `!`. When the operand is a
                 // parenthesized base, keep the comment INSIDE the parens, where the
@@ -337,7 +377,7 @@ fn linearize_recursive<'a>(
         // objects (`(A<T>).x`) take the `linearize_member_object` path instead,
         // which keeps the type args and parens.
         Expression::TSInstantiationExpression(inst) => {
-            linearize_recursive(inst.expression, comments, nodes, paren_gaps);
+            linearize_recursive(inst.expression, input, nodes, paren_gaps);
         }
 
         // Base case: expression that's not part of the chain structure
@@ -366,7 +406,7 @@ fn linearize_recursive<'a>(
 /// All other objects recurse normally.
 fn linearize_member_object<'a>(
     member: &'a internal::MemberExpression<'_>,
-    comments: &[Comment],
+    input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
@@ -376,7 +416,7 @@ fn linearize_member_object<'a>(
     } else if matches!(object, Expression::TSInstantiationExpression(_)) {
         nodes.push(ChainNode::base(object, true));
     } else {
-        linearize_recursive(object, comments, nodes, paren_gaps);
+        linearize_recursive(object, input, nodes, paren_gaps);
     }
 }
 
@@ -387,7 +427,7 @@ fn linearize_member_object<'a>(
 /// other callees recurse normally.
 fn linearize_call_callee<'a>(
     call: &'a internal::CallExpression<'_>,
-    comments: &[Comment],
+    input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
@@ -395,7 +435,7 @@ fn linearize_call_callee<'a>(
         push_sealed_chain_base(call.callee, call.span.start, nodes);
         return;
     }
-    linearize_recursive(call.callee, comments, nodes, paren_gaps);
+    linearize_recursive(call.callee, input, nodes, paren_gaps);
     // An IIFE callee reached through the chain (`( // c⏎() => {})().p`) owns its own
     // leading gap, exactly as the bare-callee path does: the pair is required and
     // prettier keeps the run inside it. A function or arrow is never itself a chain,
@@ -416,6 +456,7 @@ fn linearize_call_callee<'a>(
 /// Extracted from `linearize_recursive` so it can be shared with `linearize_chain_from_member`.
 fn linearize_member_node<'a>(
     member: &'a internal::MemberExpression<'_>,
+    source: &str,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
@@ -441,7 +482,19 @@ fn linearize_member_node<'a>(
         }
     }
 
-    let object_end = member.object.span().end;
+    // The object's own pair emits its trailing gap where the object is a sealed
+    // optional chain (`(a?.b /* t */).c`) — the same position that keeps the pair's
+    // LEADING run inside it, asked through the same predicate. This seam then opens past
+    // that `)`, so the comment is not emitted a second time outside the parens
+    // (`docs/comments.md` hazard 3), while a comment the author wrote AFTER the `)`
+    // (`(a?.b) /* t */.c`) still belongs here.
+    let operand_end = member.object.span().end;
+    let object_end = Printer::gap_start_after_owned_pair(
+        operand_end,
+        member_object_paren_leading_start(member)
+            .and_then(|_| paren_shell_close_after(source, operand_end))
+            .map(|close| (operand_end, close)),
+    );
     let property_start = member.property.span().start;
     if member.computed {
         nodes.push(ChainNode::computed_member(
@@ -767,7 +820,13 @@ mod tests {
     fn test_linearize_simple_identifier() {
         let expr = make_identifier("foo");
 
-        let nodes = linearize_chain(&expr);
+        let nodes = linearize_chain(
+            &expr,
+            LinearizeInput {
+                source: "",
+                comments: &[],
+            },
+        );
 
         assert_eq!(nodes.len(), 1);
         assert!(matches!(
@@ -787,7 +846,13 @@ mod tests {
         let ab = make_member(&arena, a, "b", 1);
         let abc = make_member(&arena, ab, "c", 3);
 
-        let nodes = linearize_chain(&abc);
+        let nodes = linearize_chain(
+            &abc,
+            LinearizeInput {
+                source: "",
+                comments: &[],
+            },
+        );
 
         // Should produce: [Base(a), Member(.b), Member(.c)]
         assert_eq!(nodes.len(), 3);
@@ -805,7 +870,13 @@ mod tests {
         let ab = make_member(&arena, a_call, "b", 3);
         let ab_call = make_call(&arena, ab, 5);
 
-        let nodes = linearize_chain(&ab_call);
+        let nodes = linearize_chain(
+            &ab_call,
+            LinearizeInput {
+                source: "",
+                comments: &[],
+            },
+        );
 
         // Should produce: [Base(a), Call(), Member(.b), Call()]
         assert_eq!(nodes.len(), 4);
@@ -824,7 +895,13 @@ mod tests {
         let abc = make_member(&arena, ab, "c", 3);
         let abcd = make_member(&arena, abc, "d", 5);
 
-        let nodes = linearize_chain(&abcd);
+        let nodes = linearize_chain(
+            &abcd,
+            LinearizeInput {
+                source: "",
+                comments: &[],
+            },
+        );
         let groups = group_chain_nodes(&nodes, &[]);
 
         // For member-only chains, Prettier puts almost everything in first group
@@ -850,7 +927,13 @@ mod tests {
         let ab_call = make_call(&arena, ab, 5);
         let abc = make_member(&arena, ab_call, "c", 7);
 
-        let nodes = linearize_chain(&abc);
+        let nodes = linearize_chain(
+            &abc,
+            LinearizeInput {
+                source: "",
+                comments: &[],
+            },
+        );
         let groups = group_chain_nodes(&nodes, &[]);
 
         // Grouping should break at member after call

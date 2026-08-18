@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 954,
+	"end": 1120,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -313,24 +313,72 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " The template tag is required with or without the `!` as well, and takes the",
+			"start": 946,
+			"end": 1024,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same shell — `(a?.b)`tpl`` seals the chain on its own.",
+			"start": 1026,
+			"end": 1083,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 1087,
+			"end": 1093,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 3
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 953,
+		"end": 1119,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 944,
+			"end": 1110,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 36,
+					"line": 42,
 					"column": 9
 				}
 			},
@@ -1548,6 +1596,160 @@
 							"value": " An inline block run leads the base flat here too.",
 							"start": 858,
 							"end": 910
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1085,
+					"end": 1109,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 1085,
+						"end": 1108,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 1
+							},
+							"end": {
+								"line": 41,
+								"column": 7
+							}
+						},
+						"tag": {
+							"type": "ChainExpression",
+							"start": 1096,
+							"end": 1100,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 2
+								},
+								"end": {
+									"line": 40,
+									"column": 6
+								}
+							},
+							"expression": {
+								"type": "MemberExpression",
+								"start": 1096,
+								"end": 1100,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 2
+									},
+									"end": {
+										"line": 40,
+										"column": 6
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 1096,
+									"end": 1097,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 2
+										},
+										"end": {
+											"line": 40,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1099,
+									"end": 1100,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 5
+										},
+										"end": {
+											"line": 40,
+											"column": 6
+										}
+									},
+									"name": "b"
+								},
+								"computed": false,
+								"optional": true
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c10",
+									"start": 1087,
+									"end": 1093
+								}
+							]
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 1103,
+							"end": 1108,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 2
+								},
+								"end": {
+									"line": 41,
+									"column": 7
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 1104,
+									"end": 1107,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 3
+										},
+										"end": {
+											"line": 41,
+											"column": 6
+										}
+									},
+									"value": {
+										"raw": "tpl",
+										"cooked": "tpl"
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The template tag is required with or without the `!` as well, and takes the",
+							"start": 946,
+							"end": 1024
+						},
+						{
+							"type": "Line",
+							"value": " same shell — `(a?.b)`tpl`` seals the chain on its own.",
+							"start": 1026,
+							"end": 1083
 						}
 					]
 				}

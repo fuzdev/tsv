@@ -50,6 +50,18 @@
 		() => {} /* c11 */
 	)`tpl`;
 
+	// With BOTH gaps commented the pair still takes ONE expanded shell — the leading run
+	// above the function, the trailing run beside it, the `)` back out — which is
+	// prettier's own shape here.
+	(
+		// c14
+		() => {} /* c15 */
+	)();
+	(
+		// c16
+		async () => {} // c17
+	)();
+
 	// A comment written OUTSIDE the pair stays outside it, on the callee→`(` gap, and
 	// so does one in a required pair that is not a function's.
 	(

@@ -1,6 +1,6 @@
 <script>
 	function* fn() {
-		yield; // comment
+		yield // comment
 		expr;
 	}
 </script>

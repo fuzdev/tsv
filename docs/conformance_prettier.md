@@ -235,6 +235,15 @@ its tail:
   whose own gap already honors the authored break, so collapsing it on the head
   side alone would answer the same question two ways within one construct. A
   keyword gap has no such counterpart.
+- **`await`→operand and `new`→callee** — the two expression-level keyword→operand
+  gaps (`new // c⏎\tFoo();`, `await // c⏎\tfn();`). The whole tail rides the
+  continuation — callee, type arguments and argument list — so a broken argument list
+  renders at the continuation's own indent. `yield` is excluded (a newline after it is
+  ASI, which would split the statement) and so is the unary family, which takes a
+  comment-holder shell instead; the statement-header keyword→`(` gaps
+  (`if`/`while`/`switch`/`for`/`for await`) keep a flush continuation uniformly and are
+  a family of their own. See [`await`→operand / `new`→callee line
+  comment](./conformance_prettier_ts_comments.md#comment-relocation).
 - **Callee→empty argument list** — the call/`new` head→`()` continuation
   (`call // c⏎\t()`), uniformly for a plain callee, `new`, explicit type arguments,
   an optional call, and a member-chain callee. Inlining here is content loss, not a
@@ -357,22 +366,16 @@ signature — so the drop is incidental to the relocation rather than a consider
 Cataloged at
 [continuation_blank_between_comments](../tests/fixtures/typescript/syntax/comments/continuation_blank_between_comments_prettier_divergence/).
 
-**Known residual.** Two gaps still keep the blank: `await`→operand and `new`→callee (inside a
-declarator; a bare expression statement has no group to collapse into, so it holds the break
-regardless of width). Those emitters **relocate** an own-line comment up onto the head line
-while the leading run picks its separator from the comment's *authored* position, so the two
-disagree: pass 1 relocates and keeps the break, pass 2 sees a now-glued comment and collapses
-it. That is not a stable resting place — it is a **non-idempotent format**, and the blank is
-incidental to it.
-
 The import/export header family had the same defect and is now fixed. The diagnosis there was
 **not** a comment-position question: `gap_comment_continuation_tail` simply never consulted its
 gate, keying the choice on line-vs-block alone while `comment_hangs_next` — the shared
 keyword→value rule its `export default` / `export =` siblings already use — says a single-line
 block collapses from *any* authored position. Routing the emitter through that gate made all 19
 header gaps idempotent and is what `export * from` needed too (it had been the lone header gap
-preserving the break, for want of the same collapse). The same shape is the likely fix for the
-two remaining gaps: ask the gate, don't re-derive the answer at the call site.
+preserving the break, for want of the same collapse). That is the family's rule: ask the gate,
+don't re-derive the answer at the call site — which is why the `await`→operand and
+`new`→callee gaps route their whole run through `build_continuation_indent` rather than
+choosing a separator of their own.
 
 Prettier is split here and not along tsv's line: it preserves the blank for a declarator and
 an object value while collapsing it (with a relocation) for a class property, a parameter

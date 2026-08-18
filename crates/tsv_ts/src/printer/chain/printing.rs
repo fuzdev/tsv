@@ -119,14 +119,10 @@ pub(crate) fn print_node_inner<'a>(
                 // the same pair but its trailing gap belongs to the member seam, and
                 // claiming it here double-printed the comment.
                 let base_start = expr.span().start;
-                let trailing_gap =
-                    paren_comment_end
-                        .map(|end| (expr.span().end, end))
-                        .or_else(|| {
-                            paren_leading_start.and_then(|_| {
-                                printer.owned_pair_trailing_gap(expr, ParenContext::Callee)
-                            })
-                        });
+                let base_end = expr.span().end;
+                let trailing_gap = paren_comment_end.map(|end| (base_end, end)).or_else(|| {
+                    printer.owned_pair_trailing_gap(base_end, paren_leading_start.is_some())
+                });
                 // The broken body is the trailing emitter's alone, so the unshaped doc is
                 // built only where that gap exists — a parenthesized binary base would
                 // otherwise pay a second full doc build on every comment-free chain. With

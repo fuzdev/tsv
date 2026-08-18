@@ -33,6 +33,9 @@ already pins. The base's pair is required with or without the `!` (`(a?.b).ddd`
 seals the chain on its own), so both spellings answer the gap the same way; here
 prettier breaks after the `=` before its compact shell.
 
+The **template tag** is required with or without the `!` too (`` (a?.b)`tpl` ``
+seals the chain on its own), and takes the same shell — c10.
+
 An inline block run leads the chain flat and matches prettier byte-for-byte —
 pinned here as the controls (`new (/* c4 */ /* c5 */ a?.b)!();`, and at the base
 `const o = (/* c9 */ a?.b)!.ccc;`).

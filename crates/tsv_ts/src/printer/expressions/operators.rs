@@ -5,7 +5,7 @@
 // - Clarity-based parens (mixing logical operators, etc.)
 
 use crate::ast::internal::{self, BinaryOperator, Expression};
-use crate::printer::comments::CommentSpacing;
+use crate::printer::comments::{CommentSpacing, KeywordOperandGap};
 use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -1174,9 +1174,15 @@ impl<'a> Printer<'a> {
             return d.concat(&parts);
         }
 
-        let comments_opt = self.build_keyword_operand_comments_opt(keyword_end, argument_start);
+        // The keyword→operand gap, shared with `new`→callee. The run is emitted OUTSIDE
+        // any parens the operand needs — the gap belongs to the keyword, not to a pair
+        // the printer must emit — so it answers one way whether or not the operand's
+        // precedence happens to require one. A comment the author wrote INSIDE those
+        // parens is glued to the operand and therefore owned, so it never reaches this
+        // axis and keeps its place (the `grouped_operand_comment` divergence).
+        let gap = self.keyword_operand_gap(keyword_end, argument_start);
 
-        let argument_doc = if comments_opt.is_some() || has_trailing_comments {
+        let argument_doc = if has_trailing_comments {
             // The grouping parens are required when the operand needs them (`await`
             // binds tighter than a binary/ternary operand, so `await x + y` is
             // `(await x) + y`) — and a comment in the operand→`)` gap RETAINS them even
@@ -1186,24 +1192,19 @@ impl<'a> Printer<'a> {
             // shell is not optional here: `await`'s own span covers the `)`, so a stripped
             // form hands the comment to the enclosing terminator gap on reparse and the
             // authoring has no fixed point at all. Mirrors `build_spread_doc`.
-            let needs_parens = self.needs_parens(await_expr.argument, ParenContext::AwaitArgument);
             let inner = self.build_expression_doc(await_expr.argument);
-            let body = match comments_opt {
-                Some(comments) => d.concat(&[comments, inner]),
-                None => inner,
-            };
             if let Some(shell) = self.build_paren_operand_comment_doc(
                 argument_end,
                 await_expr.span.end,
-                body,
-                body,
+                inner,
+                inner,
                 ")",
             ) {
                 shell
-            } else if needs_parens {
-                d.parens(body)
+            } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
+                d.parens(inner)
             } else {
-                body
+                inner
             }
         } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
             d.concat(&[
@@ -1215,7 +1216,16 @@ impl<'a> Printer<'a> {
             self.build_expression_doc(await_expr.argument)
         };
 
-        d.concat(&[d.text("await "), argument_doc])
+        match gap {
+            KeywordOperandGap::Continuation => d.concat(&[
+                d.text("await"),
+                self.build_continuation_indent(keyword_end, argument_start, argument_doc),
+            ]),
+            KeywordOperandGap::Inline(Some(run)) => {
+                d.concat(&[d.text("await "), run, argument_doc])
+            }
+            KeywordOperandGap::Inline(None) => d.concat(&[d.text("await "), argument_doc]),
+        }
     }
 
     /// Build a Doc for a yield expression

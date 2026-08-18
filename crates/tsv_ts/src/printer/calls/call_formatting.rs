@@ -33,7 +33,7 @@ use super::test_patterns::{
 };
 use crate::ast::internal;
 use crate::printer::CommentVec;
-use crate::printer::comments::paren_pair_keeps_leading_run;
+use crate::printer::chain::call_callee_paren_leading_start;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
@@ -86,18 +86,22 @@ pub(super) fn build_call_doc_with_wrapping(
         .flatten()
         .unwrap_or_else(|| printer.build_expression_doc(call.callee));
 
-    // An IIFE callee is the one callee kind whose required pair keeps BOTH its gaps
-    // inside it (`paren_pair_keeps_leading_run` — prettier's `printCommentsForFunction`
-    // prints a function/arrow callee's leading AND trailing comments within the parens).
-    // The pair has to be the author's own for a trailing gap to exist at all:
-    // `(fn /* t */)()` writes it around the callee, `(/* t */ fn())` around the whole
-    // call, where the comment belongs to the call and not to any pair printed here.
+    // Two callee positions print a required pair that keeps BOTH its gaps inside it: an
+    // IIFE (`paren_pair_keeps_leading_run` — prettier's `printCommentsForFunction` prints
+    // a function/arrow callee's leading AND trailing comments within the parens) and a
+    // sealed optional chain, where the pair is what stops the chain. ⚠️ ONE variable
+    // answers it, because the two consumers below — the pair's own doc and the window
+    // that opens past its `)` — must agree: a `trailing_gap` the doc does not emit is a
+    // DROPPED comment, and the reverse is a double-print. The pair has to be the author's
+    // own for a trailing gap to exist at all: `(fn /* t */)()` writes it around the
+    // callee, `(/* t */ fn())` around the whole call, where the comment belongs to the
+    // call and not to any pair printed here.
     let needs_parens = printer.needs_parens(call.callee, ParenContext::Callee);
-    let owned_pair = needs_parens && paren_pair_keeps_leading_run(call.callee);
-    let trailing_gap = printer.owned_pair_trailing_gap(call.callee, ParenContext::Callee);
+    let callee_end = call.callee.span().end;
+    let owned_pair = call_callee_paren_leading_start(call).is_some();
+    let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
     // Every window downstream opens PAST the pair's `)` where it owns its trailing gap.
-    let callee_gap_start =
-        Printer::gap_start_after_owned_pair(call.callee.span().end, trailing_gap);
+    let callee_gap_start = Printer::gap_start_after_owned_pair(callee_end, trailing_gap);
 
     let callee = if owned_pair {
         printer.build_owned_required_pair_doc(
