@@ -71,4 +71,32 @@
 			b
 		)
 	);
+	// a binary tail whose operand carries a leading `//` breaks the same way, and the
+	// operand keeps its continuation indent under the broken-out argument
+	fn(
+		() => {
+			a();
+		},
+		aaa &&
+			// c
+			bbb
+	);
+
+	new A(
+		() => {
+			a();
+		},
+		aaa &&
+			// c
+			bbb
+	);
+
+	obj.fn1(1).fn2(
+		() => {
+			a();
+		},
+		aaa &&
+			// c
+			bbb
+	);
 </script>
