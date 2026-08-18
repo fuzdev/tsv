@@ -7,8 +7,7 @@
 // spelling differs only in what a state opens with (its own `(` / `?.(` rather than a callee
 // doc), so `arg_wrapping.rs` owns the layouts and this file owns the strategy selection. What
 // is still this file's alone is the selection ORDER and the arms the other trees have no twin
-// for (the force-expanded hugs, the classify-and-wrap fallback, expand-first's hardline-built
-// broken form).
+// for (the force-expanded hugs, the classify-and-wrap fallback).
 
 use super::super::comments::CommentSpacing;
 use super::super::{Printer, is_curried_arrow_chain, is_multiline_template_expression};
@@ -22,21 +21,21 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    ArgItem, ArgOpener, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
+    ArgOpener, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
     arrow_hug_refused_by_comments, build_args_split_last, build_arrow_gap_break_multi_arg_doc,
     build_arrow_gap_break_single_arg_doc, build_arrow_sig_doc, build_break_body_ladder,
-    build_expand_last_obj_array_doc, build_flat_params_arg_doc, build_printed_argument_doc,
-    build_single_arrow_hug_doc, build_ternary_arrow_hug_ladder, classify_chain_arg,
-    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break, last_two_args_same_type,
-    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
-    prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
+    build_expand_first_arg_doc, build_expand_last_obj_array_doc, build_flat_params_arg_doc,
+    build_joined_argument_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
+    build_ternary_arrow_hug_ladder, classify_chain_arg, first_arg_signature_refuses_expand_first,
+    last_arg_arrow_gap_break, last_two_args_same_type, prebuild_expand_last_break_body,
+    prebuild_expand_last_obj_array_body, prepend_arrow_body_comments, should_expand_first_arg,
+    try_hook_deps_args_doc,
 };
 use crate::ast::internal::{self, Expression};
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, callback_signature_has_breaking_comments,
     function_signature_has_breaking_comments, prepend_leading,
 };
-use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::has_newline_before_position;
@@ -671,7 +670,7 @@ fn build_chain_args_force_expand(
         let flat_sig = call.arguments.len() == 1
             && matches!(arg, Expression::ArrowFunctionExpression(arrow)
                 if arrow.body.is_expression() && !is_curried_arrow_chain(arg));
-        let build_arg = || ArgItem::ArgContext.build(printer, paren_open, call.arguments, i);
+        let build_arg = || build_joined_argument_doc(printer, paren_open, call.arguments, i);
         arg_parts.push(if flat_sig {
             build_flat_params_arg_doc(printer, build_arg)
         } else {
@@ -1350,64 +1349,16 @@ fn build_chain_args_multi(
             // and `new` twins fold the same call into their `expand_first_blocked`.
             || first_arg_signature_refuses_expand_first(printer, call.arguments))
     {
-        // First arg (callback) expands, tail args stay inline
-        let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
-        let second_arg_doc = printer.build_arg_expression_doc(&call.arguments[1]);
-
-        // Inter-arg comment handling through the shared argument-gap seam (e.g.
-        // `a.b((x) => { ... }, /** @type {T} */ c)`): `through_comma` carries the
-        // before-comma run, the comma itself and a stranded after-comma block, `gap_leading`
-        // the second argument's leading run. The break sits between them, and that
-        // separator is the ONLY thing the two arms below differ in.
-        let first_end = call.arguments[0].span().end;
-        let second_start = call.arguments[1].span().start;
-        let (through_comma, gap_leading) = build_arg_gap_docs(printer, first_end, second_start);
-        // The last argument's gap to the `)` — a region no inter-argument gap covers.
-        let mut tail_trailing = DocBuf::new();
-        emit_last_arg_trailing_comments(
+        // The expand-first ladder, shared with the plain-call and `new` twins — including
+        // the tail's willBreak bail and the broken-out fallback the chain used to hand-roll
+        // beside it (`docs/comments.md` hazard 2 is answered there, once).
+        parts.push(build_expand_first_arg_doc(
             printer,
-            &mut tail_trailing,
-            &call.arguments[1],
+            opener,
+            call.arguments,
+            paren_open,
             call.span.end,
-        );
-
-        // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
-        //
-        // ⚠️ `tailArgs` is the printed tail ARGUMENT **plus the comments printed with it**,
-        // so the question is asked of the whole tail — as the `call_formatting.rs` and
-        // `new_expression.rs` twins ask it of their `tail_parts`. Asking only
-        // `second_arg_doc` is the same question minus whatever the argument's own doc does
-        // not carry, and OWNERSHIP decides that: a lone block leading the tail is owned by
-        // the argument and rides inside its doc (so the narrow ask happens to be right),
-        // while a run's unowned head rides this gap instead — `}, /* c1⏎c2 */ /* c3 */ b`
-        // kept the hug with a multi-line comment sitting in it, a form prettier never
-        // emits. `docs/comments.md` hazard 2.
-        let mut tail_parts: DocBuf = smallvec![second_arg_doc];
-        tail_parts.extend(through_comma.iter().copied());
-        tail_parts.extend(gap_leading.iter().copied());
-        tail_parts.extend(tail_trailing.iter().copied());
-        if tail_parts.iter().any(|&id| d.will_break(id)) {
-            let mut all_parts: DocBuf = smallvec![first_arg_doc];
-            all_parts.extend(through_comma.iter().copied());
-            all_parts.push(d.hardline());
-            all_parts.extend(gap_leading.iter().copied());
-            all_parts.push(second_arg_doc);
-            all_parts.extend(tail_trailing.iter().copied());
-            parts.push(d.text(prefix));
-            parts.push(d.indent_hardline(d.concat(&all_parts)));
-            parts.push(d.hardline());
-            parts.push(d.text(")"));
-            return d.concat(&parts);
-        }
-
-        parts.push(d.text(prefix));
-        parts.push(first_arg_doc);
-        parts.extend(through_comma.iter().copied());
-        parts.push(d.text(" "));
-        parts.extend(gap_leading.iter().copied());
-        parts.push(second_arg_doc);
-        parts.extend(tail_trailing.iter().copied());
-        parts.push(d.text(")"));
+        ));
         return d.concat(&parts);
     }
 

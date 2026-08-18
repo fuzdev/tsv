@@ -848,11 +848,11 @@ impl<'a> Printer<'a> {
     /// freeze-aware twin of `build_arg_expression_doc`, so no argument loop spells the
     /// dispatch itself.
     ///
-    /// Its sole caller is `calls::ArgItem::build`, which every call, `new` and member-chain
-    /// argument loop routes through — the layer that adds the *other* per-argument question
-    /// (a curried chain's progressive layout) to this one. Reach for `ArgItem` at a new
-    /// argument loop, not for this directly: skipping it is how an argument silently loses
-    /// that routing.
+    /// Its sole caller is `calls::build_joined_argument_doc`, which every call, `new` and
+    /// member-chain argument loop routes through — the layer that adds the *other*
+    /// per-argument question (a curried chain's progressive layout) to this one. Reach for
+    /// that builder at a new argument loop, not for this directly: skipping it is how an
+    /// argument silently loses that routing.
     ///
     /// The document-level flag is read HERE, with the ordinary build on its own arm, rather
     /// than left to [`Self::args_frozen_span`] one call down: this is the hottest position
