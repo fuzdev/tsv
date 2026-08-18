@@ -145,6 +145,9 @@ deno task doctor         # one-pass setup check: runtimes, pins + checkout align
 deno task typecheck      # cargo check
 deno task typecheck:js   # deno check over the bench harness, scripts/ + the tsv_debug sidecar (the JS/TS cargo can't see).
 #                          NOT in `check` — needs `deno task bench:install`, and CI installs no node_modules
+deno task typecheck:scripts # deno check over scripts/ alone — node-modules-free, so this one DOES gate in `check`
+#                          (nothing else typechecks the release scripts, and `deno run` doesn't).
+#                          `scripts/doctor.ts` is the one exclusion: its corpus probe reaches the bench node_modules
 deno task test           # cargo test
 deno task lint           # cargo clippy
 cargo fmt                # format Rust code
