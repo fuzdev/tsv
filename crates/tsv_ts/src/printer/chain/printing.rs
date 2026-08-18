@@ -208,7 +208,8 @@ pub(crate) fn print_node_inner<'a>(
 
             // Find the opening bracket position by scanning from object_end,
             // skipping over comments to find the actual `[` (or `?.[` for optional)
-            let bracket_open_pos = find_bracket_position(printer, *object_end, prop_span.start);
+            let bracket_open_pos =
+                find_bracket_position(printer.get_source(), *object_end, prop_span.start);
 
             let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
 
@@ -236,13 +237,11 @@ pub(crate) fn print_node_inner<'a>(
                     inside_start,
                     prop_span.start,
                     crate::printer::CommentSpacing::Trailing,
-                    false,
                 );
                 let trailing_comments_doc = printer.build_chain_block_comments_doc(
                     prop_span.end,
                     *bracket_end,
                     crate::printer::CommentSpacing::Leading,
-                    false,
                 );
 
                 let inner_with_comments =
@@ -295,15 +294,31 @@ pub(crate) fn print_node_inner<'a>(
                 return d.concat(&parts);
             }
 
-            // Block comments before the bracket (e.g., `a /* c */[0]`) stay inline.
-            let pre_bracket_block_doc = printer.build_chain_block_comments_doc(
-                *object_end,
-                bracket_open_pos,
-                crate::printer::CommentSpacing::Leading,
-                true,
-            );
+            // Block comments before the bracket split at the first one the author gave
+            // its own line, and the ADVANCING classification above already made that
+            // split: the trailing run — each comment continuing the line the object or
+            // the previous comment ended on — stays inline (`a /* c */[0]`,
+            // `a /* m1⏎m2 */ /* c6 */[0]`); the own-line remainder takes the same
+            // forced-break path as a `//` in this gap, each comment keeping its own
+            // line with the bracket on the next, ANCHORED past the trailing run so the
+            // break's blank scan never crosses an emitted comment's bytes. Prettier
+            // hoists an own-line block out to lead the whole expression instead
+            // (reordering it past a trailing one) — see
+            // expressions/member/computed_pre_bracket_block_comment_prettier_divergence.
+            let glued_doc = printer.build_trailing_block_doc(&pre_bracket.trailing_block);
+            if !pre_bracket.leading_block.is_empty() {
+                let anchor = pre_bracket
+                    .trailing_block
+                    .last()
+                    .map_or(*object_end, |c| c.span.end);
+                let mut parts = DocBuf::new();
+                parts.push(glued_doc);
+                push_gap_comments_and_break(&mut parts, printer, anchor, bracket_open_pos);
+                parts.push(bracket_doc);
+                return d.concat(&parts);
+            }
 
-            d.concat(&[pre_bracket_block_doc, bracket_doc])
+            d.concat(&[glued_doc, bracket_doc])
         }
 
         // A comment between the operand and the `!` (`aaa /* c */!.bbb`) is this node's
@@ -324,7 +339,6 @@ pub(crate) fn print_node_inner<'a>(
                 *operand_end,
                 *bang_end,
                 crate::printer::CommentSpacing::Leading,
-                false,
             );
             d.concat(&[comments, d.text("!")])
         }
@@ -546,7 +560,8 @@ pub(crate) fn has_inside_bracket_comments<'a>(node: &ChainNode<'a>, printer: &Pr
     } = node
     {
         let prop_span = printer.get_property_span(expr);
-        let bracket_open_pos = find_bracket_position(printer, *object_end, prop_span.start);
+        let bracket_open_pos =
+            find_bracket_position(printer.get_source(), *object_end, prop_span.start);
         let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
         printer.has_comments_on_page_between(inside_start, prop_span.start)
             || printer.has_comments_on_page_between(prop_span.end, *bracket_end)
@@ -559,8 +574,7 @@ pub(crate) fn has_inside_bracket_comments<'a>(node: &ChainNode<'a>, printer: &Pr
 /// skipping over comments to avoid matching `[` inside comments.
 ///
 /// For `?.[`, returns the position of `?` (the start of the optional chain syntax).
-fn find_bracket_position(printer: &Printer<'_>, start: u32, end: u32) -> u32 {
-    let source = printer.get_source();
+pub(crate) fn find_bracket_position(source: &str, start: u32, end: u32) -> u32 {
     let bytes = source.as_bytes();
     let start_pos = start as usize;
     let end_pos = end as usize;
@@ -677,7 +691,7 @@ pub(crate) fn push_gap_comments_and_break(
 pub(crate) fn node_comment_gap(node: &ChainNode<'_>, printer: &Printer<'_>) -> Option<(u32, u32)> {
     let (object_end, property_start) = node.comment_range()?;
     if matches!(node, ChainNode::ComputedMember { .. }) && printer.chain_has_comments() {
-        let bracket_open = find_bracket_position(printer, object_end, property_start);
+        let bracket_open = find_bracket_position(printer.get_source(), object_end, property_start);
         return Some((object_end, bracket_open));
     }
     Some((object_end, property_start))

@@ -76,9 +76,9 @@ is news, and any finding exits 1.
 
 `crates/tsv_debug/src/cli/commands/gap_audit_known.txt` is a **machine-generated** snapshot
 of every finding shape `tests/fixtures` currently produces. Unlike `scan_audit`'s
-hand-curated `ALLOW`, it carries **no per-entry rationale by design**: at several hundred
-shapes that is not a thing a human can keep honest. Every line is a **known bug**, and the
-file shrinking is the goal.
+hand-curated `ALLOW`, it carries **no per-entry rationale by design**: at the scale the file
+has run at (several hundred shapes at its peak) that is not a thing a human can keep honest.
+Every line is a **known bug**, and the file shrinking is the goal.
 
 ```
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
@@ -109,7 +109,7 @@ A `SWALLOW` shape is **pinned and graded exactly like a drop** — same file, sa
 (`KIND<TAB>SHAPE<TAB>PAYLOADS`), same two failure modes (a shape not on the list, a listed
 shape that no longer fires). It is the only kind here that loses **code** rather than a
 comment, so a run that holds still names its share (`○ of those, N SWALLOW shape(s) …`) rather
-than letting a `✓` over hundreds of them read as "no swallows".
+than letting a bare `✓` over the whole file read as "no swallows".
 
 It was **staged report-only** through its first phase, and the reason is worth keeping: the
 check only arms on a text node carrying a whole comment, and at the time only `tsv_ts`'s
@@ -189,7 +189,7 @@ next fixture edit.
 their structural key `(node_type, edge)` — the enclosing AST node and the child-role edge each
 site's gap sits in (`(CallExpression, arguments→$)`, `(VariableDeclarator, id→init)`), read off
 the wire tree. Where the site shape keys a finding by its raw adjacent tokens (the fine ratchet
-key), this keys it by the **emitter**: the several hundred shapes fold into a few dozen
+key), this keys it by the **emitter**: the fine shapes fold onto far fewer
 `(node, edge)` clusters — each roughly one printer function — ranked worst-first, the
 burn-down work-list. The comment-attachment fields the wire mirrors from acorn
 (`leadingComments` / `trailingComments`) are **not** treated as structural children, so a gap
@@ -324,8 +324,8 @@ The verify verdict is triage information, not a gate signal: it is a property of
 sampled examples, not of the shape, so it is deliberately not part of the ratchet key (and
 `--update` regenerates a byte-identical snapshot regardless of it). `--update` still reports
 the tallies — how many shapes are fully `UNCONFIRMED` and how many `PARTIAL`, the cause
-breakdown, and the output-bug shape count — since pinning several hundred claims is the moment
-worth naming the ones the audit couldn't reproduce.
+breakdown, and the output-bug shape count — since pinning a whole snapshot of claims is the
+moment worth naming the ones the audit couldn't reproduce.
 
 ## Triaging and fixing a shape
 

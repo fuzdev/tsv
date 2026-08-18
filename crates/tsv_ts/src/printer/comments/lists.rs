@@ -259,20 +259,6 @@ impl<'a> Printer<'a> {
         }
         parts
     }
-    /// Filter block comments between two positions based on whether they're on the same line as start
-    ///
-    /// # Arguments
-    /// * `start` - Start position (e.g., end of previous chain element)
-    /// * `end` - End position (e.g., start of next chain element)
-    ///
-    /// Returns the block comments on the same source line as `start`.
-    pub(crate) fn filter_block_comments(&self, start: u32, end: u32) -> CommentVec<'_> {
-        comments_to_emit_in_range(self.comments, start, end)
-            .filter(|c| c.is_block)
-            .filter(|c| self.is_same_line(start, c.span.start))
-            .collect()
-    }
-
     /// True when a block comment in the LAST item→closer gap `(start, end)` owns its line,
     /// so the list must open around it — the trailing counterpart of the leading-run walk
     /// ([`Printer::has_leading_own_line_comment_in_params`]), asked by the value-level
