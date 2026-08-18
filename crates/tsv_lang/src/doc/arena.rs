@@ -480,9 +480,11 @@ impl ArenaCommand {
 /// capacity warms once per arena instead of re-allocating per rendered piece.
 pub(super) type CmdStack = SmallVec<[ArenaCommand; 8]>;
 
-/// Inline-backed pending `line_suffix` buffer. Line suffixes are sparse — the
-/// measured high-water never exceeds 1 — so `N = 4` is generous headroom at a
-/// 64-byte inline footprint, keeping even the rare suffix push off the heap.
+/// Inline-backed pending `line_suffix` buffer. Line suffixes are sparse — a flush
+/// carries one in the overwhelming majority of cases, and two where a construct's
+/// deferred comment meets a statement trailer (the run
+/// `doc::arena_render::flush_line_suffix` must separate) — so `N = 4` is generous
+/// headroom at a 64-byte inline footprint, keeping even the rare suffix push off the heap.
 pub(super) type LineSuffixBuf = SmallVec<[ArenaCommand; 4]>;
 
 /// Sentinel cache values for the `arena_fits` flat-width fast-path. A cell holds

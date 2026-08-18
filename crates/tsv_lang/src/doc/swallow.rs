@@ -165,17 +165,21 @@ impl SwallowTracker {
             }
         });
     }
+}
 
-    /// Observe a line break: a real newline (`emitted`) ends the comment's line.
-    ///
-    /// `&mut self` for the same reason as [`Self::on_text`] — the mutation is real,
-    /// it just lands in the `thread_local!`.
-    #[allow(clippy::needless_pass_by_ref_mut)]
-    #[inline]
-    pub(crate) fn on_newline(&mut self, emitted: bool) {
-        if emitted {
-            PENDING.with(|p| *p.borrow_mut() = None);
-        }
+/// Observe a real newline in the output: it ends the pending comment's line.
+///
+/// A free function rather than a [`SwallowTracker`] method because the newline seam is
+/// **not** the per-render handle's — every break the renderer emits goes through one
+/// function (`render_line_break`), including the line-suffix run separator, which runs
+/// outside any policy's reach. Keying the hook to that seam makes the coupling
+/// structural: a newline cannot be emitted without clearing `PENDING`, so a break the
+/// renderer takes can never be mistaken for a swallow. (The state is thread-local, so a
+/// handle would carry nothing anyway.)
+#[inline]
+pub(crate) fn note_line_end() {
+    if swallow_check_enabled() {
+        PENDING.with(|p| *p.borrow_mut() = None);
     }
 }
 
