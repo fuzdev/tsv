@@ -7,10 +7,10 @@
  *
  * Deliberately tight (~±8%) around a measured value, same philosophy as the
  * wasm bounds: a legitimate size change fails the release until the constant
- * moves, keeping binary-size drift visible and intentional. Triples marked
- * PROVISIONAL haven't shipped through the matrix yet — their wide bounds are
- * placeholders to be tightened to ±8% around the first release run's printed
- * sizes.
+ * moves, keeping binary-size drift visible and intentional. All ten bands are
+ * anchored on real matrix-built artifacts — re-anchor from a run's printed
+ * sizes (this script logs them on success too) whenever a deliberate change
+ * moves one, never widen a band to absorb drift.
  *
  * Usage: deno run --allow-read scripts/validate_napi_artifact.ts [--triple <t>]
  * (default: the single staged platform dir under crates/tsv_napi/pkg/)
@@ -26,30 +26,32 @@ const { values: args } = parseArgs({
 	}
 });
 
-/** [min, max] bytes per triple for `tsv_napi.node`. Measured = ±8% around a
- * real artifact. */
+/** [min, max] bytes per triple for `tsv_napi.node` (napi profile: release +
+ * unwind). Every band is ±8% around a real artifact BUILT BY THE MATRIX — the
+ * anchors below are the measured sizes, not running figures.
+ *
+ * Anchored on the first full matrix run, where each row is built in the
+ * environment that ships it (the gnu rows in almalinux:8, musl in rust:alpine,
+ * mac/win natively) — the only measurement the gate ever sees. A host build of
+ * the same commit came within 1,840 B of the almalinux linux-x64-gnu figure, so
+ * the container is not the size variable it might have looked like; the size
+ * variable is the TARGET (win32/darwin sit ~10% under the linux rows). */
 const BOUNDS: Record<string, [number, number]> = {
-	// band anchored at a measured 3,636,240 on linux (napi profile: release +
-	// unwind), ±8% — the anchor, not a running figure
-	'linux-x64-gnu': [3_345_000, 3_927_000],
-	// PROVISIONAL — tighten to ±8% after the first release-matrix run
-	'linux-arm64-gnu': [2_500_000, 5_500_000],
-	'linux-x64-musl': [2_500_000, 5_500_000],
-	'darwin-arm64': [2_000_000, 5_500_000],
-	'win32-x64': [2_000_000, 5_500_000]
+	'linux-x64-gnu': [3_458_000, 4_060_000], // 3,758,816
+	'linux-arm64-gnu': [3_202_000, 3_760_000], // 3,480,696
+	'linux-x64-musl': [3_460_000, 4_063_000], // 3,761,776
+	'darwin-arm64': [3_061_000, 3_595_000], // 3,327,968
+	'win32-x64': [3_437_000, 4_035_000] // 3,736,064
 };
 
 /** [min, max] bytes per triple for the native `tsv` CLI binary (`release`
- * profile: abort + LTO). Same anchoring discipline as `BOUNDS`. */
+ * profile: abort + LTO). Same anchoring discipline as `BOUNDS`, same run. */
 const CLI_BOUNDS: Record<string, [number, number]> = {
-	// band anchored at a measured 3,581,576 on linux, ±8% — the anchor, not a
-	// running figure
-	'linux-x64-gnu': [3_295_000, 3_868_000],
-	// PROVISIONAL — tighten to ±8% after the first release-matrix run
-	'linux-arm64-gnu': [2_500_000, 5_500_000],
-	'linux-x64-musl': [2_500_000, 5_500_000],
-	'darwin-arm64': [2_000_000, 5_500_000],
-	'win32-x64': [2_000_000, 5_500_000]
+	'linux-x64-gnu': [3_359_000, 3_944_000], // 3,651,832
+	'linux-arm64-gnu': [3_082_000, 3_619_000], // 3,350,072
+	'linux-x64-musl': [3_362_000, 3_947_000], // 3,654,360
+	'darwin-arm64': [2_819_000, 3_311_000], // 3,065,088
+	'win32-x64': [2_990_000, 3_511_000] // 3,250,688
 };
 
 const pkg_root = 'crates/tsv_napi/pkg';
