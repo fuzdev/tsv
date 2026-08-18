@@ -299,8 +299,14 @@ fn build_call_args_doc_for_chain_impl(
     // answer the blank question exactly as a plain call's do.
     let any_arg_empty_line = any_arg_empty_line(call.arguments, printer);
 
-    // Get paren_open position (after type args if present, otherwise after callee)
-    let paren_open = type_args.map_or_else(|| call.callee.span().end, |ta| ta.span.end);
+    // Get paren_open position (after type args if present, otherwise after the callee —
+    // or past the `)` of an IIFE callee's own pair, which emitted its trailing gap
+    // itself, so nothing here scans through those parens a second time).
+    let callee_gap_start = Printer::gap_start_after_owned_pair(
+        call.callee.span().end,
+        printer.owned_pair_trailing_gap(call.callee, crate::printer::ParenContext::Callee),
+    );
+    let paren_open = type_args.map_or(callee_gap_start, |ta| ta.span.end);
 
     // Check for any comments in arguments (leading, inter-argument, or trailing)
     // Note: presence of comments doesn't necessarily mean expansion - only line comments
@@ -381,7 +387,7 @@ fn build_call_args_doc_for_chain_impl(
     // Emit comments between callee and type args: `obj.fn/* c */ <string>()`
     // Uses build_name_to_type_params_comments for safe line comment handling
     if let Some(ta) = type_args {
-        let gap_start = call.callee.span().end;
+        let gap_start = callee_gap_start;
         let gap_end = ta.span.start;
         if let Some(doc) = printer.build_name_to_type_params_comments_opt(
             gap_start,

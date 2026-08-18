@@ -5,6 +5,7 @@
 
 use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
+use crate::printer::comments::paren_pair_keeps_leading_run;
 use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::smallvec;
@@ -391,34 +392,55 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
-        // Wrap tag in parens if needed (e.g., ternary: `(a ? b : c)`template``, or an
-        // optional chain: `` (a?.b)`x` `` — a chain can't be a tag per spec). A
-        // non-null assertion that seals a parenthesized chain (`` (a?.b)!`x` ``) keeps
-        // the parens via the sealed-base rendering. This must happen BEFORE adding
-        // removed-paren comments so comments stay outside.
-        let tag_doc = if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
-            sealed
-        } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
-            d.parens(self.build_expression_doc(tagged.tag))
-        } else {
-            self.build_expression_doc(tagged.tag)
-        };
+        // A function/arrow tag is the one tag kind whose required pair keeps BOTH its
+        // gaps inside it — the template half of prettier's IIFE-callee-or-tag rule
+        // (`paren_pair_keeps_leading_run` feeding its `printCommentsForFunction`). The
+        // pair must be the author's own for a trailing gap to exist at all
+        // (`paren_shell_close_after`).
+        let owned_pair = self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+            && paren_pair_keeps_leading_run(tagged.tag);
+        let trailing_gap =
+            self.owned_pair_trailing_gap(tagged.tag, ParenContext::TaggedTemplateTag);
+        // Every window downstream — the type-argument gap, the tag→`` ` `` gap — opens
+        // PAST the pair's `)`, so a comment this doc emitted inside the parens is not
+        // emitted a second time outside them.
+        let tag_gap_start =
+            Printer::gap_start_after_owned_pair(tagged.tag.span().end, trailing_gap);
 
-        // Check for comments between removed parentheses and tag
-        // e.g., (/* comment */ tag)`template` has tagged.span.start at '(' and tag.span.start at 'tag'
-        let tag_doc = self.prepend_removed_paren_comments(
-            tagged.span.start,
-            tagged.tag.span().start,
-            tag_doc,
-        );
+        let tag_doc = if owned_pair {
+            // The tag has one rendering, so both layouts take the same body.
+            let inner = self.build_expression_doc(tagged.tag);
+            self.build_owned_required_pair_doc(
+                (tagged.span.start, tagged.tag.span().start),
+                trailing_gap,
+                inner,
+                inner,
+                ")",
+            )
+        } else {
+            // Wrap tag in parens if needed (e.g., ternary: `(a ? b : c)`template``, or an
+            // optional chain: `` (a?.b)`x` `` — a chain can't be a tag per spec). A
+            // non-null assertion that seals a parenthesized chain (`` (a?.b)!`x` ``) keeps
+            // the parens via the sealed-base rendering. This must happen BEFORE adding
+            // removed-paren comments so comments stay outside.
+            let tag_doc = if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
+                sealed
+            } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
+                d.parens(self.build_expression_doc(tagged.tag))
+            } else {
+                self.build_expression_doc(tagged.tag)
+            };
+            // Check for comments between removed parentheses and tag
+            // e.g., (/* comment */ tag)`template` has tagged.span.start at '(' and tag.span.start at 'tag'
+            self.prepend_removed_paren_comments(tagged.span.start, tagged.tag.span().start, tag_doc)
+        };
 
         let mut parts: DocBuf = smallvec![tag_doc];
         if let Some(type_args) = &tagged.type_arguments {
             // Preserve comments between tag and type args: `fn/* c */ <string>`template``
-            let tag_end = tagged.tag.span().end;
             let ta_start = type_args.span.start;
             if let Some(doc) = self.build_name_to_type_params_comments_opt(
-                tag_end,
+                tag_gap_start,
                 ta_start,
                 CommentSpacing::Trailing,
             ) {
@@ -432,7 +454,7 @@ impl<'a> Printer<'a> {
         let comment_start = tagged
             .type_arguments
             .as_ref()
-            .map_or_else(|| tagged.tag.span().end, |ta| ta.span.end);
+            .map_or(tag_gap_start, |ta| ta.span.end);
         let comment_end = tagged.quasi.span.start;
         let gap_comments: CommentVec<'_> =
             comments_to_emit_in_range(self.comments, comment_start, comment_end).collect();

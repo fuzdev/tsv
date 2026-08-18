@@ -50,6 +50,24 @@ pub(crate) struct ParenLeadingValue {
     pub forces_break: bool,
 }
 
+/// Whether a REQUIRED paren pair around `expr` — at a call callee or a tagged
+/// template's tag — keeps a leading run INSIDE it.
+///
+/// A function or arrow is the one operand kind prettier prints the comments inside
+/// those parens for (`isIifeCalleeOrTaggedTemplateExpressionTag` feeding its
+/// `printCommentsForFunction`, `src/language-js/print/index.js`); every other
+/// required pair at those positions — a ternary, a sequence, a cast, a class
+/// expression, a `new` callee (whose parent is not a call at all) — takes the run
+/// out in front, and tsv matches. Read by the three positions that print such a
+/// pair: the bare callee, the tag, and the chain's IIFE base.
+pub(crate) fn paren_pair_keeps_leading_run(expr: &internal::Expression<'_>) -> bool {
+    matches!(
+        expr,
+        internal::Expression::ArrowFunctionExpression(_)
+            | internal::Expression::FunctionExpression(_)
+    )
+}
+
 impl<'a> Printer<'a> {
     /// Split the comments between an opening `(` and the value that follows into the run
     /// the `(` LINE keeps and the run that LEADS the value, and report whether the caller
@@ -901,6 +919,180 @@ impl<'a> Printer<'a> {
         self.compose_expanded_shell_doc(paren_trailing, &body, close)
     }
 
+    /// The family's answer for a REQUIRED pair's LEADING gap — the one rule every
+    /// position that prints such a pair asks, rather than five spellings of it.
+    ///
+    /// `Some` is the expanded shell ([`Self::build_leading_run_expanded_shell_doc`]):
+    /// the run occupies a line, so the `(`-glued `//` keeps the `(` line, the operand
+    /// takes one indent and `close` comes back out. `None` says this gap does not take
+    /// the shell and the caller folds the run flat above the operand instead — either
+    /// because the run fits on one line (a glued single-line block run), or because the
+    /// pair's TRAILING gap holds comments too, where the shell is the trailing emitter's
+    /// to build and a second one here would nest two.
+    ///
+    /// `trailing_gap` is `[operand_end, boundary_end)`, `None` at a position whose pair
+    /// has no trailing gap of its own.
+    pub(in crate::printer) fn build_required_pair_leading_shell_doc(
+        &self,
+        gap_start: u32,
+        operand_start: u32,
+        trailing_gap: Option<(u32, u32)>,
+        inner: DocId,
+        close: &'static str,
+    ) -> Option<DocId> {
+        if !self.has_comments_to_emit_between(gap_start, operand_start)
+            || !self.has_newline_between(gap_start, operand_start)
+        {
+            return None;
+        }
+        if let Some((start, end)) = trailing_gap
+            && self.has_comments_to_emit_between(start, end)
+        {
+            return None;
+        }
+        Some(self.build_leading_run_expanded_shell_doc(gap_start, operand_start, inner, close))
+    }
+
+    /// The index just past the `)` that closes a REQUIRED pair around an operand
+    /// ending at `operand_end`, when the author wrote that pair — `None` when the next
+    /// thing in the source is something else (a `(` of an argument list, a `` ` ``),
+    /// which means the pair this position prints is tsv's own and the source has no
+    /// trailing gap inside it.
+    ///
+    /// The distinction is load-bearing: `(fn /* t */)()` writes the pair around the
+    /// callee and the comment is INSIDE it, while `(/* t */ fn())` writes it around the
+    /// whole call and the comment belongs to the call, not to a pair the callee prints.
+    pub(in crate::printer) fn paren_shell_close_after(&self, operand_end: u32) -> Option<u32> {
+        let bytes = self.source.as_bytes();
+        let pos = self.next_significant_byte(operand_end, bytes.len() as u32)?;
+        (bytes[pos] == b')').then_some(pos as u32 + 1)
+    }
+
+    /// The operand→`)` gap a REQUIRED pair owns, when the pair is one that keeps its
+    /// comments inside ([`paren_pair_keeps_leading_run`]) **and** the author wrote it.
+    ///
+    /// Both halves matter. Only a function/arrow callee or tag keeps a trailing comment
+    /// within the parens (prettier's `printCommentsForFunction` covers leading and
+    /// trailing alike); and the pair must be the author's own, since
+    /// `(fn /* t */)()` writes it around the callee while `(/* t */ fn())` writes it
+    /// around the whole call, where the comment belongs to the call and to no pair
+    /// printed here ([`Self::paren_shell_close_after`]).
+    ///
+    /// Every window that opens AFTER the operand — the type-argument gap, an argument
+    /// list's own leading scan, a tag→`` ` `` gap — takes its start from the returned
+    /// `)` rather than from the operand's span end, so a comment emitted inside the
+    /// parens is not emitted a second time outside them (`docs/comments.md` hazard 3).
+    pub(in crate::printer) fn owned_pair_trailing_gap(
+        &self,
+        operand: &internal::Expression<'_>,
+        context: ParenContext,
+    ) -> Option<(u32, u32)> {
+        let operand_end = operand.span().end;
+        (paren_pair_keeps_leading_run(operand) && self.needs_parens(operand, context))
+            .then(|| self.paren_shell_close_after(operand_end))
+            .flatten()
+            .map(|close| (operand_end, close))
+    }
+
+    /// Where the window AFTER an operand opens: past the `)` of a pair that emitted its
+    /// own trailing gap, or the operand's own span end where there is no such pair.
+    ///
+    /// `trailing_gap` is that operand's [`Self::owned_pair_trailing_gap`], passed in
+    /// rather than re-derived so the offset and the claim come off ONE lookup. The one
+    /// spelling of it, so the three positions that print such a pair — the bare callee,
+    /// a member chain's callee, a tagged template's tag — and every window they open
+    /// (type arguments, an argument list's leading scan, the tag→`` ` `` gap) cannot
+    /// disagree about where the pair ends.
+    pub(in crate::printer) fn gap_start_after_owned_pair(
+        operand_end: u32,
+        trailing_gap: Option<(u32, u32)>,
+    ) -> u32 {
+        trailing_gap.map_or(operand_end, |(_, close)| close)
+    }
+
+    /// A REQUIRED pair that owns BOTH of its gaps — `(`→operand and operand→`)`.
+    ///
+    /// The one emission for every position where the pair the printer emits is the
+    /// author's own and nothing outside it can reach between the parens: the chain's
+    /// sealed / IIFE base, the bare IIFE callee, a tagged template's function tag.
+    /// Layering, which is the family's convention rather than this function's choice:
+    ///
+    /// - a leading run that occupies a line takes the expanded shell
+    ///   ([`Self::build_required_pair_leading_shell_doc`]);
+    /// - otherwise the leading run folds flat above the operand, and a commented
+    ///   TRAILING gap then builds the shell around that
+    ///   ([`Self::build_paren_operand_comment_doc`]);
+    /// - with neither, the pair is bare.
+    ///
+    /// `flat_body` and `broken_body` are the operand's two renderings, which differ
+    /// only where a caller shapes the flat one (the chain base's hang / ternary
+    /// forms); the fold is applied to **both**, since the trailing emitter's line-comment
+    /// arm prints the broken one and folding into the shaped body alone would DROP the
+    /// leading run at exactly the authoring that reaches it. A caller whose SHELL body
+    /// differs from its folded one asks the two halves separately —
+    /// [`Self::build_folded_required_pair_doc`].
+    pub(in crate::printer) fn build_owned_required_pair_doc(
+        &self,
+        leading_gap: (u32, u32),
+        trailing_gap: Option<(u32, u32)>,
+        flat_body: DocId,
+        broken_body: DocId,
+        close: &'static str,
+    ) -> DocId {
+        self.build_required_pair_leading_shell_doc(
+            leading_gap.0,
+            leading_gap.1,
+            trailing_gap,
+            flat_body,
+            close,
+        )
+        .unwrap_or_else(|| {
+            self.build_folded_required_pair_doc(
+                leading_gap,
+                trailing_gap,
+                flat_body,
+                broken_body,
+                close,
+            )
+        })
+    }
+
+    /// [`Self::build_owned_required_pair_doc`] past its leading-shell arm — the form for
+    /// a caller whose shell and fold take DIFFERENT bodies.
+    ///
+    /// The non-null's `needs_parens` arm is the one such caller: its operand may carry a
+    /// ternary's width-driven expanding parens, which belong in the folded body but not
+    /// inside a hard-expanded shell, where there is no width left to decide. Every other
+    /// position hands one body to both and takes the combined form above.
+    pub(in crate::printer) fn build_folded_required_pair_doc(
+        &self,
+        leading_gap: (u32, u32),
+        trailing_gap: Option<(u32, u32)>,
+        flat_body: DocId,
+        broken_body: DocId,
+        close: &'static str,
+    ) -> DocId {
+        let d = self.d();
+        let (gap_start, operand_start) = leading_gap;
+        let fold = |body: DocId| match self.build_rhs_comments_opt(gap_start, operand_start) {
+            Some(lead) => d.concat(&[lead, body]),
+            None => body,
+        };
+        let flat_body = fold(flat_body);
+        if let Some((start, end)) = trailing_gap
+            && let Some(doc) = self.build_paren_operand_comment_doc(
+                start,
+                end,
+                flat_body,
+                fold(broken_body),
+                close,
+            )
+        {
+            return doc;
+        }
+        d.concat(&[d.text("("), flat_body, d.text(close)])
+    }
+
     /// An operand in a position that prints a REQUIRED pair around some operand
     /// kinds, with the node's `^`→operand gap emitted — the whole operand doc for
     /// an assignment expression's / assignment pattern's target
@@ -953,17 +1145,22 @@ impl<'a> Printer<'a> {
         )
         .map(|p| p as u32);
         let leading_start = open.map_or(node_start, |p| p + 1);
-        // A comment that occupies a line expands the pair. The read is in-source
-        // over the whole gap, which cannot over-fire: the gate above already found
-        // a comment to emit (a comment-free author break never reaches here), a
-        // `//` always ends its line, and an own-line block carries its break.
-        if needs_parens && self.has_newline_between(leading_start, target_start) {
-            return self.build_leading_run_expanded_shell_doc(
+        // A comment that occupies a line expands the pair, on the family's shared
+        // rule. The read is in-source over the whole gap, which cannot over-fire:
+        // the gate above already found a comment to emit (a comment-free author
+        // break never reaches here), a `//` always ends its line, and an own-line
+        // block carries its break. This position's pair encloses the operand alone,
+        // so it has no trailing gap to yield the shell to.
+        if needs_parens
+            && let Some(shell) = self.build_required_pair_leading_shell_doc(
                 leading_start,
                 target_start,
+                None,
                 self.build_expression_doc(target),
                 ")",
-            );
+            )
+        {
+            return shell;
         }
         // The flat tail serves both regimes: a glued-block run leads the operand —
         // inside the pair where one prints, ahead of the bare operand where the
