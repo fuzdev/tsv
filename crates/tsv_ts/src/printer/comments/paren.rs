@@ -1393,8 +1393,7 @@ impl<'a> Printer<'a> {
             ]));
         }
         if self.has_comments_to_emit_between(start, end) {
-            let trailing =
-                self.build_chain_block_comments_doc(start, end, CommentSpacing::Leading, false);
+            let trailing = self.build_chain_block_comments_doc(start, end, CommentSpacing::Leading);
             return Some(d.concat(&[d.text("("), flat_body, trailing, d.text(close)]));
         }
         None

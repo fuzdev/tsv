@@ -379,9 +379,15 @@ cargo run --profile corpus -p tsv_debug --features audits ignore_audit ~/dev/zzz
 # (optimized + panic=unwind) so a formatter panic is caught + reported.
 #
 # GATED as a RATCHET (like gap_audit / blank_audit): `ignore_audit_known.txt` pins the known
-# findings per (KIND, position), born red — the file shrinking (adding printer opt-ins,
-# fixing misbindings/transients) is the goal. A NEW (kind, position) pair, a STALE one (no
-# longer fires), or any PANIC (a crash on the injected directive — unpinnable) FAILS. Keyed
+# findings per (KIND, position). ⚠️ Unlike those two, the file is NOT a burn-down list: the
+# head families (list items, value heads, paren / assignment / statement / declaration heads)
+# are closed, and the remaining UNHONORED positions are predominantly expression-INTERIOR —
+# a directive written mid-expression, rare in authoring and a position where prettier's own
+# behavior is emergent rather than designed — held under a standing SANCTION rather than
+# queued for opt-ins. Lines outside that class (the UNSTABLE relocation transients, a few
+# non-interior positions) remain ordinary pinned bugs. The gate's job is unchanged: a NEW
+# (kind, position) pair, a STALE one (no longer fires), or any PANIC (a crash on the
+# injected directive — unpinnable) FAILS. Keyed
 # by AST position, so every site of a position rolls up to one line; a "covered" position
 # can still appear when an uncovered SUB-PATH of it (e.g. an object property nested in a
 # member chain) doesn't honor.

@@ -290,10 +290,52 @@ impl<'a> ClassifiedComments<'a> {
     /// O(log n + k) where n is total comments and k is comments in range.
     /// Compared to 4 separate filter calls which would be O(4 log n + 4k).
     pub fn from_range(comments: &'a [Comment], start: u32, end: u32, line_breaks: &[u32]) -> Self {
+        Self::from_range_inner(comments, start, end, line_breaks, false)
+    }
+
+    /// [`Self::from_range`] with the trailing run's anchor ADVANCING over each comment
+    /// it takes: a comment beginning on the line the previous one ended on is still
+    /// glued — the line a multiline block closes on included — so
+    /// `prev /* m1⏎m2 */ /* c6 */` keeps `c6` trailing. Measured against `start`
+    /// alone (the fixed-anchor `from_range`), everything past a multiline block reads
+    /// as own-line and the run splits. The advance stops at the first off-line comment
+    /// for free: lines only grow, so once a comment starts below the anchor's line no
+    /// later one can be on it (a comment glued to an own-line comment belongs to the
+    /// leading run, whose emitter owns the glue question).
+    ///
+    /// ⚠️ A separate constructor rather than `from_range`'s one behavior because the
+    /// classification often feeds a PARTITION — two emitters splitting one gap — and
+    /// moving the trailing/leading bound moves comments between them: an emitter pair
+    /// where only one side adopts the advance double-prints every re-homed comment.
+    /// The chain gaps' consumers all classify through one seam
+    /// (`Printer::classify_comments`) and take the advance together; a consumer set
+    /// that partitions against an independently-spelled partner (the call-argument
+    /// family's routed gaps, the delimiter-line pulls) keeps the fixed anchor until
+    /// its partner moves with it.
+    pub fn from_range_advancing(
+        comments: &'a [Comment],
+        start: u32,
+        end: u32,
+        line_breaks: &[u32],
+    ) -> Self {
+        Self::from_range_inner(comments, start, end, line_breaks, true)
+    }
+
+    fn from_range_inner(
+        comments: &'a [Comment],
+        start: u32,
+        end: u32,
+        line_breaks: &[u32],
+        advance: bool,
+    ) -> Self {
         let mut result = Self::default();
 
+        let mut anchor = start;
         for comment in comments_to_emit_in_range(comments, start, end) {
-            let same_line = printing::is_same_line_fast(line_breaks, start, comment.span.start);
+            let same_line = printing::is_same_line_fast(line_breaks, anchor, comment.span.start);
+            if same_line && advance {
+                anchor = comment.span.end;
+            }
             match (comment.is_block, same_line) {
                 (true, true) => result.trailing_block.push(comment),
                 (false, true) => result.trailing_line.push(comment),
