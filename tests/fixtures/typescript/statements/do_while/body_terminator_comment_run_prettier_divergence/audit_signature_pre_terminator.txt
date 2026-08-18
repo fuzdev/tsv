@@ -17,6 +17,12 @@
 		// c2
 		a
 	);
+	// a block in the `;`→`while` gap flushes behind the deferred tail, in source order
+	do expr2; /* c5 */
+	while (
+		// c4
+		b
+	);
 </script>
 
 %%PASS=2 (fixed point)%%
@@ -28,5 +34,11 @@
 		// c3
 		// c2
 		a
+	);
+	// a block in the `;`→`while` gap flushes behind the deferred tail, in source order
+	do expr2; /* c5 */
+	while (
+		// c4
+		b
 	);
 </script>

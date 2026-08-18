@@ -478,20 +478,21 @@ impl<'a> Printer<'a> {
             let next_bound = next_printed_stmt_start(case.consequent, i, inline_comment_boundary);
             // Deferring hands the `;` line's comments to the NEXT statement's leading run,
             // so it needs one to exist. For the last statement of a consequent there is no
-            // such run, and the switch's own after-last-case emitter sits at CASE-LABEL
-            // indent — which prettier agrees is right for a post-consequent comment, but
-            // the deferred `//` is emitted inside the statement's doc at consequent indent,
-            // so the pair could never share a fixed point (pass 2 dedents the `//`). That
-            // shape keeps the ordinary trailing path; the class / block / program lists
-            // have a body-level emitter at the right indent and defer to the end.
+            // such run; its `;`-line comments land own-line at CASE-LABEL indent instead —
+            // where the reparse's after-last-case run settles them — via the clause-tail
+            // dedent below (the docs are queued one `indent` deeper, inside the
+            // consequent's wrap). Inline suffixes flushed at the enclosing break instead:
+            // right at every sibling-case break (label indent), one level out at the LAST
+            // case, whose next break is the switch's `}` — the renderer-side holdout
+            // `doc/arena_render_suffix.rs` names.
             let has_next_stmt = next_bound != inline_comment_boundary;
+            let terminator_defers =
+                body_has_comments && self.terminator_defers_line_comment(stmt_start, stmt_end);
             // THIS statement's verdict — distinct from `prev_deferred_line_comment`, which
             // is the PREVIOUS statement's and is still being read below (the leading run
             // and the blank scan). The trailing gate needs its own answer here, before the
             // loop tail hands it forward, so the two must not share one variable.
-            let this_defers_line_comment = body_has_comments
-                && has_next_stmt
-                && self.terminator_defers_line_comment(stmt_start, stmt_end);
+            let this_defers_line_comment = terminator_defers && has_next_stmt;
             // The claim stops at the split: a comment hugging the next printed
             // statement — or, past the last one, the next case's label — leads it
             // instead (`b1(); /* c */ let d1 = 1;`, `b1(); /* c */ case 2:`), emitted
@@ -503,6 +504,17 @@ impl<'a> Printer<'a> {
             };
             let trailing = if this_defers_line_comment {
                 DocBuf::new()
+            } else if terminator_defers {
+                // Last statement behind a deferred pre-`;` `//`: nothing may share the
+                // flush line (the `//` runs to its end), so each `;`-line comment takes
+                // its own line at case-label level — the after-last-case run's settled
+                // position (see the `has_next_stmt` note above). Dedent 1 mirrors the
+                // consequent's `d.indent(...)` wrap below.
+                self.build_deferred_tail_same_line_comment_docs(
+                    stmt_end,
+                    next_bound.min(claim_end),
+                    1,
+                )
             } else {
                 self.build_trailing_same_line_comment_docs(stmt_end, next_bound.min(claim_end))
             };

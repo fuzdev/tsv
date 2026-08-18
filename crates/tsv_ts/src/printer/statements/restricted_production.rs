@@ -54,12 +54,18 @@ impl<'a> Printer<'a> {
     /// 2. Own-line comments in chain → unconditional parens
     /// 3. Binaryish arguments → conditional parens (ifBreak)
     /// 4. Otherwise → plain `keyword expr;`
+    ///
+    /// `clause_tail` is the statement container's deferral fact
+    /// (`StatementContext::clause_tail`), threaded into every arm's terminator split —
+    /// in clause position the gap's own-line run renders dedented to the flushing
+    /// construct's level (see [`Printer::split_terminator_gap_comments`]).
     pub(in crate::printer::statements) fn build_keyword_argument_doc(
         &self,
         keyword: &'static str,
         keyword_start: u32,
         span_end: u32,
         arg: &Expression<'_>,
+        clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
 
@@ -83,7 +89,7 @@ impl<'a> Printer<'a> {
             || (!self.operand_arm_keeps_line_comment_inside(keyword, arg)
                 && self.operand_parens_hold_line_comment(arg.span().end, span_end))
         {
-            return self.build_comment_paren_doc(keyword, keyword_end, arg, span_end);
+            return self.build_comment_paren_doc(keyword, keyword_end, arg, span_end, clause_tail);
         }
 
         // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
@@ -142,6 +148,7 @@ impl<'a> Printer<'a> {
                     span_end,
                     false,
                     keyword == "return",
+                    clause_tail,
                 )
             } else {
                 DocBuf::new()
@@ -179,7 +186,14 @@ impl<'a> Printer<'a> {
             // the in-paren comment is already inside `seq_doc`.
             let after_start = grouping_close.saturating_add(1).min(span_end);
             let after = if self.has_comments_to_emit_between(after_start, span_end) {
-                self.split_terminator_gap_comments(&mut parts, after_start, span_end, false, true)
+                self.split_terminator_gap_comments(
+                    &mut parts,
+                    after_start,
+                    span_end,
+                    false,
+                    true,
+                    clause_tail,
+                )
             } else {
                 DocBuf::new()
             };
@@ -189,7 +203,13 @@ impl<'a> Printer<'a> {
         }
 
         if let Expression::BinaryExpression(binary) = arg {
-            return self.build_binary_paren_doc(keyword, binary, span_end, inline_comments);
+            return self.build_binary_paren_doc(
+                keyword,
+                binary,
+                span_end,
+                inline_comments,
+                clause_tail,
+            );
         }
 
         // Ternary in return/throw: binary test expressions need continuation indent.
@@ -220,6 +240,7 @@ impl<'a> Printer<'a> {
                 span_end,
                 false,
                 false,
+                clause_tail,
             )
         } else {
             DocBuf::new()
@@ -400,13 +421,21 @@ impl<'a> Printer<'a> {
         keyword_end: u32,
         arg: &Expression<'_>,
         span_end: u32,
+        clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
         let (hanging, boundary) =
             self.build_restricted_production_paren_doc(keyword, keyword_end, arg, span_end);
         let mut parts: DocBuf = smallvec![hanging];
         let after = if self.has_comments_to_emit_between(boundary, span_end) {
-            self.split_terminator_gap_comments(&mut parts, boundary, span_end, false, true)
+            self.split_terminator_gap_comments(
+                &mut parts,
+                boundary,
+                span_end,
+                false,
+                true,
+                clause_tail,
+            )
         } else {
             DocBuf::new()
         };
@@ -542,6 +571,7 @@ impl<'a> Printer<'a> {
         binary: &internal::BinaryExpression<'_>,
         span_end: u32,
         inline_comments: Option<DocId>,
+        clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
         let raw_expr_doc = self.build_binary_chain_doc_ungrouped(binary);
@@ -588,6 +618,7 @@ impl<'a> Printer<'a> {
             semicolon_pos,
             true,
             true,
+            clause_tail,
         );
         let trailing_comments_doc = d.concat(&inline_trailing);
 

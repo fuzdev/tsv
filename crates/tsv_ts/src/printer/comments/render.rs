@@ -217,8 +217,8 @@ impl<'a> Printer<'a> {
     /// author's line, not an end-of-line hazard. The `line_suffix` is inert for a block
     /// that trails on the same line — that one keeps the inline form above.
     pub(crate) fn build_trailing_comment_doc_own_line(&self, comment: &internal::Comment) -> DocId {
-        let d = self.d();
-        d.line_suffix(d.concat(&[d.hardline(), self.build_comment_doc(comment)]))
+        self.d()
+            .line_suffix(self.deferred_own_line_comment_inner(comment, false))
     }
 
     /// [`Self::build_trailing_comment_doc_own_line`] with an author BLANK line above the
@@ -239,11 +239,26 @@ impl<'a> Printer<'a> {
         comment: &internal::Comment,
         blank_above: bool,
     ) -> DocId {
-        if !blank_above {
-            return self.build_trailing_comment_doc_own_line(comment);
-        }
+        self.d()
+            .line_suffix(self.deferred_own_line_comment_inner(comment, blank_above))
+    }
+
+    /// The payload every deferred own-line member shares — the break (and an author
+    /// blank's second `hardline`; the rule and its ⚠️ literalline caveat are
+    /// [`Self::build_trailing_comment_doc_own_line_blank`]'s) riding INSIDE the
+    /// suffix ahead of the comment. One builder so the blank rule cannot drift
+    /// between the plain and dedented spellings.
+    fn deferred_own_line_comment_inner(
+        &self,
+        comment: &internal::Comment,
+        blank_above: bool,
+    ) -> DocId {
         let d = self.d();
-        d.line_suffix(d.concat(&[d.hardline(), d.hardline(), self.build_comment_doc(comment)]))
+        if blank_above {
+            d.concat(&[d.hardline(), d.hardline(), self.build_comment_doc(comment)])
+        } else {
+            d.concat(&[d.hardline(), self.build_comment_doc(comment)])
+        }
     }
 
     /// The clause-tail spelling of
@@ -270,13 +285,7 @@ impl<'a> Printer<'a> {
         dedent: u8,
     ) -> DocId {
         let d = self.d();
-        let mut inner = if blank_above {
-            // The blank is a second hardline, not a `literalline` — the deferred
-            // sites' rule (see the sibling above).
-            d.concat(&[d.hardline(), d.hardline(), self.build_comment_doc(comment)])
-        } else {
-            d.concat(&[d.hardline(), self.build_comment_doc(comment)])
-        };
+        let mut inner = self.deferred_own_line_comment_inner(comment, blank_above);
         for _ in 0..dedent {
             inner = d.dedent(inner);
         }
