@@ -144,7 +144,6 @@ impl<'a> Printer<'a> {
         boundary: u32,
         is_last: bool,
     ) -> (CommentVec<'c>, bool) {
-        let d = self.d();
         let mut own_line: CommentVec<'c> = CommentVec::new();
         let mut has_line = false;
         for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
@@ -156,8 +155,14 @@ impl<'a> Printer<'a> {
                 is_last,
             ) {
                 CommentPosition::Trailing => {
-                    buf.push(d.text(" "));
-                    buf.push(self.build_comment_doc(comment));
+                    // A block inline, a `//` via `line_suffix` — the caller's join
+                    // already breaks after a trailing `//` (`has_line`), so the suffix
+                    // flushes there byte-identically. Deferring is what keeps it from
+                    // landing AHEAD of a run the decorator's own doc already deferred
+                    // (`@(a ? b : c // inj⏎) // c4` welded as `// c4 // inj`, reordered);
+                    // as suffixes the two meet the flush in source order and the run
+                    // separator breaks between them (`doc/arena_render_suffix.rs`).
+                    buf.push(self.build_trailing_comment_doc(comment));
                 }
                 CommentPosition::LeadingInline => pending.push(self.build_comment_doc(comment)),
                 CommentPosition::LeadingOwnLine => own_line.push(comment),

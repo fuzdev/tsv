@@ -683,7 +683,7 @@ impl<'a> Printer<'a> {
     /// line. The other trailing-run sites never saw the difference: everywhere else the
     /// comma coincides with a predecessor an earlier emitter already claimed, so `prev` is
     /// `None` there — only the one walk that covers a whole gap in a single pass
-    /// ([`Self::build_trailing_gap_comments_ext`]) reaches it.
+    /// ([`Self::build_trailing_gap_comments`]) reaches it.
     ///
     /// The `is_block` half is belt-and-braces rather than load-bearing: a `//` runs to end of
     /// line, so a following comment always has a newline between.
@@ -710,7 +710,7 @@ impl<'a> Printer<'a> {
     /// The trailing-side counterpart of
     /// [`push_leading_run_separator`](Self::push_leading_run_separator), for the runs whose
     /// own-line arm is that unconditional break — the last-item→closer walk
-    /// ([`Self::build_trailing_gap_comments_ext`]), the array literal's end-of-array scan,
+    /// ([`Self::build_trailing_gap_comments`]), the array literal's end-of-array scan,
     /// and the call family's dangling emitter. A run whose non-glue separator is the
     /// caller's ([`Self::build_trailing_closer_comments_doc`], whose container may still
     /// collapse) asks the predicate directly and keeps its own arm.

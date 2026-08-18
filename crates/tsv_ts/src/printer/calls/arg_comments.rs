@@ -827,7 +827,12 @@ where
 ///
 /// Separates comments into a run that TRAILS what precedes the gap and one that LEADS
 /// what follows it:
-/// - `trailing_line`: the run's line comments
+/// - `trailing_line`: the run's line comment — at most ONE, structurally: a `//` runs to
+///   end of line, so no second comment can occupy the line it trails on, and every
+///   constructor's walk stops claiming at the first `//`
+///   ([`Printer::closer_trailing_comment_run`] and its inter-item twin by their
+///   `take_while`; the delimiter reading because a second same-line comment would sit
+///   inside the first's text)
 /// - `trailing_block`: the run's block comments
 /// - `leading`: everything past the run
 ///
@@ -853,7 +858,7 @@ where
 /// This type adds the call-argument-specific emission (`emit_*`) and comma-relative
 /// helpers on top; only the emission differs per shape, which is intentional.
 pub(crate) struct PartitionedComments<'a> {
-    pub trailing_line: SmallVec<[&'a internal::Comment; 2]>,
+    pub trailing_line: Option<&'a internal::Comment>,
     pub trailing_block: SmallVec<[&'a internal::Comment; 2]>,
     pub leading: SmallVec<[&'a internal::Comment; 2]>,
     /// The gap the comments were partitioned over: `start` is the preceding element's
@@ -901,8 +906,11 @@ impl<'a> PartitionedComments<'a> {
         let classified =
             tsv_lang::ClassifiedComments::from_range(comments, start, end, line_breaks);
         let leading = classified.leading_in_source_order();
+        // ≤ 1 by construction: a second same-line comment would sit inside the first
+        // `//`'s own text, so it cannot exist as a token.
+        debug_assert!(classified.trailing_line.len() <= 1);
         Self {
-            trailing_line: classified.trailing_line,
+            trailing_line: classified.trailing_line.first().copied(),
             trailing_block: classified.trailing_block,
             leading,
             start,
@@ -1000,14 +1008,17 @@ impl<'a> PartitionedComments<'a> {
         start: u32,
         end: u32,
     ) -> Self {
-        let mut trailing_line: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
+        let mut trailing_line: Option<&'a internal::Comment> = None;
         let mut trailing_block: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
         let mut run_end = start;
         for comment in run {
             if comment.is_block {
                 trailing_block.push(comment);
             } else {
-                trailing_line.push(comment);
+                // The run walk stops claiming at the first `//`, so this assigns at
+                // most once.
+                debug_assert!(trailing_line.is_none());
+                trailing_line = Some(comment);
             }
             run_end = comment.span.end;
         }
@@ -1054,7 +1065,7 @@ impl<'a> PartitionedComments<'a> {
     }
 
     pub(crate) fn has_trailing_line(&self) -> bool {
-        !self.trailing_line.is_empty()
+        self.trailing_line.is_some()
     }
 
     /// Whether a **last-item→`)`** gap's comments force the parens open — asked of a
@@ -1090,10 +1101,10 @@ impl<'a> PartitionedComments<'a> {
     /// `call_formatting`'s own loop, which needs its `force_expansion` feedback) get the
     /// rule from one place.
     pub(super) fn demote_trailing_line_after_deferred(&mut self, prev_defers_line: bool) {
-        if self.trailing_line.is_empty() || !prev_defers_line {
+        if !prev_defers_line {
             return;
         }
-        for comment in self.trailing_line.drain(..).rev() {
+        if let Some(comment) = self.trailing_line.take() {
             self.leading.insert(0, comment);
         }
     }
@@ -1203,7 +1214,7 @@ impl<'a> PartitionedComments<'a> {
             parts.push(d.text(" "));
             parts.push(printer.build_comment_doc(comment));
         }
-        for comment in &self.trailing_line {
+        if let Some(comment) = self.trailing_line {
             parts.push(printer.build_trailing_line_comment_doc(comment));
         }
     }
@@ -1242,7 +1253,7 @@ impl<'a> PartitionedComments<'a> {
                 }
             }
         }
-        for comment in &self.trailing_line {
+        if let Some(comment) = self.trailing_line {
             parts.push(printer.build_trailing_line_comment_doc(comment));
         }
     }

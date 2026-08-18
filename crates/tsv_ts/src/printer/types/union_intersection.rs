@@ -965,11 +965,7 @@ impl<'a> Printer<'a> {
                     // own lines). A same-line line comment is line_suffix'd (zero width)
                     // so it can't force the previous member to break — the leading-`|`
                     // form puts the next separator on a new line, where it flushes.
-                    parts.extend(self.build_trailing_gap_comments_ext(
-                        prev_type_end,
-                        pipe_pos,
-                        true,
-                    ));
+                    parts.extend(self.build_trailing_gap_comments(prev_type_end, pipe_pos));
 
                     // Comments after the pipe lead this member. Line comments (and
                     // own-line block comments) go on their own line BEFORE the `| `
@@ -2101,7 +2097,7 @@ impl<'a> Printer<'a> {
             // glued to a preceding comment's `*/` read as own-line to *both* arms and was
             // MOVED across the `&` (`docs/comments.md` §Own-line-ness is a SOURCE
             // question). The union's member gap never had the bug: it routes through
-            // `build_trailing_gap_comments_ext`, which is the same claim.
+            // `build_trailing_gap_comments`, which is the same claim.
             let trailing_run_end = amp.map_or(prev_end, |amp_pos| {
                 self.closer_trailing_run_end(prev_end, amp_pos)
             });
@@ -2142,8 +2138,15 @@ impl<'a> Printer<'a> {
                 for comment in comments_to_emit_in_range(self.comments, prev_end, amp_pos) {
                     if comment.span.end <= trailing_run_end {
                         if !comment.is_block {
-                            unit.push(d.text(" "));
-                            unit.push(self.build_comment_doc(comment));
+                            // Via `line_suffix`: the layout below breaks after a trailing
+                            // `//` regardless, so the suffix flushes there byte-identically
+                            // — and a run the FIRST member's stripped shell already
+                            // deferred flushes ahead of it in source order instead of
+                            // welding behind an inline emission
+                            // (`(a // x⏎) // inj⏎& b` welded as `& // inj // x`); the
+                            // flush's run separator breaks between the two
+                            // (`doc/arena_render_suffix.rs`).
+                            unit.push(self.build_trailing_comment_doc(comment));
                         }
                         // A block in the run went before the `&` and is not on this line at
                         // all, so nothing can be glued to it. A `//` IS on this line, and
@@ -2182,17 +2185,28 @@ impl<'a> Printer<'a> {
                 for comment in comments_to_emit_in_range(self.comments, amp_pos + 1, cur_start)
                     .filter(|c| self.is_same_line(amp_pos, c.span.start))
                 {
-                    if prev_comment.is_some() {
+                    if prev_comment.is_none()
+                        || self.trailing_run_hugs_previous(prev_comment, comment.span.start)
+                    {
+                        // Glued at end of line (or opening it): a block inline with its
+                        // space, a `//` via `line_suffix` — deferred so the FIRST
+                        // member's stripped-shell run, already pending in the buffer,
+                        // flushes ahead of it in source order instead of welding behind
+                        // an inline emission (`(a // x⏎) & // inj⏎b` welded as
+                        // `& // inj // x`); the flush's run separator breaks between the
+                        // two (`doc/arena_render_suffix.rs`).
+                        unit.push(self.build_trailing_comment_doc(comment));
+                    } else {
+                        // The run separator's non-glue arm is a real break, which flushes
+                        // any pending run before this comment prints — no weld exposure.
                         self.push_trailing_run_separator(
                             &mut unit,
                             prev_comment,
                             scan_from,
                             comment.span.start,
                         );
-                    } else {
-                        unit.push(d.text(" "));
+                        unit.push(self.build_comment_doc(comment));
                     }
-                    unit.push(self.build_comment_doc(comment));
                     prev_comment = Some(comment);
                     scan_from = comment.span.end;
                 }

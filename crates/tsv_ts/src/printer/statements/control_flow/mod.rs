@@ -860,10 +860,17 @@ impl<'a> Printer<'a> {
         run: GapCommentRun,
     ) {
         let d = self.d();
-        // Trailing comments stay on same line
+        // Trailing comments stay on same line — a block inline, a `//` via `line_suffix`
+        // ([`Printer::build_trailing_comment_doc`]). Every caller already breaks after a
+        // `//` here (an inline one would swallow the keyword/body otherwise), so the
+        // suffix flushes at that same break and the bytes are unchanged — except when the
+        // previous construct's doc already ends in a deferred `//` (a `;`-relocated
+        // comment on a collapsed brace-less consequent): inline, this comment landed
+        // ahead of that pending suffix and the flush welded the two
+        // (`if (a) expr; // c1 // inj`); deferred, they meet the flush in source order
+        // and the run separator breaks between them (`doc/arena_render_suffix.rs`).
         for comment in inline_prev {
-            parts.push(d.text(" "));
-            parts.push(self.build_comment_doc(comment));
+            parts.push(self.build_trailing_comment_doc(comment));
         }
 
         // Where a blank above the next comment is measured FROM: whatever this emitter

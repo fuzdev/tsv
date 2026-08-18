@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 501,
+	"end": 918,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -108,9 +108,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Template literal with newlines and trailing comment",
+			"value": " Test call: an own-line comment follows the relocated trailing comment",
 			"start": 396,
-			"end": 450,
+			"end": 468,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -118,6 +118,86 @@
 				},
 				"end": {
 					"line": 21,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing comment",
+			"start": 522,
+			"end": 541,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 5
+				},
+				"end": {
+					"line": 24,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line comment",
+			"start": 543,
+			"end": 562,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Test call: a trailing block stays inside the parens",
+			"start": 565,
+			"end": 619,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 671,
+			"end": 678,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 3
+				},
+				"end": {
+					"line": 30,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Template literal with newlines and trailing comment",
+			"start": 683,
+			"end": 737,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
 					"column": 55
 				}
 			}
@@ -125,16 +205,64 @@
 		{
 			"type": "Line",
 			"value": " trailing comment",
-			"start": 471,
-			"end": 490,
+			"start": 758,
+			"end": 777,
 			"loc": {
 				"start": {
-					"line": 23,
+					"line": 34,
 					"column": 9
 				},
 				"end": {
-					"line": 23,
+					"line": 34,
 					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Template literal: an own-line comment follows the relocated one",
+			"start": 780,
+			"end": 846,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing comment",
+			"start": 867,
+			"end": 886,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 9
+				},
+				"end": {
+					"line": 38,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line comment",
+			"start": 888,
+			"end": 907,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 20
 				}
 			}
 		}
@@ -142,19 +270,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 500,
+		"end": 917,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 491,
+			"end": 908,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 24,
+					"line": 40,
 					"column": 9
 				}
 			},
@@ -752,36 +880,36 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 452,
-					"end": 470,
+					"start": 470,
+					"end": 521,
 					"loc": {
 						"start": {
 							"line": 22,
 							"column": 1
 						},
 						"end": {
-							"line": 23,
-							"column": 8
+							"line": 24,
+							"column": 4
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 452,
-						"end": 469,
+						"start": 470,
+						"end": 520,
 						"loc": {
 							"start": {
 								"line": 22,
 								"column": 1
 							},
 							"end": {
-								"line": 23,
-								"column": 7
+								"line": 24,
+								"column": 3
 							}
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 452,
-							"end": 454,
+							"start": 470,
+							"end": 472,
 							"loc": {
 								"start": {
 									"line": 22,
@@ -792,20 +920,532 @@
 									"column": 3
 								}
 							},
-							"name": "fn"
+							"name": "it"
 						},
 						"arguments": [
 							{
-								"type": "TemplateLiteral",
-								"start": 455,
-								"end": 468,
+								"type": "Literal",
+								"start": 473,
+								"end": 480,
 								"loc": {
 									"start": {
 										"line": 22,
 										"column": 4
 									},
 									"end": {
-										"line": 23,
+										"line": 22,
+										"column": 11
+									}
+								},
+								"value": "test2",
+								"raw": "'test2'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 482,
+								"end": 519,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 13
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 488,
+									"end": 519,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 19
+										},
+										"end": {
+											"line": 24,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 492,
+											"end": 516,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 2
+												},
+												"end": {
+													"line": 23,
+													"column": 26
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 492,
+												"end": 515,
+												"loc": {
+													"start": {
+														"line": 23,
+														"column": 2
+													},
+													"end": {
+														"line": 23,
+														"column": 25
+													}
+												},
+												"callee": {
+													"type": "MemberExpression",
+													"start": 492,
+													"end": 509,
+													"loc": {
+														"start": {
+															"line": 23,
+															"column": 2
+														},
+														"end": {
+															"line": 23,
+															"column": 19
+														}
+													},
+													"object": {
+														"type": "CallExpression",
+														"start": 492,
+														"end": 504,
+														"loc": {
+															"start": {
+																"line": 23,
+																"column": 2
+															},
+															"end": {
+																"line": 23,
+																"column": 14
+															}
+														},
+														"callee": {
+															"type": "Identifier",
+															"start": 492,
+															"end": 498,
+															"loc": {
+																"start": {
+																	"line": 23,
+																	"column": 2
+																},
+																"end": {
+																	"line": 23,
+																	"column": 8
+																}
+															},
+															"name": "expect"
+														},
+														"arguments": [
+															{
+																"type": "Literal",
+																"start": 499,
+																"end": 503,
+																"loc": {
+																	"start": {
+																		"line": 23,
+																		"column": 9
+																	},
+																	"end": {
+																		"line": 23,
+																		"column": 13
+																	}
+																},
+																"value": true,
+																"raw": "true"
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 505,
+														"end": 509,
+														"loc": {
+															"start": {
+																"line": 23,
+																"column": 15
+															},
+															"end": {
+																"line": 23,
+																"column": 19
+															}
+														},
+														"name": "toBe"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Literal",
+														"start": 510,
+														"end": 514,
+														"loc": {
+															"start": {
+																"line": 23,
+																"column": 20
+															},
+															"end": {
+																"line": 23,
+																"column": 24
+															}
+														},
+														"value": true,
+														"raw": "true"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Test call: an own-line comment follows the relocated trailing comment",
+							"start": 396,
+							"end": 468
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " trailing comment",
+							"start": 522,
+							"end": 541
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 621,
+					"end": 680,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 621,
+						"end": 679,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 30,
+								"column": 11
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 621,
+							"end": 623,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 1
+								},
+								"end": {
+									"line": 28,
+									"column": 3
+								}
+							},
+							"name": "it"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 624,
+								"end": 631,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 4
+									},
+									"end": {
+										"line": 28,
+										"column": 11
+									}
+								},
+								"value": "test3",
+								"raw": "'test3'"
+							},
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 633,
+								"end": 670,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 13
+									},
+									"end": {
+										"line": 30,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 639,
+									"end": 670,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 19
+										},
+										"end": {
+											"line": 30,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 643,
+											"end": 667,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 2
+												},
+												"end": {
+													"line": 29,
+													"column": 26
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 643,
+												"end": 666,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 2
+													},
+													"end": {
+														"line": 29,
+														"column": 25
+													}
+												},
+												"callee": {
+													"type": "MemberExpression",
+													"start": 643,
+													"end": 660,
+													"loc": {
+														"start": {
+															"line": 29,
+															"column": 2
+														},
+														"end": {
+															"line": 29,
+															"column": 19
+														}
+													},
+													"object": {
+														"type": "CallExpression",
+														"start": 643,
+														"end": 655,
+														"loc": {
+															"start": {
+																"line": 29,
+																"column": 2
+															},
+															"end": {
+																"line": 29,
+																"column": 14
+															}
+														},
+														"callee": {
+															"type": "Identifier",
+															"start": 643,
+															"end": 649,
+															"loc": {
+																"start": {
+																	"line": 29,
+																	"column": 2
+																},
+																"end": {
+																	"line": 29,
+																	"column": 8
+																}
+															},
+															"name": "expect"
+														},
+														"arguments": [
+															{
+																"type": "Literal",
+																"start": 650,
+																"end": 654,
+																"loc": {
+																	"start": {
+																		"line": 29,
+																		"column": 9
+																	},
+																	"end": {
+																		"line": 29,
+																		"column": 13
+																	}
+																},
+																"value": true,
+																"raw": "true"
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 656,
+														"end": 660,
+														"loc": {
+															"start": {
+																"line": 29,
+																"column": 15
+															},
+															"end": {
+																"line": 29,
+																"column": 19
+															}
+														},
+														"name": "toBe"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "Literal",
+														"start": 661,
+														"end": 665,
+														"loc": {
+															"start": {
+																"line": 29,
+																"column": 20
+															},
+															"end": {
+																"line": 29,
+																"column": 24
+															}
+														},
+														"value": true,
+														"raw": "true"
+													}
+												],
+												"optional": false
+											}
+										}
+									]
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " b ",
+										"start": 671,
+										"end": 678
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " own-line comment",
+							"start": 543,
+							"end": 562
+						},
+						{
+							"type": "Line",
+							"value": " Test call: a trailing block stays inside the parens",
+							"start": 565,
+							"end": 619
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 739,
+					"end": 757,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 739,
+						"end": 756,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 1
+							},
+							"end": {
+								"line": 34,
+								"column": 7
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 739,
+							"end": 741,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 1
+								},
+								"end": {
+									"line": 33,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 742,
+								"end": 755,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 4
+									},
+									"end": {
+										"line": 34,
 										"column": 6
 									}
 								},
@@ -813,15 +1453,15 @@
 								"quasis": [
 									{
 										"type": "TemplateElement",
-										"start": 456,
-										"end": 467,
+										"start": 743,
+										"end": 754,
 										"loc": {
 											"start": {
-												"line": 22,
+												"line": 33,
 												"column": 5
 											},
 											"end": {
-												"line": 23,
+												"line": 34,
 												"column": 5
 											}
 										},
@@ -840,16 +1480,125 @@
 						{
 							"type": "Line",
 							"value": " Template literal with newlines and trailing comment",
-							"start": 396,
-							"end": 450
+							"start": 683,
+							"end": 737
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Line",
 							"value": " trailing comment",
-							"start": 471,
-							"end": 490
+							"start": 758,
+							"end": 777
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 848,
+					"end": 866,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 848,
+						"end": 865,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 1
+							},
+							"end": {
+								"line": 38,
+								"column": 7
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 848,
+							"end": 850,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 1
+								},
+								"end": {
+									"line": 37,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 851,
+								"end": 864,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 4
+									},
+									"end": {
+										"line": 38,
+										"column": 6
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 852,
+										"end": 863,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 5
+											},
+											"end": {
+												"line": 38,
+												"column": 5
+											}
+										},
+										"value": {
+											"raw": "line3\nline4",
+											"cooked": "line3\nline4"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Template literal: an own-line comment follows the relocated one",
+							"start": 780,
+							"end": 846
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " trailing comment",
+							"start": 867,
+							"end": 886
+						},
+						{
+							"type": "Line",
+							"value": " own-line comment",
+							"start": 888,
+							"end": 907
 						}
 					]
 				}

@@ -1560,7 +1560,7 @@ impl<'a> Printer<'a> {
     /// reduces to its leading half). Anchoring it on the param's line instead called a
     /// comment glued to the list's own comma own-line and opened a list that fits
     /// (`docs/comments.md` §Own-line-ness is a SOURCE question). Paired with
-    /// [`Self::build_trailing_gap_comments_ext`], which the last param's arm of
+    /// [`Self::build_trailing_gap_comments`], which the last param's arm of
     /// `build_function_params_doc` emits that region through: it trails exactly the comments
     /// this does not force a break for.
     fn has_trailing_line_comment_in_params(
@@ -2251,8 +2251,7 @@ impl<'a> Printer<'a> {
                 // reads the same source, and must: a gate that forces the break for a
                 // comment this emitter trails inline opens the list around nothing.
                 if comments_present {
-                    inner_parts
-                        .extend(self.build_trailing_gap_comments_ext(param_end, search_end, true));
+                    inner_parts.extend(self.build_trailing_gap_comments(param_end, search_end));
                 }
             } else {
                 // The param's same-line **block** comments, split by side of the comma
@@ -2523,7 +2522,7 @@ impl<'a> Printer<'a> {
     /// predicate only: under `trailingComma: 'none'` a last param's source comma is deleted,
     /// and the anchor's whole argument is that the printer pulls the comma back onto the
     /// param's line. That region belongs to the shared last-item→closer walk
-    /// ([`Printer::build_trailing_gap_comments_ext`]), whose
+    /// ([`Printer::build_trailing_gap_comments`]), whose
     /// [`Printer::closer_trailing_comment_run`] asks the same question of a `//` (the param's
     /// line, since the comma is not in the output for it to be written against) inside one
     /// ordered pass that also places the block comments.

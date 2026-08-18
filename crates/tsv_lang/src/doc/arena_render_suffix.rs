@@ -64,7 +64,6 @@ pub(super) fn flush_line_suffix(
     // (`x; // c1 // c2` reparses as ONE comment) — see `push_run_separator`. A lone
     // suffix poses no separator question, and skips the walk (and these borrows) entirely.
     let queued = line_suffix.len();
-    eprintln!("PROBE flush_line_suffix n={queued}");
     let mut pending_line_comment = false;
     for (i, suffix_cmd) in std::mem::take(line_suffix).into_iter().enumerate() {
         let separated =
