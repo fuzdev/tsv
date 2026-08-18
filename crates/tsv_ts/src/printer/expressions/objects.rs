@@ -621,10 +621,13 @@ impl<'a> Printer<'a> {
             // other own-line comment does — even though this gap emits nothing for it (the
             // value's own node prints it, and the `comments_doc` below is empty).
             let has_own_line_comment_post_colon =
-                self.any_comment_on_page_with_next(colon_pos + 1, value_start, |c, next| {
-                    !c.is_block
-                        || self.block_comment_is_indentable(c)
-                        || self.has_newline_between(c.span.end, next)
+                self.any_comment_on_page(colon_pos + 1, value_start, |c| {
+                    // The glue half is [`Printer::comment_hugs_next`] — the comment's own
+                    // neighbours, never the distance to the value, which sits inside any
+                    // grouping paren the author wrote (see
+                    // `Printer::comment_hangs_value_after_operator`). It subsumes the
+                    // `!c.is_block` arm: a line comment never hugs what follows it.
+                    self.block_comment_is_indentable(c) || !self.comment_hugs_next(c)
                 });
 
             // The `:`→value head: an own-line directive there freezes the whole value.

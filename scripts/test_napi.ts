@@ -18,11 +18,18 @@
  * unwind — with the test-only `panic_probe` feature, whose export drives the
  * panic-contract test below). Also runs against a plain `build:napi` artifact
  * (the shipped shape, no probe): the contract test then reports as skipped.
+ *
+ * Two host-level contracts live here that no in-crate test can reach: the panic
+ * contract (a Rust panic must throw, not abort) and the THREADING contract (the
+ * addon must load in a worker thread, and its thread-local arenas must stay
+ * thread-local under concurrency). Both are properties of the shipped artifact
+ * rather than of the engine, which is why they are asserted at this boundary.
  */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { Worker } from 'node:worker_threads';
 import { get_napi_library_path, type NapiAddon } from '../benches/js/lib/napi.ts';
 
 const lib_path = get_napi_library_path();
@@ -97,4 +104,107 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			);
 		}
 	);
+
+	// Worker threads are the one host shape that exercises the addon's threading
+	// contract, and it has two independent halves:
+	//
+	//   1. **Context-awareness.** A worker is a fresh JS context in the same
+	//      process. A non-context-aware addon either refuses to load there or
+	//      corrupts state shared across contexts, and nothing else in the suite
+	//      loads the addon twice.
+	//   2. **The per-thread arenas.** Every export runs inside `with_ast_arena` /
+	//      `with_doc_arena` (crate `tsv_arena`), which are thread-local and reused
+	//      across calls. Single-threaded tests cannot distinguish "per thread" from
+	//      "one global", so a change that made an arena shared would pass everything
+	//      else and corrupt output only under concurrency — the failure mode a
+	//      consumer hits in a worker pool and never in CI.
+	//
+	// Each worker formats and parses in a loop and reports the DISTINCT outputs it
+	// observed; a torn or interleaved result shows up as a second distinct value,
+	// which is why the assertion is on the distinct set rather than on a sample.
+	it('loads and produces stable output across concurrent worker threads', async () => {
+		const worker_count = 4;
+		const iterations = 50;
+		const workers = Array.from(
+			{ length: worker_count },
+			() =>
+				new Worker(WORKER_SOURCE, {
+					eval: true,
+					workerData: { lib_path, iterations }
+				})
+		);
+		const outcomes = await Promise.all(workers.map(await_worker_message));
+		for (const [i, outcome] of outcomes.entries()) {
+			assert.deepEqual(
+				outcome.formatted,
+				['const x = 1;\n'],
+				`worker ${i} saw more than one format result`
+			);
+			assert.deepEqual(outcome.css, ['a {\n\tcolor: red;\n}\n'], `worker ${i} css result drifted`);
+			assert.deepEqual(outcome.parsed_types, ['Program'], `worker ${i} parse result drifted`);
+			assert.equal(outcome.errors, iterations, `worker ${i} lost the thrown-error path`);
+		}
+	});
 });
+
+/** What `WORKER_SOURCE` posts back: the DISTINCT results each worker observed. */
+interface WorkerOutcome {
+	formatted: string[];
+	css: string[];
+	parsed_types: string[];
+	errors: number;
+}
+
+/**
+ * The worker body, as CommonJS source for `new Worker(..., { eval: true })`.
+ *
+ * Inline rather than a sibling file on purpose: a second file would need Node's
+ * type stripping to reach it, and the point of the test is the addon's behavior in
+ * a bare worker context, not the loader path that got the worker there.
+ */
+const WORKER_SOURCE = `
+const { parentPort, workerData } = require('node:worker_threads');
+const mod = { exports: {} };
+process.dlopen(mod, workerData.lib_path);
+const addon = mod.exports;
+const formatted = new Set();
+const css = new Set();
+const parsed_types = new Set();
+let errors = 0;
+for (let i = 0; i < workerData.iterations; i++) {
+	formatted.add(addon.format_typescript('const   x=1'));
+	css.add(addon.format_css('a{color:red}'));
+	parsed_types.add(JSON.parse(addon.parse_typescript('const x = 1;')).type);
+	// A throw on every iteration too: the error path unwinds through the same
+	// arenas, so an arena the panic/error path fails to park would surface as a
+	// corrupted result on the NEXT iteration rather than as an error here.
+	try {
+		addon.format_typescript('const = ;');
+	} catch {
+		errors++;
+	}
+}
+parentPort.postMessage({
+	formatted: [...formatted],
+	css: [...css],
+	parsed_types: [...parsed_types],
+	errors
+});
+`;
+
+/**
+ * Resolve with a worker's single posted message, rejecting on a worker error or a
+ * non-zero exit. The `exit` arm is what turns an ABORT — the failure mode this
+ * whole file exists to rule out — into a failed assertion instead of a hung test:
+ * an aborting worker posts nothing, so a message-only wait would time out with no
+ * attribution.
+ */
+function await_worker_message(worker: Worker): Promise<WorkerOutcome> {
+	return new Promise<WorkerOutcome>((resolve, reject) => {
+		worker.once('message', resolve);
+		worker.once('error', reject);
+		worker.once('exit', (code) => {
+			if (code !== 0) reject(new Error(`worker exited with code ${code} before posting a result`));
+		});
+	});
+}

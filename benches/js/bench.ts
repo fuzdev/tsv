@@ -71,6 +71,7 @@ import {
 	benchmark_baseline_save
 } from '@fuzdev/fuz_util/benchmark_baseline.ts';
 import { spawn_out } from '@fuzdev/fuz_util/process.ts';
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -789,7 +790,59 @@ const same_engine_sibling_name = (name: string): string | null => {
 	return null;
 };
 
-/** One same-engine pair whose pre-flight accept sets disagree. */
+/**
+ * Whether `name`'s same-engine sibling must produce byte-identical OUTPUT, not
+ * merely accept the same files — the stronger half of the pair invariant, and the
+ * only half graded FATALLY (`check_variant_parity`).
+ *
+ * True for tsv's own rows alone, and each exclusion is an argument rather than an
+ * omission:
+ *
+ * - **tsv native↔wasm** is one Rust engine behind two bindings, so a byte
+ *   difference is a marshalling or profile bug in tsv, with no reading under which
+ *   it is tolerable — and under Node/Bun the native row IS the N-API addon, which
+ *   makes this the cheapest standing correctness signal the shipped native path has.
+ * - **rsvelte's option pair** is excluded on the strongest possible ground: its
+ *   `skipExpressionLoc` variant removes payload BY DESIGN, so byte equality there
+ *   would be the bug.
+ * - **oxc's and yuku's native↔wasm pairs** should agree, but a divergence is a
+ *   third-party binding's defect rather than something tsv's bench should hard-fail
+ *   on — and oxc's WASI binding has a known one (lib/oxc_wasm.ts). They keep the
+ *   accept-set warning, which is what surfaced that bug in the first place.
+ *
+ * The `-internal` rows are excluded because they parse without serializing and
+ * return nothing — there is no output to grade, and pretending otherwise would put
+ * a pair in the graded set that can never carry digests, which is exactly the shape
+ * the vacuity guard in `check_variant_parity` exists to catch.
+ *
+ * ⚠️ This names the BASE row of a pair. The pre-flight must digest BOTH sides, so it
+ * derives its row set from this plus `same_engine_sibling_name` rather than from a
+ * second hand-written predicate — see `run_preflight`.
+ */
+const sibling_outputs_must_match = (name: string): boolean =>
+	(name === 'tsv' || name.startsWith('tsv-')) && !name.endsWith('-internal');
+
+/**
+ * Digest one pre-flight result for byte-parity comparison, or `null` when the
+ * task produces nothing to compare.
+ *
+ * A format row returns its output string; a parse row returns the materialized
+ * AST, whose serialization is stable to compare because both sides of a graded
+ * pair emit it from the same Rust writer (the object is `JSON.parse`d from that
+ * writer's bytes on the native side and materialized from the same bytes on the
+ * wasm side, so key order is the writer's either way). The `-internal` rows parse
+ * without serializing and return `undefined` — nothing to grade, hence `null`
+ * rather than a digest of `"undefined"`, which would grade two blanks as equal
+ * and read as coverage.
+ */
+function output_digest(result: unknown): string | null {
+	if (result === undefined || result === null) return null;
+	const text = typeof result === 'string' ? result : JSON.stringify(result);
+	if (text === undefined) return null;
+	return createHash('sha1').update(text).digest('hex');
+}
+
+/** One same-engine pair that disagreed — on its accept set, its output, or both. */
 interface VariantParityFinding {
 	group: string;
 	/** The base row of the pair (the native binding, or the default-option wire). */
@@ -800,25 +853,60 @@ interface VariantParityFinding {
 	impl_only: number;
 	/** Files only `sibling` accepted. */
 	sibling_only: number;
+	/**
+	 * Files BOTH accepted whose outputs differ byte-for-byte. Always `0` for a pair
+	 * `sibling_outputs_must_match` doesn't grade — those carry no digests, and a
+	 * zero there means "not measured", not "agreed". Non-zero is fatal.
+	 */
+	output_mismatch: number;
+	/** Up to three `output_mismatch` paths, so the failure names files, not just a count. */
+	output_mismatch_examples: string[];
 }
 
-/** Populated by `warn_variant_parity()` after pre-flight; lands in the report as `variant_parity`. */
+/** Populated by `check_variant_parity()` after pre-flight; lands in the report as `variant_parity`. */
 const variant_parity_findings: VariantParityFinding[] = [];
 
 /**
- * Warn when a same-engine pair diverges in its pre-flight accept set. Both rows
- * run the identical engine (see `same_engine_sibling_name`), so their accept sets
- * should agree file-for-file; a divergence means one binding's error surface is
- * broken, or an option changed more than it claims — the concrete case being the
- * oxc WASI binding's consume-once `errors` getter, which silently accepted every
- * file and fabricated a 100% coverage row while native oxc-parser correctly
- * rejected 245 (see lib/oxc_wasm.ts + CLAUDE.md §Known Issues). Warning only
- * (never fatal): the coverage numbers themselves are the product in conformance
- * mode, and perf mode has its own hard-fail. Findings also land in the report
- * JSON (`variant_parity`), so a divergence shows up in the committed diff at
- * review time, not just the terminal scroll.
+ * Per-file output digests, keyed by tracking_key then path. Populated during
+ * pre-flight for the rows `sibling_outputs_must_match` grades and no others.
  */
-function warn_variant_parity(): void {
+const output_digests: Map<string, Map<string, string>> = new Map();
+
+/**
+ * Grade every same-engine pair on the two things one engine behind two front-ends
+ * owes: the same ACCEPT SET, and — where `sibling_outputs_must_match` says so —
+ * the same OUTPUT BYTES.
+ *
+ * **Accept set, warning only.** Both rows run the identical engine (see
+ * `same_engine_sibling_name`), so their accept sets should agree file-for-file; a
+ * divergence means one binding's error surface is broken, or an option changed
+ * more than it claims — the concrete case being the oxc WASI binding's
+ * consume-once `errors` getter, which silently accepted every file and fabricated
+ * a 100% coverage row while native oxc-parser correctly rejected 245 (see
+ * lib/oxc_wasm.ts + CLAUDE.md §Known Issues). Never fatal: the coverage numbers
+ * themselves are the product in conformance mode, and perf mode has its own
+ * hard-fail.
+ *
+ * **Output bytes, FATAL.** An accept set can only see whether a file threw, so it
+ * is blind to the failure that actually matters for a shipped binding — the same
+ * engine returning *different content* through two front-ends. Under Node and Bun
+ * the native row is the N-API addon built with the `napi` profile, so this pass is
+ * the standing correctness check on the artifact the native npm packages ship,
+ * over the whole bench corpus. There is no reading under which tsv's two bindings
+ * may disagree byte-for-byte, so a mismatch exits non-zero rather than printing a
+ * warning into a report nobody re-reads.
+ *
+ * ⚠️ The two halves are counted over different populations and must not be folded:
+ * `impl_only`/`sibling_only` are files exactly one row accepted, `output_mismatch`
+ * is files BOTH accepted. A file in the first population has no second output to
+ * compare, so it can never appear in the second.
+ *
+ * Findings also land in the report JSON (`variant_parity`), so a surviving
+ * accept-set divergence shows up in the committed diff at review time, not just
+ * the terminal scroll.
+ */
+function check_variant_parity(): void {
+	let fatal = false;
 	for (const [group_name, task_tracking] of task_tracking_by_group) {
 		for (const [name, tracking_key] of task_tracking) {
 			const sibling_name = same_engine_sibling_name(name);
@@ -828,25 +916,80 @@ function warn_variant_parity(): void {
 			const impl_set = successful_files.get(tracking_key) ?? new Set<string>();
 			const sibling_set = successful_files.get(sibling_key) ?? new Set<string>();
 			let impl_only = 0;
-			for (const path of impl_set) if (!sibling_set.has(path)) impl_only++;
+			let shared = 0;
+			for (const path of impl_set) {
+				if (sibling_set.has(path)) shared++;
+				else impl_only++;
+			}
 			let sibling_only = 0;
 			for (const path of sibling_set) if (!impl_set.has(path)) sibling_only++;
-			if (impl_only === 0 && sibling_only === 0) continue;
+
+			// Byte parity over the files both accepted. Absent digests mean this pair
+			// isn't byte-graded (the `null` in pre-flight), not that it agreed.
+			const impl_digests = output_digests.get(tracking_key);
+			const sibling_digests = output_digests.get(sibling_key);
+			let output_mismatch = 0;
+			const output_mismatch_examples: string[] = [];
+			if (impl_digests && sibling_digests) {
+				for (const [path, digest] of impl_digests) {
+					const sibling_digest = sibling_digests.get(path);
+					if (sibling_digest === undefined) continue;
+					if (sibling_digest === digest) continue;
+					output_mismatch++;
+					if (output_mismatch_examples.length < 3) output_mismatch_examples.push(path);
+				}
+			}
+
+			// ⚠️ Vacuity guard, and it is not decoration: a byte check that grades
+			// NOTHING passes every run, so the failure mode of this pass is silence,
+			// not a wrong answer. A pair the predicate declares byte-graded, with files
+			// both rows accepted, must have digests on both sides — anything else means
+			// the pre-flight's row set and the grading predicate have come apart, which
+			// is precisely the bug the first cut of this shipped with. It exits on the
+			// spot rather than joining `fatal` below: a mismatch is a finding worth
+			// listing every pair of, but a harness that grades nothing makes every
+			// other line of this pass meaningless, so there is nothing to collect.
+			if (sibling_outputs_must_match(name) && shared > 0 && !(impl_digests && sibling_digests)) {
+				console.error(
+					`✗ variant parity (${group_name}): ${name}/${sibling_name} is byte-graded and shares ` +
+						`${shared} accepted file(s), but ` +
+						`${impl_digests ? sibling_name : name} carries no digests — the pre-flight row set ` +
+						`and the grading predicate have drifted, so the byte check is a NO-OP. Fix the ` +
+						`harness; a green run here proves nothing.`
+				);
+				exit(1);
+			}
+
+			if (impl_only === 0 && sibling_only === 0 && output_mismatch === 0) continue;
 			variant_parity_findings.push({
 				group: group_name,
 				impl: name,
 				sibling: sibling_name,
 				impl_only,
-				sibling_only
+				sibling_only,
+				output_mismatch,
+				output_mismatch_examples
 			});
-			console.error(
-				`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
-					`(${impl_only} ${name}-only, ${sibling_only} ${sibling_name}-only). Same engine — a ` +
-					`divergence means a broken binding or an option doing more than it claims, not an ` +
-					`engine difference.`
-			);
+			if (impl_only > 0 || sibling_only > 0) {
+				console.error(
+					`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
+						`(${impl_only} ${name}-only, ${sibling_only} ${sibling_name}-only). Same engine — a ` +
+						`divergence means a broken binding or an option doing more than it claims, not an ` +
+						`engine difference.`
+				);
+			}
+			if (output_mismatch > 0) {
+				fatal = true;
+				console.error(
+					`✗ variant parity (${group_name}): ${name} and ${sibling_name} produced DIFFERENT ` +
+						`OUTPUT on ${output_mismatch} file(s) both accepted. One engine, two bindings — this ` +
+						`is a marshalling or build-profile bug, not an engine difference. First:\n` +
+						output_mismatch_examples.map((path) => `    ${path}`).join('\n')
+				);
+			}
 		}
 	}
+	if (fatal) exit(1);
 }
 
 /**
@@ -970,28 +1113,49 @@ async function run_preflight(
 	files: SourceFile[],
 	language: Language
 ): Promise<void> {
+	// Rows on EITHER side of a byte-graded pair — the digest set for this group.
+	// Derived from the pairing rather than spelled a second time, because the two
+	// sides cannot be allowed to drift: digesting only the base row leaves the
+	// sibling with no digests, and the byte comparison then silently comes up empty
+	// and grades nothing. (That is not hypothetical — it is what the first cut of
+	// this did, and it passed a clean run while checking nothing. The paired guard
+	// is `check_variant_parity`'s vacuity arm.)
+	const byte_graded_names = new Set<string>();
+	for (const task of tasks) {
+		if (!sibling_outputs_must_match(task.name)) continue;
+		byte_graded_names.add(task.name);
+		const sibling = same_engine_sibling_name(task.name);
+		if (sibling !== null) byte_graded_names.add(sibling);
+	}
+
 	for (let i = 0; i < tasks.length; i++) {
 		const task = tasks[i];
 		const success = new Set<string>();
+		// Digests are the byte half of `check_variant_parity`, and cost nothing on a
+		// row it doesn't grade: `null` here means no hashing happens at all.
+		const digests = byte_graded_names.has(task.name) ? new Map<string, string>() : null;
 		let bytes = 0;
 		const start_ms = performance.now();
 		for (const file of files) {
 			try {
 				// `file.goal` is set only for test262 (conformance surface); every
 				// other corpus leaves it undefined → the default module parse.
-				if (task.is_async) {
-					await task.run_async!(file.content, language, file.goal);
-				} else {
-					task.run(file.content, language, file.goal);
-				}
+				const result = task.is_async
+					? await task.run_async!(file.content, language, file.goal)
+					: task.run(file.content, language, file.goal);
 				success.add(file.path);
 				bytes += file.bytes;
+				if (digests !== null) {
+					const digest = output_digest(result);
+					if (digest !== null) digests.set(file.path, digest);
+				}
 			} catch (e) {
 				record_skip(task.tracking_key, file.path, e);
 			}
 		}
 		const elapsed_ms = performance.now() - start_ms;
 		successful_files.set(task.tracking_key, success);
+		if (digests !== null) output_digests.set(task.tracking_key, digests);
 		effective_corpus_size.set(task.tracking_key, { processed: success.size, total: files.length });
 		effective_corpus_bytes.set(task.tracking_key, bytes);
 		preflight_elapsed_ms.set(task.tracking_key, elapsed_ms);
@@ -1214,9 +1378,10 @@ for (const lang of LANGUAGES) {
 	}
 }
 
-// Same-engine native/wasm variant pairs should accept identical file sets — a
-// divergence is a binding-boundary bug masquerading as coverage (see the fn doc).
-warn_variant_parity();
+// Same-engine native/wasm variant pairs should accept identical file sets AND —
+// for tsv's own pair — produce identical bytes. A divergence is a binding-boundary
+// bug masquerading as coverage; the byte half is fatal (see the fn doc).
+check_variant_parity();
 
 // Perf corpus is real-world code every in-scope tool must fully process, so a
 // per-file pre-flight failure that isn't an explicitly-reviewed `PERF_OMITS`
@@ -1371,8 +1536,8 @@ interface Baseline {
 	suppressed_noise: Record<string, number>;
 	/**
 	 * Same-engine pairs — one engine behind two bindings, or one binding under two
-	 * options — whose pre-flight accept sets
-	 * disagreed (see `warn_variant_parity`). Empty `[]` when every pair agrees
+	 * options — whose pre-flight accept sets or output bytes
+	 * disagreed (see `check_variant_parity`). Empty `[]` when every pair agrees
 	 * — the healthy state. JSON-only, like `suppressed_noise`: a non-empty list
 	 * in a committed report is a binding-boundary bug surfacing at review time.
 	 */

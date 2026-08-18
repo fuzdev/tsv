@@ -735,8 +735,12 @@ impl<'a> Printer<'a> {
                 let is_curried_arrow = is_curried_arrow_chain_that_breaks(init);
 
                 if has_comments_after_eq
-                    && let Some(rhs) =
-                        self.build_eq_comment_break_rhs(equals_pos, init_start, init_value_doc)
+                    && let Some(rhs) = self.build_eq_comment_break_rhs(
+                        equals_pos,
+                        init_start,
+                        " =",
+                        init_value_doc,
+                    )
                 {
                     // A comment after `=` forces a break (line comment → partition;
                     // own-line / multiline block → break-after-operator hang). Shared
