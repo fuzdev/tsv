@@ -18,6 +18,7 @@ use crate::printer::ArrowChainContext;
 use crate::printer::OwnedCommentEffect;
 use crate::printer::Printer;
 use crate::printer::calls::chain_has_calls;
+use crate::printer::chain::chain_paren_leading_gap;
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
@@ -1412,6 +1413,19 @@ impl<'a> Printer<'a> {
 
     /// Recursively check for line comments in a chain (calls, members, non-null).
     fn has_line_comments_in_chain(&self, expr: &Expression<'_>) -> bool {
+        // The base's own LEADING gap, where the pair the base prints keeps the run
+        // inside it (`const m = ( // c⏎\ta?.b⏎)!.ccc`, `const z = ( // c⏎\t() => {}⏎)().p`).
+        // That run breaks the chain internally exactly as one in a member or
+        // operand→`!` gap does, so the `=` hugs the shell rather than also breaking.
+        // The gap is asked through the one predicate the linearizer and the chain
+        // head read (`chain_paren_leading_gap`); a run the pair does NOT keep — a
+        // cast, a sequence, a ternary base — leads the whole value instead and is
+        // deliberately not a chain break.
+        if let Some((start, base_start)) = chain_paren_leading_gap(expr, self.comments)
+            && self.has_line_comments_between(start, base_start)
+        {
+            return true;
+        }
         match expr {
             Expression::CallExpression(call) => {
                 // A line comment between the callee (or its type arguments) and the

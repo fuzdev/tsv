@@ -43,8 +43,8 @@ mod types;
 
 // Re-export public API
 pub use analysis::{
-    group_chain_nodes, linearize_chain_from_call, linearize_chain_from_member,
-    linearize_chain_from_non_null,
+    chain_paren_leading_gap, group_chain_nodes, linearize_chain_from_call,
+    linearize_chain_from_member, linearize_chain_from_non_null,
 };
 pub use builder::build_chain_doc;
 pub(crate) use printing::find_bracket_position;

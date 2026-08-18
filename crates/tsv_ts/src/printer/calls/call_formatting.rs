@@ -26,7 +26,6 @@ use super::arg_wrapping::{
     prepend_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
     try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
-use super::call_paren_open;
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
 use super::test_patterns::{
@@ -34,6 +33,7 @@ use super::test_patterns::{
 };
 use crate::ast::internal;
 use crate::printer::CommentVec;
+use crate::printer::comments::paren_pair_keeps_leading_run;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
@@ -86,23 +86,45 @@ pub(super) fn build_call_doc_with_wrapping(
         .flatten()
         .unwrap_or_else(|| printer.build_expression_doc(call.callee));
 
-    // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
-    // This must happen BEFORE adding removed-paren comments so comments stay outside
-    let callee_doc = if printer.needs_parens(call.callee, ParenContext::Callee) {
-        d.parens(callee_doc)
-    } else {
-        callee_doc
-    };
+    // An IIFE callee is the one callee kind whose required pair keeps BOTH its gaps
+    // inside it (`paren_pair_keeps_leading_run` — prettier's `printCommentsForFunction`
+    // prints a function/arrow callee's leading AND trailing comments within the parens).
+    // The pair has to be the author's own for a trailing gap to exist at all:
+    // `(fn /* t */)()` writes it around the callee, `(/* t */ fn())` around the whole
+    // call, where the comment belongs to the call and not to any pair printed here.
+    let needs_parens = printer.needs_parens(call.callee, ParenContext::Callee);
+    let owned_pair = needs_parens && paren_pair_keeps_leading_run(call.callee);
+    let trailing_gap = printer.owned_pair_trailing_gap(call.callee, ParenContext::Callee);
+    // Every window downstream opens PAST the pair's `)` where it owns its trailing gap.
+    let callee_gap_start =
+        Printer::gap_start_after_owned_pair(call.callee.span().end, trailing_gap);
 
-    // Check for comments between removed parentheses and callee
-    // e.g., (/* comment */ foo)() has call.span.start at '(' and callee.span.start at 'foo'
-    // The comment is in the range [call.span.start, callee.span.start) and needs to be preserved
-    // Note: This happens AFTER parens wrapping so `(/* c */ (a ? b : c))()` -> `/* c */ (a ? b : c)()`
-    let callee = printer.prepend_removed_paren_comments(
-        call.span.start,
-        call.callee.span().start,
-        callee_doc,
-    );
+    let callee = if owned_pair {
+        printer.build_owned_required_pair_doc(
+            (call.span.start, call.callee.span().start),
+            trailing_gap,
+            callee_doc,
+            callee_doc,
+            ")",
+        )
+    } else {
+        // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
+        // This must happen BEFORE adding removed-paren comments so comments stay outside
+        let callee_doc = if needs_parens {
+            d.parens(callee_doc)
+        } else {
+            callee_doc
+        };
+        // Check for comments between removed parentheses and callee
+        // e.g., (/* comment */ foo)() has call.span.start at '(' and callee.span.start at 'foo'
+        // The comment is in the range [call.span.start, callee.span.start) and needs to be preserved
+        // Note: This happens AFTER parens wrapping so `(/* c */ (a ? b : c))()` -> `/* c */ (a ? b : c)()`
+        printer.prepend_removed_paren_comments(
+            call.span.start,
+            call.callee.span().start,
+            callee_doc,
+        )
+    };
 
     // Handle optional chaining. With an empty argument list and no explicit type
     // arguments, `?.` fuses into the list's own `?.(` instead of gluing onto the
@@ -122,7 +144,7 @@ pub(super) fn build_call_doc_with_wrapping(
     let callee = append_type_args_with_gap_comments(
         printer,
         callee,
-        call.callee.span().end,
+        callee_gap_start,
         call.type_arguments.as_ref(),
     );
 
@@ -131,7 +153,7 @@ pub(super) fn build_call_doc_with_wrapping(
         let after_type_args = call
             .type_arguments
             .as_ref()
-            .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
+            .map_or(callee_gap_start, |ta| ta.span.end);
         return build_empty_args_doc(
             printer,
             callee,
@@ -145,14 +167,18 @@ pub(super) fn build_call_doc_with_wrapping(
     // and inline block comments. Own-line trailing comments defer to the general
     // comment path, so this returns `None` and the caller falls through.
     if call.arguments.len() == 1
-        && let Some(doc) = try_single_arg_comment_paths(printer, call, callee)
+        && let Some(doc) = try_single_arg_comment_paths(printer, call, callee, callee_gap_start)
     {
         return doc;
     }
 
     // Position the `(` follows — every argument-gap window (the comment scans, and Rule A's
-    // first-argument freeze) opens here.
-    let paren_open = call_paren_open(call);
+    // first-argument freeze) opens here. `callee_gap_start` rather than the callee's span
+    // end, so a pair that emitted its own trailing gap is not scanned through twice.
+    let paren_open = call
+        .type_arguments
+        .as_ref()
+        .map_or(callee_gap_start, |ta| ta.span.end);
 
     // The test-call flat layout, whose break-free callee `callee` already carries (built
     // at the top, so the type arguments and the removed-paren comments wrap it there).
@@ -532,14 +558,17 @@ fn try_single_arg_comment_paths(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
     callee: DocId,
+    callee_gap_start: u32,
 ) -> Option<DocId> {
     let d = printer.d();
     let first_arg = &call.arguments[0];
-    // Find the opening paren position (after type args if present, otherwise after callee)
+    // Find the opening paren position (after type args if present, otherwise after the
+    // callee — or past the `)` of a pair that emitted its own trailing gap, so this scan
+    // does not re-emit what is already inside the parens)
     let paren_open = call
         .type_arguments
         .as_ref()
-        .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
+        .map_or(callee_gap_start, |ta| ta.span.end);
     let arg_start = first_arg.span().start;
     let arg_end = first_arg.span().end;
     let paren_close = call.span.end;

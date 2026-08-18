@@ -36,6 +36,7 @@ pub(crate) fn print_node_inner<'a>(
         ChainNode::Base {
             expr,
             needs_parens,
+            paren_leading_start,
             paren_comment_end,
             followed_by_non_null,
         } => {
@@ -46,7 +47,7 @@ pub(crate) fn print_node_inner<'a>(
                 // The plain expression doc, memoized lazily: every arm consumes it EXCEPT
                 // a binary base's common path, which builds the chain-for-parens operand
                 // doc instead — eager, a parenthesized binary base paid two full doc
-                // builds for one rendered doc. The rare paren-comment branch still
+                // builds for one rendered doc. The rare trailing-gap branch still
                 // consumes it (the line-comment layout's broken body), which is why it is
                 // a memo rather than moved into the arms that use it.
                 let mut inner_memo = None;
@@ -100,22 +101,48 @@ pub(crate) fn print_node_inner<'a>(
                         _ => hang(inner()),
                     }
                 };
-                // Preserve a comment from the stripped grouping parens inside them,
-                // before `)` (`(x + y /* c */)!.foo`) — prettier relocates it past
-                // `)`; tsv keeps it where the author wrote it. The `!` itself is the
-                // next node, so this doc closes at the `)`.
-                if let Some(end) = *paren_comment_end
-                    && let Some(doc) = printer.build_paren_operand_comment_doc(
-                        expr.span().end,
-                        end,
-                        inner_group,
-                        inner(),
-                        ")",
-                    )
-                {
-                    return doc;
-                }
-                d.parens(inner_group)
+                // A base that OWNS its leading gap emits it here, inside the pair —
+                // nothing else can reach between a surviving `(` and the base
+                // (`prepend_removed_paren_comments` at the chain's own head hoists the
+                // run out in front of the pair, the one cell of the family that did).
+                // The trailing half is the comment from the stripped grouping parens
+                // before the `)` (`(x + y /* c */)!.foo`) — prettier relocates it past
+                // the `)`; tsv keeps it where the author wrote it. The `!` itself is
+                // the next node, so this doc closes at the `)`.
+                //
+                // `paren_comment_end` is the linearizer's, set where a non-null's `!`
+                // bounds the region; an IIFE base's pair carries no `!`, so its `)` is
+                // read from the source through the shared seam — the same answer the
+                // bare-callee path takes for the same pair. Keyed on
+                // `paren_leading_start`, which is what says this base IS a callee: an
+                // arrow that is merely a member OBJECT (`(() => 1 /* c */).p`) prints
+                // the same pair but its trailing gap belongs to the member seam, and
+                // claiming it here double-printed the comment.
+                let base_start = expr.span().start;
+                let trailing_gap =
+                    paren_comment_end
+                        .map(|end| (expr.span().end, end))
+                        .or_else(|| {
+                            paren_leading_start.and_then(|_| {
+                                printer.owned_pair_trailing_gap(expr, ParenContext::Callee)
+                            })
+                        });
+                // The broken body is the trailing emitter's alone, so the unshaped doc is
+                // built only where that gap exists — a parenthesized binary base would
+                // otherwise pay a second full doc build on every comment-free chain. With
+                // neither gap this is the bare pair the emitter itself falls back to.
+                let broken_body = if trailing_gap.is_some() {
+                    inner()
+                } else {
+                    inner_group
+                };
+                printer.build_owned_required_pair_doc(
+                    (paren_leading_start.unwrap_or(base_start), base_start),
+                    trailing_gap,
+                    inner_group,
+                    broken_body,
+                    ")",
+                )
             } else {
                 printer.build_expression_doc(expr)
             }

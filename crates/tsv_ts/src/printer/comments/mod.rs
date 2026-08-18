@@ -44,7 +44,7 @@ pub(super) use element_comma::{block_is_before_comma, next_real_element_start, r
 pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
 pub(crate) use member_body::{MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam};
 pub(crate) use owned::OwnedCommentEffect;
-pub(crate) use paren::ParenLeadingValue;
+pub(crate) use paren::{ParenLeadingValue, paren_pair_keeps_leading_run};
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};

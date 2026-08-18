@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 555,
+	"end": 954,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -201,24 +201,136 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " The member-access position reaches the same gap through the chain printer —",
+			"start": 547,
+			"end": 625,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the sealed parenthesized base — and takes the same shell, with the assignment",
+			"start": 627,
+			"end": 707,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " hugging it (`= (`). The base's pair is required with or without the `!`.",
+			"start": 709,
+			"end": 784,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 798,
+			"end": 803,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 13
+				},
+				"end": {
+					"line": 26,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 835,
+			"end": 840,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An inline block run leads the base flat here too.",
+			"start": 858,
+			"end": 910,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 923,
+			"end": 931,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 12
+				},
+				"end": {
+					"line": 35,
+					"column": 20
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 554,
+		"end": 953,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 545,
+			"end": 944,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 22,
+					"line": 36,
 					"column": 9
 				}
 			},
@@ -918,6 +1030,526 @@
 							]
 						}
 					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 786,
+					"end": 819,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 792,
+							"end": 818,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 7
+								},
+								"end": {
+									"line": 28,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 792,
+								"end": 793,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 7
+									},
+									"end": {
+										"line": 26,
+										"column": 8
+									}
+								},
+								"name": "m"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 796,
+								"end": 818,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 11
+									},
+									"end": {
+										"line": 28,
+										"column": 7
+									}
+								},
+								"object": {
+									"type": "TSNonNullExpression",
+									"start": 796,
+									"end": 814,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 11
+										},
+										"end": {
+											"line": 28,
+											"column": 3
+										}
+									},
+									"expression": {
+										"type": "ChainExpression",
+										"start": 806,
+										"end": 810,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 2
+											},
+											"end": {
+												"line": 27,
+												"column": 6
+											}
+										},
+										"expression": {
+											"type": "MemberExpression",
+											"start": 806,
+											"end": 810,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 2
+												},
+												"end": {
+													"line": 27,
+													"column": 6
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 806,
+												"end": 807,
+												"loc": {
+													"start": {
+														"line": 27,
+														"column": 2
+													},
+													"end": {
+														"line": 27,
+														"column": 3
+													}
+												},
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 809,
+												"end": 810,
+												"loc": {
+													"start": {
+														"line": 27,
+														"column": 5
+													},
+													"end": {
+														"line": 27,
+														"column": 6
+													}
+												},
+												"name": "b"
+											},
+											"computed": false,
+											"optional": true
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c7",
+												"start": 798,
+												"end": 803
+											}
+										]
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 815,
+									"end": 818,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 4
+										},
+										"end": {
+											"line": 28,
+											"column": 7
+										}
+									},
+									"name": "ccc"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The member-access position reaches the same gap through the chain printer —",
+							"start": 547,
+							"end": 625
+						},
+						{
+							"type": "Line",
+							"value": " the sealed parenthesized base — and takes the same shell, with the assignment",
+							"start": 627,
+							"end": 707
+						},
+						{
+							"type": "Line",
+							"value": " hugging it (`= (`). The base's pair is required with or without the `!`.",
+							"start": 709,
+							"end": 784
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 821,
+					"end": 855,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 827,
+							"end": 854,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 827,
+								"end": 828,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "n"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 831,
+								"end": 854,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 11
+									},
+									"end": {
+										"line": 32,
+										"column": 6
+									}
+								},
+								"object": {
+									"type": "ChainExpression",
+									"start": 843,
+									"end": 847,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 6
+										}
+									},
+									"expression": {
+										"type": "MemberExpression",
+										"start": 843,
+										"end": 847,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 6
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 843,
+											"end": 844,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 2
+												},
+												"end": {
+													"line": 31,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 846,
+											"end": 847,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 5
+												},
+												"end": {
+													"line": 31,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"computed": false,
+										"optional": true
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c8",
+											"start": 835,
+											"end": 840
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 851,
+									"end": 854,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 3
+										},
+										"end": {
+											"line": 32,
+											"column": 6
+										}
+									},
+									"name": "ddd"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 912,
+					"end": 943,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 918,
+							"end": 942,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 7
+								},
+								"end": {
+									"line": 35,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 918,
+								"end": 919,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 7
+									},
+									"end": {
+										"line": 35,
+										"column": 8
+									}
+								},
+								"name": "o"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 922,
+								"end": 942,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 11
+									},
+									"end": {
+										"line": 35,
+										"column": 31
+									}
+								},
+								"object": {
+									"type": "TSNonNullExpression",
+									"start": 922,
+									"end": 938,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 11
+										},
+										"end": {
+											"line": 35,
+											"column": 27
+										}
+									},
+									"expression": {
+										"type": "ChainExpression",
+										"start": 932,
+										"end": 936,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 21
+											},
+											"end": {
+												"line": 35,
+												"column": 25
+											}
+										},
+										"expression": {
+											"type": "MemberExpression",
+											"start": 932,
+											"end": 936,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 21
+												},
+												"end": {
+													"line": 35,
+													"column": 25
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 932,
+												"end": 933,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 21
+													},
+													"end": {
+														"line": 35,
+														"column": 22
+													}
+												},
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 935,
+												"end": 936,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 24
+													},
+													"end": {
+														"line": 35,
+														"column": 25
+													}
+												},
+												"name": "b"
+											},
+											"computed": false,
+											"optional": true
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c9 ",
+												"start": 923,
+												"end": 931
+											}
+										]
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 939,
+									"end": 942,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 28
+										},
+										"end": {
+											"line": 35,
+											"column": 31
+										}
+									},
+									"name": "ccc"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An inline block run leads the base flat here too.",
+							"start": 858,
+							"end": 910
+						}
+					]
 				}
 			],
 			"sourceType": "module"

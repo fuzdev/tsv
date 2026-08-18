@@ -1199,16 +1199,14 @@ impl<'a> Printer<'a> {
             // the anchored-run layout below, the leading run folded above the operand.
             // The shell is hard-expanded, so the ternary's width-driven expanding
             // parens have nothing left to decide and stay out of the body.
-            if leading.is_some()
-                && !self.has_comments_to_emit_between(argument_end, non_null_expr.span.end)
-                && self.has_newline_between(non_null_expr.span.start, argument_start)
-            {
-                return self.build_leading_run_expanded_shell_doc(
-                    non_null_expr.span.start,
-                    argument_start,
-                    inner_doc,
-                    ")!",
-                );
+            if let Some(shell) = self.build_required_pair_leading_shell_doc(
+                non_null_expr.span.start,
+                argument_start,
+                Some((argument_end, non_null_expr.span.end)),
+                inner_doc,
+                ")!",
+            ) {
+                return shell;
             }
             let inner_doc = if expands {
                 self.build_expanding_parens_body_doc(inner_doc)
@@ -1219,19 +1217,16 @@ impl<'a> Printer<'a> {
             // author wrote them — leading before the operand (`(/* b */ x + y)!`),
             // trailing before the `)` (`(x + y /* c */)!`). Prettier relocates them
             // outside (before `(` / between `)` and `!`); tsv preserves the position.
-            let body = match leading {
-                Some(lead) => d.concat(&[lead, inner_doc]),
-                None => inner_doc,
-            };
-            // The operand has one rendering here, so both layouts take the same body.
-            self.build_paren_operand_comment_doc(
-                argument_end,
-                non_null_expr.span.end,
-                body,
-                body,
+            // The operand has one rendering here, so both layouts take the same body —
+            // the folded form only, since the shell above already declined and wants the
+            // pre-`expands` body it was given.
+            self.build_folded_required_pair_doc(
+                (non_null_expr.span.start, argument_start),
+                Some((argument_end, non_null_expr.span.end)),
+                inner_doc,
+                inner_doc,
                 ")!",
             )
-            .unwrap_or_else(|| d.concat(&[d.text("("), body, d.text(")!")]))
         } else if self.has_comments_to_emit_between(
             non_null_expr.expression.span().end,
             non_null_expr.span.end,
@@ -1292,7 +1287,6 @@ impl<'a> Printer<'a> {
             return None;
         };
         if non_null.seals_optional_chain() {
-            let d = self.d();
             let inner_doc = self.build_expression_doc_with_indent_on_break(non_null.expression);
             let expr_start = non_null.expression.span().start;
             let inner_start = non_null.expression.span().end;
@@ -1306,35 +1300,17 @@ impl<'a> Printer<'a> {
             // inline block run leads the chain flat, matching prettier. A shell
             // whose TRAILING gap also holds comments keeps the anchored-run layout
             // below, the run folded above the chain.
-            if self.has_comments_to_emit_between(non_null.span.start, expr_start)
-                && !self.has_comments_to_emit_between(inner_start, non_null.span.end)
-                && self.has_newline_between(non_null.span.start, expr_start)
-            {
-                return Some(self.build_leading_run_expanded_shell_doc(
-                    non_null.span.start,
-                    expr_start,
-                    inner_doc,
-                    ")!",
-                ));
-            }
-            let inner_doc = match self.build_rhs_comments_opt(non_null.span.start, expr_start) {
-                Some(lead) => d.concat(&[lead, inner_doc]),
-                None => inner_doc,
-            };
-            // These positions never enter a chain, so nothing else scans the
-            // operand→`!` gap — the comment the author wrote inside the parens
-            // (`new (a?.b /* c */)!()`) is this doc's to print, on the same seam the
+            // These positions never enter a chain, so nothing else scans either gap —
+            // the comments the author wrote inside the parens (`new ( // c⏎a?.b)!()`,
+            // `new (a?.b /* c */)!()`) are this doc's to print, on the same seam the
             // chain's parenthesized base uses.
-            Some(
-                self.build_paren_operand_comment_doc(
-                    inner_start,
-                    non_null.span.end,
-                    inner_doc,
-                    inner_doc,
-                    ")!",
-                )
-                .unwrap_or_else(|| d.concat(&[d.text("("), inner_doc, d.text(")!")])),
-            )
+            Some(self.build_owned_required_pair_doc(
+                (non_null.span.start, expr_start),
+                Some((inner_start, non_null.span.end)),
+                inner_doc,
+                inner_doc,
+                ")!",
+            ))
         } else {
             None
         }

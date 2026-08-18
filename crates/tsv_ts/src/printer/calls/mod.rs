@@ -283,6 +283,18 @@ fn get_chain_base_comment_start(
     nodes: &[chain::ChainNode<'_>],
     expr: &internal::Expression<'_>,
 ) -> u32 {
+    // A base that OWNS its leading gap (a sealed optional chain, an IIFE callee —
+    // `ChainNode::Base::paren_leading_start`) emits it INSIDE the pair it prints, so
+    // the claim stops at that `(` and this prepend has nothing left to take. Claiming
+    // it here hoists the run out in front of a pair that survives, which is what both
+    // positions used to do.
+    if let Some(chain::ChainNode::Base {
+        paren_leading_start: Some(start),
+        ..
+    }) = nodes.first()
+    {
+        return *start;
+    }
     let base_start = get_chain_base_start(expr);
     // Only check for extended ranges in call chains — prettier doesn't
     // place comments mid-chain for member-only chains

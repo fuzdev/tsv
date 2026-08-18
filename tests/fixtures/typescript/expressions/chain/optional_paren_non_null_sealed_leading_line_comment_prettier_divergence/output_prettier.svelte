@@ -15,4 +15,17 @@
 	// An inline block run leads the chain flat, matching prettier.
 	new (/* c4 */ /* c5 */ a?.b)!();
 	(/* c6 */ a?.())!`tpl`;
+
+	// The member-access position reaches the same gap through the chain printer —
+	// the sealed parenthesized base — and takes the same shell, with the assignment
+	// hugging it (`= (`). The base's pair is required with or without the `!`.
+	const m =
+		(// c7
+		a?.b)!.ccc;
+	const n =
+		(// c8
+		a?.b).ddd;
+
+	// An inline block run leads the base flat here too.
+	const o = (/* c9 */ a?.b)!.ccc;
 </script>
