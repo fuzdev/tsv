@@ -1,0 +1,872 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 406,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` glued to the required head pair's `(` keeps that line; the pair expands.",
+			"start": 20,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 116,
+			"end": 121,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 13
+				},
+				"end": {
+					"line": 3,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line comment keeps its own line inside the pair.",
+			"start": 168,
+			"end": 226,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 232,
+			"end": 237,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A glued block leads the head inline; the pair stays flat.",
+			"start": 284,
+			"end": 344,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 347,
+			"end": 355,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 405,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 396,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 104,
+					"end": 165,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 110,
+							"end": 164,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 110,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "i"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 114,
+								"end": 164,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "ArrowFunctionExpression",
+									"start": 124,
+									"end": 153,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 31
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 143,
+											"end": 147,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 21
+												},
+												"end": {
+													"line": 4,
+													"column": 25
+												}
+											},
+											"name": "p",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 144,
+												"end": 147,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 22
+													},
+													"end": {
+														"line": 4,
+														"column": 25
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 146,
+													"end": 147,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 24
+														},
+														"end": {
+															"line": 4,
+															"column": 25
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 146,
+														"end": 147,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 24
+															},
+															"end": {
+																"line": 4,
+																"column": 25
+															}
+														},
+														"name": "T"
+													}
+												}
+											}
+										}
+									],
+									"body": {
+										"type": "Identifier",
+										"start": 152,
+										"end": 153,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 30
+											},
+											"end": {
+												"line": 4,
+												"column": 31
+											}
+										},
+										"name": "p"
+									},
+									"typeParameters": {
+										"type": "TSTypeParameterDeclaration",
+										"start": 124,
+										"end": 142,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 20
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeParameter",
+												"start": 125,
+												"end": 141,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 3
+													},
+													"end": {
+														"line": 4,
+														"column": 19
+													}
+												},
+												"name": "T",
+												"constraint": {
+													"type": "TSStringKeyword",
+													"start": 135,
+													"end": 141,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 13
+														},
+														"end": {
+															"line": 4,
+															"column": 19
+														}
+													}
+												}
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 116,
+											"end": 121
+										}
+									]
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 156,
+									"end": 164,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 10
+										}
+									},
+									"params": [
+										{
+											"type": "TSStringKeyword",
+											"start": 157,
+											"end": 163,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 3
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` glued to the required head pair's `(` keeps that line; the pair expands.",
+							"start": 20,
+							"end": 102
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 228,
+					"end": 281,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "TSInstantiationExpression",
+						"start": 228,
+						"end": 280,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "ArrowFunctionExpression",
+							"start": 240,
+							"end": 269,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 31
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 259,
+									"end": 263,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 21
+										},
+										"end": {
+											"line": 10,
+											"column": 25
+										}
+									},
+									"name": "p",
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 260,
+										"end": 263,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 22
+											},
+											"end": {
+												"line": 10,
+												"column": 25
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 262,
+											"end": 263,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 24
+												},
+												"end": {
+													"line": 10,
+													"column": 25
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 262,
+												"end": 263,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 24
+													},
+													"end": {
+														"line": 10,
+														"column": 25
+													}
+												},
+												"name": "T"
+											}
+										}
+									}
+								}
+							],
+							"body": {
+								"type": "Identifier",
+								"start": 268,
+								"end": 269,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 30
+									},
+									"end": {
+										"line": 10,
+										"column": 31
+									}
+								},
+								"name": "p"
+							},
+							"typeParameters": {
+								"type": "TSTypeParameterDeclaration",
+								"start": 240,
+								"end": 258,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 20
+									}
+								},
+								"params": [
+									{
+										"type": "TSTypeParameter",
+										"start": 241,
+										"end": 257,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 3
+											},
+											"end": {
+												"line": 10,
+												"column": 19
+											}
+										},
+										"name": "T",
+										"constraint": {
+											"type": "TSStringKeyword",
+											"start": 251,
+											"end": 257,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 13
+												},
+												"end": {
+													"line": 10,
+													"column": 19
+												}
+											}
+										}
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 232,
+									"end": 237
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 272,
+							"end": 280,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 10
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 273,
+									"end": 279,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 3
+										},
+										"end": {
+											"line": 11,
+											"column": 9
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line comment keeps its own line inside the pair.",
+							"start": 168,
+							"end": 226
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 346,
+					"end": 395,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 50
+						}
+					},
+					"expression": {
+						"type": "TSInstantiationExpression",
+						"start": 346,
+						"end": 394,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 49
+							}
+						},
+						"expression": {
+							"type": "ArrowFunctionExpression",
+							"start": 356,
+							"end": 385,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 11
+								},
+								"end": {
+									"line": 14,
+									"column": 40
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 375,
+									"end": 379,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 30
+										},
+										"end": {
+											"line": 14,
+											"column": 34
+										}
+									},
+									"name": "p",
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 376,
+										"end": 379,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 31
+											},
+											"end": {
+												"line": 14,
+												"column": 34
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 378,
+											"end": 379,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 33
+												},
+												"end": {
+													"line": 14,
+													"column": 34
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 378,
+												"end": 379,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 33
+													},
+													"end": {
+														"line": 14,
+														"column": 34
+													}
+												},
+												"name": "T"
+											}
+										}
+									}
+								}
+							],
+							"body": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 39
+									},
+									"end": {
+										"line": 14,
+										"column": 40
+									}
+								},
+								"name": "p"
+							},
+							"typeParameters": {
+								"type": "TSTypeParameterDeclaration",
+								"start": 356,
+								"end": 374,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 14,
+										"column": 29
+									}
+								},
+								"params": [
+									{
+										"type": "TSTypeParameter",
+										"start": 357,
+										"end": 373,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 12
+											},
+											"end": {
+												"line": 14,
+												"column": 28
+											}
+										},
+										"name": "T",
+										"constraint": {
+											"type": "TSStringKeyword",
+											"start": 367,
+											"end": 373,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 22
+												},
+												"end": {
+													"line": 14,
+													"column": 28
+												}
+											}
+										}
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c3 ",
+									"start": 347,
+									"end": 355
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 386,
+							"end": 394,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 41
+								},
+								"end": {
+									"line": 14,
+									"column": 49
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 387,
+									"end": 393,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 42
+										},
+										"end": {
+											"line": 14,
+											"column": 48
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued block leads the head inline; the pair stays flat.",
+							"start": 284,
+							"end": 344
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -32,9 +32,11 @@
 # known bugs.
 #
 # Format: KIND<TAB>POSITION
-# shapes: 34
+# shapes: 37
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
+UNHONORED	AssignmentExpression.left
+UNHONORED	AssignmentPattern.left
 UNHONORED	AwaitExpression.argument
 UNHONORED	BinaryExpression.left
 UNHONORED	BinaryExpression.right
@@ -53,6 +55,7 @@ UNHONORED	Program.body
 UNHONORED	SpreadElement.argument
 UNHONORED	TSAsExpression.expression
 UNHONORED	TSImportEqualsDeclaration.moduleReference
+UNHONORED	TSInstantiationExpression.expression
 UNHONORED	TSModuleDeclaration.body
 UNHONORED	TSNonNullExpression.expression
 UNHONORED	TSParenthesizedType.typeAnnotation

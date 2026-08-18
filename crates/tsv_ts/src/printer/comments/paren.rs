@@ -8,6 +8,7 @@
 
 use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank};
 use crate::ast::internal;
+use crate::printer::ParenContext;
 use crate::printer::expressions::operators::SeqLayout;
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
@@ -815,8 +816,6 @@ impl<'a> Printer<'a> {
             ));
         }
 
-        let d = self.d();
-
         // The shell's `(` is the statement's first token whenever the statement's leftmost
         // node is inside the operand, so it already discharges what the expression-statement
         // wrap exists for — keeping the statement from starting with `{` / `function` /
@@ -846,18 +845,137 @@ impl<'a> Printer<'a> {
             body.extend(trailing);
         }
 
+        Some(self.compose_expanded_shell_doc(paren_trailing, &body, ")"))
+    }
+
+    /// The expanded paren-shell rendering every shell emitter shares — the
+    /// leading-gap builders (via [`Self::build_leading_run_expanded_shell_doc`])
+    /// and the anchored trailing-run shell
+    /// ([`Self::build_paren_operand_comment_doc`]'s line arm): `( // c` when the
+    /// author glued a `//` to the `(` (the comment runs to end of line and the
+    /// indent's hardline supplies the break, so nothing following it is
+    /// swallowed; the space is the glued split's), the body one indent in, the
+    /// closer back out on its own line. `close` is `")"` where a separate node
+    /// prints what follows, `")!"` where this doc owns the non-null's `!`.
+    pub(in crate::printer) fn compose_expanded_shell_doc(
+        &self,
+        paren_trailing: Option<DocId>,
+        body: &DocBuf,
+        close: &'static str,
+    ) -> DocId {
+        let d = self.d();
         let open_doc = match paren_trailing {
-            // `( // c` — the comment runs to end of line and the indent's hardline supplies
-            // the break, so nothing following it is swallowed. The space is the split's.
             Some(comment) => d.concat(&[d.text("("), comment]),
             None => d.text("("),
         };
-        Some(d.concat(&[
+        d.concat(&[
             open_doc,
-            d.indent_hardline(d.concat(&body)),
+            d.indent_hardline(d.concat(body)),
             d.hardline(),
-            d.text(")"),
-        ]))
+            d.text(close),
+        ])
+    }
+
+    /// The family's expanded shell for a LEADING run — the one emission every
+    /// required-pair leading gap shares: split the `(`-glued `//` (the
+    /// opening-delimiter rule), emit the rest of the run above the operand with
+    /// its authored own-line placements kept, close with `close`. Callers: the
+    /// assignment-target / instantiation-head operand shell
+    /// ([`Self::build_shell_operand_doc`]), the non-null's needs-parens arm, and
+    /// the sealed optional chain (both `build_ts_non_null_doc` /
+    /// `build_sealed_non_null_paren_doc`, whose `close` is `")!"`).
+    pub(in crate::printer) fn build_leading_run_expanded_shell_doc(
+        &self,
+        gap_start: u32,
+        operand_start: u32,
+        inner_doc: DocId,
+        close: &'static str,
+    ) -> DocId {
+        let (paren_trailing, run_start) =
+            self.split_open_delimiter_glued_run(gap_start, operand_start);
+        let mut body = DocBuf::new();
+        if let Some(run) = self.build_rhs_comments_opt(run_start, operand_start) {
+            body.push(run);
+        }
+        body.push(inner_doc);
+        self.compose_expanded_shell_doc(paren_trailing, &body, close)
+    }
+
+    /// An operand in a position that prints a REQUIRED pair around some operand
+    /// kinds, with the node's `^`→operand gap emitted — the whole operand doc for
+    /// an assignment expression's / assignment pattern's target
+    /// ([`ParenContext::AssignmentTarget`]) and an instantiation expression's head
+    /// ([`ParenContext::InstantiationExpression`]).
+    ///
+    /// The gap is `[node_start, operand.span().start)`, `node_start` being the
+    /// enclosing node's own start — for a parenthesized operand, its authored `(`.
+    /// Nothing else emits it: a comment there that is not glued to the operand
+    /// (which would make it `owned_by_node`, printed from the operand's own doc)
+    /// belongs to no node, so the bare `"(" + operand + ")"` spelling DROPPED it
+    /// outright (`( // c⏎x as T) = 1;` → `(x as T) = 1;`).
+    ///
+    /// Where the position REQUIRES the pair — a type-assertion target (`x as T = 1;`
+    /// is a parse error), an arrow instantiation head — the pair prints whatever the
+    /// comment does, and tsv keeps the run INSIDE it, where the author wrote it;
+    /// prettier hoists it out in front, re-binding it from the operand to the whole
+    /// statement (cataloged: conformance_prettier_ts_comments.md §Comment
+    /// relocation, "Assignment-target shell, leading comment"). A run that occupies
+    /// a line — a `//`, an own-line block — expands the pair, with the `( // c` glue
+    /// and the author's own-line placements kept
+    /// ([`Self::build_asi_operand_shell_doc`]'s rendering one construct over); a
+    /// glued single-line block run stays flat.
+    ///
+    /// Any other operand's pair is REDUNDANT and strips (`(// c⏎x) = 1;`,
+    /// `(// c⏎fn)<string>;`), and the stripped form still expresses the run's
+    /// position — it leads the statement, exactly where prettier lands it.
+    pub(in crate::printer) fn build_shell_operand_doc(
+        &self,
+        node_start: u32,
+        target: &internal::Expression<'_>,
+        context: ParenContext,
+    ) -> DocId {
+        let d = self.d();
+        let target_start = target.span().start;
+        let needs_parens = self.needs_parens(target, context);
+        // Zero-comment fast gate, emit-keyed on purpose: the layouts below differ
+        // only in where EMITTED comments render — an owned (target-glued) block
+        // prints identically inside the flat pair from the target's own doc, and
+        // never asks the pair to expand.
+        if !self.has_comments_to_emit_between(node_start, target_start) {
+            let inner = self.build_expression_doc(target);
+            return if needs_parens { d.parens(inner) } else { inner };
+        }
+        let open = find_char_skipping_comments(
+            self.source.as_bytes(),
+            node_start as usize,
+            target_start as usize,
+            b'(',
+        )
+        .map(|p| p as u32);
+        let leading_start = open.map_or(node_start, |p| p + 1);
+        // A comment that occupies a line expands the pair. The read is in-source
+        // over the whole gap, which cannot over-fire: the gate above already found
+        // a comment to emit (a comment-free author break never reaches here), a
+        // `//` always ends its line, and an own-line block carries its break.
+        if needs_parens && self.has_newline_between(leading_start, target_start) {
+            return self.build_leading_run_expanded_shell_doc(
+                leading_start,
+                target_start,
+                self.build_expression_doc(target),
+                ")",
+            );
+        }
+        // The flat tail serves both regimes: a glued-block run leads the operand —
+        // inside the pair where one prints, ahead of the bare operand where the
+        // stripped run leads the statement (and there a line comment's hardline
+        // separator is what keeps the statement after it on its own line).
+        let lead = self.build_rhs_comments_opt(leading_start, target_start);
+        let inner = self.build_expression_doc(target);
+        let core = match lead {
+            Some(lead) => d.concat(&[lead, inner]),
+            None => inner,
+        };
+        if needs_parens { d.parens(core) } else { core }
     }
 
     /// Build expression doc, stripping a redundant grouping paren around a trailing
@@ -1425,16 +1543,10 @@ impl<'a> Printer<'a> {
             // instead would end the line first, landing a blank before the closer).
             // A chain-gap classification here is a category error: its `leading_*`
             // buckets would hoist an own-line comment above the operand.
-            let mut inner = DocBuf::with_capacity(4);
-            inner.push(d.hardline());
-            inner.push(broken_body);
-            self.push_anchored_trailing_run(&mut inner, start, end, RunLeadingBlank::Keep);
-            return Some(d.concat(&[
-                d.text("("),
-                d.indent(d.concat(&inner)),
-                d.hardline(),
-                d.text(close),
-            ]));
+            let mut body = DocBuf::with_capacity(3);
+            body.push(broken_body);
+            self.push_anchored_trailing_run(&mut body, start, end, RunLeadingBlank::Keep);
+            return Some(self.compose_expanded_shell_doc(None, &body, close));
         }
         if self.has_comments_to_emit_between(start, end) {
             let trailing = self.build_chain_block_comments_doc(start, end, CommentSpacing::Leading);
