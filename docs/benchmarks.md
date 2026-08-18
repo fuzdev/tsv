@@ -73,9 +73,9 @@ Things the published numbers measure that aren't quite what they look like.
   harvest bytes are also timed inside the svelte rows (rows are never summed, so
   this is disclosure, not distortion), and CSS per-file ratios stay the noisiest.
 - **PGO native flagship (forthcoming — policy; no such row ships today).** The
-  standalone native flagship (the `tsv` binary — it joins the bare `@fuzdev/tsv`
-  name the N-API set already publishes under, rather than minting a second one)
-  is planned to ship
+  standalone native flagship — the `tsv` binary the `@fuzdev/tsv` platform
+  packages already ship, un-PGO'd, under the one name rather than a second
+  package — is planned to ship
   with profile-guided optimization: native-only, a measured ~17–19% wall-time
   win, **byte-identical** output, **Linux-only first** on that single-target
   build (the cross-platform prebuilt `.node` binaries stay non-PGO — the `napi`
@@ -771,7 +771,7 @@ pre-existing bug, the parser change put a printer seam in reach for the first ti
 '!benches/js/results/**'`. Nothing gates this, and it is the step that gets skipped.
 Prose that restates the pin ("pinned at svelte X", "valid at the X pin", "the pinned
 oracle (svelte X) throws") is a duplicate of a value that just moved, and it goes
-silently wrong; one 5.56.4 → 5.56.8 bump left five such claims behind across `docs/`
+silently wrong; a single past bump left five such claims behind across `docs/`
 and two crates. A **past**-version mention is different and stays true — "Prettier
 3.9.5 tightened it", a fixture README explaining which release changed a behavior —
 so this cannot be a lint, only a read. Prefer pointing at `sidecar.ts`'s `VERSIONS`

@@ -8,7 +8,7 @@ tsv is a **multi-tool foundation** for Svelte/TypeScript/CSS—formatter, parser
 
 This inverts the typical approach where JSON compatibility drives AST design.
 
-**Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv_format_wasm` is the current yardstick—it's the most-developed and first-shipped artifact—but it holds no long-term primacy; `@fuzdev/tsv_parse_wasm`, the CLI, and future bindings count just as much as they mature. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
+**Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv_format_wasm` is the current yardstick—it's the most-developed and first-shipped artifact—but it holds no long-term primacy; `@fuzdev/tsv_parse_wasm`, the CLI, and the native N-API binding count just as much as they mature. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
 
 **Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. Only the two native binding crates relax it, each to the weakest level that compiles: `tsv_ffi` to `"allow"`, since the crate *is* the C ABI boundary and hand-writes the raw-pointer work; `tsv_napi` to `"deny"`, because it hand-writes no unsafe at all and `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` — enough to override `deny`, so every other site in that crate stays a compile error. (Neither can inherit `forbid`, which no inner `allow` may override; `tests/lint_parity.rs` pins both relaxations and guards the hand-mirrored tables against drift.) Combined with a single-digit core-library dependency set (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml`, whose externals are the nine library crates plus the CLI/debug-only `argh`/`tokio`/`futures-util`; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)), the attack surface and audit burden stay minimal.
 
@@ -140,7 +140,7 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 **Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (with `convert_ast_json()` a thin `Value` wrapper over the bytes). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
-**Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, and the experimental `tsv_check` / `tsv_svelte_compile` — which may never ship — all landed as crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
+**Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, and the experimental `tsv_check` / `tsv_svelte_compile` — which may never ship — are all crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
 ### Closed Scope, Open Convention
 
@@ -221,8 +221,8 @@ This shape gives both:
   the Rust ecosystem.
 
   **Caveat**: this property holds at the Rust crate level, not the
-  binary level. Users of the published `tsv` CLI or the WASM packages
-  (`@fuzdev/tsv_format_wasm` / `@fuzdev/tsv_parse_wasm`) would need to compose
+  binary level. Users of the published `tsv` CLI or the npm packages
+  (the WASM trio and the native `@fuzdev/tsv`) would need to compose
   their own dispatch to wire in a third-party language — the CLI
   matches on file extension over a fixed list, and the WASM
   `lang_bindings!` macro instantiates exports for a fixed set of
@@ -247,7 +247,8 @@ in those two dispatch sites), not a structural one — adding a
 tsv-shaped crate to the workspace later requires no edits to existing
 language crates.
 
-The npm publish surface (`@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_parse_wasm`) groups
+The npm publish surface (`@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_parse_wasm`,
+`@fuzdev/tsv_wasm`, and the native `@fuzdev/tsv` set) groups
 artifacts for user ergonomics independent of the Rust workspace shape.
 
 #### Cargo feature surface
@@ -894,8 +895,8 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
   choice — one central `oxc_ast` crate shared by parser, linter, transformer, minifier, and
   formatter — answers a different question: many _tools_ sharing one language's AST. tsv does
   the same per language (see [Shared Parser, Divergent Tools](#shared-parser-divergent-tools));
-  the per-language crate split is the multi-language question oxc never faces. Allocation has
-  converged: like oxc, tsv now bump-allocates lifetime-threaded (`&'arena`) AST types — but
+  the per-language crate split is the multi-language question oxc never faces. Allocation is
+  convergent: like oxc, tsv bump-allocates lifetime-threaded (`&'arena`) AST types — but
   keeps an **inline-by-value node layout** (not size-minimized via boxing/indirection, which
   regressed its traversal-bound formatter; see [Nested AST](#nested-ast-bump-arena-not-flatindexed)),
   stays `unsafe_code = "forbid"` (safe bumpalo API only), and recovers source text via `span`
