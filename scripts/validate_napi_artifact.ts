@@ -74,7 +74,7 @@ const cli_binary_name = triple!.startsWith('win32-') ? 'tsv.exe' : 'tsv';
 const validate = (filename: string, bounds: [number, number] | undefined): void => {
 	if (!bounds) {
 		console.error(
-			`FAIL: no ${filename} size bounds for triple '${triple}' — add a (PROVISIONAL) entry in scripts/validate_napi_artifact.ts`
+			`FAIL: no ${filename} size bounds for triple '${triple}' — add a band in scripts/validate_napi_artifact.ts, ±8% around a matrix-built artifact (a wide placeholder until the first run prints one)`
 		);
 		Deno.exit(1);
 	}
