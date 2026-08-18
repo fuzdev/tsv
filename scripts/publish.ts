@@ -34,8 +34,10 @@
  * Retry: a failed wetrun leaves the bump in place plus a sentinel file; re-run
  * `deno task publish --wetrun` and it resumes from the bumped version (skipping
  * the git-clean check and the bump; a passed `--bump` is ignored with a
- * warning). The publish loop itself is idempotent — already-published packages
- * are skipped.
+ * warning). Every mutating step is idempotent — already-published packages are
+ * skipped, and the git finalize no-ops on an existing commit/tag — so the
+ * sentinel covers the run through Step 8 and is removed only once the push
+ * lands.
  */
 
 import { format_size, gzip_size } from './size.ts';
@@ -539,22 +541,30 @@ for (let i = 0; i < packages.length; i++) {
 	}
 }
 
-// Remove sentinel after all packages are published — retry is safe up to this point.
-if (wetrun) {
-	try {
-		Deno.removeSync(SENTINEL_PATH);
-	} catch (error) {
-		if (!(error instanceof Deno.errors.NotFound)) throw error;
-	}
-}
-
 // Step 8: Git finalize
+
+/** The by-hand finalize — printed when `--no-git` skips the step, and as the
+ * failure hint for every git command below. Past Step 7 the packages are
+ * already public, so a failure here is the one place a bare exit code is not
+ * enough: it needs the exact recovery. */
+const manual_finalize = [
+	`    git add ${release_files.join(' ')}`,
+	`    git commit -m "publish v${version}"`,
+	`    git tag -m v${version} v${version}`,
+	'    git push --follow-tags origin main'
+].join('\n');
+const git_fail_hint =
+	'  The packages are PUBLISHED — only the release commit + tag + push is missing.\n' +
+	'  The sentinel survives this step, so `deno task publish --wetrun` resumes from here\n' +
+	'  (already-published packages skip; add --no-check to skip re-running the gates over\n' +
+	'  the tree they just passed). Or finalize by hand:\n' +
+	manual_finalize;
 
 if (wetrun && !no_git) {
 	console.log('\n=== Step 8: Git finalize (commit + tag + push) ===');
 	if (capture('git', ['status', '--porcelain', '--', ...release_files]).stdout) {
-		run('git add', 'git', ['add', '--', ...release_files]);
-		run('git commit', 'git', ['commit', '-m', `publish v${version}`]);
+		run('git add', 'git', ['add', '--', ...release_files], undefined, git_fail_hint);
+		run('git commit', 'git', ['commit', '-m', `publish v${version}`], undefined, git_fail_hint);
 	} else {
 		console.log('  Nothing to commit (retry after a previous commit)');
 	}
@@ -563,17 +573,29 @@ if (wetrun && !no_git) {
 		console.log(`  Tag ${tag} already exists`);
 	} else {
 		// Annotated — `git push --follow-tags` ignores lightweight tags
-		run('git tag', 'git', ['tag', '-m', tag, tag]);
+		run('git tag', 'git', ['tag', '-m', tag, tag], undefined, git_fail_hint);
 	}
-	run('git push', 'git', ['push', '--follow-tags', 'origin', 'main']);
+	// This push is what triggers release_napi.yml — until it lands, the wasm
+	// packages are public with no tag, so the N-API set never builds.
+	run('git push', 'git', ['push', '--follow-tags', 'origin', 'main'], undefined, git_fail_hint);
 } else if (wetrun) {
 	console.log('\n=== Step 8: Git finalize — SKIPPED (--no-git) ===');
 	console.log('  Finalize manually (only the release files; annotated tag — --follow-tags');
 	console.log('  ignores lightweight tags):');
-	console.log(`    git add ${release_files.join(' ')}`);
-	console.log(`    git commit -m "publish v${version}"`);
-	console.log(`    git tag -m v${version} v${version}`);
-	console.log('    git push --follow-tags origin main');
+	console.log(manual_finalize);
+}
+
+// Remove the sentinel LAST — the release is complete only once the commit, tag
+// and push have landed (or `--no-git` handed them off). Removing it after Step 7
+// instead made a git-finalize failure UNRESUMABLE: the retry path needs the
+// sentinel, and without it the fresh path refuses on the `## Unreleased` section
+// this very run already stamped.
+if (wetrun) {
+	try {
+		Deno.removeSync(SENTINEL_PATH);
+	} catch (error) {
+		if (!(error instanceof Deno.errors.NotFound)) throw error;
+	}
 }
 
 // Summary
@@ -588,6 +610,24 @@ for (const { label, dir } of packages) {
 		wetrun
 			? `  Published ${label}@${version} — ${size_note}`
 			: `  ${label}@${version} — ${size_note}`
+	);
+}
+if (wetrun) {
+	// This script releases the WASM half only. The N-API set publishes from
+	// release_napi.yml, triggered by the tag Step 8 pushes — so a green run here
+	// is not a finished release, and saying so beats leaving it to the runbook.
+	// (Before the skip warnings below: those keep the last word.)
+	console.log(
+		no_git
+			? `\n  The N-API set does NOT publish until the v${version} tag is pushed —`
+			: `\n  The pushed v${version} tag triggers release_napi.yml —`
+	);
+	console.log('  the six N-API packages (@fuzdev/tsv + its five platform packages) publish there.');
+	console.log(
+		no_git
+			? '  Finish the finalize above, then watch that run.'
+			: '  The release is complete only once that run is green; if the matrix fails, re-run it\n' +
+					'  from the Actions tab — dispatching ON THE TAG, so the version assertion still holds.'
 	);
 }
 if (conformance_skip_reason !== null) {

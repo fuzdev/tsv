@@ -37,7 +37,10 @@
 #
 # workflow_dispatch runs the whole matrix and gates with `npm publish
 # --dry-run` by default — the pre-tag rehearsal; set dry_run=false for a real
-# publish without a tag (the recovery path for a failed tag run).
+# publish (the recovery path for a failed tag run). Dispatch that recovery on
+# the release TAG rather than a branch: the tag↔version assertion keys on the
+# ref, so a branch dispatch publishes whatever version that branch stages, from
+# source that may have moved past the release commit.
 
 name: release_napi
 
@@ -297,15 +300,25 @@ jobs:
       # idempotency all live in the script. A missing NPM_TOKEN secret yields
       # an EMPTY token, which `npm view` (public) and `npm publish --dry-run`
       # both tolerate — so the dry-run rehearsal works before the secret exists.
+      #
+      # The two flags answer independent questions, so they key on different
+      # things. `--expect-tag` follows the REF: any run whose ref is a tag must
+      # agree with it, which covers the tag push AND a recovery dispatched on
+      # the release tag — the tagless dispatch (dispatch on a branch) is the
+      # only path with nothing tying the staged version to a released commit,
+      # so prefer dispatching on the tag. Dry-run-ness follows the EVENT.
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           flags=()
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            flags+=(--expect-tag "$GITHUB_REF_NAME" --provenance)
-          elif [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$DRY_RUN" = "true" ]; then
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            flags+=(--expect-tag "$GITHUB_REF_NAME")
+          else
+            echo "note: ref '$GITHUB_REF_NAME' is not a tag — publishing without the tag↔version assertion"
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$DRY_RUN" = "true" ]; then
             # schedule is ALWAYS dry-run — see the trigger comment.
             flags+=(--dry-run)
           else

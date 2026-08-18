@@ -15,7 +15,8 @@
 #               reason to clone — so a green CI run does not cover that leg; it
 #               gates on a dev machine and at conformance cadence (audit:corpus).
 #   artifacts — publish-parity: builds the WASM/npm packages, checks size
-#               bounds, runs the Node package tests (see the job comment).
+#               bounds, runs the Node package tests, and covers the Linux half
+#               of the N-API npm shape (see the job comment).
 #   platforms — macOS + Windows confidence for the native builds: the full
 #               `cargo test --workspace` suite plus the N-API JS-boundary and
 #               npm-package tests, per OS (see the job comment). Linux is
@@ -96,21 +97,24 @@ jobs:
       - name: Check
         run: deno task check
 
-  # Publish-parity gate: builds every WASM/npm artifact, checks the size
-  # bounds, and runs the Node package tests — none of which `check` exercises,
-  # so a packaging break surfaces on PRs instead of at release time. Runs the
-  # same `build:packages` task as scripts/publish.ts (6 wasm-pack release builds
-  # + wasm-opt), so the two can't drift.
+  # Publish-parity gate for BOTH published sets: builds every WASM/npm artifact,
+  # checks the size bounds, runs the Node package tests, and stages + tests the
+  # Linux N-API package — none of which `check` exercises, so a packaging break
+  # surfaces on PRs instead of at release time. Runs the same `build:packages`
+  # task as scripts/publish.ts (6 wasm-pack release builds + wasm-opt) and the
+  # same `build:napi:packages` staging as release_napi.yml, so none can drift.
   artifacts:
     runs-on: ubuntu-latest
     # Runs in parallel with `check` (no `needs:`) so PR wall-clock is
     # max(check, artifacts), not the sum. Tradeoff: a PR that fails `check`
     # still burns the artifact build. Re-add `needs: check` to trade that
     # latency back for not spending build minutes on red PRs.
-    # Generous headroom over the cold wasm-only build (6 wasm-pack release builds
-    # + wasm-opt; wasm-pack itself is now a prebuilt download, not a source
-    # compile) — well short of the 6h default so a hang fails fast.
-    timeout-minutes: 45
+    # Generous headroom over a cold build of both published sets: the wasm half
+    # (6 wasm-pack release builds + wasm-opt; wasm-pack itself is now a prebuilt
+    # download, not a source compile) plus the napi half's two host binaries
+    # (napi-profile addon + LTO'd tsv_cli) — well short of the 6h default so a
+    # hang fails fast.
+    timeout-minutes: 60
 
     steps:
       # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
@@ -173,11 +177,23 @@ jobs:
           deno task test:npm:parse:run
           deno task test:npm:all:run
 
+      # The N-API npm shape on LINUX — the same publish-parity reasoning as the
+      # wasm half above, for the other published set. `platforms` proves macOS +
+      # Windows and `check` covers Linux for cargo's own tests only, so without
+      # this step the loader's Linux triple detection (`is_musl()` — the one
+      # branch no other runner can reach) and the packaged CLI dispatch are
+      # proven on PRs by nothing: only release_napi.yml's tag / dispatch / weekly
+      # matrix builds them. Builds both shipped binaries (addon on the napi
+      # profile, `tsv_cli` on release), which rust-cache carries across runs.
+      - name: N-API npm package test (linux)
+        run: deno task test:napi:npm
+
   # Platform confidence for the native builds: the committed-tree test suite
   # (fixtures, CLI integration, the napi in-crate tests) plus the real N-API
-  # JS-boundary test, on each OS a native artifact will ship for. Linux is
-  # already covered by `check` (`deno task check` runs `cargo test --workspace`
-  # on ubuntu), so the matrix is macOS + Windows; macos-15 runners are arm64,
+  # JS-boundary test, on each OS a native artifact will ship for. Linux's half
+  # is split across the other two jobs — `check` runs `cargo test --workspace`
+  # on ubuntu, `artifacts` runs the N-API npm-shape test there (the JS legs are
+  # not in `check`) — so the matrix is macOS + Windows; macos-15 runners are arm64,
   # which is also aarch64 coverage. Deliberately NOT the full `deno task check`:
   # rustfmt/clippy/typecheck/the audits are platform-independent and already
   # gate on ubuntu — duplicating them here is wall-clock for no new signal.
