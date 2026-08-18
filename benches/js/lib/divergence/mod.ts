@@ -7,30 +7,10 @@
  * - `generate_audit_report()` - Cross-reference patterns against the `conformance_prettier*.md` family
  */
 
+// Only the names the two consumers (corpus_compare_format.ts, divergence_audit.ts)
+// actually import — everything else is reached from its concrete module directly.
 export { check_safety_vs_prettier, type SafetyViolation } from './safety.ts';
-export {
-	detect_divergences,
-	type DetectionContext,
-	type DivergenceMatch,
-	type DivergencePattern,
-	enrich_detection_context,
-	type HunkCoverageResult,
-	PATTERNS
-} from './patterns.ts';
-export {
-	check_expected_error,
-	EXPECTED_ERROR_PATTERNS,
-	type ExpectedErrorPattern,
-	type ExpectedErrorResult
-} from './expected_errors.ts';
+export { detect_divergences, type HunkCoverageResult } from './patterns.ts';
+export { check_expected_error } from './expected_errors.ts';
 export { is_native_panic_error } from './panic_errors.ts';
-export { type DiffHunk, extract_hunks } from '../diff.ts';
-export {
-	type AuditReport,
-	type DocumentedDivergence,
-	format_audit_report,
-	generate_audit_report,
-	load_documented_divergences,
-	parse_conformance_prettier_md,
-	type PatternCoverage
-} from './validation.ts';
+export { format_audit_report, generate_audit_report } from './validation.ts';

@@ -69,7 +69,7 @@ async function git(cwd: string, args: string[]): Promise<string | null> {
  * `git@github.com:org/repo(.git)` / `https://github.com/org/repo(.git)` →
  * `https://github.com/org/repo`; `null` for a non-GitHub or unparseable remote.
  */
-export function normalize_github_url(remote: string | null): string | null {
+function normalize_github_url(remote: string | null): string | null {
 	if (!remote) return null;
 	const match = remote.match(/github\.com[:/]([^/]+)\/(.+?)(?:\.git)?\/?$/);
 	return match ? `https://github.com/${match[1]}/${match[2]}` : null;
@@ -85,7 +85,7 @@ function checkout_prefix(source_path: string): string {
 }
 
 /** Detect the GitHub ref for one corpus source path (present repos only). */
-export async function detect_repo(source_path: string): Promise<CorpusRepoRef | null> {
+async function detect_repo(source_path: string): Promise<CorpusRepoRef | null> {
 	// A harvested cache links to its declared canonical upstream at the root
 	// (no git, no commit) — see `CACHE_CANONICAL`.
 	const canonical = CACHE_CANONICAL[source_path];

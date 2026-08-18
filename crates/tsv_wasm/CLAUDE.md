@@ -203,14 +203,18 @@ identifiers, snippet names, and simple-identifier block patterns, and the
 between an element's attributes, i.e. inside its opening tag at brace depth 0 —
 including the `<svelte:options>` head, whose wire node carries no `type` and is
 pushed into the host-element pass explicitly);
-**a no-op for CSS**. It rides the **parse-capable**
-packages only (`@fuzdev/tsv_parse_wasm`, `@fuzdev/tsv_wasm`) — it operates on the
-parse wire, so the format-only package has no use for it. `patch_npm_package.ts`
+**a no-op for CSS**. It rides every package that parses —
+`@fuzdev/tsv_parse_wasm`, `@fuzdev/tsv_wasm`, and the native `@fuzdev/tsv` loader
+(`build_napi_packages.ts` stages it there) — it operates on the
+parse wire, so only the format-only package has no use for it. `patch_npm_package.ts`
 copies it + the hand-written `npm/locations.d.ts` into the package root and
 re-exports the functions from index.js/browser.js/index.d.ts (directly, with no
 init guard — it never touches WASM). Its correctness is gated by the package Node
-tests (`scripts/test_npm.ts`) and, at corpus scale, by
-`benches/js/diagnostics/no_locations_parity.ts`.
+tests (`scripts/test_npm.ts`); at corpus scale,
+`benches/js/diagnostics/no_locations_parity.ts` proves the reconstruction *rules*
+(deliberately re-derived, the independent oracle) while
+`benches/js/diagnostics/reconstruct_vs_materialize.ts` is the diagnostic that runs
+the shipped helper itself.
 
 **`.d.ts` export-name constraint.** `index.d.ts` re-exports both `tsv_ast.d.ts`
 (`export type *`) and `locations.d.ts` (`export *`), so a name exported by BOTH is

@@ -405,7 +405,7 @@ const NO_INNER: &str = "-";
 /// ⚠️ A non-`-` `inner` is a QUESTION, not a verdict, and over real code the likeliest answer
 /// is neither "weld" nor "false positive": it is an ordinary **JSDoc cast**
 /// (`… /** @type {T} */ (expr) …`), a real block comment closing mid-line. Triaged over
-/// `../svelte/packages/svelte/src` + `~/dev/zzz/src`, 9 of the 13 interior shapes are that,
+/// `../svelte/packages/svelte/src` + `../zzz/src`, 9 of the 13 interior shapes are that,
 /// and only 4 are the mirror case — a `*/` / `-->` inside a string, template, regex, or the
 /// text of a `//` comment, called interior with no comment involved. There are none of either
 /// over `tests/fixtures`, the only corpus the ratchet grades, and even off it a false one

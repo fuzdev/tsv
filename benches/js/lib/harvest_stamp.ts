@@ -67,7 +67,7 @@ export async function harvest_up_to_date(
 }
 
 /** Whether the stamp at `path` records exactly `inputs`. */
-export async function stamp_fresh(path: string, inputs: StampInputs): Promise<boolean> {
+async function stamp_fresh(path: string, inputs: StampInputs): Promise<boolean> {
 	try {
 		const recorded = JSON.parse(await readFile(path, 'utf8')) as StampInputs;
 		const keys = Object.keys(inputs);

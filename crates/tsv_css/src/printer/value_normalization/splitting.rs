@@ -112,7 +112,7 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
         // Inside a string, a `\` escapes the next code point — so an escaped quote
         // (`"a\"b"`) must NOT close the string. Copy the pair verbatim, exactly as
         // `collapse_whitespace_runs` does. (No input reaches here with one today: a
-        // string-valued declaration prints through the string-aware `format_string_value`,
+        // string-valued declaration prints through the string-aware `format_string_literal`,
         // not this normalizer — verified across `content`, custom properties, `url()`,
         // font lists, `@media` preludes, attribute selectors and `grid-template-areas`.
         // The arm is here so the invariant does not depend on that routing holding.)

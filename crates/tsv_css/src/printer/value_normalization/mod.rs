@@ -84,7 +84,7 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             let literal = &input[start..i];
             if closed {
                 let content = &literal[1..literal.len() - 1];
-                out.push_str(&format_string_value(content, b as char));
+                out.push_str(&format_string_literal(content, b as char));
             } else {
                 out.push_str(literal);
             }
@@ -490,19 +490,6 @@ fn maybe_lowercase_feature_name(name: &str) -> Cow<'_, str> {
         return Cow::Borrowed(name);
     }
     Cow::Owned(name.to_ascii_lowercase())
-}
-
-/// Format a string value semantically
-///
-/// Formats a string with the specified quote character, properly escaping content.
-///
-/// # Example
-/// ```ignore
-/// assert_eq!(format_string_value("hello", '\''), "'hello'");
-/// assert_eq!(format_string_value("world", '"'), "\"world\"");
-/// ```
-pub(crate) fn format_string_value(content: &str, quote: char) -> String {
-    format_string_literal(content, quote)
 }
 
 /// Extract and normalize property name from declaration source

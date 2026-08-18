@@ -141,8 +141,9 @@ unsafe fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
     unsafe { bytes_to_ptr(json, out_len) }
 }
 
-/// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
-/// C FFI functions for one language module.
+/// Generate `tsv_parse_<lang>` / `tsv_parse_<lang>_no_locations` /
+/// `tsv_parse_internal_<lang>` / `tsv_format_<lang>` C FFI functions for one
+/// language module.
 ///
 /// # Safety (applies to every generated function)
 /// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes

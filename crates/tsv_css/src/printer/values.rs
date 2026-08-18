@@ -19,6 +19,7 @@ use crate::ast::internal::{CssValue, StringCooked};
 use std::borrow::Cow;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
+use tsv_lang::printing::format_string_literal;
 
 impl<'a> Printer<'a> {
     /// Format a CSS value
@@ -169,18 +170,14 @@ impl<'a> Printer<'a> {
             if raw.len() >= 2 && (raw.starts_with('\'') || raw.starts_with('"')) {
                 let quote = raw.as_bytes()[0] as char;
                 let inner = &raw[1..raw.len() - 1];
-                return self
-                    .d()
-                    .text_pooled(&value_normalization::format_string_value(inner, quote));
+                return self.d().text_pooled(&format_string_literal(inner, quote));
             }
         }
         // Fallback: span unavailable (never in practice — spans index the printer's
         // source). Re-emit the decoded content; a `Verbatim` value has no recoverable
         // text without its span, so emit nothing (mirrors `build_identifier_doc`).
         match content {
-            StringCooked::Decoded(s) => self
-                .d()
-                .text_pooled(&value_normalization::format_string_value(s, '\'')),
+            StringCooked::Decoded(s) => self.d().text_pooled(&format_string_literal(s, '\'')),
             StringCooked::Verbatim => self.d().text(""),
         }
     }

@@ -268,6 +268,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 - `prettier_nonconvergent.txt` — Prettier never reaches a fixed point on input (no oracle exists); claim live-verified (see F5/S18)
 - `prettier_rejects.txt` — Prettier throws on the input (parse rejection or printer crash; no oracle exists); the file's trimmed content is the expected-error substring, claim live-verified (see F6/S19)
 - `tsv_rejects.txt` — tsv over-rejects an input the canonical parser accepts (a tsv-rejects/canonical-accepts divergence the fixture path can otherwise not express); the file's trimmed content is the expected tsv-error substring, `expected_svelte.json` holds the canonical AST, claim live-verified (see F7/S20)
+- `goal` — Parse-goal marker for a standalone-script fixture (hand-authored, content `script`): the fixture's `input.ts` parses as a strict **Script** (`tsv_ts::Goal::Script`) rather than the default Module, on both tsv's side and the acorn `expected.json` oracle — so `await` is an ordinary identifier and `import`/`export`/`import.meta` are syntax errors. Only meaningful on `.ts`/`.svelte.ts` fixtures (Svelte `<script>` hard-wires Module; CSS has no goal); the in-tree examples are `typescript/script_goal/*`
 - `unformatted_*.svelte` — Normalization tests - both formatters normalize to `input.svelte`
 - `unformatted_ours_*.svelte` — Normalization tests - only our formatter normalizes to `input.svelte`
 - `unformatted_prettier_*.svelte` — Normalization tests - prettier normalizes to `output_prettier.svelte`
@@ -322,7 +323,7 @@ All fixtures use `input.svelte` as canonical source.
 5. **S5**: `prettier_variant_*` differs from the input file (C3 below)
 6. **S6**: `output_prettier.*` differs from the input file (C2 below)
 7. **S7**: `unformatted_ours_*` differs from the input file
-   - (Input and variant extension matching — `.svelte` preferred for inputs, variants sharing the input's extension — is a naming convention, checked nowhere in the validator; see [fixture_naming.md §Extension Matching](./fixture_naming.md#extension-matching))
+   - (Variants must share the input's extension — a variant file with a different extension isn't recognized as a variant and fails validation as an unknown file; `.svelte` stays the preferred input type. See [fixture_naming.md §Extension Matching](./fixture_naming.md#extension-matching))
 8. **S8**: Directory name ends with `_prettier_divergence` when ANY of these exist:
    - `output_prettier.*` (prettier formats input differently), OR
    - `prettier_variant_*.*` files (prettier has quirks), OR

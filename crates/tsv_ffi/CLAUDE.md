@@ -21,7 +21,7 @@ The default both-features build is the full `libtsv_ffi` the bench perf rows loa
 
 ## Public API
 
-The `lang_bindings!` macro generates three `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
+The `lang_bindings!` macro generates four `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
 
 - `tsv_parse_<lang>` — JSON AST (public, converted)
 - `tsv_parse_<lang>_no_locations` — the span-only variant (drops per-node `loc`; Svelte also drops `name_loc`). CSS is byte-identical to `tsv_parse_css` (`parseCss` emits no `loc`). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
@@ -39,7 +39,7 @@ the C ABI, unlike `tsv format --goal` and `tsv_wasm`'s
 
 Plus `tsv_free(ptr, len)` for deallocation.
 
-All return-pointer functions share the signature `(source_ptr: *const u8, source_len: usize, out_len: *mut usize) -> *mut u8`.
+All return-pointer functions share the signature `(source_ptr: *const u8, source_len: usize, out_len: *mut usize) -> *mut u8` — except the three goal-aware TypeScript exports (`tsv_parse_typescript_with_goal` / `tsv_parse_typescript_no_locations_with_goal` / `tsv_parse_internal_typescript_with_goal`), which take a fourth `goal: u32` parameter before `out_len`.
 
 ## Memory & Safety Contract
 

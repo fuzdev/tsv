@@ -1,6 +1,10 @@
 /**
  * Publish the staged N-API npm packages — the release workflow's publish step,
- * also runnable locally with `--dry-run`.
+ * also runnable locally with `--dry-run` (`deno task publish:napi --dry-run` — no
+ * `--` separator; deno task forwards it literally and parseArgs rejects it). A
+ * local run stages only the HOST platform package, so it deliberately ends at
+ * the partial-set refusal below: staging + the refusal logic proven, nothing
+ * published. The full-set rehearsal is the release workflow's dispatch dry run.
  *
  * Reads `crates/tsv_napi/pkg/`: the loader (`pkg/napi/`) plus every platform
  * package its generated `optionalDependencies` name (the loader package.json

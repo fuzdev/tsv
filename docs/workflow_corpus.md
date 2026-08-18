@@ -56,10 +56,10 @@ deno task corpus:compare:format:run --all --exit-on-first
 
 ```bash
 # Detailed diff for the file
-cargo run -p tsv_debug compare ~/dev/zzz/src/path/to/file.svelte
+cargo run -p tsv_debug compare ../zzz/src/path/to/file.svelte
 
 # Check if the divergence detector recognizes it
-deno task corpus:compare:format:run ~/dev/zzz --explain --exit-on-first
+deno task corpus:compare:format:run ../zzz --explain --exit-on-first
 ```
 
 Read `docs/conformance_prettier.md` plus the catalog for the language you're triaging (its
@@ -171,18 +171,18 @@ DISCOVER → CATEGORIZE → CHECK FIXTURES → CREATE FIXTURE (if missing) → I
 
 ```bash
 # Full comparison - builds FFI first (all languages)
-deno task corpus:compare:format ~/dev/zzz
+deno task corpus:compare:format ../zzz
 
 # Filtered by language
-deno task corpus:compare:format ~/dev/zzz --filter svelte
-deno task corpus:compare:format ~/dev/zzz --filter typescript
-deno task corpus:compare:format ~/dev/zzz --filter css
+deno task corpus:compare:format ../zzz --filter svelte
+deno task corpus:compare:format ../zzz --filter typescript
+deno task corpus:compare:format ../zzz --filter css
 
 # Verbose mode (see each file as processed)
-deno task corpus:compare:format ~/dev/zzz --verbose
+deno task corpus:compare:format ../zzz --verbose
 
 # Skip rebuild (if FFI already up-to-date)
-deno task corpus:compare:format:run ~/dev/zzz
+deno task corpus:compare:format:run ../zzz
 
 # Machine-readable: single JSON report on stdout (stats + safety/partial/unknown/
 # error lists), human output on stderr. Combine with --all / --safety-only / --filter.
@@ -240,7 +240,7 @@ The default output shows every unexplained diff — partial file hunks and full 
 deno task corpus:compare:format --all
 
 # Single project
-deno task corpus:compare:format ~/dev/zzz
+deno task corpus:compare:format ../zzz
 
 # Compact output without diffs
 deno task corpus:compare:format --all --summary
@@ -254,7 +254,7 @@ This replaces manually running `cargo run -p tsv_debug compare <file>` on each u
 
 ```bash
 # Use --explain to also list known divergences with their patterns
-deno task corpus:compare:format ~/dev/zzz --explain
+deno task corpus:compare:format ../zzz --explain
 
 # Check the conformance docs for detailed rationale (frame + the language's catalog)
 cat docs/conformance_prettier.md docs/conformance_prettier_svelte.md
@@ -482,7 +482,7 @@ Once the fix works, add the normalization variants — both formatters must redu
 ### Re-run Corpus Comparison
 
 ```bash
-deno task corpus:compare:format ~/dev/zzz --filter [language]
+deno task corpus:compare:format ../zzz --filter [language]
 ```
 
 Confirm:

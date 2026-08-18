@@ -31,6 +31,15 @@ not here. This crate stays AST-agnostic.
   validator (the hyphen-tail run) — one source of truth for the ranges.
 - **Whitespace** (`whitespace.rs`): `preserves_whitespace` (`<pre>`,
   `<textarea>`).
+- **Compiler whitespace removal** (`elements.rs`): `collapses_child_whitespace`
+  — whether inter-sibling whitespace inside an element is removed **entirely**
+  by Svelte's compiler (`clean_nodes` `can_remove_entirely`) rather than
+  collapsed to a rendered space; the exact Svelte set, a deliberate subset of
+  what HTML collapses. A different question from `preserves_whitespace`.
+- **Optional end tags** (`elements.rs`): `closing_tag_omitted(current, next)`
+  — whether `current`'s end tag is implicitly omitted (auto-closed) when
+  `next` follows; mirrors Svelte's `closing_tag_omitted` over the
+  optional-end-tag table (`<li>`, `<p>`, table parts, …).
 - **Entity decoding** (`entities.rs`): `decode_character_references` —
   named, decimal, and hex (lower- and uppercase) character references
   with HTML5 attribute-context rules and Windows-1252 / surrogate

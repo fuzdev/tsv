@@ -1,0 +1,190 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 292,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 100,
+					"end": 116,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 100,
+							"end": 116,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 100,
+											"end": 116,
+											"name": "data-attr1",
+											"matcher": "=",
+											"value": "x\\'",
+											"flags": null
+										}
+									],
+									"start": 100,
+									"end": 116
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 117,
+					"end": 135,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 121,
+							"end": 131,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 100,
+				"end": 135
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 138,
+					"end": 154,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 138,
+							"end": 154,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 138,
+											"end": 154,
+											"name": "data-attr2",
+											"matcher": "=",
+											"value": "x\\\"",
+											"flags": null
+										}
+									],
+									"start": 138,
+									"end": 154
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 155,
+					"end": 174,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 159,
+							"end": 170,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 138,
+				"end": 174
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 243,
+					"end": 262,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 243,
+							"end": 262,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 243,
+											"end": 262,
+											"name": "data-attr3",
+											"matcher": "=",
+											"value": "x\\27",
+											"flags": null
+										}
+									],
+									"start": 243,
+									"end": 262
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 263,
+					"end": 283,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 267,
+							"end": 279,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 243,
+				"end": 283
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " bare value whose escape encodes a quote stays bare (quoting would need re-escaping) ",
+				"start": 9,
+				"end": 98
+			},
+			{
+				"type": "CSSComment",
+				"value": " bare value with a hex escape: quoted, escape kept verbatim ",
+				"start": 177,
+				"end": 241
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 284,
+			"styles": "\n\t/* bare value whose escape encodes a quote stays bare (quoting would need re-escaping) */\n\t[data-attr1=x\\'] {\n\t\tcolor: red;\n\t}\n\n\t[data-attr2=x\\\"] {\n\t\tcolor: blue;\n\t}\n\n\t/* bare value with a hex escape: quoted, escape kept verbatim */\n\t[data-attr3='x\\27'] {\n\t\tcolor: green;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 293,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -40,6 +40,7 @@ pub use tsv_lang::{ParseError, Result};
 /// `arena` owns every AST node of the returned [`CssStyleSheet`]
 /// (caller-owns-`Bump`); the stylesheet borrows from it for `'arena`.
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssStyleSheet<'arena>> {
+    ParseError::ensure_source_fits(source)?;
     parser::parse_css(source, 0, arena).map_err(|e| e.with_context(source))
 }
 

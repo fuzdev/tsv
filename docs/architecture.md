@@ -10,7 +10,7 @@ This inverts the typical approach where JSON compatibility drives AST design.
 
 **Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv_format_wasm` is the current yardstick—it's the most-developed and first-shipped artifact—but it holds no long-term primacy; `@fuzdev/tsv_parse_wasm`, the CLI, and the native N-API binding count just as much as they mature. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
 
-**Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. Only the two native binding crates relax it, each to the weakest level that compiles: `tsv_ffi` to `"allow"`, since the crate *is* the C ABI boundary and hand-writes the raw-pointer work; `tsv_napi` to `"deny"`, because it hand-writes no unsafe at all and `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` — enough to override `deny`, so every other site in that crate stays a compile error. (Neither can inherit `forbid`, which no inner `allow` may override; `tests/lint_parity.rs` pins both relaxations and guards the hand-mirrored tables against drift.) Combined with a single-digit core-library dependency set (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml`, whose externals are the nine library crates plus the CLI/debug-only `argh`/`tokio`/`futures-util`; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)), the attack surface and audit burden stay minimal.
+**Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. Only the two native binding crates relax it, each to the weakest level that compiles: `tsv_ffi` to `"allow"`, since the crate *is* the C ABI boundary and hand-writes the raw-pointer work; `tsv_napi` to `"deny"`, because it hand-writes no unsafe at all and `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` — enough to override `deny`, so every other site in that crate stays a compile error. (Neither can inherit `forbid`, which no inner `allow` may override; `tests/lint_parity.rs` pins both relaxations and guards the hand-mirrored tables against drift.) Combined with a deliberately small dependency set (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml`, whose externals are the twelve library/binding crates — the `napi`/`napi-derive`/`napi-build` trio being the N-API carve-out — plus the CLI/debug-only `argh`/`tokio`/`futures-util`; the wasm32-only `talc` allocator lives in `tsv_wasm`'s own manifest; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)), the attack surface and audit burden stay minimal.
 
 ## Two-AST Design
 
@@ -271,11 +271,11 @@ scope-matched against `oxfmt` and `oxc-parser`. Third-party
 Rust consumers that only need parse/format can follow the same pattern:
 
 ```toml
-# Minimal: parse + format only
-tsv_ts = { version = "0.1", default-features = false }
+# Minimal: parse + format only (source-level consumption — tsv is not on crates.io)
+tsv_ts = { git = "https://github.com/fuzdev/tsv", default-features = false }
 
 # Full: also build the wire-JSON parse output (`convert_ast_json*`)
-tsv_ts = { version = "0.1", features = ["convert"] }
+tsv_ts = { git = "https://github.com/fuzdev/tsv", features = ["convert"] }
 ```
 
 ## Foundation Crate (tsv_lang)
@@ -317,7 +317,7 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 - Doc builder (shared: Yes, should-be: Yes) — Core formatting engine — the largest tsv_lang module, single renderer everywhere
 - Comment model (shared: Yes, should-be: Yes) — Detached model with O(log n) lookup, classification, batch helpers
 - Width / indent (shared: Yes, should-be: Yes) — Hardcoded as `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts in `tsv_lang::config`
-- EmbedContext (shared: Yes, should-be: Yes) — Embedding knobs (base_indent_offset, first_line_offset, suffix_width, mode)
+- EmbedContext (shared: Yes, should-be: Yes) — Embedding state (base_indent_offset, first_line_offset, suffix_width, mode, jsdoc_cast_cannot_hang, root_sequence_indents)
 - String formatting (shared: Yes, should-be: Yes) — Quote selection, escape swapping, visual width
 - Error types (shared: Yes, should-be: Yes) — ParseError with context enrichment
 - Position tracking (shared: Yes, should-be: Yes) — Span (u32), LocationTracker
@@ -627,17 +627,20 @@ raw cache of the printed text.
 
 ## Comment Handling
 
-Comments are stored **separately from AST nodes** in a flat `Vec<Comment>` at each root level (`Program.comments`, `CssStyleSheet.comments`, `Root.comments`). This is the "detached model" used by prettier.
+Comments are stored **separately from AST nodes** in a flat comment array at each root level (`Program.comments` — an arena slice `&'arena [Comment]`; `CssStyleSheet.comments` and `Root.comments` — `Vec<Comment>`). This is the "detached model" used by prettier.
 
 ### Core Type
 
 ```rust
 pub struct Comment {
-    pub content_span: Span,        // content WITHOUT delimiters; text via content(source)
-    pub is_block: bool,            // true for /* */, false for //
-    pub multiline: bool,           // content contains '\n' (precomputed; block-only in practice)
-    pub span: Span,                // full comment span, delimiters included
-    pub emit_character_field: bool, // Serializer hint: include `character` in JSON loc
+    pub content_span: Span,          // content WITHOUT delimiters; text via content(source)
+    pub is_block: bool,              // true for /* */ or <!-- -->, false for //
+    pub multiline: bool,             // content contains '\n' (precomputed; block-only in practice)
+    pub span: Span,                  // full comment span, delimiters included
+    pub emit_character_field: bool,  // Serializer hint: include `character` in JSON loc
+    pub bump_pattern_columns: bool,  // Serializer hint: Svelte block-pattern column shift
+    pub owned_by_node: bool,         // bound to the token after it; printed by that node,
+                                     // not the enclosing gap (see docs/comments.md)
 }
 ```
 

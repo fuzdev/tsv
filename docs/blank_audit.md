@@ -132,7 +132,7 @@ deno task blanks:audit           # the gate: tests/fixtures, ~30 s
 deno task blanks:audit:update    # regenerate BOTH snapshots (bug shapes + absorb pin)
 
 # Directly, against a real codebase — where the real yield is:
-cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits blank_audit ../zzz/src
 ```
 
 Build with **`--profile corpus`** (optimized + `panic = "unwind"`). Plain `--release` is

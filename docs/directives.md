@@ -38,17 +38,23 @@ TypeScript, `/* … */` in CSS, and `<!-- … -->` in Svelte templates.
 
 ### Placement
 
-Where the comment sits decides what it freezes. The rule is total and has no
+Where the comment sits decides what it freezes. In TypeScript/JS and CSS —
+where a comment is trivia attached to a line — the rule is line-based, with no
 exceptions:
 
 - **On its own line** (the only thing on its line, whitespace aside): the
   directive freezes the construct that follows it.
 - **Anywhere else it is inert.** A directive sharing its line with anything
-  else — trailing a statement, a list member, a separator, an opening `{`
-  (`function f() { // format-ignore`), or a declaration head
+  else — trailing a statement, a rule's `}`, a list member, a separator, an
+  opening `{` (`function f() { // format-ignore`), or a declaration head
   (`type A = // format-ignore`), or glued directly before a value
   (`let v: /* format-ignore */ {…}`) — is an ordinary comment: the surrounding
   code formats normally.
+
+In a **Svelte template**, a `<!-- format-ignore -->` is a *node*, not
+line-attached trivia, so the line test doesn't apply: a directive comment node
+freezes the next sibling node wherever it was authored, and the formatter puts
+the directive on its own line — the output always reads as the own-line form.
 
 To freeze a construct, put the directive alone on the line above it.
 

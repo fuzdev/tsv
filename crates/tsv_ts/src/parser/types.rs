@@ -333,8 +333,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 let argument = self.parse_number_or_bigint_literal()?;
                 let num_end = self.current_pos().1;
-                // TODO should this be used?
-                let _is_bigint = matches!(argument.value, LiteralValue::BigInt);
                 self.advance()?;
 
                 let unary = UnaryExpression {

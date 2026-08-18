@@ -69,8 +69,12 @@ type BumpLevel = 'patch' | 'minor' | 'major';
 const SENTINEL_PATH = '.publish-in-progress';
 const CARGO_PATH = 'Cargo.toml';
 const CHANGELOG_PATH = 'CHANGELOG.md';
-// Match version under [workspace.package] to avoid clobbering dependency versions
-const workspace_pkg_re = /(\[workspace\.package\][\s\S]*?^version\s*=\s*)"([^"]*)"/m;
+// Match version under [workspace.package] to avoid clobbering dependency versions.
+// `[^[]*?` bounds the scan to the section (stops at the next `[` heading), so a
+// missing `version` key can never make the rewrite land on a later section's line;
+// `^version` (multiline) skips a `rust-version = "..."` MSRV pin. Same grammar as
+// bench.ts's and build_napi_packages.ts's read-only forms.
+const workspace_pkg_re = /(\[workspace\.package\][^[]*?^version\s*=\s*)"([^"]*)"/m;
 
 /** The `<!-- bump: <level> -->` marker, recognized ONLY on the line directly
  * after the `## Unreleased` heading — the exact position `stamp_changelog`'s
@@ -167,19 +171,38 @@ if (branch === 'main') {
 	}
 }
 
-// Git cleanliness — skipped in retry mode (the bump left changes behind)
-if (retry_mode) {
-	console.log(`  Sentinel detected at v${version_before} — skipping git cleanliness check (retry)`);
-} else {
+// Git cleanliness. A retry legitimately carries the bump's own edits
+// (`release_files`) but nothing else: a source fix made between attempts would
+// publish without landing in the release commit — and since the pushed tag
+// builds the native set, the wasm and napi artifacts would be built from
+// different source. Commit the fix, then re-run `--wetrun` to resume.
+{
 	const git_status = capture('git', ['status', '--porcelain']);
 	if (!git_status.success) {
 		console.error('  FAIL: git status failed');
 		Deno.exit(1);
 	}
-	const uncommitted = git_status.stdout;
-	if (uncommitted) {
+	const status_lines = git_status.stdout ? git_status.stdout.split('\n') : [];
+	if (retry_mode) {
+		console.log(
+			`  Sentinel detected at v${version_before} — resuming (release-file edits expected)`
+		);
+		const outside_release = status_lines.filter((line) => {
+			const path_part = line.slice(3);
+			return path_part.split(' -> ').some((p) => !release_files.includes(p));
+		});
+		if (outside_release.length > 0) {
+			console.error('  FAIL: uncommitted changes outside the release files on a resume:');
+			for (const line of outside_release) {
+				console.error(`    ${line}`);
+			}
+			console.error('  Commit them first, then re-run --wetrun — a resumed publish must build');
+			console.error('  exactly what the release commit and tag will contain.');
+			Deno.exit(1);
+		}
+	} else if (status_lines.length > 0) {
 		console.warn('  WARN: uncommitted changes in worktree:');
-		for (const line of uncommitted.split('\n')) {
+		for (const line of status_lines) {
 			console.warn(`    ${line}`);
 		}
 		if (wetrun) {
@@ -326,8 +349,10 @@ if (no_check) {
 // alongside Step 3.
 //
 // The gates need the ../svelte + ../acorn-typescript + ../typescript +
-// ../test262 checkouts and the benches/js `node_modules` sidecar (`deno task
-// bench:install`). The probe must cover every oracle the aggregate's legs need
+// ../test262 checkouts, the corpus legs' pinned repos (../prettier,
+// ../prettier-plugin-svelte, ../kit, ../svelte.dev — DevReposLoader fails fast
+// on a missing non-optional entry), and the benches/js `node_modules` sidecar
+// (`deno task bench:install`). The probe must cover every oracle the aggregate's legs need
 // — the gates themselves fail closed on a missing checkout, so the probe is the
 // ONE tolerance point: a dry-run warn-and-skips (clean machines can still
 // validate), but a --wetrun BLOCKS — releasing with the gates never run
@@ -344,6 +369,10 @@ if (no_check) {
 		exists('../acorn-typescript/test') ? null : '../acorn-typescript checkout',
 		exists('../typescript/tests') ? null : '../typescript checkout',
 		exists('../test262/test') ? null : '../test262 checkout',
+		exists('../prettier/tests/format') ? null : '../prettier checkout',
+		exists('../prettier-plugin-svelte/test') ? null : '../prettier-plugin-svelte checkout',
+		exists('../kit/packages/kit/src') ? null : '../kit checkout',
+		exists('../svelte.dev/apps/svelte.dev/src') ? null : '../svelte.dev checkout',
 		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)'
 	].filter((m): m is string => m !== null);
 	if (missing.length > 0 && wetrun) {
@@ -365,7 +394,7 @@ if (no_check) {
 			['task', 'conformance:all'],
 			undefined,
 			'  Conformance gate failed. If it was a corpus:compare:format SAFETY hit, re-run\n' +
-				'  `deno task corpus:compare:format ~/dev/<that-repo>` on the single repo to rule out\n' +
+				'  `deno task corpus:compare:format ../<that-repo>` on the single repo to rule out\n' +
 				'  the known --all FFI heisenbug (benches/js/CLAUDE.md §Known Issues) before treating\n' +
 				'  it as a real regression. A conformance:test262 GATE FAIL is a real positive-parse\n' +
 				'  regression (or a deliberate test262 pull needing a POSITIVE_PASSED_PIN re-pin).'

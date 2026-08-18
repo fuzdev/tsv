@@ -40,7 +40,7 @@ use std::collections::HashSet;
 
 use tsv_css::ast::internal::{
     AttributeMatcher, Combinator, ComplexSelector, CssAtrule, CssBlockChild, CssDeclaration,
-    CssNode, CssRule, PseudoClassArgs, RelativeSelector, SimpleSelector,
+    CssNode, CssRule, PseudoClassArgs, RelativeSelector, SimpleSelector, attribute_value_text,
 };
 use tsv_lang::Span;
 use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
@@ -903,7 +903,7 @@ fn parse_plain_compound(
                 namespace: None,
                 name_span,
                 matcher,
-                value,
+                value_span,
                 flags,
                 ..
             } => {
@@ -914,13 +914,16 @@ fn parse_plain_compound(
                 let case_insensitive = flags_has(*flags, 'i')
                     || (!flags_has(*flags, 's')
                         && HTML_CASE_INSENSITIVE_ATTRIBUTES.contains(&name_lower.as_str()));
-                let value = match value {
-                    Some(v) => {
+                let value = match value_span {
+                    Some(s) => {
+                        // Same text the wire emits: quote-stripped, escapes still
+                        // encoded — so an escaped value refuses like an escaped name.
+                        let v = attribute_value_text(source, *s);
                         refuse_if_escaped(v)?;
                         if case_insensitive {
                             refuse_if_non_ascii(v)?;
                         }
-                        Some((*v).to_string())
+                        Some(v.to_string())
                     }
                     None => None,
                 };

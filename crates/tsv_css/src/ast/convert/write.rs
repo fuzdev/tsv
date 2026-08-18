@@ -537,13 +537,15 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             namespace,
             name_span,
             matcher,
-            value,
+            value_span,
             flags,
             span,
         } => {
             let name = raw_selector_name(ctx.source, *name_span, 0);
             let matcher = *matcher;
-            let value = *value;
+            // Svelte's `value` is the raw token with a string's quotes stripped —
+            // escapes stay encoded (`[a=x\27]` → `x\27`), so no decode here.
+            let value = value_span.map(|s| internal::attribute_value_text(ctx.source, s));
             let flags = *flags;
             let namespace = *namespace;
             w.raw("{\"type\":\"AttributeSelector\",\"start\":");

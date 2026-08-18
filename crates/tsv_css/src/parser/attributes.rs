@@ -65,7 +65,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
                 parser.skip_whitespace()?;
 
                 // Parse value (identifier or string)
-                let value = parse_attribute_value(parser)?;
+                let value_span = parse_attribute_value(parser)?;
 
                 let flags = parse_attribute_flags(parser)?;
 
@@ -76,7 +76,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
                     namespace: None,
                     name_span: maybe_namespace_span,
                     matcher: Some(AttributeMatcher::DashMatch),
-                    value,
+                    value_span,
                     flags,
                     span: Span {
                         start: start as u32,
@@ -91,7 +91,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
             // It's the attribute name (no namespace) — use its captured span; the decoded
             // `maybe_namespace` is unused here (the name is recovered from source).
 
-            let (matcher, value) = parse_attribute_matcher_and_value(parser)?;
+            let (matcher, value_span) = parse_attribute_matcher_and_value(parser)?;
             let flags = parse_attribute_flags(parser)?;
 
             // Expect ] and capture its end position
@@ -101,7 +101,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
                 namespace: None, // No namespace prefix (implicit)
                 name_span: maybe_namespace_span,
                 matcher,
-                value,
+                value_span,
                 flags,
                 span: Span {
                     start: start as u32,
@@ -128,7 +128,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
     parser.advance()?;
     parser.skip_whitespace()?;
 
-    let (matcher, value) = parse_attribute_matcher_and_value(parser)?;
+    let (matcher, value_span) = parse_attribute_matcher_and_value(parser)?;
     let flags = parse_attribute_flags(parser)?;
 
     // Expect ] and capture its end position
@@ -138,7 +138,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
         namespace,
         name_span,
         matcher,
-        value,
+        value_span,
         flags,
         span: Span {
             start: start as u32,
@@ -150,9 +150,9 @@ pub(crate) fn parse_attribute_selector<'arena>(
 /// Parse the optional matcher + value that may follow an attribute name: a
 /// closing `]` immediately yields `(None, None)` (bare `[attr]`); otherwise a
 /// matcher (`=`, `~=`, `|=`, `^=`, `$=`, `*=`) and its value.
-fn parse_attribute_matcher_and_value<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<(Option<AttributeMatcher>, Option<&'arena str>), ParseError> {
+fn parse_attribute_matcher_and_value(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<(Option<AttributeMatcher>, Option<Span>), ParseError> {
     if parser.check(TokenKind::RightBracket) {
         Ok((None, None)) // Just [attr]
     } else {
@@ -185,29 +185,23 @@ fn parse_attribute_flags<'arena>(
     }
 }
 
-/// Parse an attribute selector's value (identifier or string), copying the
-/// content (quotes stripped for strings) into the arena. Advances past the
-/// value token and trailing whitespace.
-fn parse_attribute_value<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<Option<&'arena str>, ParseError> {
-    let value =
-        match &parser.current_kind {
-            // Internal AST: use decoded value (spec-compliant)
-            TokenKind::Identifier => Some(parser.current_identifier_in_arena()),
-            TokenKind::String { .. } => {
-                // Extract content without quotes
-                Some(parser.alloc_str_in(
-                    &parser.source()[parser.current_start + 1..parser.current_end - 1],
-                ))
-            }
-            _ => {
-                return Err(parser.error_expected("attribute value"));
-            }
-        };
+/// Parse an attribute selector's value (identifier or string), recording the raw
+/// token span (a string keeps its quotes, an identifier its escapes — the wire
+/// derives its quote-stripped text via `attribute_value_text`, matching Svelte's
+/// undecoded `value`). Advances past the value token and trailing whitespace.
+fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
+    let span = match &parser.current_kind {
+        TokenKind::Identifier | TokenKind::String { .. } => Span {
+            start: parser.span_pos(parser.current_start),
+            end: parser.span_pos(parser.current_end),
+        },
+        _ => {
+            return Err(parser.error_expected("attribute value"));
+        }
+    };
     parser.advance()?;
     parser.skip_whitespace()?;
-    Ok(value)
+    Ok(Some(span))
 }
 
 /// Parse attribute matcher: =, ~=, |=, ^=, $=, *=

@@ -55,13 +55,9 @@ pub fn swap_quote_escaping(content: &str, old_quote: char, new_quote: char) -> S
                     // Unescape old quote: \' → ' or \" → "
                     chars.next();
                     result.push(old_quote);
-                } else if next == new_quote {
-                    // Keep already-escaped new quote as-is: \" stays \" or \' stays \'
-                    chars.next();
-                    result.push('\\');
-                    result.push(new_quote);
                 } else {
-                    // Keep all other escapes as-is: \n, \t, \\, \u{...}, etc.
+                    // Keep every other escape as-is — an already-escaped new quote
+                    // (`\"` staying `\"`) included: \n, \t, \\, \u{...}, etc.
                     chars.next();
                     result.push('\\');
                     result.push(next);

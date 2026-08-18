@@ -1,0 +1,352 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 534,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 91,
+					"end": 110,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 91,
+							"end": 110,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 91,
+											"end": 110,
+											"name": "data-attr1",
+											"matcher": "=",
+											"value": "it's",
+											"flags": null
+										}
+									],
+									"start": 91,
+									"end": 110
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 111,
+					"end": 129,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 115,
+							"end": 125,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 91,
+				"end": 129
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 132,
+					"end": 155,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 132,
+							"end": 155,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 132,
+											"end": 155,
+											"name": "data-attr2",
+											"matcher": "=",
+											"value": "say \"hi\"",
+											"flags": null
+										}
+									],
+									"start": 132,
+									"end": 155
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 156,
+					"end": 175,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 160,
+							"end": 171,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 132,
+				"end": 175
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 267,
+					"end": 288,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 267,
+							"end": 288,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 267,
+											"end": 288,
+											"name": "data-attr3",
+											"matcher": "=",
+											"value": "a\\'b\"c",
+											"flags": null
+										}
+									],
+									"start": 267,
+									"end": 288
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 289,
+					"end": 309,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 293,
+							"end": 305,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 267,
+				"end": 309
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 352,
+					"end": 368,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 352,
+							"end": 368,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 352,
+											"end": 368,
+											"name": "data-attr4",
+											"matcher": "=",
+											"value": "\"",
+											"flags": null
+										}
+									],
+									"start": 352,
+									"end": 368
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 369,
+					"end": 390,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 373,
+							"end": 386,
+							"property": "color",
+							"value": "purple"
+						}
+					]
+				},
+				"start": 352,
+				"end": 390
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 393,
+					"end": 409,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 393,
+							"end": 409,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 393,
+											"end": 409,
+											"name": "data-attr5",
+											"matcher": "=",
+											"value": "'",
+											"flags": null
+										}
+									],
+									"start": 393,
+									"end": 409
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 410,
+					"end": 431,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 414,
+							"end": 427,
+							"property": "color",
+							"value": "orange"
+						}
+					]
+				},
+				"start": 393,
+				"end": 431
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 485,
+					"end": 505,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 485,
+							"end": 505,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 485,
+											"end": 505,
+											"name": "data-attr6",
+											"matcher": "=",
+											"value": "\\27 x",
+											"flags": null
+										}
+									],
+									"start": 485,
+									"end": 505
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 506,
+					"end": 525,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 510,
+							"end": 521,
+							"property": "color",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 485,
+				"end": 525
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " value contains the other quote kind: delimiter preserved to avoid escaping ",
+				"start": 9,
+				"end": 89
+			},
+			{
+				"type": "CSSComment",
+				"value": " tie: both quote kinds inside — preferred single wins, its own occurrences escaped ",
+				"start": 178,
+				"end": 265
+			},
+			{
+				"type": "CSSComment",
+				"value": " only the delimiter itself inside ",
+				"start": 312,
+				"end": 350
+			},
+			{
+				"type": "CSSComment",
+				"value": " hex escape in a string value stays verbatim ",
+				"start": 434,
+				"end": 483
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 526,
+			"styles": "\n\t/* value contains the other quote kind: delimiter preserved to avoid escaping */\n\t[data-attr1=\"it's\"] {\n\t\tcolor: red;\n\t}\n\n\t[data-attr2='say \"hi\"'] {\n\t\tcolor: blue;\n\t}\n\n\t/* tie: both quote kinds inside — preferred single wins, its own occurrences escaped */\n\t[data-attr3='a\\'b\"c'] {\n\t\tcolor: green;\n\t}\n\n\t/* only the delimiter itself inside */\n\t[data-attr4='\"'] {\n\t\tcolor: purple;\n\t}\n\n\t[data-attr5=\"'\"] {\n\t\tcolor: orange;\n\t}\n\n\t/* hex escape in a string value stays verbatim */\n\t[data-attr6='\\27 x'] {\n\t\tcolor: gray;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 535,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

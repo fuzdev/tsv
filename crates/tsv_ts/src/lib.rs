@@ -116,6 +116,7 @@ fn make_doc_printer<'a>(
 /// let ast = tsv_ts::parse("const x = 42;", &arena)?;
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
+    ParseError::ensure_source_fits(source)?;
     parser::parse_typescript(source, arena).map_err(|e| e.with_context(source))
 }
 
@@ -131,6 +132,7 @@ pub fn parse_with_goal<'arena>(
     goal: Goal,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
+    ParseError::ensure_source_fits(source)?;
     parser::parse_typescript_with_goal(source, goal, arena).map_err(|e| e.with_context(source))
 }
 
@@ -145,6 +147,7 @@ pub fn parse_preserve_parens<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
+    ParseError::ensure_source_fits(source)?;
     parser::parse_typescript_preserve_parens(source, arena).map_err(|e| e.with_context(source))
 }
 

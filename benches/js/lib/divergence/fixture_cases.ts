@@ -101,7 +101,7 @@ export interface FixtureIo {
 }
 
 /** The real filesystem, rooted at `tests/fixtures/`. */
-export const disk_io: FixtureIo = {
+const disk_io: FixtureIo = {
 	list: async (fixture_path) => {
 		const names: string[] = [];
 		try {

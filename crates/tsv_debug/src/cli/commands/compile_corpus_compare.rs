@@ -76,7 +76,7 @@ mod ratchet;
 ///
 /// ⚠️ A **separate invocation** from the ordinary corpus run, never extra roots on it:
 /// these suites are ~2/3 deliberately-invalid input, so folding them in would corrupt
-/// the arc's `parity / achievable` reporting. Safe by construction — [`Report::build`]
+/// the parity run's `parity / achievable` reporting. Safe by construction — [`Report::build`]
 /// and [`Report::target_set`] are pure functions of the per-call outcomes slice, with no
 /// statics and no cross-invocation state. See the [`ratchet`] module docs.
 #[derive(FromArgs, Debug)]

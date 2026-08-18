@@ -2,13 +2,13 @@
  * Corpus comparison tool - compares our formatting against Prettier's on arbitrary codebases.
  *
  * Usage:
- *   deno task corpus:compare:format ~/dev/some-project
- *   deno task corpus:compare:format ~/dev/some-project --filter svelte
- *   deno task corpus:compare:format ~/dev/some-project --limit 100
- *   deno task corpus:compare:format ~/dev/some-project --verbose
- *   deno task corpus:compare:format ~/dev/some-project --safety-only
- *   deno task corpus:compare:format ~/dev/some-project --explain
- *   deno task corpus:compare:format ~/dev/some-project --summary   # Compact output (no diffs)
+ *   deno task corpus:compare:format ../some-project
+ *   deno task corpus:compare:format ../some-project --filter svelte
+ *   deno task corpus:compare:format ../some-project --limit 100
+ *   deno task corpus:compare:format ../some-project --verbose
+ *   deno task corpus:compare:format ../some-project --safety-only
+ *   deno task corpus:compare:format ../some-project --explain
+ *   deno task corpus:compare:format ../some-project --summary   # Compact output (no diffs)
  *   deno task corpus:compare:format --all                          # All default corpus repos
  */
 
@@ -209,12 +209,12 @@ Options:
   --help            Show this help message
 
 Examples:
-  deno task corpus:compare:format ~/dev/my-project
-  deno task corpus:compare:format ~/dev/my-project --filter svelte
-  deno task corpus:compare:format ~/dev/my-project --limit 50 --verbose
-  deno task corpus:compare:format ~/dev/my-project --exit-on-first
-  deno task corpus:compare:format ~/dev/my-project --safety-only
-  deno task corpus:compare:format ~/dev/my-project --explain
+  deno task corpus:compare:format ../my-project
+  deno task corpus:compare:format ../my-project --filter svelte
+  deno task corpus:compare:format ../my-project --limit 50 --verbose
+  deno task corpus:compare:format ../my-project --exit-on-first
+  deno task corpus:compare:format ../my-project --safety-only
+  deno task corpus:compare:format ../my-project --explain
   deno task corpus:compare:format --all --audit-patterns
   deno task corpus:compare:format --all --summary
 `);

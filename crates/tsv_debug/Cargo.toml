@@ -16,9 +16,10 @@ path = "src/main.rs"
 # instrumentation branch in the render loop.
 swallow_check = ["tsv_lang/swallow_check"]
 # Opt-in: compiles tsv_lang's print-once comment ledger into this binary and enables the
-# `comment_audit` subcommand (the `comments:audit` deno task passes it). Off by default
-# for the same reason as `swallow_check` — a default build carries no registration in the
-# format entry points and no record hook in the printers' comment seams.
+# ledger-driven subcommands — `comment_audit`, `gap_audit`, `blank_audit`, `ignore_audit`
+# (the `comments:audit` / `gaps:audit` / `blanks:audit` / `ignore:audit` deno tasks pass
+# it). Off by default for the same reason as `swallow_check` — a default build carries no
+# registration in the format entry points and no record hook in the printers' comment seams.
 comment_check = [
 	"tsv_lang/comment_check",
 	"tsv_ts/comment_check",
@@ -31,8 +32,9 @@ comment_check = [
 # `swallow_check` — the record hooks sit in the chain printer's hot analysis
 # path. Without it, `buffer_sizes` reports its parse-time metrics only.
 buffer_stats = ["tsv_ts/buffer_stats"]
-# Umbrella that compiles both diagnostic seams into one binary and enables both
-# the `swallow_audit` and `comment_audit` subcommands. EVERY audit deno task passes
+# Umbrella that compiles both diagnostic seams into one binary and enables all five
+# gated subcommands: `swallow_audit` plus the ledger-driven `comment_audit` /
+# `gap_audit` / `blank_audit` / `ignore_audit`. EVERY audit deno task passes
 # `--features audits` under `--profile corpus` — including the ones that need neither
 # seam (`scan:audit`, `fanout:audit`, `conformance:audit`, `render:audit`) — so all of
 # them share ONE `corpus+audits` build instead of splitting the workspace into a

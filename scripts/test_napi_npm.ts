@@ -386,7 +386,7 @@ const run_cli = (args: Array<string>, stdin?: string) =>
 describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () => {
 	it('is wired as the package bin', () => {
 		const pkg = JSON.parse(readFileSync(join(dirname(bin_path), 'package.json'), 'utf8'));
-		assert.deepEqual(pkg.bin, { tsv: './bin.js' });
+		assert.deepEqual(pkg.bin, { tsv: 'bin.js' });
 	});
 
 	// The dispatch discriminator: argh's generated help carries a section

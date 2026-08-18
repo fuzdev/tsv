@@ -324,7 +324,11 @@ pkg.exports = {
 	}
 };
 if (variant === 'all') {
-	pkg.bin = { tsv: `./${cli_file}` };
+	// No `./` prefix: npm normalizes bin targets to bare relative paths at publish,
+	// and its change report words that normalization as the bin being "invalid and
+	// removed" (it isn't — the bin survives). Writing the normalized form avoids
+	// the scare warning on every publish.
+	pkg.bin = { tsv: cli_file };
 }
 pkg.files = [
 	'index.js',

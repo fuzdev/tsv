@@ -169,10 +169,10 @@ pub struct GapAuditCommand {
     #[argh(switch)]
     by_node: bool,
 
-    /// print the top-N by-(node, edge) clusters as a paste-ready MARKDOWN table for
-    /// TODO_GAPS §Status — the ranked emitter work-list Phase 1 reads fattest-first, kept
-    /// current without a hand-transcribe. Report-only (implies the record-time keying
-    /// `--by-node` uses); never touches the ratchet grade or the exit code
+    /// print the top-N by-(node, edge) clusters as a paste-ready MARKDOWN table — the
+    /// ranked emitter work-list, fattest-first, kept current without a hand-transcribe.
+    /// Report-only (implies the record-time keying `--by-node` uses); never touches the
+    /// ratchet grade or the exit code
     #[argh(switch)]
     rank: bool,
 

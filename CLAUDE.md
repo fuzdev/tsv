@@ -265,7 +265,7 @@ npm-only, three packages from one WASM crate:
 - `@fuzdev/tsv_parse_wasm` — parse only; bundles hand-maintained `tsv_ast.d.ts` (`crates/tsv_wasm/types/`) + the pure-JS `no-locations` line/column reconstruction helper (`crates/tsv_wasm/npm/locations.js` + `.d.ts`)
 - `@fuzdev/tsv_wasm` — full tool (both features); bundles the above and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` mirroring `tsv_cli`'s flags/exit codes; `node:util` `parseArgs`, zero deps, single-threaded)
 
-The **N-API set** — the bare `@fuzdev/tsv` loader + five `@fuzdev/tsv-<triple>` platform packages (see ./crates/tsv_napi/CLAUDE.md §The npm packages). Each platform package ships **two binaries**: the addon (`tsv_napi.node`, `napi` profile) and the real `tsv_cli` binary (`tsv`/`tsv.exe`, plain `release` profile), and the loader's `tsv` bin is a dispatcher (`bin.js`) that execs that binary — `npx tsv` on the native set IS the native CLI (real `--jobs`, parallel discovery), the esbuild/biome shape — falling back to the shared `cli.js` JS mirror (one source with `@fuzdev/tsv_wasm`, bound to the native engine via its own `./index.js` import). The set is staged by `deno task build:napi:packages` and publishes through the tag-triggered `.github/workflows/release_napi.yml`, **never** through the single-machine `scripts/publish.ts`. The v\* tag `publish.ts` pushes triggers the 5-target matrix: container-pinned builds of both binaries (glibc **2.28 floor** on the gnu rows via almalinux:8 — Node's own binary floor; musl in rust:alpine with `-crt-static` off), each gated by the measured glibc-floor / musl-purity checks over both artifacts, per-artifact size bounds (`deno task validate:napi`, tight like `validate:artifacts`), and the npm-shape test over the real artifacts (in node:alpine for musl); then an idempotent platforms-then-loader publish (`scripts/publish_napi.ts` — refuses partial sets, re-arms the CLI binaries' executable bit that artifact transport drops; `deno task publish:napi -- --dry-run` runs it locally). `workflow_dispatch` runs the whole matrix as a dry-run rehearsal by default (`dry_run=false` is the tagless recovery path), and a weekly cron force-dry-runs it as a rot watch. Auth is a granular `NPM_TOKEN` secret from the bootstrap releases (trusted publishing is only configurable on packages that already exist on the registry); switching the workflow to npm trusted publishing (OIDC) is the pending follow-up.
+The **N-API set** — the bare `@fuzdev/tsv` loader + five `@fuzdev/tsv-<triple>` platform packages (see ./crates/tsv_napi/CLAUDE.md §The npm packages). Each platform package ships **two binaries**: the addon (`tsv_napi.node`, `napi` profile) and the real `tsv_cli` binary (`tsv`/`tsv.exe`, plain `release` profile), and the loader's `tsv` bin is a dispatcher (`bin.js`) that execs that binary — `npx tsv` on the native set IS the native CLI (real `--jobs`, parallel discovery), the esbuild/biome shape — falling back to the shared `cli.js` JS mirror (one source with `@fuzdev/tsv_wasm`, bound to the native engine via its own `./index.js` import). The set is staged by `deno task build:napi:packages` and publishes through the tag-triggered `.github/workflows/release_napi.yml`, **never** through the single-machine `scripts/publish.ts`. The v\* tag `publish.ts` pushes triggers the 5-target matrix: container-pinned builds of both binaries (glibc **2.28 floor** on the gnu rows via almalinux:8 — Node's own binary floor; musl in rust:alpine with `-crt-static` off), each gated by the measured glibc-floor / musl-purity checks over both artifacts, per-artifact size bounds (`deno task validate:napi`, tight like `validate:artifacts`), and the npm-shape test over the real artifacts (in node:alpine for musl); then an idempotent platforms-then-loader publish (`scripts/publish_napi.ts` — refuses partial sets, re-arms the CLI binaries' executable bit that artifact transport drops; `deno task publish:napi --dry-run` runs it locally — no `--` separator, which deno task forwards literally and the script's `parseArgs` rejects — where a local run proves staging + the refusal logic and then **stops at the partial-set refusal by design**, since local staging holds only the host platform; the full-set rehearsal is the `workflow_dispatch` dry run). `workflow_dispatch` runs the whole matrix as a dry-run rehearsal by default (`dry_run=false` is the tagless recovery path), and a weekly cron force-dry-runs it as a rot watch. Auth is a granular `NPM_TOKEN` secret from the bootstrap releases (trusted publishing is only configurable on packages that already exist on the registry); switching the workflow to npm trusted publishing (OIDC) is the pending follow-up.
 
 A types-only `@fuzdev/tsv_ast` package is deferred — `import type` from `tsv_parse_wasm` is zero-runtime-cost; reconsider when a real consumer appears. The bare `@fuzdev/tsv` is **taken by the N-API set** above — tsv's native distribution ships under one name: the platform packages carry the `tsv_cli` binary beside the addon (un-PGO'd `release`, matching the benched artifact; PGO stays a deliberate future re-baseline).
 
@@ -296,7 +296,7 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 Compare formatting against Prettier, and parse output against the canonical parsers, on real codebases. Full runs enforce **pinned expected counts**: the format `--all` counts hold over the reproducible subset (version-pinned framework + prettier checkouts; live dev repos are a non-gating WARN, SAFETY still gates every file); parse `compared` counts + committed fixtures are live-growth minimums. See `benches/js/lib/gate_counts.ts` and ./docs/gate_counts.md.
 
 ```bash
-deno task corpus:compare:format ~/dev/some-project  # single project, or --all for the gates corpus (real repos + prettier suites)
+deno task corpus:compare:format ../some-project  # single project, or --all for the gates corpus (real repos + prettier suites)
 # Options: --explain (patterns matched), --summary (compact), --json (stats + safety/partial/unknown/error lists; logs → stderr)
 
 deno task corpus:compare:parse --all   # deep-diff parse ASTs vs acorn-typescript/svelte/parseCss
@@ -372,16 +372,16 @@ BENCH_FILTER=zzz BENCH_LIMIT=10 deno task bench:deno:run
 
 **Prerequisites**: `cargo install wasm-pack` + `deno task bench:install` once (the install needs npm/Node). Beyond that **Deno is the only hard dependency**; Node ≥ 22.18 (native TS type-stripping) for `bench:node`, Bun for `bench:bun` — the aggregate `bench` needs both and fails fast if either is missing.
 
-Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun), WASM, and alternatives (oxc-parser — an N-API row plus a separate wasm32-wasi row — oxfmt, biome-wasm, dprint-wasm — the engine `deno fmt` runs, TS/JS only — malva-wasm, dprint's CSS plugin over the same formatter host (CSS only, enforced by the plugin), `tsc` itself, parse-only and conformance-surface-only (the language's definition, not a peer: its parser is error-recovering, so an accept there means zero `parseDiagnostics`), yuku-parser, a Zig TS/JS parser shipped as both an N-API and a WASM binding, parse-only and payload-matched to oxc; its lazy `parse()` and error-tolerant parser are corrected for in `benches/js/lib/yuku.ts`, swc, parse-only over TS/JS on both surfaces (its own AST dialect, so oxc-class payload disclosure; `decorators` must be enabled explicitly and its goal axis is `isModule`), postcss, parse-only over CSS — the parser behind prettier's CSS printer, and the only kind available there since no Rust CSS parser exposes an AST to JS — and rsvelte's Svelte **parser** via its N-API addon, two rows on `parse/svelte` (plain, mechanism- *and* payload-matched to `tsv-json`, plus a `skipExpressionLoc` variant named for its option because that reduction is not tsv's), the first third-party engine on a surface that otherwise holds only the oracle and tsv itself). `rsvelte-fmt` (Svelte only) is a **coverage-only** row — an accept rate with no timing, since it ships no in-process API and a per-file subprocess row would rank process spawn rather than format work; its end-to-end CLI numbers live in the separate hyperfine comparison published on tsv.fuz.dev. See ./docs/benchmarks.md §Coverage-only rows. Results: `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime` field) + the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See ./benches/js/CLAUDE.md.
+Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun), WASM, and alternatives (oxc-parser — an N-API row plus a separate wasm32-wasi row — oxfmt, biome-wasm, dprint-wasm — the engine `deno fmt` runs, TS/JS only — malva-wasm, dprint's CSS plugin over the same formatter host (CSS only, enforced by the plugin), `tsc` itself, parse-only and conformance-surface-only (the language's definition, not a peer: its parser is error-recovering, so an accept there means zero `parseDiagnostics`), yuku-parser, a Zig TS/JS parser shipped as both an N-API and a WASM binding, parse-only and payload-matched to oxc; its lazy `parse()` and error-tolerant parser are corrected for in `benches/js/lib/yuku.ts`, swc, parse-only over TS/JS on both surfaces (its own AST dialect, so oxc-class payload disclosure; `decorators` must be enabled explicitly and its goal axis is `isModule`), postcss, parse-only over CSS — the parser behind prettier's CSS printer, and the only kind available there since no Rust CSS parser exposes an AST to JS — and rsvelte's Svelte **parser** via its N-API addon, two rows on `parse/svelte` (plain, mechanism- *and* payload-matched to `tsv-json`, plus a `skipExpressionLoc` variant named for its option because that reduction is not tsv's), the first third-party engine on a surface that otherwise holds only the oracle and tsv itself). `rsvelte-fmt` (Svelte only) is a **coverage-only** row — an accept rate with no timing, since it ships no in-process API and a per-file subprocess row would rank process spawn rather than format work; its end-to-end CLI numbers live in the separate hyperfine comparison published on tsv.fuz.dev. See ./docs/benchmarks.md §Coverage-only rows. Results: `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime` field) + the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ../tsv.fuz.dev. See ./benches/js/CLAUDE.md.
 
 ### Performance Profiling
 
 ```bash
-cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib        # profile a directory
+cargo run --release -p tsv_debug -- profile ../zzz/src/lib        # profile a directory
 cargo run --release -p tsv_debug -- profile file.ts --iterations 20  # more iterations
 # Also: --json (machine-readable)
 
-cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib   # parse vs wire-JSON write timing
+cargo run --release -p tsv_debug -- json_profile ../zzz/src/lib   # parse vs wire-JSON write timing
 
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
 ```
@@ -390,7 +390,7 @@ For function-level hotspots, use `perf` with the `profiling` cargo profile:
 
 ```bash
 cargo build --profile profiling -p tsv_debug
-perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ~/dev/zzz/src/lib
+perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ../zzz/src/lib
 perf report --stdio                              # function-level hotspots
 perf annotate --stdio -s fits_with_lookahead     # line-level within a function
 ```
@@ -533,7 +533,9 @@ sibling makes a precise, validated claim — `expected_ours.json` / `expected_sv
 multi-pass pins — the two chain pins, anchored at `output_prettier.*` and at
 `unformatted_ours_<suffix>.*` respectively),
 `prettier_nonconvergent.txt` / `prettier_rejects.txt` / `tsv_rejects.txt` (no-oracle
-markers), `unformatted_*` / `unformatted_ours_*` / `unformatted_prettier_*`
+markers), `goal` (parse-goal marker: the `.ts` input parses at `Goal::Script` on both
+sides — see `typescript/script_goal/*`), `unformatted_*` / `unformatted_ours_*` /
+`unformatted_prettier_*`
 (normalization variants), `input_invalid_*` (must fail both parsers). Per-file semantics
 and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 
@@ -747,11 +749,11 @@ deno task conformance:tsc-check:update  # re-pin the run's snapshot counts after
 **Performance Profiling Commands** (all pure Rust, no Deno — full reference: ./docs/performance.md):
 
 ```bash
-cargo run -p tsv_debug profile ~/dev/zzz/src/lib                    # parse vs format phase timing (--iterations, --json, --flow-stats)
-cargo run -p tsv_debug profile --bind ~/dev/zzz/src                 # parse vs lower+bind timing (TS-only) + peak RSS (§1)
-cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
-cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec sizing histograms (§8)
-cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
+cargo run -p tsv_debug profile ../zzz/src/lib                    # parse vs format phase timing (--iterations, --json, --flow-stats)
+cargo run -p tsv_debug profile --bind ../zzz/src                 # parse vs lower+bind timing (TS-only) + peak RSS (§1)
+cargo run --release -p tsv_debug -- json_profile ../zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
+cargo run -p tsv_debug buffer_sizes ../zzz/src ../gro/src     # printer SmallVec sizing histograms (§8)
+cargo run -p tsv_debug arena_stats ../zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile against the format wall (§9)
 ```
 
@@ -1056,6 +1058,7 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 - ./docs/benchmarks.md - benchmark fairness caveats, the implementation catalog, binary sizes, the canonical-oracle-pin ritual
 - ./docs/gate_counts.md - the pinned counts every graded gate and harvest enforces
 - ./docs/comments.md - the detached comment model: ownership, the three axes, hazards, emitters
+- ./docs/directives.md - the format-ignore directive family: placement, freeze scope, per-language behavior
 - ./docs/compile_tooling.md - the sidecar-dependent compiler harnesses: corpus compare, compile fuzz, erase census
 - ./docs/compile_validation_ratchet.md - the validation-suite ratchet: snapshot, kinds, verdict, triage
 - ./docs/typechecker.md - the experimental `tsv_check` typechecker (may never ship) + its on-demand tsgo-conformance harness

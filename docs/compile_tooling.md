@@ -47,7 +47,9 @@ None of these run in `deno task check` — they need the Deno sidecar, and that 
 # over-acceptance bucket plus the `target_set` object, so a bucket's population (and a slice's parity
 # estimate) is checkable.
 cargo run -p tsv_debug compile_corpus_compare <paths...>
-# Also: --list, --json.
+# Also: --list, --json, --census (the sole-blocker refusal census: per refusal class,
+# sole-blocker vs co-blocker counts over the oracle-accepted, tsv-refused files — the
+# re-pricing diagnostic for deciding which refusal class to take on; incompatible with --ratchet).
 ```
 
 ## Validation-Suite Ratchet (`compile:validation`)

@@ -91,7 +91,11 @@ const cli_artifact =
 	args['cli-artifact'] ?? `target/release/${Deno.build.os === 'windows' ? 'tsv.exe' : 'tsv'}`;
 
 const cargo_toml = Deno.readTextFileSync('Cargo.toml');
-const version = /\[workspace\.package\][^[]*?version = "([^"]+)"/.exec(cargo_toml)?.[1];
+// `^version` (multiline) avoids matching a `rust-version = "..."` MSRV pin — without it,
+// the lazy section scan would stamp the MSRV as the package version across all five
+// platform packages. `[^[]*?` bounds the search to the section (stops at the next `[`
+// heading). Same grammar as bench.ts's read and publish.ts's `workspace_pkg_re` rewrite.
+const version = /\[workspace\.package\][^[]*?^version\s*=\s*"([^"]+)"/m.exec(cargo_toml)?.[1];
 if (!version) throw new Error('workspace version not found in Cargo.toml');
 
 const write_pkg = (dir: string, pkg: Record<string, unknown>): void => {
@@ -165,7 +169,10 @@ write_pkg(loader_dir, {
 			default: './index.js'
 		}
 	},
-	bin: { tsv: './bin.js' },
+	// Bare relative path: npm normalizes `./bin.js` → `bin.js` at publish and words
+	// that normalization as the bin being "invalid and removed" (a false alarm) —
+	// write the normalized form so the publish log stays quiet.
+	bin: { tsv: 'bin.js' },
 	files: [
 		'index.js',
 		'index.d.ts',

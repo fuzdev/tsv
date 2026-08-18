@@ -50,6 +50,7 @@ use identifiers::{
 };
 use numbers::read_number;
 use strings::read_string;
+pub(crate) use strings::string_end;
 pub use token::{Token, TokenKind};
 // Shared lexer-error constructor: the scanner submodules reach it via `super::lex_err`.
 use tsv_lang::{ParseError, lex_err};
@@ -258,46 +259,15 @@ impl<'a> Lexer<'a> {
     /// (or EOF: an unterminated url-token is taken as-is; tsv doesn't model bad-url
     /// recovery) and returns the whole `url(...)` as one `TokenKind::Url`.
     fn consume_url_token(&mut self, url_start: u32) -> Option<Token> {
-        // Peek past `(` and any leading whitespace to classify the first content char.
         let after_paren = self.pos + 1; // `(` is one byte
-        let mut i = after_paren;
-        while let Some(ch) = self.source[i..].chars().next() {
-            if ch.is_whitespace() {
-                i += ch.len_utf8();
-            } else {
-                break;
-            }
-        }
         // A quote opens a string arg → `url("…")` is a function-token, not a url-token.
-        if matches!(self.source[i..].chars().next(), Some('"' | '\'')) {
+        if url_arg_is_quoted(self.source, after_paren) {
             return None;
         }
-        // Opaque scan from just inside `(` to the matching unescaped `)` (or EOF). The two
-        // scan targets, `\` and `)`, are ASCII, so neither can occur as a UTF-8
-        // continuation byte — a multi-byte code point's trailing bytes are all >= 0x80 and
-        // fall through the run, landing on the same `)` the former per-char decode found.
-        let bytes = self.source.as_bytes();
-        let len = bytes.len();
-        let mut j = after_paren;
-        loop {
-            while j < len && bytes[j] != b'\\' && bytes[j] != b')' {
-                j += 1;
-            }
-            if j >= len {
-                break; // EOF before `)` — unterminated; take what we have
-            }
-            if bytes[j] == b')' {
-                j += 1; // include the closing `)`
-                break;
-            }
-            // Escaped code point: the `\` and what it escapes are both content. Stepping
-            // one byte past the `\` is enough — the escaped char's continuation bytes can
-            // match neither target, so the run passes over them.
-            j += 1;
-            if j < len {
-                j += 1;
-            }
-        }
+        // Opaque scan from just inside `(` to one past the matching unescaped `)`. An
+        // unterminated url-token is taken as-is to EOF (tsv doesn't model bad-url
+        // recovery).
+        let j = url_token_close(self.source.as_bytes(), after_paren).unwrap_or(self.source.len());
         self.pos = j;
         Some(Token {
             kind: TokenKind::Url,
@@ -482,4 +452,50 @@ impl<'a> Lexer<'a> {
 #[inline]
 pub(crate) const fn is_ascii_css_whitespace(b: u8) -> bool {
     matches!(b, b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ')
+}
+
+/// Whether the `url(` opening just past `(` at `after_paren` takes a **quoted**
+/// argument — `url("…")` lexes as a function-token (ident + `(` + string), not a
+/// url-token (css-syntax §4.3.6's fork). Skips Unicode whitespace (`char::is_whitespace`,
+/// matching `parseCss`) before classifying the first content char. The single statement
+/// of the fork, shared by `Lexer::consume_url_token` and `decl_scan::url_token_end`
+/// (the second reader of this grammar).
+pub(crate) fn url_arg_is_quoted(source: &str, after_paren: usize) -> bool {
+    let mut i = after_paren;
+    while let Some(ch) = source[i..].chars().next() {
+        if ch.is_whitespace() {
+            i += ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    matches!(source[i..].chars().next(), Some('"' | '\''))
+}
+
+/// End of the opaque url-token content opening just past `(` at `after_paren`: one past
+/// the matching **unescaped** `)`, or `None` when the token runs to end-of-source
+/// unterminated (the lexer takes it as-is; `decl_scan` declines). The two scan targets,
+/// `\` and `)`, are ASCII, so neither can occur as a UTF-8 continuation byte — a
+/// multi-byte code point's trailing bytes are all >= 0x80 and fall through the run.
+pub(crate) fn url_token_close(bytes: &[u8], after_paren: usize) -> Option<usize> {
+    let len = bytes.len();
+    let mut j = after_paren;
+    loop {
+        while j < len && bytes[j] != b'\\' && bytes[j] != b')' {
+            j += 1;
+        }
+        if j >= len {
+            return None; // EOF before `)` — unterminated
+        }
+        if bytes[j] == b')' {
+            return Some(j + 1);
+        }
+        // Escaped code point: the `\` and what it escapes are both content. Stepping
+        // one byte past the `\` is enough — the escaped char's continuation bytes can
+        // match neither target, so the run passes over them.
+        j += 1;
+        if j < len {
+            j += 1;
+        }
+    }
 }

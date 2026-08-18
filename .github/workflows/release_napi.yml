@@ -133,7 +133,7 @@ jobs:
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           # Pinned to match the check workflow / local. Bump deliberately.
-          deno-version: 2.8.0
+          deno-version: 2.9.4
 
       # For the npm-shape test (`node --test` executes the .ts directly via
       # native type stripping, >= 22.18). Pinned to match check.yml.
@@ -186,12 +186,19 @@ jobs:
         if: matrix.build == 'gnu-container'
         run: |
           for artifact in target/napi/libtsv_napi.so target/release/tsv; do
-            max=$(objdump -T "$artifact" | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -uV | tail -1)
+            # objdump runs alone (not in the substitution pipeline) so an unreadable
+            # artifact fails the step loudly instead of vanishing under pipefail; the
+            # grep pipeline takes `|| true` so a no-match yields the visible "none"
+            # rather than killing the step inside the assignment.
+            objdump -T "$artifact" > /tmp/syms.txt
+            max=$(grep -oE 'GLIBC_[0-9]+\.[0-9]+' /tmp/syms.txt | sort -uV | tail -1 || true)
             echo "$artifact max versioned glibc symbol: ${max:-none}"
-            top=$(printf '%s\nGLIBC_2.28\n' "$max" | sort -V | tail -1)
-            if [ "$top" != "GLIBC_2.28" ]; then
-              echo "FAIL: glibc floor exceeded in $artifact ($max > 2.28) — was the build run outside the container?"
-              exit 1
+            if [ -n "$max" ]; then
+              top=$(printf '%s\nGLIBC_2.28\n' "$max" | sort -V | tail -1)
+              if [ "$top" != "GLIBC_2.28" ]; then
+                echo "FAIL: glibc floor exceeded in $artifact ($max > 2.28) — was the build run outside the container?"
+                exit 1
+              fi
             fi
           done
 
@@ -202,7 +209,11 @@ jobs:
         if: matrix.build == 'musl-container'
         run: |
           for artifact in target/napi/libtsv_napi.so target/release/tsv; do
-            if objdump -T "$artifact" | grep -q 'GLIBC_'; then
+            # objdump runs alone first: inside the `if` pipeline its failure — exactly
+            # what a missing or non-dynamic artifact produces — would read as "no
+            # GLIBC_ refs" and pass the gate vacuously.
+            objdump -T "$artifact" > /tmp/syms.txt
+            if grep -q 'GLIBC_' /tmp/syms.txt; then
               echo "FAIL: musl artifact $artifact references GLIBC_ symbols"
               exit 1
             fi
@@ -255,7 +266,7 @@ jobs:
       - name: Install Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          deno-version: 2.8.0
+          deno-version: 2.9.4
 
       # registry-url writes the .npmrc that reads NODE_AUTH_TOKEN at publish.
       - name: Install Node
