@@ -71,6 +71,13 @@ both formatters — see
 tsv normalizes it to `input`. It has to carry the same glue as `input`, because glue is
 authorship: re-spelling a case here would send it to the *other* fixed point rather than
 back to this one.
+`unformatted_ours_extra_paren_layer.svelte` adds the author's **extra paren layers** to
+two of those members (`((⏎// c⏎A | B))`, `(((…)))`): they collapse into the one emitted
+pair and the run lands inside it just the same. The member ROUTER reads the shell through
+every layer, so the emitter has to as well — matched on the paren's *direct* child, a
+doubly-nested member found no emitter at all (the default path suppresses the run on the
+grounds that an upstream one placed it, and none had) and the comment was DROPPED.
+
 `variant_inside_parens.svelte` is prettier's answer from that source — the comment hoisted
 out in front of the pair (`| // c⏎  (A | B)`) — which both formatters then hold stable,
 since it is a different tree rather than a different layout of this one. The glue itself is

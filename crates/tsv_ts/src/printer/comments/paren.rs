@@ -690,12 +690,21 @@ impl<'a> Printer<'a> {
         !comments.is_empty()
     }
 
-    /// Check if stripped grouping parens left trailing comments.
+    /// Check if a grouping pair in `[expr_end, boundary_end)` holds trailing comments —
+    /// comments the author wrote INSIDE the pair, between the operand and its `)`.
     ///
-    /// Returns true when there are comments between `expr_end` and `boundary_end`
-    /// AND a `)` exists in the source after those comments (confirming that the
-    /// parser stripped a `ParenthesizedExpression`). Without the `)` check, this
-    /// would false-positive on normal operator comments (e.g. ternary `? c /* comment */ :`).
+    /// True when the gap holds a grouping `)` at all (confirming the parser stripped a
+    /// `ParenthesizedExpression`; without that check this would false-positive on normal
+    /// operator comments, e.g. ternary `? c /* comment */ :`) **and** at least one
+    /// comment lies before it.
+    ///
+    /// ⚠️ The window is `[expr_end, ')')`, not the caller's whole gap
+    /// ([`Self::collapsed_grouping_close`]). Stated the other way round — "is there a `)`
+    /// after the LAST comment" — one comment written *outside* the pair flipped the whole
+    /// question false, and the shell that asked it then emitted **nothing** for the gap,
+    /// dropping the run inside the pair along with it (`( // c⏎g // c9⏎) /* t */++` printed
+    /// `( // c⏎g⏎)++`). A gap that spans the `)` holds two runs belonging to two emitters,
+    /// so the predicate has to be about one of them.
     ///
     /// The existence check is **on page**, not *to emit*: every caller is a layout gate —
     /// does this gap's content force the shell open, keep the pair, break the arrow — and
@@ -705,19 +714,13 @@ impl<'a> Printer<'a> {
     /// at a delimiter), so the axis is stated for the reader and for the next boundary
     /// that widens, not for a behaviour it changes.
     pub(crate) fn has_trailing_paren_comments(&self, expr_end: u32, boundary_end: u32) -> bool {
-        if !self.has_comments_on_page_between(expr_end, boundary_end) {
-            return false;
-        }
-        // Find the last comment's end, then check for `)` between there and boundary
-        // **in source**: the result is a byte offset the `)` scan below starts from, so it
-        // must clear every comment physically in the gap.
-        let last_comment_end = self
-            .comments_in_source_between(expr_end, boundary_end)
-            .last()
-            .map_or(expr_end as usize, |c| c.span.end as usize);
-        self.source[last_comment_end..boundary_end as usize]
-            .bytes()
-            .any(|b| b == b')')
+        // The wide window first: it is a binary search over `self.comments` (trivially
+        // false in a comment-free document) and a strictly weaker precondition, so the
+        // source walk below never runs for the overwhelmingly common gap.
+        self.has_comments_on_page_between(expr_end, boundary_end)
+            && self
+                .collapsed_grouping_close(expr_end, boundary_end)
+                .is_some_and(|close| self.has_comments_on_page_between(expr_end, close))
     }
 
     /// The **outermost** grouping `)` a self-parenthesizing value's shells collapse into.
@@ -814,17 +817,24 @@ impl<'a> Printer<'a> {
     /// when the stripped form can still express the comment's position.
     ///
     /// A single-line block comment inlines as before (`x /* c */ as A`, `x /* c */++`),
-    /// matching prettier. The `)` check inside
-    /// [`Self::has_trailing_paren_comments`] is what keeps this keyed on a real shell.
+    /// matching prettier. Finding the `)` is what keeps this keyed on a real shell, and
+    /// the window it bounds — the pair's INTERIOR, not the caller's whole gap — is the
+    /// one this question is about: only a comment the pair actually HOLDS can need the
+    /// pair kept, and a comment past the `)` belongs to the enclosing gap
+    /// ([`Self::append_shell_outside_run`]).
     ///
-    /// The multi-line predicate is asked FIRST: it is one binary search that also
-    /// subsumes the existence check, and it is false on nearly every cast in a real
-    /// file — so [`Self::has_trailing_paren_comments`]'s second comment walk and its
-    /// `)` byte scan only run once a comment has already qualified.
+    /// The multi-line predicate is asked LAST: the two steps before it are a binary
+    /// search over `self.comments` and a short source walk, both false on nearly every
+    /// cast and update in a real file.
     pub(crate) fn asi_gap_needs_parens(&self, expr_end: u32, boundary_end: u32) -> bool {
-        comments_to_emit_in_range(self.comments, expr_end, boundary_end)
+        if !self.has_comments_on_page_between(expr_end, boundary_end) {
+            return false;
+        }
+        let Some(close) = self.collapsed_grouping_close(expr_end, boundary_end) else {
+            return false;
+        };
+        comments_to_emit_in_range(self.comments, expr_end, close)
             .any(|c| !c.is_block || c.multiline)
-            && self.has_trailing_paren_comments(expr_end, boundary_end)
     }
 
     /// The operand of an ASI-sensitive gap (an `as`/`satisfies` keyword, a postfix
@@ -845,6 +855,15 @@ impl<'a> Printer<'a> {
     ///
     /// A **sequence** operand delegates: its own required parens are the grouping, so
     /// re-wrapping would double them ([`Self::build_expression_doc_keep_paren_comments`]).
+    ///
+    /// ⚠️ `boundary_end` is the KEYWORD / operator, so the gap it bounds spans the pair's
+    /// `)` and holds **two** runs: the pair's own trailing run and, past the `)`, the
+    /// enclosing gap's. The shell claims the whole window, so it emits both — the first
+    /// inside the pair, the second after `close` — and the split is
+    /// [`Self::collapsed_grouping_close`], the same `)` every window that opens after an
+    /// operand takes its start from (`docs/comments.md` hazard 3). Emitting the window as
+    /// one run instead would have carried the outside comment *into* the parens, and the
+    /// all-or-nothing gate that preceded this dropped both runs outright.
     pub(crate) fn build_asi_operand_shell_doc(
         &self,
         node_start: u32,
@@ -867,12 +886,20 @@ impl<'a> Printer<'a> {
         if !has_leading && !self.asi_gap_needs_parens(expr_end, boundary_end) {
             return None;
         }
+
+        // The pair's `)` splits the window into the run it holds and the run the
+        // enclosing gap holds. `None` is the shell kept for its LEADING run alone with no
+        // `)` reachable past the operand, where the whole window is the pair's. The
+        // interior window ends PAST the `)` (`close + 1`) — it is what proves a pair is
+        // there, and [`Self::has_trailing_paren_comments`] looks for it inside the range
+        // it is given.
+        let close = self.collapsed_grouping_close(expr_end, boundary_end);
+        let inner_end = close.map_or(boundary_end, |c| c + 1);
+
         if matches!(expr, internal::Expression::SequenceExpression(_)) {
-            return Some(self.build_expression_doc_keep_paren_comments(
-                expr,
-                boundary_end,
-                SeqLayout::Aligned,
-            ));
+            let seq =
+                self.build_expression_doc_keep_paren_comments(expr, inner_end, SeqLayout::Aligned);
+            return Some(self.append_shell_outside_run(seq, close, boundary_end));
         }
 
         // The shell's `(` is the statement's first token whenever the statement's leftmost
@@ -899,12 +926,39 @@ impl<'a> Printer<'a> {
         }
         body.push(self.build_expression_doc(expr));
         if let Some((trailing, _needs_break)) =
-            self.trailing_paren_comment_parts(expr_end, boundary_end)
+            self.trailing_paren_comment_parts(expr_end, inner_end)
         {
             body.extend(trailing);
         }
 
-        Some(self.compose_expanded_shell_doc(paren_trailing, &body, ")"))
+        let shell = self.compose_expanded_shell_doc(paren_trailing, &body, ")");
+        Some(self.append_shell_outside_run(shell, close, boundary_end))
+    }
+
+    /// Append the run written PAST a shell's `)` — the enclosing gap's, not the pair's —
+    /// inline before the keyword / operator the caller adds next.
+    ///
+    /// Both arms of [`Self::build_asi_operand_shell_doc`] need it, and for the same
+    /// reason: the shell claims the whole `[operand_end, keyword)` window, so whatever it
+    /// does not emit is DROPPED. Only a single-line block can be here — anything
+    /// occupying a second line would put a line terminator before an ASI-sensitive token,
+    /// which is unparseable — so this is the same emitter the shell-LESS path uses for
+    /// the whole gap, and the two agree on the one shape they share.
+    fn append_shell_outside_run(
+        &self,
+        shell: DocId,
+        close: Option<u32>,
+        boundary_end: u32,
+    ) -> DocId {
+        let Some(start) = close.map(|c| c + 1).filter(|&start| {
+            start < boundary_end && self.has_comments_to_emit_between(start, boundary_end)
+        }) else {
+            return shell;
+        };
+        self.d().concat(&[
+            shell,
+            self.build_inline_comments_between_doc(start, boundary_end),
+        ])
     }
 
     /// The expanded paren-shell rendering every shell emitter shares — the

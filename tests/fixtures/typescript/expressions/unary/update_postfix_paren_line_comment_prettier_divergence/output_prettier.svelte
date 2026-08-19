@@ -34,4 +34,14 @@
 
 	// A single-line block comment stays inline without parens.
 	f /* c7 */++;
+
+	// A comment AFTER the `)` is in the gap OUTSIDE the pair: the shell's own trailing
+	// run stays inside it and this one trails the `)`, before the operator.
+	j++; // c13
+	/* c14 */
+
+	// Both shell gaps plus the outside one, each emitted where it was written.
+	// c15
+	k++; // c16
+	/* c17 */
 </script>

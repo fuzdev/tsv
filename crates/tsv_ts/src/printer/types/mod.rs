@@ -35,6 +35,10 @@ pub use helpers::unwrap_parenthesized;
 // (`statements/type_declarations.rs`) so the emitter and the gate cannot disagree.
 pub(in crate::printer) use composite::ArraySuffixLayout;
 
+// The pair an annotation's POSITION requires around its type — read by the hang seam
+// below as well as by the annotation emitters themselves.
+pub(in crate::printer) use type_annotation::AnnotationParens;
+
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::StandaloneGlue;
 pub(super) use super::comments::BlankRule;
@@ -1327,8 +1331,30 @@ impl<'a> Printer<'a> {
         inner: &TSType<'_>,
         trailing_block: TrailingBlock,
     ) -> DocId {
+        self.build_hang_value_doc_parens(
+            original,
+            inner,
+            trailing_block,
+            AnnotationParens::AsWritten,
+        )
+    }
+
+    /// [`Self::build_hang_value_doc`] carrying the annotation position's required pair.
+    ///
+    /// The hang has already STRIPPED the authored shell — `inner` is what is left — so
+    /// the pair an arrow's return type requires must be re-added here or the hung
+    /// function type prints bare (`(x: T): // c⏎↹(y: T) => T =>`, whose second `=>` the
+    /// reparse reads as the arrow's own). Every other hang keeps
+    /// [`AnnotationParens::AsWritten`] and is byte-identical.
+    pub(in crate::printer) fn build_hang_value_doc_parens(
+        &self,
+        original: &TSType<'_>,
+        inner: &TSType<'_>,
+        trailing_block: TrailingBlock,
+        parens: AnnotationParens,
+    ) -> DocId {
         self.with_stripped_paren_trailing(
-            self.build_type_doc(inner),
+            self.build_annotation_value_doc(inner, parens),
             original,
             inner,
             trailing_block,

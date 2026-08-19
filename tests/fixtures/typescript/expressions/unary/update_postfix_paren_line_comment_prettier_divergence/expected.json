@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 944,
+	"end": 1249,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -393,24 +393,152 @@
 					"column": 11
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment AFTER the `)` is in the gap OUTSIDE the pair: the shell's own trailing",
+			"start": 936,
+			"end": 1019,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 1
+				},
+				"end": {
+					"line": 54,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " run stays inside it and this one trails the `)`, before the operator.",
+			"start": 1021,
+			"end": 1093,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 1
+				},
+				"end": {
+					"line": 55,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 1101,
+			"end": 1107,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 4
+				},
+				"end": {
+					"line": 57,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c14 ",
+			"start": 1111,
+			"end": 1120,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 3
+				},
+				"end": {
+					"line": 58,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Both shell gaps plus the outside one, each emitted where it was written.",
+			"start": 1126,
+			"end": 1201,
+			"loc": {
+				"start": {
+					"line": 60,
+					"column": 1
+				},
+				"end": {
+					"line": 60,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c15",
+			"start": 1205,
+			"end": 1211,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 3
+				},
+				"end": {
+					"line": 61,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c16",
+			"start": 1216,
+			"end": 1222,
+			"loc": {
+				"start": {
+					"line": 62,
+					"column": 4
+				},
+				"end": {
+					"line": 62,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c17 ",
+			"start": 1226,
+			"end": 1235,
+			"loc": {
+				"start": {
+					"line": 63,
+					"column": 3
+				},
+				"end": {
+					"line": 63,
+					"column": 12
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 943,
+		"end": 1248,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 934,
+			"end": 1239,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 53,
+					"line": 64,
 					"column": 9
 				}
 			},
@@ -1160,6 +1288,162 @@
 							"value": " A single-line block comment stays inline without parens.",
 							"start": 859,
 							"end": 918
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1095,
+					"end": 1123,
+					"loc": {
+						"start": {
+							"line": 56,
+							"column": 1
+						},
+						"end": {
+							"line": 58,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "UpdateExpression",
+						"start": 1095,
+						"end": 1122,
+						"loc": {
+							"start": {
+								"line": 56,
+								"column": 1
+							},
+							"end": {
+								"line": 58,
+								"column": 14
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 1099,
+							"end": 1100,
+							"loc": {
+								"start": {
+									"line": 57,
+									"column": 2
+								},
+								"end": {
+									"line": 57,
+									"column": 3
+								}
+							},
+							"name": "j",
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c13",
+									"start": 1101,
+									"end": 1107
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment AFTER the `)` is in the gap OUTSIDE the pair: the shell's own trailing",
+							"start": 936,
+							"end": 1019
+						},
+						{
+							"type": "Line",
+							"value": " run stays inside it and this one trails the `)`, before the operator.",
+							"start": 1021,
+							"end": 1093
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1203,
+					"end": 1238,
+					"loc": {
+						"start": {
+							"line": 61,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "UpdateExpression",
+						"start": 1203,
+						"end": 1237,
+						"loc": {
+							"start": {
+								"line": 61,
+								"column": 1
+							},
+							"end": {
+								"line": 63,
+								"column": 14
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 1214,
+							"end": 1215,
+							"loc": {
+								"start": {
+									"line": 62,
+									"column": 2
+								},
+								"end": {
+									"line": 62,
+									"column": 3
+								}
+							},
+							"name": "k",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c15",
+									"start": 1205,
+									"end": 1211
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c16",
+									"start": 1216,
+									"end": 1222
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c14 ",
+							"start": 1111,
+							"end": 1120
+						},
+						{
+							"type": "Line",
+							"value": " Both shell gaps plus the outside one, each emitted where it was written.",
+							"start": 1126,
+							"end": 1201
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c17 ",
+							"start": 1226,
+							"end": 1235
 						}
 					]
 				}

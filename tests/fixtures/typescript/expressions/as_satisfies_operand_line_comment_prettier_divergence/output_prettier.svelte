@@ -56,6 +56,30 @@
 	// A block comment does not end its line, so it stays inline without parens.
 	const i = x /* c11 */ as A;
 
+	// A comment AFTER the `)` is in the gap OUTSIDE the pair: the shell's own trailing
+	// run stays inside it and this one trails the `)`, before the keyword.
+	const p = x as A; // c20
+	/* c21 */
+
+	// Both shell gaps plus the outside one, each emitted where it was written.
+	const q = // c22
+	x as A; // c23
+	/* c24 */
+
+	// A comment outside the pair with nothing inside it needs no shell at all.
+	const r = x /* c25 */ as A;
+
+	// A run outside the pair stays a run, in the order it was written.
+	const s = x as A; // c26
+	/* c27 */ /* c28 */
+
+	// Nested shells collapse into the one emitted pair, so the split is the OUTERMOST
+	// `)`: `((x // c29⏎) /* c30 */) /* c31 */ as A` settles here, with the comment
+	// between the two closers inside the pair and the one past both outside it.
+	const t = x as /* c30 */ // c29
+	/* c31 */
+	A;
+
 	// an author blank BELOW the pulled comment survives — the blank is authorship, not
 	// the container's leading gap (the blank ABOVE one stays erased, against the delimiter)
 	const o = // c19

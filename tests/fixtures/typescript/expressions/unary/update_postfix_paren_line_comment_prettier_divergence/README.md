@@ -52,7 +52,14 @@ The retained shell **expands** — the operand takes its own indented line rathe
 than gluing to the `(` — for every comment that makes the shell span lines, so a
 `//` and a multiline block reach one form at this gap instead of two.
 
-The shell has **two** gaps, and the other one keeps it for a different reason:
+A comment written past the `)` is in a **third** region — the enclosing gap, not
+the pair — and is emitted there, after the closer and before the operator
+(`(⏎j // c13⏎) /* c14 */++`). The window the printer scans runs to the operator, so
+it spans the `)` and holds both runs; the split is the `)`. The
+[cast sibling](../../as_satisfies_operand_line_comment_prettier_divergence/) states
+that rule and what the earlier all-or-nothing reading of the window cost.
+
+The shell has **two** interior gaps, and the other one keeps it for a different reason:
 nothing else emits the `(`→operand gap. A comment there that is neither glued to
 the operand (which would make it `owned_by_node`, printed from the operand's own
 doc) nor inside the operand's span belongs to no node at all, so stripping the
