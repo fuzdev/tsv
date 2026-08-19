@@ -1581,7 +1581,16 @@ impl<'a> Printer<'a> {
             // (`comments_force_own_line_between` walks `comments_in_source_range`), so
             // gate and emitter answer the one question identically.
             let next = self.blank_scan_end(comment.span.end, emit_next);
-            if self.comment_hangs_next(comment, next) {
+            // An honored directive owns its line on BOTH sides. The after-side is
+            // [`Self::comment_hangs_next`], which this asks of every comment; the
+            // before-side is this separator read one comment earlier — a single-line block
+            // ahead of a directive (`await /* c1 */⏎// prettier-ignore⏎v`) hangs nothing on
+            // its own, so without this the run renders `/* c1 */ // prettier-ignore` and the
+            // directive lands in the placement the floor calls INERT.
+            let next_is_directive = comments
+                .peek()
+                .is_some_and(|n| self.is_honored_directive(n));
+            if next_is_directive || self.comment_hangs_next(comment, next) {
                 // An authored blank line survives wherever the break it separates
                 // survives. Here the break is FORCED — a `//` runs to end-of-line, an
                 // own-line multiline block would reflow — so the blank is authoring

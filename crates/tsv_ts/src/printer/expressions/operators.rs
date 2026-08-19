@@ -1175,6 +1175,18 @@ impl<'a> Printer<'a> {
         let has_trailing_comments =
             self.has_comments_to_emit_between(argument_end, await_expr.span.end);
 
+        // The `await`→operand value head ([`Printer::value_head_frozen_span`]): an own-line
+        // directive in the gap freezes the whole operand. Resolved ONCE, above the arms, so
+        // every route to the operand's doc carries it — the grouping parens `await` needs are
+        // the PRINTER's and stay outside the slice, exactly as at every other value head.
+        let frozen = self.value_head_frozen_span(keyword_end, await_expr.argument.span());
+        let operand_doc = || {
+            frozen.map_or_else(
+                || self.build_expression_doc(await_expr.argument),
+                |frozen| self.build_frozen_expression_doc(await_expr.argument, frozen),
+            )
+        };
+
         // A block run the author broke AFTER, before an argument that WILL BREAK,
         // keeps its break — prettier's `printLeadingComment` newline-after `line`,
         // materialized by the argument's own break (`await /* c */⏎fn({…})` stays
@@ -1183,11 +1195,18 @@ impl<'a> Printer<'a> {
         // The gate is the shared `breaking_value_leading_run`; an argument that FITS
         // declines into the glued pull-up below. Mirrors `build_spread_doc`; a
         // parenthesized argument keeps the glued path (the compound is unprobed).
-        if !self.needs_parens(await_expr.argument, ParenContext::AwaitArgument)
+        //
+        // ⚠️ A FROZEN operand declines this arm outright. The arm glues the run to the
+        // keyword (`await /* c */⏎…`), which for an honored directive is the placement the
+        // floor calls INERT — pass 1 would print the frozen bytes with the directive welded
+        // to `await`, and pass 2 would read no freeze and normalize them, a silent loss no
+        // gate but `blanks:audit` can see (it needs a blank INSIDE the slice to make the
+        // operand `will_break` and reach here at all). The gap's own answer already routes a
+        // directive to the continuation below, where it keeps its line.
+        if frozen.is_none()
+            && !self.needs_parens(await_expr.argument, ParenContext::AwaitArgument)
             && let Some((run, arg_doc)) =
-                self.breaking_value_leading_run(keyword_end, argument_start, || {
-                    self.build_expression_doc(await_expr.argument)
-                })
+                self.breaking_value_leading_run(keyword_end, argument_start, operand_doc)
         {
             let mut parts: DocBuf = smallvec![d.text("await ")];
             self.push_leading_run_before_breaking_value(&mut parts, &run, argument_start);
@@ -1203,6 +1222,14 @@ impl<'a> Printer<'a> {
         // parens is glued to the operand and therefore owned, so it never reaches this
         // axis and keeps its place (the `grouped_operand_comment` divergence).
         let gap = self.keyword_operand_gap(keyword_end, argument_start);
+        // A resolved freeze reaches the CONTINUATION arm and no other: an honored directive
+        // hangs what follows it ([`Printer::comment_hangs_next`]), which is exactly what the
+        // gap's gate reads. Every other arm glues the run to the keyword, where the directive
+        // would be inert and the freeze lost on the next pass.
+        debug_assert!(
+            frozen.is_none() || matches!(gap, KeywordOperandGap::Continuation),
+            "an await→operand freeze must reach the continuation arm"
+        );
 
         let argument_doc = if has_trailing_comments {
             // The grouping parens are required when the operand needs them (`await`
@@ -1214,7 +1241,7 @@ impl<'a> Printer<'a> {
             // shell is not optional here: `await`'s own span covers the `)`, so a stripped
             // form hands the comment to the enclosing terminator gap on reparse and the
             // authoring has no fixed point at all. Mirrors `build_spread_doc`.
-            let inner = self.build_expression_doc(await_expr.argument);
+            let inner = operand_doc();
             if let Some(shell) = self.build_paren_operand_comment_doc(
                 argument_end,
                 await_expr.span.end,
@@ -1229,13 +1256,9 @@ impl<'a> Printer<'a> {
                 inner
             }
         } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
-            d.concat(&[
-                d.text("("),
-                self.build_expression_doc(await_expr.argument),
-                d.text(")"),
-            ])
+            d.concat(&[d.text("("), operand_doc(), d.text(")")])
         } else {
-            self.build_expression_doc(await_expr.argument)
+            operand_doc()
         };
 
         match gap {

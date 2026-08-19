@@ -392,10 +392,22 @@ impl<'a> Printer<'a> {
     /// where it is the bare `:`. Adding a site means calling this, never re-deriving
     /// `indent(" " + hang_next + tail)`. See conformance_prettier.md
     /// §Uniform Forced-Continuation Indent.
+    ///
+    /// ⚠️ The leading separator is a **hardline** where the run opens with an honored
+    /// format-ignore directive ([`Printer::leading_comment_is_honored_directive`]) — the
+    /// leading half of the rule [`Printer::comment_hangs_next`] states for the separators
+    /// *inside* the run. Beside the preceding token a directive shares its line, which the
+    /// placement floor classifies as inert, so the freeze it earns would be lost on the next
+    /// pass; the `case`→test head is the site whose freeze depends on it.
     pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {
         let d = self.d();
+        let lead = if self.leading_comment_is_honored_directive(start, end) {
+            d.hardline()
+        } else {
+            d.text(" ")
+        };
         d.indent(d.concat(&[
-            d.text(" "),
+            lead,
             self.build_trailing_comments_hang_next(start, end),
             tail,
         ]))

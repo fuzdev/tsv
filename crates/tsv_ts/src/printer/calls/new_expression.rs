@@ -32,6 +32,7 @@ use crate::printer::expressions::functions::{
 use crate::printer::{
     ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
 };
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -53,9 +54,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let keyword_end = new_expr.span.start + "new".len() as u32;
         let callee_start = new_expr.callee.span().start;
+        // The `new`→callee value head ([`Printer::value_head_frozen_span`]): an own-line
+        // directive in the gap freezes the CALLEE alone — the type arguments and the argument
+        // list follow the callee's span and stay parent-owned, so they keep normalizing.
+        let frozen = self.value_head_frozen_span(keyword_end, new_expr.callee.span());
         match self.keyword_operand_gap(keyword_end, callee_start) {
             KeywordOperandGap::Continuation => {
-                let tail = self.build_new_doc_after_keyword(new_expr, d.empty());
+                let tail = self.build_new_doc_after_keyword(new_expr, d.empty(), frozen);
                 d.concat(&[
                     d.text("new"),
                     self.build_continuation_indent(keyword_end, callee_start, tail),
@@ -66,7 +71,7 @@ impl<'a> Printer<'a> {
                     Some(run) => d.concat(&[d.text("new "), run]),
                     None => d.text("new "),
                 };
-                self.build_new_doc_after_keyword(new_expr, keyword)
+                self.build_new_doc_after_keyword(new_expr, keyword, frozen)
             }
         }
     }
@@ -78,6 +83,7 @@ impl<'a> Printer<'a> {
         &self,
         new_expr: &internal::NewExpression<'_>,
         keyword: DocId,
+        frozen: Option<Span>,
     ) -> DocId {
         let d = self.d();
         // Wrap callee in parens if needed (e.g., `new (a || b)()`, `new (a ? b : c)()`,
@@ -85,7 +91,14 @@ impl<'a> Printer<'a> {
         // A non-null assertion sealing a parenthesized chain (`new (a?.b)!()`) keeps the
         // parens via the sealed-base rendering (checked first; the `!`-outside form is
         // not stripped here even though the standalone path would).
-        let callee = if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
+        //
+        // A FROZEN callee short-circuits the cascade: the slice is its own bytes and the
+        // pair the `NewCallee` position supplies rides outside it
+        // ([`Printer::build_frozen_value_doc`]), so the arms below — each of which exists to
+        // lay out the callee's *contents* — have nothing left to decide.
+        let callee = if let Some(frozen) = frozen {
+            self.build_frozen_value_doc(new_expr.callee, frozen, ParenContext::NewCallee)
+        } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
             sealed
         } else if self.needs_parens(new_expr.callee, ParenContext::NewCallee) {
             // For binary expressions (including logical), use a group with softlines

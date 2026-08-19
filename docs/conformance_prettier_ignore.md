@@ -453,7 +453,7 @@ each fixture's `prettier_variant_frozen` pins prettier's stable frozen form, whi
 normalizes ([clauses glued
 inert](../tests/fixtures/typescript/statements/for/clauses_prettier_ignore_glued_inert_prettier_divergence/)).
 
-tsv diverges at six places:
+tsv diverges at nine places:
 
 - Directive written in an **empty `for` clause slot** — ◆comment_preservation — it stays in
   that slot, so it freezes nothing: the clause it would freeze is on the other side of the
@@ -521,12 +521,15 @@ tsv diverges at six places:
 second divergence.
 
 **On assignment-family value heads.** The same head rule, with the assignment operator as the
-delimiter: an own-line directive in an `=`→value, `:`→value or `=>`→body gap freezes that
+delimiter: an own-line directive in an `=`→value, `:`→value, `=>`→body, `?`/`:`→branch,
+`case`→test or keyword→operand gap freezes that
 **whole value**. The hosts are a declarator initializer (`const a =`, a `for` header's init
 declarator, and a Svelte `{@const a =}`), an assignment
 RHS (`a =`, a compound `a +=`, and each segment of a chain), an object property value (`k:`), a
 class field value (`f =`, `static f =`, `#f =`, `accessor f =`), an enum member value
-(`A =`), an arrow's expression body (`=>`), and a default value (a
+(`A =`), an arrow's expression body (`=>`), a ternary branch (`?`→consequent, `:`→alternate), a
+`case` label's test, the two expression-level keyword→operand gaps (`await`→operand and
+`new`→callee), and a default value (a
 parameter default, a destructuring default, an array-pattern default). The slice is the value's
 own node span, so the binding, the operator and the enclosing list stay parent-owned and a
 sibling declarator, member or property the freeze does not reach still normalizes. Prettier
@@ -536,9 +539,22 @@ agrees at every unprefixed host, so the ordinary fixtures
 `expressions/arrow/body_prettier_ignore_head`
 and `svelte/tags/const/value_prettier_ignore_head` **match**.
 
-A **ternary branch** (`?`→consequent, `:`→alternate) and a **`case`→test** are the same shape
-one family over and are still absent from the rule, so a directive there is inert while
-prettier honors it. Tracked gaps, not sanctioned differences.
+The **ternary branch**, the **`case` test** and the two **keyword→operand** gaps are the same
+shape one family over — the delimiter is an operator or a keyword rather than `=`, and the
+freeze is otherwise identical. All four are divergences rather than matches, for the one
+placement reason below. At `new` the slice is the **callee alone**: the type arguments and the
+argument list sit past the callee's span, stay parent-owned, and still normalize.
+
+**Still absent from the rule**, each probe-measured against prettier and each a case where
+prettier honors what tsv normalizes: a unary operator's →operand gap (`typeof`, `!`, `-`), a
+template literal's `${`→expression gap, a computed KEY's `[`→key gap, and a spread's
+`...`→argument gap (which also relocates the comment inside the operand's parens). Tracked gaps, not sanctioned differences — honoring a directive is a per-position
+opt-in the printer makes at each value head, so an absent host reformats rather than freezing,
+exactly as every host above did before its own cluster landed. Two neighbours are **not** on
+that list: a computed **member**'s `[`→index gap already freezes (only its layout parts), and
+a class heritage's `extends`→superClass gap freezes under neither formatter — prettier
+relocates the directive above `extends` and normalizes the value too, so there the placement
+is the whole difference.
 
 The clarity parens rule carries over unchanged — an initializer that is an assignment prints as
 `const a = (b = c)`, and those parens are the printer's, so the frozen inner keeps them around
@@ -629,6 +645,33 @@ tsv diverges at six places:
   (`Bbb = ccc + ddd // prettier-ignore`) and the freeze is gone, the same second-pass loss its
   `enum` / `namespace` **body** heads show below —
   [member init head](../tests/fixtures/typescript/declarations/enum/member_init_prettier_ignore_head_prettier_divergence/)
+- **Ternary branch** — ◆comment_preservation — the `?`→consequent and `:`→alternate gaps
+  relocate an own-line comment onto the operator's line under **both** formatters, so an honored
+  directive there would be inert; tsv therefore keeps the directive's own line (the `?` or `:`
+  is left dangling and the branch hangs below it) and freezes, while prettier pulls the
+  directive up. Keeping that line also forces the ternary's **breaking** layout in both
+  spellings — a block directive left inline would be glued to the operator, hence inert — where
+  prettier collapses the block case on its own second pass (chain pinned). A directive the
+  author wrote *on* the operator's line is inert under tsv and honored by prettier, the same
+  parting one gap out —
+  [branch head](../tests/fixtures/typescript/expressions/ternary/branch_prettier_ignore_head_prettier_divergence/)
+- **`case` test** — ◆comment_preservation — the same parting at the `case`→test gap, plus the
+  test's indent, which is the pre-existing
+  [§Uniform Forced-Continuation Indent](./conformance_prettier.md#uniform-forced-continuation-indent)
+  divergence its uncommented-by-a-directive sibling
+  `switch/case_test_gap_line_comment_prettier_divergence` already records: tsv drops the test one
+  level in, prettier leaves it flush at the case's own indent. The `:` stays parent-owned either
+  way and a sibling case the freeze does not reach still normalizes —
+  [case test head](../tests/fixtures/typescript/statements/switch/case_test_prettier_ignore_head_prettier_divergence/)
+- **`await`→operand and `new`→callee** — ◆comment_preservation — the same placement parting at
+  the two expression-level keyword→operand gaps, on top of the
+  [§Uniform Forced-Continuation Indent](./conformance_prettier.md#uniform-forced-continuation-indent)
+  divergence their uncommented-by-a-directive sibling
+  `expressions/await_new_operand_line_comment_prettier_divergence` already records. tsv keeps
+  the directive's own line and freezes the operand one level in; prettier pulls the directive
+  onto the keyword's line, leaves the operand flush, and is not idempotent on the block
+  spelling — its second pass collapses the whole expression onto one line (chain pinned) —
+  [await/new operand head](../tests/fixtures/typescript/expressions/await_new_operand_prettier_ignore_head_prettier_divergence/)
 - **Default value** — ◆design_choice — tsv breaks the enclosing list around the frozen value,
   because the directive's own line is a mandatory break inside that list and a list holding a
   break prints expanded — the same layout a plain own-line comment in that gap already produces.

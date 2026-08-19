@@ -1,0 +1,1718 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1229,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an own-line directive in a `case`→test gap freezes the whole test",
+			"start": 20,
+			"end": 88,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 115,
+			"end": 133,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 3
+				},
+				"end": {
+					"line": 5,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment behaves identically — placement keys the freeze, not the spelling",
+			"start": 167,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 95
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 288,
+			"end": 309,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the clarity parens a `case` test takes are the printer's, so the frozen inner keeps them",
+			"start": 343,
+			"end": 434,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 461,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 3
+				},
+				"end": {
+					"line": 21,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `:` stays parent-owned and a sibling case the freeze does not reach still normalizes",
+			"start": 515,
+			"end": 606,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 633,
+			"end": 651,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 3
+				},
+				"end": {
+					"line": 29,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a directive the author put on the `case` line is INERT under the placement floor: the",
+			"start": 715,
+			"end": 803,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment keeps the line it was written on and the test normalizes",
+			"start": 805,
+			"end": 872,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 895,
+			"end": 913,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 7
+				},
+				"end": {
+					"line": 39,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the block spelling of the same placement, likewise inert",
+			"start": 942,
+			"end": 1001,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 1
+				},
+				"end": {
+					"line": 44,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 1024,
+			"end": 1045,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 7
+				},
+				"end": {
+					"line": 46,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the head→`:` gap is a different gap and keeps its own answer",
+			"start": 1071,
+			"end": 1134,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1161,
+			"end": 1179,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 3
+				},
+				"end": {
+					"line": 53,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1195,
+			"end": 1202,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 15
+				},
+				"end": {
+					"line": 54,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1228,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1219,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 57,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "SwitchStatement",
+					"start": 90,
+					"end": 164,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 98,
+						"end": 101,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "aaa"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 107,
+							"end": 161,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 11
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 153,
+									"end": 161,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 11
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 153,
+										"end": 160,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 3
+											},
+											"end": {
+												"line": 7,
+												"column": 10
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 153,
+											"end": 155,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 3
+												},
+												"end": {
+													"line": 7,
+													"column": 5
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 156,
+												"end": 159,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 6
+													},
+													"end": {
+														"line": 7,
+														"column": 9
+													}
+												},
+												"name": "ddd"
+											}
+										],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 115,
+											"end": 133
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "BinaryExpression",
+								"start": 137,
+								"end": 148,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 3
+									},
+									"end": {
+										"line": 6,
+										"column": 14
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 137,
+									"end": 140,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 3
+										},
+										"end": {
+											"line": 6,
+											"column": 6
+										}
+									},
+									"name": "bbb"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 145,
+									"end": 148,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 11
+										},
+										"end": {
+											"line": 6,
+											"column": 14
+										}
+									},
+									"name": "ccc"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line directive in a `case`→test gap freezes the whole test",
+							"start": 20,
+							"end": 88
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 263,
+					"end": 340,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 271,
+						"end": 274,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 9
+							},
+							"end": {
+								"line": 11,
+								"column": 12
+							}
+						},
+						"name": "eee"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 280,
+							"end": 337,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 11
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 329,
+									"end": 337,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 15,
+											"column": 11
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 329,
+										"end": 336,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 10
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 329,
+											"end": 331,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 3
+												},
+												"end": {
+													"line": 15,
+													"column": 5
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 332,
+												"end": 335,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 6
+													},
+													"end": {
+														"line": 15,
+														"column": 9
+													}
+												},
+												"name": "hhh"
+											}
+										],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " prettier-ignore ",
+											"start": 288,
+											"end": 309
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "BinaryExpression",
+								"start": 313,
+								"end": 324,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 3
+									},
+									"end": {
+										"line": 14,
+										"column": 14
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 313,
+									"end": 316,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 6
+										}
+									},
+									"name": "fff"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 321,
+									"end": 324,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 11
+										},
+										"end": {
+											"line": 14,
+											"column": 14
+										}
+									},
+									"name": "ggg"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block comment behaves identically — placement keys the freeze, not the spelling",
+							"start": 167,
+							"end": 261
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 436,
+					"end": 512,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 444,
+						"end": 447,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 9
+							},
+							"end": {
+								"line": 19,
+								"column": 12
+							}
+						},
+						"name": "iii"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 453,
+							"end": 509,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 2
+								},
+								"end": {
+									"line": 23,
+									"column": 11
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 501,
+									"end": 509,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 3
+										},
+										"end": {
+											"line": 23,
+											"column": 11
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 501,
+										"end": 508,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 3
+											},
+											"end": {
+												"line": 23,
+												"column": 10
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 501,
+											"end": 503,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 3
+												},
+												"end": {
+													"line": 23,
+													"column": 5
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 504,
+												"end": 507,
+												"loc": {
+													"start": {
+														"line": 23,
+														"column": 6
+													},
+													"end": {
+														"line": 23,
+														"column": 9
+													}
+												},
+												"name": "lll"
+											}
+										],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 461,
+											"end": 479
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "AssignmentExpression",
+								"start": 484,
+								"end": 495,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 4
+									},
+									"end": {
+										"line": 22,
+										"column": 15
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 484,
+									"end": 487,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 4
+										},
+										"end": {
+											"line": 22,
+											"column": 7
+										}
+									},
+									"name": "jjj"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 492,
+									"end": 495,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 12
+										},
+										"end": {
+											"line": 22,
+											"column": 15
+										}
+									},
+									"name": "kkk"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the clarity parens a `case` test takes are the printer's, so the frozen inner keeps them",
+							"start": 343,
+							"end": 434
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 608,
+					"end": 712,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 616,
+						"end": 619,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 9
+							},
+							"end": {
+								"line": 27,
+								"column": 12
+							}
+						},
+						"name": "mmm"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 625,
+							"end": 679,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 31,
+									"column": 11
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 671,
+									"end": 679,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 3
+										},
+										"end": {
+											"line": 31,
+											"column": 11
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 671,
+										"end": 678,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 3
+											},
+											"end": {
+												"line": 31,
+												"column": 10
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 671,
+											"end": 673,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 3
+												},
+												"end": {
+													"line": 31,
+													"column": 5
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 674,
+												"end": 677,
+												"loc": {
+													"start": {
+														"line": 31,
+														"column": 6
+													},
+													"end": {
+														"line": 31,
+														"column": 9
+													}
+												},
+												"name": "ppp"
+											}
+										],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 633,
+											"end": 651
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "BinaryExpression",
+								"start": 655,
+								"end": 666,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 3
+									},
+									"end": {
+										"line": 30,
+										"column": 14
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 655,
+									"end": 658,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 3
+										},
+										"end": {
+											"line": 30,
+											"column": 6
+										}
+									},
+									"name": "nnn"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 663,
+									"end": 666,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 11
+										},
+										"end": {
+											"line": 30,
+											"column": 14
+										}
+									},
+									"name": "ooo"
+								}
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 682,
+							"end": 709,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 2
+								},
+								"end": {
+									"line": 33,
+									"column": 11
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 701,
+									"end": 709,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 3
+										},
+										"end": {
+											"line": 33,
+											"column": 11
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 701,
+										"end": 708,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 3
+											},
+											"end": {
+												"line": 33,
+												"column": 10
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 701,
+											"end": 703,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 3
+												},
+												"end": {
+													"line": 33,
+													"column": 5
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 704,
+												"end": 707,
+												"loc": {
+													"start": {
+														"line": 33,
+														"column": 6
+													},
+													"end": {
+														"line": 33,
+														"column": 9
+													}
+												},
+												"name": "sss"
+											}
+										],
+										"optional": false
+									}
+								}
+							],
+							"test": {
+								"type": "BinaryExpression",
+								"start": 687,
+								"end": 696,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 7
+									},
+									"end": {
+										"line": 32,
+										"column": 16
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 687,
+									"end": 690,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 7
+										},
+										"end": {
+											"line": 32,
+											"column": 10
+										}
+									},
+									"name": "qqq"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 693,
+									"end": 696,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 13
+										},
+										"end": {
+											"line": 32,
+											"column": 16
+										}
+									},
+									"name": "rrr"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the `:` stays parent-owned and a sibling case the freeze does not reach still normalizes",
+							"start": 515,
+							"end": 606
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 874,
+					"end": 939,
+					"loc": {
+						"start": {
+							"line": 38,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 882,
+						"end": 884,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 9
+							},
+							"end": {
+								"line": 38,
+								"column": 11
+							}
+						},
+						"name": "a2"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 890,
+							"end": 936,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 2
+								},
+								"end": {
+									"line": 41,
+									"column": 10
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 929,
+									"end": 936,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 3
+										},
+										"end": {
+											"line": 41,
+											"column": 10
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 929,
+										"end": 935,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 3
+											},
+											"end": {
+												"line": 41,
+												"column": 9
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 929,
+											"end": 931,
+											"loc": {
+												"start": {
+													"line": 41,
+													"column": 3
+												},
+												"end": {
+													"line": 41,
+													"column": 5
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 932,
+												"end": 934,
+												"loc": {
+													"start": {
+														"line": 41,
+														"column": 6
+													},
+													"end": {
+														"line": 41,
+														"column": 8
+													}
+												},
+												"name": "d2"
+											}
+										],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 895,
+											"end": 913
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "BinaryExpression",
+								"start": 917,
+								"end": 924,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 3
+									},
+									"end": {
+										"line": 40,
+										"column": 10
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 917,
+									"end": 919,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 3
+										},
+										"end": {
+											"line": 40,
+											"column": 5
+										}
+									},
+									"name": "b2"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 922,
+									"end": 924,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 8
+										},
+										"end": {
+											"line": 40,
+											"column": 10
+										}
+									},
+									"name": "c2"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a directive the author put on the `case` line is INERT under the placement floor: the",
+							"start": 715,
+							"end": 803
+						},
+						{
+							"type": "Line",
+							"value": " comment keeps the line it was written on and the test normalizes",
+							"start": 805,
+							"end": 872
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 1003,
+					"end": 1068,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 1011,
+						"end": 1013,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 9
+							},
+							"end": {
+								"line": 45,
+								"column": 11
+							}
+						},
+						"name": "e2"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 1019,
+							"end": 1065,
+							"loc": {
+								"start": {
+									"line": 46,
+									"column": 2
+								},
+								"end": {
+									"line": 47,
+									"column": 10
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 1058,
+									"end": 1065,
+									"loc": {
+										"start": {
+											"line": 47,
+											"column": 3
+										},
+										"end": {
+											"line": 47,
+											"column": 10
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 1058,
+										"end": 1064,
+										"loc": {
+											"start": {
+												"line": 47,
+												"column": 3
+											},
+											"end": {
+												"line": 47,
+												"column": 9
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 1058,
+											"end": 1060,
+											"loc": {
+												"start": {
+													"line": 47,
+													"column": 3
+												},
+												"end": {
+													"line": 47,
+													"column": 5
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 1061,
+												"end": 1063,
+												"loc": {
+													"start": {
+														"line": 47,
+														"column": 6
+													},
+													"end": {
+														"line": 47,
+														"column": 8
+													}
+												},
+												"name": "h2"
+											}
+										],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " prettier-ignore ",
+											"start": 1024,
+											"end": 1045
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "BinaryExpression",
+								"start": 1046,
+								"end": 1053,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 29
+									},
+									"end": {
+										"line": 46,
+										"column": 36
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 1046,
+									"end": 1048,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 29
+										},
+										"end": {
+											"line": 46,
+											"column": 31
+										}
+									},
+									"name": "f2"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1051,
+									"end": 1053,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 34
+										},
+										"end": {
+											"line": 46,
+											"column": 36
+										}
+									},
+									"name": "g2"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the block spelling of the same placement, likewise inert",
+							"start": 942,
+							"end": 1001
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 1136,
+					"end": 1218,
+					"loc": {
+						"start": {
+							"line": 51,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 1144,
+						"end": 1147,
+						"loc": {
+							"start": {
+								"line": 51,
+								"column": 9
+							},
+							"end": {
+								"line": 51,
+								"column": 12
+							}
+						},
+						"name": "ttt"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 1153,
+							"end": 1215,
+							"loc": {
+								"start": {
+									"line": 52,
+									"column": 2
+								},
+								"end": {
+									"line": 55,
+									"column": 11
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 1207,
+									"end": 1215,
+									"loc": {
+										"start": {
+											"line": 55,
+											"column": 3
+										},
+										"end": {
+											"line": 55,
+											"column": 11
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 1207,
+										"end": 1214,
+										"loc": {
+											"start": {
+												"line": 55,
+												"column": 3
+											},
+											"end": {
+												"line": 55,
+												"column": 10
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 1207,
+											"end": 1209,
+											"loc": {
+												"start": {
+													"line": 55,
+													"column": 3
+												},
+												"end": {
+													"line": 55,
+													"column": 5
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 1210,
+												"end": 1213,
+												"loc": {
+													"start": {
+														"line": 55,
+														"column": 6
+													},
+													"end": {
+														"line": 55,
+														"column": 9
+													}
+												},
+												"name": "www"
+											}
+										],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 1161,
+											"end": 1179
+										},
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 1195,
+											"end": 1202
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "BinaryExpression",
+								"start": 1183,
+								"end": 1194,
+								"loc": {
+									"start": {
+										"line": 54,
+										"column": 3
+									},
+									"end": {
+										"line": 54,
+										"column": 14
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 1183,
+									"end": 1186,
+									"loc": {
+										"start": {
+											"line": 54,
+											"column": 3
+										},
+										"end": {
+											"line": 54,
+											"column": 6
+										}
+									},
+									"name": "uuu"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1191,
+									"end": 1194,
+									"loc": {
+										"start": {
+											"line": 54,
+											"column": 11
+										},
+										"end": {
+											"line": 54,
+											"column": 14
+										}
+									},
+									"name": "vvv"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the head→`:` gap is a different gap and keeps its own answer",
+							"start": 1071,
+							"end": 1134
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

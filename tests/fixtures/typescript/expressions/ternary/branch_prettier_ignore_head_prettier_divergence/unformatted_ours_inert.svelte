@@ -1,0 +1,82 @@
+<script lang="ts">
+	// an own-line directive in a ternary's `?`→consequent gap freezes the whole branch
+	const aaa = cond
+		?
+			// prettier-ignore
+			bbb  +  ccc
+		: ddd;
+
+	// the `:`→alternate gap is the same head
+	const eee = cond
+		? fff
+		:
+			// prettier-ignore
+			ggg  +  hhh;
+
+	// an own-line block comment behaves identically — placement keys the freeze, not the spelling
+	const iii = cond
+		?
+			/* prettier-ignore */
+			jjj  +  kkk
+		: lll;
+
+	// the clarity parens a branch takes are the printer's, so the frozen inner keeps them
+	const mmm = cond
+		?
+			// prettier-ignore
+			(nnn  ??  ooo)
+		: ppp;
+
+	// the gap between the frozen slice and the `:` is the enclosing scan's — a block stays
+	// inline after the slice
+	const qqq = cond
+		?
+			// prettier-ignore
+			rrr  +  sss /* c */
+		: ttt;
+
+	// and a line comment trails it, still outside the freeze
+	const uuu = cond
+		?
+			// prettier-ignore
+			vvv  +  www // c
+		: xxx;
+
+	// the alternate's own trailing gap answers the same way, its line comment floating past
+	// the statement's `;` as the unfrozen branch's does
+	const yyy = cond
+		? zzz
+		:
+			// prettier-ignore
+			a1  +  b1; /* c */
+
+	const c1 = cond
+		? d1
+		:
+			// prettier-ignore
+			e1  +  f1; // c
+
+	// a nested conditional in the frozen position prints as its slice, not as a chain
+	const g1 = cond
+		?
+			// prettier-ignore
+			h1  ?  i1  :  j1
+		: k1;
+
+	// a directive the author put on the operator's line is INERT under the placement floor:
+	// the comment keeps the line it was written on and the branch normalizes
+	const p1 = cond
+		? // prettier-ignore
+			q1  +  r1
+		: s1;
+
+	// the block spelling of the same placement, likewise inert
+	const t1 = cond ? /* prettier-ignore */ u1  +  v1 : w1;
+
+	// the rule is not the directive's — an ordinary own-line comment in the same gap is
+	// pulled up onto the operator's line and the branch normalizes
+	const l1 = cond
+		? // c
+			m1 + n1
+		: o1;
+</script>
