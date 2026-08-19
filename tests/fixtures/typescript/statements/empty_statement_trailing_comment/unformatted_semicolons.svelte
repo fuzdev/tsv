@@ -30,4 +30,9 @@
 
 	// Trailing block comment on a dropped `;`
 	i();; /* block */
+
+	// A MULTILINE block trailing a dropped `;` runs to its own closing line, so a
+	// comment the author glued past that `*/` trails the statement too
+	j();;; /* block1
+	block2 */ // tail
 </script>

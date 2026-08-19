@@ -5,10 +5,13 @@
 // - Grouping: Group nodes by natural break points
 // - Merge decisions: Determine if first groups should be merged
 
+use super::printing::chain_gap_any;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, IdentName};
+use crate::printer::calls::is_memberish;
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
-use crate::printer::{ParenContext, Printer, needs_parens};
+use crate::printer::{ParenContext, Printer, is_multiline_template_expression, needs_parens};
+use tsv_lang::source_scan::has_newline_before_position;
 use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_comments_in_range};
 
 //
@@ -45,7 +48,7 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_recursive(expr, input, &mut nodes, &mut paren_gaps);
-    finalize_chain_nodes(&mut nodes, &paren_gaps);
+    finalize_chain_nodes(&mut nodes, &paren_gaps, input.source);
     nodes
 }
 
@@ -57,12 +60,8 @@ pub fn linearize_chain_from_call<'a>(
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
     linearize_call_callee(call, input, &mut nodes, &mut paren_gaps);
-    if call.optional {
-        nodes.push(ChainNode::call_optional(call));
-    } else {
-        nodes.push(ChainNode::call(call));
-    }
-    finalize_chain_nodes(&mut nodes, &paren_gaps);
+    nodes.push(ChainNode::call(call));
+    finalize_chain_nodes(&mut nodes, &paren_gaps, input.source);
     nodes
 }
 
@@ -75,7 +74,7 @@ pub fn linearize_chain_from_member<'a>(
     let mut paren_gaps = Vec::new();
     linearize_member_object(member, input, &mut nodes, &mut paren_gaps);
     linearize_member_node(member, input.source, &mut nodes, &mut paren_gaps);
-    finalize_chain_nodes(&mut nodes, &paren_gaps);
+    finalize_chain_nodes(&mut nodes, &paren_gaps, input.source);
     nodes
 }
 
@@ -94,7 +93,7 @@ pub fn linearize_chain_from_non_null<'a>(
     let mut paren_gaps = Vec::new();
     linearize_recursive(non_null.expression, input, &mut nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null(non_null));
-    finalize_chain_nodes(&mut nodes, &paren_gaps);
+    finalize_chain_nodes(&mut nodes, &paren_gaps, input.source);
     nodes
 }
 
@@ -145,11 +144,67 @@ type ParenGap = (usize, u32, u32);
 /// extensions, then re-evaluate the base node's parens for the callee case.
 /// Shared by every linearization entry point so the two post-passes never
 /// drift apart.
-fn finalize_chain_nodes(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap]) {
+fn finalize_chain_nodes(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap], source: &str) {
     apply_paren_gaps(nodes, paren_gaps);
     fix_callee_base_parens(nodes);
+    mark_own_call_layout(nodes, source);
     #[cfg(feature = "buffer_stats")]
     crate::printer::buffer_stats::record_chain_nodes(nodes.len());
+}
+
+/// Decide, per call node, whether prettier would print it through `printCallExpression` —
+/// where the call-level layout rules live — or as a link its `printMemberChain` swallowed
+/// ([`super::types::ChainCall::own_call_layout`]).
+///
+/// tsv routes a whole callee spine into ONE chain; prettier splits the same spine into
+/// several `printCallExpression` invocations, and only the calls under an entered
+/// `printMemberChain` lose those rules. Reconstructing that split is a single outer→inner
+/// walk, mirroring `printCallExpression` + `printMemberChain`'s `rec` step for step:
+///
+/// - **Not yet entered.** The call is printed by `printCallExpression`, so it keeps its own
+///   layout. It then enters the chain iff its callee is memberish — unless its own
+///   sole-multiline-template argument PREEMPTS the redirect, which sits below that `if`
+///   (`a.b(\`x⏎y\`).c(\`p⏎q\`)` — both hug, because the outer never reaches the redirect).
+/// - **Entered.** `rec` swallows a call whose callee is memberish *or itself a call*; that
+///   call's arguments go to `printCallArguments` and lose the rules. A call whose callee is
+///   NEITHER is where `rec` stops and falls back to `print()` — prettier's chain BASE, which
+///   re-enters `printCallExpression` and keeps them (`a(\`x⏎y\`).b()` hugs where
+///   `a.b(\`x⏎y\`).c()` expands, and that is the whole difference between them).
+///
+/// ⚠️ Only the template preempt is modelled, and the other three in prettier's `if` are
+/// **unreachable** here rather than omitted: a test call's callee must match a dotted
+/// identifier path (`describe.only`), and `require`/`define`/`import()` are a bare
+/// identifier or their own node — none of which can have a call beneath them, so none can
+/// ever be the ancestor that swallows one.
+fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) {
+    let mut entered = false;
+    for node in nodes.iter_mut().rev() {
+        let ChainNode::Call { call, facts } = node else {
+            continue;
+        };
+        if entered {
+            // `rec` swallows a memberish-or-call callee and stops at anything else, printing
+            // that one with `print()` — a fresh `printCallExpression` context for everything
+            // below it.
+            let swallowed =
+                is_memberish(call.callee) || matches!(call.callee, Expression::CallExpression(_));
+            facts.own_call_layout = !swallowed;
+            entered = swallowed;
+        } else {
+            facts.own_call_layout = true;
+            entered = is_memberish(call.callee) && !template_preempts_chain_redirect(call, source);
+        }
+    }
+}
+
+/// Prettier's `isTemplateLiteralSingleArg` — a sole multiline template the author did NOT put
+/// on a line of its own, the one condition in `printCallExpression`'s top `if` that a call
+/// with a memberish callee can meet, and so the only thing that stops the
+/// `printMemberChain` redirect below it.
+fn template_preempts_chain_redirect(call: &internal::CallExpression<'_>, source: &str) -> bool {
+    call.arguments.len() == 1
+        && is_multiline_template_expression(&call.arguments[0])
+        && !has_newline_before_position(source, call.arguments[0].span().start)
 }
 
 /// Re-evaluate the base node's parens under `Callee` context when it is the
@@ -329,11 +384,7 @@ fn linearize_recursive<'a>(
         // CallExpression: recurse into callee, then add Call node
         Expression::CallExpression(call) => {
             linearize_call_callee(call, input, nodes, paren_gaps);
-            if call.optional {
-                nodes.push(ChainNode::call_optional(call));
-            } else {
-                nodes.push(ChainNode::call(call));
-            }
+            nodes.push(ChainNode::call(call));
         }
 
         // MemberExpression: recurse into object, then add Member node
@@ -703,8 +754,15 @@ pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printe
 /// `member/computed_leading_line_comment`). Take this asymmetry as deliberate before
 /// "fixing" the two spellings into one.
 fn gap_has_line_comment(node: &ChainNode<'_>, comments: &[Comment]) -> bool {
-    node.comment_range()
-        .is_some_and(|(start, end)| has_line_comments_in_range(comments, start, end))
+    // Through the hole-honoring seam: the widened range's skipped middle holds comments
+    // this node prints none of — an inner member's gap forces its OWN node's group split,
+    // and the head's share is printed ahead of the whole chain. Asking the range whole
+    // split the group for a comment that is not on this gap's line at all.
+    node.comment_range().is_some_and(|gap| {
+        chain_gap_any(gap, node.paren_gap_skip(), |start, end| {
+            has_line_comments_in_range(comments, start, end)
+        })
+    })
 }
 
 /// Check if chain should NOT wrap between first and second groups

@@ -14,7 +14,4 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 3
-DROPPED	((⟨⟩IDENT	line
-DROPPED	(⟨⟩IDENT	line
-DOUBLE-PRINTED	␣⟨⟩//	multiline
+# shapes: 0

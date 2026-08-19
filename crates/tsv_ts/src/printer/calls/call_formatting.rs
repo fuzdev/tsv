@@ -104,6 +104,7 @@ pub(super) fn build_call_doc_with_wrapping(
         owned_pair,
         trailing_gap,
         start: callee_gap_start,
+        optional,
     } = gap;
 
     let callee = if owned_pair {
@@ -133,17 +134,18 @@ pub(super) fn build_call_doc_with_wrapping(
         )
     };
 
-    // Handle optional chaining. With an empty argument list and no explicit type
-    // arguments, `?.` fuses into the list's own `?.(` instead of gluing onto the
-    // callee, so a comment in the callee→`(` gap lands BEFORE `?.` — the side
-    // prettier picks, and the member-chain printer's answer to the same gap
-    // (`build_chain_args_empty`). With type arguments `?.` precedes them
-    // (`call?.<T>()`), and with arguments present it stays on the callee.
-    let fuse_optional = call.optional && call.arguments.is_empty() && call.type_arguments.is_none();
-    let callee = if call.optional && !fuse_optional {
-        d.concat(&[callee, d.text("?.")])
-    } else {
-        callee
+    // Handle optional chaining. With an empty argument list and no explicit type arguments
+    // `?.` fuses into the list's own `?.(` instead of gluing onto the callee, so the whole
+    // callee→`(` gap lands BEFORE it — the side prettier picks, and the member-chain
+    // printer's answer to the same gap (`build_chain_args_empty`). Otherwise the `?.` is a
+    // position with two writable sides, this call prints it, and `optional_callee_gap_doc`
+    // emits the callee-side half of the gap in front of it; the argument side's own half is
+    // already past `gap.start`. Both spellings are states of one derivation
+    // ([`CalleeGap::optional`]) rather than two `call.optional` tests.
+    let fuse_optional = optional.fused();
+    let callee = match super::optional_callee_gap_doc(printer, gap) {
+        Some(optional_doc) => d.concat(&[callee, optional_doc]),
+        None => callee,
     };
 
     // Combine callee with type arguments (`fn<T>`), preserving comments in the gap

@@ -9,7 +9,7 @@
 use crate::ast::internal::{ArrowFunctionBody, Expression};
 use crate::printer::calls::arg_predicates::is_simple_call_argument;
 
-use super::super::printing::node_comment_gap;
+use super::super::printing::{chain_gap_any, node_comment_gap};
 use super::super::types::{ChainGroup, ChainNode};
 use crate::printer::Printer;
 use tsv_lang::comments_on_page_in_range;
@@ -30,11 +30,16 @@ pub(super) fn has_blank_lines_between_methods<'a>(
     let line_breaks = printer.get_layout_line_breaks();
     // Skip groups[0] (base) and groups[1] (first method) - only check groups[2+]
     groups.iter().skip(2).any(|group| {
-        group
-            .first_member_range()
-            .is_some_and(|(obj_end, prop_start)| {
+        let Some(node) = group.nodes.first() else {
+            return false;
+        };
+        // Hole-honoring ([`chain_gap_any`]): a blank a widened range sweeps up sits INSIDE
+        // the object — between two call arguments, say — and is not a blank between methods.
+        node.comment_range().is_some_and(|gap| {
+            chain_gap_any(gap, node.paren_gap_skip(), |obj_end, prop_start| {
                 has_blank_line_between_fast(line_breaks, obj_end, prop_start)
             })
+        })
     })
 }
 
@@ -85,8 +90,14 @@ pub(super) fn has_comments_forcing_expansion<'a>(
                 continue;
             }
 
-            if let Some((obj_end, prop_start)) = node.comment_range()
-                && printer.has_comments_to_emit_between(obj_end, prop_start)
+            // Hole-honoring ([`chain_gap_any`]): the comments a widened range sweeps up
+            // belong to the object subtree's own printers or to the chain head, and
+            // expanding this chain around one is a layout the un-widened spelling of the
+            // same document does not get.
+            if let Some(gap) = node.comment_range()
+                && chain_gap_any(gap, node.paren_gap_skip(), |start, end| {
+                    printer.has_comments_to_emit_between(start, end)
+                })
             {
                 return true;
             }

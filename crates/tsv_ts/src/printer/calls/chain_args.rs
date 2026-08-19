@@ -9,6 +9,7 @@
 // is still this file's alone is the selection ORDER and the arms the other trees have no twin
 // for (the force-expanded hugs, the classify-and-wrap fallback).
 
+use super::super::chain::ChainCall;
 use super::super::comments::CommentSpacing;
 use super::super::{Printer, is_curried_arrow_chain, is_multiline_template_expression};
 use super::arg_comments::{
@@ -32,7 +33,6 @@ use super::arg_wrapping::{
     try_hook_deps_args_doc,
 };
 use crate::ast::internal::{self, Expression};
-use crate::printer::chain::call_callee_paren_leading_start;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, callback_signature_has_breaking_comments,
     function_signature_has_breaking_comments, prepend_leading,
@@ -164,9 +164,9 @@ fn build_inline_trailing_comments(
 pub(super) fn build_call_args_doc_for_chain(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
-    optional: bool,
+    facts: ChainCall,
 ) -> DocId {
-    build_call_args_doc_for_chain_impl(printer, call, optional, false, false)
+    build_call_args_doc_for_chain_impl(printer, call, facts, false, false)
 }
 
 /// A lone arrow argument with an EXPRESSION body — the shape every hug arm in
@@ -224,9 +224,9 @@ fn build_hugged_arrow_arg_doc(
 pub(super) fn build_call_args_doc_for_chain_expanded(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
-    optional: bool,
+    facts: ChainCall,
 ) -> DocId {
-    build_call_args_doc_for_chain_impl(printer, call, optional, true, false)
+    build_call_args_doc_for_chain_impl(printer, call, facts, true, false)
 }
 
 /// Build a Doc for call arguments with standard forced expansion
@@ -239,9 +239,9 @@ pub(super) fn build_call_args_doc_for_chain_expanded(
 pub(super) fn build_call_args_doc_for_chain_standard_expanded(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
-    optional: bool,
+    facts: ChainCall,
 ) -> DocId {
-    build_call_args_doc_for_chain_impl(printer, call, optional, true, true)
+    build_call_args_doc_for_chain_impl(printer, call, facts, true, true)
 }
 
 /// Shared per-call state computed once in `build_call_args_doc_for_chain_impl`'s
@@ -254,6 +254,10 @@ pub(super) fn build_call_args_doc_for_chain_standard_expanded(
 struct ChainArgsContext {
     paren_open: u32,
     prefix: &'static str,
+    /// [`ChainCall::own_call_layout`] — whether the call-level layout rules apply to this
+    /// link at all. Threaded here rather than re-derived, because it is a fact about the
+    /// link's POSITION in the chain and no branch builder can see one.
+    own_call_layout: bool,
     /// **to emit**: a non-owned leading comment before the first argument (emitted here).
     has_leading_comments: bool,
     /// **on page**: any leading comment before the first argument, **owned or not** — an
@@ -287,11 +291,11 @@ struct ChainArgsContext {
 fn build_call_args_doc_for_chain_impl(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
-    optional: bool,
+    facts: ChainCall,
     force_expand: bool,
     standard_expansion: bool,
 ) -> DocId {
-    let d = printer.d();
+    let ChainCall { own_call_layout } = facts;
     // Build type arguments if present: `<T, U>`
     let type_args = get_call_type_arguments(call);
     let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
@@ -300,16 +304,15 @@ fn build_call_args_doc_for_chain_impl(
     // answer the blank question exactly as a plain call's do.
     let any_arg_empty_line = any_arg_empty_line(call.arguments, printer);
 
-    // Get paren_open position (after type args if present, otherwise after the callee —
-    // or past the `)` of an IIFE callee's own pair, which emitted its trailing gap
-    // itself, so nothing here scans through those parens a second time).
-    let callee_end = call.callee.span().end;
-    let callee_gap_start = Printer::gap_start_after_owned_pair(
-        callee_end,
-        printer
-            .owned_pair_trailing_gap(callee_end, call_callee_paren_leading_start(call).is_some()),
-    );
-    let paren_open = type_args.map_or(callee_gap_start, |ta| ta.span.end);
+    // Every window past the callee, off the family's ONE derivation ([`super::CalleeGap`]) —
+    // past the `)` of an IIFE callee's own pair, which emitted its trailing gap itself, and
+    // past an optional call's `?.`, whose callee-side half this function emits below. This
+    // was open-coded here, a third site of the derivation that struct's ⚠️ warns about; the
+    // hand-rolled copy had no `?.` step at all, which is how the callee-side comment reached
+    // the argument-leading scan and printed inside the parens.
+    let gap = super::callee_gap(printer, call);
+    let callee_gap_start = gap.start;
+    let paren_open = gap.paren_open(call);
 
     // Check for any comments in arguments (leading, inter-argument, or trailing)
     // Note: presence of comments doesn't necessarily mean expansion - only line comments
@@ -375,17 +378,15 @@ fn build_call_args_doc_for_chain_impl(
         || comments_force_expansion
         || is_function_composition_args(call.arguments);
 
-    // `?.` precedes explicit type arguments (`a.fn?.<T>(b)`), so it only fuses
-    // with the paren when there are none
-    let prefix = if optional && type_args.is_none() {
-        "?.("
-    } else {
-        "("
-    };
+    // `?.` fuses with the paren only in the spelling where nothing follows it — an empty
+    // argument list and no type arguments ([`super::CallOptional::Fused`], the one spelling
+    // both call printers ask). Everywhere else this link prints the `?.` itself, behind the
+    // callee-side half of its own gap.
+    let prefix = if gap.optional.fused() { "?.(" } else { "(" };
 
     let mut parts = DocBuf::new();
-    if optional && type_args.is_some() {
-        parts.push(d.text("?."));
+    if let Some(optional_doc) = super::optional_callee_gap_doc(printer, gap) {
+        parts.push(optional_doc);
     }
     // Emit comments between callee and type args: `obj.fn/* c */ <string>()`
     // Uses build_name_to_type_params_comments for safe line comment handling
@@ -407,6 +408,7 @@ fn build_call_args_doc_for_chain_impl(
     let ctx = ChainArgsContext {
         paren_open,
         prefix,
+        own_call_layout,
         has_leading_comments,
         has_leading_comment_on_page,
         has_any_comments,
@@ -767,6 +769,7 @@ fn build_chain_args_single(
     let ChainArgsContext {
         paren_open,
         prefix,
+        own_call_layout,
         has_leading_comments,
         has_leading_comment_on_page,
         has_any_comments,
@@ -1013,13 +1016,20 @@ fn build_chain_args_single(
         return d.concat(&parts);
     }
 
-    // Single multiline template literal on its own line — preserve expanded form.
-    // Mirrors Prettier's isTemplateOnItsOwnLine: walks backwards from the
-    // template backtick to check if the author placed it on a new line.
-    let template_on_own_line = is_multiline_template_expression(arg)
-        && has_newline_before_position(printer.source, arg_start);
+    // Single multiline template literal — the expanded form, taken for two reasons.
+    //
+    // 1. The author put it on a line of its own, prettier's `isTemplateOnItsOwnLine`
+    //    (walk backwards from the backtick and find a newline).
+    // 2. This call is a LINK the member-chain redirect swallowed
+    //    ([`ChainCall::own_call_layout`]), so prettier prints its arguments through
+    //    `printCallArguments` and the hug — which lives at the TOP of
+    //    `printCallExpression`, above that redirect — never runs for it. The two states
+    //    that separate are `` a.b(`x⏎y`).c() `` (a link, expands) and `` a(`x⏎y`).b() ``
+    //    (prettier's chain BASE, printed with `print()`, hugs).
+    let template_expands = is_multiline_template_expression(arg)
+        && (has_newline_before_position(printer.source, arg_start) || !own_call_layout);
 
-    if template_on_own_line {
+    if template_expands {
         // `arg_with_comments`, per the ⚠️ above — this arm rebuilt the argument from
         // `build_expression_doc` instead, which is the same defect one step further:
         // it discarded the gap runs AND the argument-context printing. Every comment
