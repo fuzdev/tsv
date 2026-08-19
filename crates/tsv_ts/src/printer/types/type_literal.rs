@@ -437,12 +437,14 @@ impl<'a> Printer<'a> {
             // comments the aligned opening can hold; a `//` in its member gaps declines
             // it and falls through to the default arm below.
             if default_paren_indent == DefaultParenIndent::Nested
-                && let Some((intersection, obj)) = self.aligned_trailing_object_shell(ts_type)
+                && let Some((intersection, obj, claim)) =
+                    self.aligned_trailing_object_shell(ts_type)
             {
                 return self.build_parenthesized_intersection_trailing_object_doc(
                     intersection,
                     obj,
                     outermost_paren(ts_type),
+                    claim,
                 );
             }
 
@@ -651,8 +653,16 @@ impl<'a> Printer<'a> {
         intersection: &TSIntersectionType<'_>,
         trailing_obj: &TSTypeLiteral<'_>,
         paren: Option<&TSParenthesizedType<'_>>,
+        claimed_shell: Option<Span>,
     ) -> DocId {
         let d = self.d();
+        // `claimed_shell` widens the `(` gap over a redundant shell at the intersection's
+        // leading printed EDGE, whose run belongs in this gap once the shell strips — the
+        // standing seam ([`Printer::leading_edge_claim_and_start`]), resolved by
+        // `aligned_trailing_object_shell` so the router and this emitter cannot come to
+        // measure different windows. The claim silences the shell's own copy below; the
+        // window moves the run here. One without the other is a drop or a double-print.
+        let gap_end = claimed_shell.map_or(intersection.span.start, |c| c.end);
         // Build opening: (A & B & {
         let mut opening_parts: DocBuf = smallvec![d.text("(")];
 
@@ -673,15 +683,14 @@ impl<'a> Printer<'a> {
             // so both authorings are fixed points here as at every other bracket. It used
             // to glue either way — the run rode directly behind the `(` with no break in
             // front of it.
-            let (glued, resume) =
-                self.split_open_delimiter_glued_run(p.span.start + 1, intersection.span.start);
+            let (glued, resume) = self.split_open_delimiter_glued_run(p.span.start + 1, gap_end);
             let glued_here = glued.is_some();
             opening_parts.extend(glued);
             let mut lead: DocBuf = DocBuf::new();
             let has_line = self.push_paren_shell_leading_run(
                 &mut lead,
                 resume,
-                intersection.span.start,
+                gap_end,
                 ShellLeadingRun::Here,
             );
             // A `//` on the `(` line — the author's, or the first this run emits — has to
@@ -731,7 +740,14 @@ impl<'a> Printer<'a> {
                     t.span().start,
                 );
             }
-            opening_parts.push(self.build_intersection_member_type_doc(t, member_parens));
+            // Only the FIRST member can carry the leading-edge shell the `(` gap widened
+            // over — it is the descent link of `Printer::head_stripped_paren_shell`, and a
+            // later member is never on that path. The claim silences that shell's own run,
+            // which the gap above has already emitted.
+            let member_claim = if i == 0 { claimed_shell } else { None };
+            opening_parts.push(self.with_claimed_shell_leading_run(member_claim, || {
+                self.build_intersection_member_type_doc(t, member_parens)
+            }));
         }
 
         // Add ` & {`, with the last gap — the one before the trailing object — taking the

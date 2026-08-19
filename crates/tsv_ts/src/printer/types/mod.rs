@@ -28,6 +28,8 @@ mod type_members;
 mod type_params;
 mod union_intersection;
 
+use union_intersection::union_member_parens;
+
 // Re-export public items from helpers
 pub use helpers::unwrap_parenthesized;
 
@@ -44,7 +46,7 @@ pub(super) use super::StandaloneGlue;
 pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
-use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
+use crate::ast::internal::{TSImportType, TSIntersectionType, TSParenthesizedType, TSType};
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, ShellLeadingRun};
@@ -788,25 +790,9 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Returns true if there's a line comment between `(` and the inner type
-    /// of a parenthesized type (e.g., `(// leading\n T)`).
-    ///
-    /// ⚠️ **Shallow — checks only THIS paren's own one-level gap.** Correct only
-    /// when the caller retains this exact paren (the `TSType::Union(_)`-guarded
-    /// paren-union member callers). For a paren the caller will STRIP — where a
-    /// double-nested `((// c\n T))` hides the comment one layer deeper, between the
-    /// two `(`s this window never reaches — use the deep
-    /// [`Self::stripped_paren_has_leading_line_comment`] instead.
-    pub(in crate::printer) fn paren_has_leading_line_comment(
-        &self,
-        p: &TSParenthesizedType<'_>,
-    ) -> bool {
-        self.has_line_comments_between(p.span.start + 1, p.type_annotation.span().start)
-    }
-
-    /// Deep analog of [`Self::paren_has_leading_line_comment`]: does a possibly
-    /// multiply-nested redundant paren shell (`((// c\n X))`) hold a **relocatable**
-    /// leading line-comment run — one it is safe to hoist while stripping the shell?
+    /// Does a possibly multiply-nested redundant paren shell (`((// c\n X))`) hold a
+    /// **relocatable** leading line-comment run — one it is safe to hoist while stripping
+    /// the shell?
     /// True exactly when [`Self::stripped_paren_leading_line_comments`] returns a run.
     ///
     /// This is the predicate every caller that will **strip** the paren layers wants:
@@ -1110,23 +1096,26 @@ impl<'a> Printer<'a> {
     /// leading run is the seam's FIRST branch (the shell IS the value), and one carrying a
     /// trailing run is retained by its own emitter.
     ///
-    /// ⚠️ Each link declines where its own position REQUIRES the pair
-    /// (`type_needs_parens_for_*`): a required pair is emitted OPEN around the run by
-    /// [`Self::build_open_required_paren_doc`], which is a second emitter for the same
-    /// comments — claiming it here would print them twice, or (with the suppression) leave
-    /// an empty pair. A shell the trailing-run rule retains, and one holding a routed
-    /// format-ignore directive, decline for the reasons the seam above and
-    /// [`Self::paren_interior_routed_inner`] give.
+    /// ⚠️ Each link declines where an emitter DOWNSTREAM of the gap already owns the run —
+    /// [`Self::leading_edge_shell`]'s `downstream_owns_run`, which at three of the four
+    /// links is "the position REQUIRES the pair, so it is emitted OPEN around the run by
+    /// [`Self::build_open_required_paren_doc`]". Claiming there would print the comments
+    /// twice, or (with the suppression) leave an empty pair. The intersection link asks a
+    /// wider question, because its member builder answers a union operand differently —
+    /// see [`Self::intersection_member_run_owned_downstream`]. A shell the trailing-run
+    /// rule retains, and one holding a routed format-ignore directive, decline for the
+    /// reasons the seam above and [`Self::paren_interior_routed_inner`] give.
     fn head_stripped_paren_shell<'t>(&self, ty: &'t TSType<'t>) -> Option<&'t TSType<'t>> {
         match ty {
             TSType::Array(a) => {
-                self.leading_edge_shell(a.element_type, type_needs_parens_for_array_element)
+                self.required_pair_head_shell(a.element_type, type_needs_parens_for_array_element)
             }
-            TSType::IndexedAccess(i) => {
-                self.leading_edge_shell(i.object_type, type_needs_parens_for_indexed_access_object)
-            }
+            TSType::IndexedAccess(i) => self.required_pair_head_shell(
+                i.object_type,
+                type_needs_parens_for_indexed_access_object,
+            ),
             TSType::Conditional(c) => {
-                self.leading_edge_shell(c.check_type, type_needs_parens_for_conditional_check)
+                self.required_pair_head_shell(c.check_type, type_needs_parens_for_conditional_check)
             }
             TSType::Intersection(i) => {
                 // ⚠️ The intersection's OWN Rule A leading-run freeze slices its first
@@ -1143,10 +1132,25 @@ impl<'a> Printer<'a> {
                 {
                     return None;
                 }
-                self.leading_edge_shell(
-                    i.types.first()?,
-                    type_needs_parens_in_union_or_intersection,
-                )
+                let first = i.types.first()?;
+                // ⚠️ A **leading-operator** intersection (`& /* c */ (⏎// d⏎A)`, whose span
+                // opens at the `&`) owns bytes AHEAD of the shell — its own leading-`&`
+                // gap, which the intersection emits itself. An enclosing gap's window opens
+                // at ITS start and closes at the claim's END, so a claim here would hand it
+                // that gap too and every comment in it printed TWICE
+                // ([`comments.md`](../../../../docs/comments.md): the parent's share is a
+                // partition, and an anchor shift is not one). Only where that gap actually
+                // holds a comment, though — empty, the two windows coincide and the claim
+                // is exactly the shell's, which is what the array / indexed-access /
+                // conditional / value positions over a leading-`&` intersection need. Every
+                // other spelling starts its span at the first member, where the question
+                // cannot arise.
+                if i.span.start != first.span().start
+                    && self.has_comments_on_page_between(i.span.start, first.span().start)
+                {
+                    return None;
+                }
+                self.leading_edge_shell(first, self.intersection_member_run_owned_downstream(i))
             }
             TSType::Parenthesized(p) if self.paren_inner_comment_flags(p) == (false, false) => {
                 self.head_stripped_paren_shell(p.type_annotation)
@@ -1156,25 +1160,31 @@ impl<'a> Printer<'a> {
     }
 
     /// One link of [`Self::head_stripped_paren_shell`]'s descent: `head` is the leading
-    /// operand of a suffixed/composite type, and `needs_parens` is that position's own
-    /// pair rule.
+    /// operand of a suffixed/composite type, and `downstream_owns_run` is that position's
+    /// answer to "does an emitter below this gap already print the shell's leading run?".
     ///
-    /// ⚠️ The pair question is whether the required pair **opens around the run**, not
-    /// whether the position requires a pair. A required pair that stays CLOSED
+    /// ⚠️ It is never "does the position require a pair". A required pair that stays CLOSED
     /// (`(⏎// c⏎A) & B` as a union member — the pair is the intersection's, the shell one
     /// link inside it) prints its `(` at the enclosing gap's own indent and leaves the run
     /// where the gap can own it; only a pair required around the SHELL is emitted open
     /// around the run by [`Self::build_open_required_paren_doc`] and is that run's own
     /// emitter. Asking the coarser question declined every composite head that needs its
     /// own parens, which is most of them.
+    ///
+    /// ⚠️ And it is the POSITION's question, not this function's — which is why the answer
+    /// arrives as a bool rather than as a `needs_parens` fn. Three links resolve it as
+    /// `required_paren_pair_opens_for_leading_run`; the intersection member's builder makes
+    /// that reading false for a union operand, so it resolves its own
+    /// ([`Self::intersection_member_run_owned_downstream`]). Deriving it here from one
+    /// predicate declined an unowned run at five positions at once, each of which then
+    /// hoisted it to wherever the intersection happened to be built and disagreed with its
+    /// own reparse.
     fn leading_edge_shell<'t>(
         &self,
         head: &'t TSType<'t>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        downstream_owns_run: bool,
     ) -> Option<&'t TSType<'t>> {
-        if self.required_paren_pair_opens_for_leading_run(head, needs_parens)
-            || self.paren_interior_routed_inner(head).is_some()
-        {
+        if downstream_owns_run || self.paren_interior_routed_inner(head).is_some() {
             return None;
         }
         if self.stripped_paren_hang_has_leading_line_comment(head)
@@ -1183,6 +1193,61 @@ impl<'a> Printer<'a> {
             return Some(head);
         }
         self.head_stripped_paren_shell(head)
+    }
+
+    /// [`Self::leading_edge_shell`] for the three links whose head is rendered by the plain
+    /// required-pair seam, where "does an emitter downstream own the run?" is exactly "does
+    /// that pair OPEN around it?" ([`Self::required_paren_pair_opens_for_leading_run`]).
+    /// The intersection's first member is the fourth link and resolves its own, because its
+    /// builder answers a union operand differently
+    /// ([`Self::intersection_member_run_owned_downstream`]).
+    fn required_pair_head_shell<'t>(
+        &self,
+        head: &'t TSType<'t>,
+        needs_parens: fn(&TSType<'_>) -> bool,
+    ) -> Option<&'t TSType<'t>> {
+        self.leading_edge_shell(
+            head,
+            self.required_paren_pair_opens_for_leading_run(head, needs_parens),
+        )
+    }
+
+    /// The `downstream_owns_run` answer for an **intersection's first member**, which is
+    /// the one link whose head is built by the maybe-parens builder
+    /// (`build_intersection_member_type_doc`) rather than by the plain required-pair seam.
+    ///
+    /// ⚠️ That builder's parenthesized-**union** arm runs BEFORE its open-pair arm, so a
+    /// member whose unwrapped inner is a union never reaches
+    /// [`Self::build_open_required_paren_doc`] — the coarse "the required pair opens around
+    /// the run" reading is simply false of it, however required the pair is. What owns such
+    /// a member's run instead is the pair the run physically sits in, and only where that
+    /// pair SURVIVES: the keep-inside rule, `Printer::paren_union_line_comment_member`,
+    /// asked here as the same accessor its three readers ask.
+    ///
+    /// Everything else that unwraps to a union has NO downstream emitter but the
+    /// intersection's own first-member HOIST — a redundant outer layer
+    /// (`((// c⏎ a | b)) & d`, `(// c⏎ (a | b)) & d`) or a pair the member rule strips —
+    /// and the hoist is a fallback this gap outranks. Left to it, the run landed wherever
+    /// the intersection was built: inside a required pair that never opened, glued to a `(`
+    /// with the operand un-indented and the `)` welded to its tail. The reparse then reads
+    /// the comment from that `(`'s own gap and prints the opened shape, so the two passes
+    /// disagreed — at the optional tuple element, the union member, the array element, the
+    /// indexed-access object and the conditional check type, all off this one decline.
+    fn intersection_member_run_owned_downstream(&self, i: &TSIntersectionType<'_>) -> bool {
+        // Both facts derive from the one node, so the member and the member-parens rule
+        // asked about it cannot come from different intersections.
+        let Some(first) = i.types.first() else {
+            return false;
+        };
+        if matches!(unwrap_parenthesized(first), TSType::Union(_)) {
+            return self
+                .paren_union_line_comment_member(first, union_member_parens(i.types.len()))
+                .is_some();
+        }
+        self.required_paren_pair_opens_for_leading_run(
+            first,
+            type_needs_parens_in_union_or_intersection,
+        )
     }
 
     /// Build `value` with `shell`'s leading run marked as ALREADY CLAIMED by the

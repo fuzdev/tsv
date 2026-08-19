@@ -1,0 +1,68 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// an optional tuple element whose intersection ends in an object literal: the pair the
+	// `?` requires supplies the aligned trailing-object layout, and the head shell's `//`
+	// lands in that pair's own `(` gap - on the `(` line the author glued it to
+	type A = [
+		(// c1
+		B & { a: 1 })?
+	];
+
+	// the same comment written on its own line inside the shell keeps that line
+	type C = [
+		(// c2
+		D & { a: 1 })?
+	];
+
+	// the shell one link further in, under an array suffix
+	type E = [
+		(// c3
+		F[] & { a: 1 })?
+	];
+
+	// the bare authoring of the same comment, written directly in the pair's own gap -
+	// the fixed point every spelling above settles on
+	type G = [
+		// c4
+		(H & { a: 1 })?
+	];
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// an optional tuple element whose intersection ends in an object literal: the pair the
+	// `?` requires supplies the aligned trailing-object layout, and the head shell's `//`
+	// lands in that pair's own `(` gap - on the `(` line the author glued it to
+	type A = [
+		// c1
+		(B & { a: 1 })?
+	];
+
+	// the same comment written on its own line inside the shell keeps that line
+	type C = [
+		// c2
+		(D & { a: 1 })?
+	];
+
+	// the shell one link further in, under an array suffix
+	type E = [
+		// c3
+		(F[] & { a: 1 })?
+	];
+
+	// the bare authoring of the same comment, written directly in the pair's own gap -
+	// the fixed point every spelling above settles on
+	type G = [
+		// c4
+		(H & { a: 1 })?
+	];
+</script>

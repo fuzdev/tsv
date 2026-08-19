@@ -1,0 +1,38 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// case C: first intersection member with leading line comment
+	type C = // leading
+	a &
+		b;
+
+	// case M3: nested union inside intersection - the shell wraps the whole value, so it
+	// is the one that strips (a shell around the paren-union MEMBER is retained and keeps
+	// the comment inside, in intersection_retained_paren_first_member_leading_line_comment)
+	type M3 =
+		// leading
+		(a | b) & c;
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// case C: first intersection member with leading line comment
+	type C =
+		// leading
+		a & b;
+
+	// case M3: nested union inside intersection - the shell wraps the whole value, so it
+	// is the one that strips (a shell around the paren-union MEMBER is retained and keeps
+	// the comment inside, in intersection_retained_paren_first_member_leading_line_comment)
+	type M3 =
+		// leading
+		(a | b) & c;
+</script>
