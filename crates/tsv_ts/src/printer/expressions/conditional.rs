@@ -230,6 +230,76 @@ impl<'a> Printer<'a> {
         self.d().parens(doc)
     }
 
+    /// Whether either BRANCH gap holds an honored directive — the layout gate's half of
+    /// [`Self::frozen_ternary_branch_doc`]. It locates the `?` / `:` itself because the gate
+    /// runs one function earlier than the breaking layout that resolves those positions for
+    /// its own emitters.
+    ///
+    /// Deliberately keyed on the `?`→consequent and `:`→alternate gaps rather than on the
+    /// whole `test`→`alternate` span the sibling gates scan: a directive in the *operand*
+    /// gaps (test→`?`, consequent→`:`) freezes nothing, so treating one as a branch directive
+    /// would break a ternary open for a freeze that never fires. Behind the document-level
+    /// flag, so a directive-free document never pays for the two operator scans.
+    fn ternary_branch_gap_frozen(&self, cond: &internal::ConditionalExpression<'_>) -> bool {
+        if !self.has_format_ignore {
+            return false;
+        }
+        let question = self.find_char_outside_comments(
+            cond.test.span().end,
+            cond.consequent.span().start,
+            b'?',
+        );
+        let colon = self.find_char_outside_comments(
+            cond.consequent.span().end,
+            cond.alternate.span().start,
+            b':',
+        );
+        self.frozen_ternary_branch_span(cond.consequent, question)
+            .is_some()
+            || self
+                .frozen_ternary_branch_span(cond.alternate, colon)
+                .is_some()
+    }
+
+    /// The span an honored directive in a ternary branch's operator→value gap freezes,
+    /// `None` where nothing does — the one spelling of that question, so the layout gate
+    /// ([`Self::ternary_branch_gap_frozen`]) and the emitter
+    /// ([`Self::frozen_ternary_branch_doc`]) cannot drift into two answers.
+    fn frozen_ternary_branch_span(
+        &self,
+        expr: &internal::Expression<'_>,
+        op_pos: Option<u32>,
+    ) -> Option<Span> {
+        op_pos.and_then(|p| self.value_head_frozen_span(p + 1, expr.span()))
+    }
+
+    /// The frozen doc for a ternary branch whose operator→value gap holds an honored
+    /// directive ([`Printer::value_head_frozen_span`]), `None` where nothing freezes.
+    ///
+    /// The one seam both branches route through, so the `?`→consequent and `:`→alternate
+    /// heads cannot drift apart — the same reason [`Self::push_ternary_branch_value`] exists
+    /// one question down. It goes through [`Self::parenthesize_ternary_branch`] like every
+    /// other branch doc: the clarity parens are the POSITION's, so they belong outside the
+    /// frozen slice, and the `None` shell boundary is the line-comment layout's own (its
+    /// branches never retain a shell — the gap's comment is emitted outside the pair by the
+    /// branch's own trailing-gap scan).
+    ///
+    /// A frozen branch takes the ordinary branch's indent even where it is a nested
+    /// conditional: the chain structure that arm exists to preserve is gone once the branch
+    /// renders as a verbatim slice.
+    fn frozen_ternary_branch_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        op_pos: Option<u32>,
+    ) -> Option<DocId> {
+        let frozen = self.frozen_ternary_branch_span(expr, op_pos)?;
+        Some(self.parenthesize_ternary_branch(
+            expr,
+            self.build_frozen_expression_doc(expr, frozen),
+            None,
+        ))
+    }
+
     /// Wrap a ternary test doc in parens when its `expr` needs them (arrow/yield are
     /// load-bearing — see `ternary_test_needs_parens`). The shared seam for both
     /// layouts, mirroring `parenthesize_ternary_branch`.
@@ -290,6 +360,12 @@ impl<'a> Printer<'a> {
         let has_line_comments = self.has_line_comments_between(test_end, consequent_start)
             || self.has_line_comments_between(consequent_end, alternate_start);
 
+        // An honored directive in a BRANCH gap forces the break too, in both spellings: the
+        // breaking layout is the only one that can keep the directive's own line, and a
+        // directive glued to the operator is inert under the placement floor — so the inline
+        // layout would freeze the branch on this pass and lose the freeze on the next.
+        let has_branch_directive = self.ternary_branch_gap_frozen(cond);
+
         // A branch-gap comment separated from its value by a blank line forces the
         // break too — prettier breaks on `a ? /* c */⏎⏎b` even though an own-line
         // block comment with no blank stays inline (`a ? /* c */⏎b`). Scan the whole
@@ -309,7 +385,11 @@ impl<'a> Printer<'a> {
         // If there are line comments, a blank-separated branch comment, or multiline
         // template literals, use a breaking layout. Other block comments after ? or :
         // are handled inline in the non-breaking path.
-        if has_line_comments || has_blank_separated_comment || has_multiline_template {
+        if has_line_comments
+            || has_branch_directive
+            || has_blank_separated_comment
+            || has_multiline_template
+        {
             return self.build_conditional_doc_with_line_comments(cond, is_chained);
         }
 
@@ -575,8 +655,12 @@ impl<'a> Printer<'a> {
         // consequent must also break. Without group_break, the inner ternary's
         // group stays flat (content fits on one line), but Prettier cascades
         // the break from the parent to the entire ternary chain.
+        // The `?`→consequent value head: an own-line directive in the gap freezes the whole
+        // branch ([`Self::frozen_ternary_branch_doc`]).
         let (consequent, is_nested_cond) =
-            if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
+            if let Some(frozen) = self.frozen_ternary_branch_doc(cond.consequent, question_pos) {
+                (frozen, false)
+            } else if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
                 let chained = self.build_conditional_doc_impl(nested, true, false);
                 (d.group_break(chained), true)
             } else {
@@ -623,8 +707,11 @@ impl<'a> Printer<'a> {
             self.emit_ternary_branch_comments(&mut q_parts, colon_pos, alternate_start);
 
         // Alternate expression - nested conditionals cascade the break without extra indent
+        // The `:`→alternate value head, the consequent's mirror.
         let alternate_doc =
-            if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
+            if let Some(frozen) = self.frozen_ternary_branch_doc(cond.alternate, colon_pos) {
+                d.indent(frozen)
+            } else if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
                 // Recursively use breaking layout - no indent wrapper (has its own structure)
                 self.build_conditional_doc_with_line_comments(nested, true)
             } else {
@@ -685,10 +772,23 @@ impl<'a> Printer<'a> {
         let mut has_line_comment = false;
         let mut last_own_line = false;
         for (i, comment) in comments.iter().enumerate() {
-            if i == 0 {
+            // An HONORED directive keeps the line the author gave it, wherever in the run it
+            // sits: sharing a line with the operator (or with the comment before it) is the
+            // placement the floor classifies as inert, and the freeze it earns would be lost
+            // on the second pass. The same rule `Printer::build_header_comment_run` states at
+            // the declaration headers and [`Printer::comment_hangs_next`] states for what
+            // follows a comment — the emitter never relocates a directive.
+            let directive = self.is_honored_directive(comment);
+            if i == 0 && directive {
+                parts.push(d.hardline());
+                parts.push(d.text(INDENT));
+                last_own_line = true;
+            } else if i == 0 {
                 // First comment trails the operator inline (`? /* c */`).
                 parts.push(d.text(" "));
-            } else if self.trailing_run_hugs_previous(Some(comments[i - 1]), comment.span.start) {
+            } else if !directive
+                && self.trailing_run_hugs_previous(Some(comments[i - 1]), comment.span.start)
+            {
                 // Glued to the previous comment — keep the line the author wrote them on,
                 // and take no INDENT: the run did not start a new line to indent onto
                 // ([`Printer::trailing_run_hugs_previous`], the rule every comment run

@@ -1068,8 +1068,22 @@ impl<'a> Printer<'a> {
     ///
     /// Contrast [`Self::comment_cannot_glue_to_operator`], the operator-glue rule, which keys on
     /// the newline *before* a comment and hangs an own-line **single-line** block too.
+    ///
+    /// ⚠️ A third shape hangs: an **honored format-ignore directive**
+    /// ([`Self::is_honored_directive`]), whatever its spelling. A directive that shares its
+    /// line with what follows is inert under the placement floor, so collapsing one inline
+    /// would silently cost the freeze it earns on the very next pass — the wrong output being
+    /// its own fixed point, invisible to every gate. It belongs in this predicate rather than
+    /// at the emitters because the gate and the emitter must keep answering as one, and
+    /// because the rule is about the DIRECTIVE, not about whether this particular gap freezes:
+    /// a gap that doesn't freeze today can only start honoring one if the placement survives
+    /// to be read. The leading-separator half is
+    /// [`Self::leading_comment_is_honored_directive`], and the same rule at the declaration
+    /// headers is `Printer::build_header_comment_run`.
     pub(crate) fn comment_hangs_next(&self, c: &internal::Comment, next: u32) -> bool {
-        !c.is_block || (c.multiline && self.has_newline_between(c.span.end, next))
+        !c.is_block
+            || (c.multiline && self.has_newline_between(c.span.end, next))
+            || self.is_honored_directive(c)
     }
 
     /// Whether a comment in `(start, end)` forces the *following* value onto its own
