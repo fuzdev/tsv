@@ -8,7 +8,6 @@
 // - Blank line preservation between properties
 
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
-use crate::printer::CommentSpacing;
 use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
@@ -456,13 +455,12 @@ impl<'a> Printer<'a> {
             // Getter/setter: `get x() {}` or `set x(v) {}`
             if let Expression::FunctionExpression(func) = &prop.value {
                 let func_doc = self.build_function_doc_body(func);
-                // Comments between key and params: get [x] /* c */() {}
-                // Line comments get a hardline to prevent absorbing parens as comment text
-                let params_start = func.params_start;
-                match self.build_name_to_type_params_comments_opt(
+                // Comments between key and type params/parens: `get [x] /* c */() {}`
+                // or `get x/* c */ <T>() {}`
+                match self.build_signature_head_comments_opt(
                     key_region_end,
-                    params_start,
-                    CommentSpacing::Leading,
+                    func.type_parameters.as_ref(),
+                    func.params_start,
                 ) {
                     Some(comments) => d.concat(&[key_doc, comments, func_doc]),
                     None => d.concat(&[key_doc, func_doc]),
@@ -494,18 +492,11 @@ impl<'a> Printer<'a> {
 
                 // Handle comments between method name and type params/parameters: foo /* comment */ ()
                 // Use key_region_end (after `]` for computed) to avoid re-finding bracket comments
-                // Stop at type_params start when present — comments between `>` and `(`
-                // are handled by build_function_expression_signature_doc
-                // Line comments get a hardline to prevent absorbing type params as comment text
-                let comment_search_end = func
-                    .type_parameters
-                    .as_ref()
-                    .map_or(func.params_start, |tp| tp.span.start);
-                self.push_name_to_type_params_comments(
+                self.push_signature_head_comments(
                     &mut parts,
                     key_region_end,
-                    comment_search_end,
-                    CommentSpacing::for_type_params(func.type_parameters.is_some()),
+                    func.type_parameters.as_ref(),
+                    func.params_start,
                 );
 
                 parts.push(func_doc);

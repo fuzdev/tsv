@@ -9,7 +9,7 @@ use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, IdentName};
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{ParenContext, Printer, needs_parens};
-use tsv_lang::{Comment, TAB_WIDTH, has_line_comments_in_range};
+use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_comments_in_range};
 
 //
 // Linearization
@@ -102,23 +102,44 @@ pub fn linearize_chain_from_non_null<'a>(
 ///
 /// Only extends ranges for call chains — prettier places comments mid-chain
 /// only when the chain contains calls.
+///
+/// The widened range runs from the stripped `(` all the way to this node's property,
+/// which sweeps up the object subtree sitting in between — whose own member accesses
+/// already claim their comments. So the node also records that subtree as the region
+/// its EMITTERS must skip ([`ChainNode::paren_gap_skip`]); the widened range itself
+/// stays whole for the layout predicates.
 fn apply_paren_gaps(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap]) {
     if !paren_gaps.is_empty() && nodes.iter().any(ChainNode::is_call) {
-        for &(node_index, gap_start) in paren_gaps {
+        for &(node_index, gap_start, object_start) in paren_gaps {
             if let Some(
-                ChainNode::Member { object_end, .. }
-                | ChainNode::PrivateMember { object_end, .. }
-                | ChainNode::ComputedMember { object_end, .. },
+                ChainNode::Member {
+                    object_end,
+                    paren_gap_skip,
+                    ..
+                }
+                | ChainNode::PrivateMember {
+                    object_end,
+                    paren_gap_skip,
+                    ..
+                }
+                | ChainNode::ComputedMember {
+                    object_end,
+                    paren_gap_skip,
+                    ..
+                },
             ) = nodes.get_mut(node_index)
             {
+                // `object_end` is still the natural one: the linearizer pushes a fresh
+                // member node per call, so each index is targeted at most once.
+                *paren_gap_skip = Some(Span::new(object_start, *object_end));
                 *object_end = gap_start;
             }
         }
     }
 }
 
-/// A deferred paren gap extension: (node_index, gap_start)
-type ParenGap = (usize, u32);
+/// A deferred paren gap extension: (node_index, gap_start, object_start)
+type ParenGap = (usize, u32, u32);
 
 /// Finalize a freshly-linearized chain: apply deferred comment paren-gap
 /// extensions, then re-evaluate the base node's parens for the callee case.
@@ -473,7 +494,7 @@ fn linearize_member_node<'a>(
                 ChainNode::Member { .. }
                 | ChainNode::PrivateMember { .. }
                 | ChainNode::ComputedMember { .. } => {
-                    paren_gaps.push((i, member_start));
+                    paren_gaps.push((i, member_start, object_start));
                     break;
                 }
                 ChainNode::Base { .. } => break,

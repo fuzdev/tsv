@@ -98,7 +98,16 @@ impl<'a, 'p, 'pr> ChainPartsBuilder<'a, 'p, 'pr> {
     /// and the member-only breaking path render gap comments identically.
     fn add_comments_and_break(&mut self, group: &ChainGroup<'_>) {
         if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
-            push_gap_comments_and_break(self.parts, self.printer, object_end, property_start);
+            push_gap_comments_and_break(
+                self.parts,
+                self.printer,
+                object_end,
+                property_start,
+                group
+                    .nodes
+                    .first()
+                    .and_then(super::super::ChainNode::paren_gap_skip),
+            );
         } else {
             // No member range - just add line break
             let d = self.printer.arena();

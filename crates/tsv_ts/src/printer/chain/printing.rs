@@ -7,6 +7,7 @@
 use super::types::{ChainGroup, ChainNode, NonNullGap, is_numeric_index};
 use crate::ast::internal::{self, Expression};
 use crate::printer::{LeadingGlue, ParenContext, Printer, needs_parens};
+use tsv_lang::Span;
 use tsv_lang::doc::{
     DocBuf,
     arena::{DocArena, DocId},
@@ -157,6 +158,7 @@ pub(crate) fn print_node_inner<'a>(
             optional,
             object_end,
             property_start,
+            paren_gap_skip,
         } => print_member_access(
             printer,
             *property,
@@ -164,6 +166,7 @@ pub(crate) fn print_node_inner<'a>(
                 name_start: *property_start,
                 object_end: *object_end,
                 property_start: *property_start,
+                paren_gap_skip: *paren_gap_skip,
             },
             *optional,
             false,
@@ -176,6 +179,7 @@ pub(crate) fn print_node_inner<'a>(
             object_end,
             property_start,
             name_start,
+            paren_gap_skip,
         } => print_member_access(
             printer,
             *property,
@@ -183,6 +187,7 @@ pub(crate) fn print_node_inner<'a>(
                 name_start: *name_start,
                 object_end: *object_end,
                 property_start: *property_start,
+                paren_gap_skip: *paren_gap_skip,
             },
             *optional,
             true,
@@ -194,6 +199,7 @@ pub(crate) fn print_node_inner<'a>(
             optional,
             object_end,
             bracket_end,
+            paren_gap_skip,
         } => {
             // A computed member index is `[ Expression ]` — an assignment expression
             // there is parenthesized for clarity (`arr[(x = 0)]`, `obj?.[(x = 0)]`),
@@ -231,20 +237,16 @@ pub(crate) fn print_node_inner<'a>(
 
             // Find the opening bracket position by scanning from object_end,
             // skipping over comments to find the actual `[` (or `?.[` for optional)
-            let bracket_open_pos =
-                find_bracket_position(printer.get_source(), *object_end, prop_span.start);
-
-            let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
+            let bracket = find_computed_bracket(printer.get_source(), *object_end, prop_span.start);
 
             // A line comment inside the brackets (before the index, or after it before
             // `]`) forces the whole bracket to break so the `//` can't swallow the index
-            // or `]` — the block-only paths below would drop it (content loss). `[` is
-            // at `inside_start - 1` (the char before the index region, past `?.` for the
-            // optional form). Prettier relocates the comment before the expression instead.
+            // or `]` — the block-only paths below would drop it (content loss). Prettier
+            // relocates the comment before the expression instead.
             let bracket_doc = if let Some(broken) = printer
                 .build_computed_member_line_comment_bracket(
                     open,
-                    inside_start,
+                    bracket,
                     prop_span.start,
                     prop_span.end,
                     *bracket_end,
@@ -257,7 +259,7 @@ pub(crate) fn print_node_inner<'a>(
                 // lines, the comment may be on a different line from the bracket opening
                 // (e.g., `?.[` on one line, `/** @type {string} */ d` on the next).
                 let leading_comments_doc = printer.build_chain_block_comments_doc(
-                    inside_start,
+                    bracket.inside,
                     prop_span.start,
                     crate::printer::CommentSpacing::Trailing,
                 );
@@ -277,7 +279,7 @@ pub(crate) fn print_node_inner<'a>(
                 //       /** @type {string} */ d
                 //   ]
                 let has_inside_comments = printer
-                    .has_comments_on_page_between(inside_start, prop_span.start)
+                    .has_comments_on_page_between(bracket.inside, prop_span.start)
                     || printer.has_comments_on_page_between(prop_span.end, *bracket_end);
                 computed_lookup_doc(
                     printer,
@@ -296,7 +298,8 @@ pub(crate) fn print_node_inner<'a>(
 
             // Comments between object and `[` stay OUTSIDE brackets
             // (comments between `[` and the index went INSIDE, above)
-            let pre_bracket = printer.classify_comments(*object_end, bracket_open_pos);
+            let pre_bracket =
+                printer.classify_chain_gap(*object_end, bracket.open, *paren_gap_skip);
 
             // A LINE comment in this gap must end its line. Reaching here means no chain
             // builder owned the gap (`skip_comments` would be set): the chain's TRAILING
@@ -312,7 +315,13 @@ pub(crate) fn print_node_inner<'a>(
             // onto one line where the first `//` swallows the rest.
             if pre_bracket.has_line_comments() {
                 let mut parts = DocBuf::new();
-                push_gap_comments_and_break(&mut parts, printer, *object_end, bracket_open_pos);
+                push_gap_comments_and_break(
+                    &mut parts,
+                    printer,
+                    *object_end,
+                    bracket.open,
+                    *paren_gap_skip,
+                );
                 parts.push(bracket_doc);
                 return d.concat(&parts);
             }
@@ -336,7 +345,8 @@ pub(crate) fn print_node_inner<'a>(
                     .map_or(*object_end, |c| c.span.end);
                 let mut parts = DocBuf::new();
                 parts.push(glued_doc);
-                push_gap_comments_and_break(&mut parts, printer, anchor, bracket_open_pos);
+                // Past the trailing run, so the paren-prefix half is already emitted.
+                push_gap_comments_and_break(&mut parts, printer, anchor, bracket.open, None);
                 parts.push(bracket_doc);
                 return d.concat(&parts);
             }
@@ -499,6 +509,9 @@ struct MemberSpans {
     object_end: u32,
     /// Start of the property (end of the object→property gap).
     property_start: u32,
+    /// The hole in that gap, when it was widened over a stripped grouping paren —
+    /// see [`ChainNode::paren_gap_skip`].
+    paren_gap_skip: Option<Span>,
 }
 
 /// Print a member access (shared logic for Member and PrivateMember)
@@ -547,7 +560,8 @@ fn print_member_access(
     }
 
     // Classify all comments in the range between object and property
-    let classified = printer.classify_comments(spans.object_end, spans.property_start);
+    let classified =
+        printer.classify_chain_gap(spans.object_end, spans.property_start, spans.paren_gap_skip);
 
     // Trailing block comments: same line as previous element (e.g., `method() /* c */.prop`)
     let trailing_block = printer.build_trailing_block_doc(&classified.trailing_block);
@@ -577,16 +591,15 @@ fn print_member_access(
 pub(crate) fn has_inside_bracket_comments<'a>(node: &ChainNode<'a>, printer: &Printer<'_>) -> bool {
     if let ChainNode::ComputedMember {
         expr,
-        optional,
         object_end,
         bracket_end,
+        ..
     } = node
     {
         let prop_span = printer.get_property_span(expr);
-        let bracket_open_pos =
-            find_bracket_position(printer.get_source(), *object_end, prop_span.start);
-        let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
-        printer.has_comments_on_page_between(inside_start, prop_span.start)
+        let inside =
+            find_computed_bracket(printer.get_source(), *object_end, prop_span.start).inside;
+        printer.has_comments_on_page_between(inside, prop_span.start)
             || printer.has_comments_on_page_between(prop_span.end, *bracket_end)
     } else {
         false
@@ -598,6 +611,38 @@ pub(crate) fn has_inside_bracket_comments<'a>(node: &ChainNode<'a>, printer: &Pr
 ///
 /// For `?.[`, returns the position of `?` (the start of the optional chain syntax).
 pub(crate) fn find_bracket_position(source: &str, start: u32, end: u32) -> u32 {
+    find_computed_bracket(source, start, end).open
+}
+
+/// Where a computed lookup's bracket run opens, and where its interior begins.
+///
+/// ⚠️ **`inside` is derived from the `[` this scan actually found, never from `open`
+/// plus a width keyed on the AST's `optional` flag.** The two are different questions:
+/// `open` is the `?` only when `?.[` is written CONTIGUOUSLY — the author may space the
+/// `?.` off its bracket (`obj ?. [ // c⏎i]`), and then `open` is the `[` itself. A
+/// caller adding `3` for every optional lookup therefore started the interior scan
+/// three bytes past that `[`, straight over a `//` written on the `[` line, and the
+/// comment reached no emitter at all. Returning both positions from the one scan is
+/// what keeps them from disagreeing.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ComputedBracket {
+    /// Start of the lookup's token run: the `?` of a contiguous `?.[`, else the `[`.
+    /// The chain-level gap before the lookup ends here, so a comment the author wrote
+    /// between a spaced `?.` and its `[` still falls inside that gap.
+    pub open: u32,
+    /// Just past the `[` — where the bracket interior, and any comment in it, begins.
+    pub inside: u32,
+}
+
+impl ComputedBracket {
+    /// The `[` itself. Derived from [`Self::inside`], which the scan set from the real
+    /// bracket — never from [`Self::open`], which is the `?` on a contiguous `?.[`.
+    pub const fn bracket_pos(self) -> u32 {
+        self.inside - 1
+    }
+}
+
+pub(crate) fn find_computed_bracket(source: &str, start: u32, end: u32) -> ComputedBracket {
     let bytes = source.as_bytes();
     let start_pos = start as usize;
     let end_pos = end as usize;
@@ -608,17 +653,27 @@ pub(crate) fn find_bracket_position(source: &str, start: u32, end: u32) -> u32 {
             i = new_i;
             continue;
         }
-        // Check for `?.[` first (returns position of `?`)
+        // A contiguous `?.[` opens at the `?`
         if bytes[i] == b'?' && i + 2 < end_pos && bytes[i + 1] == b'.' && bytes[i + 2] == b'[' {
-            return i as u32;
+            return ComputedBracket {
+                open: i as u32,
+                inside: (i + 3) as u32,
+            };
         }
-        // Check for plain `[`
         if bytes[i] == b'[' {
-            return i as u32;
+            return ComputedBracket {
+                open: i as u32,
+                inside: (i + 1) as u32,
+            };
         }
         i += 1;
     }
-    start // Fallback
+    // Fallback: no bracket in range. `inside` degenerates with `open`, so the
+    // interior queries see an empty range rather than a shifted one.
+    ComputedBracket {
+        open: start,
+        inside: start,
+    }
 }
 
 //
@@ -651,6 +706,7 @@ pub(crate) fn push_gap_comments_and_break(
     printer: &Printer<'_>,
     object_end: u32,
     property_start: u32,
+    paren_gap_skip: Option<Span>,
 ) {
     // Chain-level zero-comment gate: a comment-free chain span has no comment in this
     // gap (gap ⊆ span), so the only non-empty part below is the line break — the
@@ -662,7 +718,7 @@ pub(crate) fn push_gap_comments_and_break(
     }
 
     // Classify all comments in one pass (single binary search)
-    let classified = printer.classify_comments(object_end, property_start);
+    let classified = printer.classify_chain_gap(object_end, property_start, paren_gap_skip);
 
     // Trailing block comments (same line as previous element): `method() /* c */`
     parts.push(printer.build_trailing_block_doc(&classified.trailing_block));

@@ -111,14 +111,20 @@ pub(super) fn push_empty_args(
     prefix: &'static str,
 ) {
     let d = printer.d();
-    let Some(paren_pos) = printer.find_char_outside_comments(search_from, paren_close, b'(') else {
-        // No `(` found at all (unreachable for valid code): emit the closed form.
-        parts.push(d.text(prefix));
-        parts.push(d.text(")"));
-        return;
+    // No `(` in the gap: a `new` written with no argument list at all synthesizes one
+    // (`new (Foo /* c */)` → `new Foo /* c */()`), so the whole gap is pre-paren. The
+    // shape is the found-paren case with the list's own position standing in for the
+    // `(`, which is why it routes through the same two arms below rather than emitting
+    // a bare `()` — doing that dropped every comment the callee's stripped grouping
+    // parens held, at every callee kind.
+    let paren_pos = printer
+        .find_char_outside_comments(search_from, paren_close, b'(')
+        .unwrap_or(paren_close);
+    let parens = if paren_pos == paren_close {
+        d.concat(&[d.text(prefix), d.text(")")])
+    } else {
+        printer.build_empty_parens_inline_with_comments_doc(paren_pos, paren_close, prefix)
     };
-    let parens =
-        printer.build_empty_parens_inline_with_comments_doc(paren_pos, paren_close, prefix);
     // A **line** comment in this gap runs to end of line, so the argument list cannot
     // stay on it — left inline the `//` swallows the `()` and everything after it
     // (`call // c⏎()` → `call // c();`, losing the call itself). The comment keeps the

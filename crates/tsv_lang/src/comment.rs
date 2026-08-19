@@ -347,6 +347,24 @@ impl<'a> ClassifiedComments<'a> {
         result
     }
 
+    /// Append a LATER range's classification onto this one, bucket by bucket.
+    ///
+    /// For an emitter whose claim is two DISJOINT source regions rather than one span —
+    /// a chain member whose gap was widened over a stripped grouping paren, where the
+    /// object subtree in between belongs to its own member accesses. Each range is
+    /// classified against its own anchor (the region's start), which is the point: one
+    /// classification over the whole span would read every comment in the second region
+    /// against the first region's line.
+    ///
+    /// `other` must cover a range entirely AFTER this one, so every bucket stays sorted
+    /// by `span.start` and `leading_in_source_order`'s merge still holds.
+    pub fn append(&mut self, other: Self) {
+        self.trailing_block.extend(other.trailing_block);
+        self.trailing_line.extend(other.trailing_line);
+        self.leading_block.extend(other.leading_block);
+        self.leading_line.extend(other.leading_line);
+    }
+
     /// Whether a **line** comment sits anywhere in the range, trailing or leading.
     ///
     /// The break-forcing question a `//` alone answers: it runs to end of line, so

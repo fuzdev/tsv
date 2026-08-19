@@ -239,12 +239,21 @@ impl<'a> Printer<'a> {
     /// return/throw's non-hanging paths — use `split_terminator_gap_comments` instead.
     /// return/throw's hanging layout uses **both**: this method for the region inside the
     /// retained parens, then that one for anything past the `)`.
+    /// Returns whether the run **deferred** — whether anything went out on a
+    /// `line_suffix` rather than inline. A caller whose construct has no break of its own
+    /// to flush against needs that answer: a deferred run rides to the end of the output
+    /// line, and where that line ends outside the construct the comment re-binds there
+    /// (the `{#snippet}` head floated a `//` past `{/snippet}`, into template text). Such
+    /// a caller pushes a flush-scoped break on `true` — and only on `true`, since forcing
+    /// it for an inline block breaks a construct that had no reason to open, which the
+    /// reparse then closes again. Callers that already end the line — the operand shells,
+    /// whose deferral lands past their own terminator — ignore it.
     pub(crate) fn append_trailing_paren_comments(
         &self,
         parts: &mut DocBuf,
         argument_end: u32,
         span_end: u32,
-    ) {
+    ) -> bool {
         // Whether anything has been deferred yet — a `//`, or an own-line comment.
         let mut deferred_run = false;
         // What physically precedes the next comment: an **in-source** cursor, so it
@@ -271,6 +280,7 @@ impl<'a> Printer<'a> {
             deferred_run |= own_line || !comment.is_block;
             prev_end = comment.span.end;
         }
+        deferred_run
     }
 
     /// Split the trailing comments in a statement terminator's content→`;` gap
