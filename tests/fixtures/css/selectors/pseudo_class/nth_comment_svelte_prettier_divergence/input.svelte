@@ -9,7 +9,7 @@
 		color: blue;
 	}
 
-	/* a comment freezes the An+B text verbatim - no operator respacing inside it */
+	/* the operator respacing runs with the comment opaque to it - content untouched */
 	li:nth-child(2n + 1 /* a-b */) {
 		color: green;
 	}

@@ -62,10 +62,11 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
 - CSS comments (`/* comment */`)
 - Multi-line comments
 - Comments in selectors
-- Comments in `:nth-*()` args — before or after the An+B term, around `of`, and after the
-  `of` list. A trailing comment inside the parens freezes the An+B text verbatim (`2n+1`
-  keeps its authored spacing instead of normalizing to `2n + 1`). A comment *splitting* the
-  An+B term (`:nth-child(2n /* c */ + 1)`) is not supported — see [Future Work](#not-parsed)
+- Comments in `:nth-*()` args — in every position: before the An+B term, **inside** it
+  (`:nth-child(2n /* c */ + 1)`, either interior gap of the `['+' | '-'] <signless-integer>`
+  tail), after it, around `of`, and after the `of` list. The term normalizes around the
+  comment and the comment itself is opaque to the operator respacing, so its content is
+  never rewritten
 - Comments in `::slotted()` / `::part()` / unknown-pseudo args (leading/trailing gaps preserved; the interior positions — between `::part()` names, or `::slotted()` compound-internal — are rejected by parseCss but preserved + normalized by tsv, a `_svelte_prettier_divergence`)
 - Comments in `:dir()` / `:lang()` / `::highlight()` identifier args (leading/trailing gaps preserved + normalized; parseCss accepts → a `_prettier_divergence`)
 - Comments in a `@supports`/`@import` `selector()` argument — an argument that parses as a
@@ -624,11 +625,14 @@ Features that parse correctly through generic handling.
 The constructs tsv rejects outright:
 
 - Reference combinator (`/ref/`, `selectors-5`) for IDREF-based relationships — no parse support
-- A comment splitting an An+B term (`:nth-child(2n /* c */ + 1)`) — rejected, matching
-  `parseCss`. Per css-syntax-3 §4 comments are removed at tokenization and produce no token,
-  so the spec accepts this (prettier does too); the An+B microsyntax reads frozen source text
-  and so can't see through the comment. The surrounding positions are supported — see
-  [Comments](#comments)
+- A comment inside an **attribute selector** (`[a /* c */ = 'b']`, `[a=/* c */'b']`,
+  `[a='b' /* c */]`, `[/* c */ a]`, either side of the `i`/`s` flag) or splitting a
+  **namespace separator** (`ns/* c */|a`) — rejected, matching `parseCss`. Per css-syntax-3
+  §4 comments are removed at tokenization and selectors-4's `<attribute-selector>` is a
+  token-level production, so the spec accepts these (prettier does too, by freezing the
+  selector). These are the only spec-valid selector positions still rejected — every other
+  one is listed under [Comments](#comments). An ident glued to `(` (`:not/* c */(`) is a
+  single `<function-token>` and is correctly rejected, not a gap
 
 ## Parsed Generically, Not Modeled
 
@@ -696,7 +700,8 @@ each entry with its reasoning and fixture — is [conformance_svelte.md §CSS
 Corrections](conformance_svelte.md#css-corrections); the classes are:
 
 - An+B microsyntax — `of S` nesting, spec-valid negative forms (`-3`, `-2n`, `-n-3`),
-  and leading-`-n` forms that `parseCss` rejects or mis-parses
+  leading-`-n` forms, and terms split by a comment (`2n /* c */ + 1`), all of which
+  `parseCss` rejects or mis-parses
 - Comments as inter-token trivia — at combinator boundaries, glued inside a compound,
   between `::part()` names, and in `:nth-*()` argument positions
 - Consecutive combinators (`> > .a`) — preserved rather than collapsed to the last

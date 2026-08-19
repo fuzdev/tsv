@@ -117,11 +117,24 @@ enum FixtureResult {
 fn expected_files_desc(fixture: &fixtures::Fixture) -> &'static str {
     if fixture.tsv_rejects_path().exists() {
         "expected_svelte.json"
-    } else if fixture.has_expected_ours() {
+    } else if uses_divergence_pattern(fixture) {
         "expected_ours.json + expected_svelte.json"
     } else {
         "expected.json"
     }
+}
+
+/// Whether this fixture regenerates the `expected_ours.json` + `expected_svelte.json`
+/// pair rather than a lone `expected.json`.
+///
+/// The **suffix** decides it, not the files on disk: structure rule S13 makes the pair
+/// mandatory in a svelte-divergence dir, so asking `has_expected_ours()` alone could only
+/// ever regenerate a pair that already exists — a *new* divergence fixture would take the
+/// `expected.json` path, where a canonical parser that rejects (the over-acceptance case
+/// the pattern exists for) is a hard error instead of the `expected_svelte.json` error
+/// marker. A `tsv_rejects.txt` fixture is neither, and its caller returns before this.
+fn uses_divergence_pattern(fixture: &fixtures::Fixture) -> bool {
+    fixture.has_expected_ours() || fixture.is_svelte_divergence()
 }
 
 async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult {
@@ -139,7 +152,7 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
     }
 
     // Check if this fixture uses the divergence pattern
-    if fixture.has_expected_ours() {
+    if uses_divergence_pattern(fixture) {
         // Generate expected_ours.json + expected_svelte.json
         return generate_divergence_fixture(fixture, &source).await;
     }

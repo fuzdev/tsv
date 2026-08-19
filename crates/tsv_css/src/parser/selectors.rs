@@ -984,7 +984,7 @@ fn match_an_plus_b(bytes: &[u8], start: usize, spec: bool) -> Option<usize> {
         // tail and permits only `+` (`-\d*n(\s*\+\s*\d+)`); the spec grammar permits a
         // `+`/`-` tail regardless of the leading sign (`-2n-3`, `-n-3`).
         let plus_only = !spec && sign == Some(b'-');
-        match match_anb_tail(bytes, after_n, plus_only) {
+        match match_anb_tail(bytes, after_n, plus_only, spec) {
             Some(end) => Some(end),
             // `-n` / `-2n` alone (leading `-`, no tail) is valid An+B per spec, but not
             // under `REGEX_NTH_OF`.
@@ -1000,23 +1000,20 @@ fn match_an_plus_b(bytes: &[u8], start: usize, spec: bool) -> Option<usize> {
 }
 
 /// Advance past An+B whitespace **and `/* */` comments** — inter-token trivia the spec
-/// ignores — from `i`, returning the first offset that is neither. Used only by the
-/// spec (`:nth-*()`) An+B terminator check: comments are trivia per css-syntax-3, so
-/// `:nth-child(2n /* c */)` is spec-valid even though parseCss's comment-blind reader
-/// rejects it (the `nth_comment` `_svelte_divergence`). `REGEX_NTH_OF`'s terminator
-/// (`skip_anb_ws`) stays comment-blind, matching parseCss for `:is()`/`:not()`.
+/// ignores — from `i`, returning the first offset that is neither. Used by the spec
+/// (`:nth-*()`) An+B scanner at **every** gap the microsyntax has: the terminator
+/// (`nth_arg_is_anb`) and both of the term's own tail gaps (`match_anb_tail`). Comments
+/// are trivia per css-syntax-3, so `:nth-child(2n /* c */)` and `:nth-child(2n /* c */ + 1)`
+/// are alike spec-valid even though parseCss's comment-blind reader rejects both (the
+/// `nth_comment` / `nth_comment_in_term` `_svelte_divergence`s). `REGEX_NTH_OF`'s
+/// terminator (`skip_anb_ws`) stays comment-blind, matching parseCss for `:is()`/`:not()`.
 fn skip_anb_ws_and_comments(bytes: &[u8], mut i: usize) -> usize {
     loop {
         i = skip_anb_ws(bytes, i);
-        if bytes.get(i) == Some(&b'/') && bytes.get(i + 1) == Some(&b'*') {
-            i += 2;
-            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
-                i += 1;
-            }
-            i = (i + 2).min(bytes.len()); // past the closing `*/` (or clamp at EOF)
-        } else {
+        if !crate::comments::is_comment_start(bytes, i) {
             return i;
         }
+        i = crate::comments::comment_end(bytes, i);
     }
 }
 
@@ -1059,13 +1056,25 @@ pub(crate) fn nth_arg_is_anb(source: &str, pos: usize) -> bool {
 
 /// Match the `\s*[+-]\s*\d+` An+B tail at `pos`. When `plus_only` (the leading-`-`
 /// branch) only `+` is accepted. Returns the end offset, or `None` if no tail is present.
-fn match_anb_tail(bytes: &[u8], pos: usize, plus_only: bool) -> Option<usize> {
-    let op_pos = skip_anb_ws(bytes, pos);
+///
+/// The tail's two gaps are the only positions *inside* an An+B term where trivia can sit
+/// (every other juncture is within one token), so `spec` decides them the same way it
+/// decides the terminator: under the spec grammar a comment is trivia and the term matches
+/// through it (`2n /* c */ + 1`), while `REGEX_NTH_OF` stays comment-blind for parseCss
+/// parity. Asking the two gaps a different question than the terminator is what made a
+/// split term reject — or, where the term had a type-selector reading, mis-parse.
+fn match_anb_tail(bytes: &[u8], pos: usize, plus_only: bool, spec: bool) -> Option<usize> {
+    let skip_trivia: fn(&[u8], usize) -> usize = if spec {
+        skip_anb_ws_and_comments
+    } else {
+        skip_anb_ws
+    };
+    let op_pos = skip_trivia(bytes, pos);
     let op = *bytes.get(op_pos)?;
     if op != b'+' && (plus_only || op != b'-') {
         return None;
     }
-    let digits_start = skip_anb_ws(bytes, op_pos + 1);
+    let digits_start = skip_trivia(bytes, op_pos + 1);
     let end = skip_digits(bytes, digits_start);
     (end > digits_start).then_some(end)
 }
@@ -1158,6 +1167,18 @@ mod tests {
             "-n + 3 of li.a)", // negative An+B with of
             "2n /* c */)",     // comment is inter-token trivia (spec); parseCss rejects
             "3 /* c */ of .x)",
+            // A comment SPLITTING the term: both gaps of the `['+' | '-'] <signless-integer>`
+            // tail are trivia positions too, so the term matches through one at either.
+            "2n /* c */ + 1)",
+            "2n + /* c */ 1)",
+            "2n/* c */+1)",            // glued on both sides
+            "2n /* a */ /* b */ + 1)", // a run in one gap
+            "2n/* a *//* b */+1)",     // a run glued to itself
+            "-2n /* c */ - 3)",        // composes with the spec-only negative forms
+            "n /* c */ + 1)",          // the shape that used to MIS-PARSE as a selector list
+            "2n- /* c */ 1)",          // <ndash-dimension> <signless-integer>
+            "2n /* c */ + 1 of .x)",   // composes with of S
+            "2n/* c */of .x)",         // and with a comment as the whole `of` separator
         ] {
             assert!(
                 nth_arg_is_anb(input, 0),
@@ -1178,6 +1199,11 @@ mod tests {
             "2n OF .x)",  // `of` is case-sensitive (uppercase is a type selector)
             "2n offset)", // `of` prefix of a longer ident is not the keyword
             ")",          // empty argument
+            // A comment cannot split a single TOKEN: `<n-dimension>` is one token, so
+            // `2/* c */n` is a number and an ident, which no An+B production covers.
+            "2/* c */n)",
+            // An unterminated comment reaches end-of-input (§4.3.2), so no terminator.
+            "2n /* c + 1)",
         ] {
             assert!(
                 !nth_arg_is_anb(input, 0),
@@ -1245,6 +1271,14 @@ mod tests {
             "2n of.x)",   // `\s+of\s+` needs whitespace after `of`
             "2nof .x)",   // `\s+of\s+` needs whitespace before `of`
             "2n often )", // `of` prefix, but the trailing `\s+` lands on `ten`
+            // This grammar stays COMMENT-BLIND on purpose — An+B is not a selector, so
+            // there is no spec to follow here and parity with parseCss is the whole
+            // point. The spec `:nth-*()` reader matches every one of these (see
+            // `nth_arg_is_anb_spec_grammar`); the two must not be unified.
+            "2n /* c */ + 1)",
+            "2n + /* c */ 1)",
+            "2n/* c */+1)",
+            "2n /* c */)",
         ] {
             assert_eq!(
                 match_nth_value(input, 0),
