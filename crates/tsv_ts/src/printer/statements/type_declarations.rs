@@ -156,15 +156,12 @@ impl<'a> Printer<'a> {
         // name→`=` gap (no params) and type-params→`=` gap are handled below as
         // pre-`=` comments so they stay on the head side. Line comments get a
         // hardline to prevent absorbing type params as comment text.
-        let comment_end = decl
-            .type_parameters
-            .as_ref()
-            .map_or(decl.id.span.end, |tp| tp.span.start);
-        self.push_name_to_type_params_comments(
+        self.push_signature_head_comments(
             &mut parts,
             decl.id.span.end,
-            comment_end,
-            CommentSpacing::for_type_params(decl.type_parameters.is_some()),
+            decl.type_parameters.as_ref(),
+            // A type alias has no parens, so with no type params the gap is empty.
+            decl.id.span.end,
         );
 
         if let Some(type_params) = &decl.type_parameters {
@@ -908,15 +905,11 @@ impl<'a> Printer<'a> {
 
         // Comments between name and type params/parens: `declare function fn1/* c */ <T>()` or `fn1 /* c */()`
         // Line comments get a hardline to prevent absorbing type params as comment text
-        let comment_end = decl
-            .type_parameters
-            .as_ref()
-            .map_or_else(|| paren_pos.unwrap_or(decl.id.span.end), |tp| tp.span.start);
-        self.push_name_to_type_params_comments(
+        self.push_signature_head_comments(
             &mut tail,
             decl.id.span.end,
-            comment_end,
-            CommentSpacing::for_type_params(decl.type_parameters.is_some()),
+            decl.type_parameters.as_ref(),
+            paren_pos.unwrap_or(decl.id.span.end),
         );
 
         // Type parameters with wrapping support

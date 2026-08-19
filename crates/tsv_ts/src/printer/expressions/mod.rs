@@ -30,7 +30,7 @@ mod template_literal;
 use self::operators::{OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::ShareTag;
-use crate::printer::comments::{CommentFilter, CommentSpacing};
+use crate::printer::comments::{CommentFilter, CommentSpacing, KeywordOperandGap};
 use crate::printer::decorators::DecoratorHost;
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
@@ -327,15 +327,66 @@ impl<'a> Printer<'a> {
                 self.build_ts_parameter_property_doc(param_prop)
             }
             Expression::JsdocCast(cast) => self.build_jsdoc_cast_doc(cast),
-            // Preserved grouping parens are layout-transparent: render the inner,
-            // which re-derives whatever parens it needs (matching prettier, which
-            // strips redundant parens and re-adds required ones). Only the wire
-            // AST keeps the `ParenthesizedExpression`.
+            // Preserved grouping parens — see [`Self::build_preserved_paren_doc`].
             Expression::ParenthesizedExpression(paren) => {
                 self.is_expression_statement.set(was_expr_stmt);
-                self.build_expression_doc(paren.expression)
+                self.build_preserved_paren_doc(paren)
             }
         }
+    }
+
+    /// Build a Doc for a preserved grouping pair (`ParenthesizedExpression`).
+    ///
+    /// The pair is layout-transparent: the inner renders and re-derives whatever parens
+    /// it needs, matching prettier, which strips redundant parens and re-adds required
+    /// ones. Only the wire AST keeps the node, and a Svelte `{#snippet}` parameter is the
+    /// one place tsv parses one.
+    ///
+    /// ⚠️ **The erased pair still brackets TWO gaps.** Rendering only the inner left both
+    /// with no emitter anywhere — the node's span hides them from whatever encloses it,
+    /// and the inner's span ends before them (`docs/comments.md` hazard 4; the leading
+    /// half was masked by ownership, a glued block surviving inside the inner's own doc).
+    /// They take the same stripped-shell emitters the TypeScript path's own erased parens
+    /// take, which is the whole target here: **a snippet parameter list must format
+    /// identically to the equivalent function signature.**
+    ///
+    /// Both halves answer to the REPARSE, where the pair is gone and the enclosing gap
+    /// reads the run instead:
+    ///
+    /// - The `(`→inner run takes the keyword→operand ROUTER
+    ///   ([`Printer::keyword_operand_gap`]), the only split that reproduces what that gap
+    ///   settles on. Emitting it at its authored separators kept an own-line block's
+    ///   hardline against a value that pulls up, which is not idempotent on its own
+    ///   output.
+    /// - The inner→`)` run defers, and a deferred run must not leave the construct it was
+    ///   written in — this pair prints no closer of its own to end the line, so a `//`
+    ///   rode out past the whole `{#snippet …}` head and re-parsed there as template TEXT.
+    ///   The flush-scoped break opens just the group the suffix flushes in, the parameter
+    ///   list, which is where the TypeScript twin lands it too. It is gated on the
+    ///   emitter's own report of whether it deferred: forcing the break for an inline
+    ///   block opens a list that had no reason to open, and the reparse closes it again.
+    fn build_preserved_paren_doc(
+        &self,
+        paren: &crate::ast::internal::ParenthesizedExpression<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let inner_span = paren.expression.span();
+        let inner = self.build_expression_doc(paren.expression);
+        let inner = match self.keyword_operand_gap(paren.span.start, inner_span.start) {
+            KeywordOperandGap::Continuation => {
+                self.build_value_slot_continuation_indent(paren.span.start, inner_span.start, inner)
+            }
+            KeywordOperandGap::Inline(Some(run)) => d.concat(&[run, inner]),
+            KeywordOperandGap::Inline(None) => inner,
+        };
+        if !self.has_comments_to_emit_between(inner_span.end, paren.span.end) {
+            return inner;
+        }
+        let mut parts: DocBuf = smallvec![inner];
+        if self.append_trailing_paren_comments(&mut parts, inner_span.end, paren.span.end) {
+            parts.push(d.flush_break());
+        }
+        d.concat(&parts)
     }
 
     /// Build a Doc for a JSDoc type cast: `/** @type {T} */ (inner)`.

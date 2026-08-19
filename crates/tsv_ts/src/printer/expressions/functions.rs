@@ -8,6 +8,7 @@
 
 use crate::ast::internal;
 use crate::printer::ArrowChainContext;
+use crate::printer::LeadingGlue;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::expressions::operators::SeqLayout;
@@ -15,7 +16,6 @@ use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::is_huggable_type;
-use crate::printer::{CommentSpacing, LeadingGlue};
 use crate::printer::{
     CommentVec, ParenContext, Printer, is_multiline_template_expression, unwrap_parenthesized,
 };
@@ -1912,16 +1912,11 @@ impl<'a> Printer<'a> {
             parts.push(self.build_identifier_doc(id));
 
             // Comments between name and type params/parens: `function fn1/* c */ <T>()` or `fn1 /* c */()`
-            // Line comments get a hardline to prevent absorbing type params as comment text
-            let comment_end = func
-                .type_parameters
-                .as_ref()
-                .map_or(func.params_start, |tp| tp.span.start);
-            self.push_name_to_type_params_comments(
+            self.push_signature_head_comments(
                 &mut parts,
                 id.span.end,
-                comment_end,
-                CommentSpacing::for_type_params(func.type_parameters.is_some()),
+                func.type_parameters.as_ref(),
+                func.params_start,
             );
         }
 

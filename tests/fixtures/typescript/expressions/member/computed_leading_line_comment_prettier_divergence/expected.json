@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 711,
+	"end": 901,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -201,24 +201,72 @@
 					"column": 17
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " The `?.[` spelling of that same `[`-line case. The authored form may space the",
+			"start": 703,
+			"end": 784,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `?.` off the `[` (`obj ?. [`), which must reach the identical output.",
+			"start": 786,
+			"end": 858,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 877,
+			"end": 882,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 18
+				},
+				"end": {
+					"line": 30,
+					"column": 23
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 710,
+		"end": 900,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 701,
+			"end": 891,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 27,
+					"line": 33,
 					"column": 9
 				}
 			},
@@ -732,6 +780,141 @@
 							"value": " instead, and the bracket-interior rule above is unchanged by that.",
 							"start": 605,
 							"end": 674
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 860,
+					"end": 890,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 866,
+							"end": 889,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 866,
+								"end": 867,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ChainExpression",
+								"start": 870,
+								"end": 889,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 11
+									},
+									"end": {
+										"line": 32,
+										"column": 2
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 870,
+									"end": 889,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 11
+										},
+										"end": {
+											"line": 32,
+											"column": 2
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 870,
+										"end": 873,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 11
+											},
+											"end": {
+												"line": 30,
+												"column": 14
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 885,
+										"end": 886,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 3
+											}
+										},
+										"name": "i",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c5",
+												"start": 877,
+												"end": 882
+											}
+										]
+									},
+									"computed": true,
+									"optional": true
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `?.[` spelling of that same `[`-line case. The authored form may space the",
+							"start": 703,
+							"end": 784
+						},
+						{
+							"type": "Line",
+							"value": " `?.` off the `[` (`obj ?. [`), which must reach the identical output.",
+							"start": 786,
+							"end": 858
 						}
 					]
 				}

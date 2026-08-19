@@ -7,6 +7,7 @@
 
 use crate::ast::internal::{self, IdentName, LiteralValue};
 use smallvec::SmallVec;
+use tsv_lang::Span;
 
 /// Buffer for a linearized chain — chains are measured-short, so small chains
 /// (the common case) stay on the stack. `ChainNode` is `Copy` and ~24 bytes.
@@ -79,6 +80,9 @@ pub enum ChainNode<'a> {
         optional: bool,
         object_end: u32,
         property_start: u32,
+        /// The object subtree this node's widened gap must NOT claim — see
+        /// [`ChainNode::paren_gap_skip`].
+        paren_gap_skip: Option<Span>,
     },
     /// Private member access: .#prop
     /// `property_start` is the `#` (comment detection); `name_start` is the
@@ -89,6 +93,8 @@ pub enum ChainNode<'a> {
         object_end: u32,
         property_start: u32,
         name_start: u32,
+        /// See [`ChainNode::paren_gap_skip`].
+        paren_gap_skip: Option<Span>,
     },
     /// Computed member access: `[expr]`
     /// `bracket_end` is the position just before the closing `]` (for trailing comment detection)
@@ -97,6 +103,8 @@ pub enum ChainNode<'a> {
         optional: bool,
         object_end: u32,
         bracket_end: u32,
+        /// See [`ChainNode::paren_gap_skip`].
+        paren_gap_skip: Option<Span>,
     },
     /// Non-null assertion: `!`
     ///
@@ -217,6 +225,7 @@ impl<'a> ChainNode<'a> {
             optional,
             object_end,
             property_start,
+            paren_gap_skip: None,
         }
     }
 
@@ -234,6 +243,7 @@ impl<'a> ChainNode<'a> {
             object_end,
             property_start,
             name_start,
+            paren_gap_skip: None,
         }
     }
 
@@ -249,6 +259,7 @@ impl<'a> ChainNode<'a> {
             optional,
             object_end,
             bracket_end,
+            paren_gap_skip: None,
         }
     }
 
@@ -308,6 +319,30 @@ impl<'a> ChainNode<'a> {
             Self::ComputedMember {
                 object_end, expr, ..
             } => Some((*object_end, expr.span().start)),
+            Self::Base { .. } | Self::Call { .. } | Self::NonNull { .. } => None,
+        }
+    }
+
+    /// The region *inside* this node's widened comment gap that belongs to other
+    /// emitters: its own object subtree.
+    ///
+    /// `Some` only where the linearizer widened [`Self::comment_range`] backward over a
+    /// stripped grouping paren (`apply_paren_gaps`). That widening reaches a comment the
+    /// author wrote just inside the `(`, which prettier relocates to just before this
+    /// node; but it also sweeps the whole object subtree lying between the `(` and this
+    /// node's own gap, and every member access in there already claims its own comments.
+    /// The node's real claim is therefore two DISJOINT regions — the stripped-paren
+    /// prefix and its own gap — with this subtree excluded between them; claiming the
+    /// span whole printed every comment in the object twice
+    /// (`docs/comments.md` hazard 3).
+    ///
+    /// Deliberately not applied to the *layout* predicates, which keep asking the whole
+    /// widened range: a comment anywhere in it still occupies the page here.
+    pub const fn paren_gap_skip(&self) -> Option<Span> {
+        match self {
+            Self::Member { paren_gap_skip, .. }
+            | Self::PrivateMember { paren_gap_skip, .. }
+            | Self::ComputedMember { paren_gap_skip, .. } => *paren_gap_skip,
             Self::Base { .. } | Self::Call { .. } | Self::NonNull { .. } => None,
         }
     }

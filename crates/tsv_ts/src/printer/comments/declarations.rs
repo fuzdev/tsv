@@ -363,6 +363,30 @@ impl<'a> Printer<'a> {
         ]))
     }
 
+    /// [`Self::build_continuation_indent`] for a caller sitting in a **value slot** —
+    /// one whose separator, and the space after it, is already emitted by whoever handed
+    /// it the slot.
+    ///
+    /// The keyword form owns that space because its callers emit their keyword bare; a
+    /// value slot's caller does not, and calling the keyword form there renders the
+    /// separator's space twice. Same hanging run, same indent, one seam
+    /// ([`Self::build_trailing_comments_hang_next`]) — only the separator differs, which
+    /// is why this is a sibling entry rather than a `bool` on the other.
+    ///
+    /// Its one site is a preserved grouping pair's `(`→inner run
+    /// (`build_expression_doc`'s `ParenthesizedExpression` arm): the pair is erased, so
+    /// the reparse reads that run through the enclosing value gap and this must land
+    /// where that gap's own continuation does.
+    pub(crate) fn build_value_slot_continuation_indent(
+        &self,
+        start: u32,
+        end: u32,
+        tail: DocId,
+    ) -> DocId {
+        let d = self.d();
+        d.indent(d.concat(&[self.build_trailing_comments_hang_next(start, end), tail]))
+    }
+
     /// Route a **pre-keyword** gap — the head→keyword half of a `<head> <keyword>
     /// <value>` construct: a type parameter's name→`extends` / pre-`=`
     /// (`types/type_params.rs`) and a mapped type's key→`in` / constraint→`as`
@@ -1238,6 +1262,53 @@ impl<'a> Printer<'a> {
     ) {
         if let Some(comments) =
             self.build_name_to_type_params_comments_opt(start, end, block_spacing)
+        {
+            parts.push(comments);
+        }
+    }
+
+    /// Build the name→signature-head gap's comment run — the type-params-aware form of
+    /// [`Self::build_name_to_type_params_comments_opt`], returning `None` on a comment-free gap.
+    ///
+    /// See [`Self::push_signature_head_comments`] for why the bound and the spacing are
+    /// one argument rather than two.
+    pub(crate) fn build_signature_head_comments_opt(
+        &self,
+        start: u32,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        no_type_params_end: u32,
+    ) -> Option<DocId> {
+        self.build_name_to_type_params_comments_opt(
+            start,
+            type_parameters.map_or(no_type_params_end, |tp| tp.span.start),
+            CommentSpacing::for_type_params(type_parameters.is_some()),
+        )
+    }
+
+    /// Push the name→signature-head gap's comment run: the comments between a
+    /// function/method/type name and whatever opens its signature.
+    ///
+    /// ⚠️ **The end bound and the run's spacing are ONE decision**, which is why this takes
+    /// the type parameters rather than the two derived values. A gap that stops at `<`
+    /// is followed by the type params and so spaces *after* the run (`f/* c */ <T>()`);
+    /// one that runs to the parens is followed by `(` and spaces *before* it
+    /// (`f /* c */()`). Deriving them at the call site let the object-literal accessor
+    /// get both halves wrong — it passed `params_start` unconditionally, so its window
+    /// swallowed the whole `<T>` region the signature doc also prints and every comment
+    /// in there was emitted twice.
+    ///
+    /// `no_type_params_end` is where the gap ends when there are no type parameters —
+    /// the `(` for anything with a parameter list, the name's own end for a construct
+    /// with no parens at all (a type alias), which closes the gap to nothing.
+    pub(crate) fn push_signature_head_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        no_type_params_end: u32,
+    ) {
+        if let Some(comments) =
+            self.build_signature_head_comments_opt(start, type_parameters, no_type_params_end)
         {
             parts.push(comments);
         }

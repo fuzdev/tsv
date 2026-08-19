@@ -6,8 +6,7 @@ use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::{
-    ClassMemberModifiers, CommentSpacing, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
-    MemberSeam,
+    ClassMemberModifiers, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -700,18 +699,12 @@ impl<'a> Printer<'a> {
             key_region_end
         };
 
-        // Comments between key/`?` and next token: [x] /* c */() or method /* c */ <T>()
-        // Line comments get a hardline to prevent absorbing type params as comment text
-        let next_after_key = method
-            .value
-            .type_parameters
-            .as_ref()
-            .map_or(method.value.params_start, |tp| tp.span.start);
-        self.push_name_to_type_params_comments(
+        // Comments between key/`?` and next token: `[x] /* c */()` or `method/* c */ <T>()`
+        self.push_signature_head_comments(
             &mut parts,
             after_key,
-            next_after_key,
-            CommentSpacing::for_type_params(method.value.type_parameters.is_some()),
+            method.value.type_parameters.as_ref(),
+            method.value.params_start,
         );
 
         // Type parameters if present: method<T>()
