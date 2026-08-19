@@ -520,16 +520,33 @@ impl<'a> Printer<'a> {
         let has_trailing_paren_comments =
             self.has_trailing_paren_comments(body_end, arrow.span.end);
 
+        // The `=>`→body value head ([`Printer::value_head_frozen_span`]): an own-line
+        // directive in the gap freezes the whole body, the assignment family's rule with
+        // `=>` as the delimiter. Resolved ONCE, above the cascade, because the two arms
+        // that can hold such a directive sit on opposite sides of the early return below —
+        // the retained-paren arm here and arm 1 of the cascade, and no other (asserted
+        // where `has_own_line_comment` is computed).
+        let frozen = self.value_head_frozen_span(arrow_end, expr.span());
+
         if has_trailing_paren_comments {
             let body_start = expr.span().start;
             // A sequence body hangs (prettier's `shouldIndentSequenceExpression`) — the
             // same answer the comment-free arrow-body path gives; this arm reaches the
             // sequence through the retained-paren helper, so it names the layout itself.
-            let body_doc = self.build_expression_doc_keep_paren_comments(
-                expr,
-                arrow.span.end,
-                SeqLayout::Hanging,
-            );
+            //
+            // A FROZEN body prints verbatim, so no layout of the retained pair's contents
+            // is available to it — the shell keeps its own emission
+            // ([`Printer::build_frozen_kept_paren_doc`], the same one the declarator and
+            // assignment shells take), which is what keeps this gap's comment inside the
+            // pair on both the frozen and the unfrozen path.
+            let body_doc = match frozen {
+                Some(frozen) => self.build_frozen_kept_paren_doc(frozen, arrow.span.end),
+                None => self.build_expression_doc_keep_paren_comments(
+                    expr,
+                    arrow.span.end,
+                    SeqLayout::Hanging,
+                ),
+            };
             // This arm reassembles the body — it wraps the retained parens itself — so it
             // must answer the `=>`→body gap on its own, exactly as the cascade below does.
             // Emitting the run inline unconditionally is the blind-twin bug that costs a
@@ -570,6 +587,16 @@ impl<'a> Printer<'a> {
         // while own-line comments return true (body breaks).
         let has_own_line_comment =
             has_post_arrow_comments && self.has_own_line_post_arrow_comment(arrow_end, body_start);
+
+        // A resolved freeze reaches arm 1 and no other: an honored directive is a `//` alone
+        // on its line, which satisfies both conjuncts above, and arms 2-7 are each reached
+        // only once arm 1 declined. Every one of them builds the body through a route that
+        // knows nothing of `frozen`, so a shape that broke this would drop the freeze
+        // silently — the wrong output being its own fixed point, invisible to every gate.
+        debug_assert!(
+            frozen.is_none() || has_own_line_comment,
+            "an =>→body freeze must reach the own-line-comment arm"
+        );
 
         // Prettier's `shouldPutBodyOnSameLine`: certain expression types stay hugged to =>
         // Object/array literals always hug.
@@ -668,7 +695,7 @@ impl<'a> Printer<'a> {
         if has_own_line_comment {
             // Own-line or line comments — always break
             let body_with_comments =
-                self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start);
+                self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start, frozen);
             parts.push(hang_after_operator(d, body_with_comments));
         } else if should_hug {
             // Hugged body (possibly with inline block comments):
@@ -1719,11 +1746,22 @@ impl<'a> Printer<'a> {
     ///     /* comment */
     ///     expr
     /// ```
+    ///
+    /// `frozen` is the `=>`→body freeze the caller resolved. A frozen body prints as its
+    /// verbatim slice inside the parens the ARROW-BODY position supplies, so the two forms
+    /// agree about the pair — an object body keeps the required pair a brace-less `{` would
+    /// otherwise turn into a block, and a sequence keeps its own
+    /// ([`Printer::build_frozen_value_doc`]). The layout branches
+    /// [`Self::build_arrow_body_doc_with_leading`] picks between are unavailable to a slice
+    /// that renders verbatim, and the one they would decide — the ternary's `if_break` pair
+    /// — is already settled here: the run this arm emits ends in a hardline, so that pair
+    /// takes its break arm and prints nothing.
     fn build_arrow_body_with_comments_doc(
         &self,
         expr: &internal::Expression<'_>,
         sig_end: u32,
         body_start: u32,
+        frozen: Option<Span>,
     ) -> DocId {
         // Leading comments: a block comment inline-adjacent to the next comment / the body
         // hugs it with a space; a line comment or own-line block drops to its own line (a
@@ -1735,10 +1773,15 @@ impl<'a> Printer<'a> {
         // lands on the correct side of whatever parens the body takes — see
         // `build_arrow_body_doc_with_leading`. For every body but a ternary the two are
         // the same bytes; for a ternary the run belongs inside its layout parens.
-        self.build_arrow_body_doc_with_leading(
-            expr,
-            self.arrow_gap_leading_run(sig_end, body_start),
-        )
+        let leading = self.arrow_gap_leading_run(sig_end, body_start);
+        match frozen {
+            Some(frozen) => prepend_leading(
+                self.d(),
+                leading,
+                self.build_frozen_value_doc(expr, frozen, ParenContext::ArrowBody),
+            ),
+            None => self.build_arrow_body_doc_with_leading(expr, leading),
+        }
     }
 
     /// Whether a comment between `=>` and the body forces the body onto its own line —

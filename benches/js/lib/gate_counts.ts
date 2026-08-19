@@ -398,7 +398,16 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// the merged tip**, not a sum — it happens to equal 111 − 1 because the two movers are
 	// disjoint (the clause-tail seven are `js/no-semi/*` and `js/for/*`, the IIFE mover is
 	// `js/function/*`), and that was verified per file rather than assumed.
-	typescript: 110,
+	//
+	// 110 → 109: `js/sequence-expression/ignored.js` LEAVES the bucket by MATCHING
+	// (`match` 4412 → 4413) — a file whose whole content is a `// prettier-ignore` in an
+	// arrow's `=>`→body gap. The `=>`→body head now resolves the value-head freeze
+	// (`Printer::value_head_frozen_span`), along with the enum member's and the `for`
+	// header's init declarator `=`→value gaps, the last three hosts of the assignment
+	// family that were absent from the rule. A/B'd against a HEAD-source rebuild over the
+	// whole corpus: this file is the ONLY move in any bucket — nothing arrived in
+	// `unknown`, and `partial` / `safety` / `errors` / `expected_errors` are byte-identical.
+	typescript: 109,
 	css: 23
 };
 

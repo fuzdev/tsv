@@ -1497,18 +1497,25 @@ impl<'a> Printer<'a> {
     /// (`for (let i = (() => { const k = (a /* c */); })(); ;)` keeps `k`'s comment past
     /// its `;`) — so the distinction is threaded from the one builder that knows it
     /// rather than read from that flag.
+    ///
+    /// `frozen` is the value-head freeze this position resolved, exactly as
+    /// [`Self::build_frozen_value_shell_doc`] carries it for the statement-level twin: the
+    /// slice replaces the expression doc and nothing else moves, because which shell is
+    /// retained and where its comment renders are questions about the GAP, not about what
+    /// renders between the parens.
     pub(crate) fn build_for_init_value_doc(
         &self,
         expr: &internal::Expression<'_>,
         boundary_end: u32,
         position_parens: bool,
+        frozen: Option<Span>,
     ) -> DocId {
         self.build_shell_value_doc(
             expr,
             boundary_end,
             ShellTail::ForClauseSeparator,
             position_parens,
-            None,
+            frozen,
         )
     }
 
@@ -1768,7 +1775,14 @@ impl<'a> Printer<'a> {
     /// path that reaches this one prints a `)` in the output (the position's clarity pair,
     /// or the sequence's required one), so a gap that turns out to hold nothing to emit
     /// still owes the parens.
-    fn build_frozen_kept_paren_doc(&self, frozen: Span, boundary_end: u32) -> DocId {
+    ///
+    /// The **arrow body** asks it directly rather than through [`Self::build_shell_value_doc`]:
+    /// its retained-paren arm reassembles the body itself
+    /// ([`Printer::build_arrow_expression_body`]), and answering that gap with a bare
+    /// `parens()` would leave it with no emitter and DROP the comment inside it
+    /// (`docs/comments.md` hazard 4). One emitter, so the frozen and unfrozen forms of every
+    /// retained shell keep agreeing about where the comment renders.
+    pub(crate) fn build_frozen_kept_paren_doc(&self, frozen: Span, boundary_end: u32) -> DocId {
         let inner = self.build_frozen_node_doc(frozen);
         self.build_kept_paren_shell_doc(inner, frozen.end, boundary_end)
             .unwrap_or_else(|| self.d().parens(inner))

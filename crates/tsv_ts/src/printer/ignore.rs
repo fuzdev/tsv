@@ -562,7 +562,10 @@ impl<'a> Printer<'a> {
 
     /// [`Self::value_head_frozen_span`] resolved to the doc it emits, for a value head whose
     /// unfrozen emission is the plain [`Self::build_expression_doc`] — the `export`→value and
-    /// `export default`→value gaps, the twin heads that must not disagree.
+    /// `export default`→value gaps, the twin heads that must not disagree, and an **enum
+    /// member's** `=`→value gap, whose enclosing member loop claims the value→`,` gap
+    /// (`Printer::collect_trailing_comments`) so no paren shell stands between the slice and
+    /// the separator.
     ///
     /// Deliberately NOT for a head with an ordinary builder of its own (an `if` condition, a
     /// `for` update clause, an assignment RHS, an object property value): those resolve the

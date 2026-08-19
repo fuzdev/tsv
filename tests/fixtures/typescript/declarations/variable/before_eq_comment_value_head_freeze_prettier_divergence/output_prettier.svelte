@@ -55,4 +55,22 @@
 	// pull-up the ordinary arm makes, authored broken in `unformatted_ours_hug`.
 	const aab = // c12
 		/* c13 */ bbc;
+
+	// An enum member's `=` is the same gap one host over.
+	enum Aac {
+		Bbd = // prettier-ignore // c14
+		ccd  +  dde
+	}
+
+	// So is a `for` header's init declarator, whose clause separator is a `;` rather than a
+	// statement terminator.
+	for (
+		let eef = // c15
+			// prettier-ignore
+			ffg  +  ggh;
+		eef < 10;
+		eef++
+	) {
+		fn();
+	}
 </script>

@@ -1,0 +1,977 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 744,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment the author wrote inside a frozen init declarator's clarity parens stays",
+			"start": 20,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inside them: the pair is the printer's, so the comment would have to cross a `)` the",
+			"start": 112,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " output still prints to reach the clause's `;`.",
+			"start": 201,
+			"end": 250,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 273,
+			"end": 291,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 3
+				},
+				"end": {
+					"line": 7,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 308,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 16
+				},
+				"end": {
+					"line": 8,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A line comment in the same gap opens the pair — inline it would swallow the `)`.",
+			"start": 349,
+			"end": 432,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 455,
+			"end": 473,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 3
+				},
+				"end": {
+					"line": 18,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 495,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 16
+				},
+				"end": {
+					"line": 20,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A frozen sequence supplies its own required parens, and that gap sits inside them the",
+			"start": 537,
+			"end": 625,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same way.",
+			"start": 627,
+			"end": 639,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 662,
+			"end": 680,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 3
+				},
+				"end": {
+					"line": 32,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 695,
+			"end": 702,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 14
+				},
+				"end": {
+					"line": 33,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 743,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 734,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 252,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 260,
+						"end": 316,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 8,
+								"column": 24
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 264,
+								"end": 316,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 6
+									},
+									"end": {
+										"line": 8,
+										"column": 24
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 264,
+									"end": 267,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 6
+										},
+										"end": {
+											"line": 6,
+											"column": 9
+										}
+									},
+									"name": "aaa"
+								},
+								"init": {
+									"type": "AssignmentExpression",
+									"start": 296,
+									"end": 307,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 15
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 296,
+										"end": 299,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 4
+											},
+											"end": {
+												"line": 8,
+												"column": 7
+											}
+										},
+										"name": "bbb"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 304,
+										"end": 307,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 12
+											},
+											"end": {
+												"line": 8,
+												"column": 15
+											}
+										},
+										"name": "ccc"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 273,
+											"end": 291
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 308,
+											"end": 315
+										}
+									]
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 320,
+						"end": 323,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 2
+							},
+							"end": {
+								"line": 9,
+								"column": 5
+							}
+						},
+						"name": "aaa"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 327,
+						"end": 330,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 2
+							},
+							"end": {
+								"line": 10,
+								"column": 5
+							}
+						},
+						"name": "aaa"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 334,
+						"end": 346,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 3
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 338,
+								"end": 343,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 338,
+									"end": 342,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 338,
+										"end": 340,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment the author wrote inside a frozen init declarator's clarity parens stays",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " inside them: the pair is the printer's, so the comment would have to cross a `)` the",
+							"start": 112,
+							"end": 199
+						},
+						{
+							"type": "Line",
+							"value": " output still prints to reach the clause's `;`.",
+							"start": 201,
+							"end": 250
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 434,
+					"end": 534,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 442,
+						"end": 504,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 2
+							},
+							"end": {
+								"line": 21,
+								"column": 4
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 446,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 6
+									},
+									"end": {
+										"line": 21,
+										"column": 4
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 446,
+									"end": 449,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 6
+										},
+										"end": {
+											"line": 17,
+											"column": 9
+										}
+									},
+									"name": "ddd"
+								},
+								"init": {
+									"type": "AssignmentExpression",
+									"start": 483,
+									"end": 494,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 4
+										},
+										"end": {
+											"line": 20,
+											"column": 15
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 483,
+										"end": 486,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 4
+											},
+											"end": {
+												"line": 20,
+												"column": 7
+											}
+										},
+										"name": "eee"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 491,
+										"end": 494,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 12
+											},
+											"end": {
+												"line": 20,
+												"column": 15
+											}
+										},
+										"name": "fff"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 455,
+											"end": 473
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 495,
+											"end": 499
+										}
+									]
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 508,
+						"end": 511,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 2
+							},
+							"end": {
+								"line": 22,
+								"column": 5
+							}
+						},
+						"name": "ddd"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 515,
+						"end": 518,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 2
+							},
+							"end": {
+								"line": 23,
+								"column": 5
+							}
+						},
+						"name": "ddd"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 522,
+						"end": 534,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 3
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 526,
+								"end": 531,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 526,
+									"end": 530,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 526,
+										"end": 528,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 25,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment in the same gap opens the pair — inline it would swallow the `)`.",
+							"start": 349,
+							"end": 432
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 641,
+					"end": 733,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 649,
+						"end": 703,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 2
+							},
+							"end": {
+								"line": 33,
+								"column": 22
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 653,
+								"end": 703,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 6
+									},
+									"end": {
+										"line": 33,
+										"column": 22
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 653,
+									"end": 656,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 6
+										},
+										"end": {
+											"line": 31,
+											"column": 9
+										}
+									},
+									"name": "ggg"
+								},
+								"init": {
+									"type": "SequenceExpression",
+									"start": 685,
+									"end": 694,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 4
+										},
+										"end": {
+											"line": 33,
+											"column": 13
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 685,
+											"end": 688,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 4
+												},
+												"end": {
+													"line": 33,
+													"column": 7
+												}
+											},
+											"name": "hhh"
+										},
+										{
+											"type": "Identifier",
+											"start": 691,
+											"end": 694,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 10
+												},
+												"end": {
+													"line": 33,
+													"column": 13
+												}
+											},
+											"name": "iii"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 662,
+											"end": 680
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 695,
+											"end": 702
+										}
+									]
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 707,
+						"end": 710,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 2
+							},
+							"end": {
+								"line": 34,
+								"column": 5
+							}
+						},
+						"name": "ggg"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 714,
+						"end": 717,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 2
+							},
+							"end": {
+								"line": 35,
+								"column": 5
+							}
+						},
+						"name": "ggg"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 721,
+						"end": 733,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 3
+							},
+							"end": {
+								"line": 38,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 725,
+								"end": 730,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 725,
+									"end": 729,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 2
+										},
+										"end": {
+											"line": 37,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 725,
+										"end": 727,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 2
+											},
+											"end": {
+												"line": 37,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen sequence supplies its own required parens, and that gap sits inside them the",
+							"start": 537,
+							"end": 625
+						},
+						{
+							"type": "Line",
+							"value": " same way.",
+							"start": 627,
+							"end": 639
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

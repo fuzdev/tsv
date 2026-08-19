@@ -510,16 +510,24 @@ tsv diverges at six places:
 second divergence.
 
 **On assignment-family value heads.** The same head rule, with the assignment operator as the
-delimiter: an own-line directive in an `=`→value or `:`→value gap freezes that **whole value**.
-The hosts are a declarator initializer (`const a =`, and a Svelte `{@const a =}`), an assignment
+delimiter: an own-line directive in an `=`→value, `:`→value or `=>`→body gap freezes that
+**whole value**. The hosts are a declarator initializer (`const a =`, a `for` header's init
+declarator, and a Svelte `{@const a =}`), an assignment
 RHS (`a =`, a compound `a +=`, and each segment of a chain), an object property value (`k:`), a
-class field value (`f =`, `static f =`, `#f =`, `accessor f =`), and a default value (a
+class field value (`f =`, `static f =`, `#f =`, `accessor f =`), an enum member value
+(`A =`), an arrow's expression body (`=>`), and a default value (a
 parameter default, a destructuring default, an array-pattern default). The slice is the value's
 own node span, so the binding, the operator and the enclosing list stay parent-owned and a
-sibling declarator or property the freeze does not reach still normalizes. Prettier agrees at
-every unprefixed host, so the ordinary fixtures
-`statements/variable/init_prettier_ignore_head`, `expressions/assignment/rhs_prettier_ignore_head`
+sibling declarator, member or property the freeze does not reach still normalizes. Prettier
+agrees at every unprefixed host, so the ordinary fixtures
+`statements/variable/init_prettier_ignore_head`, `expressions/assignment/rhs_prettier_ignore_head`,
+`statements/for/init_declarator_prettier_ignore_head`,
+`expressions/arrow/body_prettier_ignore_head`
 and `svelte/tags/const/value_prettier_ignore_head` **match**.
+
+A **ternary branch** (`?`→consequent, `:`→alternate) and a **`case`→test** are the same shape
+one family over and are still absent from the rule, so a directive there is inert while
+prettier honors it. Tracked gaps, not sanctioned differences.
 
 The clarity parens rule carries over unchanged — an initializer that is an assignment prints as
 `const a = (b = c)`, and those parens are the printer's, so the frozen inner keeps them around
@@ -542,25 +550,25 @@ not about what renders between the parens.
 **Which emitter owns that gap is the host's, not the freeze's**, and the two arrangements give
 two different answers — each of them the host's *unfrozen* answer, which is the whole claim:
 
-- A host that owns everything inside its own boundary — a **declarator initializer**, an
-  **assignment RHS** — emits the gap itself, so the comment stays **inside** the surviving pair:
+- A host that owns everything inside its own boundary — a **declarator initializer** (statement
+  or `for` header), an **assignment RHS**, an **arrow body** — emits the gap itself, so the
+  comment stays **inside** the surviving pair:
   a block inline, a `//` with the pair opened around it (inline it would swallow the `)`). A
-  shell the value does not need strips, and the block then defers past the `;`. These are the two
+  shell the value does not need strips, and the block then defers past the `;` — except in a
+  `for` header, whose `ForClauseSeparator` tail licenses no deferral at all: the clause's `;`
+  ends the declarator the comment was written in, so the block stays inline there. These are the
   hosts the fixtures below pin.
 - A host whose **enclosing** seam claims the gap — a **class field**, an **object property
-  value**, a **parameter default** — floats the comment out past the pair
+  value**, an **enum member value**, a **parameter default** — floats the comment out past the
+  pair
   (`(bbb  =  ccc); /* c */`), exactly as its unfrozen twin does. tsv matches prettier at the class
-  field; it parts at the object property's `//` (which prettier hoists to lead the property, the
+  field and the enum member; it parts at the object property's `//` (which prettier hoists to lead
+  the property, the
   standing relocation family) and at a **frozen parameter default**, where prettier's ignore range
   covers the pair and so keeps the comment inside it. That last parting is a **tracked gap, not a
   sanctioned difference** — the frozen and unfrozen forms agree under tsv, but prettier's do not.
 
-Three hosts are **absent from the freeze rule entirely** — an enum member and a `for`-header init
-declarator resolve no `=`→value freeze at all, and neither does an arrow's `=>`→body gap, so a
-directive at any of them is inert while prettier honors it. Also tracked gaps, not sanctioned
-differences. (A ternary branch and a `case` test are the same shape one family over.)
-
-tsv diverges at four places:
+tsv diverges at six places:
 
 - **A frozen value's surviving shell** — ◆comment_preservation ◆prettier_bug — prettier
   **throws** on a comment in that gap (`Comment "c" was not printed`): its ignore path replaces
@@ -569,22 +577,47 @@ tsv diverges at four places:
   `prettier_rejects.txt`; tsv keeps the comment where the author wrote it, matching its own
   unfrozen twins (`init_assignment_paren_block_comment`,
   `init_assignment_paren_line_comment_prettier_divergence`) — the declarator initializer
-  [init paren comment](../tests/fixtures/typescript/statements/variable/init_prettier_ignore_paren_comment_prettier_divergence/)
-  and the assignment RHS
+  [init paren comment](../tests/fixtures/typescript/statements/variable/init_prettier_ignore_paren_comment_prettier_divergence/),
+  the assignment RHS
   [rhs paren comment](../tests/fixtures/typescript/expressions/assignment/rhs_prettier_ignore_paren_comment_prettier_divergence/)
+  and the `for` header's init declarator
+  [init declarator paren comment](../tests/fixtures/typescript/statements/for/init_declarator_prettier_ignore_paren_comment_prettier_divergence/).
+  The **arrow body** is the one host of this family where prettier survives the shape — its
+  grouping pair strips rather than throwing — so that host has an oracle and keeps its own
+  entry below
 - **A frozen value's REDUNDANT shell** — ◆comment_preservation — the shell strips, so prettier
   survives and there is an oracle. Both tools defer the **block** past the `;`; on the **line**
   spelling tsv retains the shell and keeps the `//` inside it, where prettier strips anyway and
   carries the comment past the `;` onto a line it does not own. The same parting the unfrozen
   twin already records, and prettier reaches its own block answer only on a second pass (chain
   pinned) —
-  [init redundant paren comment](../tests/fixtures/typescript/statements/variable/init_prettier_ignore_redundant_paren_comment_prettier_divergence/)
+  [init redundant paren comment](../tests/fixtures/typescript/statements/variable/init_prettier_ignore_redundant_paren_comment_prettier_divergence/).
+  A `for` header's init declarator parts on the **line** spelling for the same reason and on the
+  block for none — its clause `;` is not a terminator, so the block stays inline and matches —
+  [init declarator redundant paren comment](../tests/fixtures/typescript/statements/for/init_declarator_prettier_ignore_redundant_paren_comment_prettier_divergence/)
+- **A frozen arrow body's shell** — ◆comment_preservation — tsv retains the author's pair and
+  keeps the comment inside it, a block inline and a `//` with the pair opened around it, exactly
+  as the unfrozen arrow body does. Prettier strips the grouping pair and relocates the comment
+  out, floating a `//` past the body's `;` and moving a block outside a *required* object pair,
+  which re-associates it from the object to the whole expression; its second pass moves the
+  blocks again (chain pinned). The unfrozen twin is already sanctioned at
+  `arrows/body_paren_comment_prettier_divergence` —
+  [body paren comment](../tests/fixtures/typescript/expressions/arrow/body_prettier_ignore_paren_comment_prettier_divergence/)
 - **A directive inside the before-`=` continuation** — ◆comment_preservation — when a comment
   before the `=` drops `= value` to a continuation line, the `=`→value gap inside it keeps its
   own rule: an own-line directive still keeps its own line and still freezes. Prettier relocates
   the before-`=` comment past the operator (the family divergence §Comment relocation already
   sanctions) and honors the freeze either way —
   [before-`=` value-head freeze](../tests/fixtures/typescript/declarations/variable/before_eq_comment_value_head_freeze_prettier_divergence/)
+- **Enum member value** — ◆comment_preservation — the one host of the family where prettier
+  relocates an own-line `=`→value comment onto the `=`'s line (it agrees with tsv at the
+  declarator, the class field, the assignment RHS and the object value). tsv keeps the line the
+  author gave it, directive or not: trailing the operator a directive is inert under the floor,
+  so following the relocation would cost the freeze on tsv's own second pass. Prettier
+  demonstrates exactly that loss — its own pass 2 floats the directive past the value
+  (`Bbb = ccc + ddd // prettier-ignore`) and the freeze is gone, the same second-pass loss its
+  `enum` / `namespace` **body** heads show below —
+  [member init head](../tests/fixtures/typescript/declarations/enum/member_init_prettier_ignore_head_prettier_divergence/)
 - **Default value** — ◆design_choice — tsv breaks the enclosing list around the frozen value,
   because the directive's own line is a mandatory break inside that list and a list holding a
   break prints expanded — the same layout a plain own-line comment in that gap already produces.
