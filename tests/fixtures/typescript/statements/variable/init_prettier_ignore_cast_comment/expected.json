@@ -1,0 +1,878 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 819,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A JSDoc cast owns its comment, so a freeze that replaces the value's doc with a",
+			"start": 20,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " verbatim slice has to print that comment itself — the slice starts at the cast's `(`.",
+			"start": 104,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 208,
+			"end": 226,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 229,
+			"end": 245,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The cast owns its comment from the line ABOVE its `(` too, and that line is the",
+			"start": 263,
+			"end": 345,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author's: the freeze keeps it, exactly as the unfrozen cast does.",
+			"start": 347,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 431,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 452,
+			"end": 468,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A redundant shell around the cast collapses into the cast's own preserved pair.",
+			"start": 488,
+			"end": 570,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 586,
+			"end": 604,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 607,
+			"end": 623,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The unfrozen twin, for contrast: same two placements, same two answers.",
+			"start": 643,
+			"end": 717,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 731,
+			"end": 747,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 13
+				},
+				"end": {
+					"line": 22,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 777,
+			"end": 793,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 818,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 809,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 194,
+					"end": 260,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 200,
+							"end": 259,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 200,
+								"end": 203,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"name": "aaa"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 247,
+								"end": 258,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 20
+									},
+									"end": {
+										"line": 6,
+										"column": 31
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 247,
+									"end": 250,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 20
+										},
+										"end": {
+											"line": 6,
+											"column": 23
+										}
+									},
+									"name": "bbb"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 255,
+									"end": 258,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 28
+										},
+										"end": {
+											"line": 6,
+											"column": 31
+										}
+									},
+									"name": "ccc"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 208,
+										"end": 226
+									},
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 229,
+										"end": 245
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A JSDoc cast owns its comment, so a freeze that replaces the value's doc with a",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " verbatim slice has to print that comment itself — the slice starts at the cast's `(`.",
+							"start": 104,
+							"end": 192
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 417,
+					"end": 485,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 423,
+							"end": 484,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 423,
+								"end": 426,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								},
+								"name": "ddd"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 472,
+								"end": 483,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 3
+									},
+									"end": {
+										"line": 13,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 472,
+									"end": 475,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 3
+										},
+										"end": {
+											"line": 13,
+											"column": 6
+										}
+									},
+									"name": "eee"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 480,
+									"end": 483,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 11
+										},
+										"end": {
+											"line": 13,
+											"column": 14
+										}
+									},
+									"name": "fff"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 431,
+										"end": 449
+									},
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 452,
+										"end": 468
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The cast owns its comment from the line ABOVE its `(` too, and that line is the",
+							"start": 263,
+							"end": 345
+						},
+						{
+							"type": "Line",
+							"value": " author's: the freeze keeps it, exactly as the unfrozen cast does.",
+							"start": 347,
+							"end": 415
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 572,
+					"end": 640,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 578,
+							"end": 639,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 578,
+								"end": 581,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 10
+									}
+								},
+								"name": "ggg"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 627,
+								"end": 638,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 3
+									},
+									"end": {
+										"line": 19,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 627,
+									"end": 630,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 3
+										},
+										"end": {
+											"line": 19,
+											"column": 6
+										}
+									},
+									"name": "hhh"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 635,
+									"end": 638,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 11
+										},
+										"end": {
+											"line": 19,
+											"column": 14
+										}
+									},
+									"name": "iii"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 586,
+										"end": 604
+									},
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 607,
+										"end": 623
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A redundant shell around the cast collapses into the cast's own preserved pair.",
+							"start": 488,
+							"end": 570
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 719,
+					"end": 760,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 42
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 725,
+							"end": 759,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 22,
+									"column": 41
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 725,
+								"end": 728,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 10
+									}
+								},
+								"name": "jjj"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 749,
+								"end": 758,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 31
+									},
+									"end": {
+										"line": 22,
+										"column": 40
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 749,
+									"end": 752,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 31
+										},
+										"end": {
+											"line": 22,
+											"column": 34
+										}
+									},
+									"name": "kkk"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 755,
+									"end": 758,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 37
+										},
+										"end": {
+											"line": 22,
+											"column": 40
+										}
+									},
+									"name": "lll"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 731,
+										"end": 747
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The unfrozen twin, for contrast: same two placements, same two answers.",
+							"start": 643,
+							"end": 717
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 763,
+					"end": 808,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 769,
+							"end": 807,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 769,
+								"end": 772,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 10
+									}
+								},
+								"name": "mmm"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 797,
+								"end": 806,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 3
+									},
+									"end": {
+										"line": 26,
+										"column": 12
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 797,
+									"end": 800,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 3
+										},
+										"end": {
+											"line": 26,
+											"column": 6
+										}
+									},
+									"name": "nnn"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 803,
+									"end": 806,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 9
+										},
+										"end": {
+											"line": 26,
+											"column": 12
+										}
+									},
+									"name": "ooo"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 777,
+										"end": 793
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

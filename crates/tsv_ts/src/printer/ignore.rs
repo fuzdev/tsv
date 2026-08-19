@@ -562,7 +562,10 @@ impl<'a> Printer<'a> {
 
     /// [`Self::value_head_frozen_span`] resolved to the doc it emits, for a value head whose
     /// unfrozen emission is the plain [`Self::build_expression_doc`] — the `export`→value and
-    /// `export default`→value gaps, the twin heads that must not disagree.
+    /// `export default`→value gaps, the twin heads that must not disagree, and an **enum
+    /// member's** `=`→value gap, whose enclosing member loop claims the value→`,` gap
+    /// (`Printer::collect_trailing_comments`) so no paren shell stands between the slice and
+    /// the separator.
     ///
     /// Deliberately NOT for a head with an ordinary builder of its own (an `if` condition, a
     /// `for` update clause, an assignment RHS, an object property value): those resolve the
@@ -787,6 +790,16 @@ impl<'a> Printer<'a> {
     /// The must-break rides in the doc ([`Self::build_frozen_span_doc`]): every layout in
     /// this family is width-decided, and a `verbatim_source_span` is `will_break`-opaque,
     /// so a multi-line frozen item has to say so explicitly.
+    ///
+    /// ⚠️ **This emits the pair and nothing else, so it is only for a position whose
+    /// ENCLOSING seam claims the slice→`)` gap** — an argument or element (the element-comma
+    /// seam), a statement test, a binding default. Those all float such a comment out past
+    /// the `)`, which is what their unfrozen twins do too. A position that owns everything
+    /// inside its own boundary — a declarator initializer, an assignment RHS — must take
+    /// [`Self::build_frozen_value_shell_doc`] instead: nothing out there can see between the
+    /// parens, so a bare pair leaves that gap with no emitter and DROPS the comment
+    /// (`docs/comments.md` hazard 4), which is what both of those hosts did while they
+    /// spelled the bare pair here.
     pub(in crate::printer) fn build_frozen_value_doc(
         &self,
         value: &internal::Expression<'_>,

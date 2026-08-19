@@ -11,6 +11,7 @@ use crate::ast::internal;
 use crate::printer::ParenContext;
 use crate::printer::expressions::operators::SeqLayout;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -1361,6 +1362,37 @@ impl<'a> Printer<'a> {
             boundary_end,
             ShellTail::StatementTerminator,
             position_parens,
+            None,
+        )
+    }
+
+    /// [`Self::build_expression_doc_with_paren_comments`] for a value the position froze
+    /// (`prettier-ignore` in its `=`→value gap): the same shell, with the verbatim slice
+    /// standing in for the expression doc.
+    ///
+    /// ⚠️ **The freeze does not take the value out of its shell.** The slice is the value's
+    /// own node span, so the author's grouping parens lie OUTSIDE it and the gap between
+    /// the slice and that `)` is the shell's, exactly as in the unfrozen form — a frozen
+    /// arm that skipped this builder printed its own bare `parens()` and left that gap with
+    /// no emitter at all, DROPPING every comment in it (`docs/comments.md` hazard 4; a
+    /// printer that synthesizes its own `(`…`)` owns the gap inside it, per
+    /// [`Self::trailing_paren_comment_parts`]). Routing through here is what keeps the
+    /// frozen and unfrozen forms answering the gap identically — which shell is retained,
+    /// where the comment renders, and when it defers past the terminator are all questions
+    /// about the GAP, not about what renders between the parens.
+    pub(crate) fn build_frozen_value_shell_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        frozen: Span,
+        boundary_end: u32,
+        position_parens: bool,
+    ) -> DocId {
+        self.build_shell_value_doc(
+            expr,
+            boundary_end,
+            ShellTail::StatementTerminator,
+            position_parens,
+            Some(frozen),
         )
     }
 
@@ -1465,18 +1497,42 @@ impl<'a> Printer<'a> {
     /// (`for (let i = (() => { const k = (a /* c */); })(); ;)` keeps `k`'s comment past
     /// its `;`) — so the distinction is threaded from the one builder that knows it
     /// rather than read from that flag.
+    ///
+    /// `frozen` is the value-head freeze this position resolved, exactly as
+    /// [`Self::build_frozen_value_shell_doc`] carries it for the statement-level twin: the
+    /// slice replaces the expression doc and nothing else moves, because which shell is
+    /// retained and where its comment renders are questions about the GAP, not about what
+    /// renders between the parens.
     pub(crate) fn build_for_init_value_doc(
         &self,
         expr: &internal::Expression<'_>,
         boundary_end: u32,
         position_parens: bool,
+        frozen: Option<Span>,
     ) -> DocId {
         self.build_shell_value_doc(
             expr,
             boundary_end,
             ShellTail::ForClauseSeparator,
             position_parens,
+            frozen,
         )
+    }
+
+    /// The value's own doc inside a shell arm that does NOT print the pair itself: the
+    /// verbatim frozen slice where the position resolved a freeze, else the ordinary
+    /// expression doc. Both spellings supply a self-parenthesizing value's own required
+    /// pair ([`Self::build_frozen_expression_doc`] is `build_expression_doc`'s twin in
+    /// exactly that), so the arms that return it need no sequence case of their own.
+    fn build_shell_inner_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        frozen: Option<Span>,
+    ) -> DocId {
+        match frozen {
+            Some(frozen) => self.build_frozen_expression_doc(expr, frozen),
+            None => self.build_expression_doc(expr),
+        }
     }
 
     fn build_shell_value_doc(
@@ -1485,6 +1541,7 @@ impl<'a> Printer<'a> {
         boundary_end: u32,
         tail: ShellTail,
         position_parens: bool,
+        frozen: Option<Span>,
     ) -> DocId {
         let expr_end = expr.span().end;
         // The for-header's `[~In]` parens are applied HERE rather than by the caller,
@@ -1501,14 +1558,23 @@ impl<'a> Printer<'a> {
         };
 
         if !self.has_trailing_paren_comments(expr_end, boundary_end) {
-            return wrap_in(self.build_expression_doc(expr));
+            return wrap_in(self.build_shell_inner_doc(expr, frozen));
         }
 
         // Every position this serves — variable init, assignment RHS, ternary branch —
         // is prettier's default layout arm; the two that hang (a `return`/`throw`
         // argument, an arrow body) claim their sequence before reaching here.
         if let internal::Expression::SequenceExpression(seq) = expr {
-            return self.build_shell_sequence_doc(seq, expr_end, boundary_end, SeqLayout::Aligned);
+            // A FROZEN sequence prints verbatim, so the operand-per-line layout the
+            // sequence builder chooses is not available to it — its required pair takes
+            // the retained-shell rendering below instead, which is where this gap's
+            // comment goes on either path.
+            return match frozen {
+                Some(frozen) => self.build_frozen_kept_paren_doc(frozen, boundary_end),
+                None => {
+                    self.build_shell_sequence_doc(seq, expr_end, boundary_end, SeqLayout::Aligned)
+                }
+            };
         }
 
         // Two reasons the shell is RETAINED rather than stripped, and either sends the
@@ -1528,15 +1594,18 @@ impl<'a> Printer<'a> {
         // construct one comma over — a non-last declarator, with no terminator to defer
         // past — already kept it inside, and prettier keeps it inside in both.
         if self.shell_gap_retains_parens(expr_end, boundary_end, position_parens) {
-            return self.build_expression_doc_keep_paren_comments(
-                expr,
-                boundary_end,
-                SeqLayout::Aligned,
-            );
+            return match frozen {
+                Some(frozen) => self.build_frozen_kept_paren_doc(frozen, boundary_end),
+                None => self.build_expression_doc_keep_paren_comments(
+                    expr,
+                    boundary_end,
+                    SeqLayout::Aligned,
+                ),
+            };
         }
 
         let d = self.d();
-        let inner = wrap_in(self.build_expression_doc(expr));
+        let inner = wrap_in(self.build_shell_inner_doc(expr, frozen));
 
         // Every comment left here is a same-line block. Where the shell is the last
         // thing before a statement `;`, that block defers past the terminator — the same
@@ -1648,7 +1717,6 @@ impl<'a> Printer<'a> {
         boundary_end: u32,
         layout: SeqLayout,
     ) -> DocId {
-        let d = self.d();
         let expr_end = expr.span().end;
 
         // A sequence self-parenthesizes, so it takes the shared arm rather than the
@@ -1659,15 +1727,30 @@ impl<'a> Printer<'a> {
             return self.build_shell_sequence_doc(seq, expr_end, boundary_end, layout);
         }
 
-        let Some((comment_parts, needs_break)) =
-            self.trailing_paren_comment_parts(expr_end, boundary_end)
-        else {
-            return self.build_expression_doc(expr);
-        };
-
         let inner = self.build_expression_doc(expr);
+        self.build_kept_paren_shell_doc(inner, expr_end, boundary_end)
+            .unwrap_or(inner)
+    }
 
-        if needs_break {
+    /// The RETAINED shell's rendering: the value inside the pair the author wrote, with
+    /// the operand→`)` run behind it — inline where the run is a same-line block, on the
+    /// operand's own indented line where a `//` or an own-line comment forces the pair
+    /// open ([`Self::trailing_paren_comment_parts`] decides which).
+    ///
+    /// `inner` is whatever renders the value at this position, so the ordinary expression
+    /// doc and a frozen verbatim slice share one rendering rather than two. `None` says
+    /// the gap holds nothing to emit, leaving the caller its own bare form.
+    fn build_kept_paren_shell_doc(
+        &self,
+        inner: DocId,
+        expr_end: u32,
+        boundary_end: u32,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let (comment_parts, needs_break) =
+            self.trailing_paren_comment_parts(expr_end, boundary_end)?;
+
+        Some(if needs_break {
             let mut indent_parts: DocBuf = smallvec![d.hardline(), inner];
             indent_parts.extend(comment_parts);
             d.concat(&[
@@ -1681,7 +1764,28 @@ impl<'a> Printer<'a> {
             parts.extend(comment_parts);
             parts.push(d.text(")"));
             d.concat(&parts)
-        }
+        })
+    }
+
+    /// [`Self::build_kept_paren_shell_doc`] over a FROZEN value's verbatim slice — the
+    /// retained arm of [`Self::build_shell_value_doc`] and the frozen sequence's own
+    /// required pair, which is the same emission.
+    ///
+    /// The pair is unconditional here, unlike the unfrozen twin's bare fallback: every
+    /// path that reaches this one prints a `)` in the output (the position's clarity pair,
+    /// or the sequence's required one), so a gap that turns out to hold nothing to emit
+    /// still owes the parens.
+    ///
+    /// The **arrow body** asks it directly rather than through [`Self::build_shell_value_doc`]:
+    /// its retained-paren arm reassembles the body itself
+    /// ([`Printer::build_arrow_expression_body`]), and answering that gap with a bare
+    /// `parens()` would leave it with no emitter and DROP the comment inside it
+    /// (`docs/comments.md` hazard 4). One emitter, so the frozen and unfrozen forms of every
+    /// retained shell keep agreeing about where the comment renders.
+    pub(crate) fn build_frozen_kept_paren_doc(&self, frozen: Span, boundary_end: u32) -> DocId {
+        let inner = self.build_frozen_node_doc(frozen);
+        self.build_kept_paren_shell_doc(inner, frozen.end, boundary_end)
+            .unwrap_or_else(|| self.d().parens(inner))
     }
 
     /// Promote block comments that appear before an assignment operator to the LHS.

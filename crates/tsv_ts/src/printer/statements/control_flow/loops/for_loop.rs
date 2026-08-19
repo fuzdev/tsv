@@ -7,8 +7,8 @@ use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::statements::StatementContext;
 use crate::printer::{
-    CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer, RunLeadingBlank,
-    needs_parens,
+    CommentVec, ContinuationValue, LeadingGlue, OwnedCommentEffect, ParenContext, Printer,
+    RunLeadingBlank, needs_parens,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -1850,11 +1850,22 @@ impl<'a> Printer<'a> {
                         // (`for (let k = (a in b); ;)` → `((a in b))`). This flag answers
                         // only "does the declarator POSITION parenthesize its value?".
                         let position_parens = needs_parens(init, ParenContext::VariableInit, false);
+                        // The `=`→value head, resolved exactly as the statement-level
+                        // declarator resolves it ([`Printer::value_head_frozen_span`]): an
+                        // own-line directive in the gap freezes the whole value. Handed to
+                        // the shell builder rather than emitted here, so the slice→`)` gap
+                        // keeps the answer the unfrozen form gives it — the header's
+                        // `ForClauseSeparator` tail, which never defers past the clause's
+                        // `;`. Every branch below routes through `build_value`, so the
+                        // freeze is stated once. The predicate opens on the document-level
+                        // flag, so a directive-free document pays one predicted branch.
+                        let init_frozen = self.value_head_frozen_span(eq_pos + 1, init.span());
                         let build_value = || {
                             let inner = self.build_for_init_value_doc(
                                 init,
                                 declarator.span.end,
                                 position_parens,
+                                init_frozen,
                             );
                             self.wrap_value_position_parens(
                                 init,
@@ -1882,9 +1893,18 @@ impl<'a> Printer<'a> {
                         let before_eq = self.has_comments_to_emit_between(id_end, eq_pos);
                         let continuation = before_eq
                             .then(|| {
-                                self.build_initializer_line_continuation(id_end, eq_pos, || {
-                                    self.prepend_rhs_comments(build_value(), eq_pos + 1, init_start)
-                                })
+                                self.build_initializer_line_continuation(
+                                    id_end,
+                                    eq_pos,
+                                    ContinuationValue::Expression(init),
+                                    || {
+                                        self.prepend_rhs_comments(
+                                            build_value(),
+                                            eq_pos + 1,
+                                            init_start,
+                                        )
+                                    },
+                                )
                             })
                             .flatten();
                         if let Some(cont) = continuation {

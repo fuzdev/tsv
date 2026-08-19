@@ -11,8 +11,8 @@ use crate::printer::types::helpers::{
 };
 use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
 use crate::printer::{
-    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, MemberBlankScan,
-    MemberBody, MemberFloor, MemberFreeze, MemberSeam,
+    CommentFilter, CommentSpacing, CommentVec, ContinuationValue, HeritageKeyword, LeadingGlue,
+    MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
 };
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
@@ -1234,19 +1234,28 @@ impl<'a> Printer<'a> {
 
         // Initializer: ` = value`
         if let Some(init) = &member.initializer {
-            // An enum member's `=` is a value gap (`mark_jsdoc_cast_value_gap`).
-            self.mark_jsdoc_cast_value_gap(init);
-            let init_doc = self.build_expression_doc(init);
-
             // Extract comments between `=` and initializer value
             let id_end = member.id.span().end;
             let init_start = init.span().start;
             let eq_pos = self.find_equals_position(id_end, init_start);
 
+            // An enum member's `=` is a value gap (`mark_jsdoc_cast_value_gap`).
+            self.mark_jsdoc_cast_value_gap(init);
+
+            // The `=`→value head: an own-line directive in the gap freezes the whole value,
+            // exactly as at the declarator initializer and every other host of the
+            // assignment family. Through [`Printer::build_value_head_doc`] because this
+            // position's ordinary emission IS the plain expression doc — the member loop's
+            // own trailing scan claims the value→`,` gap
+            // (`Printer::collect_trailing_comments`, anchored past the frozen slice), so
+            // there is no paren shell here for the freeze to ride inside.
+            let init_doc = self.build_value_head_doc(eq_pos + 1, init);
+
             // The post-`=` value content (shared by the inline and the
             // continuation forms). For binary expressions, indent so wrapped
             // continuations align under the value; any `=`→value block comment
-            // leads it.
+            // leads it. A frozen value is unaffected either way — a verbatim slice
+            // holds no `line` for the indent to act on.
             let init_with_indent = if matches!(init, internal::Expression::BinaryExpression(_)) {
                 d.indent(init_doc)
             } else {
@@ -1259,9 +1268,14 @@ impl<'a> Printer<'a> {
             // (preserve position — lossless when a second comment also trails the
             // member; prettier relocates past the value and merges the two onto one
             // line — see conformance_prettier_ts_comments.md §Comment relocation).
-            if let Some(cont) =
-                self.build_initializer_line_continuation(id_end, eq_pos, || value_doc)
-            {
+            if let Some(cont) = self.build_initializer_line_continuation(
+                id_end,
+                eq_pos,
+                // A type alias's RHS is a TYPE — it owns no comment, so the gap's bound is
+                // the whole of what this seam needs from it.
+                ContinuationValue::Opaque(init_start),
+                || value_doc,
+            ) {
                 d.concat(&[id_doc, cont])
             } else {
                 // Comments between name and `=` (block stays inline: `a /* c */ = 1`)
