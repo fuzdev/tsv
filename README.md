@@ -28,7 +28,9 @@ tsv prioritizes, in order:
 3. binary size and memory usage
 4. extensibility (valued but deprioritized), modularity, and reusability
 
-See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
+Staying simple is an over-arching goal.
+
+See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
 Compared to Oxc and Biome, tsv is faster, smaller,
 and uses less memory to parse and format its supported languages.
 One reason for tsv to exist is to help find the performance bonuses
@@ -60,7 +62,7 @@ tsv derives its tools from:
 tsv's features:
 
 - [x] parsers for TypeScript/JS, CSS, and Svelte, drop-in for Svelte+acorn+acorn-typescript
-- [x] formatter following Prettier + prettier-plugin-svelte (with intentional divergences)
+- [x] formatter following Prettier + prettier-plugin-svelte (with intentional divergences and no supported style config)
 - [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - `fuzdev.tsv-format`
 - [ ] ts-to-js conversion (types-to-whitespace only)
 - [ ] module lexer
