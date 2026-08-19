@@ -14,6 +14,11 @@
  * catalogue, never an invisible gap. Keep it EMPTY when it can be; an empty list
  * means every tool handles the whole real-world corpus.
  *
+ * A RATCHET, not an accumulator: a full perf run grades the list in both
+ * directions — an unlisted failure fails, and so does an entry that excused
+ * nothing (`stale_perf_omits`). So a tolerance cannot outlive the failure it was
+ * written for.
+ *
  * Distinct from `parse_sanctions.ts`: those `Sanction`/`KnownGap` lists are about
  * tsv-vs-canonical parse PARITY over the fixture suites (over-rejections tsv keeps
  * or owes), scoped to the correctness gates. This list is about a benchmarked tool
@@ -110,15 +115,46 @@ export const PERF_OMITS: PerfOmit[] = [
 	}
 ];
 
-/** First matching omit reason for `(tracking_key, path)`, or `null` when the failure is unlisted. */
-export function perf_omit_reason(
-	omits: PerfOmit[],
+/**
+ * The first omit excusing `(tracking_key, path)`, or `null` when the failure is
+ * unlisted.
+ *
+ * Returns the ENTRY, not its reason, because the caller has two questions and the
+ * reason answers only one: "is this failure excused?" and "did this excuse fire?".
+ * The second is what makes the list a ratchet rather than an accumulator — see
+ * `stale_perf_omits`.
+ */
+export function perf_omit_match(
+	omits: readonly PerfOmit[],
 	tracking_key: string,
 	path: string
-): string | null {
+): PerfOmit | null {
 	return (
 		omits.find(
 			(o) => (o.task === undefined || tracking_key.includes(o.task)) && path.includes(o.path)
-		)?.reason ?? null
+		) ?? null
 	);
+}
+
+/**
+ * The entries in `omits` that `used` never matched — a tolerance for a failure
+ * that no longer happens.
+ *
+ * The counterpart the omit check owes its own list, and the discipline every other
+ * ledger in this repo already has (`lib/fixtures_gate.ts` FAILS on a sanction /
+ * known-gap that matched nothing; the injection ratchets refuse a narrowed run).
+ * Without it an entry rots dormant after the tool it excuses is fixed, or after an
+ * upstream path rename orphans it — and worse, a too-broad `path` fragment goes on
+ * silently excusing a NEW failure that arrives beneath it.
+ *
+ * ⚠️ Only sound over a FULL perf run: a corpus filter (`BENCH_LIMIT` /
+ * `BENCH_FILTER`), or a missing corpus repo under `BENCH_ALLOW_MISSING`, can
+ * withhold the very files these entries are about — where "matched nothing" means
+ * "was not reachable", not "is stale". The caller gates on that.
+ */
+export function stale_perf_omits(
+	omits: readonly PerfOmit[],
+	used: ReadonlySet<PerfOmit>
+): PerfOmit[] {
+	return omits.filter((o) => !used.has(o));
 }

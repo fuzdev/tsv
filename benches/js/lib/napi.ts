@@ -66,7 +66,6 @@ export class NapiImplementation extends BaseImplementation {
 	// Distinct from FFI's `'native'` so the two native bindings are
 	// self-describing (one is instantiated per runtime — FFI under Deno, N-API
 	// under Node/Bun). Nothing branches on this tag; rows key on `tracking_key`.
-	readonly name = 'napi' as const;
 	private _addon: NapiAddon | null = null;
 
 	readonly parse_languages = LANGUAGES;

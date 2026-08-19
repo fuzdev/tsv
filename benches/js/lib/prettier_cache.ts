@@ -29,6 +29,11 @@
  * side effect worth knowing: cached hits remove the prettier-side flake from
  * repeat runs entirely — only the tsv/FFI side stays live.
  *
+ * **Atomic**: entries land by `rename` from a PID-suffixed temp file, so an
+ * interrupted run can never leave a TRUNCATED entry at a content-addressed key —
+ * which the empty guards above cannot catch and which every later run would read
+ * as the oracle itself. See `put`.
+ *
  * **Scope**: opt-in via `CanonicalImplementation.enable_format_cache()` — used
  * by `corpus:compare:format` and the `conformance.ts` driver only. NEVER the
  * bench (it times prettier) and NEVER the fixture validator (live-verification
@@ -38,7 +43,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
 
@@ -57,6 +62,8 @@ export class PrettierCache {
 	readonly #context_hash: string;
 	hits = 0;
 	misses = 0;
+	/** Entries `put` could not write (see its doc) — reported, never thrown. */
+	writes_failed = 0;
 
 	constructor(versions: CanonicalVersions, prettier_options_json: string) {
 		this.#context_hash = createHash('sha256')
@@ -108,15 +115,41 @@ export class PrettierCache {
 	 * too). Whitespace-only counts as empty: the safety differential strips
 	 * whitespace, so caching such an output would freeze exactly the
 	 * prettier-miss shape the empty guard exists to reject.
+	 *
+	 * ATOMIC — written to a sibling temp name and renamed into place. A direct
+	 * write is not interruption-safe, and an interrupted one is worse than a miss:
+	 * the truncated bytes sit at a content-addressed key, so every later run reads
+	 * a PREFIX of prettier's output as the oracle itself. That poisons the release
+	 * gate this cache serves (`corpus:compare:format --all`), and the `trim()`
+	 * guards catch only a fully-empty entry, never a truncated one. `rename` within
+	 * a directory is atomic, so a reader sees the whole entry or no entry.
+	 *
+	 * The temp name carries the PID so two concurrent writers of the same key
+	 * (different processes, same corpus) can't truncate each other's temp file.
+	 *
+	 * BEST-EFFORT — a write failure is counted, never thrown. The caller already
+	 * holds the live output, and its `format_async` reads a throw as "prettier
+	 * failed on this file", so letting a full disk out of here would file cache
+	 * trouble in the gate's per-file ERROR bucket. `writes_failed` is what keeps
+	 * that from being silent: a wholly unwritable cache dir shows up in `stats()`
+	 * as every put failing rather than as a cache that never warms.
 	 */
 	async put(source: string, parser: string, filepath: string, output: string): Promise<void> {
 		if (output.trim() === '') return;
 		const { dir, path } = this.#entry(source, parser, filepath);
-		await mkdir(dir, { recursive: true });
-		await writeFile(path, output);
+		const tmp = `${path}.${process.pid}.tmp`;
+		try {
+			await mkdir(dir, { recursive: true });
+			await writeFile(tmp, output);
+			await rename(tmp, path);
+		} catch {
+			this.writes_failed++;
+			await rm(tmp, { force: true }).catch(() => {});
+		}
 	}
 
 	stats(): string {
-		return `prettier cache: ${this.hits} hits / ${this.misses} misses`;
+		const failed = this.writes_failed > 0 ? ` / ${this.writes_failed} writes FAILED` : '';
+		return `prettier cache: ${this.hits} hits / ${this.misses} misses${failed}`;
 	}
 }

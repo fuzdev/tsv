@@ -23,8 +23,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const RUNTIMES = ['deno', 'node', 'bun'] as const;
-type Runtime = (typeof RUNTIMES)[number];
+import type { Machine, Runtime } from './lib/runtime.ts';
+
+/** Every runtime a sibling report can come from, in the order they fold. The
+ * `Runtime` union above is the authority on the vocabulary; this is the
+ * enumeration, and the `satisfies` keeps the two from drifting apart. */
+const RUNTIMES = ['deno', 'node', 'bun'] as const satisfies readonly Runtime[];
 
 /**
  * The fields of a per-runtime `report.<runtime>.json` row this composer reads.
@@ -41,15 +45,6 @@ interface Entry {
 	ops_per_second: number | null;
 	files_iterated: number | null;
 	runtime: Runtime;
-}
-
-/** The machine block a `version` 7+ sibling report carries (`lib/runtime.ts`
- * `Machine`); absent on older siblings, hence optional on `Report`. */
-interface Machine {
-	cpu_model: string;
-	os: string;
-	arch: string;
-	runtime_version: string;
 }
 
 /**
@@ -70,6 +65,7 @@ interface Report {
 	runtime: Runtime;
 	timestamp: string;
 	git_commit: string | null;
+	/** Absent on pre-`version` 7 siblings — the hardware identity behind the numbers. */
 	machine?: Machine;
 	versions: Record<string, string>;
 	entries: Entry[];
@@ -200,17 +196,22 @@ const mixed_machine = machine_ids.length > 0 && new Set(machine_ids).size > 1;
  * `mixed_machine`), for the one-line md disclosure. */
 const machine = sources.find((s) => s.machine)?.machine ?? null;
 
+/**
+ * The COMBINED report's schema version — distinct from the per-runtime siblings'
+ * (`bench.ts` `REPORT_SCHEMA_VERSION`), which this composer reads rather than emits.
+ *
+ * BUMP IT whenever a top-level field is added, removed, or has its meaning or key
+ * names changed, and say what the new number means in one line below, so a consumer
+ * can tell "this composer didn't record it" from "there was nothing to record".
+ *
+ * 9: `unavailable_by_runtime[]` entries carry `rows` (was `impls`) — the row names a
+ * runtime's load failures removed, which is the identity these tables are keyed by.
+ */
+const COMBINED_SCHEMA_VERSION = 9;
+
 // JSON: metadata + provenance per source + the comparison rows.
 const combined = {
-	// Bumped 8 → 9 for `unavailable_by_runtime[].rows` (was `.impls`): the entries
-	// carry the ROW names a runtime's load failures removed, which is the identity
-	// these tables are keyed by — the init labels they held before matched no row,
-	// so the lookup they exist for could never match. 7 → 8 added
-	// `unavailable_by_runtime` itself (which impls failed to load on which
-	// sibling, folded from their `unavailable` lists). Same discipline as the
-	// per-runtime reports: a new top-level field moves the number, so a consumer can
-	// tell "this composer didn't record it" from "there was nothing to record".
-	version: 9,
+	version: COMBINED_SCHEMA_VERSION,
 	kind: 'combined' as const,
 	generated: new Date().toISOString(),
 	runtimes: present,

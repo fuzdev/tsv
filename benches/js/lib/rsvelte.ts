@@ -77,7 +77,6 @@ export function rsvelte_binary_path(): string | null {
  * - Parse: unsupported — the CLI emits formatted source, never an AST
  */
 export class RsvelteImplementation extends BaseImplementation {
-	readonly name = 'rsvelte-fmt' as const;
 	readonly versions: RsvelteVersions;
 	private _bin: string | null = null;
 	private _config_path: string | null = null;

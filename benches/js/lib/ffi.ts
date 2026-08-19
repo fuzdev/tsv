@@ -144,7 +144,6 @@ const next_capacity = (needed: number, current: number): number => {
 const INITIAL_BUFFER_CAPACITY = 1 << 16;
 
 export class NativeImplementation extends BaseImplementation {
-	readonly name = 'native' as const;
 	private _lib: Deno.DynamicLibrary<typeof symbols> | null = null;
 	private _marshal: MarshalState | null = null;
 	private encoder = new TextEncoder();

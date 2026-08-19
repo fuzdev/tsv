@@ -6,7 +6,7 @@ import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
 import { benchmark_format_number } from '@fuzdev/fuz_util/benchmark_format.ts';
 import { time_format, time_unit_detect_best, TIME_UNIT_DISPLAY } from '@fuzdev/fuz_util/time.ts';
 
-import type { Language } from './types.ts';
+import { CANONICAL_FORMATTER_ROW, CANONICAL_PARSER_ROWS, type Language } from './types.ts';
 
 /** Results from a benchmark group */
 export interface GroupResults {
@@ -44,16 +44,6 @@ function create_bar(value: number, max: number, width = 40): string {
 	const filled = Math.round((value / max) * width);
 	return '█'.repeat(filled) + '░'.repeat(width - filled);
 }
-
-/** Known canonical parser names by language */
-const CANONICAL_PARSERS: Record<Language, string> = {
-	svelte: 'svelte/compiler',
-	typescript: 'acorn-typescript',
-	css: 'svelte/compiler'
-};
-
-/** Known canonical formatter name */
-const CANONICAL_FORMATTER = 'prettier';
 
 /** Internal parse variants (for measuring JSON overhead) */
 const INTERNAL_PARSE_VARIANTS = ['tsv-internal', 'tsv_wasm-internal'];
@@ -186,7 +176,7 @@ export function generate_summary_report(
 		const results = get_group_results(`parse/${lang}`);
 		if (results.length === 0) continue;
 
-		const canonical_name = CANONICAL_PARSERS[lang];
+		const canonical_name = CANONICAL_PARSER_ROWS[lang];
 		const canonical_result = results.find((r) => r.name === canonical_name);
 
 		// Get main results (excluding internal variants)
@@ -294,7 +284,7 @@ export function generate_summary_report(
 		const results = get_group_results(`format/${lang}`);
 		if (results.length === 0) continue;
 
-		const canonical_result = results.find((r) => r.name === CANONICAL_FORMATTER);
+		const canonical_result = results.find((r) => r.name === CANONICAL_FORMATTER_ROW);
 		if (!canonical_result) continue;
 
 		// Calculate max time for bar scaling
@@ -317,7 +307,7 @@ export function generate_summary_report(
 
 		// Show alternatives in stable display order (tsv variants, then third-party)
 		const alternatives = sort_by_display_order(
-			results.filter((r) => r.name !== CANONICAL_FORMATTER)
+			results.filter((r) => r.name !== CANONICAL_FORMATTER_ROW)
 		);
 
 		for (const result of alternatives) {
@@ -570,6 +560,204 @@ interface ComparisonSection {
 	rows: ComparisonRow[];
 }
 
+/**
+ * A fairness note, in the two wordings the two surfaces take: the terminal's
+ * hand-wrapped lines and the markdown's single sentence (joined into the trailing
+ * `_…._` paragraph). Rendered only when its opponent produced at least one cell,
+ * and deduped by identity — one note covers a native/wasm opponent pair, and must
+ * not print twice when both ran.
+ */
+interface FairnessNote {
+	terminal: readonly string[];
+	markdown: string;
+}
+
+const OXC_NOTE: FairnessNote = {
+	terminal: [
+		'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and',
+		'   deserializes in JS, the same eager materialization as tsv-json — apples-to-apples)'
+	],
+	markdown:
+		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples'
+};
+
+const YUKU_NOTE: FairnessNote = {
+	terminal: [
+		'  (yuku-parser — native and wasm — decodes a binary AST buffer into JS objects,',
+		'   also full eager materialization; its parse() is lazy, so the bench forces it —',
+		'   verified: no lazy accessors survive, and its tree serializes to oxc-parser’s size)'
+	],
+	markdown:
+		'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
+};
+
+const SWC_NOTE: FairnessNote = {
+	terminal: [
+		'  (swc parses to its own AST dialect — root `Module`, `span` rather than `loc` —',
+		'   so like oxc it emits neither tsv’s loc-bearing drop-in shape nor its span-only wire)'
+	],
+	markdown:
+		'swc parses to its own AST dialect (root `Module`, `span` rather than `loc`, `Ts`-prefixed kinds), so it carries the same payload disclosure oxc-parser does — the mechanism matches `tsv-json` (serialize, cross, materialize) while the tree it produces is neither tsv’s loc-bearing drop-in shape nor its span-only wire'
+};
+
+const RSVELTE_PARSE_NOTE: FairnessNote = {
+	terminal: [
+		'  (rsvelte-parse returns a JSON string the caller parses — the identical mechanism',
+		'   tsv-json measures, and within ~1.5% of its payload, so this pair matches on both axes)'
+	],
+	markdown:
+		'rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload on a real component, so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire'
+};
+
+const POSTCSS_NOTE: FairnessNote = {
+	terminal: [
+		'  (postcss is the JS parser behind prettier’s CSS printer — i.e. behind the',
+		'   format/css baseline; no Rust CSS parser exposes an AST to JS, so it is the only peer)'
+	],
+	markdown:
+		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since no Rust CSS parser exposes an AST to JS'
+};
+
+const MALVA_NOTE: FairnessNote = {
+	terminal: [
+		'  (malva-wasm is dprint’s CSS plugin over the same @dprint/formatter wasm host as',
+		'   dprint-wasm — a same-tier wasm-vs-wasm read on format/css)'
+	],
+	markdown:
+		'malva-wasm is dprint’s CSS plugin running over the same `@dprint/formatter` wasm host as dprint-wasm — a same-tier wasm-vs-wasm read, and with biome-wasm the only other engine on `format/css`'
+};
+
+/**
+ * One opponent a section compares against: the row to look up, plus the fairness
+ * note its presence earns.
+ *
+ * `row` is a per-language record where the opponent's row name varies by language —
+ * only the canonical parser does (`CANONICAL_PARSER_ROWS`), which is why the type
+ * admits exactly that shape rather than an arbitrary resolver.
+ */
+interface ComparisonOpponent {
+	row: string | Record<Language, string>;
+	note?: FairnessNote;
+}
+
+/** The row `opponent` names in `lang`'s group. */
+function opponent_row(opponent: ComparisonOpponent, lang: Language): string {
+	return typeof opponent.row === 'string' ? opponent.row : opponent.row[lang];
+}
+
+/**
+ * One section of the Comparisons tables: a tsv row, and every opponent it is
+ * measured against per operation.
+ *
+ * DECLARED rather than open-coded, and this is the whole point of the shape. The
+ * four loops this replaced spelled their opponent lists inline, so an impl added to
+ * the harness had to be remembered in one of four places to reach the table — and
+ * four weren't: `swc`, `postcss`, `rsvelte-parse` and `malva-wasm` were each
+ * registered, preflighted and timed at full coverage, then dropped from every
+ * comparison with nothing saying so. `rows_missing_from_comparisons` is the
+ * guard that keeps it from happening again; this table is what that guard can read.
+ *
+ * Sections are TIERS — tsv's native binding and its wasm bundle — so a wasm engine
+ * belongs under `tsv_wasm` and a native one under `tsv`. The two JS opponents
+ * (`prettier`/the canonical parsers, and `postcss`) appear under BOTH: a JS
+ * reference is equally meaningful against either build, which is the reading
+ * prettier has always had here.
+ */
+interface ComparisonSectionSpec {
+	/** Section heading, and the tsv row every ratio in it is against. */
+	label: string;
+	/** The tsv row this section measures, per operation. */
+	self: Record<'format' | 'parse', string>;
+	/** Opponents in render order; one absent from a run contributes no cell. */
+	opponents: Record<'format' | 'parse', readonly ComparisonOpponent[]>;
+}
+
+const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
+	{
+		label: 'tsv',
+		self: { format: 'tsv', parse: 'tsv-json' },
+		opponents: {
+			format: [{ row: CANONICAL_FORMATTER_ROW }, { row: 'oxfmt' }],
+			parse: [
+				{ row: CANONICAL_PARSER_ROWS },
+				{ row: 'oxc-parser', note: OXC_NOTE },
+				{ row: 'yuku-parser', note: YUKU_NOTE },
+				{ row: 'swc', note: SWC_NOTE },
+				{ row: 'rsvelte-parse', note: RSVELTE_PARSE_NOTE },
+				{ row: 'postcss', note: POSTCSS_NOTE }
+			]
+		}
+	},
+	{
+		label: 'tsv_wasm',
+		self: { format: 'tsv_wasm', parse: 'tsv_wasm-json' },
+		opponents: {
+			format: [
+				{ row: CANONICAL_FORMATTER_ROW },
+				{ row: 'biome-wasm' },
+				// dprint is TypeScript/JS-only, so it contributes a cell on that language
+				// alone — the same-tier WASM-vs-WASM read (docs/benchmarks.md §Fairness caveats).
+				{ row: 'dprint-wasm' },
+				{ row: 'malva-wasm', note: MALVA_NOTE }
+			],
+			parse: [
+				{ row: CANONICAL_PARSER_ROWS },
+				{ row: 'oxc-parser-wasm', note: OXC_NOTE },
+				{ row: 'yuku-parser-wasm', note: YUKU_NOTE },
+				{ row: 'postcss', note: POSTCSS_NOTE }
+			]
+		}
+	}
+];
+
+/**
+ * Rows that carry no comparison cell BY DECISION, each with the decision.
+ *
+ * The other half of `rows_missing_from_comparisons`: a registered row is either an
+ * opponent, a section's own `self`, or listed here. Without this list the guard
+ * could only be a warning nobody could ever clear, since several rows legitimately
+ * belong in no comparison — and "legitimately absent" and "forgotten" would stay
+ * indistinguishable, which is the state that let four impls go missing.
+ */
+const COMPARISON_EXCLUSIONS: Readonly<Record<string, string>> = {
+	'tsv-json-no-locations': "tsv's own wire variant — a row of the group table, not an opponent",
+	'tsv_wasm-json-no-locations':
+		"tsv's own wire variant — a row of the group table, not an opponent",
+	'tsv-internal': "tsv's own parse-only variant; no third-party row is the same tier",
+	'tsv_wasm-internal': "tsv's own parse-only variant; no third-party row is the same tier",
+	'tsv-forced-async': 'opt-in async-tax control (`BENCH_FORCED_ASYNC=1`), deliberately unpublished',
+	'rsvelte-fmt': 'coverage-only — never timed, so there is no ratio to take',
+	tsc: 'conformance surface only — a verdict row, never timed',
+	'rsvelte-parse-skip-expr-loc':
+		'its reduction is not tsv’s span-only wire, so it is not payload-matched to any tsv row; the plain `rsvelte-parse` row carries the engine'
+};
+
+/**
+ * The rows in `names` this module neither compares nor excuses.
+ *
+ * Asked of the rows a surface DEFINES (`get_defined_rows`), so the answer is a
+ * property of the code rather than of the machine — the same question, and the same
+ * one-directional shape, as `rows_missing_from_display_order`: a LISTED opponent
+ * absent from `names` is not drift, since each surface registers its own subset.
+ *
+ * Warns rather than throws at the call site, matching `DISPLAY_ORDER`'s severity: a
+ * missing cell understates a comparison, where a stale `SURFACE_DISCLOSURES` claim
+ * would assert something false.
+ */
+export function rows_missing_from_comparisons(names: Iterable<string>): string[] {
+	const covered = new Set<string>(Object.keys(COMPARISON_EXCLUSIONS));
+	for (const section of COMPARISON_SECTIONS) {
+		for (const operation of ['format', 'parse'] as const) {
+			covered.add(section.self[operation]);
+			for (const opponent of section.opponents[operation]) {
+				if (typeof opponent.row === 'string') covered.add(opponent.row);
+				else for (const row of Object.values(opponent.row)) covered.add(row);
+			}
+		}
+	}
+	return [...names].filter((name) => !covered.has(name));
+}
+
 /** Resolve the iterated file count for a (group, display_name) pair via task_tracking. */
 function lookup_iterated(
 	group_name: string,
@@ -683,13 +871,20 @@ export function generate_group_bench_table_markdown(
 }
 
 /**
- * Build comparison data from benchmark results.
+ * Build comparison data from benchmark results, one pass over
+ * `COMPARISON_SECTIONS`.
  *
  * Ratios are computed from timed ops/sec — in default `intersection` mode the
  * comparison is apples-to-apples within each group (every impl ran on the
  * same files). The `(Mf)` annotation is the self impl's iterated file count
  * for that group (the per-group intersection size in default mode; the
  * impl's preflight success set size in `BENCH_MODE=union`).
+ *
+ * A row is emitted only when the section's own tsv row AND the section's FIRST
+ * opponent both timed — the first opponent is the canonical reference in every
+ * section, so a group without it has no baseline to compare against. Every later
+ * opponent contributes a cell iff it timed, which is how a language-scoped tool
+ * (dprint on TS, malva on CSS) appears on its language alone with no special case.
  */
 function build_comparison_data(
 	all_group_results: GroupResults[],
@@ -704,163 +899,119 @@ function build_comparison_data(
 		return result?.stats.mean_ns ?? null;
 	}
 
-	function ratio(tsv_ns: number, other_ns: number): number {
-		return other_ns / tsv_ns;
+	function ratio(self_ns: number, other_ns: number): number {
+		return other_ns / self_ns;
 	}
 
 	const sections: ComparisonSection[] = [];
 
-	// Native comparisons
-	const native_rows: ComparisonRow[] = [];
+	for (const spec of COMPARISON_SECTIONS) {
+		const rows: ComparisonRow[] = [];
+		for (const operation of ['format', 'parse'] as const) {
+			const self_row = spec.self[operation];
+			for (const lang of languages) {
+				const group_name = `${operation}/${lang}`;
+				const self_ns = get_mean_ns(group_name, self_row);
+				if (self_ns === null) continue;
 
-	for (const lang of languages) {
-		const group_name = `format/${lang}`;
-		const tsv_ns = get_mean_ns(group_name, 'tsv');
-		const prettier_ns = get_mean_ns(group_name, CANONICAL_FORMATTER);
-		if (tsv_ns === null || prettier_ns === null) continue;
+				const comparisons: ComparisonRow['comparisons'] = [];
+				for (const opponent of spec.opponents[operation]) {
+					const name = opponent_row(opponent, lang);
+					const opponent_ns = get_mean_ns(group_name, name);
+					if (opponent_ns === null) continue;
+					comparisons.push({ name, ratio: ratio(self_ns, opponent_ns) });
+				}
+				// The reference didn't time here, so there is nothing to be N× faster
+				// THAN — an alternatives-only row would read as a comparison while
+				// naming no baseline.
+				if (comparisons.length === 0) continue;
 
-		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'prettier', ratio: ratio(tsv_ns, prettier_ns) }
-		];
-		const oxfmt_ns = get_mean_ns(group_name, 'oxfmt');
-		if (oxfmt_ns !== null) comparisons.push({ name: 'oxfmt', ratio: ratio(tsv_ns, oxfmt_ns) });
-
-		native_rows.push({
-			operation: 'format',
-			language: lang,
-			files: lookup_iterated(group_name, 'tsv', iterated_counts, task_tracking_by_group),
-			comparisons
-		});
-	}
-
-	for (const lang of languages) {
-		const group_name = `parse/${lang}`;
-		const tsv_ns = get_mean_ns(group_name, 'tsv-json');
-		const canonical_parse_name = CANONICAL_PARSERS[lang];
-		const canonical_ns = get_mean_ns(group_name, canonical_parse_name);
-		if (tsv_ns === null || canonical_ns === null) continue;
-
-		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'svelte', ratio: ratio(tsv_ns, canonical_ns) }
-		];
-		const oxc_ns = get_mean_ns(group_name, 'oxc-parser');
-		if (oxc_ns !== null) comparisons.push({ name: 'oxc-parser', ratio: ratio(tsv_ns, oxc_ns) });
-		const yuku_ns = get_mean_ns(group_name, 'yuku-parser');
-		if (yuku_ns !== null) comparisons.push({ name: 'yuku-parser', ratio: ratio(tsv_ns, yuku_ns) });
-
-		native_rows.push({
-			operation: 'parse',
-			language: lang,
-			files: lookup_iterated(group_name, 'tsv-json', iterated_counts, task_tracking_by_group),
-			comparisons
-		});
-	}
-
-	if (native_rows.length > 0) {
-		sections.push({ label: 'tsv', rows: native_rows });
-	}
-
-	// WASM comparisons
-	const wasm_rows: ComparisonRow[] = [];
-
-	for (const lang of languages) {
-		const group_name = `format/${lang}`;
-		const tsv_wasm_ns = get_mean_ns(group_name, 'tsv_wasm');
-		const prettier_ns = get_mean_ns(group_name, CANONICAL_FORMATTER);
-		if (tsv_wasm_ns === null || prettier_ns === null) continue;
-
-		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'prettier', ratio: ratio(tsv_wasm_ns, prettier_ns) }
-		];
-		const biome_ns = get_mean_ns(group_name, 'biome-wasm');
-		if (biome_ns !== null) {
-			comparisons.push({ name: 'biome-wasm', ratio: ratio(tsv_wasm_ns, biome_ns) });
+				rows.push({
+					operation,
+					language: lang,
+					files: lookup_iterated(group_name, self_row, iterated_counts, task_tracking_by_group),
+					comparisons
+				});
+			}
 		}
-		// dprint is TypeScript/JS-only, so this contributes a row for that language
-		// alone — the same-tier WASM-vs-WASM read (see docs/benchmarks.md §Fairness caveats).
-		const dprint_ns = get_mean_ns(group_name, 'dprint-wasm');
-		if (dprint_ns !== null) {
-			comparisons.push({ name: 'dprint-wasm', ratio: ratio(tsv_wasm_ns, dprint_ns) });
-		}
-
-		wasm_rows.push({
-			operation: 'format',
-			language: lang,
-			files: lookup_iterated(group_name, 'tsv_wasm', iterated_counts, task_tracking_by_group),
-			comparisons
-		});
-	}
-
-	for (const lang of languages) {
-		const group_name = `parse/${lang}`;
-		const tsv_wasm_ns = get_mean_ns(group_name, 'tsv_wasm-json');
-		const canonical_parse_name = CANONICAL_PARSERS[lang];
-		const canonical_ns = get_mean_ns(group_name, canonical_parse_name);
-		if (tsv_wasm_ns === null || canonical_ns === null) continue;
-
-		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'svelte', ratio: ratio(tsv_wasm_ns, canonical_ns) }
-		];
-		const oxc_wasm_ns = get_mean_ns(group_name, 'oxc-parser-wasm');
-		if (oxc_wasm_ns !== null) {
-			comparisons.push({ name: 'oxc-parser-wasm', ratio: ratio(tsv_wasm_ns, oxc_wasm_ns) });
-		}
-		const yuku_wasm_ns = get_mean_ns(group_name, 'yuku-parser-wasm');
-		if (yuku_wasm_ns !== null) {
-			comparisons.push({ name: 'yuku-parser-wasm', ratio: ratio(tsv_wasm_ns, yuku_wasm_ns) });
-		}
-
-		wasm_rows.push({
-			operation: 'parse',
-			language: lang,
-			files: lookup_iterated(group_name, 'tsv_wasm-json', iterated_counts, task_tracking_by_group),
-			comparisons
-		});
-	}
-
-	if (wasm_rows.length > 0) {
-		sections.push({ label: 'tsv_wasm', rows: wasm_rows });
+		if (rows.length > 0) sections.push({ label: spec.label, rows });
 	}
 
 	return sections;
 }
 
 /**
+ * The fairness notes this run earned, in `surface`'s wording.
+ *
+ * DERIVED from the built sections rather than from a second list of row names: a
+ * note explains a cell, so it must appear exactly when that cell does. As two
+ * hand-kept predicates the presence tests had already drifted in shape (the oxc
+ * test pinned the section label, the yuku test didn't), and a note silently
+ * missing from one surface is the exact failure the notes exist to prevent.
+ *
+ * Deduped by note identity, since one note covers a native/wasm opponent pair and
+ * must print once when both ran.
+ */
+function comparison_notes(
+	sections: ComparisonSection[],
+	surface: 'terminal' | 'markdown'
+): string[] {
+	const present = new Set<string>();
+	for (const section of sections) {
+		for (const row of section.rows) for (const c of row.comparisons) present.add(c.name);
+	}
+
+	const seen = new Set<FairnessNote>();
+	const notes: string[] = [];
+	for (const spec of COMPARISON_SECTIONS) {
+		for (const operation of ['format', 'parse'] as const) {
+			for (const opponent of spec.opponents[operation]) {
+				if (!opponent.note || seen.has(opponent.note)) continue;
+				const rows =
+					typeof opponent.row === 'string' ? [opponent.row] : Object.values(opponent.row);
+				if (!rows.some((row) => present.has(row))) continue;
+				seen.add(opponent.note);
+				if (surface === 'markdown') notes.push(opponent.note.markdown);
+				else notes.push(...opponent.note.terminal);
+			}
+		}
+	}
+
+	// The one note that is about an ABSENCE rather than about a row, so it hangs
+	// off no opponent: tsv's parse-only variants have no counterpart among the
+	// eager-materializing third-party parsers, which is only worth saying once one
+	// of them is on the page.
+	if (
+		present.has('oxc-parser') ||
+		present.has('oxc-parser-wasm') ||
+		present.has('yuku-parser') ||
+		present.has('yuku-parser-wasm')
+	) {
+		if (surface === 'markdown') {
+			notes.push(
+				'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku still serializes to a binary buffer before its decode, so neither is the same tier'
+			);
+		} else {
+			notes.push(
+				'  (tsv-internal/tsv_wasm-internal are parse-only, no JS materialization; neither',
+				'   oxc nor yuku has a matching mode, so they have no counterpart row)'
+			);
+		}
+	}
+
+	return notes;
+}
+
+/**
  * Generate compact comparison summary (plain text).
  *
  * Ratios are speedup form (other_time / self_time): >1 means tsv is faster.
- * Parse canonical is labeled "svelte" (wraps acorn-typescript for TS).
+ * Each opponent is named by its ROW, the canonical parser included — it is
+ * `acorn-typescript` on the TS group and `svelte/compiler` on the other two, and
+ * a single hardcoded label there named the wrong tool on one group of three.
  * Each cell carries an `(Mf)` annotation — the iterated file count timing
  * reflects.
  */
-/**
- * Which alternative parsers a comparison run actually produced rows for.
- *
- * The fairness notes below each renderer are gated on this, and both the terminal
- * and the markdown renderer need the same answer — so it is computed once. As two
- * copies the predicates had already diverged in shape (the oxc test pinned the
- * section label, the yuku test didn't), and a note silently missing from one
- * surface is the exact failure the notes exist to prevent.
- *
- * An opponent counts as present when any section carries a comparison against it;
- * the oxc test additionally requires the native/wasm row to sit under its
- * like-tier section, since a cross-tier oxc comparison wouldn't justify the
- * apples-to-apples note.
- */
-function detect_comparison_opponents(sections: ComparisonSection[]): {
-	oxc: boolean;
-	yuku: boolean;
-} {
-	const has = (label: string, opponent: string) =>
-		sections.some(
-			(s) => s.label === label && s.rows.some((r) => r.comparisons.some((c) => c.name === opponent))
-		);
-	return {
-		oxc: has('tsv', 'oxc-parser') || has('tsv_wasm', 'oxc-parser-wasm'),
-		yuku: has('tsv', 'yuku-parser') || has('tsv_wasm', 'yuku-parser-wasm')
-	};
-}
-
 export function generate_comparison_summary(
 	all_group_results: GroupResults[],
 	languages: Language[],
@@ -901,29 +1052,11 @@ export function generate_comparison_summary(
 		}
 	}
 
-	// Fairness notes, gated on which opponents this run actually produced rows for.
-	const { oxc: has_oxc, yuku: has_yuku } = detect_comparison_opponents(sections);
-
+	// Fairness notes, derived from the cells this run actually produced.
 	lines.push('');
 	lines.push('  (`Nx` = self is N× faster; `(Mf)` = files the timing reflects)');
 	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
-	if (has_oxc) {
-		lines.push('  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and');
-		lines.push(
-			'   deserializes in JS, the same eager materialization as tsv-json — apples-to-apples)'
-		);
-	}
-	if (has_yuku) {
-		lines.push('  (yuku-parser — native and wasm — decodes a binary AST buffer into JS objects,');
-		lines.push('   also full eager materialization; its parse() is lazy, so the bench forces it —');
-		lines.push(
-			'   verified: no lazy accessors survive, and its tree serializes to oxc-parser’s size)'
-		);
-	}
-	if (has_oxc || has_yuku) {
-		lines.push('  (tsv-internal/tsv_wasm-internal are parse-only, no JS materialization; neither');
-		lines.push('   oxc nor yuku has a matching mode, so they have no counterpart row)');
-	}
+	lines.push(...comparison_notes(sections, 'terminal'));
 	lines.push('  (format groups include parse time — each formatter parses internally)');
 	lines.push('  (oxfmt formats JS/TS natively; its css/svelte rows route through its BUNDLED');
 	lines.push('   prettier — native-vs-native reads apply to the typescript group only)');
@@ -970,29 +1103,13 @@ export function generate_comparison_markdown(
 		lines.push('');
 	}
 
-	// Fairness notes, gated on which opponents this run actually produced rows for.
-	const { oxc: has_oxc, yuku: has_yuku } = detect_comparison_opponents(sections);
-
+	// Fairness notes, derived from the cells this run actually produced.
 	const notes: string[] = [
 		'`Nx` is speedup — self is N× faster than the named opponent',
 		"`(Mf)` is the self impl's iterated count (per-group intersection in default mode; per-impl success set in `BENCH_MODE=union`)",
-		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts'
+		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts — each named by its own row',
+		...comparison_notes(sections, 'markdown')
 	];
-	if (has_oxc) {
-		notes.push(
-			'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples'
-		);
-	}
-	if (has_yuku) {
-		notes.push(
-			'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
-		);
-	}
-	if (has_oxc || has_yuku) {
-		notes.push(
-			'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku still serializes to a binary buffer before its decode, so neither is the same tier'
-		);
-	}
 	notes.push('Format groups include parse time — each formatter parses internally');
 	notes.push(
 		'oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only'

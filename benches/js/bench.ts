@@ -77,9 +77,8 @@ import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { type CorpusSource, DevReposLoader, group_by_language } from './lib/corpus.ts';
 import { enrich_source_repos } from './lib/corpus_repos.ts';
-import { PERF_OMITS, perf_omit_reason } from './lib/perf_omit.ts';
+import { PERF_OMITS, type PerfOmit, perf_omit_match, stale_perf_omits } from './lib/perf_omit.ts';
 import {
-	canonical_parser_label,
 	get_alternative_versions,
 	get_benchmark_tasks,
 	get_defined_rows,
@@ -107,6 +106,7 @@ import {
 	generate_summary_report,
 	generate_versions_info,
 	type GroupResults,
+	rows_missing_from_comparisons,
 	rows_missing_from_display_order,
 	type SourceCoverageCell,
 	alternative_version_parts,
@@ -119,7 +119,13 @@ import {
 	generate_binary_size_markdown,
 	generate_binary_size_report
 } from './lib/binary_sizes.ts';
-import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
+import {
+	CANONICAL_FORMATTER_ROW,
+	CANONICAL_PARSER_ROWS,
+	type Language,
+	LANGUAGES,
+	type SourceFile
+} from './lib/types.ts';
 import { check_executed_artifacts } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { current_machine, current_runtime, type Machine, type Runtime } from './lib/runtime.ts';
@@ -675,6 +681,23 @@ if (unordered_rows.length > 0) {
 	);
 }
 
+// The Comparisons tables' opponent list, asked the same way and at the same
+// severity. Its drift is quieter than DISPLAY_ORDER's — an unlisted row doesn't
+// sort oddly, it simply has no cell — and that is how `swc`, `postcss`,
+// `rsvelte-parse` and `malva-wasm` each came to be registered, preflighted and
+// timed at full coverage while appearing in no comparison at all. A row that
+// genuinely belongs in none is listed in `COMPARISON_EXCLUSIONS` with its reason,
+// so this can reach zero rather than being a warning nobody can clear.
+const uncompared_rows = rows_missing_from_comparisons(REGISTERED_ROWS);
+if (uncompared_rows.length > 0) {
+	log(
+		`⚠ ${uncompared_rows.join(', ')} — neither an opponent in report.ts ` +
+			`COMPARISON_SECTIONS nor excused in COMPARISON_EXCLUSIONS, so ${
+				uncompared_rows.length === 1 ? 'it appears' : 'they appear'
+			} in no Comparisons table`
+	);
+}
+
 //
 // Benchmark Helpers
 //
@@ -753,23 +776,48 @@ const coverage_only_keys: Set<string> = new Set();
  * we publish must process every real-world file, and a coverage-only row
  * publishes no throughput — sub-100% there is the measurement, not an erosion of
  * one.
+ *
+ * The list is graded in BOTH directions, which is what makes it a ratchet rather
+ * than an accumulator: an unlisted failure fails (above), and — on a full run — an
+ * entry that excused nothing fails too (`stale_perf_omits`). One direction alone
+ * lets a tolerance outlive the failure it was written for, where a too-broad
+ * `path` fragment goes on quietly absorbing whatever arrives beneath it. Same
+ * posture as `lib/fixtures_gate.ts`'s sanction / known-gap freshness check.
+ *
+ * `full_corpus` is the caller's answer to "were these files even reachable?" — a
+ * filtered or partial corpus withholds them, and reading that as staleness would
+ * fail every `BENCH_LIMIT` run.
  */
-function enforce_perf_coverage(): void {
+function enforce_perf_coverage(full_corpus: boolean): void {
 	const violations: string[] = [];
+	const used = new Set<PerfOmit>();
 	for (const [tracking_key, files] of skipped_files) {
 		if (coverage_only_keys.has(tracking_key)) continue;
 		for (const [path, error] of files) {
-			if (perf_omit_reason(PERF_OMITS, tracking_key, path) === null) {
-				violations.push(`  ${tracking_key}  ${path}: ${error}`);
-			}
+			const omit = perf_omit_match(PERF_OMITS, tracking_key, path);
+			if (omit === null) violations.push(`  ${tracking_key}  ${path}: ${error}`);
+			else used.add(omit);
 		}
 	}
-	if (violations.length === 0) return;
-	violations.sort();
+	if (violations.length > 0) {
+		violations.sort();
+		console.error(
+			`Perf corpus: ${violations.length} unlisted pre-flight failure(s). Every in-scope tool must ` +
+				`process every real-world file — fix the tool, or add a reviewed entry (with a reason) to ` +
+				`PERF_OMITS in lib/perf_omit.ts:\n${violations.join('\n')}`
+		);
+		exit(1);
+	}
+
+	if (!full_corpus) return;
+	const stale = stale_perf_omits(PERF_OMITS, used);
+	if (stale.length === 0) return;
 	console.error(
-		`Perf corpus: ${violations.length} unlisted pre-flight failure(s). Every in-scope tool must ` +
-			`process every real-world file — fix the tool, or add a reviewed entry (with a reason) to ` +
-			`PERF_OMITS in lib/perf_omit.ts:\n${violations.join('\n')}`
+		`Perf corpus: ${stale.length} stale PERF_OMITS entr${stale.length === 1 ? 'y' : 'ies'} — ` +
+			`excused no pre-flight failure in this full-corpus run:\n` +
+			stale.map((o) => `  ${o.task ?? '<any task>'}  ${o.path}: ${o.reason}`).join('\n') +
+			`\n  Delete the entry if the tool was fixed; update it if the corpus path was renamed. ` +
+			`A tolerance that matches nothing is a broad pattern waiting to absorb a real regression.`
 	);
 	exit(1);
 }
@@ -1223,18 +1271,24 @@ async function run_preflight_group(
 
 	const filtered_files_by_task = new Map<string, SourceFile[]>();
 	if (USE_INTERSECTION) {
-		let intersection: Set<string> | null = null;
+		// Seeded EMPTY rather than null-until-first-task, so the no-timed-tasks case
+		// (a group of nothing but coverage-only rows) falls out as the empty
+		// intersection it is, without the membership test below having to re-answer
+		// "was there a first task?" once per file.
+		let intersection = new Set<string>();
+		let seeded = false;
 		for (const task of timed_tasks) {
 			const success_set = successful_files.get(task.tracking_key) ?? new Set<string>();
-			if (intersection === null) {
+			if (!seeded) {
 				intersection = new Set(success_set);
+				seeded = true;
 			} else {
 				for (const path of intersection) {
 					if (!success_set.has(path)) intersection.delete(path);
 				}
 			}
 		}
-		const intersection_list = files.filter((f) => (intersection ?? new Set<string>()).has(f.path));
+		const intersection_list = files.filter((f) => intersection.has(f.path));
 		for (const task of timed_tasks) {
 			filtered_files_by_task.set(task.tracking_key, intersection_list);
 		}
@@ -1388,8 +1442,13 @@ check_variant_parity();
 // entry is a hard error — not the silent skip that would quietly erode coverage.
 // Conformance mode measures coverage (sub-100% is the metric), so this is
 // perf-only. Runs before the timed phase, so a regression fails in seconds.
+//
+// The staleness half of the same grade is asked only of a run that could actually
+// reach every omitted file: a corpus filter, or a missing repo tolerated by
+// BENCH_ALLOW_MISSING, withholds them, and "matched nothing" would then mean
+// "wasn't there" (see `stale_perf_omits`).
 if (CORPUS_MODE === 'perf') {
-	enforce_perf_coverage();
+	enforce_perf_coverage(!is_limited && env.BENCH_ALLOW_MISSING !== '1');
 }
 
 if (COVERAGE_ONLY) {
@@ -1467,7 +1526,24 @@ interface BaselineVersions extends ReportVersions {
 	tsv: string;
 }
 
+/**
+ * The report's schema version — every consumer reads it to tell "this producer did
+ * not record that field" from "there was nothing to record".
+ *
+ * BUMP IT whenever a field is added, removed, or has its meaning or key names
+ * changed, and say what the new number means in one line below. `compose_reports.ts`
+ * carries its own, for the combined report, on the same rule; `../tsv.fuz.dev`'s
+ * `benchmark_data.ts` mirrors this shape field for field and degrades on an older
+ * report, so a bump here is a change there too.
+ *
+ * 12: `unavailable[]` entries carry `rows` — the row NAMES each load failure removed
+ * from this surface. Every other identity the report publishes is a row name, so the
+ * init label alone (`Biome`, `OXC WASM`) could not be joined against any table.
+ */
+const REPORT_SCHEMA_VERSION = 12;
+
 interface Baseline {
+	/** See `REPORT_SCHEMA_VERSION`. */
 	version: number;
 	/** The JS runtime that produced this report (`deno` | `node` | `bun`). Mirrors
 	 * the per-row `runtime` and matches the `report.<runtime>.{json,md}` filename. */
@@ -1709,25 +1785,7 @@ async function build_results_data(
 	}
 
 	return {
-		// Bumped 11 → 12 for `unavailable[].rows` — the row names each load failure
-		// removed from this surface. The entries previously carried only the ⚠ init
-		// LABEL (`OXC WASM`, `Biome`), which matches no row name (`oxc-parser-wasm`,
-		// `biome-wasm`), so the one consumer that has to join them — a table asking
-		// "is this blank cell a load failure?" — could never match. Every other
-		// identity the report publishes is a row name; this field now is too.
-		// 10 → 11 for `binary_sizes_absent` (the size table's composition
-		// disclosure — which expected artifacts were not on disk). 9 → 10 for
-		// `unavailable` (the impls that failed to init, so a row
-		// missing from every table has a recorded cause instead of only a ⚠ line in
-		// the run's output). 8 → 9 for `variant_parity`'s neutral pair keys
-		// (`impl`/`sibling` + their `_only` counts, was `native`/`wasm`): the check
-		// now also pairs one binding under two options, which those names described
-		// wrongly. 7 → 8 added
-		// `coverage_by_source` (coverage-only runs; the markdown's per-source tables in
-		// machine-readable form). 6 → 7 added the top-level `machine` block (CPU model,
-		// OS/arch, runtime version); 5 → 6 added `corpus_kind` + `corpus_sources`;
-		// 4 → 5 added the `runtime` field, top-level and per row.
-		version: 12,
+		version: REPORT_SCHEMA_VERSION,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
 		timestamp: new Date().toISOString(),
@@ -1750,21 +1808,23 @@ async function build_results_data(
 }
 
 /** Generate a full markdown report from benchmark data */
-function generate_markdown_report(
-	groups: GroupResults[],
-	binary_sizes: BinarySize[],
-	corpus: { svelte: number; typescript: number; css: number },
-	corpus_bytes: Record<Language, number>,
-	versions: BaselineVersions,
-	timestamp: string,
-	git_commit: string | null,
-	machine: Machine,
-	task_tracking: Map<string, Map<string, string>>,
-	effective_size: Map<string, EffectiveCorpusEntry>,
-	effective_bytes: Map<string, number>,
-	iterated_counts: Map<string, number>,
-	skipped: Map<string, Map<string, string>>
-): string {
+function generate_markdown_report(data: Baseline, groups: GroupResults[]): string {
+	// Every figure the report labels comes from ONE `Baseline`, and the live
+	// pre-flight state is read straight from module scope rather than threaded back
+	// into a function that already sits in this module.
+	//
+	// This took thirteen positional parameters before, six of them those same
+	// globals passed through and seven of them fields of the `data` the caller
+	// already had — thirteen chances, at each of two call sites, to pair one run's
+	// corpus with another's versions. Same hazard `CollectedBinarySizes` names for
+	// its own two halves, an order of magnitude wider.
+	const { binary_sizes, corpus, versions, timestamp, git_commit, machine } = data;
+	const corpus_bytes = bytes_by_language;
+	const task_tracking = task_tracking_by_group;
+	const effective_size = effective_corpus_size;
+	const effective_bytes = effective_corpus_bytes;
+	const iterated_counts = iterated_file_count;
+	const skipped = skipped_files;
 	const lines: string[] = [];
 	lines.push(
 		IS_CONFORMANCE ? '# tsv conformance benchmark results (parse)\n' : '# tsv benchmark results\n'
@@ -1839,7 +1899,8 @@ function generate_markdown_report(
 		// Use the canonical reference as the bench-table baseline. Without this,
 		// the library picks the fastest task (often `tsv-internal`, a non-public
 		// optimization variant) which is not the comparison readers want.
-		const baseline = operation === 'format' ? 'prettier' : canonical_parser_label(language);
+		const baseline =
+			operation === 'format' ? CANONICAL_FORMATTER_ROW : CANONICAL_PARSER_ROWS[language];
 		const baseline_exists = group.results.some((r) => r.name === baseline);
 
 		const tracking = task_tracking.get(group.name);
@@ -1948,7 +2009,6 @@ function generate_markdown_report(
 async function save_results(
 	data: Baseline,
 	groups: GroupResults[],
-	binary_sizes: BinarySize[],
 	write_report: boolean
 ): Promise<string> {
 	await mkdir(RESULTS_DIR, { recursive: true });
@@ -1956,21 +2016,7 @@ async function save_results(
 	const commit = data.git_commit ?? 'unknown';
 	const base_path = `${RESULTS_DIR}/${timestamp}_${commit}.${REPORT_TAG}`;
 
-	const markdown = generate_markdown_report(
-		groups,
-		binary_sizes,
-		data.corpus,
-		bytes_by_language,
-		data.versions,
-		data.timestamp,
-		data.git_commit,
-		data.machine,
-		task_tracking_by_group,
-		effective_corpus_size,
-		effective_corpus_bytes,
-		iterated_file_count,
-		skipped_files
-	);
+	const markdown = generate_markdown_report(data, groups);
 
 	const json = JSON.stringify(data, null, '\t');
 	const writes: Promise<void>[] = [
@@ -2126,23 +2172,7 @@ if (args.json) {
 	// JSON output (same structure as saved results)
 	console.log(JSON.stringify(results_data, null, '\t'));
 } else if (args.markdown) {
-	console.log(
-		generate_markdown_report(
-			all_group_results,
-			binary_sizes,
-			corpus,
-			bytes_by_language,
-			versions,
-			results_data.timestamp,
-			results_data.git_commit,
-			results_data.machine,
-			task_tracking_by_group,
-			effective_corpus_size,
-			effective_corpus_bytes,
-			iterated_file_count,
-			skipped_files
-		)
-	);
+	console.log(generate_markdown_report(results_data, all_group_results));
 } else {
 	// Standard text output. The timed summary is empty in coverage-only mode —
 	// the effective-corpus report below carries the coverage picture instead.
@@ -2204,12 +2234,7 @@ if (suppressed_noise.size > 0) {
 // Always save the timestamped pair; only overwrite the canonical
 // `report.<runtime>.{json,md}` on full-corpus runs or when --save-report is set.
 const write_report = args.save_report || !is_limited;
-const results_path = await save_results(
-	results_data,
-	all_group_results,
-	binary_sizes,
-	write_report
-);
+const results_path = await save_results(results_data, all_group_results, write_report);
 log(`\nResults saved to:`);
 log(`  ${results_path}.json`);
 log(`  ${results_path}.md`);

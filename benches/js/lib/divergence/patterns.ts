@@ -631,9 +631,9 @@ const bom_strip: DivergencePattern = {
 		'typescript/syntax/whitespace/bom_prettier_divergence'
 	],
 	detect(ctx) {
-		// Use the `﻿` escape rather than a literal BOM glyph in source — a raw
+		// Use the `\uFEFF` escape rather than a literal BOM glyph in source — a raw
 		// BOM byte in this file is an editing hazard (invisible, easily mangled).
-		const BOM = '﻿';
+		const BOM = '\uFEFF';
 		// Source starts with BOM, our output doesn't
 		if (ctx.source.startsWith(BOM) && !ctx.ours.startsWith(BOM)) {
 			// Verify prettier keeps BOM

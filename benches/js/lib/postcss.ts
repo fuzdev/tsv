@@ -47,7 +47,6 @@ interface PostcssModule {
  *   and prettier already has the baseline row).
  */
 export class PostcssImplementation extends BaseImplementation {
-	readonly name = 'postcss' as const;
 	readonly versions: PostcssVersions;
 	private _postcss: PostcssModule | null = null;
 

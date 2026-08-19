@@ -43,7 +43,6 @@ import type { Formatter } from '@dprint/formatter';
  *   only `format_text` and config entry points, never an AST across the boundary.
  */
 export class DprintImplementation extends BaseImplementation {
-	readonly name = 'dprint-wasm' as const;
 	readonly versions: DprintVersions;
 	private _formatter: Formatter | null = null;
 
