@@ -232,9 +232,14 @@ impl<'a> Printer<'a> {
         // Cheap byte gate next: this runs once per expression node (the highest-frequency
         // comment path), and almost every expression is mid-line — preceded by `(`/`,`/space,
         // not a block comment's `*/` — so the gate bails in a few instructions before the
-        // JsdocCast match and the 13-arm left-spine walk. Byte-identical: when no glued block
-        // comment ends here, `owned_leading_comment_at` would find nothing and every arm below
-        // returns `doc` unchanged, so the early return is the same result reached sooner.
+        // JsdocCast match and the 13-arm left-spine walk.
+        //
+        // ⚠️ Deliberately **narrower** than the lookup it guards, which asks
+        // `CommentGlue::AnyLine` because a JSDoc cast owns its comment from the line above
+        // its `(`. Result-identical here regardless: the own-line spelling this gate rejects
+        // is owned by a cast alone, and a cast is excluded two lines down anyway (it prints
+        // its own copy). A second AnyLine producer would break that argument — widen the gate
+        // with it, don't rediscover this comment.
         if source_scan::block_comment_end_before(
             self.source.as_bytes(),
             start as usize,
@@ -317,7 +322,19 @@ impl<'a> Printer<'a> {
             return doc;
         };
         let d = self.d();
-        d.concat(&[self.build_comment_doc(comment), d.text(" "), doc])
+        // The separator is the author's: a general owned comment is glued on the token's
+        // own line, so it is always the space — but a JSDoc cast may own its comment from
+        // the line ABOVE its `(`, and collapsing that onto one line is a relocation the
+        // unfrozen path does not make (`build_jsdoc_cast_doc` keeps the break on exactly
+        // `jsdoc_cast_comment_is_own_line`'s shape, and so does prettier). Reading it off
+        // the source keeps the two producers answering with one rule rather than the
+        // claim having to know which bound the comment.
+        let separator = if self.comment_has_newline_between(comment.span.end, start) {
+            d.hardline()
+        } else {
+            d.text(" ")
+        };
+        d.concat(&[self.build_comment_doc(comment), separator, doc])
     }
 
     /// **on page**: what the comment `expr` owns does to the operator's line (`=` / `:`) —
@@ -355,11 +372,12 @@ impl<'a> Printer<'a> {
         // A JSDoc cast keeps its own hang rule, and must: it prints a hardline between the
         // comment and its `(` on exactly the shape `jsdoc_cast_comment_is_own_line`
         // describes, and a hang without that hardline strands the `(` (see that
-        // function's doc — it is the single source of truth for both). The cast's comment
-        // may also sit a *newline* away from the `(`, which the glued lookup below
-        // deliberately does not match — a bundler annotation binds only when glued — and it
-        // may lead the value from the LEFTMOST LEAF rather than from `expr` itself, which
-        // is why the cast is resolved through [`leading_jsdoc_cast`] rather than matched.
+        // function's doc — it is the single source of truth for both). The cast is resolved
+        // through [`leading_jsdoc_cast`] rather than matched because it may lead the value
+        // from the LEFTMOST LEAF rather than from `expr` itself, a position the lookup below
+        // cannot ask about. (That lookup would otherwise find an own-line cast's comment —
+        // it takes ownership's UNION glue — so the early return above is also what keeps the
+        // general arm from answering for a shape whose hang rule is the cast's.)
         let is_cast = if let Some(cast) = leading_jsdoc_cast(expr) {
             if jsdoc_cast_comment_is_own_line(cast, self.source) {
                 return Some(OwnedCommentEffect::Hangs);
@@ -429,10 +447,10 @@ impl<'a> Printer<'a> {
             return None;
         }
         // A JSDoc cast carries its own copy and always prints it (`build_jsdoc_cast_doc`), so
-        // it is the one node that answers from the node rather than the glued-comment lookup.
+        // it is the one node that answers from the node rather than the position lookup.
         // It must: `JsdocCast::span` covers the `(`…`)` only — the comment sits *outside* it —
-        // and the cast's comment may be a newline away from the `(`, which the glue rule below
-        // deliberately does not match. Asking the lookup would miss exactly the own-line cast.
+        // so the lookup below can only ever find the cast's comment when the cast is `expr`'s
+        // own left edge, and it is asked at a POSITION, which cannot walk.
         // Resolved down the left spine ([`leading_jsdoc_cast`]): the comment leads the value
         // from its leftmost leaf too, and a bound taken past it drops an authored blank line
         // (`[a,⏎⏎/** @type {A} */⏎(x).b]`) — the loss this function exists to prevent.
@@ -443,11 +461,14 @@ impl<'a> Printer<'a> {
             .map(|c| c.span.start)
     }
 
-    /// The owned comment ending immediately before `start`, glued to the token there —
+    /// The owned comment ending immediately before `start` —
     /// [`tsv_lang::owned_leading_comment_at`] against this document.
     ///
-    /// (A JSDoc cast's comment may sit a newline away and is deliberately NOT found here —
-    /// it hangs off its `JsdocCast` node, which carries its own copy.)
+    /// Whitespace-adjacent, not same-line-glued: ownership's two producers use two glues,
+    /// so the lookup takes their union and `owned_by_node` decides (see that function). A
+    /// JSDoc cast's comment therefore IS found here even from the line above its `(` — the
+    /// three callers that must not print it twice each resolve the cast off the node first
+    /// ([`leading_jsdoc_cast`], which also walks the left spine this position cannot).
     fn owned_leading_comment_at(&self, start: u32) -> Option<&'a internal::Comment> {
         tsv_lang::owned_leading_comment_at(self.source, self.comments, start)
     }

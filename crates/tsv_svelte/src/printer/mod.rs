@@ -324,8 +324,9 @@ impl<'a> Printer<'a> {
         self.claim_owned_leading_comment(self.verbatim_source_doc(span), span.start)
     }
 
-    /// Prepend the block comment **owned** by the node beginning at `start`, when one
-    /// is glued there — the claim any builder owes that assembles a node's doc itself
+    /// Prepend the block comment **owned** by the node beginning at `start`, when one is
+    /// bound there (glued on the token's own line, or — for a JSDoc cast — from the line
+    /// above its `(`) — the claim any builder owes that assembles a node's doc itself
     /// instead of routing through `tsv_ts`'s comment-aware expression builder (which
     /// makes the claim via `prepend_owned_leading_comment`).
     ///
@@ -340,6 +341,14 @@ impl<'a> Printer<'a> {
     /// whole dispatch: two nested nodes can begin at the same offset (an
     /// `AssignmentPattern` and its `left`, a paren-less arrow and its parameter), and a
     /// claim made at both is a double print.
+    ///
+    /// ⚠️ **The separator is the author's, not a constant** — the same rule, and the same
+    /// reason, as `tsv_ts`'s `prepend_owned_leading_comment_at`. Ownership's two producers
+    /// bind at two different glues, so a claim that always writes a space is right only for
+    /// the glued one: a JSDoc cast owns its comment from the line **above** its `(`, and
+    /// pulling that comment up onto the `(`'s line is a relocation the unfrozen path does
+    /// not make (`{@const a =⏎/** @type {T} */⏎(b)}` keeps the break, and so does prettier).
+    /// Reading the newline off the source keeps the two claims answering with one rule.
     pub(in crate::printer) fn claim_owned_leading_comment(&self, doc: DocId, start: u32) -> DocId {
         if !self.has_owned_comments {
             return doc;
@@ -350,7 +359,16 @@ impl<'a> Printer<'a> {
         };
         let d = self.d();
         let comment_doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
-        d.concat(&[comment_doc, d.text(" "), doc])
+        let separator = if tsv_lang::printing::has_newline_between_fast(
+            &self.line_breaks,
+            comment.span.end,
+            start,
+        ) {
+            d.hardline()
+        } else {
+            d.text(" ")
+        };
+        d.concat(&[comment_doc, separator, doc])
     }
 
     /// A braced head's **value stage**: the frozen slice when the head's gap resolved a

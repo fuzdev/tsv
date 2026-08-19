@@ -1,0 +1,1844 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1864,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment before the `=` drops `= value` to a continuation line — and the",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `=`→value gap keeps its OWN rule inside that continuation: an own-line directive",
+			"start": 98,
+			"end": 181,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " there still freezes the value, and still keeps its own line (trailing the `=` it",
+			"start": 183,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " would be inert, so the next pass would drop the freeze).",
+			"start": 268,
+			"end": 327,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 339,
+			"end": 344,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 11
+				},
+				"end": {
+					"line": 6,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 351,
+			"end": 369,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same with no shell to re-synthesize.",
+			"start": 389,
+			"end": 432,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 444,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 11
+				},
+				"end": {
+					"line": 12,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 456,
+			"end": 474,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A class field's `=` is the same gap one host over.",
+			"start": 492,
+			"end": 545,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 563,
+			"end": 568,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 6
+				},
+				"end": {
+					"line": 19,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 577,
+			"end": 595,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 3
+				},
+				"end": {
+					"line": 21,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " So is an assignment expression's, with the author's operator on the continuation.",
+			"start": 619,
+			"end": 703,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 709,
+			"end": 714,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 5
+				},
+				"end": {
+					"line": 26,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 721,
+			"end": 739,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The rule is not the directive's: any own-line comment after the `=` leads the value",
+			"start": 757,
+			"end": 843,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " from its own line here, exactly as it does when nothing precedes the `=`.",
+			"start": 845,
+			"end": 921,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 933,
+			"end": 938,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 11
+				},
+				"end": {
+					"line": 33,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 945,
+			"end": 950,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The control — a comment the author put ON the `=`'s line stays there.",
+			"start": 960,
+			"end": 1032,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 1044,
+			"end": 1049,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 11
+				},
+				"end": {
+					"line": 39,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 1054,
+			"end": 1059,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 4
+				},
+				"end": {
+					"line": 40,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The value's clarity parens are the position's, and the gap's content cannot strip",
+			"start": 1069,
+			"end": 1153,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 1
+				},
+				"end": {
+					"line": 43,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " them.",
+			"start": 1155,
+			"end": 1163,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 1
+				},
+				"end": {
+					"line": 44,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 1175,
+			"end": 1180,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 11
+				},
+				"end": {
+					"line": 45,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The run the value's own doc prints leads it here too. A JSDoc cast OWNS its comment,",
+			"start": 1200,
+			"end": 1287,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 1
+				},
+				"end": {
+					"line": 48,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " so the gap's to-emit lookup cannot see it — but it is on the page, and the line the",
+			"start": 1289,
+			"end": 1375,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 1
+				},
+				"end": {
+					"line": 49,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author gave it survives exactly as it does outside the continuation.",
+			"start": 1377,
+			"end": 1448,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 1460,
+			"end": 1466,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 11
+				},
+				"end": {
+					"line": 51,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {Aaa} ",
+			"start": 1473,
+			"end": 1491,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 2
+				},
+				"end": {
+					"line": 53,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The glued authoring of that cast is the control, and stays on the operator's line.",
+			"start": 1509,
+			"end": 1594,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 1
+				},
+				"end": {
+					"line": 56,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 1606,
+			"end": 1612,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 11
+				},
+				"end": {
+					"line": 57,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {Aaa} ",
+			"start": 1617,
+			"end": 1635,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 4
+				},
+				"end": {
+					"line": 58,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block glued to the operator hugs the value across the author's newline — the same",
+			"start": 1651,
+			"end": 1737,
+			"loc": {
+				"start": {
+					"line": 60,
+					"column": 1
+				},
+				"end": {
+					"line": 60,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " pull-up the ordinary arm makes, authored broken in `unformatted_ours_hug`.",
+			"start": 1739,
+			"end": 1816,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 1
+				},
+				"end": {
+					"line": 61,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c12",
+			"start": 1828,
+			"end": 1834,
+			"loc": {
+				"start": {
+					"line": 62,
+					"column": 11
+				},
+				"end": {
+					"line": 62,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c13 ",
+			"start": 1839,
+			"end": 1848,
+			"loc": {
+				"start": {
+					"line": 63,
+					"column": 4
+				},
+				"end": {
+					"line": 63,
+					"column": 13
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1863,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1854,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 64,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 329,
+					"end": 386,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 335,
+							"end": 385,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 335,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"name": "aaa",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 339,
+										"end": 344
+									}
+								]
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 373,
+								"end": 384,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 3
+									},
+									"end": {
+										"line": 9,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 373,
+									"end": 376,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"name": "bbb"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 381,
+									"end": 384,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 11
+										},
+										"end": {
+											"line": 9,
+											"column": 14
+										}
+									},
+									"name": "ccc"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 351,
+										"end": 369
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment before the `=` drops `= value` to a continuation line — and the",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " `=`→value gap keeps its OWN rule inside that continuation: an own-line directive",
+							"start": 98,
+							"end": 181
+						},
+						{
+							"type": "Line",
+							"value": " there still freezes the value, and still keeps its own line (trailing the `=` it",
+							"start": 183,
+							"end": 266
+						},
+						{
+							"type": "Line",
+							"value": " would be inert, so the next pass would drop the freeze).",
+							"start": 268,
+							"end": 327
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 434,
+					"end": 489,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 440,
+							"end": 488,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 440,
+								"end": 443,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 10
+									}
+								},
+								"name": "ddd",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 444,
+										"end": 449
+									}
+								]
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 477,
+								"end": 488,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 477,
+									"end": 480,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 5
+										}
+									},
+									"name": "eee"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 485,
+									"end": 488,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 10
+										},
+										"end": {
+											"line": 15,
+											"column": 13
+										}
+									},
+									"name": "fff"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 456,
+										"end": 474
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same with no shell to re-synthesize.",
+							"start": 389,
+							"end": 432
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 547,
+					"end": 616,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 553,
+						"end": 554,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 7
+							},
+							"end": {
+								"line": 18,
+								"column": 8
+							}
+						},
+						"name": "G"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 555,
+						"end": 616,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 9
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 559,
+								"end": 613,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 17
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 559,
+									"end": 562,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 5
+										}
+									},
+									"name": "hhh",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 563,
+											"end": 568
+										}
+									]
+								},
+								"value": {
+									"type": "AssignmentExpression",
+									"start": 600,
+									"end": 611,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 4
+										},
+										"end": {
+											"line": 22,
+											"column": 15
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 600,
+										"end": 603,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 4
+											},
+											"end": {
+												"line": 22,
+												"column": 7
+											}
+										},
+										"name": "iii"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 608,
+										"end": 611,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 12
+											},
+											"end": {
+												"line": 22,
+												"column": 15
+											}
+										},
+										"name": "jjj"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 577,
+											"end": 595
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A class field's `=` is the same gap one host over.",
+							"start": 492,
+							"end": 545
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 705,
+					"end": 754,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 705,
+						"end": 753,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 1
+							},
+							"end": {
+								"line": 29,
+								"column": 13
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 705,
+							"end": 708,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 1
+								},
+								"end": {
+									"line": 26,
+									"column": 4
+								}
+							},
+							"name": "kkk",
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 709,
+									"end": 714
+								}
+							]
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 742,
+							"end": 753,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 2
+								},
+								"end": {
+									"line": 29,
+									"column": 13
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 742,
+								"end": 745,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 5
+									}
+								},
+								"name": "lll"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 750,
+								"end": 753,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 10
+									},
+									"end": {
+										"line": 29,
+										"column": 13
+									}
+								},
+								"name": "mmm"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 721,
+									"end": 739
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " So is an assignment expression's, with the author's operator on the continuation.",
+							"start": 619,
+							"end": 703
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 923,
+					"end": 957,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 929,
+							"end": 956,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 929,
+								"end": 932,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 7
+									},
+									"end": {
+										"line": 33,
+										"column": 10
+									}
+								},
+								"name": "nnn",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c5",
+										"start": 933,
+										"end": 938
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 953,
+								"end": 956,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 5
+									}
+								},
+								"name": "ooo",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c6",
+										"start": 945,
+										"end": 950
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The rule is not the directive's: any own-line comment after the `=` leads the value",
+							"start": 757,
+							"end": 843
+						},
+						{
+							"type": "Line",
+							"value": " from its own line here, exactly as it does when nothing precedes the `=`.",
+							"start": 845,
+							"end": 921
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1034,
+					"end": 1066,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1040,
+							"end": 1065,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 7
+								},
+								"end": {
+									"line": 41,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1040,
+								"end": 1043,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 7
+									},
+									"end": {
+										"line": 39,
+										"column": 10
+									}
+								},
+								"name": "ppp",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c7",
+										"start": 1044,
+										"end": 1049
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 1062,
+								"end": 1065,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 2
+									},
+									"end": {
+										"line": 41,
+										"column": 5
+									}
+								},
+								"name": "qqq",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c8",
+										"start": 1054,
+										"end": 1059
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The control — a comment the author put ON the `=`'s line stays there.",
+							"start": 960,
+							"end": 1032
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1165,
+					"end": 1197,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 46,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1171,
+							"end": 1196,
+							"loc": {
+								"start": {
+									"line": 45,
+									"column": 7
+								},
+								"end": {
+									"line": 46,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1171,
+								"end": 1174,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 7
+									},
+									"end": {
+										"line": 45,
+										"column": 10
+									}
+								},
+								"name": "rrr",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c9",
+										"start": 1175,
+										"end": 1180
+									}
+								]
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 1186,
+								"end": 1195,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 5
+									},
+									"end": {
+										"line": 46,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 1186,
+									"end": 1189,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 5
+										},
+										"end": {
+											"line": 46,
+											"column": 8
+										}
+									},
+									"name": "sss"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1192,
+									"end": 1195,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 11
+										},
+										"end": {
+											"line": 46,
+											"column": 14
+										}
+									},
+									"name": "ttt"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The value's clarity parens are the position's, and the gap's content cannot strip",
+							"start": 1069,
+							"end": 1153
+						},
+						{
+							"type": "Line",
+							"value": " them.",
+							"start": 1155,
+							"end": 1163
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1450,
+					"end": 1506,
+					"loc": {
+						"start": {
+							"line": 51,
+							"column": 1
+						},
+						"end": {
+							"line": 54,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1456,
+							"end": 1505,
+							"loc": {
+								"start": {
+									"line": 51,
+									"column": 7
+								},
+								"end": {
+									"line": 54,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1456,
+								"end": 1459,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 7
+									},
+									"end": {
+										"line": 51,
+										"column": 10
+									}
+								},
+								"name": "uuu",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c10",
+										"start": 1460,
+										"end": 1466
+									}
+								]
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 1495,
+								"end": 1504,
+								"loc": {
+									"start": {
+										"line": 54,
+										"column": 3
+									},
+									"end": {
+										"line": 54,
+										"column": 12
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 1495,
+									"end": 1498,
+									"loc": {
+										"start": {
+											"line": 54,
+											"column": 3
+										},
+										"end": {
+											"line": 54,
+											"column": 6
+										}
+									},
+									"name": "vvv"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1501,
+									"end": 1504,
+									"loc": {
+										"start": {
+											"line": 54,
+											"column": 9
+										},
+										"end": {
+											"line": 54,
+											"column": 12
+										}
+									},
+									"name": "www"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {Aaa} ",
+										"start": 1473,
+										"end": 1491
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The run the value's own doc prints leads it here too. A JSDoc cast OWNS its comment,",
+							"start": 1200,
+							"end": 1287
+						},
+						{
+							"type": "Line",
+							"value": " so the gap's to-emit lookup cannot see it — but it is on the page, and the line the",
+							"start": 1289,
+							"end": 1375
+						},
+						{
+							"type": "Line",
+							"value": " author gave it survives exactly as it does outside the continuation.",
+							"start": 1377,
+							"end": 1448
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1596,
+					"end": 1648,
+					"loc": {
+						"start": {
+							"line": 57,
+							"column": 1
+						},
+						"end": {
+							"line": 58,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1602,
+							"end": 1647,
+							"loc": {
+								"start": {
+									"line": 57,
+									"column": 7
+								},
+								"end": {
+									"line": 58,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1602,
+								"end": 1605,
+								"loc": {
+									"start": {
+										"line": 57,
+										"column": 7
+									},
+									"end": {
+										"line": 57,
+										"column": 10
+									}
+								},
+								"name": "xxx",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c11",
+										"start": 1606,
+										"end": 1612
+									}
+								]
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 1637,
+								"end": 1646,
+								"loc": {
+									"start": {
+										"line": 58,
+										"column": 24
+									},
+									"end": {
+										"line": 58,
+										"column": 33
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 1637,
+									"end": 1640,
+									"loc": {
+										"start": {
+											"line": 58,
+											"column": 24
+										},
+										"end": {
+											"line": 58,
+											"column": 27
+										}
+									},
+									"name": "yyy"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1643,
+									"end": 1646,
+									"loc": {
+										"start": {
+											"line": 58,
+											"column": 30
+										},
+										"end": {
+											"line": 58,
+											"column": 33
+										}
+									},
+									"name": "zzz"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {Aaa} ",
+										"start": 1617,
+										"end": 1635
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The glued authoring of that cast is the control, and stays on the operator's line.",
+							"start": 1509,
+							"end": 1594
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1818,
+					"end": 1853,
+					"loc": {
+						"start": {
+							"line": 62,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1824,
+							"end": 1852,
+							"loc": {
+								"start": {
+									"line": 62,
+									"column": 7
+								},
+								"end": {
+									"line": 63,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1824,
+								"end": 1827,
+								"loc": {
+									"start": {
+										"line": 62,
+										"column": 7
+									},
+									"end": {
+										"line": 62,
+										"column": 10
+									}
+								},
+								"name": "aab",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c12",
+										"start": 1828,
+										"end": 1834
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 1849,
+								"end": 1852,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 14
+									},
+									"end": {
+										"line": 63,
+										"column": 17
+									}
+								},
+								"name": "bbc",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c13 ",
+										"start": 1839,
+										"end": 1848
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block glued to the operator hugs the value across the author's newline — the same",
+							"start": 1651,
+							"end": 1737
+						},
+						{
+							"type": "Line",
+							"value": " pull-up the ordinary arm makes, authored broken in `unformatted_ours_hug`.",
+							"start": 1739,
+							"end": 1816
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

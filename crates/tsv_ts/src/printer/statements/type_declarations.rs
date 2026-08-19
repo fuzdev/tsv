@@ -11,8 +11,8 @@ use crate::printer::types::helpers::{
 };
 use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
 use crate::printer::{
-    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, MemberBlankScan,
-    MemberBody, MemberFloor, MemberFreeze, MemberSeam,
+    CommentFilter, CommentSpacing, CommentVec, ContinuationValue, HeritageKeyword, LeadingGlue,
+    MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
 };
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
@@ -1259,9 +1259,14 @@ impl<'a> Printer<'a> {
             // (preserve position — lossless when a second comment also trails the
             // member; prettier relocates past the value and merges the two onto one
             // line — see conformance_prettier_ts_comments.md §Comment relocation).
-            if let Some(cont) =
-                self.build_initializer_line_continuation(id_end, eq_pos, || value_doc)
-            {
+            if let Some(cont) = self.build_initializer_line_continuation(
+                id_end,
+                eq_pos,
+                // A type alias's RHS is a TYPE — it owns no comment, so the gap's bound is
+                // the whole of what this seam needs from it.
+                ContinuationValue::Opaque(init_start),
+                || value_doc,
+            ) {
                 d.concat(&[id_doc, cont])
             } else {
                 // Comments between name and `=` (block stays inline: `a /* c */ = 1`)
