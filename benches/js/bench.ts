@@ -77,7 +77,7 @@ import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { type CorpusSource, DevReposLoader, group_by_language } from './lib/corpus.ts';
 import { enrich_source_repos } from './lib/corpus_repos.ts';
-import { PERF_OMITS, type PerfOmit, perf_omit_match, stale_perf_omits } from './lib/perf_omit.ts';
+import { PERF_OMITS, type PerfOmit, perf_omit_matches, stale_perf_omits } from './lib/perf_omit.ts';
 import {
 	get_alternative_versions,
 	get_benchmark_tasks,
@@ -786,6 +786,14 @@ const coverage_only_keys: Set<string> = new Set();
  * direction catches an entry written too BROADLY — that stays the author's job;
  * see `stale_perf_omits`.)
  *
+ * Between the two sits the DISJOINTNESS check, which needs no full run: a failure
+ * that more than one entry claims fails here, whatever the corpus scope, because
+ * the overlap was observed rather than inferred. It is what makes the staleness
+ * direction trustworthy — under a first-match reading an overlapping pair credits
+ * only the earlier entry, and the shadowed one then reports as stale while the
+ * failure it describes is live. Every match is credited (`perf_omit_matches`), so
+ * that misreport is unreachable even if this check is somehow bypassed.
+ *
  * Staleness is asked only of entries this run could have exercised, along two
  * independent axes, because "matched nothing" otherwise indicts the ledger for
  * something else's absence:
@@ -802,14 +810,32 @@ const coverage_only_keys: Set<string> = new Set();
 function enforce_perf_coverage(full_corpus: boolean): void {
 	const violations: string[] = [];
 	const used = new Set<PerfOmit>();
+	/**
+	 * Distinct overlapping CLAIM SETS, keyed by the entries that make them up — a
+	 * broad entry reaching a narrow one's file can shadow it across dozens of
+	 * files, and that is one ledger defect to fix, not dozens to read.
+	 */
+	const overlaps = new Map<string, { entries: PerfOmit[]; count: number; example: string }>();
 	for (const [tracking_key, files] of skipped_files) {
 		if (coverage_only_keys.has(tracking_key)) continue;
 		for (const [path, error] of files) {
-			const omit = perf_omit_match(PERF_OMITS, tracking_key, path);
-			if (omit === null) violations.push(`  ${tracking_key}  ${path}: ${error}`);
-			else used.add(omit);
+			const matches = perf_omit_matches(PERF_OMITS, tracking_key, path);
+			if (matches.length === 0) {
+				violations.push(`  ${tracking_key}  ${path}: ${error}`);
+				continue;
+			}
+			for (const match of matches) used.add(match);
+			if (matches.length === 1) continue;
+			const key = matches.map((o) => `${o.task ?? '<any>'} @ ${o.path}`).join(' || ');
+			const seen = overlaps.get(key);
+			if (seen) seen.count += 1;
+			else overlaps.set(key, { entries: matches, count: 1, example: `${tracking_key}  ${path}` });
 		}
 	}
+	// Both are ledger failures and both are worth seeing in one pass: an unlisted
+	// failure is a tool regression, an overlap is the list itself being ambiguous,
+	// and fixing either in ignorance of the other invites a second round trip.
+	let failed = false;
 	if (violations.length > 0) {
 		violations.sort();
 		console.error(
@@ -817,8 +843,27 @@ function enforce_perf_coverage(full_corpus: boolean): void {
 				`process every real-world file — fix the tool, or add a reviewed entry (with a reason) to ` +
 				`PERF_OMITS in lib/perf_omit.ts:\n${violations.join('\n')}`
 		);
-		exit(1);
+		failed = true;
 	}
+	if (overlaps.size > 0) {
+		console.error(
+			`Perf corpus: ${overlaps.size} pre-flight failure shape(s) claimed by more than one ` +
+				`PERF_OMITS entry. Entries must be DISJOINT — while two both match, neither is the entry ` +
+				`that describes the failure, and one of them is redundant or reaches past what it was ` +
+				`written for. Narrow or merge them in lib/perf_omit.ts:\n` +
+				[...overlaps.values()]
+					.map(
+						(o) =>
+							`  ${o.example}${o.count === 1 ? '' : ` (and ${o.count - 1} more file(s))`}\n` +
+							o.entries
+								.map((e) => `      claimed by  ${e.task ?? '<any task>'}  ${e.path}`)
+								.join('\n')
+					)
+					.join('\n')
+		);
+		failed = true;
+	}
+	if (failed) exit(1);
 
 	if (!full_corpus) return;
 	// The tasks this run actually graded — every task that reached pre-flight,
@@ -1551,6 +1596,13 @@ interface BaselineVersions extends ReportVersions {
  * carries its own, for the combined report, on the same rule; `../tsv.fuz.dev`'s
  * `benchmark_data.ts` mirrors this shape field for field and degrades on an older
  * report, so a bump here is a change there too.
+ *
+ * "A field" means anywhere in the emitted shape, NESTED ONES INCLUDED — a new key
+ * on `Machine` or `CorpusSource` is as much a schema change as a new key on
+ * `Baseline`, and the quieter one, since the `Baseline` field holding it doesn't
+ * move. `Machine` is the case with a second reader: `compose_reports.ts` imports
+ * that type to describe sibling reports written by older benches, so a field added
+ * there is absent from data the composer already reads (see `Machine`).
  *
  * 12: `unavailable[]` entries carry `rows` — the row NAMES each load failure removed
  * from this surface. Every other identity the report publishes is a row name, so the

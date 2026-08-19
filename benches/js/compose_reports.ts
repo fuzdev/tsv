@@ -78,7 +78,16 @@ interface Report {
 	runtime: Runtime;
 	timestamp: string;
 	git_commit: string | null;
-	/** Absent on pre-`version` 7 siblings — the hardware identity behind the numbers. */
+	/**
+	 * Absent on pre-`version` 7 siblings — the hardware identity behind the numbers.
+	 *
+	 * The one field here typed from the PRODUCER's module rather than described
+	 * locally, which buys one definition and costs an assertion: `Machine`'s fields
+	 * are all required, and the siblings on disk may predate any of them. Sound as
+	 * written because the reads below stay inside the four fields `Machine` shipped
+	 * with at `version` 7 — a field added to it later must be read as optional here,
+	 * whatever the shared type says (see `Machine`).
+	 */
 	machine?: Machine;
 	versions: Record<string, string>;
 	entries: Entry[];
