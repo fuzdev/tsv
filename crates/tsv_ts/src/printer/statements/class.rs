@@ -441,8 +441,12 @@ impl<'a> Printer<'a> {
             // Parenthesize an assignment-expression computed key (`[(x = 0)] = 1`)
             // and an `in` key inside a for-header init, exactly like the object
             // computed-key path (shared helper).
-            let key_doc = self.build_computed_key_expr_doc(&prop.key);
-            let (doc, end) = self.build_computed_key_bracket_doc(cursor, &prop.key, key_doc);
+            let (doc, end) = self.build_computed_key_bracket_doc(
+                cursor,
+                &prop.key,
+                Some(super::ParenContext::ComputedPropertyKey),
+                || self.build_computed_key_expr_doc(&prop.key),
+            );
             key_region_end = end;
             parts.push(doc);
         } else {
@@ -732,8 +736,12 @@ impl<'a> Printer<'a> {
             // Parenthesize an assignment-expression computed key (`[(x = 0)]() {}`)
             // and an `in` key inside a for-header init, via the shared object/class
             // computed-key helper.
-            let key_doc = self.build_computed_key_expr_doc(&method.key);
-            let (doc, end) = self.build_computed_key_bracket_doc(cursor, &method.key, key_doc);
+            let (doc, end) = self.build_computed_key_bracket_doc(
+                cursor,
+                &method.key,
+                Some(super::ParenContext::ComputedPropertyKey),
+                || self.build_computed_key_expr_doc(&method.key),
+            );
             key_region_end = end;
             parts.push(doc);
         } else {
