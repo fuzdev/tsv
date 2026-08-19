@@ -6,13 +6,26 @@ use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::{
-    ClassMemberModifiers, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
+    ClassMemberModifiers, ContinuationValue, MemberBlankScan, MemberBody, MemberFloor,
+    MemberFreeze, MemberSeam,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
+
+/// What a class field's value needs to know about its own position, resolved once by
+/// [`Printer::property_value_facts`] and handed to both paths that print that value.
+#[derive(Clone, Copy)]
+struct PropertyValueFacts {
+    /// The `=`→value head's freeze ([`Printer::value_head_frozen_span`]): the span to emit
+    /// verbatim in place of the value's doc.
+    frozen: Option<Span>,
+    /// Whether the position supplies clarity parens ([`Printer::needs_parens`] at
+    /// `ParenContext::DefaultValue`).
+    position_parens: bool,
+}
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a class declaration
@@ -487,6 +500,8 @@ impl<'a> Printer<'a> {
                 .map_or(after_modifier, |ta| ta.span.end);
             let value_start = value.span().start;
             let eq_pos = self.find_equals_position(before_eq, value_start);
+            // Resolved ONCE for both value paths below — see `property_value_facts`.
+            let facts = self.property_value_facts(value, eq_pos);
 
             // A line comment between the LHS and `=` keeps the comment in place and
             // drops `= value` to a continuation line indented one level (preserve —
@@ -494,18 +509,19 @@ impl<'a> Printer<'a> {
             // it to end-of-line and merges the two — conformance_prettier_ts_comments.md
             // §Comment relocation). Bypasses the assignment layout; value built lazily so the
             // common no-comment path is unaffected.
-            let preserve = self.build_initializer_line_continuation(before_eq, eq_pos, || {
-                let value_doc = if self.needs_parens(value, super::ParenContext::DefaultValue) {
-                    d.parens(self.build_expression_doc(value))
-                } else {
-                    self.build_expression_doc(value)
-                };
-                self.prepend_rhs_comments(value_doc, eq_pos + 1, value_start)
-            });
+            let preserve = self.build_initializer_line_continuation(
+                before_eq,
+                eq_pos,
+                ContinuationValue::Expression(value),
+                || {
+                    let value_doc = self.build_property_value_doc(value, facts);
+                    self.prepend_rhs_comments(value_doc, eq_pos + 1, value_start)
+                },
+            );
             if let Some(cont) = preserve {
                 parts.push(cont);
             } else {
-                self.build_property_assignment_layout(&mut parts, before_eq, eq_pos, value);
+                self.build_property_assignment_layout(&mut parts, before_eq, eq_pos, value, facts);
             }
         }
 
@@ -525,16 +541,61 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// The `=`→value freeze verdict and the position's clarity-paren answer for a class
+    /// field's value, resolved together.
+    ///
+    /// Both are properties of the VALUE and its position — the `=`→value gap's *content*
+    /// cannot change either — so the two paths that print a field's value ask once, at the
+    /// caller, and are handed the answer. Resolving them independently is how the
+    /// continuation arm (taken when a comment precedes the `=`) came to print an
+    /// unparenthesized, **unfrozen** value where the ordinary arm below printed a
+    /// parenthesized, frozen one: `p = // c⏎bbb = ccc` against `p = /* c */ (bbb  =  ccc)`,
+    /// the directive's whole effect gone at the first spelling.
+    fn property_value_facts(
+        &self,
+        value: &internal::Expression<'_>,
+        eq_pos: u32,
+    ) -> PropertyValueFacts {
+        PropertyValueFacts {
+            frozen: self.value_head_frozen_span(eq_pos + 1, value.span()),
+            position_parens: self.needs_parens(value, super::ParenContext::DefaultValue),
+        }
+    }
+
+    /// A class field's value doc: the verbatim slice where its `=`→value gap froze it, else
+    /// the ordinary expression doc, inside the clarity parens the position supplies
+    /// (`a = (this.a = b);` — built manually like object property values, since the layout
+    /// chooser takes the bare expression).
+    fn build_property_value_doc(
+        &self,
+        value: &internal::Expression<'_>,
+        facts: PropertyValueFacts,
+    ) -> DocId {
+        let doc = match facts.frozen {
+            Some(frozen) => self.build_frozen_expression_doc(value, frozen),
+            None => self.build_expression_doc(value),
+        };
+        if facts.position_parens {
+            self.d().parens(doc)
+        } else {
+            doc
+        }
+    }
+
     /// Emit a class property's `= value` layout into `parts` (which already holds the
     /// property's LHS). The line-comment-before-`=` fast path is handled by the caller;
     /// this covers before-`=` block comments, a line comment after `=`, and the
     /// no-comment / inline-block assignment layout.
+    ///
+    /// `facts` is resolved by the caller and shared with that fast path — see
+    /// [`Self::property_value_facts`] for why the two arms must be handed one answer.
     fn build_property_assignment_layout(
         &self,
         parts: &mut DocBuf,
         before_eq: u32,
         eq_pos: u32,
         value: &internal::Expression<'_>,
+        facts: PropertyValueFacts,
     ) {
         let d = self.d();
         let value_start = value.span().start;
@@ -544,12 +605,11 @@ impl<'a> Printer<'a> {
             parts.push(self.build_inline_comments_between_doc(before_eq, eq_pos));
         }
 
-        // The `=`→value head: an own-line directive there freezes the whole value.
-        let value_frozen = self.value_head_frozen_span(eq_pos + 1, value.span());
-        let build_value = || match value_frozen {
-            Some(frozen) => self.build_frozen_expression_doc(value, frozen),
-            None => self.build_expression_doc(value),
-        };
+        let PropertyValueFacts {
+            frozen: value_frozen,
+            position_parens,
+        } = facts;
+        let build_value = || self.build_property_value_doc(value, facts);
 
         // Comments after `=`
         if self.has_line_comments_between(eq_pos + 1, value_start) {
@@ -568,11 +628,8 @@ impl<'a> Printer<'a> {
             // test → BreakAfterOperator).
             let rhs_comments = self.build_value_gap_comments_opt(eq_pos + 1, value_start);
             let left_doc = d.concat(&parts[..]);
-            // An assignment value keeps its parens (`a = (this.a = b);`) —
-            // built manually like object property values, since the layout
-            // chooser takes the bare expression
-            let assignment_doc = if self.needs_parens(value, super::ParenContext::DefaultValue) {
-                let value_doc = d.parens(build_value());
+            let assignment_doc = if position_parens {
+                let value_doc = build_value();
                 let value_doc = match rhs_comments {
                     Some(comments_doc) => d.concat(&[comments_doc, value_doc]),
                     None => value_doc,

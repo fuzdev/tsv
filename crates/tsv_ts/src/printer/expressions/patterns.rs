@@ -12,7 +12,8 @@ use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternPro
 use crate::printer::comments::next_real_element_start;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
-    CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
+    CommentVec, ContinuationValue, ParenContext, PatternContext, Printer,
+    object_pattern_should_expand,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -184,19 +185,34 @@ impl<'a> Printer<'a> {
         // multiline block this gate reads. Bypasses the assignment-layout selection;
         // the value is built lazily so the common path is unaffected.
         if let Some(op_pos) = op_pos
-            && let Some(continuation) =
-                self.build_operator_value_continuation(rhs_comment_start, op_pos, operator, || {
-                    let value_doc = self.build_expression_doc_with_paren_comments(
-                        assign.right,
-                        assign.span.end,
-                        false,
-                    );
-                    self.prepend_rhs_comments(
-                        value_doc,
-                        op_pos + operator.len() as u32,
-                        rhs_comment_end,
-                    )
-                })
+            && let Some(continuation) = self.build_operator_value_continuation(
+                rhs_comment_start,
+                op_pos,
+                operator,
+                ContinuationValue::Expression(assign.right),
+                || {
+                    // The operator→RHS head freezes here exactly as it does on the
+                    // ordinary path below — this arm decides where the operator and
+                    // its value SIT, not what the value is. Skipping the verdict let
+                    // an honored directive through with its effect silently dropped.
+                    let gap_start = op_pos + operator.len() as u32;
+                    let value_doc =
+                        match self.value_head_frozen_span(gap_start, assign.right.span()) {
+                            Some(frozen) => self.build_frozen_value_shell_doc(
+                                assign.right,
+                                frozen,
+                                assign.span.end,
+                                false,
+                            ),
+                            None => self.build_expression_doc_with_paren_comments(
+                                assign.right,
+                                assign.span.end,
+                                false,
+                            ),
+                        };
+                    self.prepend_rhs_comments(value_doc, gap_start, rhs_comment_end)
+                },
+            )
         {
             return d.concat(&[left_doc, continuation]);
         }
@@ -338,7 +354,10 @@ impl<'a> Printer<'a> {
         // reaches the shape. Take it with the chain layout, not as a patch.
         // Build right doc for paths that handle layout directly
         let right_doc = if let Some(frozen) = rhs_frozen {
-            self.build_frozen_expression_doc(assign.right, frozen)
+            // The same shell the unfrozen arm two lines down builds, over the slice — the
+            // RHS's grouping `)` sits past the slice's end, so its interior comment has no
+            // other emitter (`Printer::build_frozen_value_shell_doc`).
+            self.build_frozen_value_shell_doc(assign.right, frozen, assign.span.end, false)
         } else if let Expression::AssignmentExpression(rhs_assign) = assign.right {
             self.build_assignment_doc_with_context(rhs_assign, AssignmentContext::Chain)
         } else {

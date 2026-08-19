@@ -576,9 +576,16 @@ pub fn comments_in_source_after(comments: &[Comment], pos: u32) -> impl Iterator
 /// answer is a pure function of the source bytes and the comment array, and a second
 /// copy is exactly the drift the shared-emitter rule exists to prevent.
 ///
-/// `CommentGlue::SameLine` mirrors the parser's own binding scan — only a glued block
-/// comment is bound to its token — so `owned ⇒ is_block` holds and a line comment is
-/// never returned.
+/// ⚠️ **The scan LOCATES; [`Comment::owned_by_node`] DECIDES.** Ownership has two
+/// producers with two different glues — the general rule binds a block comment glued on
+/// the token's own line, while a JSDoc cast owns its comment even from the line **above**
+/// its `(` — so a locator spelling only one of them cannot find everything the flag
+/// marks. `CommentGlue::AnyLine` is the union, and the flag then rejects the ordinary
+/// own-line block that is nobody's: asking `SameLine` here instead made a frozen cast's
+/// comment owned-but-unprintable, which is hazard 1 exactly (`const a =⏎//
+/// prettier-ignore⏎/** @type {T} */⏎(b  =  c);` lost the annotation outright).
+/// `owned ⇒ is_block` still holds — both producers bind blocks only — so a line comment
+/// is never returned.
 pub fn owned_leading_comment_at<'c>(
     source: &str,
     comments: &'c [Comment],
@@ -588,7 +595,7 @@ pub fn owned_leading_comment_at<'c>(
     let glued_end = source_scan::block_comment_end_before(
         source.as_bytes(),
         start as usize,
-        source_scan::CommentGlue::SameLine,
+        source_scan::CommentGlue::AnyLine,
     )?;
 
     let idx = comments

@@ -15,6 +15,44 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
+/// What follows the operator in a
+/// [`Printer::build_operator_value_continuation`] tail — everything that seam needs to
+/// answer its separator question, in one value so a caller cannot supply half of it.
+///
+/// The gap's far bound and "does the value's own doc lead with an own-line JSDoc cast"
+/// are two readings of the same value, and passing the bound alone is what let the cast
+/// go unseen: the gap's to-emit lookup skips an owned comment, so an empty answer there
+/// means "nothing *the gap* prints", never "nothing prints".
+#[derive(Clone, Copy)]
+pub(crate) enum ContinuationValue<'e, 'ast> {
+    /// An ordinary expression value. Its span start bounds the gap, and its doc may lead
+    /// with a comment it OWNS — which no gap lookup can see.
+    Expression(&'e internal::Expression<'ast>),
+    /// A value that owns no comment and is not an expression — a type alias's RHS, whose
+    /// gap is bounded by the start alone.
+    Opaque(u32),
+}
+
+impl ContinuationValue<'_, '_> {
+    /// The operator→value gap's far bound: where the value's own first token begins.
+    fn gap_end(self) -> u32 {
+        match self {
+            Self::Expression(expr) => expr.span().start,
+            Self::Opaque(start) => start,
+        }
+    }
+
+    /// Whether the value's own doc opens with a JSDoc cast's comment on a line of its own —
+    /// the one owned shape that prints its own hardline
+    /// ([`Printer::is_own_line_jsdoc_cast`]).
+    fn leads_with_own_line_jsdoc_cast(self, printer: &Printer<'_>) -> bool {
+        match self {
+            Self::Expression(expr) => printer.is_own_line_jsdoc_cast(expr),
+            Self::Opaque(_) => false,
+        }
+    }
+}
+
 /// How one heritage inter-item gap splits between the preceding item's doc and the
 /// join separator. The gap holds a comma, any comments, and the break to the next
 /// item; which of those the item's doc already emitted decides what the separator
@@ -521,9 +559,10 @@ impl<'a> Printer<'a> {
         &self,
         name_end: u32,
         eq_pos: u32,
+        value: ContinuationValue<'_, '_>,
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
-        self.build_operator_value_continuation(name_end, eq_pos, "=", build_value)
+        self.build_operator_value_continuation(name_end, eq_pos, "=", value, build_value)
     }
 
     /// [`Self::build_initializer_line_continuation`] for a gap whose separator is not
@@ -536,19 +575,67 @@ impl<'a> Printer<'a> {
     /// author put *before* a separator stays there, and the separator's tail takes
     /// the continuation line. Keeping the `=` sites on the named wrapper keeps their
     /// call sites reading as the initializer rule they are.
+    ///
+    /// ⚠️ **The operator→value gap keeps its OWN rule inside this tail.** `value` is there
+    /// for one question: does what `build_value` prints begin on the operator's line, or on
+    /// a line of its own? A comment the author gave its own line keeps it here exactly as it
+    /// does when nothing precedes the operator
+    /// ([`Self::build_eq_comment_break_rhs`]'s partition, the same gap's other emitter) —
+    /// gluing it to the operator with an unconditional space made this arm the family's
+    /// lone dissenter, and for an honored `prettier-ignore` it was worse than a layout
+    /// difference: a directive trailing the operator is **inert** under tsv's own floor,
+    /// so the next pass read no freeze, normalized the value, and the directive's whole
+    /// effect vanished with no gate firing.
+    ///
+    /// ⚠️ **The tail is GROUPED, and that is what keeps the rest of the gap's rule intact.**
+    /// The hanging run this indents ends in a hardline, so an ungrouped tail hands every
+    /// soft `line` in it a broken group and renders it as a break — which turned the value
+    /// gap's own pull-up off inside the continuation alone (`= /* c */⏎v` stayed broken here
+    /// while the ordinary arm collapsed it, as prettier does). Grouping scopes the width
+    /// decision to the tail, where the gap's `line`s are the only ones that answer to it.
     pub(crate) fn build_operator_value_continuation(
         &self,
         head_end: u32,
         op_pos: u32,
         op_text: &'static str,
+        value: ContinuationValue<'_, '_>,
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
         let d = self.d();
         self.comments_force_own_line_between(head_end, op_pos)
             .then(|| {
-                let tail = d.concat(&[d.text(op_text), d.text(" "), build_value()]);
+                let separator = if self.operator_gap_run_is_own_line(op_pos, value) {
+                    d.hardline()
+                } else {
+                    d.text(" ")
+                };
+                let tail = d.group(d.concat(&[d.text(op_text), separator, build_value()]));
                 self.build_continuation_indent(head_end, op_pos, tail)
             })
+    }
+
+    /// Whether what the operator→value gap prints first sits on a line of its own rather
+    /// than on the operator's — the separator question
+    /// [`Self::build_operator_value_continuation`] asks, and the same partition test
+    /// [`Self::build_eq_comment_break_rhs`] applies per comment.
+    ///
+    /// Only the FIRST comment is asked: everything after it takes the leading run's own
+    /// separators (`build_value_gap_comments_opt`), which already read each comment's own
+    /// neighbours.
+    ///
+    /// ⚠️ **An empty gap on the to-emit axis is not an empty gap.** An owned comment prints
+    /// from inside the value's own doc, so it is skipped here — and for the one owned shape
+    /// that prints on a line of its own, the **JSDoc cast** ([`Self::is_own_line_jsdoc_cast`],
+    /// which supplies the hardline between its comment and its `(`), a space separator leaves
+    /// that `(` stranded at the continuation's indent with the annotation welded to the
+    /// operator. Every other owned comment is glued to its token and prints inline
+    /// (`= /* c */ v`, the ordinary arm's answer too), so the emit-axis reading is right for
+    /// it — which is why this asks the cast by name rather than widening to the on-page axis.
+    fn operator_gap_run_is_own_line(&self, op_pos: u32, value: ContinuationValue<'_, '_>) -> bool {
+        match comments_to_emit_in_range(self.comments, op_pos, value.gap_end()).next() {
+            Some(first) => !self.is_same_line(op_pos, first.span.start),
+            None => value.leads_with_own_line_jsdoc_cast(self),
+        }
     }
 
     /// Build the value side of a pattern's `=`/`:` gap that holds comments: the

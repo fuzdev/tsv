@@ -18,6 +18,14 @@ authoring keeps its line (`input.svelte`):
 formatter divergence to pin (no `output_prettier.svelte`), and this shape must stay
 untouched by the hugging heads' reflow.
 
+**And by the freeze.** The `dd` / `gg` cases are the same two authorings under an honored
+`prettier-ignore` in the same gap. A freeze replaces the value's doc with a verbatim slice
+that starts at the cast's `(`, so the slice owes the owned comment its claim — and that
+claim owes the author's **separator**, not a constant space. Writing the space
+unconditionally welded the annotation onto the `(`'s line, relocating a comment the
+unfrozen `bb` case two lines up leaves alone; it is a fixed point, so no gate sees it. Same
+rule, same reason as `tsv_ts`'s `prepend_owned_leading_comment_at`.
+
 **Parser (vs Svelte).** Svelte parses the init with `preserveParens: true`, then
 `remove_parens` discards the wrapper **and its `leadingComments`**, so the cast comment
 survives only in the root `comments` array. tsv (no `ParenthesizedExpression` node)

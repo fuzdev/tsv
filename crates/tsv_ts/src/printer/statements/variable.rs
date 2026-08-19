@@ -4,8 +4,8 @@ use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
-    CommentFilter, CommentSpacing, CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext,
-    analysis, class_expr_has_decorators, conditional_should_break_after_op,
+    CommentFilter, CommentSpacing, CommentVec, ContinuationValue, LeadingGlue, OwnedCommentEffect,
+    ParenContext, analysis, class_expr_has_decorators, conditional_should_break_after_op,
     is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
     is_literal_member_chain, is_module_path_fluid_call, is_multiline_string_literal,
     is_poorly_breakable_chain, is_pure_property_chain, is_regex_root_chain,
@@ -67,15 +67,22 @@ impl<'a> Printer<'a> {
         boundary_end: u32,
         frozen: Option<Span>,
     ) -> DocId {
-        if let Some(frozen) = frozen {
-            return self.build_frozen_value_doc(init, frozen, ParenContext::VariableInit);
+        // Declarator init — an `ancestorNameMap` value position. A frozen value takes the
+        // same shell (its slice replaces the expression doc, nothing else); only the
+        // ternary mark is unfrozen-only, since a verbatim slice takes no layout from it.
+        if frozen.is_none() {
+            self.mark_ternary_extra_indent(init);
         }
-        // Declarator init — an `ancestorNameMap` value position.
-        self.mark_ternary_extra_indent(init);
         let position_parens =
             needs_parens(init, ParenContext::VariableInit, self.in_for_init.get());
-        let inner =
-            self.build_expression_doc_with_paren_comments(init, boundary_end, position_parens);
+        let inner = match frozen {
+            Some(frozen) => {
+                self.build_frozen_value_shell_doc(init, frozen, boundary_end, position_parens)
+            }
+            None => {
+                self.build_expression_doc_with_paren_comments(init, boundary_end, position_parens)
+            }
+        };
         self.wrap_value_position_parens(init, boundary_end, position_parens, inner)
     }
 
@@ -409,15 +416,22 @@ impl<'a> Printer<'a> {
                 // (the comma/separator is handled above, the `;` after the loop), so a
                 // plain push + `continue` is safe.
                 if has_comments_before_eq
-                    && let Some(cont) =
-                        self.build_initializer_line_continuation(id_end, equals_pos, || {
-                            let value_doc = self.build_expression_doc_with_paren_comments(
-                                init,
-                                declarator.span.end,
-                                false,
-                            );
+                    && let Some(cont) = self.build_initializer_line_continuation(
+                        id_end,
+                        equals_pos,
+                        ContinuationValue::Expression(init),
+                        || {
+                            // The declarator's own value builder, exactly as every other
+                            // layout branch below spells it: this arm changes where the `=`
+                            // and its value SIT, not what the value is. Building the bare
+                            // expression here instead dropped the position's clarity parens
+                            // (`const a // c⏎= b = c`) and skipped the freeze outright, so a
+                            // `prettier-ignore` in the gap silently normalized its value.
+                            let value_doc =
+                                self.build_init_value_doc(init, declarator.span.end, init_frozen);
                             self.prepend_rhs_comments(value_doc, equals_pos + 1, init_start)
-                        })
+                        },
+                    )
                 {
                     parts.push(id_doc);
                     parts.push(cont);

@@ -1112,6 +1112,7 @@ impl<'a> Printer<'a> {
                 right_expr,
                 frozen,
                 rhs_info.comments,
+                rhs_info.boundary,
             );
         }
         let mut layout = choose_layout(
@@ -1321,9 +1322,15 @@ impl<'a> Printer<'a> {
     ///
     /// Always this one layout — the directive is alone on its line, so the run ends in a
     /// hardline and no width-decided form could keep the value beside the operator anyway.
-    /// The slice replaces the RHS's doc, so no paren shell is added here: the ordinary path
-    /// leaves that to the caller too (an object property and a class field each apply
+    /// The slice replaces the RHS's doc, so no POSITION paren is added here: the ordinary
+    /// path leaves that to the caller too (an object property and a class field each apply
     /// their own `needs_parens` before choosing this layout).
+    ///
+    /// `boundary` is the gap the RHS's own grouping shell lives in
+    /// (`RhsCommentInfo::boundary`), threaded for exactly the reason the ordinary path
+    /// threads it: the shell's `)` is past the slice's end, so a comment written inside it
+    /// reaches no other emitter ([`Printer::build_frozen_value_shell_doc`]). `None` at a
+    /// host that scans no shell, where the plain slice is the whole emission.
     fn build_frozen_assignment_doc(
         &self,
         left_doc: DocId,
@@ -1331,9 +1338,15 @@ impl<'a> Printer<'a> {
         right_expr: &Expression<'_>,
         frozen: Span,
         comments: Option<DocId>,
+        boundary: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let frozen_doc = self.build_frozen_expression_doc(right_expr, frozen);
+        let frozen_doc = match boundary {
+            Some(boundary) => {
+                self.build_frozen_value_shell_doc(right_expr, frozen, boundary, false)
+            }
+            None => self.build_frozen_expression_doc(right_expr, frozen),
+        };
         let rhs = match comments {
             Some(comments_doc) => d.concat(&[comments_doc, frozen_doc]),
             None => frozen_doc,

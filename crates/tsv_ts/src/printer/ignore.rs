@@ -787,6 +787,16 @@ impl<'a> Printer<'a> {
     /// The must-break rides in the doc ([`Self::build_frozen_span_doc`]): every layout in
     /// this family is width-decided, and a `verbatim_source_span` is `will_break`-opaque,
     /// so a multi-line frozen item has to say so explicitly.
+    ///
+    /// ⚠️ **This emits the pair and nothing else, so it is only for a position whose
+    /// ENCLOSING seam claims the slice→`)` gap** — an argument or element (the element-comma
+    /// seam), a statement test, a binding default. Those all float such a comment out past
+    /// the `)`, which is what their unfrozen twins do too. A position that owns everything
+    /// inside its own boundary — a declarator initializer, an assignment RHS — must take
+    /// [`Self::build_frozen_value_shell_doc`] instead: nothing out there can see between the
+    /// parens, so a bare pair leaves that gap with no emitter and DROPS the comment
+    /// (`docs/comments.md` hazard 4), which is what both of those hosts did while they
+    /// spelled the bare pair here.
     pub(in crate::printer) fn build_frozen_value_doc(
         &self,
         value: &internal::Expression<'_>,

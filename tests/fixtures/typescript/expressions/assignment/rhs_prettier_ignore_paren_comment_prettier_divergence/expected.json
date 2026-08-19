@@ -1,0 +1,591 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 534,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A frozen assignment RHS answers the slice→`)` gap exactly as a frozen declarator",
+			"start": 20,
+			"end": 103,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " initializer does — one rule, two hosts. A `//` retains the shell on its own account.",
+			"start": 105,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 202,
+			"end": 220,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 240,
+			"end": 244,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 15
+				},
+				"end": {
+					"line": 7,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A frozen sequence supplies its own required parens, and the gap is inside them.",
+			"start": 252,
+			"end": 334,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 344,
+			"end": 362,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 376,
+			"end": 383,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 13
+				},
+				"end": {
+					"line": 13,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A shell the frozen value does not need strips, and the block defers past the `;`.",
+			"start": 388,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 482,
+			"end": 500,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 516,
+			"end": 523,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 15
+				},
+				"end": {
+					"line": 18,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 533,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 524,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 194,
+					"end": 249,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 194,
+						"end": 248,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 3
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 194,
+							"end": 197,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 4
+								}
+							},
+							"name": "aaa"
+						},
+						"right": {
+							"type": "AssignmentExpression",
+							"start": 228,
+							"end": 239,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 3
+								},
+								"end": {
+									"line": 7,
+									"column": 14
+								}
+							},
+							"operator": "=",
+							"left": {
+								"type": "Identifier",
+								"start": 228,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 3
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"name": "bbb"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 236,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 14
+									}
+								},
+								"name": "ccc"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 202,
+									"end": 220
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 240,
+									"end": 244
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen assignment RHS answers the slice→`)` gap exactly as a frozen declarator",
+							"start": 20,
+							"end": 103
+						},
+						{
+							"type": "Line",
+							"value": " initializer does — one rule, two hosts. A `//` retains the shell on its own account.",
+							"start": 105,
+							"end": 192
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 336,
+					"end": 385,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 22
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 336,
+						"end": 384,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 21
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 336,
+							"end": 339,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 4
+								}
+							},
+							"name": "ddd"
+						},
+						"right": {
+							"type": "SequenceExpression",
+							"start": 366,
+							"end": 375,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 3
+								},
+								"end": {
+									"line": 13,
+									"column": 12
+								}
+							},
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 366,
+									"end": 369,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 3
+										},
+										"end": {
+											"line": 13,
+											"column": 6
+										}
+									},
+									"name": "eee"
+								},
+								{
+									"type": "Identifier",
+									"start": 372,
+									"end": 375,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 9
+										},
+										"end": {
+											"line": 13,
+											"column": 12
+										}
+									},
+									"name": "fff"
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 344,
+									"end": 362
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 376,
+									"end": 383
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen sequence supplies its own required parens, and the gap is inside them.",
+							"start": 252,
+							"end": 334
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 474,
+					"end": 515,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 474,
+						"end": 514,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 13
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 474,
+							"end": 477,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 1
+								},
+								"end": {
+									"line": 16,
+									"column": 4
+								}
+							},
+							"name": "ggg"
+						},
+						"right": {
+							"type": "AssignmentExpression",
+							"start": 503,
+							"end": 514,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 2
+								},
+								"end": {
+									"line": 18,
+									"column": 13
+								}
+							},
+							"operator": "=",
+							"left": {
+								"type": "Identifier",
+								"start": 503,
+								"end": 506,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 5
+									}
+								},
+								"name": "hhh"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 511,
+								"end": 514,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 10
+									},
+									"end": {
+										"line": 18,
+										"column": 13
+									}
+								},
+								"name": "iii"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 482,
+									"end": 500
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A shell the frozen value does not need strips, and the block defers past the `;`.",
+							"start": 388,
+							"end": 472
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 516,
+							"end": 523
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

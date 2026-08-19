@@ -7,8 +7,8 @@ use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::statements::StatementContext;
 use crate::printer::{
-    CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext, Printer, RunLeadingBlank,
-    needs_parens,
+    CommentVec, ContinuationValue, LeadingGlue, OwnedCommentEffect, ParenContext, Printer,
+    RunLeadingBlank, needs_parens,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -1882,9 +1882,18 @@ impl<'a> Printer<'a> {
                         let before_eq = self.has_comments_to_emit_between(id_end, eq_pos);
                         let continuation = before_eq
                             .then(|| {
-                                self.build_initializer_line_continuation(id_end, eq_pos, || {
-                                    self.prepend_rhs_comments(build_value(), eq_pos + 1, init_start)
-                                })
+                                self.build_initializer_line_continuation(
+                                    id_end,
+                                    eq_pos,
+                                    ContinuationValue::Expression(init),
+                                    || {
+                                        self.prepend_rhs_comments(
+                                            build_value(),
+                                            eq_pos + 1,
+                                            init_start,
+                                        )
+                                    },
+                                )
                             })
                             .flatten();
                         if let Some(cont) = continuation {
