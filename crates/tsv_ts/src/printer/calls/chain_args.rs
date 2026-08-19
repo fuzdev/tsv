@@ -1020,9 +1020,13 @@ fn build_chain_args_single(
         && has_newline_before_position(printer.source, arg_start);
 
     if template_on_own_line {
-        let arg_doc = printer.build_expression_doc(arg);
+        // `arg_with_comments`, per the ⚠️ above — this arm rebuilt the argument from
+        // `build_expression_doc` instead, which is the same defect one step further:
+        // it discarded the gap runs AND the argument-context printing. Every comment
+        // around such an argument was DROPPED (`o.toBe(/* c */⏎\`a⏎b\`)` and its
+        // trailing twin), at the one call layout that reassembles rather than splices.
         parts.push(d.text(prefix));
-        parts.push(d.indent_hardline(arg_doc));
+        parts.push(d.indent_hardline(arg_with_comments));
         parts.push(d.hardline());
         parts.push(d.text(")"));
         return d.concat(&parts);

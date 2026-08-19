@@ -72,5 +72,19 @@ inline.
 A **block** comment forces nothing (`x /* c11 */ as A` stays inline without parens,
 matching prettier) — it is pinned here as the control for the line-comment rule.
 
+The gap the printer scans runs to the **keyword**, so it spans the `)` and holds
+**two** runs belonging to two emitters: the pair's own, and — past the `)` — the
+enclosing gap's. Both are emitted where they were written (`(⏎x // c20⏎) /* c21 */ as A`),
+and the split is the outermost `)`, so a comment between two nested closers is
+inside the one pair that survives the collapse. Only a single-line block can be
+outside: anything occupying a second line there puts a line terminator before the
+keyword, which is unparseable. Reading the window as one run instead is what the
+earlier gate did — it asked whether a `)` followed the *last* comment, so one
+comment written outside the pair flipped the whole question false and the shell
+emitted **nothing**, dropping the run inside the pair along with it. Where no
+leading comment forced the shell, the same reading produced output that does not
+re-parse: `(⏎x // c20⏎) /* c21 */ as A` became `x // c20⏎/* c21 */ as A`, whose
+line break before `as` ends the expression.
+
 See
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

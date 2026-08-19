@@ -1089,8 +1089,17 @@ impl<'a> Printer<'a> {
                     TrailingBlock::Inline,
                 ));
             } else if let TSType::Parenthesized(p) = t
-                && let TSType::Union(inner_union) = p.type_annotation
-                && self.paren_has_leading_line_comment(p)
+                // ⚠️ Both halves read THROUGH the author's extra layers, because the
+                // ROUTER above does ([`Self::union_member_paren_leading_line_comment`])
+                // and a member it routed here must find an emitter. A direct-child match
+                // plus the shallow one-paren window missed `X | ((// c⏎A | B))`: the run
+                // fell to the default arm, whose `ShellLeadingRun::Upstream` licence is
+                // granted on an upstream emitter EXISTING — this arm — so nothing printed
+                // it and the comment was DROPPED. The pair the shells collapse into is
+                // the outermost, and `build_parenthesized_union_doc`'s window already
+                // spans from it to the union, so any nesting depth emits the whole run.
+                && let TSType::Union(inner_union) = unwrap_parenthesized(t)
+                && self.stripped_paren_hang_has_leading_line_comment(t)
             {
                 // `first_leading` is non-empty only for the first member (see its
                 // declaration); a later member's leading comments were emitted on their
