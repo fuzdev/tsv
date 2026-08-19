@@ -5,12 +5,12 @@
 	}
 
 	/* comment after the An+B (part of the expression text, kept verbatim) */
-	li:nth-child(2n /* c2 */) {
+	li:nth-child(2n/* c2 */) {
 		color: blue;
 	}
 
-	/* a comment freezes the An+B text verbatim - no operator respacing inside it */
-	li:nth-child(2n + 1 /* a-b */) {
+	/* the operator respacing runs with the comment opaque to it - content untouched */
+	li:nth-child(2n+1 /* a-b */) {
 		color: green;
 	}
 

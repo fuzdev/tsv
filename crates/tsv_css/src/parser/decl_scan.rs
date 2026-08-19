@@ -33,7 +33,7 @@
 // on the verdict because paren depth evolves identically in each.
 
 use super::CssParser;
-use crate::comments::comment_end_checked;
+use crate::comments::{comment_end_checked, is_comment_start};
 use crate::lexer::{
     IDENT_CONTINUE_LUT, Lexer, TokenKind, is_ascii_css_whitespace, string_end, url_arg_is_quoted,
     url_token_close,
@@ -202,7 +202,7 @@ fn scan_rule_or_declaration_and_value_bytes(source: &str, from: usize) -> Option
                 i += 1;
                 break;
             }
-            b'/' if bytes.get(i + 1) == Some(&b'*') => i = comment_end_checked(bytes, i)?,
+            b'/' if is_comment_start(bytes, i) => i = comment_end_checked(bytes, i)?,
             // The caller settled that a `:` follows; anything else means the bytes disagree
             // with the token lookahead, so decline to the reference walk rather than guess.
             _ => return None,
@@ -318,7 +318,7 @@ fn peek_significant_kind_bytes(bytes: &[u8], from: usize) -> Option<TokenKind> {
         }
         match bytes.get(i)? {
             b':' => return Some(TokenKind::Colon),
-            b'/' if bytes.get(i + 1) == Some(&b'*') => i = comment_end_checked(bytes, i)?,
+            b'/' if is_comment_start(bytes, i) => i = comment_end_checked(bytes, i)?,
             _ => return None,
         }
     }
@@ -486,7 +486,7 @@ fn scan_value_core<const WANT_VERDICT: bool>(
             },
             // A string the lexer would reject (unterminated / trailing `\`) declines.
             b'"' | b'\'' => i = string_end(bytes, i).ok()?,
-            b'/' if bytes.get(i + 1) == Some(&b'*') => {
+            b'/' if is_comment_start(bytes, i) => {
                 has_comment = true;
                 i = comment_end_checked(bytes, i)?;
             }
@@ -597,7 +597,7 @@ fn skip_trivia(bytes: &[u8], from: usize, to: usize) -> usize {
     while i < to {
         if is_ascii_css_whitespace(bytes[i]) {
             i += 1;
-        } else if bytes[i] == b'/' && bytes.get(i + 1) == Some(&b'*') {
+        } else if is_comment_start(bytes, i) {
             match comment_end_checked(bytes, i) {
                 Some(end) => i = end,
                 None => return to,
