@@ -414,9 +414,12 @@ impl<'a> Printer<'a> {
         let key_region_end;
         let key_doc = if prop.computed {
             // Assignment expressions need parens in computed keys: {[(a = b)]: c}
-            let key_expr_doc = self.build_computed_key_expr_doc(&prop.key);
-            let (doc, end) =
-                self.build_computed_key_bracket_doc(prop.span.start, &prop.key, key_expr_doc);
+            let (doc, end) = self.build_computed_key_bracket_doc(
+                prop.span.start,
+                &prop.key,
+                Some(super::ParenContext::ComputedPropertyKey),
+                || self.build_computed_key_expr_doc(&prop.key),
+            );
             key_region_end = end;
             doc
         } else {
@@ -879,8 +882,14 @@ impl<'a> Printer<'a> {
         computed: bool,
     ) -> (DocId, u32) {
         if computed {
-            let key_doc = self.build_expression_doc(key);
-            self.build_computed_key_bracket_doc(search_start, key, key_doc)
+            // Deliberately NOT `build_computed_key_expr_doc`: a TYPE member's computed key
+            // takes no clarity parens — prettier emits `{ [a = 0]: A }` bare where the value
+            // spellings print `{ [(a = 0)]: 1 }` (pinned by `types/computed_key_grammar`).
+            // Hence the `None` shell below: the frozen arm must reproduce what THIS position's
+            // ordinary builder emits, not what its neighbours do.
+            self.build_computed_key_bracket_doc(search_start, key, None, || {
+                self.build_expression_doc(key)
+            })
         } else {
             (self.build_property_key_doc(key), key.span().end)
         }
@@ -921,22 +930,32 @@ impl<'a> Printer<'a> {
     /// Used by object properties/methods, class methods/properties, destructuring
     /// patterns, and interface/type-literal members (via `build_type_member_key_doc`).
     ///
-    /// `[`→key comment placement: a block comment hugs `[` inline (`[/* c */ foo]`)
-    /// and the bracket stays flat; a **line** comment can't sit inline before the
-    /// key (a `//` runs to EOL and would swallow it), so it forces the bracket to
-    /// break — preserved where the author wrote it (on the `[` line via
+    /// `[`→key comment placement: a block comment the author GLUED to the key hugs `[`
+    /// inline (`[/* c */ foo]`) and the bracket stays flat; a **line** comment can't sit
+    /// inline before the key (a `//` runs to EOL and would swallow it), and a block the
+    /// author gave its OWN LINE keeps that line — both force the bracket to break,
+    /// preserved where the author wrote it (on the `[` line via
     /// `delimiter_line_comment_prefix`, or on its own line) with the key dropped to
     /// an indented continuation. Prettier relocates such a comment (out to the
     /// member's leading line, or glued flush to the key) — a divergence
     /// (conformance_prettier_ts_comments.md §Comment relocation, "Object/array/block
-    /// open-delimiter trailing"). A computed key never breaks on width alone
-    /// (prettier keeps a long key inline), so the flat, no-line-comment path stays
-    /// verbatim — only a `[`→key line comment switches to the breaking layout.
+    /// open-delimiter trailing"). A computed key never breaks on WIDTH alone
+    /// (prettier keeps a long key inline), so a comment is the only thing that opens
+    /// the brackets.
+    ///
+    /// `ordinary` builds the key when nothing freezes it, taken lazily so a directive-free
+    /// document never pays for a doc the freeze would discard. `key_paren_shell` is the
+    /// clarity-paren context that same builder applies — `None` where it applies none — so
+    /// the frozen slice re-synthesizes exactly the shell the caller's own position would
+    /// have emitted. It is a parameter rather than a constant because the five hosts do NOT
+    /// agree: an object property, class field, class method and destructuring pattern
+    /// parenthesize an assignment key, and a **type-literal member** does not.
     pub(in crate::printer) fn build_computed_key_bracket_doc(
         &self,
         search_start: u32,
         key: &Expression<'_>,
-        key_doc: DocId,
+        key_paren_shell: Option<super::ParenContext>,
+        ordinary: impl FnOnce() -> DocId,
     ) -> (DocId, u32) {
         let d = self.d();
         let key_start = key.span().start;
@@ -944,13 +963,66 @@ impl<'a> Printer<'a> {
         let bracket_start = self.find_opening_bracket_after(search_start, key_start);
         let bracket_end = self.find_closing_bracket_after(key_end);
 
+        // The `[`→key value head ([`Printer::value_head_frozen_span`]): an own-line directive
+        // in the gap freezes the whole KEY. The brackets are the property's own and stay
+        // outside the slice, as does any pair the key requires — which is why the frozen arm
+        // names `ComputedPropertyKey` even where the caller's ordinary doc did not: every
+        // host here IS a computed key, and the paren rule is the position's, not the
+        // caller's. `ordinary` is taken lazily so a directive-free document never builds a
+        // doc the freeze would discard.
+        //
+        // Resolved BEFORE the layout choice below, not inside it: the flat arm hugs the run
+        // onto the key's line, which is the placement the floor calls inert, so a BLOCK
+        // directive would lose its freeze on the next pass. (A line directive already forces
+        // the breaking arm through `bracket_line`.)
+        let frozen = self.value_head_frozen_span(bracket_start + 1, key.span());
+        let key_doc = match frozen {
+            Some(frozen) => {
+                let slice = self.build_frozen_expression_doc(key, frozen);
+                // `key_paren_shell` is the clarity shell the CALLER's ordinary builder
+                // supplies, so the frozen and unfrozen forms cannot disagree about it — the
+                // rule `Printer::build_frozen_value_doc` states, threaded here because this
+                // one emitter serves five hosts and they do not all answer it alike (a type
+                // member takes no shell at all).
+                match key_paren_shell {
+                    Some(ctx) if self.needs_parens(key, ctx) => d.parens(slice),
+                    _ => slice,
+                }
+            }
+            None => ordinary(),
+        };
+
         let bracket_line = self.has_line_comments_between(bracket_start + 1, key_start);
         let after_key_line = self.has_line_comments_between(key_end, bracket_end);
+        // A comment the author gave its OWN LINE in the `[`→key gap keeps that line, which
+        // means taking the breaking layout below. Own-line-ness is a SOURCE question about
+        // the comment's own neighbours (`docs/comments.md`), asked per comment because a run
+        // may mix glued and own-line members.
+        //
+        // Without this the flat arm collapsed such a comment onto the key's line
+        // (`[⏎/* c */⏎key]` → `[/* c */ key]`), reflowing a break the author wrote — the same
+        // hand-rolled kind-keyed split the template interpolation carried. The width stance
+        // is untouched: a computed key still never breaks on WIDTH, and a glued block still
+        // hugs inline. This is also what makes a BLOCK-spelled honored directive reachable
+        // here — the floor reads only a directive alone on its line, so the collapse used to
+        // make the block spelling inert while the `//` spelling froze.
+        let bracket_own_line =
+            comments_to_emit_in_range(self.comments, bracket_start + 1, key_start).any(|c| {
+                self.has_newline_between(bracket_start + 1, c.span.start)
+                    && self.has_newline_between(c.span.end, key_start)
+            });
+        // A resolved freeze reaches the breaking arm and no other, and needs no term of its
+        // own to do it: an honored directive is alone on its line, which is `bracket_own_line`
+        // by construction (and, for the `//` spelling, `bracket_line` as well).
+        debug_assert!(
+            frozen.is_none() || bracket_own_line,
+            "a `[`→key freeze must reach the breaking bracket layout"
+        );
 
         // Flat path (no line comment in either in-bracket gap): block comments hug
         // inline (`[/* d */ foo]`, `[foo /* c */]`), the key never breaks on width.
         // Byte-identical to the pre-divergence behavior.
-        if !bracket_line && !after_key_line {
+        if !bracket_line && !after_key_line && !bracket_own_line {
             let mut parts: DocBuf = smallvec![d.text("[")];
             for comment in comments_to_emit_in_range(self.comments, bracket_start + 1, key_start) {
                 parts.push(self.build_comment_doc(comment));

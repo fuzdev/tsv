@@ -68,11 +68,25 @@ impl<'a> Printer<'a> {
                 };
                 previous_quasi_indent_size = indent_size;
 
-                // Build expression doc
+                // The `${`→expression value head ([`Printer::value_head_frozen_span`]): an
+                // own-line directive in the gap freezes the whole expression. The `${` and
+                // `}` are the literal's own and stay outside the slice, and so does any pair
+                // the expression REQUIRES — the printer's, not the author's, exactly as at
+                // every other value head.
+                let frozen = self.value_head_frozen_span(quasi.span.end, expr.span());
+
+                // Build expression doc. The clarity parens are asked ONCE, outside the
+                // freeze — they are the position's, so the frozen and unfrozen forms cannot
+                // disagree about the shell (the rule `Printer::build_frozen_value_doc`
+                // states for the heads that reach it through that helper).
+                let expr_inner = match frozen {
+                    Some(frozen) => self.build_frozen_expression_doc(expr, frozen),
+                    None => self.build_expression_doc(expr),
+                };
                 let expr_doc = if self.needs_parens(expr, ParenContext::TemplateLiteralExpression) {
-                    d.parens(self.build_expression_doc(expr))
+                    d.parens(expr_inner)
                 } else {
-                    self.build_expression_doc(expr)
+                    expr_inner
                 };
 
                 // Collect comments in the interpolation region (gated: when the
@@ -98,26 +112,15 @@ impl<'a> Printer<'a> {
                         (CommentVec::new(), CommentVec::new())
                     };
 
-                // Check if any comments are line comments (non-block)
-                let has_line_comment = leading_comments.iter().any(|c| !c.is_block)
-                    || trailing_comments.iter().any(|c| !c.is_block);
-
-                // Combine expression with comments. The line-comment path builds its own
-                // layout (hardlines after `//`), so the plain leading/trailing docs are only
-                // built in the branch that uses them.
-                let full_expr_doc = if has_line_comment {
-                    self.build_template_comments_and_expr_doc(
+                // Combine expression with comments — one path, whose leading run goes
+                // through the shared leading-comment emitter.
+                let (full_expr_doc, leading_forces_break) = self
+                    .build_template_comments_and_expr_doc(
                         &leading_comments,
                         expr_doc,
                         &trailing_comments,
-                    )
-                } else {
-                    let leading_comments_doc =
-                        self.build_template_interpolation_comments(&leading_comments, true);
-                    let trailing_comments_doc =
-                        self.build_template_interpolation_comments(&trailing_comments, false);
-                    d.concat(&[leading_comments_doc, expr_doc, trailing_comments_doc])
-                };
+                        expr.span().start,
+                    );
 
                 let has_comments = !leading_comments.is_empty() || !trailing_comments.is_empty();
                 let has_trailing_line_comment = trailing_comments.iter().any(|c| !c.is_block);
@@ -136,6 +139,14 @@ impl<'a> Printer<'a> {
                 let interpolation_has_newline = self
                     .has_newline_between(quasi.span.end, next_quasi.span.start)
                     || d.will_break(full_expr_doc);
+                // A resolved freeze reaches the broken arm and no other: the directive is
+                // alone on its line, so the gap it sits in provably holds a newline and the
+                // atomizing arm below — which would collapse the frozen slice's own line
+                // structure onto one line — is unreachable.
+                debug_assert!(
+                    frozen.is_none() || interpolation_has_newline,
+                    "a `${{`→expression freeze must reach the broken interpolation arm"
+                );
 
                 let inner = if interpolation_has_newline {
                     // Qualifying types and trailing line comments use softline
@@ -184,8 +195,11 @@ impl<'a> Printer<'a> {
                 let group_doc =
                     d.concat(&[d.text("${"), aligned, d.line_suffix_boundary(), d.text("}")]);
                 // Force break when trailing line comments are present — a line
-                // comment on a flat line would swallow the closing `}`.
-                parts.push(if has_trailing_line_comment {
+                // comment on a flat line would swallow the closing `}`. A freeze forces it
+                // for the placement reason instead: the leading run's own line is where the
+                // floor reads the directive, and tsv has no `propagateBreaks`, so a hardline
+                // buried in that run is invisible to this group.
+                parts.push(if has_trailing_line_comment || leading_forces_break {
                     d.group_break(group_doc)
                 } else {
                     d.group(group_doc)
@@ -315,58 +329,48 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Build comments doc for template literal interpolations
+    /// Build the comments-plus-expression doc for one `${…}` interpolation, and report
+    /// whether the LEADING run ends a line unconditionally.
     ///
-    /// Line comments get a hardline after them (required since `//` extends to EOL).
-    /// Block comments get a space after (leading) or before (trailing).
-    fn build_template_interpolation_comments(
-        &self,
-        comments: &[&crate::ast::internal::Comment],
-        is_leading: bool,
-    ) -> DocId {
-        let d = self.d();
-        if comments.is_empty() {
-            return d.empty();
-        }
-
-        let mut parts = DocBuf::new();
-        for comment in comments {
-            if is_leading {
-                // Leading comments: comment then separator
-                parts.push(self.build_comment_doc(comment));
-                self.push_comment_kind_separator(&mut parts, comment);
-            } else {
-                // Trailing comments: space then comment
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-                // Line comments at the end still need hardline for proper formatting
-                if !comment.is_block {
-                    parts.push(d.hardline());
-                }
-            }
-        }
-        d.concat(&parts)
-    }
-
-    /// Build comments and expression doc for template interpolation with line comments.
+    /// The leading run goes through the shared leading-comment emitter
+    /// ([`Printer::push_leading_comment_run`]), so this gap answers the placement question
+    /// the way every other leading-comment site does: a comment the author **glued** to what
+    /// follows leads it inline (`` `${/* c */ x}` ``), one the author gave its **own line**
+    /// keeps that line, and a `//` always breaks. Both authorings are fixed points, which is
+    /// what the *type*-side spelling of this same gap already guaranteed
+    /// (conformance_prettier_ts_comments.md §A template-literal interpolation is
+    /// authoring-dependent) — the expression side used to key its separator on the comment's
+    /// KIND alone and gave every block a space, collapsing an own-line block onto the value's
+    /// line and reflowing a break the author wrote. That is the hand-rolled `is_block` split
+    /// `docs/comments.md` §Leading comments exists to prevent, and it is also what made an
+    /// own-line block DIRECTIVE inert here, since the floor reads only a directive alone on
+    /// its line.
     ///
-    /// Uses `hardline` after line comments so the enclosing `indent()` wrapper handles indentation.
-    /// Does NOT add hardline after the last trailing comment since the closing `}` literalline
-    /// will provide that newline.
+    /// The returned flag is why the emitter is asked rather than re-derived: tsv has no
+    /// `propagateBreaks`, so a hardline buried in the run is invisible to the `${…}` group
+    /// that has to open for it.
+    ///
+    /// Trailing comments keep their own loop: each is emitted after the value with a leading
+    /// space, and the LAST one takes no hardline — the closing `}`'s own `literalline`
+    /// provides that newline.
     fn build_template_comments_and_expr_doc(
         &self,
         leading_comments: &[&crate::ast::internal::Comment],
         expr_doc: DocId,
         trailing_comments: &[&crate::ast::internal::Comment],
-    ) -> DocId {
+        expr_start: u32,
+    ) -> (DocId, bool) {
         let d = self.d();
         let mut parts = DocBuf::new();
 
         // Leading comments
-        for comment in leading_comments {
-            parts.push(self.build_comment_doc(comment));
-            self.push_comment_kind_separator(&mut parts, comment);
-        }
+        let forces_break = self.push_leading_comment_run(
+            &mut parts,
+            leading_comments.iter().copied(),
+            expr_start,
+            crate::printer::comments::LeadingGlue::Adjacent,
+            d.empty(),
+        );
 
         // Expression
         parts.push(expr_doc);
@@ -382,7 +386,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        d.concat(&parts)
+        (d.concat(&parts), forces_break)
     }
 
     /// Build a Doc for a tagged template expression

@@ -1,0 +1,1447 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1180,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line directive in a spread's `...`→argument gap freezes the whole argument.",
+			"start": 20,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The directive keeps the line the author gave it, so the argument hangs below it.",
+			"start": 107,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 206,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 3
+				},
+				"end": {
+					"line": 6,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 272,
+			"end": 290,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 3
+				},
+				"end": {
+					"line": 12,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 338,
+			"end": 356,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 3
+				},
+				"end": {
+					"line": 18,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An argument needing no parens freezes bare.",
+			"start": 381,
+			"end": 427,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 443,
+			"end": 461,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 3
+				},
+				"end": {
+					"line": 25,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line block comment behaves identically — placement keys the freeze, not the",
+			"start": 481,
+			"end": 566,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " spelling.",
+			"start": 568,
+			"end": 580,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 596,
+			"end": 617,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 3
+				},
+				"end": {
+					"line": 33,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The slice→`)` gap belongs to the shell, not to the slice.",
+			"start": 642,
+			"end": 702,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 718,
+			"end": 736,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 3
+				},
+				"end": {
+					"line": 40,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 754,
+			"end": 761,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 17
+				},
+				"end": {
+					"line": 41,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A SEQUENCE argument's parens are its own node's, not the context's, so the frozen",
+			"start": 769,
+			"end": 853,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 1
+				},
+				"end": {
+					"line": 44,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " slice gets them back rather than losing the grouping.",
+			"start": 855,
+			"end": 911,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 1
+				},
+				"end": {
+					"line": 45,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 927,
+			"end": 945,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 3
+				},
+				"end": {
+					"line": 48,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A directive the author glued to the `...` is INERT under the placement floor: the",
+			"start": 966,
+			"end": 1050,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 1
+				},
+				"end": {
+					"line": 52,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment keeps the line it was written on and the argument normalizes.",
+			"start": 1052,
+			"end": 1124,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 1
+				},
+				"end": {
+					"line": 53,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 1133,
+			"end": 1154,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 8
+				},
+				"end": {
+					"line": 54,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1179,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1170,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 55,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 192,
+					"end": 246,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 192,
+						"end": 245,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 192,
+							"end": 195,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 199,
+								"end": 242,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 17
+									}
+								},
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 229,
+									"end": 241,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 4
+										},
+										"end": {
+											"line": 7,
+											"column": 16
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 229,
+										"end": 232,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 4
+											},
+											"end": {
+												"line": 7,
+												"column": 7
+											}
+										},
+										"name": "aaa"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 238,
+										"end": 241,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 13
+											},
+											"end": {
+												"line": 7,
+												"column": 16
+											}
+										},
+										"name": "bbb"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 206,
+											"end": 224
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line directive in a spread's `...`→argument gap freezes the whole argument.",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " The directive keeps the line the author gave it, so the argument hangs below it.",
+							"start": 107,
+							"end": 190
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 249,
+					"end": 312,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 255,
+							"end": 311,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 255,
+								"end": 258,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								},
+								"name": "ccc"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 261,
+								"end": 311,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 13
+									},
+									"end": {
+										"line": 14,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 265,
+										"end": 308,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 17
+											}
+										},
+										"argument": {
+											"type": "LogicalExpression",
+											"start": 295,
+											"end": 307,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 4
+												},
+												"end": {
+													"line": 13,
+													"column": 16
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 295,
+												"end": 298,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 4
+													},
+													"end": {
+														"line": 13,
+														"column": 7
+													}
+												},
+												"name": "ddd"
+											},
+											"operator": "??",
+											"right": {
+												"type": "Identifier",
+												"start": 304,
+												"end": 307,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 13
+													},
+													"end": {
+														"line": 13,
+														"column": 16
+													}
+												},
+												"name": "eee"
+											},
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " prettier-ignore",
+													"start": 272,
+													"end": 290
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 315,
+					"end": 378,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 321,
+							"end": 377,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 321,
+								"end": 324,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 10
+									}
+								},
+								"name": "fff"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 327,
+								"end": 377,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 13
+									},
+									"end": {
+										"line": 20,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "SpreadElement",
+										"start": 331,
+										"end": 374,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 17
+											}
+										},
+										"argument": {
+											"type": "LogicalExpression",
+											"start": 361,
+											"end": 373,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 4
+												},
+												"end": {
+													"line": 19,
+													"column": 16
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 361,
+												"end": 364,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 4
+													},
+													"end": {
+														"line": 19,
+														"column": 7
+													}
+												},
+												"name": "ggg"
+											},
+											"operator": "??",
+											"right": {
+												"type": "Identifier",
+												"start": 370,
+												"end": 373,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 13
+													},
+													"end": {
+														"line": 19,
+														"column": 16
+													}
+												},
+												"name": "hhh"
+											},
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " prettier-ignore",
+													"start": 338,
+													"end": 356
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 429,
+					"end": 478,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 429,
+						"end": 477,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 429,
+							"end": 432,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 1
+								},
+								"end": {
+									"line": 23,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 436,
+								"end": 474,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 12
+									}
+								},
+								"argument": {
+									"type": "MemberExpression",
+									"start": 465,
+									"end": 474,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 3
+										},
+										"end": {
+											"line": 26,
+											"column": 12
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 465,
+										"end": 468,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 3
+											},
+											"end": {
+												"line": 26,
+												"column": 6
+											}
+										},
+										"name": "iii"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 471,
+										"end": 474,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 9
+											},
+											"end": {
+												"line": 26,
+												"column": 12
+											}
+										},
+										"name": "jjj"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 443,
+											"end": 461
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An argument needing no parens freezes bare.",
+							"start": 381,
+							"end": 427
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 582,
+					"end": 639,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 582,
+						"end": 638,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 1
+							},
+							"end": {
+								"line": 35,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 582,
+							"end": 585,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 1
+								},
+								"end": {
+									"line": 31,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 589,
+								"end": 635,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 34,
+										"column": 17
+									}
+								},
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 622,
+									"end": 634,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 4
+										},
+										"end": {
+											"line": 34,
+											"column": 16
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 622,
+										"end": 625,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 4
+											},
+											"end": {
+												"line": 34,
+												"column": 7
+											}
+										},
+										"name": "kkk"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 631,
+										"end": 634,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 13
+											},
+											"end": {
+												"line": 34,
+												"column": 16
+											}
+										},
+										"name": "lll"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " prettier-ignore ",
+											"start": 596,
+											"end": 617
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line block comment behaves identically — placement keys the freeze, not the",
+							"start": 481,
+							"end": 566
+						},
+						{
+							"type": "Line",
+							"value": " spelling.",
+							"start": 568,
+							"end": 580
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 704,
+					"end": 766,
+					"loc": {
+						"start": {
+							"line": 38,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 704,
+						"end": 765,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 1
+							},
+							"end": {
+								"line": 42,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 704,
+							"end": 707,
+							"loc": {
+								"start": {
+									"line": 38,
+									"column": 1
+								},
+								"end": {
+									"line": 38,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 711,
+								"end": 762,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 2
+									},
+									"end": {
+										"line": 41,
+										"column": 25
+									}
+								},
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 741,
+									"end": 753,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 4
+										},
+										"end": {
+											"line": 41,
+											"column": 16
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 741,
+										"end": 744,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 4
+											},
+											"end": {
+												"line": 41,
+												"column": 7
+											}
+										},
+										"name": "mmm"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 750,
+										"end": 753,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 13
+											},
+											"end": {
+												"line": 41,
+												"column": 16
+											}
+										},
+										"name": "nnn"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 718,
+											"end": 736
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 754,
+											"end": 761
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The slice→`)` gap belongs to the shell, not to the slice.",
+							"start": 642,
+							"end": 702
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 913,
+					"end": 963,
+					"loc": {
+						"start": {
+							"line": 46,
+							"column": 1
+						},
+						"end": {
+							"line": 50,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 913,
+						"end": 962,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 1
+							},
+							"end": {
+								"line": 50,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 913,
+							"end": 916,
+							"loc": {
+								"start": {
+									"line": 46,
+									"column": 1
+								},
+								"end": {
+									"line": 46,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 920,
+								"end": 959,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 2
+									},
+									"end": {
+										"line": 49,
+										"column": 13
+									}
+								},
+								"argument": {
+									"type": "SequenceExpression",
+									"start": 950,
+									"end": 958,
+									"loc": {
+										"start": {
+											"line": 49,
+											"column": 4
+										},
+										"end": {
+											"line": 49,
+											"column": 12
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 950,
+											"end": 953,
+											"loc": {
+												"start": {
+													"line": 49,
+													"column": 4
+												},
+												"end": {
+													"line": 49,
+													"column": 7
+												}
+											},
+											"name": "qqq"
+										},
+										{
+											"type": "Identifier",
+											"start": 955,
+											"end": 958,
+											"loc": {
+												"start": {
+													"line": 49,
+													"column": 9
+												},
+												"end": {
+													"line": 49,
+													"column": 12
+												}
+											},
+											"name": "rrr"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 927,
+											"end": 945
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A SEQUENCE argument's parens are its own node's, not the context's, so the frozen",
+							"start": 769,
+							"end": 853
+						},
+						{
+							"type": "Line",
+							"value": " slice gets them back rather than losing the grouping.",
+							"start": 855,
+							"end": 911
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1126,
+					"end": 1169,
+					"loc": {
+						"start": {
+							"line": 54,
+							"column": 1
+						},
+						"end": {
+							"line": 54,
+							"column": 44
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1126,
+						"end": 1168,
+						"loc": {
+							"start": {
+								"line": 54,
+								"column": 1
+							},
+							"end": {
+								"line": 54,
+								"column": 43
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1126,
+							"end": 1129,
+							"loc": {
+								"start": {
+									"line": 54,
+									"column": 1
+								},
+								"end": {
+									"line": 54,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 1130,
+								"end": 1167,
+								"loc": {
+									"start": {
+										"line": 54,
+										"column": 5
+									},
+									"end": {
+										"line": 54,
+										"column": 42
+									}
+								},
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 1156,
+									"end": 1166,
+									"loc": {
+										"start": {
+											"line": 54,
+											"column": 31
+										},
+										"end": {
+											"line": 54,
+											"column": 41
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 1156,
+										"end": 1159,
+										"loc": {
+											"start": {
+												"line": 54,
+												"column": 31
+											},
+											"end": {
+												"line": 54,
+												"column": 34
+											}
+										},
+										"name": "ooo"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 1163,
+										"end": 1166,
+										"loc": {
+											"start": {
+												"line": 54,
+												"column": 38
+											},
+											"end": {
+												"line": 54,
+												"column": 41
+											}
+										},
+										"name": "ppp"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " prettier-ignore ",
+											"start": 1133,
+											"end": 1154
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A directive the author glued to the `...` is INERT under the placement floor: the",
+							"start": 966,
+							"end": 1050
+						},
+						{
+							"type": "Line",
+							"value": " comment keeps the line it was written on and the argument normalizes.",
+							"start": 1052,
+							"end": 1124
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

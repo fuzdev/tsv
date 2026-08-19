@@ -423,12 +423,6 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let needs_parens = self.needs_parens(spread.argument, super::ParenContext::SpreadArgument);
-        // A binaryish spread argument indents its continuation when it breaks
-        // (`...(a &&\n\tb && {…})`), matching Prettier — a `SpreadElement` parent is
-        // not in binaryish.js's `shouldNotIndent` set, so the logical/binary chain
-        // gets the continuation indent. Non-binary arguments are unaffected.
-        let arg_doc = self.build_expression_doc_with_indent_on_break(spread.argument);
-
         // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)
         let dots_end = spread.span.start + "...".len() as u32;
         let arg_start = spread.argument.span().start;
@@ -438,6 +432,51 @@ impl<'a> Printer<'a> {
         let has_trailing_comments =
             self.has_comments_to_emit_between(argument_end, spread.span.end);
 
+        // The `...`→argument value head ([`Printer::value_head_frozen_span`]): an own-line
+        // directive in the gap freezes the whole argument.
+        //
+        // It returns EARLY, ahead of both layouts below, because both glue the gap's run to a
+        // delimiter — the breaking arm to the `...` itself, the hug to the `...` or to the
+        // shell's `(` — and a directive on a delimiter's line is inert under tsv's floor. Pass
+        // 1 would print the frozen bytes with the directive welded to `...`, pass 2 would read
+        // no freeze and normalize them: a silent loss with nothing dropped and no gate firing.
+        // So an honored directive keeps its own line and the argument hangs below it, through
+        // the uniform forced-continuation indent — the same answer `await`→operand and
+        // `new`→callee give their own keyword gaps, and the same divergence: prettier pulls
+        // the directive up onto the `...` line and honors it there anyway.
+        //
+        // Parens the argument REQUIRES are the printer's, not the author's, so they ride
+        // OUTSIDE the slice — and the slice→`)` gap is answered by the shell's own trailing
+        // emitter rather than a second pair open-coded here (`docs/comments.md` hazard 4).
+        if let Some(frozen) = self.value_head_frozen_span(dots_end, spread.argument.span()) {
+            let mut inner: DocBuf = DocBuf::new();
+            if needs_parens {
+                inner.push(d.text("("));
+            }
+            inner.push(self.build_frozen_expression_doc(spread.argument, frozen));
+            if has_trailing_comments {
+                self.append_spread_trailing_paren_comments(
+                    &mut inner,
+                    argument_end,
+                    spread.span.end,
+                );
+            }
+            if needs_parens {
+                inner.push(d.text(")"));
+            }
+            let value = d.concat(&inner);
+            return d.concat(&[
+                d.text("..."),
+                self.build_continuation_indent(dots_end, arg_start, value),
+            ]);
+        }
+
+        // A binaryish spread argument indents its continuation when it breaks
+        // (`...(a &&\n\tb && {…})`), matching Prettier — a `SpreadElement` parent is
+        // not in binaryish.js's `shouldNotIndent` set, so the logical/binary chain
+        // gets the continuation indent. Non-binary arguments are unaffected.
+        let arg_doc = self.build_expression_doc_with_indent_on_break(spread.argument);
+
         // A block run the author broke AFTER, before an argument that WILL BREAK,
         // keeps its break — prettier's `printLeadingComment` newline-after `line`,
         // materialized by the argument's own break (`.../*#__PURE__*/⏎fn({…})` stays
@@ -445,8 +484,9 @@ impl<'a> Printer<'a> {
         // the shared `breaking_value_leading_run` (geometry + `will_break` + the
         // owned-comment decline); an argument that FITS declines into the glued path
         // below, whose flat render is the same bytes prettier's collapsed `line`
-        // produces. A synthesized paren shell keeps the glued path too — the compound
-        // is unprobed, and the hug is that path's existing answer there.
+        // produces. An argument that NEEDS parens keeps the glued path too — the compound
+        // is unprobed, and the hug is that path's existing answer there (the run is emitted
+        // outside the pair on both paths, so only the break survives as the difference).
         if !needs_parens
             && let Some((run, arg_doc)) =
                 self.breaking_value_leading_run(dots_end, arg_start, || arg_doc)
@@ -471,10 +511,21 @@ impl<'a> Printer<'a> {
         // this hug.
         let comment_doc = self.build_rhs_comments_glued_opt(dots_end, arg_start);
 
-        let prefix = if needs_parens { "...(" } else { "..." };
-        let mut parts = smallvec![d.text(prefix)];
+        // The run is emitted OUTSIDE any parens the argument needs — the gap belongs to the
+        // `...`, not to a pair the printer must emit, so it answers one way whether or not
+        // the argument's precedence happens to require one. That is `await`→operand's rule
+        // verbatim, and this site used to break it: opening the shell first moved a comment
+        // the author wrote BEFORE the `(` to after it (`.../* c */ (a ?? b)` →
+        // `...(/* c */ a ?? b)`), re-associating it from the spread to the operand. A comment
+        // the author wrote INSIDE those parens is glued to the argument and therefore owned,
+        // so it never reaches this axis and keeps its place (the `grouped_operand_comment`
+        // divergence).
+        let mut parts = smallvec![d.text("...")];
         if let Some(c) = comment_doc {
             parts.push(c);
+        }
+        if needs_parens {
+            parts.push(d.text("("));
         }
         parts.push(arg_doc);
         if has_trailing_comments {

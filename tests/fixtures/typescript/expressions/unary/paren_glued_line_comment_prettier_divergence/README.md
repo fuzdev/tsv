@@ -70,3 +70,16 @@ and
   authorship and rides. Scanning the whole gap read the `(`'s own newline as an author blank
   and fabricated one — output that reparses and is its own fixed point, so only a prettier
   `compare` or the fabrication audit over real code sees it.
+
+- **m** — the rule applied to a format-ignore **directive**, which is what makes it a
+  correctness claim rather than a taste one. Keeping the directive on the `(`'s line is
+  exactly what leaves it **inert**: tsv's placement floor honors only a directive alone on
+  its line, so the operand normalizes. `unformatted_ours_ignore_inert.svelte` carries that
+  case with un-normalized spacing and only tsv rewrites it — prettier, which has no such
+  floor, freezes it there. Relocating the directive onto its own line to "honor" it would
+  **arm a freeze the author's placement never asked for**, and the dual-stable
+  `variant_ignore_inert.svelte` is that form: once the directive owns its line, tsv freezes
+  too and both tools hold it stable. The own-line authoring is the sibling head fixture
+  [operand_prettier_ignore_head](../operand_prettier_ignore_head/); the same
+  trailing-a-delimiter inertness at the other value heads is
+  [clauses_prettier_ignore_glued_inert](../../../statements/for/clauses_prettier_ignore_glued_inert_prettier_divergence/).

@@ -522,14 +522,18 @@ second divergence.
 
 **On assignment-family value heads.** The same head rule, with the assignment operator as the
 delimiter: an own-line directive in an `=`→value, `:`→value, `=>`→body, `?`/`:`→branch,
-`case`→test or keyword→operand gap freezes that
+`case`→test, keyword→operand, unary→operand, `${`→expression, `[`→key or `...`→argument gap
+freezes that
 **whole value**. The hosts are a declarator initializer (`const a =`, a `for` header's init
 declarator, and a Svelte `{@const a =}`), an assignment
 RHS (`a =`, a compound `a +=`, and each segment of a chain), an object property value (`k:`), a
 class field value (`f =`, `static f =`, `#f =`, `accessor f =`), an enum member value
 (`A =`), an arrow's expression body (`=>`), a ternary branch (`?`→consequent, `:`→alternate), a
 `case` label's test, the two expression-level keyword→operand gaps (`await`→operand and
-`new`→callee), and a default value (a
+`new`→callee), a unary operator's operand (`typeof`, `!`, `-`, `void` and the sign operators),
+a template literal's `${`→expression gap, a computed **key**'s `[`→key gap (object property,
+class field, class method, destructuring pattern), a spread's `...`→argument gap, and a default
+value (a
 parameter default, a destructuring default, an array-pattern default). The slice is the value's
 own node span, so the binding, the operator and the enclosing list stay parent-owned and a
 sibling declarator, member or property the freeze does not reach still normalizes. Prettier
@@ -545,16 +549,53 @@ freeze is otherwise identical. All four are divergences rather than matches, for
 placement reason below. At `new` the slice is the **callee alone**: the type arguments and the
 argument list sit past the callee's span, stay parent-owned, and still normalize.
 
-**Still absent from the rule**, each probe-measured against prettier and each a case where
-prettier honors what tsv normalizes: a unary operator's →operand gap (`typeof`, `!`, `-`), a
-template literal's `${`→expression gap, a computed KEY's `[`→key gap, and a spread's
-`...`→argument gap (which also relocates the comment inside the operand's parens). Tracked gaps, not sanctioned differences — honoring a directive is a per-position
-opt-in the printer makes at each value head, so an absent host reformats rather than freezing,
-exactly as every host above did before its own cluster landed. Two neighbours are **not** on
-that list: a computed **member**'s `[`→index gap already freezes (only its layout parts), and
-a class heritage's `extends`→superClass gap freezes under neither formatter — prettier
-relocates the directive above `extends` and normalizes the value too, so there the placement
-is the whole difference.
+The **unary operand**, the **template `${`→expression** gap, the **computed key** and the
+**spread argument** complete the family. The first two **match** prettier
+(`expressions/unary/operand_prettier_ignore_head`,
+`expressions/literals/template/interpolation_prettier_ignore_head`) — at both, tsv's ordinary
+layout already gives an own-line comment its own line, which is where the floor reads the
+directive, so the frozen and unfrozen placements agree and prettier's do too. The other two are
+divergences on the placement reason below: prettier pulls the directive onto the `[` and onto
+the `...` respectively, placements tsv's floor calls inert. At the unary the comment-holder
+shell is the printer's pair and stays outside the slice, and its own trailing emitter answers
+the slice→`)` gap; at the spread the required parens likewise ride outside the slice, and the
+frozen argument takes the uniform forced-continuation indent its `await`/`new` siblings take.
+
+**Absent hosts are tracked gaps, not sanctioned differences** — honoring a directive is a
+per-position opt-in the printer makes at each value head, so an absent host reformats rather
+than freezing, exactly as every host above did before its own cluster landed. Two neighbours
+were probed and cleared: a computed **member**'s `[`→index gap already freezes (only its layout
+parts), and a class heritage's `extends`→superClass gap freezes under neither formatter —
+prettier relocates the directive above `extends` and normalizes the value too, so there the
+placement is the whole difference.
+
+**The placement floor cuts BOTH ways, and the inert direction is the one tsv must protect.**
+A directive that shares its line with anything else is an ordinary comment here — glued to the
+value (`k: /* prettier-ignore */ v`) or **trailing an opening delimiter** (`[ // prettier-ignore`,
+`typeof ( // prettier-ignore`, `...// prettier-ignore`). At those delimiters tsv's
+opening-delimiter rule *keeps* the comment on the delimiter's line, and that is not an accident
+to be fixed: relocating it onto its own line to "honor" it would **arm a freeze the author's
+placement never asked for**, silently turning a formatted value verbatim on the next pass. So
+the rule and the floor agree by construction — the comment stays, the directive stays inert, and
+the value normalizes. Prettier, having no floor, writes the same placement at the `[` and the
+`...` and freezes anyway; at the unary comment-holder `(` it relocates the comment as well.
+Pinned by [clauses_prettier_ignore_glued_inert](../tests/fixtures/typescript/statements/for/clauses_prettier_ignore_glued_inert_prettier_divergence/)
+(both spellings, across the value heads) and by
+[unary paren_glued_line_comment](../tests/fixtures/typescript/expressions/unary/paren_glued_line_comment_prettier_divergence/),
+whose `variant_ignore_inert` is dual-stable precisely because tsv *does* freeze once the
+directive owns its line. A `${`→expression gap is the one host with no such delimiter rule: a
+`//` there must break, so both tools move it to its own line, and only tsv's first pass
+normalizes before the second freezes the (already normalized) result.
+
+**A spelling that a layout collapse can disarm is the rule's own business.** Two of these
+hosts pulled an own-line **block** comment onto the value's line — the template interpolation
+keyed its separator on the comment's kind alone, and a computed key took its flat layout for
+anything but a `//`. Either collapse makes the block spelling of a directive glued, hence
+inert, while the `//` spelling freezes: the same directive, two answers, keyed on nothing the
+author would recognize. Both now preserve the authored line for **every** comment, so the two
+spellings agree — see
+[§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation) for the
+ordinary-comment face of each.
 
 The clarity parens rule carries over unchanged — an initializer that is an assignment prints as
 `const a = (b = c)`, and those parens are the printer's, so the frozen inner keeps them around
@@ -630,6 +671,31 @@ tsv diverges at six places:
   blocks again (chain pinned). The unfrozen twin is already sanctioned at
   `arrows/body_paren_comment_prettier_divergence` —
   [body paren comment](../tests/fixtures/typescript/expressions/arrow/body_prettier_ignore_paren_comment_prettier_divergence/)
+- **A frozen `await` operand's shell** — ◆comment_preservation — the arrow body's entry above,
+  one host over: tsv retains the author's pair and keeps the comment inside it, a block inline
+  and a `//` with the pair opened around it, exactly as the unfrozen `await` operand does. The
+  shell is not optional here — `await`'s own span covers the `)`, so a stripped form would hand
+  the comment to the enclosing terminator gap on reparse and the authoring would have no fixed
+  point at all. Prettier strips and relocates out past the `;`, and on an operand whose parens
+  are **required** it re-emits that pair with the comment outside it; its second pass moves the
+  blocks again (chain pinned) —
+  [await operand paren comment](../tests/fixtures/typescript/expressions/await_operand_prettier_ignore_paren_comment_prettier_divergence/)
+- **Computed key** — ◆comment_preservation — with the `[` as the delimiter: prettier pulls an
+  own-line `[`→key directive onto the `[`'s line and honors it there, a placement inert under
+  tsv's floor, so tsv keeps the author's line and freezes below it. The brackets stay
+  parent-owned (a slice swallowing the `]` emits a property that no longer parses) and parens
+  the key requires ride outside the slice. Both spellings behave alike, which is what makes the
+  ordinary-comment layout fix below part of this rule —
+  [computed key head](../tests/fixtures/typescript/expressions/objects/computed_key_prettier_ignore_head_prettier_divergence/),
+  and its ordinary-comment face
+  [computed key own-line block](../tests/fixtures/typescript/expressions/objects/computed_key_own_line_block_comment_prettier_divergence/)
+- **Spread argument** — ◆comment_preservation — the same shape with `...` as the delimiter:
+  prettier glues an own-line `...`→argument directive to the `...` and honors it there, inert
+  under tsv's floor, so tsv keeps the author's line and hangs the argument below it through the
+  uniform forced-continuation indent its `await`/`new` siblings take. Parens the argument
+  requires ride outside the slice, and the slice→`)` gap is the shell's own. An **ordinary**
+  comment in this gap is not relocated by either formatter (`spread/grouped_operand_leading_comment`) —
+  [spread argument head](../tests/fixtures/typescript/expressions/spread/argument_prettier_ignore_head_prettier_divergence/)
 - **A directive inside the before-`=` continuation** — ◆comment_preservation — when a comment
   before the `=` drops `= value` to a continuation line, the `=`→value gap inside it keeps its
   own rule: an own-line directive still keeps its own line and still freezes. Prettier relocates

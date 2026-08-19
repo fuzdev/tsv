@@ -1,0 +1,1221 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 977,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line directive in a template interpolation's `${`→expression gap freezes the",
+			"start": 20,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " whole expression. The `${` and `}` are the literal's own and stay outside the slice.",
+			"start": 108,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 216,
+			"end": 234,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Parens the expression REQUIRES are the printer's, not the author's, so they ride",
+			"start": 257,
+			"end": 340,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " outside the frozen slice.",
+			"start": 342,
+			"end": 370,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 391,
+			"end": 409,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line block comment behaves identically — placement keys the freeze, not the",
+			"start": 434,
+			"end": 519,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " spelling.",
+			"start": 521,
+			"end": 533,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 554,
+			"end": 575,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An honored directive owns its line on BOTH sides: a single-line block the author",
+			"start": 598,
+			"end": 681,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " wrote above it keeps its own line instead of welding onto the directive's.",
+			"start": 683,
+			"end": 760,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 781,
+			"end": 788,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 791,
+			"end": 809,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The expression→`}` gap belongs to the literal, not to the slice.",
+			"start": 832,
+			"end": 899,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 920,
+			"end": 938,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 2
+				},
+				"end": {
+					"line": 33,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 953,
+			"end": 960,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 14
+				},
+				"end": {
+					"line": 34,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 976,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 967,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 36,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 197,
+					"end": 254,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 203,
+							"end": 253,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 203,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"name": "aaa"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 209,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 7,
+										"column": 4
+									}
+								},
+								"expressions": [
+									{
+										"type": "BinaryExpression",
+										"start": 237,
+										"end": 248,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 13
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 237,
+											"end": 240,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 5
+												}
+											},
+											"name": "bbb"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 245,
+											"end": 248,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 10
+												},
+												"end": {
+													"line": 6,
+													"column": 13
+												}
+											},
+											"name": "ccc"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 216,
+												"end": 234
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 210,
+										"end": 211,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 14
+											},
+											"end": {
+												"line": 4,
+												"column": 15
+											}
+										},
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 251,
+										"end": 252,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 3
+											}
+										},
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line directive in a template interpolation's `${`→expression gap freezes the",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " whole expression. The `${` and `}` are the literal's own and stay outside the slice.",
+							"start": 108,
+							"end": 195
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 372,
+					"end": 431,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 378,
+							"end": 430,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 378,
+								"end": 381,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 10
+									}
+								},
+								"name": "ddd"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 384,
+								"end": 430,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 13
+									},
+									"end": {
+										"line": 14,
+										"column": 4
+									}
+								},
+								"expressions": [
+									{
+										"type": "AssignmentExpression",
+										"start": 413,
+										"end": 424,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 3
+											},
+											"end": {
+												"line": 13,
+												"column": 14
+											}
+										},
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 413,
+											"end": 416,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 3
+												},
+												"end": {
+													"line": 13,
+													"column": 6
+												}
+											},
+											"name": "eee"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 421,
+											"end": 424,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 11
+												},
+												"end": {
+													"line": 13,
+													"column": 14
+												}
+											},
+											"name": "fff"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 391,
+												"end": 409
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 385,
+										"end": 386,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 14
+											},
+											"end": {
+												"line": 11,
+												"column": 15
+											}
+										},
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 428,
+										"end": 429,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 3
+											}
+										},
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Parens the expression REQUIRES are the printer's, not the author's, so they ride",
+							"start": 257,
+							"end": 340
+						},
+						{
+							"type": "Line",
+							"value": " outside the frozen slice.",
+							"start": 342,
+							"end": 370
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 535,
+					"end": 595,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 541,
+							"end": 594,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 541,
+								"end": 544,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 10
+									}
+								},
+								"name": "ggg"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 547,
+								"end": 594,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 13
+									},
+									"end": {
+										"line": 21,
+										"column": 4
+									}
+								},
+								"expressions": [
+									{
+										"type": "BinaryExpression",
+										"start": 578,
+										"end": 589,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 13
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 578,
+											"end": 581,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 2
+												},
+												"end": {
+													"line": 20,
+													"column": 5
+												}
+											},
+											"name": "hhh"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 586,
+											"end": 589,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 10
+												},
+												"end": {
+													"line": 20,
+													"column": 13
+												}
+											},
+											"name": "iii"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " prettier-ignore ",
+												"start": 554,
+												"end": 575
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 548,
+										"end": 549,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 14
+											},
+											"end": {
+												"line": 18,
+												"column": 15
+											}
+										},
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 592,
+										"end": 593,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 3
+											}
+										},
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line block comment behaves identically — placement keys the freeze, not the",
+							"start": 434,
+							"end": 519
+						},
+						{
+							"type": "Line",
+							"value": " spelling.",
+							"start": 521,
+							"end": 533
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 762,
+					"end": 829,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 768,
+							"end": 828,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 7
+								},
+								"end": {
+									"line": 29,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 768,
+								"end": 771,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 10
+									}
+								},
+								"name": "jjj"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 774,
+								"end": 828,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 13
+									},
+									"end": {
+										"line": 29,
+										"column": 4
+									}
+								},
+								"expressions": [
+									{
+										"type": "BinaryExpression",
+										"start": 812,
+										"end": 823,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 13
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 812,
+											"end": 815,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 2
+												},
+												"end": {
+													"line": 28,
+													"column": 5
+												}
+											},
+											"name": "kkk"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 820,
+											"end": 823,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 10
+												},
+												"end": {
+													"line": 28,
+													"column": 13
+												}
+											},
+											"name": "lll"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 781,
+												"end": 788
+											},
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 791,
+												"end": 809
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 775,
+										"end": 776,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 14
+											},
+											"end": {
+												"line": 25,
+												"column": 15
+											}
+										},
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 826,
+										"end": 827,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 3
+											}
+										},
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An honored directive owns its line on BOTH sides: a single-line block the author",
+							"start": 598,
+							"end": 681
+						},
+						{
+							"type": "Line",
+							"value": " wrote above it keeps its own line instead of welding onto the directive's.",
+							"start": 683,
+							"end": 760
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 901,
+					"end": 966,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 907,
+							"end": 965,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 7
+								},
+								"end": {
+									"line": 35,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 907,
+								"end": 910,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 7
+									},
+									"end": {
+										"line": 32,
+										"column": 10
+									}
+								},
+								"name": "mmm"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 913,
+								"end": 965,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 13
+									},
+									"end": {
+										"line": 35,
+										"column": 4
+									}
+								},
+								"expressions": [
+									{
+										"type": "BinaryExpression",
+										"start": 941,
+										"end": 952,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 2
+											},
+											"end": {
+												"line": 34,
+												"column": 13
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 941,
+											"end": 944,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 2
+												},
+												"end": {
+													"line": 34,
+													"column": 5
+												}
+											},
+											"name": "nnn"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 949,
+											"end": 952,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 10
+												},
+												"end": {
+													"line": 34,
+													"column": 13
+												}
+											},
+											"name": "ooo"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 920,
+												"end": 938
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 953,
+												"end": 960
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 914,
+										"end": 915,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 14
+											},
+											"end": {
+												"line": 32,
+												"column": 15
+											}
+										},
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 963,
+										"end": 964,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 2
+											},
+											"end": {
+												"line": 35,
+												"column": 3
+											}
+										},
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The expression→`}` gap belongs to the literal, not to the slice.",
+							"start": 832,
+							"end": 899
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

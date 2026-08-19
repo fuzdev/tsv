@@ -80,6 +80,6 @@
 	// for — see the sibling head fixture, where the own-line authoring does freeze.
 	const m = typeof (
 		// prettier-ignore
-		x || y
+		x  ||  y
 	);
 </script>

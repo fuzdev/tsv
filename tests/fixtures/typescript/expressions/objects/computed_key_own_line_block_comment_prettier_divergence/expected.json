@@ -1,0 +1,1053 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 636,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block the author GLUED to the key leads it inline and the bracket stays flat — a",
+			"start": 20,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " computed key never breaks on width.",
+			"start": 107,
+			"end": 145,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 162,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 16
+				},
+				"end": {
+					"line": 4,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block the author gave its OWN LINE keeps that line, so the bracket opens around it.",
+			"start": 191,
+			"end": 279,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 302,
+			"end": 309,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 3
+				},
+				"end": {
+					"line": 9,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same at a class member and at a destructuring pattern.",
+			"start": 338,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 420,
+			"end": 427,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 3
+				},
+				"end": {
+					"line": 17,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 472,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 3
+				},
+				"end": {
+					"line": 24,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run the author broke keeps each line.",
+			"start": 514,
+			"end": 556,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 579,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 3
+				},
+				"end": {
+					"line": 32,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 591,
+			"end": 599,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 3
+				},
+				"end": {
+					"line": 33,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 635,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 626,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 37,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 147,
+					"end": 188,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 42
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 153,
+							"end": 187,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 41
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 153,
+								"end": 156,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"name": "aaa"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 159,
+								"end": 187,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 41
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 161,
+										"end": 185,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 15
+											},
+											"end": {
+												"line": 4,
+												"column": 39
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": true,
+										"key": {
+											"type": "BinaryExpression",
+											"start": 170,
+											"end": 179,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 24
+												},
+												"end": {
+													"line": 4,
+													"column": 33
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 170,
+												"end": 173,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 24
+													},
+													"end": {
+														"line": 4,
+														"column": 27
+													}
+												},
+												"name": "bbb"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 176,
+												"end": 179,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 30
+													},
+													"end": {
+														"line": 4,
+														"column": 33
+													}
+												},
+												"name": "ccc"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 162,
+													"end": 169
+												}
+											]
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 182,
+											"end": 185,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 36
+												},
+												"end": {
+													"line": 4,
+													"column": 39
+												}
+											},
+											"name": "ddd"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block the author GLUED to the key leads it inline and the bracket stays flat — a",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " computed key never breaks on width.",
+							"start": 107,
+							"end": 145
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 281,
+					"end": 335,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 287,
+							"end": 334,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 287,
+								"end": 290,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 10
+									}
+								},
+								"name": "eee"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 293,
+								"end": 334,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 13
+									},
+									"end": {
+										"line": 12,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 297,
+										"end": 331,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 8
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": true,
+										"key": {
+											"type": "BinaryExpression",
+											"start": 313,
+											"end": 322,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 3
+												},
+												"end": {
+													"line": 10,
+													"column": 12
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 313,
+												"end": 316,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 3
+													},
+													"end": {
+														"line": 10,
+														"column": 6
+													}
+												},
+												"name": "fff"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 319,
+												"end": 322,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 9
+													},
+													"end": {
+														"line": 10,
+														"column": 12
+													}
+												},
+												"name": "ggg"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 302,
+													"end": 309
+												}
+											]
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 328,
+											"end": 331,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 5
+												},
+												"end": {
+													"line": 11,
+													"column": 8
+												}
+											},
+											"name": "hhh"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block the author gave its OWN LINE keeps that line, so the bracket opens around it.",
+							"start": 191,
+							"end": 279
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 401,
+					"end": 454,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 407,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 7
+							},
+							"end": {
+								"line": 15,
+								"column": 10
+							}
+						},
+						"name": "Iii"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 411,
+						"end": 454,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 11
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 415,
+								"end": 451,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 10
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "BinaryExpression",
+									"start": 431,
+									"end": 440,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 12
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 431,
+										"end": 434,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 3
+											},
+											"end": {
+												"line": 18,
+												"column": 6
+											}
+										},
+										"name": "jjj"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 437,
+										"end": 440,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 9
+											},
+											"end": {
+												"line": 18,
+												"column": 12
+											}
+										},
+										"name": "kkk"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 420,
+											"end": 427
+										}
+									]
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 447,
+									"end": 450,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 6
+										},
+										"end": {
+											"line": 19,
+											"column": 9
+										}
+									},
+									"name": "lll"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same at a class member and at a destructuring pattern.",
+							"start": 338,
+							"end": 399
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 457,
+					"end": 511,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 463,
+							"end": 510,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 463,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 467,
+										"end": 501,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 8
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": true,
+										"key": {
+											"type": "BinaryExpression",
+											"start": 483,
+											"end": 492,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 3
+												},
+												"end": {
+													"line": 25,
+													"column": 12
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 483,
+												"end": 486,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 3
+													},
+													"end": {
+														"line": 25,
+														"column": 6
+													}
+												},
+												"name": "mmm"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 489,
+												"end": 492,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 9
+													},
+													"end": {
+														"line": 25,
+														"column": 12
+													}
+												},
+												"name": "nnn"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 472,
+													"end": 479
+												}
+											]
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 498,
+											"end": 501,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 5
+												},
+												"end": {
+													"line": 26,
+													"column": 8
+												}
+											},
+											"name": "ooo"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 507,
+								"end": 510,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 5
+									},
+									"end": {
+										"line": 27,
+										"column": 8
+									}
+								},
+								"name": "ppp"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 558,
+					"end": 625,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 564,
+							"end": 624,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 564,
+								"end": 567,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 10
+									}
+								},
+								"name": "qqq"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 570,
+								"end": 624,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 13
+									},
+									"end": {
+										"line": 36,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 574,
+										"end": 621,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 35,
+												"column": 8
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": true,
+										"key": {
+											"type": "BinaryExpression",
+											"start": 603,
+											"end": 612,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 3
+												},
+												"end": {
+													"line": 34,
+													"column": 12
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 603,
+												"end": 606,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 3
+													},
+													"end": {
+														"line": 34,
+														"column": 6
+													}
+												},
+												"name": "rrr"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 609,
+												"end": 612,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 9
+													},
+													"end": {
+														"line": 34,
+														"column": 12
+													}
+												},
+												"name": "sss"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c1 ",
+													"start": 579,
+													"end": 587
+												},
+												{
+													"type": "Block",
+													"value": " c2 ",
+													"start": 591,
+													"end": 599
+												}
+											]
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 618,
+											"end": 621,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 5
+												},
+												"end": {
+													"line": 35,
+													"column": 8
+												}
+											},
+											"name": "ttt"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author broke keeps each line.",
+							"start": 514,
+							"end": 556
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

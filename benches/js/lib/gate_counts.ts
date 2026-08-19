@@ -423,7 +423,13 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// reminder that it has to be verified per file rather than assumed. It was: the three
 	// movers are disjoint (`js/sequence-expression/*` vs `js/dynamic-import/*`) and
 	// `corpus:compare:format --all` on the merged tree reports 107.
-	typescript: 107,
+	//
+	// 107 → 106 (`bug461`, the unary/`${`/computed-key/spread value-head freeze):
+	// `js/sequence-expression/ignore.js` leaves for **match** — a `+` whose operand carries an
+	// own-line `// prettier-ignore`, the unary→operand head this cluster added. A/B'd against a
+	// HEAD worktree over the whole corpus: this is the ONLY mover in any bucket (the unknown
+	// lists are otherwise identical file-for-file, no new entry), SAFETY 0 both sides.
+	typescript: 106,
 	css: 23
 };
 

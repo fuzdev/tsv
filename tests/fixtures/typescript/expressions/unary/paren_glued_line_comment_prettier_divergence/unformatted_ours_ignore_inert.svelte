@@ -1,30 +1,25 @@
 <script>
 	// A `//` the author glued to the comment-holder `(` keeps that line
-	const a = !(
-		// c1
+	const a = !( // c1
 		x || y
 	);
 
 	// The keyword operators answer the same way
-	const b = typeof (
-		// c2
+	const b = typeof ( // c2
 		x || y
 	);
 
-	const c = void (
-		// c3
+	const c = void ( // c3
 		x || y
 	);
 
 	// So does a sign operator, whose parens the operand requires
-	const d = -(
-		// c4
+	const d = -( // c4
 		x + y
 	);
 
 	// Only the glued comment claims the line - the rest of the run keeps its own
-	const e = !(
-		// c5
+	const e = !( // c5
 		// c6
 		x || y
 	);
@@ -36,8 +31,7 @@
 	);
 
 	// An author blank below the glued comment survives it
-	const g = !(
-		// c9
+	const g = !( // c9
 
 		x || y
 	);
@@ -55,21 +49,18 @@
 
 	// The comment-holder's gap opens at the OPERATOR, so the author may put the `(` on a
 	// line of its own; the break it takes there is structure, and no blank is invented
-	const j = !!(
-		// c13
+	const j = !!( // c13
 		x || y
 	);
 
 	// The same, from an authoring that also left a blank BELOW that `(` — that one sits
 	// against the delimiter and stays erased
-	const k = !!(
-		// c14
+	const k = !!( // c14
 		x || y
 	);
 
 	// A blank the author wrote between the comment and the `(` is authorship and rides
-	const l = !!(
-		// c15
+	const l = !!( // c15
 
 		x || y
 	);
@@ -78,8 +69,7 @@
 	// the placement floor reads only a directive alone on its line, so the operand normalizes.
 	// Forcing it onto its own line to "honor" it would ARM a freeze the author never asked
 	// for — see the sibling head fixture, where the own-line authoring does freeze.
-	const m = typeof (
-		// prettier-ignore
-		x || y
+	const m = typeof ( // prettier-ignore
+		x  ||  y
 	);
 </script>
