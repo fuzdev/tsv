@@ -58,6 +58,17 @@ pub(crate) fn comment_end(bytes: &[u8], i: usize) -> usize {
     comment_end_checked(bytes, i).unwrap_or(bytes.len())
 }
 
+/// The end of the block comment opening at the **start** of `s`, or `None` when none
+/// does — the `&str` face of [`comment_end`], for a scanner that steps over a comment by
+/// slicing rather than by byte index.
+///
+/// The end is a `*/` (or end-of-input) boundary and so always a char boundary, which is
+/// what makes it safe to slice with.
+pub(crate) fn leading_comment_end(s: &str) -> Option<usize> {
+    let bytes = s.as_bytes();
+    is_comment_start(bytes, 0).then(|| comment_end(bytes, 0))
+}
+
 /// The end of the block-comment **run** opening at `i`, or `None` when no comment opens
 /// there.
 ///
@@ -100,6 +111,22 @@ mod tests {
         // the case that makes the two functions differ in kind rather than in value.
         assert_eq!(comment_end(b"/* c */", 0), 7);
         assert_eq!(comment_end_checked(b"/* c */", 0), Some(7));
+    }
+
+    #[test]
+    fn leading_comment_end_is_the_str_face_of_comment_end() {
+        assert_eq!(leading_comment_end("/* c */x"), Some(7));
+        assert_eq!(
+            leading_comment_end("x/* c */"),
+            None,
+            "must open AT the start"
+        );
+        assert_eq!(leading_comment_end(""), None);
+        // §4.3.2's EOF clause, so a slicing caller consumes the rest rather than looping.
+        assert_eq!(leading_comment_end("/* c"), Some(4));
+        // Multibyte interiors: the returned end is a `*/` boundary, always sliceable.
+        let s = "/* ünïcödé */2n";
+        assert_eq!(&s[..leading_comment_end(s).unwrap()], "/* ünïcödé */");
     }
 
     #[test]

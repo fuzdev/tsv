@@ -756,15 +756,13 @@ impl<'a> Printer<'a> {
                 span,
                 value_span,
             } => {
-                // A comment inside the An+B text freezes it verbatim: the spacing
-                // normalizer would do string surgery inside the comment content
-                // (`/* a-b */` → `/* a - b */`). Prettier also skips An+B
-                // normalization when a comment is present, so verbatim matches.
-                let normalized = if value.contains("/*") {
-                    Cow::Borrowed(*value)
-                } else {
-                    Self::normalize_an_plus_b(value)
-                };
+                // A comment inside the An+B text is trivia like any other gap material:
+                // the spacing normalizes around it and the comment itself is opaque to
+                // the walk, so its content is never rewritten (`/* a-b */` must not
+                // become `/* a - b */`). Prettier prints the whole *selector* verbatim
+                // whenever it holds a comment — its selector parser gives up before
+                // reaching the An+B — so that spelling is a parser artifact, not a rule.
+                let normalized = Self::normalize_an_plus_b(value);
                 // Comments in the gaps around the An+B text are not part of
                 // `value`; interleave them like the SelectorList arm above.
                 let leading = self.comment_blocks_in_range(span.start, value_span.start);
@@ -929,6 +927,13 @@ impl<'a> Printer<'a> {
     /// - `2n  +  1` → `2n + 1` (collapse multiple spaces)
     /// - `  n  ` → `n` (trim outer spaces)
     /// - `odd`, `even`, `3` → unchanged
+    ///
+    /// A `/* … */` comment is **opaque**: it is copied out byte for byte and separated
+    /// from its neighbours by a single space, exactly like the whitespace it stands in
+    /// for (css-syntax-3 §4.3.2 consumes it to nothing). Reading into it would respace
+    /// operator characters in prose (`/* a-b */` → `/* a - b */`) — the value-scanner
+    /// opacity class, and the reason this walk steps over a comment through
+    /// [`crate::comments`] rather than treating it as content.
     fn normalize_an_plus_b(value: &str) -> Cow<'_, str> {
         // Lowercase the `n` variable when it carries a numeric coefficient
         // (`2N`→`2n`), matching prettier — a bare `N`/`-N` keeps its case (prettier
@@ -937,9 +942,12 @@ impl<'a> Printer<'a> {
         // is cased too.
         let cased = lowercase_an_plus_b_n(value.trim());
 
-        // Simple cases: keywords and plain numbers (no operators) need no spacing
-        // work — return the cased form as-is (borrowed when no `n` was recased).
-        if !cased.contains('+') && !cased.contains('-') {
+        // Simple cases: a keyword or plain number with nothing for the walk to do — no
+        // operator to respace, no comment to space off — returns the cased form as-is
+        // (borrowed when no `n` was recased). Both halves must be asked: a comment is
+        // separated from its neighbours whether or not an operator is present, so gating
+        // on the operators alone would leave `2n/* c */` glued.
+        if !cased.contains(['+', '-']) && !cased.contains("/*") {
             return cased;
         }
 
@@ -949,10 +957,27 @@ impl<'a> Printer<'a> {
         // and the loop never emits a leading/trailing space, so no final trim copy
         // is needed.
         let mut result = String::with_capacity(cased.len() + 4);
-        let mut chars = cased.chars().peekable();
+        let mut rest = cased.as_ref();
         let mut prev_exists = false;
 
-        while let Some(ch) = chars.next() {
+        while let Some(ch) = rest.chars().next() {
+            // A comment is trivia standing in for whitespace: copy it verbatim, spaced
+            // off from whatever sits on either side of it.
+            if let Some(end) = crate::comments::leading_comment_end(rest) {
+                if prev_exists && !result.ends_with(' ') {
+                    result.push(' ');
+                }
+                result.push_str(&rest[..end]);
+                rest = rest[end..].trim_start();
+                if !rest.is_empty() {
+                    result.push(' ');
+                }
+                prev_exists = true;
+                continue;
+            }
+
+            rest = &rest[ch.len_utf8()..];
+
             // Handle + and - operators: always normalize to ` op `
             if (ch == '+' || ch == '-') && prev_exists {
                 // Operator only when there is content before it (compute the trimmed
@@ -965,10 +990,8 @@ impl<'a> Printer<'a> {
 
                     // Skip any spaces after the operator and add a single space
                     // only when more content follows.
-                    while matches!(chars.peek(), Some(c) if c.is_whitespace()) {
-                        chars.next();
-                    }
-                    if chars.peek().is_some() {
+                    rest = rest.trim_start();
+                    if !rest.is_empty() {
                         result.push(' ');
                     }
                     prev_exists = true;
@@ -999,30 +1022,36 @@ fn split_nth_of(value: &str) -> Option<&str> {
 /// preserves it), and the `even`/`odd` keywords are untouched (their `n` is not
 /// digit-preceded). Borrows when there is nothing to change.
 fn lowercase_an_plus_b_n(s: &str) -> Cow<'_, str> {
-    let bytes = s.as_bytes();
-    let needs = bytes
-        .iter()
-        .enumerate()
-        .any(|(i, &b)| b == b'N' && i > 0 && bytes[i - 1].is_ascii_digit());
-    if !needs {
+    // No `N` at all — comment interiors included — means nothing to case, which is every
+    // real An+B. A comment that merely spells one takes the walk and comes out unchanged.
+    if !s.contains('N') {
         return Cow::Borrowed(s);
     }
     let mut out = String::with_capacity(s.len());
+    let mut rest = s;
     let mut prev_digit = false;
-    for ch in s.chars() {
-        if ch == 'N' && prev_digit {
-            out.push('n');
-        } else {
-            out.push(ch);
+    while let Some(ch) = rest.chars().next() {
+        // A comment is prose, not a term: `/* 2N */` keeps its case (the value-scanner
+        // opacity class — see `normalize_an_plus_b`), and it also breaks the digit run,
+        // so an `N` just past it is bare rather than coefficient-carrying — which is what
+        // the tokenizer sees too, since `2/* c */N` is a number and an ident, never one
+        // `<n-dimension>`.
+        if let Some(end) = crate::comments::leading_comment_end(rest) {
+            out.push_str(&rest[..end]);
+            rest = &rest[end..];
+            prev_digit = false;
+            continue;
         }
+        out.push(if ch == 'N' && prev_digit { 'n' } else { ch });
         prev_digit = ch.is_ascii_digit();
+        rest = &rest[ch.len_utf8()..];
     }
     Cow::Owned(out)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::lowercase_an_plus_b_n;
+    use super::{Printer, lowercase_an_plus_b_n};
 
     /// Preserved consecutive combinators produce empty-compound `RelativeSelector`s, which
     /// both selector printer paths must handle without panicking or losing idempotency. The
@@ -1057,13 +1086,56 @@ mod tests {
         assert_eq!(lowercase_an_plus_b_n("2N+1"), "2n+1");
         assert_eq!(lowercase_an_plus_b_n("0N"), "0n");
         // Bare `N`/`-N` keep their case (prettier preserves them).
-        assert!(matches!(
-            lowercase_an_plus_b_n("N"),
-            std::borrow::Cow::Borrowed("N")
-        ));
+        assert_eq!(lowercase_an_plus_b_n("N"), "N");
         assert_eq!(lowercase_an_plus_b_n("-N+3"), "-N+3");
         // `even`/`odd` are untouched (their `n` is not digit-preceded).
         assert_eq!(lowercase_an_plus_b_n("EVEN"), "EVEN");
         assert_eq!(lowercase_an_plus_b_n("ODD"), "ODD");
+        // No `N` anywhere — every real An+B — is borrowed rather than copied.
+        assert!(matches!(
+            lowercase_an_plus_b_n("2n + 1"),
+            std::borrow::Cow::Borrowed(_)
+        ));
+        // A comment is opaque: its interior keeps its case, and it breaks the digit run,
+        // so an `N` just past one is bare (`2/* c */N` is a number and an ident, never
+        // one `<n-dimension>`).
+        assert_eq!(lowercase_an_plus_b_n("2n /* 2N */ + 1"), "2n /* 2N */ + 1");
+        assert_eq!(lowercase_an_plus_b_n("2/* c */N"), "2/* c */N");
+    }
+
+    /// The An+B spacing walk treats a comment as one opaque unit of trivia: separated
+    /// from its neighbours by a single space, never read into. The fixtures pin the
+    /// whole-selector forms; these pin the function on the shapes a fixture cannot
+    /// reach (a term that is not a `:nth-*()` argument's whole value).
+    #[test]
+    fn normalize_an_plus_b_steps_over_comments() {
+        // Both interior gaps, glued, space off.
+        assert_eq!(
+            Printer::normalize_an_plus_b("2n/* c */+1"),
+            "2n /* c */ + 1"
+        );
+        assert_eq!(
+            Printer::normalize_an_plus_b("2n+/* c */1"),
+            "2n + /* c */ 1"
+        );
+        // A glued run separates single-spaced, like a glued run in a value list.
+        assert_eq!(
+            Printer::normalize_an_plus_b("2n/* a *//* b */+1"),
+            "2n /* a */ /* b */ + 1"
+        );
+        // Operator characters inside the comment are never respaced — the corruption the
+        // old verbatim freeze existed to avoid.
+        assert_eq!(
+            Printer::normalize_an_plus_b("2n/* a+b-c */+1"),
+            "2n /* a+b-c */ + 1"
+        );
+        // A comment with no operator beside it still spaces off (the fast path must ask
+        // about comments, not just operators).
+        assert_eq!(Printer::normalize_an_plus_b("2n/* c */"), "2n /* c */");
+        // Already-normalized forms are fixed points.
+        assert_eq!(
+            Printer::normalize_an_plus_b("2n /* c */ + 1"),
+            "2n /* c */ + 1"
+        );
     }
 }

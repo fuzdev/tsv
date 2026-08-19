@@ -16,15 +16,16 @@ Syntax 3, comments are valid wherever whitespace is. See
 
 Gap-comment spacing normalizes to single spaces, keeping the comment's side —
 the same rule as every other selector-comment position — while prettier
-preserves the source spacing. The gaps are: before the An+B, between `of` and
-the selector list, and after the `of` selector list; `prettier_variant_compact`
-pins the glued forms prettier keeps stable.
+preserves the source spacing. The gaps are: before the An+B, inside the An+B
+expression text, between `of` and the selector list, and after the `of` selector
+list; `prettier_variant_compact` pins the glued forms prettier keeps stable.
 
-A comment **inside** the An+B expression text freezes the whole An+B verbatim —
-no operator respacing, which would otherwise corrupt comment content
-(`/* a-b */` must not become `/* a - b */`). Prettier likewise skips An+B
-normalization when a comment is present, so the verbatim forms match (this part
-is not a divergence). See
+A comment **inside** the An+B expression text does not freeze it — the operator
+spacing normalizes as usual, and the comment is opaque to the respacing, so its
+content is never rewritten (`/* a-b */` must not become `/* a - b */`). Prettier
+prints the *whole selector* verbatim whenever it holds a comment, which is its
+selector parser giving up rather than a rule about An+B, so
+`prettier_variant_compact` pins the glued `2n+1 /* a-b */` spelling it keeps. See
 [conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
