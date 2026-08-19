@@ -1036,6 +1036,18 @@ fn build_chain_args_single(
     // Mirrors call_formatting.rs's isTemplateOnItsOwnLine handling:
     // when the template starts on the same line as the opening paren,
     // prettier hugs it (no break between `(` and the backtick).
+    //
+    // ⚠️ Do NOT delete this as "the outer dispatcher already routes such a call to the flat
+    // form" — that bypass only sees the OUTERMOST call, and the two answers are genuinely
+    // different questions. Prettier reaches the hug here through `printCallee`'s recursion
+    // into `printCallExpression` when a call's callee is a plain call
+    // (`` template(`…`)({…}) `` — hugged in prettier's own snapshot), which tsv's linearizer
+    // folds into a chain; it does NOT reach it for a link of a real member chain
+    // (`` a.b(`x⏎y`).c().d(z) ``, where `printMemberChain` prints the group's arguments
+    // itself and the template expands). Neutralizing this arm was measured over ~23k files:
+    // exactly two movers, both prettier-suite files, and both AWAY from prettier's committed
+    // output. The residual — the member-chain link, where tsv hugs and prettier expands — is
+    // a chain-linearization difference, not this arm's.
     if is_multiline_template_expression(arg) {
         parts.push(d.text(prefix));
         parts.push(arg_with_comments);

@@ -8,6 +8,7 @@ use super::super::Printer;
 use super::super::comments::ParenLeadingValue;
 use super::arg_comments::{PartitionedComments, should_force_expansion_for_comments};
 use super::arg_predicates::{is_expandable_object, is_hook_callback_with_deps};
+use super::arg_wrapping::try_hug_multiline_template_arg;
 use crate::ast::internal;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -23,9 +24,13 @@ fn import_phase_word(phase: internal::ImportPhase) -> Option<&'static str> {
     }
 }
 
-/// The whole opening of a (possibly phased) dynamic import — `import`, the phase
-/// (`.source` / `.defer`) when there is one, and the `(` — plus the offset where the
+/// The HEAD of a (possibly phased) dynamic import — `import` plus the phase (`.source` /
+/// `.defer`) when there is one, everything before the `(` — plus the offset where the
 /// caller's leading-comment scan must begin.
+///
+/// The `(` is the layout's, not the head's: it is what a call and a `new` hand their own
+/// argument builders as the callee, so the multiline-template hug — the one layout here
+/// that owns its `(` — can take the same shared builder they do.
 ///
 /// A phased import is a dotted pair (`import` `.` `source`), so both gaps around its dot
 /// are positions an author can comment in; the shared printer emits them. Baking the
@@ -38,7 +43,7 @@ fn import_phase_word(phase: internal::ImportPhase) -> Option<&'static str> {
 /// exactly as before. `span.start + import_open(phase).len()` could not: it assumes the
 /// opening is contiguous, so a comment inside it shifts the real `(` past that offset
 /// and the scan starts mid-comment, missing it. That was the drop.
-fn build_import_open_doc(
+fn build_import_head_doc(
     printer: &Printer<'_>,
     import_expr: &internal::ImportExpression<'_>,
 ) -> (DocId, u32) {
@@ -74,7 +79,7 @@ fn build_import_open_doc(
         },
     };
 
-    (d.concat(&[head, d.text("(")]), head_end)
+    (head, head_end)
 }
 
 /// The import-argument shell, in whichever of its two shapes the layout calls for: the
@@ -279,13 +284,34 @@ pub(super) fn build_import_expression_doc(
 ) -> DocId {
     let d = printer.d();
 
-    // The opening — `import`, any phase (`.source` / `.defer`), and the `(` — built once
-    // and threaded into every wrapper. It also reports where the leading-comment scan
-    // starts: the head's end, so the scan spans the `(` and catches a comment on either
-    // side of it (`import /* c */ ('m')`, `import(/* @vite-ignore */ m)`). Own-line
-    // comments force the parens to break; `leading_forces_break` drives that below.
-    let (open, leading_scan_start) = build_import_open_doc(printer, import_expr);
+    // The head — `import` plus any phase (`.source` / `.defer`) — built once and threaded
+    // into every wrapper below with the `(` appended. It also reports where the
+    // leading-comment scan starts: the head's end, so the scan spans the `(` and catches a
+    // comment on either side of it (`import /* c */ ('m')`, `import(/* @vite-ignore */ m)`).
+    // Own-line comments force the parens to break; `leading_forces_break` drives that below.
+    let (head, leading_scan_start) = build_import_head_doc(printer, import_expr);
     let source_start = import_expr.source.span().start;
+
+    // Single multiline-template specifier on the `(` line — hug it, through the same
+    // builder the plain call, `new` and the member chain take. Prettier reaches it the same
+    // way: `isTemplateLiteralSingleArg` is asked at the top of `printCallExpression`, whose
+    // node list has `ImportExpression` in it, so the rule is one rule across all four
+    // spellings rather than a call-only special case. `options.is_none()` is this node's
+    // spelling of the shared `args.len() == 1` — an import's arguments are two named fields,
+    // not a slice.
+    if import_expr.options.is_none()
+        && let Some(doc) = try_hug_multiline_template_arg(
+            printer,
+            head,
+            std::slice::from_ref(import_expr.source),
+            leading_scan_start,
+            import_expr.span.end,
+        )
+    {
+        return doc;
+    }
+
+    let open = d.concat(&[head, d.text("(")]);
 
     // Rule A over the two arguments: `import()`'s source and options are an argument list
     // like any other, so an own-line directive in the head→source gap (which spans the

@@ -2172,6 +2172,38 @@ pub(super) fn build_empty_args_doc(
     printer.d().concat(&parts)
 }
 
+/// Whether the sole-multiline-template hug applies — [`try_hug_multiline_template_arg`]'s
+/// whole guard set, named because the call DISPATCHER has to ask the same question one level
+/// up (a memberish callee is routed into the chain printer before any argument layout is
+/// consulted, and this rule outranks that routing in prettier).
+///
+/// `gap_start` is where the `(` follows, per each family's convention — see
+/// [`try_hug_multiline_template_arg`].
+pub(super) fn multiline_template_hug_applies(
+    printer: &Printer<'_>,
+    args: &[internal::Expression<'_>],
+    gap_start: u32,
+) -> bool {
+    args.len() == 1
+        && is_multiline_template_expression(&args[0])
+        // Prettier's `isTemplateOnItsOwnLine`: a template the author put on a line of its
+        // own declines, and the caller falls through to the expanded layout.
+        && !has_newline_before_position(printer.source, args[0].span().start)
+        // An honored directive in this gap DECLINES the hug — the parameter list's answer to
+        // the same question (`docs/conformance_prettier_ignore.md` §On parameter lists: "a
+        // lone huggable parameter expands rather than hugging, because a hug would pull the
+        // directive off its own line and make it inert"). The hug is a flat concat with no
+        // line of its own to put the run on, so the directive would land on the `(`'s —
+        // inert — and the freeze this very gap grants would be gone on pass 2. Prettier hugs
+        // and stays frozen (its directive lookup is attachment-based, not line-based), so
+        // the expanded form is a cataloged divergence rather than a match.
+        //
+        // Not implied by the newline test above: the directive's own trailing newline puts
+        // the template on a fresh line only when nothing else follows it, and
+        // `` fn(⏎// prettier-ignore⏎/* x */ `a⏎b`) `` glues a SECOND comment to the backtick.
+        && printer.args_frozen_span(gap_start, args, 0).is_none()
+}
+
 /// Single multiline-template argument on the same line as `(` — hug it,
 /// keeping trailing comments as a line suffix.
 ///
@@ -2179,22 +2211,47 @@ pub(super) fn build_empty_args_doc(
 /// - Hugged: `` fn(`line1\nline2`) `` → keep inline (no groups)
 /// - Expanded: template on its own line → returns None so the caller falls
 ///   through to the has_multiline_content path (hardline expansion).
+///
+/// `gap_start` opens the `(`-line gap — the position after the callee and its type
+/// arguments, i.e. the same `paren_open` every other argument seam scans from. The gap
+/// spans the `(` itself, so a comment the author wrote on either side of it
+/// (`` fn/* c */(`…`) ``, `` fn(/* c */ `…`) ``) lands in the one region and takes the one
+/// emitter; prettier reaches the same place from the other side, attaching both spellings
+/// as the argument's own leading comments.
+///
+/// ⚠️ A `//` CAN be in that gap, and the tempting argument that it cannot is one comment
+/// short: a line comment ends its line, but the hug's own test asks only what precedes the
+/// BACKTICK, so `` fn(// c⏎/* x */ `a⏎b`) `` glues a second comment to the template and the
+/// hug still fires. The leading-run emitter handles it (`//` takes a hardline separator, so
+/// it keeps its line and swallows nothing) — but a caller must not assume this gap is
+/// block-only. It is the same near-miss the honored-directive conjunct in
+/// [`multiline_template_hug_applies`] documents, and the same one that makes a chain callee's
+/// DEFERRED `//` weld here (see `calls/mod.rs`'s bypass, which declines for it).
 pub(super) fn try_hug_multiline_template_arg(
     printer: &Printer<'_>,
     callee: DocId,
     args: &[internal::Expression<'_>],
+    gap_start: u32,
     paren_close: u32,
 ) -> Option<DocId> {
-    if args.len() != 1 || !is_multiline_template_expression(&args[0]) {
+    if !multiline_template_hug_applies(printer, args, gap_start) {
         return None;
     }
     let template_start = args[0].span().start;
-    if has_newline_before_position(printer.source, template_start) {
-        return None;
-    }
     let d = printer.d();
-    let arg_doc = printer.build_expression_doc(&args[0]);
-    let mut parts: DocBuf = smallvec![callee, d.text("("), arg_doc];
+    // Argument context, matching what the member chain's twin arm splices — a no-op for a
+    // template either way, and the shape the rule is stated in.
+    let arg_doc = printer.build_arg_expression_doc(&args[0]);
+    let mut parts: DocBuf = smallvec![callee, d.text("(")];
+    // The `(`-line gap. Emitted here or DROPPED — this builder reassembles the call from
+    // two texts plus the argument's doc, so nothing outside can see in (hazard 4 in
+    // docs/comments.md). An OWNED comment (one the author glued to the backtick) rides
+    // `arg_doc` instead and the emitter returns `None` for it, which is what keeps the two
+    // from double-printing the same bytes.
+    if let Some(leading) = printer.build_rhs_comments_glued_opt(gap_start, template_start) {
+        parts.push(leading);
+    }
+    parts.push(arg_doc);
     // The template→`)` gap, per the canonical trailing-run rule: a block inline before
     // the `)`, a `//` deferred past it (the hug keeps the call flat, so the suffix
     // flushes at the statement's own break — `` fn(`…`); // c ``, matching prettier),

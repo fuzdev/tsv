@@ -399,15 +399,31 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// disjoint (the clause-tail seven are `js/no-semi/*` and `js/for/*`, the IIFE mover is
 	// `js/function/*`), and that was verified per file rather than assumed.
 	//
-	// 110 → 109: `js/sequence-expression/ignored.js` LEAVES the bucket by MATCHING
-	// (`match` 4412 → 4413) — a file whose whole content is a `// prettier-ignore` in an
+	// 110 → 109 (`main`, the value-head freeze): `js/sequence-expression/ignored.js` LEAVES
+	// the bucket by MATCHING — a file whose whole content is a `// prettier-ignore` in an
 	// arrow's `=>`→body gap. The `=>`→body head now resolves the value-head freeze
 	// (`Printer::value_head_frozen_span`), along with the enum member's and the `for`
 	// header's init declarator `=`→value gaps, the last three hosts of the assignment
 	// family that were absent from the rule. A/B'd against a HEAD-source rebuild over the
 	// whole corpus: this file is the ONLY move in any bucket — nothing arrived in
 	// `unknown`, and `partial` / `safety` / `errors` / `expected_errors` are byte-identical.
-	typescript: 109,
+	//
+	// 110 → 108 (`bug456`, the multiline-template hug): `js/dynamic-import/template-literal.js`
+	// and `js/dynamic-import/import-phase.js` leave for **match** — a fix, not a
+	// reclassification. A dynamic `import()` never asked the sole-multiline-template hug, so
+	// it expanded where prettier keeps the specifier on the `(` line; `import()` shares
+	// `printCallExpression` with a call, so the rule reaches it too. Measured by a
+	// whole-corpus byte-diff against a reverse-patched build (~23k files): these two are the
+	// ONLY non-fixture movers in any bucket, and both land byte-identical to prettier's own
+	// committed snapshot.
+	//
+	// ⚠️ **107 is the re-measurement on the merged tip, not 110 − 1 − 2.** The two entries
+	// above landed on separate branches, each measured against 110 in its own tree; the sum
+	// is only *predictive*, and this file's earlier merge (111 − 1 = 110) is the standing
+	// reminder that it has to be verified per file rather than assumed. It was: the three
+	// movers are disjoint (`js/sequence-expression/*` vs `js/dynamic-import/*`) and
+	// `corpus:compare:format --all` on the merged tree reports 107.
+	typescript: 107,
 	css: 23
 };
 
