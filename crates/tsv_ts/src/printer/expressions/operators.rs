@@ -288,9 +288,31 @@ impl<'a> Printer<'a> {
         // between argument end and unary span end is lost if we don't re-add parens.
         let has_trailing_comments = self.has_comments_to_emit_between(argument_end, unary.span.end);
 
+        // The operator→operand value head ([`Printer::value_head_frozen_span`]): an own-line
+        // directive in the gap freezes the whole operand. The comment-holder shell below is
+        // the PRINTER's pair, so it stays outside the slice exactly as at every other value
+        // head — and its own trailing-run emitter still answers the slice→`)` gap, so nothing
+        // here open-codes a second pair.
+        //
+        // Unlike `await` / `new` this gap needs no placement rule of its own: the shell's
+        // leading run already gives an own-line comment its own line, which is where the
+        // floor reads the directive, so the frozen and unfrozen layouts agree.
+        let frozen = self.value_head_frozen_span(operator_end, unary.argument.span());
+        // A resolved freeze reaches the comment-holder arm and no other: the directive is a
+        // LINE comment alone on its line, so it can neither be owned nor be claimed by the
+        // glued split, and `leading_comments_opt` therefore holds it. Every other arm emits
+        // no run at all, which would drop the directive along with the freeze.
+        debug_assert!(
+            frozen.is_none() || has_leading_comments,
+            "a unary→operand freeze must reach the comment-holder shell"
+        );
+
         let argument_doc = if has_leading_comments || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
-            let inner = self.build_expression_doc(unary.argument);
+            let inner = match frozen {
+                Some(frozen) => self.build_frozen_expression_doc(unary.argument, frozen),
+                None => self.build_expression_doc(unary.argument),
+            };
             // The outer comment-holder parens already group the operand, so the inner
             // needs_parens layer is redundant for a binary/logical operand — prettier
             // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their

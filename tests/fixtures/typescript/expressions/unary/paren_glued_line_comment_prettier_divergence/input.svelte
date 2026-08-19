@@ -64,4 +64,12 @@
 
 		x || y
 	);
+
+	// The rule keeps an ignore DIRECTIVE on that line too, and that is what leaves it inert:
+	// the placement floor reads only a directive alone on its line, so the operand normalizes.
+	// Forcing it onto its own line to "honor" it would ARM a freeze the author never asked
+	// for — see the sibling head fixture, where the own-line authoring does freeze.
+	const m = typeof ( // prettier-ignore
+		x || y
+	);
 </script>
