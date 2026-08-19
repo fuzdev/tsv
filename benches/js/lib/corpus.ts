@@ -26,6 +26,7 @@
  */
 
 import { fs_exists } from '@fuzdev/fuz_util/fs.ts';
+import { Buffer } from 'node:buffer';
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
@@ -198,7 +199,7 @@ async function* walk_corpus(
 				path,
 				content,
 				language,
-				bytes: new TextEncoder().encode(content).length
+				bytes: Buffer.byteLength(content, 'utf8')
 			};
 		} catch (e) {
 			console.warn(`Warning: Could not read ${path}: ${e}`);
@@ -235,7 +236,7 @@ async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
 				path,
 				content,
 				language,
-				bytes: new TextEncoder().encode(content).length,
+				bytes: Buffer.byteLength(content, 'utf8'),
 				goal
 			};
 		} catch (e) {

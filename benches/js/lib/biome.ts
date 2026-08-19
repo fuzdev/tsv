@@ -21,7 +21,6 @@ import type { Biome } from '@biomejs/js-api/bundler';
  *   internally but never surfaces the AST across the JS boundary.
  */
 export class BiomeImplementation extends BaseImplementation {
-	readonly name = 'biome-wasm' as const;
 	readonly versions: BiomeVersions;
 	private _biome: Biome | null = null;
 	private _project_key: number | null = null;

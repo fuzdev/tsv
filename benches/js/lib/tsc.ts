@@ -118,7 +118,6 @@ export function tsc_parse(ts: TypeScriptModule, file_name: string, source: strin
 }
 
 export class TscImplementation extends BaseImplementation {
-	readonly name = 'tsc' as const;
 	/** Parse only, TypeScript/JS only — tsc has no source printer and no Svelte/CSS. */
 	readonly parse_languages: ReadonlyArray<Language> = ['typescript'];
 	readonly format_languages: ReadonlyArray<Language> = [];

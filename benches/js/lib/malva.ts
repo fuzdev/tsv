@@ -31,7 +31,6 @@ import type { Formatter } from '@dprint/formatter';
  *   config entry points, never an AST across the boundary.
  */
 export class MalvaImplementation extends BaseImplementation {
-	readonly name = 'malva-wasm' as const;
 	readonly versions: MalvaVersions;
 	private _formatter: Formatter | null = null;
 

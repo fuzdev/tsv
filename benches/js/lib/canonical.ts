@@ -42,7 +42,6 @@ const PRETTIER_OPTIONS = {
 } as const;
 
 export class CanonicalImplementation extends BaseImplementation {
-	readonly name = 'canonical' as const;
 	readonly versions: CanonicalVersions;
 
 	#prettier: PrettierModule | null = null;

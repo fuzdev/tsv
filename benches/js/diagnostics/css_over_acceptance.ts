@@ -42,7 +42,7 @@
 import { DevReposLoader } from '../lib/corpus.ts';
 import { CSS_REJECTS_PIN } from '../lib/gate_counts.ts';
 import { init_implementations } from '../lib/implementations.ts';
-import type { TsvImplementation } from '../lib/types.ts';
+import { CANONICAL_PARSER_ROWS, type TsvImplementation } from '../lib/types.ts';
 
 /** Sample paths kept per tool for `--verbose` — enough to see the shape, not a dump. */
 const SAMPLE_LIMIT = 8;
@@ -55,9 +55,18 @@ const log = (...args: unknown[]): void => {
 
 const impls = await init_implementations({ logger: log });
 
+/**
+ * The row this comparison's ORACLE reports under. Named once because the run
+ * REGISTERS the row below and looks it up again further down — the register /
+ * look-up pair is where a respelling goes unnoticed. From the shared constant
+ * rather than spelled here, since `parseCss` is the canonical CSS parser the rest
+ * of the harness already names that way.
+ */
+const ORACLE_ROW = CANONICAL_PARSER_ROWS.css;
+
 /** The CSS-parsing rows, in the conformance report's display order. */
 const rows: Array<{ name: string; impl: TsvImplementation | undefined }> = [
-	{ name: 'svelte/compiler', impl: impls.canonical },
+	{ name: ORACLE_ROW, impl: impls.canonical },
 	{ name: 'tsv', impl: impls.native },
 	{ name: 'tsv_wasm', impl: impls.wasm },
 	{ name: 'postcss', impl: impls.postcss }
@@ -132,7 +141,7 @@ for (const { name, impl } of rows) {
 for (const { impl } of rows) impl?.dispose();
 
 // The oracle row must be 0 — see the module doc.
-const oracle_row = results.find((r) => r.name === 'svelte/compiler');
+const oracle_row = results.find((r) => r.name === ORACLE_ROW);
 const oracle_broken = oracle_row !== undefined && oracle_row.accepted > 0;
 
 if (json_mode) {

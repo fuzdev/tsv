@@ -42,7 +42,7 @@ import { readFile } from 'node:fs/promises';
 
 import { init_implementations } from '../lib/implementations.ts';
 import { TS_REPO_REJECTS_PIN } from '../lib/gate_counts.ts';
-import type { TsvImplementation } from '../lib/types.ts';
+import { CANONICAL_PARSER_ROWS, type TsvImplementation } from '../lib/types.ts';
 
 const REJECTS_PATH = 'benches/js/.cache/ts_repo_rejects.json';
 /** Sample paths kept per tool for `--verbose` — enough to see the shape, not a dump. */
@@ -84,10 +84,19 @@ for (const path of paths) {
 
 const impls = await init_implementations({ logger: log });
 
+/**
+ * The row this comparison's ORACLE reports under. Named once because the run
+ * REGISTERS the row below and looks it up again further down — the register /
+ * look-up pair is where a respelling goes unnoticed. `tsc` rather than the
+ * canonical parser here: the corpus is the files tsc's own parser rejects, so tsc
+ * is what must score zero (see the module doc).
+ */
+const ORACLE_ROW = 'tsc';
+
 /** The TS-parsing rows, in the conformance report's display order. */
 const rows: Array<{ name: string; impl: TsvImplementation | undefined }> = [
-	{ name: 'tsc', impl: impls.tsc },
-	{ name: 'acorn-typescript', impl: impls.canonical },
+	{ name: ORACLE_ROW, impl: impls.tsc },
+	{ name: CANONICAL_PARSER_ROWS.typescript, impl: impls.canonical },
 	{ name: 'tsv', impl: impls.native },
 	{ name: 'tsv_wasm', impl: impls.wasm },
 	{ name: 'oxc-parser', impl: impls.oxc },
@@ -132,7 +141,7 @@ for (const { name, impl } of rows) {
 for (const { impl } of rows) impl?.dispose();
 
 // The oracle row must be 0 — see the module doc.
-const oracle = results.find((r) => r.name === 'tsc');
+const oracle = results.find((r) => r.name === ORACLE_ROW);
 const oracle_broken = oracle !== undefined && oracle.accepted > 0;
 
 if (json_mode) {

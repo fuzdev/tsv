@@ -10,6 +10,7 @@
  */
 
 import {
+	CANONICAL_PARSER_ROWS,
 	type Language,
 	LANGUAGES,
 	type Logger,
@@ -558,7 +559,7 @@ export function get_benchmark_tasks(
 		add(
 			'canonical',
 			true,
-			canonical_parser_label(language),
+			CANONICAL_PARSER_ROWS[language],
 			'canonical',
 			(source, _language, goal) => impls.canonical.parse(source, language, goal)
 		);
@@ -853,18 +854,6 @@ export function unavailable_with_rows(
 		reason: u.reason,
 		rows: defined.filter((row) => row.impl === u.key).map((row) => row.name)
 	}));
-}
-
-/** Get canonical parser label for a language */
-export function canonical_parser_label(lang: Language): string {
-	switch (lang) {
-		case 'svelte':
-			return 'svelte/compiler';
-		case 'typescript':
-			return 'acorn-typescript';
-		case 'css':
-			return 'svelte/compiler';
-	}
 }
 
 /**

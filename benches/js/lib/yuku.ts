@@ -239,6 +239,12 @@ function assert_options_land(parser: YukuParserModule, binding: YukuBinding): vo
  * - Format: None (yuku ships no formatter)
  */
 export class YukuImplementation extends BaseImplementation {
+	/**
+	 * Which of the two bindings this instance drives — the specifier it imports,
+	 * the version it reports, and the label its errors carry. A wrapper-local
+	 * selector, not a shared identity: no impl declares a name to the harness,
+	 * which keys everything on the ROW names `get_benchmark_tasks` registers.
+	 */
 	readonly name: YukuBinding;
 	readonly versions: YukuVersions;
 	private _parser: YukuParserModule | null = null;

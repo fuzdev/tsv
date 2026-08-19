@@ -62,7 +62,6 @@ interface SwcModule {
  * - Format: unsupported — swc ships no formatter.
  */
 export class SwcImplementation extends BaseImplementation {
-	readonly name = 'swc' as const;
 	readonly versions: SwcVersions;
 	private _swc: SwcModule | null = null;
 

@@ -26,7 +26,27 @@ export const LANGUAGE_PRETTIER_PARSERS: Record<Language, string> = {
 	css: 'css'
 };
 
-/** A source file loaded into memory for benchmarking */
+/**
+ * The canonical PARSER's row name per language — the oracle every parse row is
+ * measured against, and the per-group table's baseline. CSS shares svelte's entry
+ * because the oracle there is svelte's own `parseCss`.
+ *
+ * Here rather than beside either consumer: `lib/implementations.ts` registers the
+ * row under this name and `lib/report.ts` looks the row up by it, and those two
+ * cannot import from each other (implementations.ts already `import type`s report
+ * types, so a value import back would close a runtime cycle). As two spellings
+ * they were a rename away from the report silently failing to find the baseline
+ * row it names.
+ */
+export const CANONICAL_PARSER_ROWS: Record<Language, string> = {
+	svelte: 'svelte/compiler',
+	typescript: 'acorn-typescript',
+	css: 'svelte/compiler'
+};
+
+/** The canonical FORMATTER's row name — one tool for every language. */
+export const CANONICAL_FORMATTER_ROW = 'prettier';
+
 /**
  * The TypeScript/JS parse goal (`sourceType`). Only test262 fixtures carry a
  * non-default goal — a `flags: [module]` test is `module`, everything else is a
@@ -39,6 +59,7 @@ export const LANGUAGE_PRETTIER_PARSERS: Record<Language, string> = {
  */
 export type ParseGoal = 'script' | 'module';
 
+/** A source file loaded into memory for benchmarking. */
 export interface SourceFile {
 	/** Absolute path to the file */
 	path: string;
@@ -46,7 +67,13 @@ export interface SourceFile {
 	content: string;
 	/** Detected language based on extension */
 	language: Language;
-	/** Size in bytes */
+	/**
+	 * UTF-8 size — the denominator of every MB/s figure, so it must be BYTES and
+	 * not `content.length` (UTF-16 code units, which under-counts every non-ASCII
+	 * file). Measured with `Buffer.byteLength`, which computes the length without
+	 * materializing the encoded copy a `TextEncoder().encode(…).length` would
+	 * allocate for each of the corpus's thousands of files.
+	 */
 	bytes: number;
 	/**
 	 * True when this file comes from a version-pinned, `pins:audit`-tracked
@@ -74,29 +101,8 @@ export interface SourceFile {
 	goal?: ParseGoal;
 }
 
-/** Implementation names for benchmarking */
-export type ImplementationName =
-	| 'canonical'
-	| 'native'
-	| 'napi'
-	| 'wasm'
-	| 'oxc'
-	| 'oxc-wasm'
-	| 'tsc'
-	| 'yuku-parser'
-	| 'yuku-parser-wasm'
-	| 'biome-wasm'
-	| 'dprint-wasm'
-	| 'malva-wasm'
-	| 'postcss'
-	| 'rsvelte-fmt'
-	| 'rsvelte-parse'
-	| 'swc';
-
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {
-	name: ImplementationName;
-
 	/** Initialize the implementation (load WASM, open FFI library, etc.) */
 	init(): Promise<void>;
 
@@ -151,8 +157,6 @@ export interface TsvImplementation {
  * logic can still override the two methods.
  */
 export abstract class BaseImplementation implements TsvImplementation {
-	abstract readonly name: ImplementationName;
-
 	/** Languages this impl can parse; `[]` for a format-only tool. */
 	abstract readonly parse_languages: ReadonlyArray<Language>;
 

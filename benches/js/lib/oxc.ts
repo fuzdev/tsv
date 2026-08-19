@@ -49,7 +49,6 @@ interface OxfmtModule {
  * - Format: TypeScript, JS, CSS, Svelte (Svelte is experimental, expect partial coverage)
  */
 export class OxcImplementation extends BaseImplementation {
-	readonly name = 'oxc' as const;
 	readonly versions: OxcVersions;
 	private _parser: OxcParserModule | null = null;
 	private _formatter: OxfmtModule | null = null;
