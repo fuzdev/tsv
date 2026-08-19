@@ -145,11 +145,11 @@ pub(crate) fn print_node_inner<'a>(
             }
         }
 
-        ChainNode::Call { call, optional } => {
+        ChainNode::Call { call, facts } => {
             if expanded {
-                printer.print_call_args_expanded(call, *optional)
+                printer.print_call_args_expanded(call, *facts)
             } else {
-                printer.print_call_args(call, *optional)
+                printer.print_call_args(call, *facts)
             }
         }
 
@@ -413,8 +413,8 @@ pub(crate) fn print_group_standard_expanded<'a>(
         .nodes
         .iter()
         .map(|n| match n {
-            ChainNode::Call { call, optional } => {
-                printer.print_call_args_standard_expanded(call, *optional)
+            ChainNode::Call { call, facts } => {
+                printer.print_call_args_standard_expanded(call, *facts)
             }
             _ => print_node_inner(n, printer, false, false),
         })
@@ -774,6 +774,43 @@ pub(crate) fn node_comment_gap(node: &ChainNode<'_>, printer: &Printer<'_>) -> O
         return Some((object_end, bracket_open));
     }
     Some((object_end, property_start))
+}
+
+/// Ask `f` about a chain node's comment gap while honoring the node's own
+/// [`ChainNode::paren_gap_skip`] hole — the same region the EMITTER claims
+/// ([`Printer::classify_chain_gap`]), so every question asked about a gap is asked about the
+/// gap that gap actually owns.
+///
+/// A node linearization did not widen has no hole and this is exactly `f(start, end)`.
+///
+/// ⚠️ **The hole is the object subtree's whole span, and every comment in it is printed by
+/// something else**: an inner chain node's own gap, a call's arguments, a computed lookup's
+/// brackets, and — past the innermost widened claim — the chain HEAD's share
+/// (`calls::chain_head_comment_window`). A predicate that reads the widened
+/// range whole therefore answers about comments this gap cannot see, and the answer is a
+/// layout the same document does not get when the author writes one paren fewer: a `//`
+/// above `((⟨⟩a).b).c(x)` force-expanded the chain, where `(⟨⟩a).b.c(x)` — one stripped
+/// paren, so no widening at all — stays flat.
+///
+/// Every question over a chain gap routes here, with two stated exceptions. The EMITTER
+/// ([`Printer::classify_chain_gap`]) keeps its own spelling because it builds a
+/// `ClassifiedComments` rather than answering a `bool`, and an unconditional second classify
+/// would cost every hole-less gap — the common case — for nothing. And
+/// `super::builder::expansion`'s `trailing_member_gap_line_comment` keeps a continuous scan,
+/// whose state must span both regions where this short-circuits between them: a widened node
+/// is never the chain's TRAILING member, since `apply_paren_gaps` attributes a paren gap to a
+/// member node already pushed when a LATER one is linearized, so that scan can never meet a
+/// hole.
+pub(crate) fn chain_gap_any(
+    gap: (u32, u32),
+    skip: Option<Span>,
+    mut f: impl FnMut(u32, u32) -> bool,
+) -> bool {
+    let (start, end) = gap;
+    let Some(skip) = skip else {
+        return f(start, end);
+    };
+    f(start, skip.start) || f(skip.end, end)
 }
 
 /// The chain-level comment gap before a group's first node — see [`node_comment_gap`].

@@ -31,6 +31,37 @@ pub type ChainGroupNodesVec<'a> = SmallVec<[ChainNode<'a>; 4]>;
 /// of the `ChainGroup` slice; `'a` is the AST lifetime the nodes point into.
 pub type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
 
+/// The facts about one call LINK that only the chain can supply — the link's own printer
+/// has no parent pointer and cannot see either of them.
+///
+/// `own_call_layout` is the one prettier states as a routing decision: `printCallExpression`
+/// answers the call-level layout rules (the sole-multiline-template hug, the test-call flat
+/// form) at its TOP, above the `printMemberChain` redirect, so a call that reaches that
+/// function keeps them — but a call the redirect **swallowed** is printed by
+/// `printMemberChain`'s own `rec`, which goes straight to `printCallArguments` and never asks
+/// them. tsv linearizes more finely than `rec` does, folding calls into one chain that
+/// prettier prints as separate `printCallExpression` invocations, so the two answers have to
+/// be reconstructed rather than read off the chain's existence. See `mark_own_call_layout`.
+///
+/// The link's `?.` is deliberately NOT here: it is `call.optional`, readable from the node's
+/// own `call`, and a second copy is a flag with two producers that can only ever disagree.
+#[derive(Debug, Clone, Copy)]
+pub struct ChainCall {
+    /// This call keeps `printCallExpression`'s own layout rules — it is not a link the
+    /// member-chain redirect swallowed. Set by `mark_own_call_layout` after linearization;
+    /// `new` seeds it `true`, the value for a chain nothing entered.
+    pub own_call_layout: bool,
+}
+
+impl ChainCall {
+    /// A link's facts before the chain-wide pass decides `own_call_layout`.
+    pub fn new() -> Self {
+        Self {
+            own_call_layout: true,
+        }
+    }
+}
+
 /// A node in a linearized chain
 ///
 /// Each variant contains exactly the data it needs - no optional fields.
@@ -69,7 +100,8 @@ pub enum ChainNode<'a> {
     /// Call expression: ()
     Call {
         call: &'a internal::CallExpression<'a>,
-        optional: bool,
+        /// The facts about this call that only the CHAIN knows — see [`ChainCall`].
+        facts: ChainCall,
     },
     /// Member access: .prop
     /// `object_end` is where the object expression ends
@@ -201,15 +233,7 @@ impl<'a> ChainNode<'a> {
     pub fn call(call: &'a internal::CallExpression<'a>) -> Self {
         Self::Call {
             call,
-            optional: false,
-        }
-    }
-
-    /// Create a new call node with optional chaining
-    pub fn call_optional(call: &'a internal::CallExpression<'a>) -> Self {
-        Self::Call {
-            call,
-            optional: true,
+            facts: ChainCall::new(),
         }
     }
 
@@ -406,12 +430,6 @@ impl<'a> ChainGroup<'a> {
 
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
-    }
-
-    /// Get the comment range of the first node in this group
-    /// Returns (object_end, property_start) if the first node is a member type
-    pub fn first_member_range(&self) -> Option<(u32, u32)> {
-        self.nodes.first()?.comment_range()
     }
 }
 

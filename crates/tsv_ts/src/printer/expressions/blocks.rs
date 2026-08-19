@@ -367,6 +367,18 @@ impl<'a> Printer<'a> {
                     self.find_end_with_trailing_comments(stmt_end)
                         .min(next_start)
                         .min(claim_end)
+                        // ⚠️ **The cursor is MONOTONE.** Both `min`s above are bounds on
+                        // this `;`'s own slot and neither knows where the last PRINTED
+                        // statement's trailing run ended — a run that follows a multi-line
+                        // block to its closing line ends past a following `;` (`a();;;
+                        // /* m⏎n */ // c`), so taking them raw moved `prev_end` BACKWARD
+                        // over comments already emitted and the next `;`'s orphan run
+                        // printed one of them a second time. Nothing else caught it:
+                        // `comment_already_trailed`'s span-end anchor is a line below such
+                        // a comment, and its ⚠️ argues from exactly the invariant this
+                        // restores — a comment inside the trailing run stays BEHIND the
+                        // cursor and never reaches that filter.
+                        .max(prev_end)
                 } else {
                     stmt_end
                 };

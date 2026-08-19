@@ -4,7 +4,7 @@
 // lookup its own group — prettier's `printMemberExpression` shape.
 
 use super::super::printing::{
-    member_lookup_group, node_comment_gap, print_node, print_node_inner,
+    chain_gap_any, member_lookup_group, node_comment_gap, print_node, print_node_inner,
     push_gap_comments_and_break,
 };
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
@@ -25,6 +25,11 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 /// rather than this printer-narrowed [`node_comment_gap`]. The two differ only for a
 /// computed member (the narrow one cuts at the `[`), and deliberately; read that
 /// function's warning before unifying them.
+///
+/// Routed through [`chain_gap_any`] like every other question about a chain gap. A
+/// member-ONLY chain never widens — `apply_paren_gaps` requires a call — so the hole is
+/// always `None` here and the seam is inert; it is used anyway so the reader does not have
+/// to re-derive that, and so a widening this file cannot see cannot make it wrong.
 pub(super) fn member_only_has_interior_line_comments<'a>(
     groups: &[ChainGroup<'a>],
     printer: &Printer<'_>,
@@ -33,7 +38,9 @@ pub(super) fn member_only_has_interior_line_comments<'a>(
         .iter()
         .flat_map(|g| g.nodes.iter())
         .any(|node| match node_comment_gap(node, printer) {
-            Some((start, end)) => printer.classify_comments(start, end).has_line_comments(),
+            Some(gap) => chain_gap_any(gap, node.paren_gap_skip(), |start, end| {
+                printer.classify_comments(start, end).has_line_comments()
+            }),
             None => false,
         })
 }
@@ -80,7 +87,13 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a>(
         // computed one — the comments inside its brackets belong to the bracket
         // builder, not to this chain gap. See `node_comment_gap`.
         match node_comment_gap(node, printer) {
-            Some((obj_end, gap_end)) if printer.has_comments_to_emit_between(obj_end, gap_end) => {
+            // The gate reads the same region the emitter below claims — [`chain_gap_any`]
+            // and `push_gap_comments_and_break` take the identical hole.
+            Some((obj_end, gap_end))
+                if chain_gap_any((obj_end, gap_end), node.paren_gap_skip(), |start, end| {
+                    printer.has_comments_to_emit_between(start, end)
+                }) =>
+            {
                 push_gap_comments_and_break(
                     &mut rest,
                     printer,

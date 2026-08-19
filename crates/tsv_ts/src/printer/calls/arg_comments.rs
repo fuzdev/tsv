@@ -7,7 +7,7 @@
 
 use smallvec::SmallVec;
 
-use super::super::{CommentFilter, CommentSpacing, LeadingGlue, Printer};
+use super::super::{LeadingGlue, Printer};
 use crate::ast::internal;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -127,24 +127,11 @@ pub(super) fn push_empty_args(
     };
     // A **line** comment in this gap runs to end of line, so the argument list cannot
     // stay on it — left inline the `//` swallows the `()` and everything after it
-    // (`call // c⏎()` → `call // c();`, losing the call itself). The comment keeps the
-    // position the author gave it and the list drops to a continuation line indented one
-    // level: the uniform forced-continuation indent every line-comment-split construct
-    // shares (`build_continuation_indent`), so the list reads as part of its call rather
-    // than as a sibling statement. A block comment forces nothing and stays inline below.
-    if printer.has_line_comments_between(search_from, paren_pos) {
-        parts.push(printer.build_continuation_indent(search_from, paren_pos, parens));
-        return;
-    }
-    if let Some(pre) = printer.build_comments_between_filtered_opt(
-        search_from,
-        paren_pos,
-        CommentSpacing::Leading,
-        CommentFilter::All,
-    ) {
-        parts.push(pre);
-    }
-    parts.push(parens);
+    // (`call // c⏎()` → `call // c();`, losing the call itself). That is the whole rule
+    // [`Printer::build_line_split_gap_doc`] states, shared with the callee→`?.` half an
+    // optional call splits off ([`super::optional_callee_gap_doc`]) — the same position,
+    // so the two cannot answer it differently.
+    parts.push(printer.build_line_split_gap_doc(search_from, paren_pos, parens));
 }
 
 //

@@ -1,0 +1,1142 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 932,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment inside NESTED stripped grouping parens at a chain's head. Each",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " paren's own prefix belongs to the member whose gap linearization widened back",
+			"start": 97,
+			"end": 177,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " over it; everything from the innermost paren inward is the chain head's, and",
+			"start": 179,
+			"end": 258,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the two claims must partition the region — with a single paren the head takes",
+			"start": 260,
+			"end": 340,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " all of it, and with two the region between them was claimed by neither.",
+			"start": 342,
+			"end": 416,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 419,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 433,
+			"end": 438,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 449,
+			"end": 454,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The head's share sits in the widened node's SKIPPED middle, so every layout",
+			"start": 466,
+			"end": 544,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " question asked about that gap has to skip it too — read whole, the range",
+			"start": 546,
+			"end": 621,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " force-expanded the chain around a comment printed above it",
+			"start": 623,
+			"end": 684,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 686,
+			"end": 691,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The skipped middle is the object's WHOLE span, so a comment inside an inner",
+			"start": 705,
+			"end": 783,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " call's arguments is in it as well",
+			"start": 785,
+			"end": 821,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 825,
+			"end": 833,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 3
+				},
+				"end": {
+					"line": 25,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a single paren — the head's whole region, the control",
+			"start": 849,
+			"end": 905,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 907,
+			"end": 912,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 931,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 922,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 426,
+					"end": 430,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 426,
+						"end": 429,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 4
+							}
+						},
+						"object": {
+							"type": "Identifier",
+							"start": 426,
+							"end": 427,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 1
+								},
+								"end": {
+									"line": 9,
+									"column": 2
+								}
+							},
+							"name": "a"
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 428,
+							"end": 429,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 3
+								},
+								"end": {
+									"line": 9,
+									"column": 4
+								}
+							},
+							"name": "b"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment inside NESTED stripped grouping parens at a chain's head. Each",
+							"start": 20,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " paren's own prefix belongs to the member whose gap linearization widened back",
+							"start": 97,
+							"end": 177
+						},
+						{
+							"type": "Line",
+							"value": " over it; everything from the innermost paren inward is the chain head's, and",
+							"start": 179,
+							"end": 258
+						},
+						{
+							"type": "Line",
+							"value": " the two claims must partition the region — with a single paren the head takes",
+							"start": 260,
+							"end": 340
+						},
+						{
+							"type": "Line",
+							"value": " all of it, and with two the region between them was claimed by neither.",
+							"start": 342,
+							"end": 416
+						},
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 419,
+							"end": 424
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 440,
+					"end": 446,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 440,
+						"end": 445,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 6
+							}
+						},
+						"object": {
+							"type": "MemberExpression",
+							"start": 440,
+							"end": 443,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 4
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 440,
+								"end": 441,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 1
+									},
+									"end": {
+										"line": 12,
+										"column": 2
+									}
+								},
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 442,
+								"end": 443,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 3
+									},
+									"end": {
+										"line": 12,
+										"column": 4
+									}
+								},
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 444,
+							"end": 445,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 5
+								},
+								"end": {
+									"line": 12,
+									"column": 6
+								}
+							},
+							"name": "c"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 433,
+							"end": 438
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 456,
+					"end": 463,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 456,
+						"end": 462,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 456,
+							"end": 459,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 1
+								},
+								"end": {
+									"line": 15,
+									"column": 4
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 456,
+								"end": 457,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 1
+									},
+									"end": {
+										"line": 15,
+										"column": 2
+									}
+								},
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 458,
+								"end": 459,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 3
+									},
+									"end": {
+										"line": 15,
+										"column": 4
+									}
+								},
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 460,
+								"end": 461,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 5
+									},
+									"end": {
+										"line": 15,
+										"column": 6
+									}
+								},
+								"name": "x"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 449,
+							"end": 454
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 693,
+					"end": 702,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 693,
+						"end": 701,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 9
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 693,
+							"end": 698,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 6
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 693,
+								"end": 696,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 1
+									},
+									"end": {
+										"line": 21,
+										"column": 4
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 693,
+									"end": 694,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 1
+										},
+										"end": {
+											"line": 21,
+											"column": 2
+										}
+									},
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 695,
+									"end": 696,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 4
+										}
+									},
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 697,
+								"end": 698,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 5
+									},
+									"end": {
+										"line": 21,
+										"column": 6
+									}
+								},
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 699,
+								"end": 700,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "x"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The head's share sits in the widened node's SKIPPED middle, so every layout",
+							"start": 466,
+							"end": 544
+						},
+						{
+							"type": "Line",
+							"value": " question asked about that gap has to skip it too — read whole, the range",
+							"start": 546,
+							"end": 621
+						},
+						{
+							"type": "Line",
+							"value": " force-expanded the chain around a comment printed above it",
+							"start": 623,
+							"end": 684
+						},
+						{
+							"type": "Line",
+							"value": " c5",
+							"start": 686,
+							"end": 691
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 823,
+					"end": 846,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 24
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 823,
+						"end": 845,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 25,
+								"column": 23
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 823,
+							"end": 842,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 1
+								},
+								"end": {
+									"line": 25,
+									"column": 20
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 823,
+								"end": 840,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 1
+									},
+									"end": {
+										"line": 25,
+										"column": 18
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 823,
+									"end": 838,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 1
+										},
+										"end": {
+											"line": 25,
+											"column": 16
+										}
+									},
+									"object": {
+										"type": "CallExpression",
+										"start": 823,
+										"end": 836,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 1
+											},
+											"end": {
+												"line": 25,
+												"column": 14
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 823,
+											"end": 824,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 1
+												},
+												"end": {
+													"line": 25,
+													"column": 2
+												}
+											},
+											"name": "f"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 834,
+												"end": 835,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 12
+													},
+													"end": {
+														"line": 25,
+														"column": 13
+													}
+												},
+												"value": 1,
+												"raw": "1",
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": " c6 ",
+														"start": 825,
+														"end": 833
+													}
+												]
+											}
+										],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 837,
+										"end": 838,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 15
+											},
+											"end": {
+												"line": 25,
+												"column": 16
+											}
+										},
+										"name": "a"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 839,
+									"end": 840,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 17
+										},
+										"end": {
+											"line": 25,
+											"column": 18
+										}
+									},
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 841,
+								"end": 842,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 19
+									},
+									"end": {
+										"line": 25,
+										"column": 20
+									}
+								},
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 843,
+								"end": 844,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 21
+									},
+									"end": {
+										"line": 25,
+										"column": 22
+									}
+								},
+								"name": "y"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The skipped middle is the object's WHOLE span, so a comment inside an inner",
+							"start": 705,
+							"end": 783
+						},
+						{
+							"type": "Line",
+							"value": " call's arguments is in it as well",
+							"start": 785,
+							"end": 821
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 914,
+					"end": 921,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 914,
+						"end": 920,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 1
+							},
+							"end": {
+								"line": 29,
+								"column": 7
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 914,
+							"end": 917,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 1
+								},
+								"end": {
+									"line": 29,
+									"column": 4
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 914,
+								"end": 915,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 1
+									},
+									"end": {
+										"line": 29,
+										"column": 2
+									}
+								},
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 916,
+								"end": 917,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 3
+									},
+									"end": {
+										"line": 29,
+										"column": 4
+									}
+								},
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 918,
+								"end": 919,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 5
+									},
+									"end": {
+										"line": 29,
+										"column": 6
+									}
+								},
+								"name": "x"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a single paren — the head's whole region, the control",
+							"start": 849,
+							"end": 905
+						},
+						{
+							"type": "Line",
+							"value": " c4",
+							"start": 907,
+							"end": 912
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

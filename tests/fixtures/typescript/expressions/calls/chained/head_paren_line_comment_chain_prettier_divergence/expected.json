@@ -1,0 +1,599 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 393,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` the author wrote inside stripped grouping parens at a chain's HEAD.",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Prettier binds it to the base node, so the break it forces lands inside the",
+			"start": 99,
+			"end": 177,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " chain's first group and expands the whole chain; tsv prints it above the chain",
+			"start": 179,
+			"end": 260,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " and keeps the layout the same document gets with the parens left out.",
+			"start": 262,
+			"end": 334,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 337,
+			"end": 342,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 361,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 392,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 383,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 344,
+					"end": 358,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 344,
+						"end": 357,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 14
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 344,
+							"end": 354,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 11
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 344,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 1
+									},
+									"end": {
+										"line": 8,
+										"column": 9
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 344,
+									"end": 349,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 1
+										},
+										"end": {
+											"line": 8,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "MemberExpression",
+										"start": 344,
+										"end": 347,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 1
+											},
+											"end": {
+												"line": 8,
+												"column": 4
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 344,
+											"end": 345,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 1
+												},
+												"end": {
+													"line": 8,
+													"column": 2
+												}
+											},
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 346,
+											"end": 347,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 3
+												},
+												"end": {
+													"line": 8,
+													"column": 4
+												}
+											},
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 348,
+										"end": 349,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 5
+											},
+											"end": {
+												"line": 8,
+												"column": 6
+											}
+										},
+										"name": "c"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 350,
+										"end": 351,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 7
+											},
+											"end": {
+												"line": 8,
+												"column": 8
+											}
+										},
+										"name": "x"
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 353,
+								"end": 354,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 10
+									},
+									"end": {
+										"line": 8,
+										"column": 11
+									}
+								},
+								"name": "d"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 355,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 12
+									},
+									"end": {
+										"line": 8,
+										"column": 13
+									}
+								},
+								"name": "y"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` the author wrote inside stripped grouping parens at a chain's HEAD.",
+							"start": 20,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " Prettier binds it to the base node, so the break it forces lands inside the",
+							"start": 99,
+							"end": 177
+						},
+						{
+							"type": "Line",
+							"value": " chain's first group and expands the whole chain; tsv prints it above the chain",
+							"start": 179,
+							"end": 260
+						},
+						{
+							"type": "Line",
+							"value": " and keeps the layout the same document gets with the parens left out.",
+							"start": 262,
+							"end": 334
+						},
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 337,
+							"end": 342
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 368,
+					"end": 382,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 368,
+						"end": 381,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 14
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 368,
+							"end": 378,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 11
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 368,
+								"end": 376,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 1
+									},
+									"end": {
+										"line": 11,
+										"column": 9
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 368,
+									"end": 373,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 1
+										},
+										"end": {
+											"line": 11,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "MemberExpression",
+										"start": 368,
+										"end": 371,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 1
+											},
+											"end": {
+												"line": 11,
+												"column": 4
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 368,
+											"end": 369,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 1
+												},
+												"end": {
+													"line": 11,
+													"column": 2
+												}
+											},
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 370,
+											"end": 371,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 3
+												},
+												"end": {
+													"line": 11,
+													"column": 4
+												}
+											},
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 372,
+										"end": 373,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 5
+											},
+											"end": {
+												"line": 11,
+												"column": 6
+											}
+										},
+										"name": "c"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 374,
+										"end": 375,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 7
+											},
+											"end": {
+												"line": 11,
+												"column": 8
+											}
+										},
+										"name": "x"
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 377,
+								"end": 378,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 10
+									},
+									"end": {
+										"line": 11,
+										"column": 11
+									}
+								},
+								"name": "d"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 379,
+								"end": 380,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 12
+									},
+									"end": {
+										"line": 11,
+										"column": 13
+									}
+								},
+								"name": "y"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 361,
+							"end": 366
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

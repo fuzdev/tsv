@@ -29,7 +29,7 @@ use member_only::{
 
 use super::analysis::should_merge_first_groups;
 use super::printing::{
-    has_inside_bracket_comments, member_lookup_group, node_comment_gap, print_group,
+    chain_gap_any, has_inside_bracket_comments, member_lookup_group, node_comment_gap, print_group,
     print_group_expanded, print_group_standard_expanded, print_node_inner,
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
@@ -469,7 +469,8 @@ fn peel_trailing_member_tail<'a, 'p>(
     let mut gap_comments = None;
     if let Some((object_end, property_start)) = node_comment_gap(&tail[0], printer) {
         if printer.chain_has_comments() {
-            let classified = printer.classify_comments(object_end, property_start);
+            let classified =
+                printer.classify_chain_gap(object_end, property_start, tail[0].paren_gap_skip());
             if gap_has_break_forcing_comments(&classified) {
                 return None;
             }
@@ -483,8 +484,11 @@ fn peel_trailing_member_tail<'a, 'p>(
     // comment-aware chain paths.
     if printer.chain_has_comments()
         && tail[1..].iter().any(|n| {
-            n.comment_range()
-                .is_some_and(|(start, end)| printer.has_comments_to_emit_between(start, end))
+            n.comment_range().is_some_and(|gap| {
+                chain_gap_any(gap, n.paren_gap_skip(), |start, end| {
+                    printer.has_comments_to_emit_between(start, end)
+                })
+            })
         })
     {
         return None;

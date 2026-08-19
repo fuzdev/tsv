@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 704,
+	"end": 889,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -233,24 +233,88 @@
 					"column": 17
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A MULTILINE block trailing a dropped `;` runs to its own closing line, so a",
+			"start": 696,
+			"end": 774,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment the author glued past that `*/` trails the statement too",
+			"start": 776,
+			"end": 843,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block1\nblock2 ",
+			"start": 850,
+			"end": 870,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 6
+				},
+				"end": {
+					"line": 37,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tail",
+			"start": 871,
+			"end": 878,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 11
+				},
+				"end": {
+					"line": 37,
+					"column": 18
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 703,
+		"end": 888,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 694,
+			"end": 879,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 33,
+					"line": 38,
 					"column": 9
 				}
 			},
@@ -1015,6 +1079,82 @@
 							"value": " block ",
 							"start": 682,
 							"end": 693
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 845,
+					"end": 849,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 845,
+						"end": 848,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 1
+							},
+							"end": {
+								"line": 36,
+								"column": 4
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 845,
+							"end": 846,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 1
+								},
+								"end": {
+									"line": 36,
+									"column": 2
+								}
+							},
+							"name": "j"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A MULTILINE block trailing a dropped `;` runs to its own closing line, so a",
+							"start": 696,
+							"end": 774
+						},
+						{
+							"type": "Line",
+							"value": " comment the author glued past that `*/` trails the statement too",
+							"start": 776,
+							"end": 843
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " block1\nblock2 ",
+							"start": 850,
+							"end": 870
+						},
+						{
+							"type": "Line",
+							"value": " tail",
+							"start": 871,
+							"end": 878
 						}
 					]
 				}
