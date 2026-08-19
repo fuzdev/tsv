@@ -17,8 +17,11 @@
  * A RATCHET, not an accumulator: a full perf run grades the list in both
  * directions — an unlisted failure fails, and so does an entry that excused
  * nothing on a run that could have exercised it (`stale_perf_omits`). So a
- * tolerance cannot outlive the failure it was written for. It can still be
- * written too BROADLY, which no grading catches — see `stale_perf_omits`.
+ * tolerance cannot outlive the failure it was written for. The entries must also
+ * be DISJOINT, which the caller enforces on what a run observed: a failure two
+ * entries both claim fails the run (`perf_omit_matches`). It can still be written
+ * too BROADLY without overlapping anything, which no grading catches — see
+ * `stale_perf_omits`.
  *
  * Distinct from `parse_sanctions.ts`: those `Sanction`/`KnownGap` lists are about
  * tsv-vs-canonical parse PARITY over the fixture suites (over-rejections tsv keeps
@@ -117,28 +120,36 @@ export const PERF_OMITS: PerfOmit[] = [
 ];
 
 /**
- * The first omit excusing `(tracking_key, path)`, or `null` when the failure is
- * unlisted.
+ * EVERY omit excusing `(tracking_key, path)`, in list order — empty when the
+ * failure is unlisted.
  *
- * Returns the ENTRY, not its reason, because the caller has two questions and the
- * reason answers only one: "is this failure excused?" and "did this excuse fire?".
- * The second is what makes the list a ratchet rather than an accumulator — see
- * `stale_perf_omits`.
+ * Returns the ENTRIES, not their reasons, because the caller has three questions
+ * and the reason answers only one: "is this failure excused?" (any match at all),
+ * "did this excuse fire?" (the ratchet's second direction — see
+ * `stale_perf_omits`), and "does more than one entry claim it?".
  *
- * FIRST match, so a broader entry shadows a narrower one that would also apply,
- * and only the broad one is then marked used. Keep the entries disjoint: an
- * overlapping pair reports the shadowed entry as stale even though the failure it
- * describes is live, which reads as the opposite of what happened.
+ * ALL matches rather than the first, and that third question is why. Under a
+ * first-match rule a broad entry SHADOWS a narrower one that also applies: only
+ * the broad one is marked used, so the shadowed entry then reports as STALE while
+ * the failure it describes is live — the exact inverse of what happened. Crediting
+ * every match makes that misreport unreachable and leaves the overlap itself
+ * visible, which is the defect actually worth naming: two entries claiming one
+ * failure means neither is the entry that describes it, and one of them is
+ * redundant or too broad. The caller fails the run on that
+ * (`enforce_perf_coverage`).
+ *
+ * Disjointness is checkable only against OBSERVED failures, never structurally:
+ * both predicates are substring tests, so for any two entries some string contains
+ * both fragments and no pair is disjoint in the abstract. What a run sees is the
+ * answerable question, and it is also the only one that matters.
  */
-export function perf_omit_match(
+export function perf_omit_matches(
 	omits: readonly PerfOmit[],
 	tracking_key: string,
 	path: string
-): PerfOmit | null {
-	return (
-		omits.find(
-			(o) => (o.task === undefined || tracking_key.includes(o.task)) && path.includes(o.path)
-		) ?? null
+): PerfOmit[] {
+	return omits.filter(
+		(o) => (o.task === undefined || tracking_key.includes(o.task)) && path.includes(o.path)
 	);
 }
 
@@ -157,7 +168,10 @@ export function perf_omit_match(
  * its ORIGINAL failure stays used, and goes on silently absorbing whatever new
  * failure arrives beneath it. Staleness only ever finds an entry matching
  * nothing; keeping each `path` narrow enough to name one file is still the
- * author's job.
+ * author's job. The one form of over-breadth that IS caught is the one that
+ * reaches another entry's failure — the caller's disjointness check
+ * (`perf_omit_matches`) fails on a failure two entries both claim, which is also
+ * what keeps a shadowed entry from being reported here as stale.
  *
  * `graded_keys` is the run's REACHABILITY answer — the tracking keys whose tasks
  * both existed and were graded. An entry naming a task no key matches was never

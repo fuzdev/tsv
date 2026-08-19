@@ -869,10 +869,19 @@ couldn't reproduce its own number).
   meaningful. The list is a **RATCHET**, graded in both directions: a full-corpus
   run also fails on an entry that excused NOTHING, the same ledger-freshness
   discipline `lib/fixtures_gate.ts` applies to its sanction / known-gap lists — so
-  a tolerance can't outlive the failure it was written for. It can still be written
-  too BROADLY, which neither direction catches: an entry that still matches its
-  original failure counts as used and goes on absorbing whatever arrives beneath
-  it, so keeping each `path` narrow enough to name one file stays the author's job.
+  a tolerance can't outlive the failure it was written for. The entries must also
+  be **DISJOINT**, checked on any run (not just a full one) because the overlap is
+  OBSERVED rather than inferred: a failure two entries both claim fails, since
+  neither is then the entry that describes it. That check is what makes the
+  staleness direction trustworthy — a first-match reading credits only the earlier
+  of an overlapping pair, and the shadowed entry then reports as stale while its
+  failure is live, the inverse of what happened (every match is credited, so the
+  misreport is unreachable either way). Structural disjointness is not checkable at
+  all: both predicates are substring tests, so for any two entries some string
+  contains both fragments. An entry can still be written too BROADLY without
+  reaching another's failure, which nothing catches: it stays used on its original
+  failure and goes on absorbing whatever arrives beneath it, so keeping each `path`
+  narrow enough to name one file stays the author's job.
   Staleness is asked only where the run could have exercised the entry, along two
   axes — the FILES (`BENCH_LIMIT` / `BENCH_FILTER` / `BENCH_ALLOW_MISSING` withhold
   the very files an entry is about, so only a full run grades that half) and the

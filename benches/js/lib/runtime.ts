@@ -98,6 +98,22 @@ export function wasm_target(): 'deno' | 'nodejs' {
  * Deliberately excludes hostname (the reports are published) and volatile
  * fields (free memory, load average, live CPU frequency) that would churn the
  * committed report every run — only the stable hardware identity belongs here.
+ *
+ * ⚠️ A WIRE shape, not merely a producer-side struct, and it is read back by a
+ * consumer this module never sees: `compose_reports.ts` imports this same type to
+ * describe SIBLING reports on disk, which routinely predate the current producer
+ * (the composer folds whatever reports exist, and flags the vintage spread rather
+ * than refusing it). Every field below is therefore asserted over data written by
+ * an older bench. That holds today because the composer reads only the four fields
+ * this type shipped with, at `REPORT_SCHEMA_VERSION` 7.
+ *
+ * So ADDING a field here is a schema change, not a local one. Bump
+ * `REPORT_SCHEMA_VERSION` (bench.ts) and mark the new field `Since version N`, the
+ * way `Baseline`'s own fields are marked — the nesting is what makes it easy to
+ * miss, since `Baseline.machine` itself doesn't change. Any composer code reading
+ * the new field owes it the per-field optionality the composer already spells out
+ * by hand for `UnavailableImpl.rows`; the shared type cannot express "present only
+ * from version N" for both sides at once.
  */
 export interface Machine {
 	/** `os.cpus()[0].model` — the stable CPU identifier (e.g. `AMD Ryzen 9 7950X`). */

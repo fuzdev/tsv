@@ -45,8 +45,44 @@ function create_bar(value: number, max: number, width = 40): string {
 	return '█'.repeat(filled) + '░'.repeat(width - filled);
 }
 
-/** Internal parse variants (for measuring JSON overhead) */
-const INTERNAL_PARSE_VARIANTS = ['tsv-internal', 'tsv_wasm-internal'];
+/**
+ * The parse-only row beside the row that materializes the same AST into JS, as
+ * `[internal, json]` — one pair per tsv tier. The ratio between the two IS the
+ * JSON-materialization cost, which is the only thing either reader below renders.
+ *
+ * ONE table because this is one fact with three readers, and it used to be three
+ * separate statements: which rows are internal, which json row each internal row
+ * pairs with (terminal summary), and the same pairing again (markdown note). The
+ * partner lookup was the fragile one — it chose the json row by testing the
+ * internal row's NAME for `wasm`, so the correctness of every rendered overhead
+ * ratio rested on no other internal row ever containing that substring. A third
+ * tier would have paired silently to `tsv-json` and rendered a wrong number, with
+ * nothing in the output looking off.
+ *
+ * tsv-only by ARGUMENT, not for lack of looking: no alternative parser has a
+ * comparably cheap parse-only mode — oxc's JS API always serializes to cross into
+ * JS (`experimentalLazy` is setup-dominated, see `oxc.ts`), and yuku's lazy
+ * `parse()` has already serialized the AST to a binary buffer by the time it
+ * returns (see `yuku.ts`) — so neither yields a pair that belongs here.
+ */
+const INTERNAL_PARSE_PAIRS: ReadonlyArray<readonly [internal: string, json: string]> = [
+	['tsv-internal', 'tsv-json'],
+	['tsv_wasm-internal', 'tsv_wasm-json']
+];
+
+/** The `-internal` half of `INTERNAL_PARSE_PAIRS` — the rows a group table shows separately. */
+const INTERNAL_PARSE_VARIANTS: readonly string[] = INTERNAL_PARSE_PAIRS.map(
+	([internal]) => internal
+);
+
+/**
+ * The row materializing the same AST as `internal_name`, or `undefined` when it
+ * names no pair — which a caller must treat as "render no ratio", never as a
+ * default partner.
+ */
+function internal_parse_partner(internal_name: string): string | undefined {
+	return INTERNAL_PARSE_PAIRS.find(([internal]) => internal === internal_name)?.[1];
+}
 
 /**
  * Stable display order for implementations.
@@ -272,9 +308,10 @@ export function generate_summary_report(
 
 		// Show internal variants (JSON overhead measurement)
 		for (const internal_result of sort_by_display_order(internal_results)) {
-			// Find the corresponding JSON variant
-			const json_name = internal_result.name.includes('wasm') ? 'tsv_wasm-json' : 'tsv-json';
-			const json_result = results.find((r) => r.name === json_name);
+			// The json row materializing the same AST, by table rather than by name shape.
+			const json_name = internal_parse_partner(internal_result.name);
+			const json_result =
+				json_name === undefined ? undefined : results.find((r) => r.name === json_name);
 
 			if (json_result) {
 				const json_overhead = json_result.stats.mean_ns / internal_result.stats.mean_ns;
@@ -739,6 +776,21 @@ const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
  * could only be a warning nobody could ever clear, since several rows legitimately
  * belong in no comparison — and "legitimately absent" and "forgotten" would stay
  * indistinguishable, which is the state that let four impls go missing.
+ *
+ * UNCHECKED in the reverse direction, and that is a decision rather than an
+ * oversight: a renamed or deleted row leaves a dead entry here and nothing fires.
+ * The check that would catch it cannot be written from inside a run, because the
+ * row universe is SURFACE-scoped — `tsc` is registered only on the conformance
+ * surface, `tsv-forced-async` only under `BENCH_FORCED_ASYNC=1` — so asking "does
+ * every key here name a registered row?" of one surface's registry would indict the
+ * entries the other surface owns, on every run. Same one-directional shape as
+ * `DISPLAY_ORDER`, for the same reason.
+ *
+ * This is also where the list differs from `PERF_OMITS`'s two-direction ratchet,
+ * which grades its own entries for staleness: an omit names a TASK, and a run can
+ * observe whether that task was reachable (`graded_keys`), so "matched nothing"
+ * separates cleanly from "was never asked". A row's existence on the OTHER surface
+ * has no such per-run signal here — the two surfaces never share a process.
  */
 const COMPARISON_EXCLUSIONS: Readonly<Record<string, string>> = {
 	'tsv-json-no-locations': "tsv's own wire variant — a row of the group table, not an opponent",
@@ -1039,6 +1091,34 @@ function comparison_notes(
 }
 
 /**
+ * Which canonical parser backs which language's baseline —
+ * `svelte/compiler for svelte + css, acorn-typescript for typescript` — inverted
+ * out of `CANONICAL_PARSER_ROWS` rather than spelled out.
+ *
+ * The note it feeds used to name FILE EXTENSIONS (`.svelte`/`.css` vs `.ts`), which
+ * read naturally but left this module's last hand-written canonical-parser fact
+ * sitting one line under the tables the record now names — the same drift
+ * `CANONICAL_PARSER_ROWS` exists to close, reachable here because the extensions
+ * are not in it and so nothing could check the sentence. Languages are what the
+ * record holds AND what the tables key on (`parse svelte`, `parse css`), so the
+ * note now joins against the rows beside it instead of describing them from
+ * memory.
+ *
+ * Takes the run's languages, so a filtered run (`BENCH_FILTER`) describes the
+ * baselines it actually rendered rather than the full set.
+ */
+function canonical_parser_note(languages: readonly Language[]): string {
+	const by_row: Map<string, Language[]> = new Map();
+	for (const lang of languages) {
+		const row = CANONICAL_PARSER_ROWS[lang];
+		const langs = by_row.get(row);
+		if (langs) langs.push(lang);
+		else by_row.set(row, [lang]);
+	}
+	return [...by_row].map(([row, langs]) => `${row} for ${langs.join(' + ')}`).join(', ');
+}
+
+/**
  * Generate compact comparison summary (plain text).
  *
  * Ratios are speedup form (other_time / self_time): >1 means tsv is faster.
@@ -1093,7 +1173,7 @@ export function generate_comparison_summary(
 	// per-opponent notes come last rather than being interleaved.
 	lines.push('');
 	lines.push('  (`Nx` = self is N× faster; `(Mf)` = files the timing reflects)');
-	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
+	lines.push(`  (parse canonical: ${canonical_parser_note(languages)})`);
 	lines.push('  (format groups include parse time — each formatter parses internally)');
 	lines.push(...comparison_notes(sections, 'terminal'));
 
@@ -1145,7 +1225,7 @@ export function generate_comparison_markdown(
 	const notes: string[] = [
 		'`Nx` is speedup — self is N× faster than the named opponent',
 		"`(Mf)` is the self impl's iterated count (per-group intersection in default mode; per-impl success set in `BENCH_MODE=union`)",
-		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts — each named by its own row',
+		`Parse canonical: ${canonical_parser_note(languages)} — each named by its own row`,
 		'Format groups include parse time — each formatter parses internally',
 		...comparison_notes(sections, 'markdown')
 	];
@@ -1379,18 +1459,10 @@ export function generate_coverage_by_source_markdown(
  * the direction.
  */
 export function generate_json_overhead_note(results: BenchmarkResult[]): string | null {
-	// Each pair is [non-materializing parse, full-JS-tree parse]; the ratio is the
-	// cost of materializing the AST into JS. tsv-only: neither alternative parser has
-	// a comparably cheap parse-only mode — oxc's JS API always serializes to cross
-	// into JS (experimentalLazy is setup-dominated — see oxc.ts), and yuku's lazy
-	// `parse()` has already serialized the AST to a binary buffer by the time it
-	// returns (see yuku.ts), so neither yields a pair that belongs in this table.
-	const pairs = [
-		['tsv-internal', 'tsv-json'],
-		['tsv_wasm-internal', 'tsv_wasm-json']
-	] as const;
+	// The pairs, and the argument for why they are tsv-only, live on
+	// `INTERNAL_PARSE_PAIRS` — this note is one of its three readers.
 	const notes: string[] = [];
-	for (const [internal_name, json_name] of pairs) {
+	for (const [internal_name, json_name] of INTERNAL_PARSE_PAIRS) {
 		const internal = results.find((r) => r.name === internal_name);
 		const json = results.find((r) => r.name === json_name);
 		if (!internal || !json) continue;
