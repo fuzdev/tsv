@@ -68,7 +68,6 @@ interface RsvelteNative {
  *   `@rsvelte/fmt` CLI, whose row is coverage-only; see `lib/rsvelte.ts`).
  */
 export class RsvelteParseImplementation extends BaseImplementation {
-	readonly name = 'rsvelte-parse' as const;
 	readonly versions: RsvelteParseVersions;
 	private _native: RsvelteNative | null = null;
 

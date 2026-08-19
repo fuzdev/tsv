@@ -44,7 +44,6 @@ interface WasmModule {
 }
 
 export class WasmImplementation extends BaseImplementation {
-	readonly name = 'wasm' as const;
 	private _module: WasmModule | null = null;
 
 	readonly parse_languages = LANGUAGES;

@@ -32,7 +32,6 @@ type JsonParseAst = (programJson: string) => unknown;
  * - Format: None (oxfmt has no WASM variant)
  */
 export class OxcWasmImplementation extends BaseImplementation {
-	readonly name = 'oxc-wasm' as const;
 	readonly versions: OxcVersions;
 	private _parser: OxcParserWasmModule | null = null;
 	private _json_parse_ast: JsonParseAst | null = null;

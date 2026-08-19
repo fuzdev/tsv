@@ -208,8 +208,13 @@ plugin's peer) + `PRETTIER_DEBUG` + a schema constant — a hit is exactly equiv
 to a live run. Success-only: errors and semantically-empty outputs are never cached
 (`put` rejects whitespace-only, `get` treats a stored whitespace-only entry as a
 miss), so the prettier-miss heisenbug can't poison it and cached hits remove the
-prettier-side flake from repeat runs entirely; the tsv/FFI side stays live. The run
-reports `prettier cache: N hits / M misses`. Scope: this tool + the conformance
+prettier-side flake from repeat runs entirely; the tsv/FFI side stays live. Writes
+are **atomic** (temp file + `rename`), so an interrupted run can't leave a
+TRUNCATED entry — which the empty guards can't catch and which every later run
+would then read as the oracle. A write that fails is counted, never thrown (the
+caller reads a throw as "prettier failed on this file"). The run
+reports `prettier cache: N hits / M misses`, plus `/ K writes FAILED` if any did.
+Scope: this tool + the conformance
 driver only — never the bench (it times prettier), never the fixture validator (live
 by design). `TSV_PRETTIER_CACHE=0` disables; `deno task bench:clean` wipes.
 
@@ -744,6 +749,31 @@ silent. One absence is exempt — an **added** row whose impl
 never initialized is this machine coming up short (already in `unavailable`), so the
 run warns and drops that line instead of failing.
 
+**Two more registry-checked claims, both warnings.** `report.ts` holds two checked
+hand-maintained lists that a new impl has to reach, and each is asked the same
+availability-independent question at init (`get_defined_rows`), one direction only
+(a listed row absent from a surface is not drift — each surface registers its own
+subset): `DISPLAY_ORDER`, where an unlisted row sorts silently to the end of every
+table (`rows_missing_from_display_order`), and `COMPARISON_SECTIONS` — the
+Comparisons tables' per-tier opponent lists — where an unlisted row gets no
+comparison cell at all (`rows_missing_from_comparisons`, cleared by an entry in
+`COMPARISON_EXCLUSIONS` for a row that belongs in none). Both WARN rather than
+throw: an absent row understates a table, where a stale `SURFACE_DISCLOSURES`
+sentence asserts something false. The comparison guard exists because its drift is
+the quietest of the three — a missing cell looks like nothing — and `swc`,
+`postcss`, `rsvelte-parse` and `malva-wasm` were each registered, preflighted and
+timed at full coverage while appearing in no comparison. A section's opponents each
+carry their own fairness note, rendered iff that opponent produced a cell, so the
+prose can't drift from the table either.
+
+A **third** row list in the same module is deliberately unchecked: the curated
+payload-matched lines in `generate_summary_report` (`tsv-json-no-locations` vs
+`oxc-parser`, and the rest). Its membership is an ARGUMENT — this tsv wire and
+that opponent emit the same product — not a completeness claim: most rows have no
+payload-matched partner and never will, so a guard there could only be a warning
+nobody clears. A new impl still has to be considered against it; `swc` and `postcss`
+were, and are absent on purpose (docs/benchmarks.md §Fairness caveats).
+
 ## Artifact Freshness Guard
 
 The rebuild-skipping tasks (`bench:{deno,node,bun}:run`, `bench:conformance:run`,
@@ -836,7 +866,18 @@ couldn't reproduce its own number).
   the current entries all tolerate third-party limitations on declaration-file-only
   syntax, e.g. acorn-typescript has no `.d.ts` mode). A silent skip would let
   coverage quietly erode; that invariant is what makes the perf/conformance split
-  meaningful.
+  meaningful. The list is a **RATCHET**, graded in both directions: a full-corpus
+  run also fails on an entry that excused NOTHING, the same ledger-freshness
+  discipline `lib/fixtures_gate.ts` applies to its sanction / known-gap lists — so
+  a tolerance can't outlive the failure it was written for. It can still be written
+  too BROADLY, which neither direction catches: an entry that still matches its
+  original failure counts as used and goes on absorbing whatever arrives beneath
+  it, so keeping each `path` narrow enough to name one file stays the author's job.
+  Staleness is asked only where the run could have exercised the entry, along two
+  axes — the FILES (`BENCH_LIMIT` / `BENCH_FILTER` / `BENCH_ALLOW_MISSING` withhold
+  the very files an entry is about, so only a full run grades that half) and the
+  TASK (every alternative impl is optional, and one that fails to load registers no
+  task at all, so on that machine its entries are unasked rather than stale).
 - **`gates`** (~6,200 files) — `real` + `framework` + `prettier_fixture`, no perf
   prune: adds Prettier's `tests/format/{typescript,js,css,html}` suites and
   prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a companion
