@@ -62,10 +62,13 @@ lands at one indent level less on the first pass and settles on the next, pinned
   `input.svelte` under tsv; prettier's chain from it converges on neither, so it is pinned
   by `audit_signature_hug.txt` (rule N12) rather than by a single-form marker.
 
-⚠️ Two hosts of the assignment family are **absent by construction** — an enum member and a
-`for`-header init declarator resolve no `=`→value freeze at all, in this arm or the
-ordinary one, so a directive there is inert on both sides and there is nothing for this
-fixture to pin.
+The last two cases are the remaining hosts of the family — an **enum member** (`c14`) and a
+**`for`-header init declarator** (`c15`), whose clause separator is a `;` rather than a
+statement terminator. At the enum member prettier's relocation is **lossy**: it merges the
+directive and the before-`=` comment onto one line (`Bbb = // prettier-ignore // c14`, where
+`// c14` stops being a comment), and its own second pass then floats the merged run past the
+value and normalizes it, so the freeze the author asked for disappears. That merge is the
+family's whole argument, at the one host where it also costs the freeze.
 
 ## Reason
 
