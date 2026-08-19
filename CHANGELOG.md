@@ -13,12 +13,7 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: minor -->
 
-- fix: many formatting fixes — the comment content-loss classes are now **closed** for
-  the gaps a comment can be written into: injecting one into any gap across the whole
-  fixture corpus prints it exactly once — no drops, no double-prints, nothing swallowed
-  after a `//` — and a raw input-vs-output comment census finds no parse-time drop,
-  merge or rewrite. Both are standing audits whose known-bug snapshots are now empty, so
-  any new loss fails the gate outright
+- fix: many formatting fixes and add some standing audits, clearing some to 0 like comment injection
 - feat: publish native binaries, both CLI and JS lib — install `@fuzdev/tsv`
   (N-API addon plus the real native `tsv` CLI; `npx tsv` execs the binary), over
   `@fuzdev/tsv-<triple>` platform packages for Linux (x64 gnu and musl, arm64 gnu),
