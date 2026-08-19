@@ -42,33 +42,97 @@ pub(crate) use arg_comments::{
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
 use super::Printer;
-use super::chain;
+use super::chain::{self, ChainCall, call_callee_paren_leading_start};
 use crate::ast::internal;
-use crate::printer::chain::call_callee_paren_leading_start;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
 use arg_wrapping::{build_args_split_last, multiline_template_hug_applies};
 use tsv_lang::doc::arena::DocId;
 
 /// A call's callee gap: whether the callee prints a REQUIRED pair that keeps both its gaps
-/// inside it, the operand→`)` region such a pair emits itself, and where every window past
-/// the callee opens.
+/// inside it, the operand→`)` region such a pair emits itself, how the call spells its `?.`,
+/// and where every window past the callee opens.
 ///
 /// ⚠️ **ONE derivation**, because the pair's own doc and the windows that open past its `)`
 /// must agree: a `trailing_gap` the doc does not emit is a DROPPED comment, and the reverse
 /// is a DOUBLE-PRINT. The three values were once derived twice — inline in
 /// [`call_formatting::build_call_doc_with_wrapping`] and again in a type-args-only
 /// `call_paren_open` — and the
-/// two disagreed on exactly this pair.
+/// two disagreed on exactly this pair. [`Self::optional`] joins them for the same reason: it
+/// is the region [`optional_callee_gap_doc`] emits, and [`Self::start`] is what every other
+/// window opens PAST it at, so deriving either alone re-splits the gap the wrong way.
 #[derive(Clone, Copy)]
 pub(super) struct CalleeGap {
     /// The callee prints its own required pair (an IIFE, a sealed optional chain).
     pub(super) owned_pair: bool,
     /// The operand→`)` region that pair emits itself, when it owns one.
     pub(super) trailing_gap: Option<(u32, u32)>,
-    /// Where every window past the callee opens: past that `)`, else the callee's span end.
+    /// Where every window past the callee opens: past that `)`, else the callee's span end
+    /// — then past the `?.` of an optional call whose gap [`Self::optional`] splits.
     pub(super) start: u32,
+    /// How this call spells its `?.` — see [`CallOptional`].
+    pub(super) optional: CallOptional,
 }
+
+/// The `?.` of a call, as the whole family needs to read it: WHO prints the token, and
+/// whether the callee→`(` gap SPLITS at it.
+///
+/// ⚠️ The two are **not** the same question and a `bool` for either one answered the other
+/// wrongly: a call whose gap declines to split still prints its own `?.`
+/// ([`Self::Unsplit`]), so "no split" read as "no `?.`" DROPPED the token, and "prints its
+/// own `?.`" read as "the gap splits" re-split a gap that must stay whole. Naming all four
+/// states is what makes both unaskable.
+#[derive(Clone, Copy)]
+pub(super) enum CallOptional {
+    /// Not an optional call: no `?.` anywhere, and the whole callee→`(` gap belongs to the
+    /// argument side.
+    Absent,
+    /// The `?.` FUSES into the argument list's own `?.(` opener rather than being printed by
+    /// the callee side — the empty-argument spelling with no type arguments, where nothing
+    /// follows the `?.` at all.
+    ///
+    /// The gap does not split here, and that is the same rule as [`Self::Split`] read from
+    /// the other end rather than a carve-out: nothing follows the `?.` for an after-`?.`
+    /// comment to lead, so both formatters normalize either authoring onto the callee side
+    /// and there is no side left to preserve. That is the pure-separator entry the
+    /// empty-argument twin is cataloged under
+    /// (`docs/conformance_prettier_ts_comments.md` §Comment relocation), and its argument
+    /// stops exactly here.
+    Fused,
+    /// This call prints its own `?.`, over a gap that deliberately does NOT split — an
+    /// honored directive in the callee-side half (see [`call_optional`]), or a `?` the scan
+    /// could not find. The whole gap stays the argument side's.
+    Unsplit,
+    /// This call prints its own `?.` behind the callee-side half of its gap, `[start, end)`,
+    /// `end` being the `?`.
+    ///
+    /// Both formatters split this gap at the `?.` and preserve the authored side: a comment
+    /// before it trails the callee (`fn /* c */?.(a)`), one after it leads whatever follows
+    /// — the first argument (`fn?.(/* c */ a)`) or the type-argument list
+    /// (`fn?./* c */ <A>(a)`).
+    Split { start: u32, end: u32 },
+}
+
+impl CallOptional {
+    /// Whether the argument list opens with `?.(` because the `?.` fused into it — the one
+    /// spelling of that question, asked by both call printers (the plain path's
+    /// `fuse_optional` and the chain's `prefix`) so the two cannot answer differently.
+    pub(super) fn fused(self) -> bool {
+        matches!(self, Self::Fused)
+    }
+
+    /// Where the ARGUMENT side of the callee→`(` gap opens on a split gap: past the `?.`.
+    /// `None` when the gap does not split, leaving the argument side the whole gap.
+    fn arg_side_start(self) -> Option<u32> {
+        match self {
+            Self::Split { end, .. } => Some(end + OPTIONAL_TOKEN_LEN),
+            Self::Absent | Self::Fused | Self::Unsplit => None,
+        }
+    }
+}
+
+/// The width of `?.`, which a split gap's argument side opens past.
+const OPTIONAL_TOKEN_LEN: u32 = "?.".len() as u32;
 
 impl CalleeGap {
     /// The position the call's `(` follows — [`Self::start`], then past the type-argument
@@ -89,10 +153,88 @@ pub(super) fn callee_gap(printer: &Printer<'_>, call: &internal::CallExpression<
     let callee_end = call.callee.span().end;
     let owned_pair = call_callee_paren_leading_start(call).is_some();
     let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
+    let start = Printer::gap_start_after_owned_pair(callee_end, trailing_gap);
+    let optional = call_optional(printer, call, start);
     CalleeGap {
         owned_pair,
         trailing_gap,
-        start: Printer::gap_start_after_owned_pair(callee_end, trailing_gap),
+        // Past the `?.` when the gap splits: everything below — the type-argument gap, the
+        // leading-argument scans, the freeze window, the template hug — asks about the
+        // region the ARGUMENT side owns, and opening it at the callee hands them a comment
+        // `optional_callee_gap_doc` has already emitted.
+        start: optional.arg_side_start().unwrap_or(start),
+        optional,
+    }
+}
+
+/// Derive a call's [`CallOptional`] — the family's one answer to who prints the `?.` and
+/// where the callee→`(` gap splits, from which [`CalleeGap::start`] then opens.
+fn call_optional(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    start: u32,
+) -> CallOptional {
+    if !call.optional {
+        return CallOptional::Absent;
+    }
+    if call.arguments.is_empty() && call.type_arguments.is_none() {
+        return CallOptional::Fused;
+    }
+    // The gap holds only whitespace, comments and the `?.` itself, so the first `?` outside
+    // a comment is that token. Bounded by whatever follows it, never by the call's end: a
+    // `?` inside an argument (`fn?.(a ? b : c)`) is past the bound and can't be reached.
+    let end = call.type_arguments.as_ref().map_or_else(
+        || {
+            call.arguments
+                .first()
+                .map_or(call.span.end, |arg| arg.span().start)
+        },
+        |ta| ta.span.start,
+    );
+    let Some(question) = printer.find_char_outside_comments(start, end, b'?') else {
+        return CallOptional::Unsplit;
+    };
+    // An honored directive in the callee-side half DECLINES the split, the same refusal
+    // [`arg_wrapping::multiline_template_hug_applies`] makes for the same reason: the run
+    // would print ahead of the `?.`, a placement where a directive is INERT, and the freeze
+    // window — which opens at [`CalleeGap::start`] — would no longer reach it, so pass 2
+    // silently loses the freeze ⚠️ with no gate able to see it. Stated as what the split
+    // DESTROYS rather than as "a directive is in the gap": one the author wrote AFTER the
+    // `?.` sits in both windows, is unmoved by the split, and keeps it.
+    if !call.arguments.is_empty()
+        && printer.args_frozen_span(start, call.arguments, 0).is_some()
+        && printer
+            .args_frozen_span(question + OPTIONAL_TOKEN_LEN, call.arguments, 0)
+            .is_none()
+    {
+        return CallOptional::Unsplit;
+    }
+    CallOptional::Split {
+        start,
+        end: question,
+    }
+}
+
+/// The `?.` this call prints itself — the doc that goes between the callee and the argument
+/// list's `(`, behind the callee-side half of its gap when that gap splits.
+///
+/// `None` when the call prints no `?.` of its own: a plain call, or the fused spelling whose
+/// `?.` belongs to the argument list's `?.(` opener ([`CallOptional::Fused`]).
+///
+/// A **line** comment in the split half runs to end of line, so the `?.` cannot stay on it —
+/// it takes the uniform forced-continuation indent every line-comment-split construct
+/// shares, and a block comment stays inline glued in front of the `?.`. That is exactly
+/// [`Printer::build_line_split_gap_doc`], shared with the answer the fused spelling reaches
+/// through [`arg_comments::push_empty_args`]: the same gap, so the `?.` cannot change how it
+/// reads.
+pub(super) fn optional_callee_gap_doc(printer: &Printer<'_>, gap: CalleeGap) -> Option<DocId> {
+    let d = printer.d();
+    match gap.optional {
+        CallOptional::Absent | CallOptional::Fused => None,
+        CallOptional::Unsplit => Some(d.text("?.")),
+        CallOptional::Split { start, end } => {
+            Some(printer.build_line_split_gap_doc(start, end, d.text("?.")))
+        }
     }
 }
 
@@ -119,7 +261,11 @@ pub(in crate::printer) fn chain_has_calls(expr: &internal::Expression<'_>) -> bo
 }
 
 /// Check if callee is a member expression (used for chain detection)
-fn is_memberish(expr: &internal::Expression<'_>) -> bool {
+///
+/// Prettier's `isMemberish`, and the gate on BOTH of its chain decisions: the
+/// `printMemberChain` redirect here, and — in the linearizer's
+/// `mark_own_call_layout` — which of the chain's own calls that redirect swallowed.
+pub(in crate::printer) fn is_memberish(expr: &internal::Expression<'_>) -> bool {
     matches!(
         expr,
         internal::Expression::MemberExpression(_) | internal::Expression::TSNonNullExpression(_)
@@ -253,10 +399,11 @@ impl<'a> Printer<'a> {
 
             // Use chain wrapping for chains (nested calls) or memberish callees
             let nodes = chain::linearize_chain_from_call(call, self.linearize_input());
-            let base_start = get_chain_base_comment_start(&nodes, call.callee);
+            let (head_start, head_end) =
+                chain_head_comment_window(&nodes, call.callee, call.span.start);
             let groups = chain::group_chain_nodes(&nodes, self.comments);
             let chain_doc = chain::build_chain_doc(&groups, call.span, self);
-            self.prepend_removed_paren_comments(call.span.start, base_start, chain_doc)
+            self.prepend_removed_paren_comments(head_start, head_end, chain_doc)
         } else {
             // Simple call (non-memberish callee) - wrap args directly
             self.build_call_doc_with_wrapping(call)
@@ -281,13 +428,14 @@ impl<'a> Printer<'a> {
 
         // Use chain-based implementation
         let nodes = chain::linearize_chain_from_member(member, self.linearize_input());
-        let base_start = get_chain_base_comment_start(&nodes, member.object);
+        let (head_start, head_end) =
+            chain_head_comment_window(&nodes, member.object, member.span.start);
         let groups = chain::group_chain_nodes(&nodes, self.comments);
         let chain_doc = chain::build_chain_doc(&groups, member.span, self);
 
-        // Prepend comments from removed parentheses at the chain base.
-        // For call chains, base_start excludes paren gaps handled mid-chain.
-        self.prepend_removed_paren_comments(member.span.start, base_start, chain_doc)
+        // Prepend comments from removed parentheses at the chain base — the share the
+        // chain's own widened nodes did not claim ([`chain_head_comment_window`]).
+        self.prepend_removed_paren_comments(head_start, head_end, chain_doc)
     }
 
     /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
@@ -309,9 +457,9 @@ impl<'a> Printer<'a> {
     pub(super) fn build_call_args_doc_for_chain(
         &self,
         call: &internal::CallExpression<'_>,
-        optional: bool,
+        facts: ChainCall,
     ) -> DocId {
-        chain_args::build_call_args_doc_for_chain(self, call, optional)
+        chain_args::build_call_args_doc_for_chain(self, call, facts)
     }
 
     /// Build a Doc for call arguments with forced expansion (hardlines instead of softlines)
@@ -320,9 +468,9 @@ impl<'a> Printer<'a> {
     pub(super) fn build_call_args_doc_for_chain_expanded(
         &self,
         call: &internal::CallExpression<'_>,
-        optional: bool,
+        facts: ChainCall,
     ) -> DocId {
-        chain_args::build_call_args_doc_for_chain_expanded(self, call, optional)
+        chain_args::build_call_args_doc_for_chain_expanded(self, call, facts)
     }
 
     /// Build a Doc for call arguments with standard forced expansion
@@ -331,25 +479,39 @@ impl<'a> Printer<'a> {
     pub(super) fn build_call_args_doc_for_chain_standard_expanded(
         &self,
         call: &internal::CallExpression<'_>,
-        optional: bool,
+        facts: ChainCall,
     ) -> DocId {
-        chain_args::build_call_args_doc_for_chain_standard_expanded(self, call, optional)
+        chain_args::build_call_args_doc_for_chain_standard_expanded(self, call, facts)
     }
 }
 
-/// Get the comment boundary for prepend_removed_paren_comments in chains.
+/// The window `prepend_removed_paren_comments` claims at a chain's head: the leading
+/// region the chain's own nodes do NOT claim.
 ///
-/// When linearization extends a member's object_end backward to cover a paren gap
-/// (indicated by object_end < base_start), returns that extended position so
-/// prepend_removed_paren_comments won't double-print comments already handled
-/// mid-chain. Falls back to the normal base start otherwise.
+/// The whole region is `[chain start, base start)` — the stripped grouping parens the
+/// author wrapped the chain in, and any comment among them. It is claimed by two
+/// emitters and they must PARTITION it (`docs/comments.md` hazard 3):
 ///
-/// Only applies to call chains: prettier places comments mid-chain only when the
-/// chain has calls. Member-only chains keep all comments before the chain base.
-fn get_chain_base_comment_start(
+/// - A member whose gap linearization widened back over a stripped `(` claims that
+///   paren's own prefix, `[member start, its object's start)` — prettier relocates a
+///   comment written just inside such a `(` to just before that member.
+/// - The head takes the REST, which is everything from the innermost widened paren's
+///   object inward.
+///
+/// So the window's `start` is the innermost widened claim's END (the largest
+/// [`chain::ChainNode::paren_gap_skip`] start, since the parens nest), not the chain's own
+/// start — reading it as the chain's start hands the head a region a member already
+/// claimed, and stopping the head at the widened claim's START (what this returned
+/// before, as a single bound) handed it NOTHING while the member skipped the same
+/// region: `((⟨⟩a).b).c(x)` had no emitter at all and DROPPED every comment there.
+///
+/// Only call chains widen at all — prettier places comments mid-chain only when the
+/// chain has calls — so a member-only chain keeps the whole region at the head.
+fn chain_head_comment_window(
     nodes: &[chain::ChainNode<'_>],
     expr: &internal::Expression<'_>,
-) -> u32 {
+    chain_start: u32,
+) -> (u32, u32) {
     // A base that OWNS its leading gap (a sealed optional chain, an IIFE callee —
     // `ChainNode::Base::paren_leading_start`) emits it INSIDE the pair it prints, so
     // the claim stops at that `(` and this prepend has nothing left to take. Claiming
@@ -360,24 +522,20 @@ fn get_chain_base_comment_start(
         ..
     }) = nodes.first()
     {
-        return *start;
+        return (chain_start, *start);
     }
     let base_start = get_chain_base_start(expr);
-    // Only check for extended ranges in call chains — prettier doesn't
-    // place comments mid-chain for member-only chains
-    let has_calls = nodes.iter().any(chain::ChainNode::is_call);
-    if has_calls {
-        for node in nodes {
-            if let Some((object_end, _)) = node.comment_range()
-                && object_end < base_start
-            {
-                // This member's range was extended by linearization to cover
-                // a paren gap — prepend should stop here to avoid duplication
-                return object_end;
-            }
-        }
-    }
-    base_start
+    // The innermost widened claim's end. `paren_gap_skip` is `Some` exactly on a node
+    // linearization widened, and its start is that node's object's own span start —
+    // never past the base, since the object contains it — so the max is a position in
+    // `[chain_start, base_start]` and the window can't invert.
+    let start = nodes
+        .iter()
+        .filter_map(chain::ChainNode::paren_gap_skip)
+        .map(|skip| skip.start)
+        .max()
+        .unwrap_or(chain_start);
+    (start, base_start)
 }
 
 /// Get the start position of the innermost base expression in a chain

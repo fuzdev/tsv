@@ -6,7 +6,7 @@
 // heritage clauses (`extends` / `implements`).
 
 use super::layout::hang_after_operator;
-use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
+use super::{CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use crate::printer::analysis;
 use smallvec::{SmallVec, smallvec};
@@ -382,8 +382,10 @@ impl<'a> Printer<'a> {
     /// object-property and import-attribute key→`:` gaps, the pattern-family
     /// pre-separator gaps — a pattern property's key→`:` and every binding default's
     /// head→`=` ([`Self::route_pre_separator_gap`], `expressions/patterns.rs`) — the
-    /// index-signature `]`→value-`:` gap (`build_index_signature_member_doc`), the
-    /// callee→empty argument list gap (`push_empty_args`), the two expression-level
+    /// index-signature `]`→value-`:` gap (`build_index_signature_member_doc`), the two
+    /// callee gaps that share [`Self::build_line_split_gap_doc`] — the callee→empty
+    /// argument list gap (`push_empty_args`) and an optional call's callee→`?.` half
+    /// (`calls::optional_callee_gap_doc`) — the two expression-level
     /// keyword→operand gaps — `new`→callee (`build_new_doc_with_wrapping`) and
     /// `await`→operand (`build_await_doc`), whose tail is the WHOLE operand so a broken
     /// argument list renders at the continuation's indent — and the switch case label's
@@ -435,6 +437,44 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         d.indent(d.concat(&[self.build_trailing_comments_hang_next(start, end), tail]))
+    }
+
+    /// A gap whose comment run precedes `tail`, routed on the **line**-comment question
+    /// alone.
+    ///
+    /// A `//` runs to end of line, so `tail` cannot stay on that line: the run keeps the
+    /// position the author gave it and `tail` drops to the uniform forced-continuation
+    /// indent ([`Self::build_continuation_indent`]). Anything else — a block comment in any
+    /// authored position, glued or own-line, single-line or multiline — forces nothing,
+    /// reflows inline, and glues in front of `tail` behind prettier's own space. An empty
+    /// gap is `tail` alone.
+    ///
+    /// The two sites are one gap under two spellings, which is why the shape is stated
+    /// once rather than hand-rolled at each: the callee→`(` gap ahead of an EMPTY argument
+    /// list (`push_empty_args`, where `tail` is the `()` an inline `//` would swallow) and
+    /// the callee→`?.` half an optional call with arguments splits off
+    /// (`calls::optional_callee_gap_doc`, where it is the `?.`). Both are the same
+    /// position — the region between a callee and what opens its argument list — so a
+    /// caller that answered them differently would make the `?.` change how the gap reads.
+    ///
+    /// ⚠️ Not [`Self::keyword_operand_gap`], whose gate is
+    /// [`Printer::comments_force_own_line_between`] and therefore also hangs a multiline
+    /// block the author broke after. These two gaps reflow that block inline instead, so
+    /// the narrower gate is deliberate and the two routers are siblings rather than
+    /// duplicates.
+    pub(crate) fn build_line_split_gap_doc(&self, start: u32, end: u32, tail: DocId) -> DocId {
+        if self.has_line_comments_between(start, end) {
+            return self.build_continuation_indent(start, end, tail);
+        }
+        match self.build_comments_between_filtered_opt(
+            start,
+            end,
+            CommentSpacing::Leading,
+            CommentFilter::All,
+        ) {
+            Some(run) => self.d().concat(&[run, tail]),
+            None => tail,
+        }
     }
 
     /// Route a **pre-keyword** gap — the head→keyword half of a `<head> <keyword>

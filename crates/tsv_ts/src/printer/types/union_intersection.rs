@@ -1433,7 +1433,18 @@ impl<'a> Printer<'a> {
         let TSType::TypeLiteral(obj) = unwrap_parenthesized(intersection.types.last()?) else {
             return None;
         };
-        (!self.intersection_needs_line_comment_layout(intersection)).then_some((intersection, obj))
+        // A first-member paren holding a leading `//` declines too. The aligned builder
+        // reassembles the intersection from its members' docs, so the hoist run
+        // `build_intersection_type_doc` would have lifted out has no emitter here and the
+        // comment was DROPPED (`docs/comments.md` hazard 4) — invisibly, because the
+        // hoist's own shape is a REQUIRED pair (`((⟨⟩b | c) & { x: X }) | e`), which the
+        // redundant-shell claims the union's routing gate asks about cannot see.
+        (!self.intersection_needs_line_comment_layout(intersection)
+            && intersection.types.first().is_none_or(|first| {
+                self.intersection_first_member_hoist_comments(first)
+                    .is_empty()
+            }))
+        .then_some((intersection, obj))
     }
 
     //
