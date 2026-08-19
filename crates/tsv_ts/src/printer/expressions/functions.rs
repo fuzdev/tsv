@@ -1234,12 +1234,20 @@ impl<'a> Printer<'a> {
             .build_close_paren_to_return_type_comments(close_paren_after, annotation.span.start);
 
         // Function types need parentheses to disambiguate from the arrow's `=>`
-        // Example: `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
-        // Unwrap any explicit parenthesized types to check the inner type
+        // (`(x: T): ((y: T) => U) =>`, never `(x: T): (y: T) => U =>`). The pair is the
+        // POSITION's, not the annotation's, so it rides the ordinary return-type emitter
+        // as an `AnnotationParens::ArrowReturn` rather than a hand-rolled
+        // `": (" + type + ")"`. That reassembly was hazard 4: it ran no gap lookup, so
+        // every comment in the `:`→type gap and in the authored shell — `(x: T): /* c */
+        // ((y: T) => T)`, `(x: T): (/* c */ (y: T) => T)`, `(x: T): ((y: T) => T /* c */)`
+        // — reached no emitter and was DROPPED, at the one return-type position that has
+        // no comment-aware twin to fall back to.
         let inner_type = unwrap_parenthesized(annotation.type_annotation);
         if matches!(inner_type, internal::TSType::Function(_)) {
-            let type_doc = self.build_type_doc(inner_type);
-            return d.concat(&[comment_prefix, d.text(": ("), type_doc, d.text(")")]);
+            return d.concat(&[
+                comment_prefix,
+                self.build_arrow_return_type_annotation_doc(annotation),
+            ]);
         }
 
         // Use return type version - only wraps for complex type args (unions/intersections)

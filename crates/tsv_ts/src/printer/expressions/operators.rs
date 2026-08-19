@@ -133,13 +133,13 @@ impl<'a> Printer<'a> {
             return d.concat(&[shell, operator_doc]);
         }
 
-        let argument_doc = self.build_expression_doc(update.argument);
+        let inner_doc = self.build_expression_doc(update.argument);
         // A type-assertion operand keeps its parens: `(a as T)++` (bare
         // `a as T++` binds `++` to `T`).
         let argument_doc = if self.needs_parens(update.argument, ParenContext::UpdateArgument) {
-            d.parens(argument_doc)
+            d.parens(inner_doc)
         } else {
-            argument_doc
+            inner_doc
         };
 
         if update.prefix {
@@ -154,10 +154,32 @@ impl<'a> Printer<'a> {
             // break after a glued block — `++/* c */⏎x` keeps the break. Gluing pulled the
             // operand up to `++/* c */ x` instead.
             let operator_end = update.span.start + operator_len;
-            match self.build_rhs_comments_opt(operator_end, update.argument.span().start) {
-                Some(comments) => d.concat(&[operator_doc, comments, argument_doc]),
-                None => d.concat(&[operator_doc, argument_doc]),
+            let mut parts: DocBuf = smallvec![operator_doc];
+            if let Some(comments) =
+                self.build_rhs_comments_opt(operator_end, update.argument.span().start)
+            {
+                parts.push(comments);
             }
+            // The operand→`)` gap is the PREFIX form's alone, and it RETAINS its shell —
+            // the `await`/`yield` answer, reached for the same reason: a prefix update
+            // **spans its own `)`**, so the enclosing terminator gap starts past it and
+            // cannot see inside. Unclaimed the comment was simply DROPPED
+            // (`++(a as T /* c */);` → `++(a as T);`, `++(a⏎// c⏎);` → `++a;`), and
+            // relocating it outside instead has no fixed point: on reparse it lands in
+            // the terminator gap and moves again, past the `;`. The POSTFIX twin has no
+            // such gap — its span ends past the operator, so the region before it is
+            // inside the node and its own emitter covers it.
+            parts.push(
+                self.build_paren_operand_comment_doc(
+                    update.argument.span().end,
+                    update.span.end,
+                    inner_doc,
+                    inner_doc,
+                    ")",
+                )
+                .unwrap_or(argument_doc),
+            );
+            d.concat(&parts)
         } else {
             // Postfix, no shell needed (see above): the same unclaimed gap on the other
             // side, emitted **inline** rather than hanging the operator — a break would

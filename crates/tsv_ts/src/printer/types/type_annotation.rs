@@ -5,7 +5,7 @@
 // - Width-aware wrapping for type arguments
 // - Return type annotations
 
-use super::helpers::type_args_should_wrap_for_return_type;
+use super::helpers::{type_args_should_wrap_for_return_type, unwrap_parenthesized};
 use super::{CommentSpacing, Printer, TrailingBlock};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
@@ -13,7 +13,107 @@ use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// Which pair, if any, an annotation's **position** requires around its type — over and
+/// above the parens the author wrote, which the type's own doc already prints.
+///
+/// The annotation emitters below build their value in three SHAPES, and the pair has to
+/// reach all three or it is present at one arm and missing at another:
+///
+/// - an ordinary **type doc** — [`Printer::build_annotation_value_doc`], which every
+///   value-building site asks instead of `build_type_doc` directly (the comment-free fast
+///   path, the broke-after leading run, the plain fall-through, the `:`-gap hang);
+/// - a **frozen** verbatim slice — [`frozen_annotation_parens`], the slicing rule, since
+///   a source paren the freeze would drop as redundant is the very pair required here;
+/// - a shell-**stripped** inner — [`Printer::wrap_annotation_required_pair`], the one
+///   shape neither of the above covers, because the shell it would have kept is what was
+///   stripped.
+///
+/// The hand-rolled `": (" + build_type_doc(inner) + ")"` the arrow callsite used instead
+/// was none of them: an alternate-layout builder that reassembled the annotation from
+/// parts and therefore ran no gap lookup at all, dropping every comment in the `:`→type
+/// gap and in the authored shell ([`comments.md`](../../../../docs/comments.md)
+/// hazard 4).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum AnnotationParens {
+    /// The type prints exactly the parens the author wrote — every annotation position
+    /// but the one below.
+    AsWritten,
+    /// An **arrow's return type**, where a function type needs the disambiguating pair:
+    /// `(x: T): ((y: T) => T) =>`, never `(x: T): (y: T) => T =>`, whose second `=>`
+    /// would read as the arrow's own.
+    ArrowReturn,
+}
+
+/// The [`AnnotationParens::ArrowReturn`] predicate, in the `fn` shape
+/// [`Printer::build_required_paren_pair_operand_doc`] takes. Reads through the author's
+/// shell: `(x: T): ((y: T) => T) =>` needs the pair just as the shell-less spelling does,
+/// and the shell is redundant *as a type* — only this position requires it.
+fn arrow_return_needs_parens(ty: &TSType<'_>) -> bool {
+    matches!(unwrap_parenthesized(ty), TSType::Function(_))
+}
+
+/// Never — the annotation `:` gap's ordinary answer to "does this frozen child need a
+/// pair of its own?", the `member_parens` predicate [`Printer::build_frozen_head_doc`]
+/// takes. A source paren after `:` is redundant *as a type* and drops under the freeze;
+/// this is exactly what [`Printer::build_frozen_single_child_doc`] hardcodes, named here
+/// so the position can select it beside the arrow-return rule.
+fn no_frozen_parens(_ty: &TSType<'_>) -> bool {
+    false
+}
+
+/// The freeze's paren rule for an annotation position — the `member_parens` predicate
+/// [`Printer::build_frozen_head_doc`] slices by, so a frozen arrow return type keeps (or
+/// re-synthesizes) the pair the grammar requires instead of dropping it as redundant.
+///
+/// A freeze must not unmake a pair the grammar requires: with the ordinary rule,
+/// `: // prettier-ignore⏎((y: T) => T)` froze to `(y: T) => T` and the arrow's own `=>`
+/// bound the reparse the other way.
+fn frozen_annotation_parens(parens: AnnotationParens) -> fn(&TSType<'_>) -> bool {
+    match parens {
+        AnnotationParens::AsWritten => no_frozen_parens,
+        AnnotationParens::ArrowReturn => arrow_return_needs_parens,
+    }
+}
+
 impl<'a> Printer<'a> {
+    /// Build an annotation's value doc, adding the pair the POSITION requires around it.
+    ///
+    /// The required pair routes through [`Self::build_required_paren_pair_operand_doc`],
+    /// so an authored shell that prints its own pair — one retained for a trailing `//`,
+    /// or opened over a leading one — is not double-wrapped, and the shell's leading and
+    /// trailing gaps keep their own emitter. `build_type_doc` alone would strip the
+    /// redundant shell and print no pair at all, which is why the arrow callsite had to
+    /// synthesize one.
+    pub(in crate::printer) fn build_annotation_value_doc(
+        &self,
+        ty: &TSType<'_>,
+        parens: AnnotationParens,
+    ) -> DocId {
+        match parens {
+            AnnotationParens::AsWritten => self.build_type_doc(ty),
+            AnnotationParens::ArrowReturn => {
+                self.build_required_paren_pair_operand_doc(ty, arrow_return_needs_parens)
+            }
+        }
+    }
+
+    /// Add the position's required pair around a **shell-stripped** value.
+    ///
+    /// The strip's counterpart to [`Self::build_annotation_value_doc`]: an in-shell
+    /// directive routes its inner out of the shell that held it, and the resulting doc
+    /// is not a type doc, so the shell-aware routing inside
+    /// `build_required_paren_pair_operand_doc` has nothing to read. The *freeze* answers
+    /// the same question through its slice instead ([`frozen_annotation_parens`]); this
+    /// is the one arm no slice covers, because the shell it would have kept is exactly
+    /// what was stripped.
+    fn wrap_annotation_required_pair(&self, value: DocId, parens: AnnotationParens) -> DocId {
+        let d = self.d();
+        match parens {
+            AnnotationParens::AsWritten => value,
+            AnnotationParens::ArrowReturn => d.concat(&[d.text("("), value, d.text(")")]),
+        }
+    }
+
     /// Build a Doc for a type annotation (e.g., `: number`)
     ///
     /// Handles comments between the colon and the type. For a line comment
@@ -34,9 +134,22 @@ impl<'a> Printer<'a> {
         self.build_type_annotation_doc(annotation)
     }
 
+    /// The `: Type` doc for every annotation position but an arrow's return type — the
+    /// [`AnnotationParens::AsWritten`] entry to [`Self::build_type_annotation_doc_parens`].
     pub(in crate::printer) fn build_type_annotation_doc(
         &self,
         annotation: &internal::TSTypeAnnotation<'_>,
+    ) -> DocId {
+        self.build_type_annotation_doc_parens(annotation, AnnotationParens::AsWritten)
+    }
+
+    /// [`Self::build_type_annotation_doc`] with the position's required pair
+    /// ([`AnnotationParens`]) — the arrow return type's entry, and the only caller that
+    /// passes anything but [`AnnotationParens::AsWritten`].
+    fn build_type_annotation_doc_parens(
+        &self,
+        annotation: &internal::TSTypeAnnotation<'_>,
+        parens: AnnotationParens,
     ) -> DocId {
         let d = self.d();
         // Check for comments between `:` and the type
@@ -82,7 +195,7 @@ impl<'a> Printer<'a> {
                     .paren_interior_routed_inner(annotation.type_annotation)
                     .is_some()
             {
-                return self.build_annotation_own_line_directive_doc(annotation);
+                return self.build_annotation_own_line_directive_doc(annotation, parens);
             }
             // Uniform forced-continuation indent (`build_continuation_indent`): the
             // first comment trails `:` on its line, then the remaining comments and the
@@ -101,7 +214,12 @@ impl<'a> Printer<'a> {
             // Type position: a trailing block lifted from the shell trails the type
             // inline before the terminator.
             let type_doc = self.with_claimed_shell_leading_run(hang.claimed_shell, || {
-                self.build_hang_value_doc(annotation.type_annotation, ty, TrailingBlock::Inline)
+                self.build_hang_value_doc_parens(
+                    annotation.type_annotation,
+                    ty,
+                    TrailingBlock::Inline,
+                    parens,
+                )
             });
             d.concat(&[
                 d.text(":"),
@@ -143,6 +261,7 @@ impl<'a> Printer<'a> {
                     type_start,
                     ty,
                     gap_has_comments,
+                    parens,
                 ),
             }
         }
@@ -159,9 +278,18 @@ impl<'a> Printer<'a> {
     /// and freezes the inner, converging in one pass to the fixed point the bare
     /// authoring holds; trailing shell-gap comments are lifted after the value
     /// (lossless strip).
+    ///
+    /// Neither frozen arm is a type doc — one is a verbatim source slice, the other a
+    /// shell-STRIPPED inner — so `build_annotation_value_doc`'s shell-aware routing has
+    /// nothing to read and the position's required pair has to reach them another way:
+    /// the freeze slices by [`frozen_annotation_parens`], and the strip re-adds the pair
+    /// through [`Self::wrap_annotation_required_pair`]. Without both, an arrow return
+    /// type printed `: // prettier-ignore⏎(y: T) => T =>`, whose second `=>` the reparse
+    /// reads as the arrow's own — a freeze that unmakes the disambiguation it froze.
     fn build_annotation_own_line_directive_doc(
         &self,
         annotation: &internal::TSTypeAnnotation<'_>,
+        parens: AnnotationParens,
     ) -> DocId {
         let d = self.d();
         let colon_end = annotation.span.start + 1;
@@ -169,16 +297,21 @@ impl<'a> Printer<'a> {
         let (gap_end, value_doc) = if self.single_child_frozen(colon_end, child) {
             (
                 child.span().start,
-                self.build_frozen_single_child_doc(child),
+                self.build_frozen_head_doc(child, frozen_annotation_parens(parens)),
             )
         } else if let Some(inner) = self.paren_interior_routed_inner(child) {
             let inner_doc = self.build_routed_child_doc(inner);
+            let stripped =
+                self.with_stripped_paren_trailing(inner_doc, child, inner, TrailingBlock::Inline);
             (
                 inner.span().start,
-                self.with_stripped_paren_trailing(inner_doc, child, inner, TrailingBlock::Inline),
+                self.wrap_annotation_required_pair(stripped, parens),
             )
         } else {
-            (child.span().start, self.build_type_doc(child))
+            (
+                child.span().start,
+                self.build_annotation_value_doc(child, parens),
+            )
         };
         let mut parts: DocBuf = smallvec![d.text(":")];
         self.append_keyword_value_line_comments(&mut parts, colon_end, gap_end, value_doc);
@@ -201,6 +334,7 @@ impl<'a> Printer<'a> {
         type_start: u32,
         ty: &TSType<'_>,
         gap_has_comments: bool,
+        parens: AnnotationParens,
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![d.text(": ")];
@@ -209,19 +343,21 @@ impl<'a> Printer<'a> {
         // (walked by render + every fits pass) is ubiquitous. Byte-identical: the gap is
         // comment-free, so the comment doc would be `empty()`.
         if !gap_has_comments {
-            parts.push(self.build_type_doc(ty));
+            parts.push(self.build_annotation_value_doc(ty, parens));
             return d.concat(&parts);
         }
         // A glued format-ignore directive in the gap freezes a non-composite type
         // verbatim (`let v: /* format-ignore */ {x:   1}` — the directive itself is
-        // emitted inline; own-line directives took the own-line branch).
+        // emitted inline; own-line directives took the own-line branch). The slice
+        // keeps the position's required pair (`frozen_annotation_parens`), as at the
+        // own-line arm.
         if self.single_child_frozen(colon_end, ty) {
             parts.push(self.build_comments_between(
                 colon_end,
                 type_start,
                 CommentSpacing::Trailing,
             ));
-            parts.push(self.build_frozen_single_child_doc(ty));
+            parts.push(self.build_frozen_head_doc(ty, frozen_annotation_parens(parens)));
             return d.concat(&parts);
         }
         // A block run the author broke AFTER, before a type that actually breaks
@@ -235,14 +371,16 @@ impl<'a> Printer<'a> {
         // decline, so an OWNED comment glued to the type keeps the glued path here
         // exactly as it does at the `=` seams.
         if let Some((run, type_doc)) =
-            self.breaking_value_leading_run(colon_end, type_start, || self.build_type_doc(ty))
+            self.breaking_value_leading_run(colon_end, type_start, || {
+                self.build_annotation_value_doc(ty, parens)
+            })
         {
             self.push_leading_run_before_breaking_value(&mut parts, &run, type_start);
             parts.push(type_doc);
             return d.concat(&parts);
         }
         parts.push(self.build_comments_between(colon_end, type_start, CommentSpacing::Trailing));
-        parts.push(self.build_type_doc(ty));
+        parts.push(self.build_annotation_value_doc(ty, parens));
         d.concat(&parts)
     }
 
@@ -296,7 +434,7 @@ impl<'a> Printer<'a> {
         &self,
         annotation: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
-        self.build_type_annotation_doc_with_wrapping(annotation, true)
+        self.build_type_annotation_doc_with_wrapping(annotation, true, AnnotationParens::AsWritten)
     }
 
     /// Build type annotation doc for function return types.
@@ -310,7 +448,23 @@ impl<'a> Printer<'a> {
         &self,
         annotation: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
-        self.build_type_annotation_doc_with_wrapping(annotation, false)
+        self.build_type_annotation_doc_with_wrapping(annotation, false, AnnotationParens::AsWritten)
+    }
+
+    /// [`Self::build_type_annotation_doc_for_return_type`] for an **arrow's** return
+    /// type, whose function-type case takes the disambiguating pair
+    /// ([`AnnotationParens::ArrowReturn`]). Every other return-type position — the
+    /// function type's own, `function` declarations, methods — ends its annotation at a
+    /// token that cannot be mistaken for a `=>`, so they keep the `AsWritten` entry.
+    pub(in crate::printer) fn build_arrow_return_type_annotation_doc(
+        &self,
+        annotation: &internal::TSTypeAnnotation<'_>,
+    ) -> DocId {
+        self.build_type_annotation_doc_with_wrapping(
+            annotation,
+            false,
+            AnnotationParens::ArrowReturn,
+        )
     }
 
     /// Inner implementation for type annotation with wrapping support.
@@ -321,6 +475,7 @@ impl<'a> Printer<'a> {
         &self,
         annotation: &internal::TSTypeAnnotation<'_>,
         always_wrap: bool,
+        parens: AnnotationParens,
     ) -> DocId {
         let d = self.d();
         let colon_end = annotation.span.start + 1; // After the `:`
@@ -349,7 +504,7 @@ impl<'a> Printer<'a> {
             .keyword_value_stripped_paren_hang(annotation.type_annotation)
             .value_start;
         if has_comments && self.has_line_comments_between(colon_end, line_comment_probe_end) {
-            return self.build_type_annotation_doc(annotation);
+            return self.build_type_annotation_doc_parens(annotation, parens);
         }
 
         // A glued format-ignore directive freezes a non-composite type verbatim —
@@ -362,6 +517,7 @@ impl<'a> Printer<'a> {
                 type_start,
                 annotation.type_annotation,
                 true,
+                parens,
             );
         }
 
@@ -484,6 +640,7 @@ impl<'a> Printer<'a> {
             type_start,
             annotation.type_annotation,
             has_comments && self.has_comments_to_emit_between(colon_end, type_start),
+            parens,
         )
     }
 

@@ -24,4 +24,27 @@ line 3
 content
 `
 	);
+
+	// A comment leading the template rides the expanded form with it.
+	expect(a).toBe(
+		/* c1 */
+		`with leading
+comment
+`
+	);
+
+	// So does one trailing it, before the `)`.
+	expect(b).toBe(
+		`with trailing
+comment
+` /* c2 */
+	);
+
+	// Both gaps at once, on a plain member callee.
+	obj.method(
+		/* c3 */
+		`both
+gaps
+` /* c4 */
+	);
 </script>
