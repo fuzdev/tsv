@@ -148,11 +148,16 @@ impl<'a> Printer<'a> {
     // JS Comment Doc builders
     //
 
-    /// One JS comment's own text, verbatim from source — no separator, no break, no
-    /// ledger tag. **The single spelling** the three JS-comment builders in this crate
-    /// share ([`Self::build_leading_js_comment_doc`],
-    /// [`Self::build_trailing_js_comment_doc`], `Printer::build_attr_js_comment_doc`);
-    /// each wraps it in its own separators and tags the result once.
+    /// One JS comment's own text, **verbatim** from source — no separator, no break, no
+    /// ledger tag. The **attr** builder's spelling (`Printer::build_attr_js_comment_doc`,
+    /// which adds the ledger tag): a between-attributes comment is a template-position
+    /// comment with a live prettier oracle, and prettier keeps it verbatim at every
+    /// payload — multi-line interiors included (`svelte/attributes/comment` pins the
+    /// match, "preserved verbatim, not dedented"). The leading and trailing builders'
+    /// comments are JS-*expression* comments instead, which prettier either reindents
+    /// (leading) or drops outright (trailing — no oracle, so tsv answers with the
+    /// `<script>` twin's form): those route through `tsv_ts::build_comment_doc` and
+    /// never reach this.
     ///
     /// ⚠️ **A line comment must reach the doc as ONE node**, which is why this returns a
     /// whole-`span` slice rather than assembling `text("//") + <content>`. The swallow
@@ -160,12 +165,11 @@ impl<'a> Printer<'a> {
     /// (`DocArena::line_comment_source_span`), so the split spelling — which is what all
     /// three sites used to hand-roll — presents nothing for it to tag, and every `//`
     /// this crate prints goes unguarded. Spelling, not intent, decides whether an emitter
-    /// is instrumented; keep new emitters on this function.
+    /// is instrumented; keep new emitters on this function or on
+    /// `tsv_ts::build_comment_doc`, whose line arm is the same instrumented node.
     ///
     /// A block comment's whole span is verbatim `/*…*/` for the same reason the content
-    /// slice was: the delimiters are source bytes, not synthesized. Multi-line blocks are
-    /// emitted verbatim here — the leading builder routes them to `tsv_ts` *before*
-    /// reaching this, for the reindent its own doc explains.
+    /// slice was: the delimiters are source bytes, not synthesized.
     pub(super) fn js_comment_text_doc(&self, comment: &Comment) -> DocId {
         let d = self.d();
         if comment.is_block {
@@ -177,17 +181,20 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a leading JS comment (before content)
     ///
-    /// Multi-line block comments: routed through tsv_ts's comment builder — the *same*
-    /// rendering the owned path uses (`prepend_owned_leading_comment`) — so they reindent
-    /// to context and propagate their break via a `MultilineText`, forcing the surrounding
-    /// value/head/attribute to expand; a trailing space matches the single-line block form.
-    /// This is what keeps a **non-owned** leading multi-line block idempotent: the bare
-    /// authoring glues it to its operand (owned, so tsv_ts prints it and forces the break),
-    /// but stripping a redundant grouping paren leaves it positional (a discarded `(` owns
-    /// nothing) — and a verbatim source span emits it inline with no break, so a
-    /// paren-stripped value stayed inline on pass 1 and expanded only on pass 2 (an F1
-    /// non-idempotency). `build_comment_doc` already tags the print-once ledger, so this
-    /// branch must **not** tag again.
+    /// The comment's own text comes from `tsv_ts::build_comment_doc` — the *same*
+    /// rendering the owned path uses (`prepend_owned_leading_comment`) — so a JS comment
+    /// in an expression value formats exactly as it would in a `<script>` block. For a
+    /// single-line block or a `//` that is the identical verbatim node this builder used
+    /// to hand-roll; the payload it exists for is the **multi-line block**, which
+    /// reindents to context (`*`-aligned interiors) or preserves its layout (any other),
+    /// and propagates its break via a `MultilineText`, forcing the surrounding
+    /// value/head/attribute to expand. That is what keeps a **non-owned** leading
+    /// multi-line block idempotent: the bare authoring glues it to its operand (owned, so
+    /// tsv_ts prints it and forces the break), but stripping a redundant grouping paren
+    /// leaves it positional (a discarded `(` owns nothing) — and a verbatim source span
+    /// emits it inline with no break, so a paren-stripped value stayed inline on pass 1
+    /// and expanded only on pass 2 (an F1 non-idempotency). `build_comment_doc` tags the
+    /// print-once ledger itself, so this builder must **not** tag again.
     ///
     /// Single-line block comments: `/*content*/ ` (with trailing space).
     /// Line comments: `// content\n` (with hardline).
@@ -198,21 +205,13 @@ impl<'a> Printer<'a> {
     /// available to it.
     pub(super) fn build_leading_js_comment_doc(&self, comment: &Comment) -> DocId {
         let d = self.d();
-        if comment.is_block && comment.multiline {
-            let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
-            return d.concat(&[doc, self.leading_js_comment_separator(comment)]);
-        }
+        let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
         let separator = if comment.is_block {
             self.leading_js_comment_separator(comment)
         } else {
             d.hardline()
         };
-        let doc = d.concat(&[self.js_comment_text_doc(comment), separator]);
-        // The renderer records the emit when it reaches the node — see
-        // `tsv_lang::comment_ledger`.
-        #[cfg(feature = "comment_check")]
-        d.tag_comment_doc(doc, comment.span, self.source);
-        doc
+        d.concat(&[doc, separator])
     }
 
     /// What separates a **block** leading comment from the construct it leads: a space when
@@ -280,8 +279,19 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a trailing JS comment (after content), before a closing
     /// `}` / `)` / ` as ` token emitted by the caller.
     ///
-    /// Block comments: ` /*content*/` (inline, leading space) — the closing token
-    /// follows on the same line.
+    /// The comment's own text comes from `tsv_ts::build_comment_doc`, exactly as in
+    /// [`Self::build_leading_js_comment_doc`] — for single-line payloads the identical
+    /// verbatim node, and for the **multi-line block** the `<script>` twin's form:
+    /// TypeScript formatting is context-free, so a `*`-aligned interior reindents to
+    /// context, any other interior is preserved verbatim, and the break propagates via a
+    /// `MultilineText`. The verbatim source span this site used to emit made the
+    /// comment's interior columns a fixed point of whatever the author wrote — the same
+    /// comment held N distinct stable forms, one per authoring
+    /// (`expr_trailing_multiline_prettier_divergence`). `build_comment_doc` tags the
+    /// print-once ledger itself, so this builder must **not** tag again.
+    ///
+    /// Single-line block comments: ` /*content*/` (inline, leading space) — the closing
+    /// token follows on the same line.
     /// Line comments: ` // content` + `hardline` — a `//` comment runs to end of
     /// line, so the closing token MUST drop to the next line; otherwise it would be
     /// swallowed into the comment and lost on reparse. Unlike a trailing line comment
@@ -312,13 +322,13 @@ impl<'a> Printer<'a> {
         dedent_break: bool,
     ) -> DocId {
         let d = self.d();
-        // Both payloads take the same leading separator; only the trailing one differs, so
-        // the two arms are one assembly rather than two spellings of the comment.
+        // Every payload takes the same leading separator; only the trailing one differs,
+        // so the arms are one assembly rather than per-kind spellings of the comment.
         let mut parts = DocBuf::new();
         if !self.trailing_comment_starts_line(comment) {
             parts.push(d.text(" "));
         }
-        parts.push(self.js_comment_text_doc(comment));
+        parts.push(tsv_ts::build_comment_doc(d, comment, &self.ts_inputs()));
         if !comment.is_block {
             parts.push(if dedent_break {
                 d.dedent(d.hardline())
@@ -326,12 +336,7 @@ impl<'a> Printer<'a> {
                 d.hardline()
             });
         }
-        let doc = d.concat(&parts);
-        // The renderer records the emit when it reaches the node — see
-        // `tsv_lang::comment_ledger`.
-        #[cfg(feature = "comment_check")]
-        d.tag_comment_doc(doc, comment.span, self.source);
-        doc
+        d.concat(&parts)
     }
 
     //

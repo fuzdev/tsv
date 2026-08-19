@@ -1,0 +1,643 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 316,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` glued to the pair's `(` keeps the `(` line and the pair expands.",
+			"start": 20,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 108,
+			"end": 112,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 13
+				},
+				"end": {
+					"line": 3,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line comment keeps its own line inside the pair.",
+			"start": 131,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 205,
+			"end": 209,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `satisfies` takes the same shell.",
+			"start": 228,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 278,
+			"end": 282,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 13
+				},
+				"end": {
+					"line": 14,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 315,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 96,
+					"end": 128,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 102,
+							"end": 127,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 102,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 106,
+								"end": 127,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 115,
+									"end": 119,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 6
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 115,
+											"end": 116,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 3
+												}
+											},
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 118,
+											"end": 119,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 5
+												},
+												"end": {
+													"line": 4,
+													"column": 6
+												}
+											},
+											"name": "y"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 108,
+											"end": 112
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 126,
+									"end": 127,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 6
+										},
+										"end": {
+											"line": 5,
+											"column": 7
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 126,
+										"end": 127,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 6
+											},
+											"end": {
+												"line": 5,
+												"column": 7
+											}
+										},
+										"name": "A"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` glued to the pair's `(` keeps the `(` line and the pair expands.",
+							"start": 20,
+							"end": 94
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 191,
+					"end": 225,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 197,
+							"end": 224,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 197,
+								"end": 198,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 201,
+								"end": 224,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 212,
+									"end": 216,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 6
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 212,
+											"end": 213,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 2
+												},
+												"end": {
+													"line": 10,
+													"column": 3
+												}
+											},
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 215,
+											"end": 216,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 5
+												},
+												"end": {
+													"line": 10,
+													"column": 6
+												}
+											},
+											"name": "y"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 205,
+											"end": 209
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 223,
+									"end": 224,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 6
+										},
+										"end": {
+											"line": 11,
+											"column": 7
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 223,
+										"end": 224,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 6
+											},
+											"end": {
+												"line": 11,
+												"column": 7
+											}
+										},
+										"name": "A"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line comment keeps its own line inside the pair.",
+							"start": 131,
+							"end": 189
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 266,
+					"end": 305,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 272,
+							"end": 304,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 272,
+								"end": 273,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 276,
+								"end": 304,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 16,
+										"column": 14
+									}
+								},
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 285,
+									"end": 289,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 6
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 285,
+											"end": 286,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 3
+												}
+											},
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 288,
+											"end": 289,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 5
+												},
+												"end": {
+													"line": 15,
+													"column": 6
+												}
+											},
+											"name": "y"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 278,
+											"end": 282
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 303,
+									"end": 304,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 13
+										},
+										"end": {
+											"line": 16,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 303,
+										"end": 304,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 13
+											},
+											"end": {
+												"line": 16,
+												"column": 14
+											}
+										},
+										"name": "A"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `satisfies` takes the same shell.",
+							"start": 228,
+							"end": 264
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

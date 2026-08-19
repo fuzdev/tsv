@@ -96,6 +96,13 @@ const BENIGN_FALLBACK_DIVERGENCES: &[&str] = &[
     // reimplement what the compile arm already does; deliberately not pursued.
     "svelte/directives/value_paren_multiline_comment_prettier_divergence/unformatted_bare.svelte",
     "svelte/directives/value_paren_multiline_comment_prettier_divergence/unformatted_ours_paren.svelte",
+    // Multiline-comment INTERIOR indentation inside trailing template-expression
+    // comments (the variants author flat/over-indented interiors the input aligns).
+    // Verified: compiles render-key-equal with the `bind:` target `$state`-declared;
+    // the compiled bytes differ only inside comment text. Same fallback hole as the
+    // directive pair above.
+    "svelte/syntax/comments/expr_trailing_multiline_prettier_divergence/unformatted_ours_flat.svelte",
+    "svelte/syntax/comments/expr_trailing_multiline_prettier_divergence/unformatted_ours_indented.svelte",
     // `{#await x then y}` ↔ `{#await x}{:then y}` — the block's structural shape
     // differs (shorthand has no pending branch, the explicit form an empty one).
     // Verified: compiles byte-identical. Retiring it needs await-shorthand structural

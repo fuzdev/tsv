@@ -863,8 +863,15 @@ impl<'a> Printer<'a> {
     /// (`( // c⏎x) as A` → `x as A`, the comment gone). Retaining on either gap is one
     /// rule for one shell rather than two half-rules that disagree about `( // b⏎x // c⏎)`.
     ///
-    /// A **sequence** operand delegates: its own required parens are the grouping, so
-    /// re-wrapping would double them ([`Self::build_expression_doc_keep_paren_comments`]).
+    /// A **sequence** operand's own required parens are the grouping, so re-wrapping
+    /// would double them: with no leading run it delegates to the value builder, which
+    /// keeps the trailing run inside the pair
+    /// ([`Self::build_expression_doc_keep_paren_comments`]); with one, the pair is built
+    /// HERE — the leading gap is the pair's and the value builder's window opens at the
+    /// operand, so delegating dropped the run outright (`(// c⏎x, y) as A` →
+    /// `(x, y) as A`). The sequence rides the expanded shell BARE
+    /// ([`Printer::build_sequence_doc_bare`]), the same one-shell-for-both-gaps layering
+    /// every required pair in the family takes.
     ///
     /// ⚠️ `boundary_end` is the KEYWORD / operator, so the gap it bounds spans the pair's
     /// `)` and holds **two** runs: the pair's own trailing run and, past the `)`, the
@@ -906,7 +913,7 @@ impl<'a> Printer<'a> {
         let close = self.collapsed_grouping_close(expr_end, boundary_end);
         let inner_end = close.map_or(boundary_end, |c| c + 1);
 
-        if matches!(expr, internal::Expression::SequenceExpression(_)) {
+        if matches!(expr, internal::Expression::SequenceExpression(_)) && !has_leading {
             let seq =
                 self.build_expression_doc_keep_paren_comments(expr, inner_end, SeqLayout::Aligned);
             return Some(self.append_shell_outside_run(seq, close, boundary_end));
@@ -934,7 +941,11 @@ impl<'a> Printer<'a> {
         if let Some(run) = leading_run {
             body.push(run);
         }
-        body.push(self.build_expression_doc(expr));
+        body.push(match expr {
+            // Bare: the shell composed below IS the sequence's required pair.
+            internal::Expression::SequenceExpression(seq) => self.build_sequence_doc_bare(seq),
+            _ => self.build_expression_doc(expr),
+        });
         if let Some((trailing, _needs_break)) =
             self.trailing_paren_comment_parts(expr_end, inner_end)
         {
