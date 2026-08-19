@@ -5,6 +5,7 @@
 // `SymbolLookup` traits — collapsed to inherent methods, since `Printer` was
 // their only implementor.
 
+use super::printing::ComputedBracket;
 use crate::ast::internal;
 use crate::printer::comments::CommentVec;
 use crate::printer::{CommentSpacing, Printer, comments_to_emit_in_range};
@@ -64,12 +65,13 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_computed_member_line_comment_bracket(
         &self,
         open: &'static str,
-        inside_start: u32,
+        bracket: ComputedBracket,
         prop_start: u32,
         prop_end: u32,
         bracket_end: u32,
         inner: DocId,
     ) -> Option<DocId> {
+        let inside_start = bracket.inside;
         // Only the break path — a line comment before the index or after it (before
         // `]`). A block-only or comment-free bracket falls through to the caller.
         if !self.has_line_comments_between(inside_start, prop_start)
@@ -95,10 +97,9 @@ impl<'a> Printer<'a> {
             body_parts.push(self.build_comment_doc(comment));
             prev = comment.span.end;
         }
-        // The `[` is the char just before the index region (past `?.` for `?.[`).
         Some(self.build_bracket_line_comment_break(
             open,
-            inside_start - 1,
+            bracket.bracket_pos(),
             prop_start,
             d.concat(&body_parts),
         ))
@@ -147,6 +148,27 @@ impl<'a> Printer<'a> {
             end,
             self.comment_line_breaks,
         )
+    }
+
+    /// A chain node's gap classification, honoring the node's own
+    /// [`super::ChainNode::paren_gap_skip`] hole.
+    ///
+    /// The common node has no hole and this is exactly [`Self::classify_comments`]. A
+    /// node whose gap was widened back over a stripped grouping paren has one, and its
+    /// claim is the two regions either side of it — the paren prefix and its own gap —
+    /// classified separately so each is read against its own anchor.
+    pub(crate) fn classify_chain_gap(
+        &self,
+        start: u32,
+        end: u32,
+        skip: Option<Span>,
+    ) -> ClassifiedComments<'_> {
+        let Some(skip) = skip else {
+            return self.classify_comments(start, end);
+        };
+        let mut classified = self.classify_comments(start, skip.start);
+        classified.append(self.classify_comments(skip.end, end));
+        classified
     }
 
     /// A gap's same-line block run, each comment behind a space

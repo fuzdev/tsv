@@ -24,4 +24,10 @@
 	arr.foo()[ // c4
 		0
 	];
+
+	// The `?.[` spelling of that same `[`-line case. The authored form may space the
+	// `?.` off the `[` (`obj ?. [`), which must reach the identical output.
+	const d = obj?.[ // c5
+		i
+	];
 </script>

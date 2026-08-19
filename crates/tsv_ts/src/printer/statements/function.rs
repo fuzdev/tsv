@@ -3,7 +3,6 @@
 use super::super::types::function_types::group_params_if_should;
 use super::Printer;
 use crate::ast::internal;
-use crate::printer::CommentSpacing;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -264,16 +263,11 @@ impl<'a> Printer<'a> {
             tail.push(self.identifier_name_doc(id));
 
             // Comments between name and type params/parens: `function fn1/* c */ <T>()` or `fn1 /* c */()`
-            // Line comments get a hardline to prevent absorbing type params as comment text
-            let comment_end = decl
-                .type_parameters
-                .as_ref()
-                .map_or(decl.params_start, |tp| tp.span.start);
-            self.push_name_to_type_params_comments(
+            self.push_signature_head_comments(
                 &mut tail,
                 id.span.end,
-                comment_end,
-                CommentSpacing::for_type_params(decl.type_parameters.is_some()),
+                decl.type_parameters.as_ref(),
+                decl.params_start,
             );
             id.span.start
         } else {

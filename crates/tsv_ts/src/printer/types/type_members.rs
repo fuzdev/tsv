@@ -239,17 +239,12 @@ impl<'a> Printer<'a> {
         // type-param doc below, and including it here would emit it twice. Line
         // comments get a hardline to prevent absorbing the type params/params as
         // comment text.
-        let comments_boundary = method
-            .type_parameters
-            .as_ref()
-            .map(|tp| tp.span.start)
-            .or(paren_pos)
-            .unwrap_or(key_region_end);
-        self.push_name_to_type_params_comments(
+        self.push_signature_head_comments(
             &mut parts,
             after_key,
-            comments_boundary,
-            CommentSpacing::for_type_params(method.type_parameters.is_some()),
+            method.type_parameters.as_ref(),
+            // A member with no parens to find has no gap either — close it at the key.
+            paren_pos.unwrap_or(key_region_end),
         );
 
         // Print type parameters if present: `<T>` or `<T, U>`
