@@ -1,0 +1,1014 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 742,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " the leading-`&` gap and the first member's stripped shell are contiguous in source,",
+			"start": 20,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " so their comments are ONE run, emitted in source order",
+			"start": 108,
+			"end": 165,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 176,
+			"end": 184,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 10
+				},
+				"end": {
+					"line": 4,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d1",
+			"start": 187,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same gap on a 2-member intersection written with the leading `&`",
+			"start": 200,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 282,
+			"end": 290,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 10
+				},
+				"end": {
+					"line": 9,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d2",
+			"start": 293,
+			"end": 298,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an extra redundant layer on the shell changes nothing",
+			"start": 310,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 377,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 10
+				},
+				"end": {
+					"line": 14,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d3",
+			"start": 388,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a run of blocks in the gap, each keeping its own line",
+			"start": 401,
+			"end": 457,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4a ",
+			"start": 468,
+			"end": 477,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 10
+				},
+				"end": {
+					"line": 19,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4b ",
+			"start": 480,
+			"end": 489,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d4",
+			"start": 492,
+			"end": 497,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " under an array suffix, where the position's own pair would otherwise claim the shell",
+			"start": 509,
+			"end": 596,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 607,
+			"end": 615,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 10
+				},
+				"end": {
+					"line": 25,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d5",
+			"start": 618,
+			"end": 623,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment in the gap takes the same run, ahead of the shell's",
+			"start": 633,
+			"end": 702,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 713,
+			"end": 718,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 10
+				},
+				"end": {
+					"line": 30,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d6",
+			"start": 721,
+			"end": 726,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 741,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 732,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 33,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 167,
+					"end": 197,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 172,
+						"end": 173,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 195,
+						"end": 196,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 3
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 195,
+							"end": 196,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "a"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 176,
+								"end": 184
+							},
+							{
+								"type": "Line",
+								"value": " d1",
+								"start": 187,
+								"end": 192
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the leading-`&` gap and the first member's stripped shell are contiguous in source,",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " so their comments are ONE run, emitted in source order",
+							"start": 108,
+							"end": 165
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 273,
+					"end": 307,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 8
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 278,
+						"end": 279,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 301,
+						"end": 306,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 7
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 301,
+								"end": 302,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 301,
+									"end": 302,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"name": "b"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 305,
+								"end": 306,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 6
+									},
+									"end": {
+										"line": 11,
+										"column": 7
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 305,
+									"end": 306,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 6
+										},
+										"end": {
+											"line": 11,
+											"column": 7
+										}
+									},
+									"name": "c"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 282,
+								"end": 290
+							},
+							{
+								"type": "Line",
+								"value": " d2",
+								"start": 293,
+								"end": 298
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same gap on a 2-member intersection written with the leading `&`",
+							"start": 200,
+							"end": 271
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 368,
+					"end": 398,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 373,
+						"end": 374,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 396,
+						"end": 397,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 2
+							},
+							"end": {
+								"line": 16,
+								"column": 3
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 396,
+							"end": 397,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 3
+								}
+							},
+							"name": "d"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 377,
+								"end": 385
+							},
+							{
+								"type": "Line",
+								"value": " d3",
+								"start": 388,
+								"end": 393
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an extra redundant layer on the shell changes nothing",
+							"start": 310,
+							"end": 366
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 459,
+					"end": 506,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 8
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 464,
+						"end": 465,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 500,
+						"end": 505,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 2
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 500,
+								"end": 501,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 500,
+									"end": 501,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 3
+										}
+									},
+									"name": "e"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 504,
+								"end": 505,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 6
+									},
+									"end": {
+										"line": 22,
+										"column": 7
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 504,
+									"end": 505,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 6
+										},
+										"end": {
+											"line": 22,
+											"column": 7
+										}
+									},
+									"name": "f"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c4a ",
+								"start": 468,
+								"end": 477
+							},
+							{
+								"type": "Block",
+								"value": " c4b ",
+								"start": 480,
+								"end": 489
+							},
+							{
+								"type": "Line",
+								"value": " d4",
+								"start": 492,
+								"end": 497
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run of blocks in the gap, each keeping its own line",
+							"start": 401,
+							"end": 457
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 598,
+					"end": 630,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 603,
+						"end": 604,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 6
+							},
+							"end": {
+								"line": 25,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 626,
+						"end": 629,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 2
+							},
+							"end": {
+								"line": 27,
+								"column": 5
+							}
+						},
+						"elementType": {
+							"type": "TSTypeReference",
+							"start": 626,
+							"end": 627,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 2
+								},
+								"end": {
+									"line": 27,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 626,
+								"end": 627,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 3
+									}
+								},
+								"name": "g"
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 607,
+								"end": 615
+							},
+							{
+								"type": "Line",
+								"value": " d5",
+								"start": 618,
+								"end": 623
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " under an array suffix, where the position's own pair would otherwise claim the shell",
+							"start": 509,
+							"end": 596
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 704,
+					"end": 731,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 709,
+						"end": 710,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 6
+							},
+							"end": {
+								"line": 30,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 729,
+						"end": 730,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 2
+							},
+							"end": {
+								"line": 32,
+								"column": 3
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 729,
+							"end": 730,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 2
+								},
+								"end": {
+									"line": 32,
+									"column": 3
+								}
+							},
+							"name": "h"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c6",
+								"start": 713,
+								"end": 718
+							},
+							{
+								"type": "Line",
+								"value": " d6",
+								"start": 721,
+								"end": 726
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment in the gap takes the same run, ahead of the shell's",
+							"start": 633,
+							"end": 702
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

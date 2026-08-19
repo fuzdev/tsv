@@ -30,11 +30,17 @@ comment takes is the author's, per the opening-delimiter rule. `TupleElement` is
 **own-line** context: the caller already places the element on its own indented line, so the
 member keeps the comment inside at the element's indent with no extra continuation level.
 
-The boundary is which pair the comment sits in, and it is asked of the paren's **direct**
-child. A **redundant** outer layer (`(// c\n (A | B)) & C`, `((// c\n A | B)) & C`) is
-stripped, so the pair holding the run does not survive and the comment must hoist to the
-value seam instead — that case keeps its existing answer in
-[intersection_leading_line_comment](../intersection_leading_line_comment_prettier_divergence/).
+The boundary is whether a pair SURVIVES, which is the intersection's own member-parens rule
+(`union_member_parens`) and **not** the layer count the author wrote. One pair is emitted
+however many the author nested, and the run renders inside it: `unformatted_ours_extra_layer`
+adds a redundant layer to every case here (`((// c\n A | B)) & C`, and two at `Plain`) and
+lands byte-identically on `input`. Prettier converges its own three spellings the same way,
+which is the argument — a paren layer carries no authorship signal, so answering the nested
+form differently from the single one is tsv disagreeing with itself about one authoring.
+Where the member needs no pair at all, nothing survives and the run must move instead; the
+shell-around-the-whole-value spelling of that is in
+[intersection_leading_line_comment](../intersection_leading_line_comment_prettier_divergence/),
+and the member-level one is `TransparentShell` below.
 
 `TransparentShell` is that boundary reached from the other side — the control for the rule's
 one exception. A **single-member** union (the leading-`|` spelling, `(// c\n | A) & B`) parses

@@ -106,6 +106,19 @@ comment position as semantic and preserves it wherever that distinction is real.
    element either way) — tsv trails like Prettier rather than manufacturing a divergence
    for a meaningless distinction.
 
+A corollary the redundant-paren members make explicit: **a LEADING comment never
+changes which parens are retained, only where it renders once they are.** Whether a
+shell survives is the comment-free rule's answer; the comment then either sits inside
+the pair that survived (`(// c⏎A | B) & C`) or relocates into the gap the strip leaves
+it in (`a & (// c⏎| b)` → `a &⏎// c⏎b`). Deciding retention *from* the comment produces
+a pair the reparse then removes, so the output disagrees with **itself** rather than
+with prettier — an F1 violation, not a divergence. ⚠️ The rule is the leading side's
+alone: a **trailing** `//` genuinely does retain a shell that would otherwise strip
+(`Printer::paren_retains_for_trailing_run`), because there is nowhere lossless to put
+it — deferring carries it out of the construct it was written in
+([comments.md](./comments.md)). A leading run always has the enclosing gap to fall
+back to; a trailing one does not.
+
 A corollary the before-`:`/`=` gaps make explicit: **own-line-ness is authoring
 signal for a leading position, not a trailing one.** A single-line block comment
 that trails a head token (a key before its `:`, a name before its `=`) has its
