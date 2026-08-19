@@ -141,6 +141,28 @@ impl<'a> Printer<'a> {
 
         // Build callee with type args: `new Foo<K, V>`
         let callee_with_types = d.concat(&[keyword, callee_with_types_base]);
+
+        // Single template literal argument with embedded newlines on the same line as `(` —
+        // hug it. A template on its own line declines and falls through to
+        // has_multiline_content below.
+        //
+        // Prettier's own position, shared with the plain call and dynamic `import()`:
+        // `isTemplateLiteralSingleArg` is the first thing `printCallExpression` asks, above
+        // `printCallArguments` and every layout inside it. `new` reached the same ANSWER from
+        // further down only because the two gates it used to sit under — `anyArgEmptyLine`
+        // and the composition check — are vacuous for a single argument; stating the position
+        // once is what keeps the four spellings one rule rather than four that happen to
+        // agree.
+        if let Some(doc) = try_hug_multiline_template_arg(
+            self,
+            callee_with_types,
+            new_expr.arguments,
+            paren_open,
+            new_expr.span.end,
+        ) {
+            return doc;
+        }
+
         // Zero-comment fast gate: one binary search over the whole argument window
         // (`(` … `)`) short-circuits every per-branch argument-comment predicate
         // below (trailing-line / trailing-block / inter-argument / leading), each of
@@ -416,18 +438,6 @@ impl<'a> Printer<'a> {
                 paren_open,
                 new_expr.span.end,
             );
-        }
-
-        // Single template literal argument with embedded newlines on the same line
-        // as `(` — hug it. A template on its own line falls through to
-        // has_multiline_content below.
-        if let Some(doc) = try_hug_multiline_template_arg(
-            self,
-            callee_with_types,
-            new_expr.arguments,
-            new_expr.span.end,
-        ) {
-            return doc;
         }
 
         // Check if any argument has multiline content

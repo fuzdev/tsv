@@ -345,11 +345,22 @@ ordinary fixtures `calls/args_prettier_ignore_member`,
 `patterns/prettier_ignore_element`, `parenthesized/jsdoc_cast_prettier_ignore_interior` (the
 directive inside a JSDoc cast's own parens, which freezes the cast's inner), and the Svelte
 `expressions/call_args_prettier_ignore_member` (the embedded-TS route, where the frozen
-slice is a raw range in host coordinates) all **match** prettier — no divergence in this
-family. The one place the two tools part is the flat **test-call** layout, and that is a
-comment-position question rather than a freeze one: see
-[§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s
-test-call entry.
+slice is a raw range in host coordinates) all **match** prettier on the FREEZE. Two layouts
+part from it, and only one is a freeze question:
+
+- Directive in the `(`→argument gap of a lone **multiline-template** argument —
+  ◆design_choice ◆comment_preservation — the call expands where prettier hugs. This is the
+  only argument position where prettier HAS a hug to disagree with (the flat form of
+  `printCallExpression`'s `isTemplateLiteralSingleArg` branch, comment-independent there),
+  and the flat concat has no line of its own to put the directive's run on: it would land on
+  the `(`'s line, inert, and the freeze would be gone on the second pass. Prettier hugs and
+  stays frozen because it decides a directive by comment *attachment* rather than by
+  placement. All four call spellings agree, and with nothing glued to the backtick the
+  newline before it declines the hug anyway, so both tools expand —
+  [template argument](../tests/fixtures/typescript/expressions/calls/template_arg_prettier_ignore_expands_prettier_divergence/)
+- The flat **test-call** layout, which is a comment-position question rather than a freeze
+  one: see [§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s
+  test-call entry.
 
 **On module and declarator lists.** Rule A once more, over the remaining comma lists: an
 own-line directive in the `{`→first-item gap or between two items freezes the **following

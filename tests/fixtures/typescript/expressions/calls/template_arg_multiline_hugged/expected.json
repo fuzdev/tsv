@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 406,
+	"end": 740,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,72 @@
 					"column": 46
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Dynamic import — the same rule, its fourth spelling",
+			"start": 398,
+			"end": 452,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control: a second argument defeats the hug (the rule is sole-argument only)",
+			"start": 489,
+			"end": 567,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Member chain — the rule outranks chain routing, so the heads stay flat",
+			"start": 617,
+			"end": 690,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 74
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 405,
+		"end": 739,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 396,
+			"end": 730,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 24,
+					"line": 45,
 					"column": 9
 				}
 			},
@@ -655,6 +703,404 @@
 							"value": " Short control (single line — no multiline)",
 							"start": 336,
 							"end": 381
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 454,
+					"end": 486,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ImportExpression",
+						"start": 454,
+						"end": 485,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 1
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"source": {
+							"type": "TemplateLiteral",
+							"start": 461,
+							"end": 484,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 8
+								},
+								"end": {
+									"line": 29,
+									"column": 1
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 462,
+									"end": 483,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 9
+										},
+										"end": {
+											"line": 29,
+											"column": 0
+										}
+									},
+									"value": {
+										"raw": "line 1\nline 2\nline 3\n",
+										"cooked": "line 1\nline 2\nline 3\n"
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Dynamic import — the same rule, its fourth spelling",
+							"start": 398,
+							"end": 452
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 569,
+					"end": 614,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ImportExpression",
+						"start": 569,
+						"end": 613,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 1
+							},
+							"end": {
+								"line": 38,
+								"column": 2
+							}
+						},
+						"source": {
+							"type": "TemplateLiteral",
+							"start": 579,
+							"end": 602,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 2
+								},
+								"end": {
+									"line": 36,
+									"column": 1
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 580,
+									"end": 601,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 3
+										},
+										"end": {
+											"line": 36,
+											"column": 0
+										}
+									},
+									"value": {
+										"raw": "line 1\nline 2\nline 3\n",
+										"cooked": "line 1\nline 2\nline 3\n"
+									},
+									"tail": true
+								}
+							]
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 606,
+								"end": 610,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 6
+									}
+								},
+								"name": "opts"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a second argument defeats the hug (the rule is sole-argument only)",
+							"start": 489,
+							"end": 567
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 692,
+					"end": 729,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 44,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 692,
+						"end": 728,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 1
+							},
+							"end": {
+								"line": 44,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 692,
+							"end": 703,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 1
+								},
+								"end": {
+									"line": 41,
+									"column": 12
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 692,
+								"end": 701,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 1
+									},
+									"end": {
+										"line": 41,
+										"column": 10
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 692,
+									"end": 699,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 1
+										},
+										"end": {
+											"line": 41,
+											"column": 8
+										}
+									},
+									"object": {
+										"type": "CallExpression",
+										"start": 692,
+										"end": 697,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 1
+											},
+											"end": {
+												"line": 41,
+												"column": 6
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 692,
+											"end": 695,
+											"loc": {
+												"start": {
+													"line": 41,
+													"column": 1
+												},
+												"end": {
+													"line": 41,
+													"column": 4
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 692,
+												"end": 693,
+												"loc": {
+													"start": {
+														"line": 41,
+														"column": 1
+													},
+													"end": {
+														"line": 41,
+														"column": 2
+													}
+												},
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 694,
+												"end": 695,
+												"loc": {
+													"start": {
+														"line": 41,
+														"column": 3
+													},
+													"end": {
+														"line": 41,
+														"column": 4
+													}
+												},
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 698,
+										"end": 699,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 7
+											},
+											"end": {
+												"line": 41,
+												"column": 8
+											}
+										},
+										"name": "c"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 702,
+								"end": 703,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 11
+									},
+									"end": {
+										"line": 41,
+										"column": 12
+									}
+								},
+								"name": "d"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 704,
+								"end": 727,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 13
+									},
+									"end": {
+										"line": 44,
+										"column": 1
+									}
+								},
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 705,
+										"end": 726,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 14
+											},
+											"end": {
+												"line": 44,
+												"column": 0
+											}
+										},
+										"value": {
+											"raw": "line 1\nline 2\nline 3\n",
+											"cooked": "line 1\nline 2\nline 3\n"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Member chain — the rule outranks chain routing, so the heads stay flat",
+							"start": 617,
+							"end": 690
 						}
 					]
 				}

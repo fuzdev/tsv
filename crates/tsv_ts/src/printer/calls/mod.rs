@@ -44,20 +44,62 @@ pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_com
 use super::Printer;
 use super::chain;
 use crate::ast::internal;
+use crate::printer::chain::call_callee_paren_leading_start;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
-use arg_wrapping::build_args_split_last;
+use arg_wrapping::{build_args_split_last, multiline_template_hug_applies};
 use tsv_lang::doc::arena::DocId;
 
-/// The position the call's `(` follows — the end of the type-argument list when the call
-/// has one (`fn<T>(a)`), else the callee's end. Every argument-gap window in this family
-/// opens here: the leading-argument comment scans, and Rule A's first-argument freeze
-/// window ([`Printer::args_frozen_span`]). One spelling, so a caller can't accidentally
-/// open the window at the callee and swallow the type arguments' own comments.
-pub(super) fn call_paren_open(call: &internal::CallExpression<'_>) -> u32 {
-    call.type_arguments
-        .as_ref()
-        .map_or_else(|| call.callee.span().end, |ta| ta.span.end)
+/// A call's callee gap: whether the callee prints a REQUIRED pair that keeps both its gaps
+/// inside it, the operand→`)` region such a pair emits itself, and where every window past
+/// the callee opens.
+///
+/// ⚠️ **ONE derivation**, because the pair's own doc and the windows that open past its `)`
+/// must agree: a `trailing_gap` the doc does not emit is a DROPPED comment, and the reverse
+/// is a DOUBLE-PRINT. The three values were once derived twice — inline in
+/// [`call_formatting::build_call_doc_with_wrapping`] and again in a type-args-only
+/// `call_paren_open` — and the
+/// two disagreed on exactly this pair.
+#[derive(Clone, Copy)]
+pub(super) struct CalleeGap {
+    /// The callee prints its own required pair (an IIFE, a sealed optional chain).
+    pub(super) owned_pair: bool,
+    /// The operand→`)` region that pair emits itself, when it owns one.
+    pub(super) trailing_gap: Option<(u32, u32)>,
+    /// Where every window past the callee opens: past that `)`, else the callee's span end.
+    pub(super) start: u32,
+}
+
+impl CalleeGap {
+    /// The position the call's `(` follows — [`Self::start`], then past the type-argument
+    /// list when the call has one (`fn<T>(a)`). Every argument-gap window in this family
+    /// opens here: the leading-argument comment scans, and Rule A's first-argument freeze
+    /// window ([`Printer::args_frozen_span`]). Separate from [`Self::start`] so a caller
+    /// can't accidentally open the window at the callee and swallow the type arguments'
+    /// own comments.
+    pub(super) fn paren_open(&self, call: &internal::CallExpression<'_>) -> u32 {
+        call.type_arguments
+            .as_ref()
+            .map_or(self.start, |ta| ta.span.end)
+    }
+}
+
+/// Resolve a call's [`CalleeGap`].
+pub(super) fn callee_gap(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -> CalleeGap {
+    let callee_end = call.callee.span().end;
+    let owned_pair = call_callee_paren_leading_start(call).is_some();
+    let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
+    CalleeGap {
+        owned_pair,
+        trailing_gap,
+        start: Printer::gap_start_after_owned_pair(callee_end, trailing_gap),
+    }
+}
+
+/// [`CalleeGap::paren_open`] for a caller that wants only the position — the dispatcher's
+/// bypass tests and the test-call predicate, neither of which builds a callee doc.
+pub(super) fn call_paren_open(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -> u32 {
+    callee_gap(printer, call).paren_open(call)
 }
 
 /// Check if a chain expression contains any call expressions
@@ -162,14 +204,6 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Test function calls (it.skip, test.only, etc.) stay on one line even
-        // if they exceed print width. Must check BEFORE chain routing, because
-        // memberish callees like `it.skip(...)` would otherwise be routed through
-        // the chain path which doesn't know about test call special-casing.
-        if test_patterns::test_call_flat_layout_applies(call, self) {
-            return self.build_call_doc_with_wrapping(call);
-        }
-
         // Check if this is a true chain (callee contains calls, like `a().b()`)
         let is_true_chain = chain_has_calls(call.callee);
 
@@ -184,6 +218,39 @@ impl<'a> Printer<'a> {
         let callee_is_memberish = is_memberish(call.callee);
 
         if is_true_chain || callee_is_memberish {
+            // ⚠️ The MEMBER-CHAIN BYPASS, stated once. Prettier states it once too: the
+            // `printMemberChain` redirect sits BELOW one `if (isTemplateLiteralSingleArg ||
+            // … || isTestCall(…))` in `printCallExpression`, so a call in any of those shapes
+            // never reaches the chain layout at all. Both arms route to the same place —
+            // `build_call_doc_with_wrapping`, where each layout is actually answered — so
+            // this block decides ROUTING only, and neither rule gets a second definition
+            // here. It lives inside this arm because that is the only routing it changes: a
+            // non-memberish callee already falls through to the wrapping path below.
+            //
+            // 1. **Test calls** (`it.skip`, `test.only`, …) stay on one line past the print
+            //    width; the chain path knows nothing about that special-casing.
+            // 2. **A sole multiline template on the `(` line** keeps the whole call flat
+            //    (`` a.b().c().d(`x⏎y`) ``, where the chain path would break the heads).
+            //
+            // Each declines on a comment its flat form has no emitter for — the test call on
+            // an argument-gap comment (its own predicate), the template on a LINE comment
+            // anywhere in the callee. A `//` in a chain gap defers as a `line_suffix`, and
+            // with the heads flat there is no break of its own left to flush at, so it drains
+            // at the first break the ARGUMENT side produces — welding onto the `(`-line run's
+            // own comment (`a.b().c() // c⏎.d(// z⏎…)` → `.d(// z // c`), content loss the
+            // print-once ledger is blind to. Line comments only: ownership binds a block
+            // (`owned ⇒ is_block`) and a block never defers, so this is the axis-free half of
+            // the question.
+            if test_patterns::test_call_flat_layout_applies(call, self) {
+                return self.build_call_doc_with_wrapping(call);
+            }
+            let paren_open = call_paren_open(self, call);
+            if multiline_template_hug_applies(self, call.arguments, paren_open)
+                && !self.has_line_comments_between(call.span.start, paren_open)
+            {
+                return self.build_call_doc_with_wrapping(call);
+            }
+
             // Use chain wrapping for chains (nested calls) or memberish callees
             let nodes = chain::linearize_chain_from_call(call, self.linearize_input());
             let base_start = get_chain_base_comment_start(&nodes, call.callee);
