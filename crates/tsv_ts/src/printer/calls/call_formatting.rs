@@ -6,6 +6,7 @@
 use super::super::{
     ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
 };
+use super::CalleeGap;
 use super::arg_comments::{
     PartitionedComments, any_arg_empty_line, first_arg_has_any_comments,
     has_inter_argument_comments, has_trailing_comments_on_args,
@@ -33,7 +34,6 @@ use super::test_patterns::{
 };
 use crate::ast::internal;
 use crate::printer::CommentVec;
-use crate::printer::chain::call_callee_paren_leading_start;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
@@ -97,11 +97,14 @@ pub(super) fn build_call_doc_with_wrapping(
     // callee, `(/* t */ fn())` around the whole call, where the comment belongs to the
     // call and not to any pair printed here.
     let needs_parens = printer.needs_parens(call.callee, ParenContext::Callee);
-    let callee_end = call.callee.span().end;
-    let owned_pair = call_callee_paren_leading_start(call).is_some();
-    let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
-    // Every window downstream opens PAST the pair's `)` where it owns its trailing gap.
-    let callee_gap_start = Printer::gap_start_after_owned_pair(callee_end, trailing_gap);
+    // The pair's facts and every window that opens past its `)`, off ONE derivation
+    // ([`super::CalleeGap`]).
+    let gap = super::callee_gap(printer, call);
+    let CalleeGap {
+        owned_pair,
+        trailing_gap,
+        start: callee_gap_start,
+    } = gap;
 
     let callee = if owned_pair {
         printer.build_owned_required_pair_doc(
@@ -167,22 +170,36 @@ pub(super) fn build_call_doc_with_wrapping(
         );
     }
 
-    // Single-argument comment paths: leading line comments (multi-line expansion)
-    // and inline block comments. Own-line trailing comments defer to the general
-    // comment path, so this returns `None` and the caller falls through.
-    if call.arguments.len() == 1
-        && let Some(doc) = try_single_arg_comment_paths(printer, call, callee, callee_gap_start)
+    let paren_open = gap.paren_open(call);
+
+    // Single template literal argument with embedded newlines on the same line as `(` — hug
+    // it. A template on its own line declines and falls through to has_multiline_content,
+    // which produces the expanded form via build_call_args_expanded.
+    //
+    // ⚠️ ABOVE the comment paths, which is prettier's own position and not a preference:
+    // `isTemplateLiteralSingleArg` is the FIRST thing `printCallExpression` asks, above the
+    // member chain and above `printCallArguments` entirely, so the rule is
+    // comment-INDEPENDENT there — `` fn(/* c */ `a⏎b`) `` hugs. Asking it below
+    // `try_single_arg_comment_paths` let any leading comment defeat the hug, which is a
+    // divergence on its own AND the reason the gap emitter inside the hug could not be added
+    // alone: emitting the run inline gave prettier's form on pass 1 and re-expanded on pass 2,
+    // because the relocated comment then leads the argument and the comment path claims it
+    // again. The `new` twin and the member chain already hugged past a leading comment, so
+    // this is the plain call joining them rather than a third answer.
+    if let Some(doc) =
+        try_hug_multiline_template_arg(printer, callee, call.arguments, paren_open, call.span.end)
     {
         return doc;
     }
 
-    // Position the `(` follows — every argument-gap window (the comment scans, and Rule A's
-    // first-argument freeze) opens here. `callee_gap_start` rather than the callee's span
-    // end, so a pair that emitted its own trailing gap is not scanned through twice.
-    let paren_open = call
-        .type_arguments
-        .as_ref()
-        .map_or(callee_gap_start, |ta| ta.span.end);
+    // Single-argument comment paths: leading line comments (multi-line expansion)
+    // and inline block comments. Own-line trailing comments defer to the general
+    // comment path, so this returns `None` and the caller falls through.
+    if call.arguments.len() == 1
+        && let Some(doc) = try_single_arg_comment_paths(printer, call, callee, paren_open)
+    {
+        return doc;
+    }
 
     // The test-call flat layout, whose break-free callee `callee` already carries (built
     // at the top, so the type arguments and the removed-paren comments wrap it there).
@@ -393,16 +410,6 @@ pub(super) fn build_call_doc_with_wrapping(
         return doc;
     }
 
-    // Single template literal argument with embedded newlines on the same line
-    // as `(` — hug it. A template on its own line falls through to
-    // has_multiline_content, which produces the expanded form via
-    // build_call_args_expanded.
-    if let Some(doc) =
-        try_hug_multiline_template_arg(printer, callee, call.arguments, call.span.end)
-    {
-        return doc;
-    }
-
     // Check if any argument has multiline content (e.g., line continuation strings)
     // Prettier expands calls containing multiline strings (recursively)
     let has_multiline = container_may_have_multiline_content(call.span, printer.source)
@@ -562,17 +569,10 @@ fn try_single_arg_comment_paths(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
     callee: DocId,
-    callee_gap_start: u32,
+    paren_open: u32,
 ) -> Option<DocId> {
     let d = printer.d();
     let first_arg = &call.arguments[0];
-    // Find the opening paren position (after type args if present, otherwise after the
-    // callee — or past the `)` of a pair that emitted its own trailing gap, so this scan
-    // does not re-emit what is already inside the parens)
-    let paren_open = call
-        .type_arguments
-        .as_ref()
-        .map_or(callee_gap_start, |ta| ta.span.end);
     let arg_start = first_arg.span().start;
     let arg_end = first_arg.span().end;
     let paren_close = call.span.end;

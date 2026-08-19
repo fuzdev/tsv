@@ -398,7 +398,15 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// the merged tip**, not a sum — it happens to equal 111 − 1 because the two movers are
 	// disjoint (the clause-tail seven are `js/no-semi/*` and `js/for/*`, the IIFE mover is
 	// `js/function/*`), and that was verified per file rather than assumed.
-	typescript: 110,
+	//
+	// 110 → 108: `js/dynamic-import/template-literal.js` and `js/dynamic-import/import-phase.js`
+	// leave for **match** — a fix, not a reclassification. A dynamic `import()` never asked the
+	// sole-multiline-template hug, so it expanded where prettier keeps the specifier on the `(`
+	// line; `import()` shares `printCallExpression` with a call, so the rule reaches it too.
+	// Measured by a whole-corpus byte-diff against a reverse-patched build (~23k files): these
+	// two are the ONLY non-fixture movers in any bucket, and both land byte-identical to
+	// prettier's own committed snapshot.
+	typescript: 108,
 	css: 23
 };
 

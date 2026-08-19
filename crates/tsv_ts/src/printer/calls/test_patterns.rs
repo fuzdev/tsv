@@ -163,7 +163,7 @@ pub(super) fn test_call_flat_layout_applies(
     if !is_test_call(call, printer) {
         return false;
     }
-    let paren_open = call_paren_open(call);
+    let paren_open = call_paren_open(printer, call);
     // Zero-comment fast gate: ONE binary search over `[paren_open, last argument's start)`,
     // which strictly contains every gap the check below looks at — the `(`→first-argument
     // gap and each inter-argument gap all end at or before the last argument. So with no
