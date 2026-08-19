@@ -64,6 +64,24 @@
 	// A block glued to the operator hugs the value across the author's newline — the same
 	// pull-up the ordinary arm makes, authored broken in `unformatted_ours_hug`.
 	const aab = /* c13 */ bbc; // c12
+
+	// An enum member's `=` is the same gap one host over.
+	enum Aac {
+		Bbd = // prettier-ignore // c14
+		ccd  +  dde
+	}
+
+	// So is a `for` header's init declarator, whose clause separator is a `;` rather than a
+	// statement terminator.
+	for (
+		let eef = // c15
+			// prettier-ignore
+			ffg  +  ggh;
+		eef < 10;
+		eef++
+	) {
+		fn();
+	}
 </script>
 
 %%PASS=2 (fixed point)%%
@@ -123,4 +141,21 @@
 	// A block glued to the operator hugs the value across the author's newline — the same
 	// pull-up the ordinary arm makes, authored broken in `unformatted_ours_hug`.
 	const aab = /* c13 */ bbc; // c12
+
+	// An enum member's `=` is the same gap one host over.
+	enum Aac {
+		Bbd = ccd + dde // prettier-ignore // c14
+	}
+
+	// So is a `for` header's init declarator, whose clause separator is a `;` rather than a
+	// statement terminator.
+	for (
+		let eef = // c15
+			// prettier-ignore
+			ffg  +  ggh;
+		eef < 10;
+		eef++
+	) {
+		fn();
+	}
 </script>
