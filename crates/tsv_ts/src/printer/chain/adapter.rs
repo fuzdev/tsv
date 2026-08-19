@@ -6,6 +6,7 @@
 // their only implementor.
 
 use super::printing::ComputedBracket;
+use super::types::ChainCall;
 use crate::ast::internal;
 use crate::printer::comments::CommentVec;
 use crate::printer::{CommentSpacing, Printer, comments_to_emit_in_range};
@@ -29,25 +30,25 @@ impl<'a> Printer<'a> {
     pub(crate) fn print_call_args(
         &self,
         call: &internal::CallExpression<'_>,
-        optional: bool,
+        facts: ChainCall,
     ) -> DocId {
-        self.build_call_args_doc_for_chain(call, optional)
+        self.build_call_args_doc_for_chain(call, facts)
     }
 
     pub(crate) fn print_call_args_expanded(
         &self,
         call: &internal::CallExpression<'_>,
-        optional: bool,
+        facts: ChainCall,
     ) -> DocId {
-        self.build_call_args_doc_for_chain_expanded(call, optional)
+        self.build_call_args_doc_for_chain_expanded(call, facts)
     }
 
     pub(crate) fn print_call_args_standard_expanded(
         &self,
         call: &internal::CallExpression<'_>,
-        optional: bool,
+        facts: ChainCall,
     ) -> DocId {
-        self.build_call_args_doc_for_chain_standard_expanded(call, optional)
+        self.build_call_args_doc_for_chain_standard_expanded(call, facts)
     }
 
     pub(crate) fn build_chain_block_comments_doc(
@@ -157,6 +158,12 @@ impl<'a> Printer<'a> {
     /// node whose gap was widened back over a stripped grouping paren has one, and its
     /// claim is the two regions either side of it — the paren prefix and its own gap —
     /// classified separately so each is read against its own anchor.
+    ///
+    /// ⚠️ **Every layout predicate asked about the same gap must honor the hole too**, and
+    /// they all do it through one seam — [`super::printing::chain_gap_any`], whose ⚠️ carries
+    /// the argument. This emitter keeps its own spelling only because it builds a
+    /// `ClassifiedComments` rather than answering a `bool`, and an unconditional second
+    /// classify would cost every hole-less gap (the common case) for nothing.
     pub(crate) fn classify_chain_gap(
         &self,
         start: u32,
