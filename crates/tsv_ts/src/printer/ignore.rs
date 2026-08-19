@@ -72,8 +72,8 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{
-    Span, comments_in_source_range, directive_alone_on_line, is_format_ignore_directive,
-    is_honored_format_ignore,
+    Span, comments_in_source_range, comments_to_emit_in_range, directive_alone_on_line,
+    is_format_ignore_directive, is_honored_format_ignore,
 };
 
 /// The freeze implied by a format-ignore directive alone on its line in a union's or
@@ -271,6 +271,21 @@ impl<'a> Printer<'a> {
     /// where the flag buys something this one can't: skipping the range scan entirely.
     pub(in crate::printer) fn is_honored_directive(&self, c: &Comment) -> bool {
         self.has_format_ignore && is_honored_format_ignore(self.source, c)
+    }
+
+    /// Whether the FIRST comment a run in `[start, end)` emits is an honored directive —
+    /// the leading-separator half of the rule [`Self::comment_hangs_next`] states for the
+    /// separators inside a run: an honored directive must own its line, so a run that opens
+    /// with one opens on a line of its own rather than beside the token before it.
+    pub(in crate::printer) fn leading_comment_is_honored_directive(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> bool {
+        self.has_format_ignore
+            && comments_to_emit_in_range(self.comments, start, end)
+                .next()
+                .is_some_and(|c| self.is_honored_directive(c))
     }
 
     /// The placement floor alone — [`tsv_lang::directive_alone_on_line`] against this

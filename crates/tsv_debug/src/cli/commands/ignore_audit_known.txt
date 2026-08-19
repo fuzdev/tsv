@@ -32,12 +32,11 @@
 # known bugs.
 #
 # Format: KIND<TAB>POSITION
-# shapes: 38
+# shapes: 36
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
 UNHONORED	AssignmentExpression.left
 UNHONORED	AssignmentPattern.left
-UNHONORED	AwaitExpression.argument
 UNHONORED	BinaryExpression.left
 UNHONORED	BinaryExpression.right
 UNHONORED	CallExpression.callee
@@ -50,7 +49,6 @@ UNHONORED	LogicalExpression.left
 UNHONORED	LogicalExpression.right
 UNHONORED	MemberExpression.object
 UNHONORED	MethodDefinition.value
-UNHONORED	NewExpression.callee
 UNHONORED	Program.body
 UNHONORED	SpreadElement.argument
 UNHONORED	TSAsExpression.expression

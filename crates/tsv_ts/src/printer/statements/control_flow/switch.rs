@@ -257,7 +257,26 @@ impl<'a> Printer<'a> {
             // outside its own allowlist (a for init/update, an expression statement, an
             // object-pattern property value, …), and a case test is not on it. The
             // parens are recomputed, not preserved, so `case a = 1:` gains them too.
-            let test_doc = self.wrap_statement_test_parens(test, self.build_expression_doc(test));
+            let test_gap_start = case.span.start + "case".len() as u32;
+            let test_start = test.span().start;
+            // The `case`→test value head ([`Printer::value_head_frozen_span`]): an own-line
+            // directive in the gap freezes the whole test, the assignment family's rule with
+            // `case` as the delimiter. The `:` stays parent-owned, exactly as the `for`
+            // header's `;` does — and the clarity parens above are the POSITION's, so they
+            // wrap the frozen slice instead of riding inside it.
+            //
+            // Resolved before the layout rather than at the emission, because the layout has
+            // to KEEP the directive's own line for the freeze to survive tsv's own second
+            // pass: trailing the keyword a directive is inert under the placement floor, so
+            // the continuation arm below is gated on the freeze as well as on a line comment.
+            let frozen = self.value_head_frozen_span(test_gap_start, test.span());
+            let test_doc = self.wrap_statement_test_parens(
+                test,
+                frozen.map_or_else(
+                    || self.build_expression_doc(test),
+                    |frozen| self.build_frozen_expression_doc(test, frozen),
+                ),
+            );
             // The `case`→test gap needs its own emitter (`docs/comments.md` hazard 4): the
             // only comment here that survives on the test's own doc is the innermost block
             // GLUED to it, which ownership carries inside. Anything else has no owner at
@@ -265,9 +284,7 @@ impl<'a> Printer<'a> {
             // (`case /* c */ (a, b):`), or an earlier block in a run
             // (`case /* p */ /* q */ b:`) — so without this it is dropped. Emitted ahead of
             // any paren this position synthesizes, which is prettier's placement too.
-            let test_gap_start = case.span.start + "case".len() as u32;
-            let test_start = test.span().start;
-            if self.has_line_comments_between(test_gap_start, test_start) {
+            if frozen.is_some() || self.has_line_comments_between(test_gap_start, test_start) {
                 // A `//` here runs to end-of-line, so emitting the gap inline would swallow
                 // the test AND its `:` into the comment (`case // c x:`, which does not
                 // reparse) — the head→`:` gap's argument one construct earlier. The uniform
