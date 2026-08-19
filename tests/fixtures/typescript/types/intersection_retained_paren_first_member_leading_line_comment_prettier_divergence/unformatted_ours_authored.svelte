@@ -1,0 +1,40 @@
+<script lang="ts">
+	// the base spelling: the alias value IS the intersection, so the union's own required
+	// pair is the only shell in play - the comment stays inside it
+	type Plain = (// c
+	A | B) & C;
+
+	// the intersection's FIRST member is a retained paren-union - the leading line comment
+	// stays inside those parens, on the `(` line the author glued it to
+	type First = (// c
+	A | B) & C | D;
+
+	// the same shell with a trailing object member, which supplies its own aligned layout
+	type FirstTrailingObject = ((// c
+	A | B) & { a: 1 }) | D;
+
+	// the comment written on its own line inside the parens keeps that line
+	type FirstOwnLine = (
+	// c
+	A | B) & C | D;
+
+	// a tuple element is an own-line context - the comment stays inside the member's
+	// parens the same way, at the element's own indent, and a line comment between two
+	// LATER members keeps its own position
+	type TupleElement = [(// c
+	A | B) & C & // c2
+	D, E];
+
+	// the boundary's other side - a SINGLE-member union (the leading-`|` spelling) needs no
+	// pair, so the shell is REDUNDANT: the enclosing value seam strips it and claims the
+	// comment, which prints once, outside the parens
+	type TransparentShell = (// c
+	| A) & B;
+
+	// the same redundant shell with a second comment in the member gap, which routes this
+	// intersection to the comment-aware layout on its OWN trigger - the claimed run must
+	// still stand down there, or the member prints `// c` a second time
+	type TransparentShellOperatorGap = (// c
+	| A) // x
+	& B;
+</script>
