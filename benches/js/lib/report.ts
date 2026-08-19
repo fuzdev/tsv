@@ -53,10 +53,13 @@ const INTERNAL_PARSE_VARIANTS = ['tsv-internal', 'tsv_wasm-internal'];
  * Order: canonical → tsv variants → third-party alternatives (alphabetical)
  */
 const DISPLAY_ORDER = [
-	// Canonical (shown separately, but included for completeness)
-	'svelte/compiler',
-	'acorn-typescript',
-	'prettier',
+	// Canonical (shown separately, but included for completeness). Taken from the
+	// shared constants rather than respelled — a literal here is the same drift
+	// `CANONICAL_PARSER_ROWS` exists to close, and the cost of getting it wrong is
+	// the quietest kind: the row sorts last instead of first, and nothing says so.
+	// Deduped because CSS and Svelte share an oracle.
+	...new Set(Object.values(CANONICAL_PARSER_ROWS)),
+	CANONICAL_FORMATTER_ROW,
 	// tsv variants
 	'tsv-json',
 	'tsv-json-no-locations',
@@ -224,6 +227,15 @@ export function generate_summary_report(
 		// opponent whose product it actually matches, with the note naming what makes
 		// the match. Emitted only where both rows exist, so a pair costs nothing on a
 		// surface neither runs on.
+		//
+		// ⚠ The THIRD hand-maintained row list in this module, and the one no
+		// registry guard covers — deliberately, because unlike `DISPLAY_ORDER` and
+		// `COMPARISON_SECTIONS` its membership is an ARGUMENT rather than a
+		// completeness claim: most rows have no payload-matched partner and never
+		// will, so "every registered row appears or is excused" is not the
+		// invariant. An impl added to the harness still has to be considered here;
+		// `swc` and `postcss` were, and are absent on purpose (docs/benchmarks.md
+		// §Fairness caveats states why for each).
 		//
 		// - The span-only pairs: tsv's `no-locations` wire against the span-only
 		//   default ASTs oxc and yuku emit (plain `tsv-json` carries the richer
@@ -572,6 +584,15 @@ interface FairnessNote {
 	markdown: string;
 }
 
+const OXFMT_NOTE: FairnessNote = {
+	terminal: [
+		'  (oxfmt formats JS/TS natively; its css/svelte rows route through its BUNDLED',
+		'   prettier — native-vs-native reads apply to the typescript group only)'
+	],
+	markdown:
+		'oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only'
+};
+
 const OXC_NOTE: FairnessNote = {
 	terminal: [
 		'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and',
@@ -677,7 +698,7 @@ const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
 		label: 'tsv',
 		self: { format: 'tsv', parse: 'tsv-json' },
 		opponents: {
-			format: [{ row: CANONICAL_FORMATTER_ROW }, { row: 'oxfmt' }],
+			format: [{ row: CANONICAL_FORMATTER_ROW }, { row: 'oxfmt', note: OXFMT_NOTE }],
 			parse: [
 				{ row: CANONICAL_PARSER_ROWS },
 				{ row: 'oxc-parser', note: OXC_NOTE },
@@ -914,17 +935,24 @@ function build_comparison_data(
 				const self_ns = get_mean_ns(group_name, self_row);
 				if (self_ns === null) continue;
 
+				const opponents = spec.opponents[operation];
+				// A section with no opponents is a COMPARISON_SECTIONS mistake rather
+				// than a run condition — there is no reference to gate on below.
+				if (opponents.length === 0) continue;
+
 				const comparisons: ComparisonRow['comparisons'] = [];
-				for (const opponent of spec.opponents[operation]) {
+				for (const opponent of opponents) {
 					const name = opponent_row(opponent, lang);
 					const opponent_ns = get_mean_ns(group_name, name);
 					if (opponent_ns === null) continue;
 					comparisons.push({ name, ratio: ratio(self_ns, opponent_ns) });
 				}
-				// The reference didn't time here, so there is nothing to be N× faster
-				// THAN — an alternatives-only row would read as a comparison while
-				// naming no baseline.
-				if (comparisons.length === 0) continue;
+				// Gated on the FIRST opponent specifically, not on "any cell survived":
+				// the first is the canonical reference in every section, and without it
+				// there is nothing to be N× faster THAN — an alternatives-only row
+				// would read as a comparison while naming no baseline. Cells are pushed
+				// in opponent order, so the reference timed iff it leads the list.
+				if (comparisons[0]?.name !== opponent_row(opponents[0], lang)) continue;
 
 				rows.push({
 					operation,
@@ -948,6 +976,13 @@ function build_comparison_data(
  * hand-kept predicates the presence tests had already drifted in shape (the oxc
  * test pinned the section label, the yuku test didn't), and a note silently
  * missing from one surface is the exact failure the notes exist to prevent.
+ *
+ * Presence is asked of ALL sections at once, with no like-tier check of its own —
+ * which the oxc predicate used to carry, so that a cross-tier oxc cell couldn't
+ * earn the apples-to-apples note. That check is now structural: `COMPARISON_SECTIONS`
+ * assigns `oxc-parser` to the native section and `oxc-parser-wasm` to the wasm one,
+ * so a cross-tier cell cannot be built. Move a row between tiers and the guarantee
+ * moves with it — re-tier the note's opponent entry too.
  *
  * Deduped by note identity, since one note covers a native/wasm opponent pair and
  * must print once when both ran.
@@ -981,12 +1016,13 @@ function comparison_notes(
 	// off no opponent: tsv's parse-only variants have no counterpart among the
 	// eager-materializing third-party parsers, which is only worth saying once one
 	// of them is on the page.
-	if (
-		present.has('oxc-parser') ||
-		present.has('oxc-parser-wasm') ||
-		present.has('yuku-parser') ||
-		present.has('yuku-parser-wasm')
-	) {
+	//
+	// Gated on the NOTES those two rows earned, not on a re-spelled list of their
+	// four row names: this note's text is about oxc and yuku specifically, so the
+	// question it needs answered is the one `seen` already holds — did their notes
+	// print? A parallel row list here would be a fifth spelling of the same
+	// membership, free to drift from the opponents that define it.
+	if (seen.has(OXC_NOTE) || seen.has(YUKU_NOTE)) {
 		if (surface === 'markdown') {
 			notes.push(
 				'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku still serializes to a binary buffer before its decode, so neither is the same tier'
@@ -1052,14 +1088,14 @@ export function generate_comparison_summary(
 		}
 	}
 
-	// Fairness notes, derived from the cells this run actually produced.
+	// The notes that hold whatever ran, then the ones derived from the cells this
+	// run actually produced — general before specific, which is also why the
+	// per-opponent notes come last rather than being interleaved.
 	lines.push('');
 	lines.push('  (`Nx` = self is N× faster; `(Mf)` = files the timing reflects)');
 	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
-	lines.push(...comparison_notes(sections, 'terminal'));
 	lines.push('  (format groups include parse time — each formatter parses internally)');
-	lines.push('  (oxfmt formats JS/TS natively; its css/svelte rows route through its BUNDLED');
-	lines.push('   prettier — native-vs-native reads apply to the typescript group only)');
+	lines.push(...comparison_notes(sections, 'terminal'));
 
 	return lines.join('\n');
 }
@@ -1103,17 +1139,16 @@ export function generate_comparison_markdown(
 		lines.push('');
 	}
 
-	// Fairness notes, derived from the cells this run actually produced.
+	// The notes that hold whatever ran, then the ones derived from the cells this
+	// run actually produced — same order as the terminal surface, general before
+	// specific.
 	const notes: string[] = [
 		'`Nx` is speedup — self is N× faster than the named opponent',
 		"`(Mf)` is the self impl's iterated count (per-group intersection in default mode; per-impl success set in `BENCH_MODE=union`)",
 		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts — each named by its own row',
+		'Format groups include parse time — each formatter parses internally',
 		...comparison_notes(sections, 'markdown')
 	];
-	notes.push('Format groups include parse time — each formatter parses internally');
-	notes.push(
-		'oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only'
-	);
 
 	lines.push('_' + notes.join('. ') + '._');
 

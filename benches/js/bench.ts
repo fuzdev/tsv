@@ -548,8 +548,9 @@ type SurfaceDisclosure =
  * filter-proof form of the same question, and it can be asked before the run
  * measures anything.
  *
- * Mirrors the presence-gated disclosure notes in `lib/report.ts`
- * (`has('tsv', 'oxc-parser')`), which derive the same way.
+ * Mirrors the presence-gated fairness notes in `lib/report.ts`
+ * (`comparison_notes`), which derive the same way — from what the run actually
+ * produced rather than from a second hand-kept list.
  */
 const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
 	{
@@ -780,13 +781,23 @@ const coverage_only_keys: Set<string> = new Set();
  * The list is graded in BOTH directions, which is what makes it a ratchet rather
  * than an accumulator: an unlisted failure fails (above), and — on a full run — an
  * entry that excused nothing fails too (`stale_perf_omits`). One direction alone
- * lets a tolerance outlive the failure it was written for, where a too-broad
- * `path` fragment goes on quietly absorbing whatever arrives beneath it. Same
- * posture as `lib/fixtures_gate.ts`'s sanction / known-gap freshness check.
+ * lets a tolerance outlive the failure it was written for. Same posture as
+ * `lib/fixtures_gate.ts`'s sanction / known-gap freshness check. (Neither
+ * direction catches an entry written too BROADLY — that stays the author's job;
+ * see `stale_perf_omits`.)
  *
- * `full_corpus` is the caller's answer to "were these files even reachable?" — a
- * filtered or partial corpus withholds them, and reading that as staleness would
- * fail every `BENCH_LIMIT` run.
+ * Staleness is asked only of entries this run could have exercised, along two
+ * independent axes, because "matched nothing" otherwise indicts the ledger for
+ * something else's absence:
+ *
+ * - the TASK, passed down as the graded tracking keys. Every alternative impl is
+ *   optional, and one that fails to load registers no task, so its entries can
+ *   never fire — on that machine they are unasked, not stale. Coverage-only keys
+ *   drop out for the mirror reason: they're exempt from the violation pass above,
+ *   so nothing there can ever mark an entry used.
+ * - the FILES, which is `full_corpus`: a filter or a partial checkout withholds
+ *   the very files an entry is about, and reading that as staleness would fail
+ *   every `BENCH_LIMIT` run.
  */
 function enforce_perf_coverage(full_corpus: boolean): void {
 	const violations: string[] = [];
@@ -810,14 +821,17 @@ function enforce_perf_coverage(full_corpus: boolean): void {
 	}
 
 	if (!full_corpus) return;
-	const stale = stale_perf_omits(PERF_OMITS, used);
+	// The tasks this run actually graded — every task that reached pre-flight,
+	// minus the coverage-only ones the violation pass skips. An entry naming
+	// anything else was never asked (see `stale_perf_omits`).
+	const graded_keys = [...successful_files.keys()].filter((key) => !coverage_only_keys.has(key));
+	const stale = stale_perf_omits(PERF_OMITS, used, graded_keys);
 	if (stale.length === 0) return;
 	console.error(
 		`Perf corpus: ${stale.length} stale PERF_OMITS entr${stale.length === 1 ? 'y' : 'ies'} — ` +
-			`excused no pre-flight failure in this full-corpus run:\n` +
+			`excused no pre-flight failure in this full-corpus run, though the task each names ran:\n` +
 			stale.map((o) => `  ${o.task ?? '<any task>'}  ${o.path}: ${o.reason}`).join('\n') +
-			`\n  Delete the entry if the tool was fixed; update it if the corpus path was renamed. ` +
-			`A tolerance that matches nothing is a broad pattern waiting to absorb a real regression.`
+			`\n  Delete the entry if the tool was fixed; update it if the corpus path was renamed.`
 	);
 	exit(1);
 }
@@ -1446,7 +1460,9 @@ check_variant_parity();
 // The staleness half of the same grade is asked only of a run that could actually
 // reach every omitted file: a corpus filter, or a missing repo tolerated by
 // BENCH_ALLOW_MISSING, withholds them, and "matched nothing" would then mean
-// "wasn't there" (see `stale_perf_omits`).
+// "wasn't there". The other absence — an optional impl that didn't load, so its
+// task never ran — is handled inside, against the graded tracking keys (see
+// `stale_perf_omits`).
 if (CORPUS_MODE === 'perf') {
 	enforce_perf_coverage(!is_limited && env.BENCH_ALLOW_MISSING !== '1');
 }
@@ -1553,6 +1569,8 @@ interface Baseline {
 	 * parse + format groups — `report.<runtime>.*`) or `conformance`
 	 * (fixtures-only corpus, disjoint from perf, Svelte set minus canonical-rejects,
 	 * parse groups only — `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
+	 *
+	 * Since `version` 6.
 	 */
 	corpus_kind: CorpusKind;
 	timestamp: string;
@@ -1562,6 +1580,8 @@ interface Baseline {
 	 * runtime's own version. The throughput numbers are machine-relative, so
 	 * without this a report copied to the site (or diffed against an older one)
 	 * can't distinguish a code change from a different box. See `Machine`.
+	 *
+	 * Since `version` 7.
 	 */
 	machine: Machine;
 	corpus: {
@@ -1584,6 +1604,8 @@ interface Baseline {
 	 * aggregate: the aggregate blends corpora that answer different questions, and
 	 * on a corpus filtered by its own canonical parser that parser's row is 100% by
 	 * construction rather than by achievement.
+	 *
+	 * Since `version` 8.
 	 */
 	coverage_by_source?: Record<string, Record<string, Record<string, SourceCoverageCell>>>;
 	versions: BaselineVersions;
@@ -1599,6 +1621,8 @@ interface Baseline {
 	 * being produced. A tsv variant listed here usually just means its optional
 	 * build task wasn't run; a third-party label means its package shipped nothing
 	 * where this module looked.
+	 *
+	 * Since `version` 11.
 	 */
 	binary_sizes_absent: string[];
 	entries: BaselineEntry[];

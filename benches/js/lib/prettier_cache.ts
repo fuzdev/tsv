@@ -64,6 +64,8 @@ export class PrettierCache {
 	misses = 0;
 	/** Entries `put` could not write (see its doc) — reported, never thrown. */
 	writes_failed = 0;
+	/** Monotonic suffix that makes every temp name unique — see `put`. */
+	#write_seq = 0;
 
 	constructor(versions: CanonicalVersions, prettier_options_json: string) {
 		this.#context_hash = createHash('sha256')
@@ -124,8 +126,12 @@ export class PrettierCache {
 	 * guards catch only a fully-empty entry, never a truncated one. `rename` within
 	 * a directory is atomic, so a reader sees the whole entry or no entry.
 	 *
-	 * The temp name carries the PID so two concurrent writers of the same key
-	 * (different processes, same corpus) can't truncate each other's temp file.
+	 * The temp name is unique per WRITE, not per key: the PID separates two
+	 * processes over one corpus, and the sequence number separates two in-flight
+	 * `put`s of the same key inside one process (the callers run files
+	 * concurrently, and one path can be handed to the gate twice). Either
+	 * collision would have the two writers truncating each other's temp file,
+	 * which is the one way an atomic rename can still publish a partial entry.
 	 *
 	 * BEST-EFFORT — a write failure is counted, never thrown. The caller already
 	 * holds the live output, and its `format_async` reads a throw as "prettier
@@ -137,7 +143,7 @@ export class PrettierCache {
 	async put(source: string, parser: string, filepath: string, output: string): Promise<void> {
 		if (output.trim() === '') return;
 		const { dir, path } = this.#entry(source, parser, filepath);
-		const tmp = `${path}.${process.pid}.tmp`;
+		const tmp = `${path}.${process.pid}.${this.#write_seq++}.tmp`;
 		try {
 			await mkdir(dir, { recursive: true });
 			await writeFile(tmp, output);

@@ -749,7 +749,7 @@ silent. One absence is exempt — an **added** row whose impl
 never initialized is this machine coming up short (already in `unavailable`), so the
 run warns and drops that line instead of failing.
 
-**Two more registry-checked claims, both warnings.** `report.ts` holds two
+**Two more registry-checked claims, both warnings.** `report.ts` holds two checked
 hand-maintained lists that a new impl has to reach, and each is asked the same
 availability-independent question at init (`get_defined_rows`), one direction only
 (a listed row absent from a surface is not drift — each surface registers its own
@@ -765,6 +765,14 @@ the quietest of the three — a missing cell looks like nothing — and `swc`,
 timed at full coverage while appearing in no comparison. A section's opponents each
 carry their own fairness note, rendered iff that opponent produced a cell, so the
 prose can't drift from the table either.
+
+A **third** row list in the same module is deliberately unchecked: the curated
+payload-matched lines in `generate_summary_report` (`tsv-json-no-locations` vs
+`oxc-parser`, and the rest). Its membership is an ARGUMENT — this tsv wire and
+that opponent emit the same product — not a completeness claim: most rows have no
+payload-matched partner and never will, so a guard there could only be a warning
+nobody clears. A new impl still has to be considered against it; `swc` and `postcss`
+were, and are absent on purpose (docs/benchmarks.md §Fairness caveats).
 
 ## Artifact Freshness Guard
 
@@ -861,10 +869,15 @@ couldn't reproduce its own number).
   meaningful. The list is a **RATCHET**, graded in both directions: a full-corpus
   run also fails on an entry that excused NOTHING, the same ledger-freshness
   discipline `lib/fixtures_gate.ts` applies to its sanction / known-gap lists — so
-  a tolerance can't outlive the failure it was written for, and a broad `path`
-  fragment can't sit there absorbing whatever arrives beneath it. Only a full run
-  grades that half; `BENCH_LIMIT` / `BENCH_FILTER` / `BENCH_ALLOW_MISSING` can
-  withhold the very files an entry is about.
+  a tolerance can't outlive the failure it was written for. It can still be written
+  too BROADLY, which neither direction catches: an entry that still matches its
+  original failure counts as used and goes on absorbing whatever arrives beneath
+  it, so keeping each `path` narrow enough to name one file stays the author's job.
+  Staleness is asked only where the run could have exercised the entry, along two
+  axes — the FILES (`BENCH_LIMIT` / `BENCH_FILTER` / `BENCH_ALLOW_MISSING` withhold
+  the very files an entry is about, so only a full run grades that half) and the
+  TASK (every alternative impl is optional, and one that fails to load registers no
+  task at all, so on that machine its entries are unasked rather than stale).
 - **`gates`** (~6,200 files) — `real` + `framework` + `prettier_fixture`, no perf
   prune: adds Prettier's `tests/format/{typescript,js,css,html}` suites and
   prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a companion

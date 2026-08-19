@@ -25,10 +25,23 @@ import { fileURLToPath } from 'node:url';
 
 import type { Machine, Runtime } from './lib/runtime.ts';
 
-/** Every runtime a sibling report can come from, in the order they fold. The
- * `Runtime` union above is the authority on the vocabulary; this is the
- * enumeration, and the `satisfies` keeps the two from drifting apart. */
-const RUNTIMES = ['deno', 'node', 'bun'] as const satisfies readonly Runtime[];
+/**
+ * Every runtime a sibling report can come from, and the order they fold in.
+ * `Runtime` is the authority on the vocabulary; this is the enumeration.
+ *
+ * A `Record` over the union rather than an array, because the two directions are
+ * not equally cheap to state. `['deno','node','bun'] satisfies readonly Runtime[]`
+ * proves only that each listed value IS a runtime — the direction that matters
+ * here is the reverse, that every runtime is LISTED, and a new member of the union
+ * would otherwise go on being silently unfolded. A `Record` key set is exhaustive
+ * by construction: add a runtime in `lib/runtime.ts` and this literal fails to
+ * compile until it is placed.
+ */
+const RUNTIME_FOLD_ORDER: Record<Runtime, number> = { deno: 0, node: 1, bun: 2 };
+
+const RUNTIMES: readonly Runtime[] = (Object.keys(RUNTIME_FOLD_ORDER) as Runtime[]).sort(
+	(a, b) => RUNTIME_FOLD_ORDER[a] - RUNTIME_FOLD_ORDER[b]
+);
 
 /**
  * The fields of a per-runtime `report.<runtime>.json` row this composer reads.

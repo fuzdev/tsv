@@ -16,8 +16,9 @@
  *
  * A RATCHET, not an accumulator: a full perf run grades the list in both
  * directions — an unlisted failure fails, and so does an entry that excused
- * nothing (`stale_perf_omits`). So a tolerance cannot outlive the failure it was
- * written for.
+ * nothing on a run that could have exercised it (`stale_perf_omits`). So a
+ * tolerance cannot outlive the failure it was written for. It can still be
+ * written too BROADLY, which no grading catches — see `stale_perf_omits`.
  *
  * Distinct from `parse_sanctions.ts`: those `Sanction`/`KnownGap` lists are about
  * tsv-vs-canonical parse PARITY over the fixture suites (over-rejections tsv keeps
@@ -123,6 +124,11 @@ export const PERF_OMITS: PerfOmit[] = [
  * reason answers only one: "is this failure excused?" and "did this excuse fire?".
  * The second is what makes the list a ratchet rather than an accumulator — see
  * `stale_perf_omits`.
+ *
+ * FIRST match, so a broader entry shadows a narrower one that would also apply,
+ * and only the broad one is then marked used. Keep the entries disjoint: an
+ * overlapping pair reports the shadowed entry as stale even though the failure it
+ * describes is live, which reads as the opposite of what happened.
  */
 export function perf_omit_match(
 	omits: readonly PerfOmit[],
@@ -137,24 +143,42 @@ export function perf_omit_match(
 }
 
 /**
- * The entries in `omits` that `used` never matched — a tolerance for a failure
+ * The entries in `omits` that `used` never matched, restricted to the ones a run
+ * over `graded_keys` could actually have exercised — a tolerance for a failure
  * that no longer happens.
  *
  * The counterpart the omit check owes its own list, and the discipline every other
  * ledger in this repo already has (`lib/fixtures_gate.ts` FAILS on a sanction /
  * known-gap that matched nothing; the injection ratchets refuse a narrowed run).
  * Without it an entry rots dormant after the tool it excuses is fixed, or after an
- * upstream path rename orphans it — and worse, a too-broad `path` fragment goes on
- * silently excusing a NEW failure that arrives beneath it.
+ * upstream path rename orphans it.
  *
- * ⚠️ Only sound over a FULL perf run: a corpus filter (`BENCH_LIMIT` /
+ * What it does NOT catch, and can't: a broad `path` fragment that still matches
+ * its ORIGINAL failure stays used, and goes on silently absorbing whatever new
+ * failure arrives beneath it. Staleness only ever finds an entry matching
+ * nothing; keeping each `path` narrow enough to name one file is still the
+ * author's job.
+ *
+ * `graded_keys` is the run's REACHABILITY answer — the tracking keys whose tasks
+ * both existed and were graded. An entry naming a task no key matches was never
+ * asked, so calling it stale would accuse the ledger of a machine's shortfall:
+ * every alternative impl is optional (`init_optional`), and one that fails to
+ * load registers no task at all, so its files never fail and its entry never
+ * fires. Coverage-only keys belong out of this set too — they are exempt from the
+ * violation pass, so an entry scoped to one could never be marked used.
+ *
+ * ⚠️ Even so, only sound over a FULL perf run: a corpus filter (`BENCH_LIMIT` /
  * `BENCH_FILTER`), or a missing corpus repo under `BENCH_ALLOW_MISSING`, can
- * withhold the very files these entries are about — where "matched nothing" means
- * "was not reachable", not "is stale". The caller gates on that.
+ * withhold the very files these entries are about while the task itself runs
+ * fine — reachability at the task level can't see that. The caller gates on it.
  */
 export function stale_perf_omits(
 	omits: readonly PerfOmit[],
-	used: ReadonlySet<PerfOmit>
+	used: ReadonlySet<PerfOmit>,
+	graded_keys: Iterable<string>
 ): PerfOmit[] {
-	return omits.filter((o) => !used.has(o));
+	const keys = [...graded_keys];
+	return omits.filter(
+		(o) => !used.has(o) && keys.some((key) => o.task === undefined || key.includes(o.task))
+	);
 }
