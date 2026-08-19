@@ -13,7 +13,9 @@ use super::helpers::{
     unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer, TrailingBlock};
-use crate::ast::internal::{Comment, TSIntersectionType, TSType, TSTypeLiteral, TSUnionType};
+use crate::ast::internal::{
+    Comment, TSIntersectionType, TSParenthesizedType, TSType, TSTypeLiteral, TSUnionType,
+};
 use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
 use crate::printer::ShellLeadingRun;
@@ -1349,12 +1351,16 @@ impl<'a> Printer<'a> {
     /// - an **isolated** comment between two members (any line comment, or an own-line
     ///   block — see `intersection_has_isolated_member_comment`); a block inline-adjacent
     ///   to either member stays inline (unlike the union path, which expands it);
-    /// - a **non-first** parenthesized *union* member with a leading line comment inside
-    ///   its parens (`(a | b) & (// c⏎ c | d)`) — a line comment can't be inline, and tsv
-    ///   preserves it inside the parens (the member breaks open). The *first*-member case
-    ///   is hoisted out by `build_intersection_type_doc`; this catches the rest, which the
-    ///   inline form would otherwise drop. Restricted to a union inner — the only shape
-    ///   the multiline path renders comment-aware (`build_parenthesized_union_doc`). A
+    /// - a parenthesized *union* member with a leading line comment inside its parens
+    ///   (`(a | b) & (// c⏎ c | d)`) — a line comment can't be inline, and tsv preserves it
+    ///   inside the parens (the member breaks open), which the inline form would otherwise
+    ///   drop. Asked of **every** member including the first — the pair is the union's own
+    ///   required one, so it survives into the output and can host the run, and
+    ///   `intersection_first_member_hoist_comments` declines that shape for exactly this
+    ///   arm to answer it — save where an enclosing seam has already claimed the first
+    ///   member's run ([`Self::first_member_shell_run_claimed`]), which is the one shape
+    ///   whose pair does NOT survive. Restricted to a union inner — the only shape the
+    ///   multiline path renders comment-aware (`build_parenthesized_union_doc`). A
     ///   paren-intersection / paren-function member with a leading line comment still
     ///   drops it — extend when a real case appears.
     fn intersection_needs_line_comment_layout(
@@ -1362,11 +1368,61 @@ impl<'a> Printer<'a> {
         intersection: &TSIntersectionType<'_>,
     ) -> bool {
         self.intersection_has_isolated_member_comment(intersection)
-            || intersection.types.iter().skip(1).any(|t| {
-                matches!(t, TSType::Parenthesized(p)
-                    if matches!(p.type_annotation, TSType::Union(_))
-                        && self.paren_has_leading_line_comment(p))
+            || intersection.types.iter().enumerate().any(|(i, t)| {
+                self.paren_union_line_comment_member(t).is_some()
+                    && (i > 0 || !self.first_member_shell_run_claimed(t))
             })
+    }
+
+    /// The paren-union member shape this file answers a leading `//` in three times: the
+    /// routing gate above, [`Self::build_intersection_line_comment_member_doc`] (which
+    /// emits the run inside the pair), and
+    /// [`Self::intersection_first_member_hoist_comments`] (which declines to hoist it out
+    /// of one). ONE accessor, so the three cannot drift: a decline whose shape is wider
+    /// than the layout answering it is a DROPPED comment, and one that is narrower is a
+    /// DOUBLE-PRINTED one.
+    ///
+    /// ⚠️ Asked of the paren's **DIRECT** child, never of `unwrap_parenthesized`. This is
+    /// the pair the run physically sits in, and only a pair the printer RETAINS can host
+    /// it: a redundant outer layer (`(// c⏎ (a | b))`, `((// c⏎ a | b))`) unwraps to a
+    /// union too, but there the pair holding the run is the one that gets STRIPPED and the
+    /// run must relocate instead — the same retained-vs-stripped split
+    /// [`Self::paren_has_leading_line_comment`] draws against
+    /// [`Self::stripped_paren_has_leading_line_comment`].
+    fn paren_union_line_comment_member<'t>(
+        &self,
+        t: &'t TSType<'t>,
+    ) -> Option<(&'t TSParenthesizedType<'t>, &'t TSUnionType<'t>)> {
+        let TSType::Parenthesized(p) = t else {
+            return None;
+        };
+        let TSType::Union(union) = p.type_annotation else {
+            return None;
+        };
+        self.paren_has_leading_line_comment(p).then_some((p, union))
+    }
+
+    /// Whether an ENCLOSING leading-edge seam has already claimed the run inside the
+    /// intersection's **first** member's paren shell
+    /// ([`Self::shell_leading_run_claimed`]). Only the first member can be claimed — it
+    /// is the descent link of `Printer::head_stripped_paren_shell`, and a later member
+    /// is never on that path.
+    ///
+    /// ⚠️ Asked by all THREE readers of the paren-union member shape — the routing gate
+    /// above, [`Self::build_intersection_line_comment_member_doc`], and
+    /// [`Self::intersection_first_member_hoist_comments`] — which is the whole point:
+    /// where the seam has claimed, the keep-inside layout is a SECOND emitter for one
+    /// comment. Asking it at the router alone is not enough, since the isolated
+    /// member-comment trigger reaches that layout without consulting the router's arm. A
+    /// *single-member* union (`(// c⏎ | a) & b`, the leading-`|` spelling) is exactly the
+    /// claimed case — the shell is transparent, so the seam strips it and claims the run,
+    /// while the pair around a real union is required and never claimed
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 3).
+    fn first_member_shell_run_claimed(&self, first_member: &TSType<'_>) -> bool {
+        self.shell_leading_run_claimed(
+            first_member.span().start,
+            unwrap_parenthesized(first_member).span().start,
+        )
     }
 
     /// Emit one intersection member→member gap — the comments before the `&`, the `&`
@@ -2292,14 +2348,21 @@ impl<'a> Printer<'a> {
     /// comment in place); `build_type_doc_maybe_parens` would re-wrap the parens but
     /// drop that comment. Every other member (block-only / non-union parens) uses the
     /// default.
+    ///
+    /// ⚠️ The claim question ([`Self::first_member_shell_run_claimed`]) is asked HERE and
+    /// not only at the router: this layout is reached by TWO triggers, and the isolated
+    /// member-comment one never asks it (`(// c⏎ | A) // x⏎ & B` routes on the `// x` in
+    /// the operator gap). A claimed run built here is a SECOND emitter for one comment —
+    /// the enclosing seam prints it, then the pair prints it again
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 3). Declining hands the
+    /// member to the default builder, which is the shape the seam already assumed.
     fn build_intersection_line_comment_member_doc(
         &self,
         t: &TSType<'_>,
         member_parens: fn(&TSType<'_>) -> bool,
     ) -> DocId {
-        if let TSType::Parenthesized(p) = t
-            && let TSType::Union(inner_union) = p.type_annotation
-            && self.paren_has_leading_line_comment(p)
+        if let Some((p, inner_union)) = self.paren_union_line_comment_member(t)
+            && !self.first_member_shell_run_claimed(t)
         {
             self.build_parenthesized_union_doc(inner_union, Some(p), ShellLeadingRun::Here)
         } else {
@@ -2340,7 +2403,21 @@ impl<'a> Printer<'a> {
         // The hoist's own relocation is the fallback — correct only while nothing above it
         // has a better answer about the indent
         // ([`comments.md`](../../../../docs/comments.md) hazard 3).
-        if self.shell_leading_run_claimed(first_member.span().start, inner.span().start) {
+        if self.first_member_shell_run_claimed(first_member) {
+            return smallvec![];
+        }
+        // The pair that DIRECTLY holds the run is the union's own required one, so it
+        // survives into the output and `build_intersection_line_comment_member_doc` emits
+        // the run inside it — declining here is what keeps the comment where the author
+        // wrote it, the answer every LATER member already gives. Hoisting it instead was
+        // also non-idempotent: it relocated the run into an enclosing retained shell's
+        // `(`→member gap, which the next pass renders through that gap's own emitter.
+        //
+        // Asked through `paren_union_line_comment_member`, the same accessor the routing
+        // gate and the member emitter ask — the decline and the layout that answers it are
+        // one shape by construction, and its ⚠️ is why a redundant outer layer
+        // (`(// c⏎ (a | b)) & c`, `((// c⏎ a | b)) & c`) still hoists below.
+        if self.paren_union_line_comment_member(first_member).is_some() {
             return smallvec![];
         }
         if matches!(inner, TSType::Union(_)) {
