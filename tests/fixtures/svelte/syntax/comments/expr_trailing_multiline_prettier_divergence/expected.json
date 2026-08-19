@@ -1,0 +1,637 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 760,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 211,
+				"data": " Trailing multi-line block comments in template expressions: tsv preserves them,\n\trendered through the TS printer's multi-line block form (interior lines reindented\n\tto context for a `*`-aligned comment) "
+			},
+			{
+				"type": "Text",
+				"start": 211,
+				"end": 212,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 212,
+				"end": 232,
+				"expression": {
+					"type": "Identifier",
+					"start": 213,
+					"end": 214,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 2
+						}
+					},
+					"name": "a",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": "* c1\n * c2\n ",
+							"start": 215,
+							"end": 231
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 232,
+				"end": 234,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 234,
+				"end": 275,
+				"test": {
+					"type": "Identifier",
+					"start": 239,
+					"end": 243,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 5
+						},
+						"end": {
+							"line": 8,
+							"column": 9
+						}
+					},
+					"name": "cond",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": "* c1\n * c2\n ",
+							"start": 244,
+							"end": 260
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 262,
+							"end": 270,
+							"raw": "\n\ttext1\n",
+							"data": "\n\ttext1\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 275,
+				"end": 277,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 277,
+				"end": 330,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 278
+					},
+					"end": {
+						"line": 15,
+						"column": 6,
+						"character": 283
+					}
+				},
+				"attributes": [
+					{
+						"start": 285,
+						"end": 327,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 16,
+								"column": 1,
+								"character": 285
+							},
+							"end": {
+								"line": 16,
+								"column": 11,
+								"character": 295
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 300,
+							"end": 303,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 5
+								}
+							},
+							"name": "val",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": "* c1\n * c2\n ",
+									"start": 304,
+									"end": 324
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 330,
+				"end": 332,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 332,
+				"end": 359,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 340,
+						"end": 341,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 8
+							},
+							"end": {
+								"line": 23,
+								"column": 9
+							}
+						},
+						"name": "x",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": "* c1\n * c2\n ",
+								"start": 342,
+								"end": 358
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 359,
+				"end": 361,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 361,
+				"end": 427,
+				"data": " nested: interior lines sit at the expression's own indent "
+			},
+			{
+				"type": "Text",
+				"start": 427,
+				"end": 428,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 428,
+				"end": 465,
+				"test": {
+					"type": "Identifier",
+					"start": 433,
+					"end": 434,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 5
+						},
+						"end": {
+							"line": 28,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 435,
+							"end": 437,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 437,
+							"end": 459,
+							"expression": {
+								"type": "Identifier",
+								"start": 438,
+								"end": 439,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": "* c1\n * c2\n ",
+										"start": 440,
+										"end": 458
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 459,
+							"end": 460,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 465,
+				"end": 467,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 467,
+				"end": 595,
+				"data": " {@const}: the same reindent; prettier's own output here is additionally corrupt\n\t(an unmatched paren it then throws on) "
+			},
+			{
+				"type": "Text",
+				"start": 595,
+				"end": 596,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 596,
+				"end": 668,
+				"expression": {
+					"type": "Identifier",
+					"start": 603,
+					"end": 608,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 7
+						},
+						"end": {
+							"line": 36,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 617,
+							"end": 619,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 619,
+							"end": 655,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "y",
+											"start": 627,
+											"end": 628,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 9,
+													"character": 627
+												},
+												"end": {
+													"line": 37,
+													"column": 10,
+													"character": 628
+												}
+											}
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 631,
+											"end": 635,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 13
+												},
+												"end": {
+													"line": 37,
+													"column": 17
+												}
+											},
+											"name": "item",
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": "* c1\n * c2\n ",
+													"start": 636,
+													"end": 654
+												}
+											]
+										},
+										"start": 627,
+										"end": 654
+									}
+								],
+								"start": 621,
+								"end": 654
+							}
+						},
+						{
+							"type": "Text",
+							"start": 655,
+							"end": 657,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 657,
+							"end": 660,
+							"expression": {
+								"type": "Identifier",
+								"start": 658,
+								"end": 659,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 2
+									},
+									"end": {
+										"line": 40,
+										"column": 3
+									}
+								},
+								"name": "y"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 660,
+							"end": 661,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 612,
+					"end": 616,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 16,
+							"character": 612
+						},
+						"end": {
+							"line": 36,
+							"column": 20,
+							"character": 616
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 668,
+				"end": 670,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 670,
+				"end": 743,
+				"data": " a non-`*`-aligned interior is preserved verbatim, not reindented "
+			},
+			{
+				"type": "Text",
+				"start": 743,
+				"end": 744,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 744,
+				"end": 759,
+				"expression": {
+					"type": "Identifier",
+					"start": 745,
+					"end": 746,
+					"loc": {
+						"start": {
+							"line": 44,
+							"column": 1
+						},
+						"end": {
+							"line": 44,
+							"column": 2
+						}
+					},
+					"name": "c",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " n1\nn2 ",
+							"start": 747,
+							"end": 758
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": "* c1\n * c2\n ",
+			"start": 215,
+			"end": 231,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 3
+				},
+				"end": {
+					"line": 6,
+					"column": 3
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* c1\n * c2\n ",
+			"start": 244,
+			"end": 260,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 10
+				},
+				"end": {
+					"line": 10,
+					"column": 3
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* c1\n * c2\n ",
+			"start": 304,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 6
+				},
+				"end": {
+					"line": 19,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* c1\n * c2\n ",
+			"start": 342,
+			"end": 358,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 10
+				},
+				"end": {
+					"line": 25,
+					"column": 3
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* c1\n * c2\n ",
+			"start": 440,
+			"end": 458,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 4
+				},
+				"end": {
+					"line": 31,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* c1\n * c2\n ",
+			"start": 636,
+			"end": 654,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 18
+				},
+				"end": {
+					"line": 39,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " n1\nn2 ",
+			"start": 747,
+			"end": 758,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 3
+				},
+				"end": {
+					"line": 45,
+					"column": 5
+				}
+			}
+		}
+	]
+}
