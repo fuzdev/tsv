@@ -32,10 +32,35 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   mirror below.
 - **`tsv` npm bin, WASM (`@fuzdev/tsv_wasm`)**: `crates/tsv_wasm/npm/cli.js`
   — a hand-written Node mirror of this CLI's contract (subcommands, flags,
-  exit codes, output streams, traversal rules; single-threaded — `--jobs` is
-  accepted for drop-in parity and ignored). One source: it imports its
-  engine from `./index.js`, so the copy staged into the native `@fuzdev/tsv`
-  (as the dispatcher's fallback) binds to the N-API engine with no adapter.
+  exit codes, output streams, traversal rules). `--jobs` is real: path mode
+  fans onto `node:worker_threads`, spawning `cli.js` as its own worker. Where
+  it differs from the native CLI is in the two **defaults**, both of which are
+  smaller here:
+  - **When to pool at all.** A pool costs tens of milliseconds to bring up here
+    against the native pool's ~50 µs of thread spawn, so with no `--jobs` given
+    the run stays single-threaded until the in-scope file count clears a
+    threshold — measured at ~565 files on the WASM engine and ~394 on N-API,
+    with the shipped constants set above each so a pool is only taken where it
+    clearly pays.
+  - **How wide.** Not the native `min(logical, ceil(1.5 × physical))`. That
+    rule assumes an idle machine, and on the WASM engine V8's own wasm tier-up
+    is already using roughly a third of one before the first worker exists — so
+    the pool peaks at half the physical cores and *regresses* past it. The
+    N-API mirror has no compiler thread to compete with and peaks at the
+    physical core count.
+
+  An explicit `--jobs N` is obeyed at any size, exactly as it is natively — and
+  it is the only way to compare the two paths at a given size, which
+  calibrating those defaults needed.
+  `--jobs 1`, `--content`, `--stdin`, and `--list` are single-threaded on both
+  CLIs. The parallel and single-threaded paths report identically (same sorted
+  stdout, same summary, same exit code), so the split is a cost decision and
+  not a contract one. One source:
+  it imports its engine from `./index.js`, so the copy staged into the native
+  `@fuzdev/tsv` (as the dispatcher's fallback) binds to the N-API engine with
+  no adapter — and its workers, having no compiled module to inherit, load
+  that engine themselves, while WASM workers take the main thread's module
+  through the package's `./worker` entry and recompile nothing.
   Behavioral changes to `format`/`parse` here must be mirrored there and in
   the CLI tests of `scripts/test_npm.ts` (wasm) and
   `scripts/test_napi_npm.ts` (native).
@@ -108,7 +133,7 @@ Implemented in `tsv_cli/src/cli/input.rs`
 - **In-place writes**: files are rewritten only when output differs (no mtime churn). `--content`/`--stdin` keep printing to stdout.
 - **`--check`**: lists files that would change without writing; exits 1 if any would. For CI. Also works with `--content`/`--stdin` (nothing printed to stdout; the exit code is the API) for editor integrations.
 - **`--list`**: prints the discovered in-scope files (one per line) without formatting — a read-only view of the set `format` would touch, after the ignore files are applied. Path mode only (errors with `--content`/`--stdin`) and mutually exclusive with `--check`. Unlike the format action, an empty scope is a valid answer (exit 0, no output) rather than the "no supported files" error; traversal errors still exit 2. Useful for debugging ignore-file scoping and for scripting over the set.
-- **Parallelism**: files format concurrently on `std::thread::scope` workers claiming one file at a time from a shared queue — dynamic load balancing with no thread-pool dependency. `--jobs N` overrides the worker count; path mode only, an error with `--content`/`--stdin`. Each worker reserves an 8 MiB stack (`WORKER_STACK_SIZE` — the common 2 MiB platform default aborts at ~360 nested parens, 8 MiB clears 1400), pinning the pool's ceiling against the platform-dependent main-thread default; the `--content`/`--stdin` path stays on the main thread.
+- **Parallelism**: files format concurrently on `std::thread::scope` workers claiming one file at a time from a shared queue — dynamic load balancing with no thread-pool dependency. `--jobs N` overrides the worker count, clamped to the file count and floored at 1 (`--jobs 0` is a width, not an opt-out — it means `--jobs 1`); path mode only, an error with `--content`/`--stdin`. Each worker reserves an 8 MiB stack (`WORKER_STACK_SIZE` — the common 2 MiB platform default aborts at ~360 nested parens, 8 MiB clears 1400), pinning the pool's ceiling against the platform-dependent main-thread default; the `--content`/`--stdin` path stays on the main thread.
 
   The default is **`min(logical CPUs, ceil(1.5 × physical cores))`**, not one worker per logical CPU. This workload does not scale onto SMT siblings — the per-file work is memory-bound, and on a large tree the discovery walk is the bottleneck, so extra workers compete with it for cores. One worker per logical CPU costs up to 28% on walk-bound trees while buying nothing on flat repos. The SMT width is read once from `/sys/devices/system/cpu/cpu0/topology/thread_siblings_list`; where that is unavailable (no SMT, or a non-Linux platform) the cap is inert and the default is the logical count, so it can only ever lower the worker count.
 - **Streaming discovery**: a single directory root — the common invocation — feeds the workers *as the walk finds files*, so the directory walk runs beside the first files' parse+format rather than in front of an idle pool. It is worth having: the walk is 5–10% of the wall on an application repo, and 40–67% on a repo with a large tree, where it can outrun what the pool consumes. Other argument shapes (explicit files, multiple roots) discover the whole set first, because the canonical-path dedup above is set-wide. The set of files formatted is identical either way, as is the reporting order below — only the order work is handed out differs.

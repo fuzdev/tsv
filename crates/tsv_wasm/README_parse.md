@@ -31,6 +31,8 @@ Three parsers: `parse_svelte` (matches Svelte's modern parser), `parse_typescrip
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
+To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv_parse_wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead; there is nothing compiled to hand across.
+
 Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) taking the same arguments but returning the AST as a compact JSON string — faster when you're writing it to disk or sending it over the wire, since it skips materializing the JS object tree.
 
 ### Options

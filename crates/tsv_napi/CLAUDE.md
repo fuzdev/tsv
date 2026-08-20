@@ -113,9 +113,17 @@ file, ~1 ms on top of Node's ~20 ms startup) and never reads PATH — only this
 package's own optionalDependency. When no binary is reachable, `bin.js`
 defers to `cli.js` — `tsv_wasm/npm/cli.js`, the shared JS mirror of the same
 contract, copied in at stage time; it imports its engine from `./index.js`,
-so the copy binds to the native loader with no adapter (and remains
-single-threaded, `--jobs` accepted-and-ignored — in `@fuzdev/tsv_wasm`, where
-it is the bin itself, that caveat still holds). The dispatcher lives in a
+so the copy binds to the native loader with no adapter. Its `--jobs` is real
+too — path mode fans onto `node:worker_threads` above a file-count threshold
+(`NATIVE_WORKER_FILE_THRESHOLD`, its own: the mirror sizes the pool per engine,
+and this one has no wasm tier-up competing for cores, so it both crosses over
+sooner and scales to the full physical core count where the WASM copy peaks at
+half) —
+but the workers here load the addon themselves, since this package exports no
+compiled `wasm_module` for them to inherit (the WASM package does, and its
+workers take it through the `./worker` entry). That path is the only place the
+pool runs over the native engine, and `scripts/test_napi_npm.ts` covers it
+against a `--jobs 1` run. The dispatcher lives in a
 napi-only file rather than as a branch inside the shared `cli.js` so the wasm
 copy stays byte-identical with no dead dispatch code — and so the wasm CLI
 can never resolve a sibling-installed native platform package by accident.
@@ -194,7 +202,7 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 ## Files
 
 - `src/lib.rs` — All bindings: the `lang_bindings!` macro, the three `lang_bindings!` invocations, the flat goal-aware TS exports, the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written, mirroring the wasm packages' surface minus `init`/`init_sync`/`wasm_module`, and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The Span-Only Wire), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two
 

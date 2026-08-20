@@ -722,6 +722,38 @@ fn test_format_jobs_one() {
     }
 }
 
+/// `--jobs 0` is a width, not an opt-out — it means the same as `--jobs 1`.
+/// Both discovery paths must agree on that: a **directory** streams into the
+/// pool and an **explicit file argument** collects first, and only the collected
+/// one used to clamp. Unclamped, the streamed path left every file unclaimed and
+/// reported a "worker thread panicked" error for a worker it never spawned.
+#[test]
+fn test_format_jobs_zero_means_one() {
+    let dir = temp_dir("jobs_zero");
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("b.ts"), UNFORMATTED_TS).unwrap();
+
+    let streamed = tsv(&["format", "--jobs", "0", dir.to_str().unwrap()]);
+    assert_eq!(
+        streamed.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&streamed.stderr)
+    );
+    assert_eq!(fs::read_to_string(dir.join("a.ts")).unwrap(), FORMATTED_TS);
+    assert_eq!(fs::read_to_string(dir.join("b.ts")).unwrap(), FORMATTED_TS);
+
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    let collected = tsv(&["format", "--jobs", "0", dir.join("a.ts").to_str().unwrap()]);
+    assert_eq!(
+        collected.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&collected.stderr)
+    );
+    assert_eq!(fs::read_to_string(dir.join("a.ts")).unwrap(), FORMATTED_TS);
+}
+
 #[test]
 fn test_format_nonexistent_path() {
     let output = tsv(&["format", "/nonexistent/tsv_cli_test_path"]);
