@@ -1,0 +1,118 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// a one-member union prints as its member, so a `//` in that member's shell changes
+	// only where it renders - never which parens survive, and never a `|` of its own
+	type A =
+		// c1
+		B | C;
+
+	// the same run one redundant layer deeper
+	type D =
+		// c2
+		E | F;
+
+	// a type argument
+	type G = q<
+		// c3
+		H | I
+	>;
+
+	// an object type's value
+	type J = {
+		p:
+			// c4
+			K | L;
+	};
+
+	// a tuple element
+	type M = [
+		// c5
+		N | O
+	];
+
+	// an indexed access's object
+	type P = (
+		// c6
+		Q | R
+	)['k'];
+
+	// a conditional's check type
+	type S =
+		// c7
+		T | U extends V
+		? W
+		: X;
+
+	// the member's own pair is REQUIRED, so it survives and keeps the comment inside
+	type Y = // c8
+	(Z | A1) &
+		B1;
+
+	// control: the same authoring without the leading `|`, which lands on the same form
+	type C1 =
+		// c9
+		D1 | E1;
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a one-member union prints as its member, so a `//` in that member's shell changes
+	// only where it renders - never which parens survive, and never a `|` of its own
+	type A =
+		// c1
+		B | C;
+
+	// the same run one redundant layer deeper
+	type D =
+		// c2
+		E | F;
+
+	// a type argument
+	type G = q<
+		// c3
+		H | I
+	>;
+
+	// an object type's value
+	type J = {
+		p:
+			// c4
+			K | L;
+	};
+
+	// a tuple element
+	type M = [
+		// c5
+		N | O
+	];
+
+	// an indexed access's object
+	type P = (
+		// c6
+		Q | R
+	)['k'];
+
+	// a conditional's check type
+	type S =
+		// c7
+		T | U extends V ? W : X;
+
+	// the member's own pair is REQUIRED, so it survives and keeps the comment inside
+	type Y =
+		// c8
+		(Z | A1) & B1;
+
+	// control: the same authoring without the leading `|`, which lands on the same form
+	type C1 =
+		// c9
+		D1 | E1;
+</script>
