@@ -38,6 +38,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Worker } from 'node:worker_threads';
 
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 
@@ -85,16 +86,57 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		assert.equal(pkg.name, PKG_NAMES[variant]);
 	});
 
+	// Walks the whole map rather than a fixed key list: conditions nest (the `.`
+	// subpath resolves `types` inside each of `node`/`default`, since the two
+	// entries do not export the same names), and a hard-coded set of keys would
+	// have silently stopped visiting anything the day it did.
 	it('exports map points at files that exist', () => {
-		const root = pkg.exports['.'];
-		for (const key of ['types', 'node', 'default']) {
-			const rel = root[key];
-			assert.ok(rel, `exports['.'].${key} missing`);
-			assert.ok(
-				existsSync(new URL(`../${pkg_dir}/${rel}`, import.meta.url)),
-				`exports['.'].${key} → ${rel} does not exist`
-			);
+		const seen: Array<string> = [];
+		const walk = (node: unknown, path: string): void => {
+			if (typeof node === 'string') {
+				seen.push(path);
+				assert.ok(
+					existsSync(new URL(`../${pkg_dir}/${node}`, import.meta.url)),
+					`exports${path} → ${node} does not exist`
+				);
+				return;
+			}
+			assert.ok(node && typeof node === 'object', `exports${path} is neither a path nor a map`);
+			for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+				walk(value, `${path}[${JSON.stringify(key)}]`);
+			}
+		};
+		walk(pkg.exports, '');
+		// every entry must resolve to SOMETHING typed and something runnable
+		assert.ok(
+			seen.some((p) => p.includes('"types"')),
+			'no types condition in the exports map'
+		);
+		assert.ok(seen.length >= 5, `exports map looks truncated: only ${seen.length} targets`);
+	});
+
+	// Every relative specifier in a shipped `.d.ts` must carry the `.js`
+	// extension. Under `moduleResolution: node16`/`nodenext` an extensionless
+	// one is TS2834/TS2835 — errors raised from INSIDE the package, at any
+	// consumer without `skipLibCheck`. This is a real blind spot rather than a
+	// hypothetical: nothing in-repo type-checks the merged package `.d.ts`
+	// (`check:ast-types` covers `tsv_ast.d.ts` alone), and the same class has
+	// now shipped twice — the generated declarations and the napi loader's
+	// hand-written one. A regex is not a typechecker, but it pins this class
+	// without adding a `tsc` dependency to the package suites.
+	it('every .d.ts relative specifier carries the .js extension', () => {
+		const bad: Array<string> = [];
+		for (const rel of pkg.files.filter((f: string) => f.endsWith('.d.ts'))) {
+			const source = readFileSync(new URL(`../${pkg_dir}/${rel}`, import.meta.url), 'utf-8');
+			for (const [, spec] of source.matchAll(/(?:from|import\()\s*['"](\.[^'"]*)['"]/g)) {
+				if (!/\.(?:js|mjs|cjs|json)$/.test(spec)) bad.push(`${rel}: ${spec}`);
+			}
 		}
+		assert.deepEqual(
+			bad,
+			[],
+			`extensionless relative specifiers in shipped .d.ts:\n${bad.join('\n')}`
+		);
 	});
 
 	it('every files[] entry exists', () => {
@@ -124,8 +166,51 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		assert.ok(pkg.files.includes('cli.js'));
 	});
 
+	// The other half of the one-source claim `scripts/test_napi_npm.ts` pins
+	// from its side. Together they make the two packages' bins byte-identical
+	// transitively, which is what lets cli.js branch on its engine at runtime
+	// instead of being forked per package.
+	it('ships the shared cli.js verbatim', { skip: variant !== 'all' }, () => {
+		assert.equal(
+			readFileSync(new URL(`../${pkg_dir}/cli.js`, import.meta.url), 'utf-8'),
+			readFileSync(new URL('../crates/tsv_wasm/npm/cli.js', import.meta.url), 'utf-8'),
+			'the packaged cli.js differs from crates/tsv_wasm/npm/cli.js'
+		);
+	});
+
 	it('subset variants ship no bin', { skip: variant === 'all' }, () => {
 		assert.equal(pkg.bin, undefined);
+	});
+
+	it('exports the ./worker subpath (the no-auto-init entry, reachable from Node)', () => {
+		assert.deepEqual(pkg.exports['./worker'], {
+			types: './browser.d.ts',
+			default: './worker.js'
+		});
+		assert.ok(pkg.files.includes('worker.js'));
+	});
+
+	// The two entries do NOT have the same exports — only the Node one compiles
+	// at import, so only it has `wasm_module` — so `types` nests inside each
+	// condition. A hoisted `types` would hand the browser build a declaration
+	// for an export `browser.js` does not have: a bundler build error the
+	// compiler waved through.
+	it('types resolve per condition, and only the node entry declares wasm_module', () => {
+		assert.deepEqual(pkg.exports['.'], {
+			node: { types: './index.d.ts', default: './index.js' },
+			default: { types: './browser.d.ts', default: './browser.js' }
+		});
+		assert.ok(pkg.files.includes('browser.d.ts'));
+		const index_dts = readFileSync(new URL(`../${pkg_dir}/index.d.ts`, import.meta.url), 'utf-8');
+		const browser_dts = readFileSync(
+			new URL(`../${pkg_dir}/browser.d.ts`, import.meta.url),
+			'utf-8'
+		);
+		assert.match(index_dts, /export declare const wasm_module: WebAssembly\.Module;/);
+		assert.ok(
+			!browser_dts.includes('wasm_module'),
+			'browser.d.ts must not declare wasm_module — browser.js has no such export'
+		);
 	});
 });
 
@@ -594,6 +679,44 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	});
 });
 
+// The worker-pool contract: the node entry exposes its compiled module, and the
+// `./worker` entry initializes from one. `cli.js` is the first consumer, but the
+// pair is public API — a caller fanning tsv across threads needs both halves,
+// and neither is obtainable otherwise (the `.wasm` file is not an exports entry,
+// and the bare specifier always resolves to the auto-init entry under Node).
+describe(`worker entry (worker.js): ${pkg_dir}`, () => {
+	it('the node entry exposes its compiled WebAssembly.Module', () => {
+		assert.ok(node_entry.wasm_module instanceof WebAssembly.Module);
+	});
+
+	it('a worker initializes from that module and formats', async () => {
+		const worker_url = new URL(`../${pkg_dir}/worker.js`, import.meta.url).href;
+		const source = has_format
+			? `import {workerData, parentPort} from 'node:worker_threads';
+				const tsv = await import(${JSON.stringify(worker_url)});
+				tsv.init_sync({module: workerData.module});
+				parentPort.postMessage(tsv.format_typescript('const   x=1'));`
+			: `import {workerData, parentPort} from 'node:worker_threads';
+				const tsv = await import(${JSON.stringify(worker_url)});
+				tsv.init_sync({module: workerData.module});
+				parentPort.postMessage(tsv.parse_typescript('const x = 1;').type);`;
+		const result = await new Promise((resolve, reject) => {
+			// `eval: true` resolves bare specifiers against the cwd, which is why
+			// the worker entry goes in as an absolute URL rather than a relative one
+			const worker = new Worker(source, {
+				eval: true,
+				workerData: { module: node_entry.wasm_module }
+			});
+			worker.on('message', (message) => {
+				void worker.terminate();
+				resolve(message);
+			});
+			worker.on('error', reject);
+		});
+		assert.equal(result, has_format ? 'const x = 1;\n' : 'Program');
+	});
+});
+
 // CLI (`tsv` bin, `all` variant only) — subprocess tests against the contract
 // the JS CLI mirrors from the native tsv_cli: flags, exit codes, output streams.
 describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
@@ -959,7 +1082,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(result.stderr, /applies to --content/);
 	});
 
-	it('format --jobs is accepted in path mode and ignored', () => {
+	it('format --jobs is accepted in path mode', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
 			writeFileSync(join(dir, 'a.ts'), 'const x = 1;\n');
@@ -968,6 +1091,132 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			assert.match(result.stderr, /0 would change, 1 unchanged/);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// Above `WORKER_FILE_THRESHOLD` the run fans out onto worker threads, so
+	// these two drive a tree big enough to cross it. What they assert is that
+	// crossing it changes nothing observable: the same sorted stdout, the same
+	// summary, the same exit code, and — formatting for real — the same bytes on
+	// disk as the single-threaded run. Each side gets its own pristine copy,
+	// since formatting in place consumes the tree it measures.
+	//
+	// The tree size comes from the shipped source rather than a literal, because
+	// the whole claim is VACUOUS if it doesn't: parallel and sequential are
+	// designed to be indistinguishable from outside, so a tree that quietly fell
+	// under a raised threshold would keep passing while testing nothing. Failing
+	// to find the constant fails the suite for the same reason.
+	//
+	// Read lazily, not at suite-registration time: only the `all` variant ships a
+	// cli.js, and this block is skipped for the other two only because node:test
+	// does not execute a skipped suite's body — which is its behavior, not its
+	// contract, and not something a file read should depend on.
+	let sizing: { threshold: number; count: number; half: number } | undefined;
+	const worker_sizing = (): { threshold: number; count: number; half: number } => {
+		if (!sizing) {
+			const source = readFileSync(new URL(`../${pkg_dir}/cli.js`, import.meta.url), 'utf-8');
+			const match = /const WASM_WORKER_FILE_THRESHOLD = (\d+);/.exec(source);
+			assert.ok(
+				match,
+				'could not read WASM_WORKER_FILE_THRESHOLD out of cli.js — did it get renamed?'
+			);
+			// even, so the half-unformatted split below lands on a whole number
+			const count = 2 * Math.ceil((Number(match[1]) + 1) / 2);
+			sizing = { threshold: Number(match[1]), count, half: count / 2 };
+		}
+		return sizing;
+	};
+
+	const worker_tree = (root: string): void => {
+		for (let i = 0; i < worker_sizing().count; i++) {
+			// half unformatted, half already-formatted, plus one file the parser
+			// rejects — so the comparison covers all three outcomes a worker reports
+			writeFileSync(
+				join(root, `f${i}.ts`),
+				i % 2 === 0 ? `const  a${i}=${i}` : `const a${i} = ${i};\n`
+			);
+		}
+		writeFileSync(join(root, 'broken.ts'), 'const bad = ;\n');
+	};
+
+	it('format --check over a worker-sized tree matches --jobs 1 exactly', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			worker_tree(dir);
+			const one = run_cli(['format', '--check', '--jobs', '1', dir]);
+			const many = run_cli(['format', '--check', dir]);
+			assert.equal(one.status, 2, one.stderr);
+			assert.equal(many.status, one.status);
+			assert.equal(many.stdout, one.stdout);
+			assert.equal(many.stderr, one.stderr);
+			const { half } = worker_sizing();
+			assert.match(
+				many.stderr,
+				new RegExp(`^${half} would change, ${half} unchanged, 1 errors$`, 'm')
+			);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// An explicit `--jobs` is obeyed at any size, so this drives the pool on a
+	// tree deliberately UNDER the threshold — the arm the default never reaches,
+	// and the one that makes calibrating the threshold possible.
+	it('format --jobs forces the pool below the threshold, same output', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			for (let i = 0; i < 4; i++) writeFileSync(join(dir, `f${i}.ts`), `const  a${i}=${i}`);
+			const one = run_cli(['format', '--check', '--jobs', '1', dir]);
+			const many = run_cli(['format', '--check', '--jobs', '4', dir]);
+			assert.ok(
+				4 < worker_sizing().threshold,
+				'this tree must sit under the threshold to test that arm'
+			);
+			assert.equal(many.status, one.status);
+			assert.equal(many.stdout, one.stdout);
+			assert.equal(many.stderr, one.stderr);
+			assert.match(many.stderr, /4 would change, 0 unchanged/);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// `--jobs 0` is a width, not an opt-out: it clamps to 1 rather than spawning
+	// an empty pool. The native CLI's streaming path had escaped that clamp.
+	it('format --jobs 0 means --jobs 1', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const  x=1');
+			const result = run_cli(['format', '--check', '--jobs', '0', dir]);
+			assert.equal(result.status, 1, result.stderr);
+			assert.match(result.stderr, /1 would change, 0 unchanged$/m);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('format in place over a worker-sized tree writes what --jobs 1 writes', () => {
+		const one_dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		const many_dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			worker_tree(one_dir);
+			worker_tree(many_dir);
+			const one = run_cli(['format', '--jobs', '1', one_dir]);
+			const many = run_cli(['format', many_dir]);
+			assert.equal(one.status, 2, one.stderr);
+			assert.equal(many.status, one.status);
+			assert.equal(many.stdout.replaceAll(many_dir, ''), one.stdout.replaceAll(one_dir, ''));
+			assert.equal(many.stderr.replaceAll(many_dir, ''), one.stderr.replaceAll(one_dir, ''));
+			for (let i = 0; i < worker_sizing().count; i++) {
+				assert.equal(
+					readFileSync(join(many_dir, `f${i}.ts`), 'utf-8'),
+					readFileSync(join(one_dir, `f${i}.ts`), 'utf-8'),
+					`f${i}.ts differs between the parallel and single-threaded runs`
+				);
+			}
+		} finally {
+			rmSync(one_dir, { recursive: true, force: true });
+			rmSync(many_dir, { recursive: true, force: true });
 		}
 	});
 

@@ -542,6 +542,16 @@ fn format_streamed(
     });
     let mut claimed: Vec<(usize, PathBuf, FileOutcome)> = Vec::new();
 
+    // `--jobs 0` is a width, not an opt-out: a pool of zero leaves every
+    // discovered file unclaimed, and each one then reads out through the
+    // died-outside-`catch_unwind` arm below as a bogus "worker thread panicked"
+    // — a run that formats nothing and blames a worker that never existed.
+    // `format_files` (the collected path) already clamps, so without this the
+    // same flag works on explicit file arguments and fails on a directory.
+    // Clamped only at the bottom: the file count isn't known up front here,
+    // which is the whole point of streaming.
+    let jobs = jobs.max(1);
+
     thread::scope(|scope| {
         let handles: Vec<_> = (0..jobs)
             .map(|_| {

@@ -150,7 +150,7 @@ Deno.writeTextFileSync(
 );
 // `export *`, not `export type *` — the helper's functions AND its types flow
 // through, matching the wasm packages' index.d.ts.
-Deno.writeTextFileSync(`${loader_dir}/index.d.ts`, `\nexport * from './locations';\n`, {
+Deno.writeTextFileSync(`${loader_dir}/index.d.ts`, `\nexport * from './locations.js';\n`, {
 	append: true
 });
 write_pkg(loader_dir, {
