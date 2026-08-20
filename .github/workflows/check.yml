@@ -80,7 +80,7 @@ jobs:
           # Pinned to match local: deno drives the prettier/svelte fixture oracle
           # and `deno test`, so a floating minor could shift behavior the pinned
           # Rust toolchain can't guard. Bump deliberately.
-          deno-version: 2.9.4
+          deno-version: 2.9.5
           # Round-trips DENO_DIR across runs — captures the sidecar's runtime
           # npm fetches (prettier/svelte/acorn) since those land in DENO_DIR.
           cache: true
@@ -93,6 +93,18 @@ jobs:
           # sidecar's (crates/tsv_debug/src/deno/deno.lock, embedded + frozen); the
           # bench resolves npm from package-lock.json and the root has no external deps.
           cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
+
+      # The lockfile gate for this job, in one cheap step instead of `--locked` on
+      # every cargo command. `deno task check` reaches cargo only through deno tasks
+      # (`typecheck`, `test`, `lint`, and every `cargo run -p tsv_debug` audit), and
+      # threading `--locked` through those would impose it locally too, where an
+      # in-progress dependency edit legitimately moves the lock. This asks the same
+      # question up front — would resolving need to CHANGE Cargo.lock? — and it
+      # settles it for the whole job: once the answer is no, the unpinned commands
+      # below cannot rewrite it either. `metadata` resolves without compiling, so it
+      # costs seconds and fails before the toolchain does any work.
+      - name: Verify Cargo.lock is current
+        run: cargo metadata --locked --format-version 1 > /dev/null
 
       - name: Check
         run: deno task check
@@ -147,7 +159,7 @@ jobs:
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           # Pinned to match the check job / local. Bump deliberately.
-          deno-version: 2.9.4
+          deno-version: 2.9.5
           cache: true
 
       - name: Install Node
@@ -234,7 +246,7 @@ jobs:
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           # Pinned to match the check job / local. Bump deliberately.
-          deno-version: 2.9.4
+          deno-version: 2.9.5
           cache: true
           cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
 
@@ -248,8 +260,13 @@ jobs:
       # --no-fail-fast: cargo test stops at the first failing test BINARY by
       # default, hiding every later suite — the platform burn-down wants all
       # failures per run, not one per push.
+      # --locked: this job is the cross-platform verdict, so it must build the
+      # dependency set the repo committed, not whatever resolves today — a silent
+      # lock update here would mean macOS/Windows green on versions Linux never
+      # tested. The release matrix pins the same way; the `check` job asks the
+      # question once up front instead (see its lockfile step).
       - name: Test
-        run: cargo test --workspace --no-fail-fast
+        run: cargo test --locked --workspace --no-fail-fast
 
       # The real N-API JS boundary against this OS's napi-profile cdylib
       # (release + unwind, built with the test-only panic probe so the

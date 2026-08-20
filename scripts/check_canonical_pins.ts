@@ -33,6 +33,10 @@
  * Drift here silently grades fixtures and corpora against a different oracle
  * than the bench measures.
  *
+ * The prettier OPTIONS ride along, for the same reason and at the same cadence: a
+ * version and an option are both pins on what the oracle emits, and the two oracles
+ * spell their options in two files (`check_prettier_option_agreement`).
+ *
  * The lockfile also carries the pins nothing else can: the oracle's own
  * transitive dependencies (`LOCKED_TRANSITIVE`). A version pinned by no literal
  * — `esrap`, which prints svelte's compiled output — can otherwise move under a
@@ -243,6 +247,89 @@ if (run_pins) {
 		assert_locked(name, expected, 'LOCKED_TRANSITIVE in scripts/check_canonical_pins.ts');
 	}
 }
+
+/**
+ * Keys the sidecar's prettier call carries that are STRUCTURAL rather than layout
+ * pins — the plugin list and the per-call parser/filepath routing, which the bench
+ * spells its own way. Everything else in that call is a pin and must agree.
+ *
+ * A new key on either side lands in `failures` until it is either mirrored or
+ * added here, which is the point: the agreement is maintained by a deliberate act,
+ * not by whoever edits one file remembering the other.
+ */
+const PRETTIER_STRUCTURAL_KEYS = new Set(['plugins', 'parser', 'filepath']);
+
+/** `key: value` literal pairs in an object-literal body, values kept verbatim. */
+function option_pairs(body: string): Map<string, string> {
+	const pairs = new Map<string, string>();
+	for (const m of body.matchAll(/^\s*([a-zA-Z_$][\w$]*)\s*:\s*(.+?),?\s*$/gm)) {
+		pairs.set(m[1], m[2].trim().replace(/,$/, ''));
+	}
+	return pairs;
+}
+
+/**
+ * The prettier OPTIONS must stay identical across the two oracles, exactly as the
+ * versions above must.
+ *
+ * A version and an option are the same kind of pin — both decide what the oracle
+ * emits — but only the version had a guard. The bench's `PRETTIER_OPTIONS`
+ * (`benches/js/lib/canonical.ts`) grades every `corpus:compare:format` verdict and
+ * is the denominator of every published speedup; the sidecar's inline copy
+ * (`crates/tsv_debug/src/deno/sidecar.ts`) regenerates every fixture's
+ * `output_prettier.*`. `canonical.ts` has said "keep these two option sets
+ * identical" since it was written, with nothing checking it.
+ *
+ * Note what this does NOT cover, and what does: whether either set still LANDS in
+ * the tool is a behavioral question a text comparison can't answer — two identical
+ * option sets can both be ignored after an upstream rename. `canonical.ts`'s `init`
+ * probe answers it for the bench (`benches/js/lib/format_config_probe.ts`); the
+ * sidecar's answer is `deno task fixtures:validate`, whose F2 arm re-formats
+ * through the live oracle. This check is the repo-fact half: that the two sets are
+ * the SAME set.
+ */
+function check_prettier_option_agreement(): void {
+	const BENCH_CANONICAL_PATH = 'benches/js/lib/canonical.ts';
+	const bench_src = Deno.readTextFileSync(BENCH_CANONICAL_PATH);
+
+	const bench_body = /const PRETTIER_OPTIONS = \{([\s\S]*?)\} as const;/.exec(bench_src)?.[1];
+	const sidecar_body = /return await prettier\.format\(content, \{([\s\S]*?)\}\);/.exec(
+		sidecar
+	)?.[1];
+	if (bench_body === undefined || sidecar_body === undefined) {
+		failures.push(
+			`prettier options: could not locate the option literal in ${
+				bench_body === undefined ? BENCH_CANONICAL_PATH : SIDECAR_PATH
+			} — this check reads source text, so a refactor of that call site must update it`
+		);
+		return;
+	}
+
+	const bench = option_pairs(bench_body);
+	const sidecar_opts = new Map(
+		[...option_pairs(sidecar_body)].filter(([k]) => !PRETTIER_STRUCTURAL_KEYS.has(k))
+	);
+
+	// A pin missing from one side is drift as surely as a pin whose value differs —
+	// the union is what makes a one-sided ADDITION fail rather than pass unnoticed.
+	for (const key of new Set([...bench.keys(), ...sidecar_opts.keys()])) {
+		const a = bench.get(key);
+		const b = sidecar_opts.get(key);
+		if (a === b) continue;
+		failures.push(
+			`prettier option '${key}': ${BENCH_CANONICAL_PATH} has ${a ?? '(absent)'}, ` +
+				`${SIDECAR_PATH} has ${b ?? '(absent)'} — the bench oracle and the fixture oracle ` +
+				`would format differently, so fixtures and corpus verdicts would grade against ` +
+				`different prettiers`
+		);
+	}
+	report.push(`prettier options agree (${[...bench].map(([k, v]) => `${k}=${v}`).join(', ')})`);
+}
+
+// Invoked here rather than inside the `run_pins` block above: that block runs before
+// this declaration, and `PRETTIER_STRUCTURAL_KEYS` is a `const` — a call from there
+// hits the temporal dead zone, where the version checks' hoisted helpers do not.
+if (run_pins) check_prettier_option_agreement();
 
 // --- Checkout alignment + commit drift (header docstring, halves 2 and 3) ------
 

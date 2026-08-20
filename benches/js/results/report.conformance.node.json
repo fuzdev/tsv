@@ -1,9 +1,9 @@
 {
-	"version": 12,
+	"version": 13,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-08-15T18:43:31.524Z",
-	"git_commit": "a2f101d6",
+	"timestamp": "2026-08-20T14:11:34.662Z",
+	"git_commit": "1b4e0011",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -102,7 +102,7 @@
 			"repo": {
 				"url": "https://github.com/sveltejs/svelte",
 				"slug": "sveltejs/svelte",
-				"commit": "20b341f10048cf1016a2028ac7eee5595cfef6a5",
+				"commit": "f145959ea73b572d3b2ffdbffad1c60b93b93516",
 				"subpath": "packages/svelte/tests"
 			}
 		},
@@ -675,45 +675,45 @@
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3437328,
+			"bytes": 3487056,
 			"kind": "native",
-			"gzip_bytes": 1490124
+			"gzip_bytes": 1515373
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3143264,
+			"bytes": 3191472,
 			"kind": "native",
-			"gzip_bytes": 1360396
+			"gzip_bytes": 1385393
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1529744,
+			"bytes": 1534784,
 			"kind": "native",
-			"gzip_bytes": 663669
+			"gzip_bytes": 666098
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3758464,
+			"bytes": 3802208,
 			"kind": "native",
-			"gzip_bytes": 1614573
+			"gzip_bytes": 1638257
 		},
 		{
 			"label": "tsv_format_wasm",
-			"bytes": 2170436,
+			"bytes": 2212396,
 			"kind": "wasm",
-			"gzip_bytes": 801265
+			"gzip_bytes": 825476
 		},
 		{
 			"label": "tsv_parse_wasm",
-			"bytes": 926719,
+			"bytes": 927459,
 			"kind": "wasm",
-			"gzip_bytes": 363414
+			"gzip_bytes": 364027
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2422474,
+			"bytes": 2465073,
 			"kind": "wasm",
-			"gzip_bytes": 892683
+			"gzip_bytes": 917171
 		},
 		{
 			"label": "biome (wasm)",
@@ -1326,6 +1326,12 @@
 		}
 	],
 	"suppressed_noise": {},
+	"output_digest_ungraded": {
+		"parse/typescript/tsv-json": 1,
+		"parse/typescript/tsv_wasm-json": 1,
+		"parse/typescript/tsv-json-no-locations": 1,
+		"parse/typescript/tsv_wasm-json-no-locations": 1
+	},
 	"variant_parity": [],
 	"unavailable": []
 }

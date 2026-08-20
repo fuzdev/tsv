@@ -41,6 +41,15 @@ import type { Language, Logger, ParseGoal, SourceFile } from './types.ts';
 function detect_language(path: string): Language | null {
 	const ext = extname(path).toLowerCase();
 	switch (ext) {
+		// `.html` → svelte for `../prettier-plugin-svelte/test`, whose printer samples
+		// are `.html` files holding Svelte components — the extension is that suite's
+		// convention, not a claim about HTML. It reaches one other entry,
+		// `../prettier/tests/format/html`, where the files really are HTML documents:
+		// svelte/compiler rejects 40 of the 124 (harvested into the reject cache) and
+		// parses the rest, so 84 plain HTML files sit in the Svelte parse denominator
+		// at ~1.8% of it. Tolerated, not intended — Svelte's grammar is an HTML
+		// superset, so an accept there is a weaker claim than the rest of the set
+		// makes. The per-source coverage table keeps it separable.
 		case '.svelte':
 		case '.html':
 			return 'svelte';
@@ -245,13 +254,31 @@ async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
 	}
 }
 
+/**
+ * Format bytes as MB with one decimal — DECIMAL (1e6), the convention the report's
+ * `MB/s` throughput already uses, so a corpus size and a rate over it stay
+ * commensurable. Always MB, even below 1 MB (renders as e.g. `0.4 MB`), so a
+ * column of sizes scans uniformly without unit-switching mid-table.
+ *
+ * EVERY printer of a corpus SIZE routes here: this module's loader summary, the
+ * terminal corpus block and the markdown report's `**Corpus:**` line in
+ * `bench.ts`, and `diagnostics/corpus_stats.ts`'s MB tier. They all describe the
+ * same bytes, so a second spelling is a second answer — dividing by 1024² under
+ * this same `MB` label makes a LARGER corpus print as fewer MB than a smaller one
+ * measured decimally, which is a disagreement no reader can resolve from the
+ * output.
+ */
+export function format_mb(bytes: number): string {
+	return `${(bytes / 1_000_000).toFixed(1)} MB`;
+}
+
 /** Log corpus summary */
 function log_corpus_summary(files: SourceFile[], logger: Logger): void {
 	const total_bytes = files.reduce((sum, f) => sum + f.bytes, 0);
 	const by_lang = { svelte: 0, typescript: 0, css: 0 };
 	for (const f of files) by_lang[f.language]++;
 	logger(`\nCorpus loaded:`);
-	logger(`  Total: ${files.length} files, ${(total_bytes / 1024 / 1024).toFixed(2)} MB`);
+	logger(`  Total: ${files.length} files, ${format_mb(total_bytes)}`);
 	logger(`  Svelte: ${by_lang.svelte} files`);
 	logger(`  TypeScript: ${by_lang.typescript} files`);
 	logger(`  CSS: ${by_lang.css} files`);

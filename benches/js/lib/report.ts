@@ -282,8 +282,11 @@ export function generate_summary_report(
 		// - The Svelte pair: rsvelte's parser is the only third-party engine there,
 		//   and it matches `tsv-json` on BOTH axes — mechanism (each returns a compact
 		//   JSON string the caller parses, so both pay the identical serialize +
-		//   boundary + JSON.parse cost) and payload (within ~1.5% of tsv's bytes on a
-		//   real component). Deliberately NOT paired with the no-locations rows:
+		//   boundary + JSON.parse cost) and payload (-1.1% of tsv's bytes ACROSS THE
+		//   CORPUS — the axis a throughput ratio integrates over; per component the
+		//   spread is wider, p90 3% and up to 12%, so the aggregate is the claim.
+		//   Measured over 120 real components; re-measure on an rsvelte pin bump).
+		//   Deliberately NOT paired with the no-locations rows:
 		//   `skipExpressionLoc` is a different reduction from tsv's span-only wire
 		//   (see lib/rsvelte_parse.ts), which is also why that row is named for its
 		//   option rather than for tsv's.
@@ -432,15 +435,32 @@ export function generate_skipped_files_report(
 		return bench_diff !== 0 ? bench_diff : a.file_path.localeCompare(b.file_path);
 	});
 
-	const skips_by_lang = { svelte: 0, typescript: 0, css: 0 };
-	for (const { lang } of sorted_errors) {
-		if (lang !== 'other') skips_by_lang[lang]++;
-	}
+	// TWO counts, and on a real corpus they are far apart: `file_error_map` is keyed
+	// by path, `all_errors` by (path, error), so a file several impls reject splits
+	// into one entry per distinct MESSAGE — one file rejected by acorn, swc, oxc and
+	// tsc in four different words is four combinations. Printing the combination
+	// count under a `files` label therefore overstates how much of the corpus went
+	// unmeasured (on the conformance corpus, by about double), and the only way to
+	// catch it from the output is to difference the pre-flight intersection by hand.
+	// The file count answers "how much did we not measure"; the combination count is
+	// what the per-file detail below enumerates. Both, named.
+	const files_by_lang: Record<SkipLang, number> = { svelte: 0, typescript: 0, css: 0, other: 0 };
+	for (const file_path of file_error_map.keys()) files_by_lang[classify_lang(file_path)]++;
+	const combos_by_lang: Record<SkipLang, number> = { svelte: 0, typescript: 0, css: 0, other: 0 };
+	for (const { lang } of sorted_errors) combos_by_lang[lang]++;
 
-	lines.push(`Total unique file+error combinations: ${sorted_errors.length}`);
-	lines.push(`  Svelte:      ${skips_by_lang.svelte} files skipped`);
-	lines.push(`  TypeScript:  ${skips_by_lang.typescript} files skipped`);
-	lines.push(`  CSS:         ${skips_by_lang.css} files skipped`);
+	const skip_row = (label: string, files: number, combos: number) =>
+		`  ${label.padEnd(13)}${String(files).padStart(8)}${String(combos).padStart(20)}`;
+	lines.push(`${' '.repeat(15)}${'files'.padStart(8)}${'file+error combos'.padStart(20)}`);
+	lines.push(skip_row('Total:', file_error_map.size, sorted_errors.length));
+	lines.push(skip_row('Svelte:', files_by_lang.svelte, combos_by_lang.svelte));
+	lines.push(skip_row('TypeScript:', files_by_lang.typescript, combos_by_lang.typescript));
+	lines.push(skip_row('CSS:', files_by_lang.css, combos_by_lang.css));
+	// Only ever non-zero if a corpus entry yields an extension `classify_lang` doesn't
+	// name — silent otherwise, but never silently absent from the total it is inside.
+	if (files_by_lang.other > 0) {
+		lines.push(skip_row('Other:', files_by_lang.other, combos_by_lang.other));
+	}
 
 	// Per-benchmark skip counts (always shown). Display names instead of
 	// tracking_keys so the labels match the bench tables.
@@ -661,10 +681,10 @@ const SWC_NOTE: FairnessNote = {
 const RSVELTE_PARSE_NOTE: FairnessNote = {
 	terminal: [
 		'  (rsvelte-parse returns a JSON string the caller parses — the identical mechanism',
-		'   tsv-json measures, and within ~1.5% of its payload, so this pair matches on both axes)'
+		'   tsv-json measures, and within ~1.5% of its payload corpus-wide, so this pair matches on both axes)'
 	],
 	markdown:
-		'rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload on a real component, so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire'
+		'rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload measured across the corpus (the axis a throughput ratio integrates; per component the spread is wider), so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire'
 };
 
 const POSTCSS_NOTE: FairnessNote = {
@@ -1623,10 +1643,19 @@ export function generate_skipped_files_markdown(
 	}
 	per_bench.sort((a, b) => b.skips - a.skips);
 
+	// Per-language FILE counts, beside the combination counts the buckets below hold:
+	// a file several impls reject with different messages is one file and several
+	// combinations, so the two differ by ~2x on the conformance corpus. See the
+	// terminal twin, `generate_skipped_files_report`.
+	const files_by_lang: Record<SkipLang, number> = { svelte: 0, typescript: 0, css: 0, other: 0 };
+	for (const file_path of file_error_map.keys()) files_by_lang[classify_lang(file_path)]++;
+
 	const lines: string[] = [];
 	lines.push('## Skipped Files\n');
 	lines.push(
-		`${all_errors.length} unique file+error combinations — Svelte ${by_lang.svelte.length}, TypeScript ${by_lang.typescript.length}, CSS ${by_lang.css.length}.\n`
+		`${file_error_map.size} files skipped, ${all_errors.length} unique file+error combinations — ` +
+			`Svelte ${files_by_lang.svelte}, TypeScript ${files_by_lang.typescript}, ` +
+			`CSS ${files_by_lang.css} files.\n`
 	);
 
 	if (per_bench.length > 0) {
@@ -1684,10 +1713,21 @@ export function generate_skipped_files_markdown(
  * (e.g. `svelte/compiler`, `tsv_wasm-internal`) instead of the tracking_key
  * suffix (e.g. `canonical`, `wasm-internal`) so the labels line up with
  * the bench tables.
+ *
+ * `coverage_only` re-frames the block for a run that skipped the timed phase
+ * (`BENCH_COVERAGE_ONLY=1`), where the same numbers answer a different question.
+ * A timed run prints them as a CAVEAT — implementations that swept unequal file
+ * sets can't be ranked against each other — but with nothing timed, the spread IS
+ * the measurement, and a fairness warning over it reads as a defect report on the
+ * surface's own deliverable. It also prints unconditionally there: this block is
+ * the coverage-only run's whole terminal result (the timed summary is suppressed),
+ * so a group at 100% across the board must still be shown rather than skipped as
+ * uneventful.
  */
 export function generate_effective_corpus_report(
 	effective_corpus_size: Map<string, EffectiveCorpusEntry>,
-	task_tracking_by_group?: Map<string, Map<string, string>>
+	task_tracking_by_group?: Map<string, Map<string, string>>,
+	coverage_only = false
 ): string | null {
 	// Check if any benchmarks had skipped files
 	let has_skips = false;
@@ -1698,7 +1738,7 @@ export function generate_effective_corpus_report(
 		}
 	}
 
-	if (!has_skips) return null;
+	if (!has_skips && !coverage_only) return null;
 
 	// Build tracking_key → display_name lookup
 	const tracking_to_display = new Map<string, string>();
@@ -1713,10 +1753,17 @@ export function generate_effective_corpus_report(
 	const lines: string[] = [];
 	lines.push('');
 	lines.push('-'.repeat(80));
-	lines.push('EFFECTIVE CORPUS SIZE (files actually processed per iteration):');
-	lines.push('');
-	lines.push('⚠️  Some benchmarks processed fewer files due to errors.');
-	lines.push('   Comparisons between implementations with different skip rates may be unfair.');
+	if (coverage_only) {
+		lines.push('COVERAGE (files each implementation accepted):');
+		lines.push('');
+		lines.push('   Differing accept rates are the measurement here, not a hazard to it:');
+		lines.push('   no throughput was timed, so nothing is being compared over unequal work.');
+	} else {
+		lines.push('EFFECTIVE CORPUS SIZE (files actually processed per iteration):');
+		lines.push('');
+		lines.push('⚠️  Some benchmarks processed fewer files due to errors.');
+		lines.push('   Comparisons between implementations with different skip rates may be unfair.');
+	}
 	lines.push('');
 
 	// Group by operation/language
@@ -1746,7 +1793,7 @@ export function generate_effective_corpus_report(
 	for (const [group_name, impls] of grouped) {
 		const entries = Array.from(impls.entries());
 		const any_skips = entries.some(([, e]) => e.processed < e.total);
-		if (!any_skips) continue;
+		if (!any_skips && !coverage_only) continue;
 
 		lines.push(`  ${group_name}:`);
 		for (const [label, entry] of entries) {

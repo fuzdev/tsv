@@ -174,7 +174,7 @@ const FIXTURE_LINK_RE = /\[([^\]|`]+)\]\(\.\.\/tests\/fixtures\/([^)]+?)\/?\)/g;
  * fixture links are match/contrast anchors ("where tsv matches"), not
  * divergence claims.
  */
-export function parse_conformance_prettier_md(content: string): DocumentedDivergence[] {
+function parse_conformance_prettier_md(content: string): DocumentedDivergence[] {
 	const divergences: DocumentedDivergence[] = [];
 	const lines = content.split('\n');
 
@@ -301,7 +301,7 @@ async function conformance_prettier_docs(): Promise<string[]> {
 /**
  * Load and parse the `conformance_prettier*.md` family from the repo.
  */
-export async function load_documented_divergences(): Promise<DocumentedDivergence[]> {
+async function load_documented_divergences(): Promise<DocumentedDivergence[]> {
 	const docs_dir = fileURLToPath(new URL('../../../../docs/', import.meta.url));
 	const divergences: DocumentedDivergence[] = [];
 	for (const doc of await conformance_prettier_docs()) {

@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-08-15T18:43:31.524Z — tsv 0.2.0 (a2f101d6)
+**Date:** 2026-08-20T14:11:34.662Z — tsv 0.2.0 (1b4e0011)
 
 **Corpus:** 4556 Svelte (1.1 MB), 52321 TypeScript (69.0 MB), 22641 CSS (7.7 MB) — 79518 files, 77.8 MB total
 
@@ -63,25 +63,25 @@
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv_format_wasm | 2.2 MB | 801.3 KB | 0.9x | 0.9x |
-| tsv_parse_wasm | 926.7 KB | 363.4 KB | 0.4x | 0.4x |
-| tsv_wasm | 2.4 MB | 892.7 KB | — | — |
-| biome (wasm) | 44.6 MB | 11.1 MB | 18.4x | 12.4x |
+| tsv_format_wasm | 2.2 MB | 825.5 KB | 0.9x | 0.9x |
+| tsv_parse_wasm | 927.5 KB | 364.0 KB | 0.4x | 0.4x |
+| tsv_wasm | 2.5 MB | 917.2 KB | — | — |
+| biome (wasm) | 44.6 MB | 11.1 MB | 18.1x | 12.1x |
 | dprint (wasm) | 4.2 MB | 1.2 MB | 1.7x | 1.3x |
 | oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.6x | 0.5x |
 | yuku-parser (wasm) | 673.9 KB | 200.3 KB | 0.3x | 0.2x |
 | malva (wasm) | 1.5 MB | 414.0 KB | 0.6x | 0.5x |
-| tsv (ffi) | 3.4 MB | 1.5 MB | 0.9x | 0.9x |
-| tsv format (ffi) | 3.1 MB | 1.4 MB | 0.8x | 0.8x |
-| tsv parse (ffi) | 1.5 MB | 663.7 KB | 0.4x | 0.4x |
+| tsv (ffi) | 3.5 MB | 1.5 MB | 0.9x | 0.9x |
+| tsv format (ffi) | 3.2 MB | 1.4 MB | 0.8x | 0.8x |
+| tsv parse (ffi) | 1.5 MB | 666.1 KB | 0.4x | 0.4x |
 | tsv (napi) | 3.8 MB | 1.6 MB | — | — |
-| oxc-parser+oxfmt (napi) | 11.2 MB | 4.6 MB | 3.0x | 2.8x |
+| oxc-parser+oxfmt (napi) | 11.2 MB | 4.6 MB | 2.9x | 2.8x |
 | oxc-parser (napi) | 2.1 MB | 885.7 KB | 0.6x | 0.5x |
-| oxfmt (napi) | 9.0 MB | 3.7 MB | 2.4x | 2.3x |
+| oxfmt (napi) | 9.0 MB | 3.7 MB | 2.4x | 2.2x |
 | yuku-parser (napi) | 741.1 KB | 310.4 KB | 0.2x | 0.2x |
 | rsvelte-fmt (binary) | 8.3 MB | 3.3 MB | 2.2x | 2.0x |
-| rsvelte compiler (napi) | 14.5 MB | 6.0 MB | 3.9x | 3.7x |
-| swc (napi) | 31.9 MB | 11.9 MB | 8.5x | 7.4x |
+| rsvelte compiler (napi) | 14.5 MB | 6.0 MB | 3.8x | 3.7x |
+| swc (napi) | 31.9 MB | 11.9 MB | 8.4x | 7.3x |
 
 _Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
 
