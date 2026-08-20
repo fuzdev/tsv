@@ -4,7 +4,10 @@
  * Creates:
  * - index.js — Node.js/Bun entry: auto-init via readFileSync + initSync (zero config)
  * - browser.js — Browser/default entry: async `init()` with not-initialized guards
- * - index.d.ts — type declarations for both entries
+ * - worker.js — the `./worker` subpath: browser.js under the name a worker
+ *   consumer reaches for (the same module instance, so the same singleton)
+ * - index.d.ts / browser.d.ts — type declarations, one per entry (the Node
+ *   entry has one export the lazy entries don't: `wasm_module`)
  *
  * Also patches package.json (name, description, conditional exports, npm
  * metadata) and copies the variant README + repo LICENSE into the package
@@ -28,7 +31,7 @@
  * `typescript_type = "import('./tsv_ast').*"` extern types resolve against
  * this bundled file at consumer compile time. It also copies the pure-JS
  * `no-locations` reconstruction helper (`npm/locations.js` + `locations.d.ts`)
- * and re-exports its functions from index.js/browser.js/index.d.ts — it works on
+ * and re-exports its functions from index.js/browser.js and both `.d.ts` — it works on
  * the span-only parse wire, so it ships only where parsing does (not format-only).
  *
  * The `all` variant additionally ships the CLI: `crates/tsv_wasm/npm/cli.js`
@@ -61,10 +64,28 @@ const has_parse_exports = variant !== 'format';
 const pkg_root = `crates/tsv_wasm/pkg/${variant}/npm`;
 const main_js = 'tsv_wasm.js';
 const dts_file = 'tsv_wasm.d.ts';
-/** `dts_file` as an import specifier — what the generated `index.d.ts` re-exports from. */
-const dts_module = `./${dts_file.replace(/\.d\.ts$/, '')}`;
+/**
+ * `dts_file` as an import specifier — what the generated `.d.ts` re-exports
+ * from. Spelled with the **`.js`** extension, not extensionless and not
+ * `.d.ts`: under `moduleResolution: node16`/`nodenext` a relative specifier in
+ * a declaration file must carry the runtime extension (TS2834/TS2835), and TS
+ * resolves `./x.js` to `./x.d.ts`. Extensionless works only for consumers on
+ * the legacy resolver or with `skipLibCheck`, which is a coin flip we don't
+ * need to take. Same rule for the two hand-written siblings below.
+ */
+const dts_module = `./${dts_file.replace(/\.d\.ts$/, '.js')}`;
 const wasm_file = 'tsv_wasm_bg.wasm';
 const cli_file = 'cli.js';
+/** The `./worker` subpath — a re-export of `browser.js`, which is already the
+ * no-auto-init entry a worker wants (`init_sync({module})` then call). Node and
+ * Bun resolve the bare specifier to `index.js` via the `node` condition, so the
+ * lazy entry is otherwise unreachable there; this gives it a name that says what
+ * it is at the point of use, without a second copy of the wrappers. */
+const worker_file = 'worker.js';
+/** Declarations for the two lazy-init entries (`browser.js`, and `./worker`,
+ * which re-exports it). Separate from `index.d.ts` only because the Node entry
+ * has one extra export, `wasm_module`. */
+const browser_dts = 'browser.d.ts';
 // The pure-JS `no-locations` line/column reconstruction helper (`npm/locations.js`
 // + hand-written `locations.d.ts`). Rides the parse-capable packages only — it
 // operates on the span-only parse wire, so the format-only package has no use for
@@ -141,13 +162,13 @@ if (has_format_exports) {
 console.log(`Exports: ${[...fns, ...classes].join(', ')}`);
 
 // Each family's hand-written option types (the `TS_PARSE_DECLS` /
-// `TS_FORMAT_DECLS` custom sections in crates/tsv_wasm/src/lib.rs). index.d.ts
+// `TS_FORMAT_DECLS` custom sections in crates/tsv_wasm/src/lib.rs). The `.d.ts`
 // re-exports them by NAME, so the tsv_ast/locations star exports can never
 // ambiguate them away (the TS2308 rule).
 const parse_option_types = has_parse_exports ? ['ParseOptions', 'TypeScriptParseOptions'] : [];
 const format_option_types = has_format_exports ? ['FormatOptions', 'TypeScriptFormatOptions'] : [];
 
-// Every name index.d.ts will re-export must actually be DECLARED in the
+// Every name the generated `.d.ts` will re-export must actually be DECLARED in the
 // generated `tsv_wasm.d.ts`. Not a formality: every parse/format export is
 // `#[wasm_bindgen(skip_typescript)]`, so its declaration comes from a
 // hand-written `typescript_custom_section` rather than from wasm-bindgen, and
@@ -177,6 +198,12 @@ if (undeclared.length) {
 
 // 2. Create index.js — Node.js/Bun entry: auto-init via readFileSync + initSync.
 // WASM is initialized synchronously at import time, so no init guard needed.
+// The module is compiled here rather than left to `initSync` (which would
+// compile the same bytes internally) so the compiled `WebAssembly.Module` can be
+// exported: it is the one piece a worker-pool consumer cannot obtain otherwise,
+// since the `.wasm` file is not an exports entry. Handing it to a worker that
+// initializes via the `./worker` subpath means no worker recompiles — V8 shares
+// compiled wasm code across isolates, so tier-up is paid once process-wide.
 
 const index_js = `import { readFileSync } from 'node:fs';
 import {
@@ -185,10 +212,15 @@ import {
 ${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
 } from './${main_js}';
 
-const wasm = readFileSync(new URL('./${wasm_file}', import.meta.url));
-initSync({ module: wasm });
+/** The compiled WASM module backing this package's exports. Pass it to a worker
+ * (\`workerData\`/\`postMessage\`) and initialize there via \`${pkg_name}/worker\`'s
+ * \`init_sync({module})\` — no worker recompiles, and compiled code is shared. */
+const wasm_module = new WebAssembly.Module(
+	readFileSync(new URL('./${wasm_file}', import.meta.url))
+);
+initSync({ module: wasm_module });
 
-export { init, initSync as init_sync, ${[...fns, ...classes].join(', ')} };
+export { init, initSync as init_sync, wasm_module, ${[...fns, ...classes].join(', ')} };
 ${locations_reexport}`;
 
 Deno.writeTextFileSync(`${pkg_root}/index.js`, index_js);
@@ -247,20 +279,41 @@ ${fns
 Deno.writeTextFileSync(`${pkg_root}/browser.js`, browser_js);
 console.log(`Created ${pkg_root}/browser.js`);
 
-// 4. Create index.d.ts — type declarations for both entries.
+// 3b. Create worker.js — the `./worker` subpath, a re-export of browser.js.
+// `export *` keeps it the SAME module instance, so `init_sync` here initializes
+// the singleton every other import of it sees. A copy of the wrappers would not.
+
+const worker_js = `// The \`${pkg_name}/worker\` entry: the same lazy-init exports as the browser
+// entry, under the name a worker reaches for. Initialize once per worker with
+// \`init_sync({module})\`, passing the \`wasm_module\` the main thread exports from
+// \`${pkg_name}\` — that shares compiled code across isolates instead of
+// recompiling per worker. In a browser Web Worker, \`await init()\` works too.
+export * from './browser.js';
+`;
+
+Deno.writeTextFileSync(`${pkg_root}/${worker_file}`, worker_js);
+console.log(`Created ${pkg_root}/${worker_file}`);
+
+// 4. Create the type declarations — one file per entry.
 // Re-exports the generated function types, but declares init/init_sync with clean
 // signatures to avoid leaking wasm-bindgen internals (InitOutput with raw pointers).
 
-const ast_reexport = has_parse_exports ? `export type * from './tsv_ast';\n` : '';
+const ast_reexport = has_parse_exports ? `export type * from './tsv_ast.js';\n` : '';
 // `export *` (not `export type *`) so the helper's functions AND its types flow through.
 const locations_reexport_dts = has_parse_exports
-	? `export * from './${locations_dts.replace(/\.d\.ts$/, '')}';\n`
+	? `export * from './${locations_dts.replace(/\.d\.ts$/, '.js')}';\n`
 	: '';
 const options_reexport = (names: Array<string>) =>
 	names.length ? `export type { ${names.join(', ')} } from '${dts_module}';\n` : '';
 const parse_options_reexport = options_reexport(parse_option_types);
 const format_options_reexport = options_reexport(format_option_types);
-const index_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}${format_options_reexport}export {
+// Everything all three entries share. `wasm_module` is deliberately NOT here:
+// only `index.js` compiles at import and exports it, so declaring it for the
+// browser and `./worker` entries would name an export that does not exist —
+// under a bundler that is a build error TypeScript said was fine, which is a
+// worse failure than a nullable type. Hence one `.d.ts` per entry, and the
+// per-condition `types` in `exports` that lets each be reached.
+const shared_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}${format_options_reexport}export {
 ${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
 } from '${dts_module}';
 /** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
@@ -273,8 +326,23 @@ export declare function init_sync(module: {
 }): void;
 `;
 
+const index_dts = `${shared_dts}/**
+ * The compiled WASM module backing this package's exports, for handing to a
+ * worker (\`workerData\` / \`postMessage\`) which then initializes from it via
+ * \`${pkg_name}/worker\`'s \`init_sync({module})\` — sharing compiled code across
+ * isolates instead of recompiling per worker.
+ */
+export declare const wasm_module: WebAssembly.Module;
+`;
+
 Deno.writeTextFileSync(`${pkg_root}/index.d.ts`, index_dts);
 console.log(`Created ${pkg_root}/index.d.ts`);
+
+// The browser and `./worker` entries: the same exports minus `wasm_module`,
+// which neither compiles. `browser.js` IS `worker.js` (the subpath re-exports
+// it), so one declaration file serves both.
+Deno.writeTextFileSync(`${pkg_root}/${browser_dts}`, shared_dts);
+console.log(`Created ${pkg_root}/${browser_dts}`);
 
 // 5. Copy the variant README and the repo LICENSE into the package root.
 
@@ -317,10 +385,25 @@ pkg.description = {
 pkg.type = 'module';
 pkg.exports = {
 	'./package.json': './package.json',
+	// `types` nests INSIDE each condition rather than sitting beside them: the
+	// two entries do not have the same exports (only the Node one compiles at
+	// import, so only it has `wasm_module`), and a single hoisted `types` would
+	// declare that export for the browser build too.
 	'.': {
-		types: './index.d.ts',
-		node: './index.js',
-		default: './browser.js'
+		node: {
+			types: './index.d.ts',
+			default: './index.js'
+		},
+		default: {
+			types: `./${browser_dts}`,
+			default: './browser.js'
+		}
+	},
+	// the no-auto-init entry, reachable from Node and Bun (where the `node`
+	// condition would otherwise always resolve the auto-init one)
+	'./worker': {
+		types: `./${browser_dts}`,
+		default: `./${worker_file}`
 	}
 };
 if (variant === 'all') {
@@ -334,6 +417,8 @@ pkg.files = [
 	'index.js',
 	'index.d.ts',
 	'browser.js',
+	browser_dts,
+	worker_file,
 	main_js,
 	dts_file,
 	wasm_file,

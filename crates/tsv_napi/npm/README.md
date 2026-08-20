@@ -35,7 +35,7 @@ Installed (`npm i -D @fuzdev/tsv`), the bin is `tsv` — and here it is the **re
 
 `format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--goal script|module` (default `module`; for `format`, `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier and `import`/`export`/`import.meta` are errors. `parse --no-locations` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`; no-op for CSS). Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 
-Files format in parallel; `--jobs N` overrides the worker count. (If the platform package's CLI binary is missing or unrunnable, the bin degrades to a single-threaded JS mirror of the same contract over the addon; on a platform with no prebuilt package at all, use [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) instead.)
+Files format in parallel; `--jobs N` overrides the worker count. (If the platform package's CLI binary is missing or unrunnable, the bin degrades to a JS mirror of the same contract over the addon — which parallelizes too, on worker threads; on a platform with no prebuilt package at all, use [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) instead.)
 
 ## Usage
 

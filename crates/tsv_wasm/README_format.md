@@ -45,6 +45,22 @@ const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 
 `init_sync({ module })` is also exported for Workers and custom loading.
 
+### Worker pools
+
+To format across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv_format_wasm/worker` subpath is the same API without the import-time initialization, so a worker starts from that module instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead; there is nothing compiled to hand across.
+
+```typescript
+// main thread
+import {wasm_module} from '@fuzdev/tsv_format_wasm';
+new Worker(worker_url, {workerData: {wasm_module}});
+
+// worker
+import {format_typescript, init_sync} from '@fuzdev/tsv_format_wasm/worker';
+init_sync({module: workerData.wasm_module});
+```
+
+In a browser Web Worker the same entry takes `await init()` instead, or a `WebAssembly.Module` sent through `postMessage`.
+
 tsv is non-configurable: settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.
 
 ### File scoping (`IgnoreStack`)

@@ -3,9 +3,23 @@
  * The `tsv` bin — mirrors the native `tsv_cli` contract (subcommands, flags,
  * exit codes, output streams, traversal rules) over whichever engine
  * `./index.js` resolves to: one source shipped verbatim in both
- * `@fuzdev/tsv_wasm` (WASM) and the native `@fuzdev/tsv` (N-API).
- * Single-threaded — `--jobs` is accepted for drop-in parity and ignored; the
- * Rust `tsv_cli` binary is the fast path for large trees.
+ * `@fuzdev/tsv_wasm` (WASM) and the native `@fuzdev/tsv` (N-API). The Rust
+ * `tsv_cli` binary is still the fast path for large trees — the per-file
+ * engine tax is the gap, not the driver.
+ *
+ * Path mode formats in parallel on `node:worker_threads` behind `--jobs`,
+ * spawning this same file as its own worker (`isMainThread` splits the two
+ * roles). A pool only pays for itself once the job is big enough to amortize
+ * its startup, so the *default* waits for `WORKER_FILE_THRESHOLD` files; an
+ * explicit `--jobs N` is obeyed at any size, as it is natively. `--jobs 1`,
+ * `--content`/`--stdin`, and `--list` stay on one thread either way.
+ * Which engine a worker binds is decided by whether the main thread's
+ * `./index.js` exposes a `wasm_module`: the WASM package hands the compiled
+ * module across and the worker initializes from it (compiled code is shared
+ * process-wide, so no worker recompiles), while the N-API package has no such
+ * export and its workers just load the addon. That same discriminant sizes the
+ * pool — both the threshold and the worker count are per engine, because a WASM
+ * run shares its cores with V8's wasm tier-up and a native one doesn't.
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
  * `parse` — 0 ok, 1 error. Flag-parsing errors exit 1 (both commands); `format`'s
@@ -20,17 +34,49 @@ import {
 	statSync,
 	writeFileSync
 } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { dirname, isAbsolute, join, relative as path_relative, sep } from 'node:path';
 import { parseArgs } from 'node:util';
-import {
-	format_css,
-	format_svelte,
-	format_typescript,
-	IgnoreStack,
-	parse_css_json,
-	parse_svelte_json,
-	parse_typescript_json
-} from './index.js';
+import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads';
+
+/** The compiled module a worker inherited from the main thread, or `undefined`
+ * on the main thread and in an N-API worker (whose package exports none). */
+const inherited_wasm_module = isMainThread ? undefined : workerData?.wasm_module;
+
+/**
+ * The engine, resolved before anything else runs.
+ *
+ * A worker handed a compiled `wasm_module` binds through `./worker.js`, the
+ * package's no-auto-init entry, so it initializes from the module the main
+ * thread already compiled instead of reading and compiling the `.wasm` again.
+ * Every other role — the main thread, and an N-API worker, whose package
+ * exports no `wasm_module` — loads `./index.js`, which auto-initializes. The
+ * dynamic import is what makes that choice possible at all: a static one is
+ * hoisted above the branch, so the worker would have paid for `./index.js`
+ * before it could ask.
+ */
+const engine = await (async () => {
+	if (inherited_wasm_module === undefined) return import('./index.js');
+	const lazy = await import('./worker.js');
+	lazy.init_sync({ module: inherited_wasm_module });
+	return lazy;
+})();
+
+/**
+ * Which engine this copy is bound to. The same `wasm_module` export that
+ * decides how a worker binds also decides how the pool is *sized*, because the
+ * two engines have different amounts of machine left to give a worker: see
+ * `WORKER_FILE_THRESHOLD` and `default_jobs`.
+ *
+ * Answered per role rather than from `engine` alone — a WASM worker binds
+ * `./worker.js`, which exports no `wasm_module` of its own, so asking the
+ * engine there would say "native".
+ */
+const IS_WASM_ENGINE = isMainThread
+	? engine.wasm_module !== undefined
+	: inherited_wasm_module !== undefined;
+
+const { IgnoreStack } = engine;
 
 /** tsv's native ignore file, discovered hierarchically (one per directory).
  * Mirrors `FORMATIGNORE_FILE`. */
@@ -49,16 +95,46 @@ const PRETTIERIGNORE_FILE = '.prettierignore';
 const GITIGNORE_FILE = '.gitignore';
 
 const FORMATTERS = {
-	svelte: format_svelte,
-	typescript: format_typescript,
-	css: format_css
+	svelte: engine.format_svelte,
+	typescript: engine.format_typescript,
+	css: engine.format_css
 };
 
 const PARSERS = {
-	svelte: parse_svelte_json,
-	typescript: parse_typescript_json,
-	css: parse_css_json
+	svelte: engine.parse_svelte_json,
+	typescript: engine.parse_typescript_json,
+	css: engine.parse_css_json
 };
+
+/**
+ * How many in-scope files it takes before worker threads are worth their
+ * startup. Below this the run stays on the main thread: bringing a pool up
+ * costs tens of milliseconds (module resolution and per-isolate setup, paid
+ * once per worker), which a small job never earns back — and unlike the native
+ * CLI's ~50µs thread spawn, that cost is large enough to have to gate on.
+ * Clamping the worker count to the file count (as the native CLI does) is not
+ * enough on its own: two workers over four files is still a losing trade.
+ *
+ * One value per engine, because the crossover is not a property of the driver.
+ * Measured by sweeping file count against `--jobs 1` on a real tree (outline's
+ * 1648-file TypeScript subset, size-stratified subsets, quiet machine, 6
+ * physical cores): the pool breaks even at ~565 files on WASM and ~394 on
+ * N-API. Both constants sit above their crossover on purpose — below it a pool
+ * costs wall time *and* ~1.5× the CPU and RSS, while above it staying serial
+ * costs only wall time, so being late is the cheaper error.
+ *
+ * File count is only a proxy for work: one 500 KB file outweighs a hundred
+ * small ones and still stays on this thread, which is correct anyway (a single
+ * file can't be split), but it means these can only ever be approximately
+ * right. A byte-count gate would track the real quantity, and was declined: it
+ * needs a `stat` per discovered file, which `readdirSync(withFileTypes)` does
+ * not give for free.
+ */
+const WASM_WORKER_FILE_THRESHOLD = 768;
+const NATIVE_WORKER_FILE_THRESHOLD = 512;
+const WORKER_FILE_THRESHOLD = IS_WASM_ENGINE
+	? WASM_WORKER_FILE_THRESHOLD
+	: NATIVE_WORKER_FILE_THRESHOLD;
 
 /** Valid `--parser` values (shared by `format` and `parse` — `FORMATTERS` and
  * `PARSERS` are keyed by the same names). */
@@ -98,7 +174,7 @@ Options:
   --goal <g>        TypeScript parse goal: script | module (default: module; --content/--stdin only)
   --check           check instead of writing/printing: exit 1 if any input would change
   --list            list the discovered in-scope files (one per line) without formatting; path mode only
-  --jobs <n>        accepted for native-CLI parity and ignored (single-threaded)
+  --jobs <n>        worker thread count (default: scaled to this machine and engine)
 
 Exit codes: 0 clean, 1 would change (--check), 2 errors.
 `;
@@ -116,13 +192,19 @@ Options:
   --no-locations    omit per-node loc (span-only wire; svelte also omits name_loc; no-op for css)
 `;
 
-main();
+// the two roles this file plays: the CLI itself, and the worker it spawns for
+// path-mode formatting (see `format_files_parallel`)
+if (isMainThread) {
+	await main();
+} else {
+	run_format_worker();
+}
 
-function main() {
+async function main() {
 	const [command, ...rest] = process.argv.slice(2);
 	switch (command) {
 		case 'format':
-			run_format(rest);
+			await run_format(rest);
 			break;
 		case 'parse':
 			run_parse(rest);
@@ -229,7 +311,7 @@ function parser_from_extension(path) {
 	return 'typescript';
 }
 
-function run_format(args) {
+async function run_format(args) {
 	const { values, positionals } = parse_argv(
 		args,
 		{
@@ -247,10 +329,9 @@ function run_format(args) {
 
 	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
 	const parser = values.parser === undefined ? undefined : resolve_parser(values.parser);
-	// --jobs is accepted for drop-in parity with the native CLI and otherwise
-	// ignored (single-threaded): a non-integer value is an argument-parsing
-	// error (exit 1, argh parity), and combining it with --content/--stdin is
-	// rejected in format_single like the native CLI (exit 2)
+	// --jobs sets the worker-thread count in path mode: a non-integer value is
+	// an argument-parsing error (exit 1, argh parity), and combining it with
+	// --content/--stdin is rejected in format_single like the native CLI (exit 2)
 	if (values.jobs !== undefined && !/^\d+$/.test(values.jobs)) {
 		eprint(`Error: --jobs expects an integer, got '${values.jobs}'\n`);
 		process.exit(1);
@@ -261,7 +342,7 @@ function run_format(args) {
 		const goal = resolve_goal(values.goal, 2);
 		format_single(values, positionals, parser, goal);
 	} else {
-		format_paths(values, positionals);
+		await format_paths(values, positionals);
 	}
 }
 
@@ -303,8 +384,9 @@ function format_single(values, positionals, parser, goal) {
 	}
 }
 
-/** Path mode — discover files, format sequentially, report in sorted order. */
-function format_paths(values, positionals) {
+/** Path mode — discover files, format (in parallel above
+ * `WORKER_FILE_THRESHOLD`), report in sorted order. */
+async function format_paths(values, positionals) {
 	if (positionals.length === 0) {
 		eprint('Error: No input provided. Use a file path, --content, or --stdin\n');
 		process.exit(2);
@@ -353,42 +435,36 @@ function format_paths(values, positionals) {
 		process.exit(2);
 	}
 
+	const jobs = resolve_jobs(values.jobs, files.length);
+	const outcomes =
+		jobs > 1
+			? await format_files_parallel(files, values.check, jobs)
+			: format_files(files, values.check);
+
+	// Buffer the changed-path lines and emit them in one write, matching the
+	// native CLI: a per-path write re-locks stdout for each of (potentially
+	// thousands of) changed files, which dominates --check on a large
+	// unformatted tree. Errors stay per-line on stderr (rare, and stderr is for
+	// immediate diagnostics). Both report in sorted-path order — `files` is
+	// sorted and `outcomes` is indexed by it, so parallel execution reports
+	// exactly what the sequential path does.
 	let changed = 0;
 	let unchanged = 0;
 	let errors = traversal_errors.length;
-	for (const path of files) {
-		let source;
-		try {
-			source = readFileSync(path, 'utf-8');
-		} catch (error) {
-			errors++;
-			eprint(`error: ${path}: read failed: ${error.message}\n`);
-			continue;
-		}
-		let formatted;
-		try {
-			formatted = FORMATTERS[parser_from_extension(path)](source);
-		} catch (error) {
-			errors++;
-			eprint(`error: ${path}: ${error.message}\n`);
-			continue;
-		}
-		if (formatted === source) {
+	let changed_paths = '';
+	for (let i = 0; i < files.length; i++) {
+		const outcome = outcomes[i];
+		if (outcome.kind === 'unchanged') {
 			unchanged++;
-			continue;
+		} else if (outcome.kind === 'changed') {
+			changed++;
+			changed_paths += `${files[i]}\n`;
+		} else {
+			errors++;
+			eprint(`error: ${files[i]}: ${outcome.message}\n`);
 		}
-		if (!values.check) {
-			try {
-				writeFileSync(path, formatted);
-			} catch (error) {
-				errors++;
-				eprint(`error: ${path}: write failed: ${error.message}\n`);
-				continue;
-			}
-		}
-		changed++;
-		print(`${path}\n`);
 	}
+	print(changed_paths);
 
 	const action = values.check ? 'would change' : 'formatted';
 	const error_note = errors > 0 ? `, ${errors} errors` : '';
@@ -396,6 +472,255 @@ function format_paths(values, positionals) {
 
 	if (errors > 0) process.exit(2);
 	if (values.check && changed > 0) process.exit(1);
+}
+
+/**
+ * Format one discovered file, in place unless `check`. The single definition of
+ * what a file's outcome is — the sequential path and every worker call it, so
+ * the two can't drift on what counts as changed or how an error reads.
+ */
+function format_one(path, check) {
+	let source;
+	try {
+		source = readFileSync(path, 'utf-8');
+	} catch (error) {
+		return { kind: 'error', message: `read failed: ${error.message}` };
+	}
+	let formatted;
+	try {
+		formatted = FORMATTERS[parser_from_extension(path)](source);
+	} catch (error) {
+		return { kind: 'error', message: error.message };
+	}
+	if (formatted === source) return { kind: 'unchanged' };
+	if (!check) {
+		try {
+			writeFileSync(path, formatted);
+		} catch (error) {
+			return { kind: 'error', message: `write failed: ${error.message}` };
+		}
+	}
+	return { kind: 'changed' };
+}
+
+/** Format every file on this thread — the path below `WORKER_FILE_THRESHOLD`,
+ * and the fallback when a pool can't be brought up. */
+function format_files(files, check) {
+	return files.map((path) => format_one(path, check));
+}
+
+/** Logical and physical CPU counts. The SMT width is one read of
+ * `thread_siblings_list`, not one per CPU; anywhere that read fails — every
+ * non-Linux platform included — it reads 1 and physical degrades to logical,
+ * so the topology can only ever lower a worker count, never raise it. */
+function cpu_topology() {
+	let logical;
+	try {
+		logical = availableParallelism();
+	} catch {
+		return { logical: 1, physical: 1 };
+	}
+	let siblings = 1;
+	try {
+		siblings = cpu_list_len(
+			readFileSync('/sys/devices/system/cpu/cpu0/topology/thread_siblings_list', 'utf-8')
+		);
+	} catch {
+		// unreadable (not Linux, or a kernel without the topology sysfs) — no SMT cap
+	}
+	return { logical, physical: Math.max(1, Math.floor(logical / Math.max(1, siblings))) };
+}
+
+/**
+ * Worker count when `--jobs` is not given, clamped to the file count.
+ *
+ * Deliberately **not** the native CLI's `min(logical, ceil(1.5 × physical))`.
+ * That rule assumes the pool arrives on an otherwise idle machine, and neither
+ * engine here does — measured on a 6-physical-core machine over outline's
+ * 1648-file tree, both peak well below it and *regress* past their peak:
+ *
+ * | engine | 1 | 2 | 3 | 4 | 6 | 9 | 12 |
+ * | --- | --- | --- | --- | --- | --- | --- | --- |
+ * | WASM  | 1.00× | 1.31× | **1.40×** | 1.37× | 1.32× | 1.21× | 1.14× |
+ * | N-API | 1.00× | 1.34× | 1.64× | 1.82× | **1.90×** | 1.69× | 1.46× |
+ *
+ * The two knees have different causes, so they get different rules rather than
+ * one fitted number:
+ *
+ * - **WASM — half the physical cores, because V8 already took the other half.**
+ *   Wasm tier-up is itself multithreaded and starts before the first worker
+ *   exists: at `--jobs 1` the process already runs at 2.39× CPU/wall, and
+ *   tier-up accounts for 3.07G of the run's 8.34G instructions. Format workers
+ *   are therefore competing with TurboFan, not filling idle cores. (With
+ *   `node --liftoff-only` the same pool scales to 2.31× at 6 workers — which is
+ *   the measurement, not an option: the flag can't be set from inside the
+ *   process, and Bun has no equivalent.)
+ * - **N-API — the physical cores, and no more.** No compiler thread to compete
+ *   with (CPU/wall at `--jobs 1` is 1.02), so it scales cleanly to the core
+ *   count. It still falls short of the native binary's 1.5× rule because this
+ *   driver reads and decodes each file in JS, and that allocation pressure is
+ *   per-worker GC the Rust pool never pays.
+ */
+function default_jobs() {
+	const { logical, physical } = cpu_topology();
+	return IS_WASM_ENGINE ? Math.max(1, Math.floor(physical / 2)) : Math.min(logical, physical);
+}
+
+/** One CPU index, or `undefined` if the field isn't a bare integer. Not
+ * `Number()`, which reads the empty string as 0 — a trailing comma would then
+ * count as a sibling. Mirrors Rust's `parse::<usize>()`, which rejects it. */
+function cpu_index(field) {
+	return /^\s*\d+\s*$/.test(field) ? Number.parseInt(field, 10) : undefined;
+}
+
+/** Length of a Linux CPU-list string (`"0-1"`, `"0,6"`, `"0-3,8-11"`, `"0"`).
+ * Any malformed field contributes 0, so a surprise format degrades to "no SMT"
+ * rather than to a bogus width. Mirrors the native `cpu_list_len`. */
+function cpu_list_len(list) {
+	let total = 0;
+	for (const part of list.trim().split(',')) {
+		const [lo, hi] = part.split('-');
+		const low = cpu_index(lo);
+		if (low === undefined) continue;
+		if (hi === undefined) {
+			total += 1;
+			continue;
+		}
+		const high = cpu_index(hi);
+		if (high !== undefined && high >= low) total += high - low + 1;
+	}
+	return total;
+}
+
+/**
+ * How many workers to actually spawn: 1 means "stay on this thread".
+ *
+ * `WORKER_FILE_THRESHOLD` governs the **default** only. An explicit `--jobs N`
+ * is obeyed at any file count — the user asked, the native CLI obeys it, and
+ * second-guessing a flag is the kind of surprise a drop-in mirror can't afford.
+ * It is also the only way to compare the two paths at a fixed size, which is
+ * what calibrating the threshold and `default_jobs` took.
+ *
+ * Both forms clamp to the file count (a worker with no file to claim is pure
+ * startup cost) and to a floor of 1, so `--jobs 0` means the same as `--jobs 1`
+ * — matching the native clamp, which `--jobs 0` had escaped on its streaming
+ * path (`format_streamed`).
+ */
+function resolve_jobs(requested, file_count) {
+	if (requested === undefined) {
+		return file_count < WORKER_FILE_THRESHOLD ? 1 : clamp_jobs(default_jobs(), file_count);
+	}
+	return clamp_jobs(Number.parseInt(requested, 10), file_count);
+}
+
+/** A worker count clamped to what there is work for, floored at 1. */
+function clamp_jobs(jobs, file_count) {
+	return Math.max(1, Math.min(jobs, file_count));
+}
+
+/**
+ * Format `files` across `jobs` worker threads, returning outcomes indexed by
+ * `files`.
+ *
+ * Work is claimed dynamically rather than partitioned up front: every worker
+ * takes the next unclaimed index off one shared counter, so a slow file holds
+ * up only itself. That mirrors the native pool's claim-by-index design, and for
+ * the same reason — a static split strands whole workers behind one large file.
+ *
+ * A pool that cannot be brought up at all falls back to this thread. A worker
+ * that dies mid-run does not: every index left unfilled surfaces as an error,
+ * because turning one worker's death into a silent "unchanged" would report a
+ * clean run over files nobody formatted. A dying worker still posts what it
+ * finished (see `run_format_worker`), so "unfilled" means genuinely unformatted
+ * rather than "claimed by the worker that died".
+ */
+async function format_files_parallel(files, check, jobs) {
+	const outcomes = new Array(files.length);
+	// one Int32 the workers bump with Atomics — the whole hand-off, since the
+	// file list itself never changes once discovery is done
+	const cursor = new Int32Array(new SharedArrayBuffer(4));
+	// Every worker gets the identical payload — the cursor is what makes them
+	// take different work. `wasm_module` is `undefined` on the N-API path, which
+	// is exactly the signal a worker reads to load `./index.js` instead of the
+	// wasm `./worker` entry.
+	const worker_data = { wasm_module: engine.wasm_module, files, check, cursor };
+	const workers = [];
+	for (let i = 0; i < jobs; i++) {
+		try {
+			workers.push(new Worker(new URL(import.meta.url), { workerData: worker_data }));
+		} catch (error) {
+			// A worker starts claiming the moment it is constructed, so once ANY
+			// came up, falling back to this thread would re-format files that are
+			// already done — reporting them "unchanged" when they changed. A
+			// narrower pool is not a problem: the cursor is shared, so however few
+			// workers exist between them drain the whole list.
+			if (workers.length > 0) {
+				eprint(`warning: only ${workers.length} of ${jobs} format workers started\n`);
+				break;
+			}
+			eprint(
+				`warning: could not start format workers (${error.message}); formatting on one thread\n`
+			);
+			return format_files(files, check);
+		}
+	}
+
+	await Promise.all(
+		workers.map(
+			(worker) =>
+				new Promise((resolve) => {
+					worker.on('message', (results) => {
+						for (const { index, outcome } of results) outcomes[index] = outcome;
+					});
+					worker.on('error', (error) => {
+						// not counted here — the unfilled-slot sweep below turns
+						// every index nobody reported into its own error, which is
+						// the accounting the summary line reports. A worker that
+						// throws still posts what it finished on the way out, so
+						// that sweep lands only on genuinely unformatted files.
+						eprint(`error: format worker failed: ${error.message}\n`);
+						resolve();
+					});
+					worker.on('exit', () => resolve());
+				})
+		)
+	);
+
+	for (let i = 0; i < outcomes.length; i++) {
+		outcomes[i] ??= { kind: 'error', message: 'not formatted (worker failed)' };
+	}
+	return outcomes;
+}
+
+/**
+ * The worker role: claim indices off the shared cursor until the list is
+ * exhausted, then report every outcome in one message. Batching the report
+ * keeps the message count at one per worker instead of one per file — the
+ * results are tiny and the main thread has nothing to do with them until every
+ * worker is done.
+ *
+ * The `finally` is what makes batching free of its usual cost. Reporting only
+ * at the end would mean a worker that dies mid-run loses the files it *did*
+ * finish along with the ones it didn't, and in place-formatting mode those were
+ * already written — the run would claim a file wasn't formatted when it was on
+ * disk. Posting on the way out of the throw keeps the accounting honest without
+ * a per-file message: the send is enqueued before the exception propagates, so
+ * the parent gets the partial batch and only then the `error` event (verified
+ * on Node and Bun). A hard abort — OOM, a kill — still loses the batch, and
+ * there the conservative over-report is the right answer anyway.
+ */
+function run_format_worker() {
+	const { files, check, cursor } = workerData;
+	const results = [];
+	try {
+		for (;;) {
+			const index = Atomics.add(cursor, 0, 1);
+			if (index >= files.length) break;
+			results.push({ index, outcome: format_one(files[index], check) });
+		}
+	} finally {
+		parentPort.postMessage(results);
+	}
 }
 
 function run_parse(args) {

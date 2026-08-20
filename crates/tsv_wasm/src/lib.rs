@@ -256,10 +256,16 @@ impl IgnoreStack {
 /// Re-export every type from the bundled `./tsv_ast` declaration file
 /// so consumers of `@fuzdev/tsv_parse_wasm` can `import type { Program } from
 /// '@fuzdev/tsv_parse_wasm'` without reaching into the bundled `.d.ts`.
+///
+/// Spelled `./tsv_ast.js`, here and in every `import(...)` below: under
+/// `moduleResolution: node16`/`nodenext` a relative specifier inside a
+/// declaration file must carry the runtime extension or the consumer gets
+/// TS2834, and TypeScript resolves `./tsv_ast.js` to `./tsv_ast.d.ts`. The
+/// extensionless form only survives `skipLibCheck` or the legacy resolver.
 #[cfg(feature = "parse")]
 #[wasm_bindgen(typescript_custom_section)]
 const TS_AST_REEXPORT: &'static str = r#"
-export type * from "./tsv_ast";
+export type * from "./tsv_ast.js";
 "#;
 
 /// Hand-written declarations for the parse exports, which are all
@@ -319,7 +325,7 @@ export interface TypeScriptParseOptions {
 }
 
 export function parse_svelte(source: string, options: ParseOptions & { locations: false }): any;
-export function parse_svelte(source: string, options?: ParseOptions): import('./tsv_ast').Root;
+export function parse_svelte(source: string, options?: ParseOptions): import('./tsv_ast.js').Root;
 export function parse_svelte_json(source: string, options?: ParseOptions): string;
 export function parse_internal_svelte(source: string, options?: ParseOptions): void;
 
@@ -330,14 +336,14 @@ export function parse_typescript(
 export function parse_typescript(
 	source: string,
 	options?: TypeScriptParseOptions
-): import('./tsv_ast').Program;
+): import('./tsv_ast.js').Program;
 export function parse_typescript_json(source: string, options?: TypeScriptParseOptions): string;
 export function parse_internal_typescript(
 	source: string,
 	options?: TypeScriptParseOptions
 ): void;
 
-export function parse_css(source: string, options?: ParseOptions): import('./tsv_ast').StyleSheetFile;
+export function parse_css(source: string, options?: ParseOptions): import('./tsv_ast.js').StyleSheetFile;
 export function parse_css_json(source: string, options?: ParseOptions): string;
 export function parse_internal_css(source: string, options?: ParseOptions): void;
 "#;

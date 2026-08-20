@@ -1,12 +1,19 @@
 /**
  * Hand-written types for `@fuzdev/tsv` — mirrors `@fuzdev/tsv_wasm`'s
  * surface (same option interfaces, same overloads, same `tsv_ast` re-export),
- * so the two packages type-check interchangeably. `init()` is the one
- * difference: nothing here needs initializing. The `locations.js` helper's
- * types are appended at stage time by `scripts/build_napi_packages.ts`,
- * alongside the copy of the helper itself.
+ * so the two packages type-check interchangeably except for what a WASM engine
+ * needs and this one doesn't: `init()` and `init_sync()` (nothing here needs
+ * initializing) and `wasm_module` (no compiled module to hand a worker). The
+ * `locations.js` helper's types are appended at stage time by
+ * `scripts/build_napi_packages.ts`, alongside the copy of the helper itself.
+ *
+ * Relative specifiers carry the **`.js`** extension, here and in every
+ * `import(...)` below: under `moduleResolution: node16`/`nodenext` a relative
+ * specifier inside a declaration file must have the runtime extension or the
+ * consumer gets TS2834, and TypeScript resolves `./tsv_ast.js` to
+ * `./tsv_ast.d.ts`. Same rule the wasm packages' generated declarations follow.
  */
-export type * from './tsv_ast';
+export type * from './tsv_ast.js';
 
 /**
  * Options accepted by `parse_svelte` / `parse_css` (and their `_json`
@@ -72,7 +79,7 @@ export interface TypeScriptFormatOptions {
 }
 
 export function parse_svelte(source: string, options: ParseOptions & { locations: false }): any;
-export function parse_svelte(source: string, options?: ParseOptions): import('./tsv_ast').Root;
+export function parse_svelte(source: string, options?: ParseOptions): import('./tsv_ast.js').Root;
 export function parse_svelte_json(source: string, options?: ParseOptions): string;
 
 export function parse_typescript(
@@ -82,13 +89,13 @@ export function parse_typescript(
 export function parse_typescript(
 	source: string,
 	options?: TypeScriptParseOptions
-): import('./tsv_ast').Program;
+): import('./tsv_ast.js').Program;
 export function parse_typescript_json(source: string, options?: TypeScriptParseOptions): string;
 
 export function parse_css(
 	source: string,
 	options?: ParseOptions
-): import('./tsv_ast').StyleSheetFile;
+): import('./tsv_ast.js').StyleSheetFile;
 export function parse_css_json(source: string, options?: ParseOptions): string;
 
 export function format_svelte(source: string, options?: FormatOptions): string;

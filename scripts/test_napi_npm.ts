@@ -357,6 +357,29 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		}
 	});
 
+	// The same rule `scripts/test_npm.ts` pins over the wasm packages, over this
+	// package's hand-written declarations. Under `moduleResolution:
+	// node16`/`nodenext` an extensionless relative specifier inside a `.d.ts` is
+	// TS2834/TS2835 raised from inside the package, at every consumer without
+	// `skipLibCheck` — and nothing in-repo type-checks the merged package
+	// `.d.ts`, so it is invisible until someone else compiles.
+	it('every .d.ts relative specifier carries the .js extension', () => {
+		const loader_dir = join(staged, 'node_modules', '@fuzdev', 'tsv');
+		const loader_pkg = JSON.parse(readFileSync(join(loader_dir, 'package.json'), 'utf8'));
+		const bad: Array<string> = [];
+		for (const rel of loader_pkg.files.filter((f: string) => f.endsWith('.d.ts'))) {
+			const source = readFileSync(join(loader_dir, rel), 'utf8');
+			for (const [, spec] of source.matchAll(/(?:from|import\()\s*['"](\.[^'"]*)['"]/g)) {
+				if (!/\.(?:js|mjs|cjs|json)$/.test(spec)) bad.push(`${rel}: ${spec}`);
+			}
+		}
+		assert.deepEqual(
+			bad,
+			[],
+			`extensionless relative specifiers in shipped .d.ts:\n${bad.join('\n')}`
+		);
+	});
+
 	it('an unsupported platform fails loudly and points at the WASM package', async () => {
 		const bare_loader = join(staged_bare, 'node_modules', '@fuzdev', 'tsv', 'index.js');
 		await assert.rejects(import(pathToFileURL(bare_loader).href), (e: unknown) => {
@@ -550,6 +573,62 @@ describe('cli (bin.js): fallback to the JS mirror without the binary', () => {
 			1
 		);
 		assert.equal(run_fallback(['format', '--content', 'const =', '--parser', 'ts']).status, 2);
+	});
+
+	// The mirror's worker pool over the NATIVE engine. Its wasm sibling gets the
+	// main thread's compiled module handed across; this package exports none, so
+	// its workers load the addon themselves — a different engine-binding path
+	// through the same pool, and the only place it runs.
+	//
+	// The tree is sized from the shipped source, not a literal, for the reason
+	// `scripts/test_npm.ts` spells out: parallel and sequential are DESIGNED to
+	// be indistinguishable from outside, so a tree that fell under a raised
+	// threshold would keep passing while exercising nothing. This copy reads
+	// NATIVE_WORKER_FILE_THRESHOLD — the two engines size their pools
+	// differently (there is no wasm tier-up competing for cores here), so each
+	// suite must read its own engine's constant or one of them goes vacuous the
+	// next time the other moves.
+	// The mirror is ONE source staged into two packages, and that is now
+	// load-bearing rather than tidy: cli.js carries an engine discriminant and a
+	// pair of engine-specific pool constants, so a staging step that ever
+	// transformed the file would break the branch this package depends on —
+	// invisibly, because each suite otherwise only ever reads its own copy.
+	it('is the shared cli.js verbatim, not a transformed copy', () => {
+		assert.equal(
+			readFileSync(join(dirname(fallback_bin), 'cli.js'), 'utf8'),
+			readFileSync(new URL('../crates/tsv_wasm/npm/cli.js', import.meta.url), 'utf8'),
+			'the staged cli.js differs from crates/tsv_wasm/npm/cli.js — the two packages must ship one source'
+		);
+	});
+
+	it('fans a worker-sized tree onto threads, matching --jobs 1 exactly', () => {
+		const source = readFileSync(join(dirname(fallback_bin), 'cli.js'), 'utf8');
+		const match = /const NATIVE_WORKER_FILE_THRESHOLD = (\d+);/.exec(source);
+		assert.ok(
+			match,
+			'could not read NATIVE_WORKER_FILE_THRESHOLD out of cli.js — did it get renamed?'
+		);
+		// even, so the half-unformatted split below lands on a whole number
+		const count = 2 * Math.ceil((Number(match[1]) + 1) / 2);
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-napi-jobs-'));
+		try {
+			for (let i = 0; i < count; i++) {
+				writeFileSync(
+					join(dir, `f${i}.ts`),
+					i % 2 === 0 ? `const  a${i}=${i}` : `const a${i} = ${i};\n`
+				);
+			}
+			const one = run_fallback(['format', '--check', '--jobs', '1', dir]);
+			const many = run_fallback(['format', '--check', dir]);
+			assert.equal(one.status, 1, one.stderr);
+			assert.equal(many.status, one.status);
+			assert.equal(many.stdout, one.stdout);
+			assert.equal(many.stderr, one.stderr);
+			const half = count / 2;
+			assert.match(many.stderr, new RegExp(`^${half} would change, ${half} unchanged$`, 'm'));
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });
 

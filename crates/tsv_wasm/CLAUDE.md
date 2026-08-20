@@ -225,10 +225,54 @@ the `{line, column}` point rather than naming a `Position`. Any future hand-writ
 `.d.ts` added to the parse packages faces the same rule; nothing in-repo type-checks
 the merged package `.d.ts` (`check:ast-types` covers `tsv_ast.d.ts` alone), so a
 collision only surfaces at a consumer's compile — check names against `tsv_ast`
-before adding. (`ParseOptions` / `TypeScriptParseOptions` and `FormatOptions` /
+before adding.
+
+That blind spot has cost twice, and the second class is now gated. A relative
+specifier inside a shipped `.d.ts` must carry the **`.js`** extension
+(`'./tsv_ast.js'`, which TypeScript resolves to `./tsv_ast.d.ts`): extensionless
+is TS2834/TS2835 under `moduleResolution: node16`/`nodenext`, raised from inside
+the package at every consumer without `skipLibCheck`. Both package suites assert
+it over every declared `.d.ts` — a regex, not a typechecker, but it pins the
+class without putting `tsc` in the package tests. **The TS2308 collision rule
+above is still ungated**, so it remains a review-time check. (`ParseOptions` / `TypeScriptParseOptions` and `FormatOptions` /
 `TypeScriptFormatOptions` are re-exported **by name** from the generated
 `tsv_wasm.d.ts`, which explicit form star-export ambiguation can't drop — but
 the names were checked against both files anyway.)
+
+## The `./worker` Entry
+
+Every published variant exports two halves of one worker-pool contract, and
+neither is obtainable without them: the node entry's **`wasm_module`** (the
+compiled `WebAssembly.Module` behind its exports — the `.wasm` file is not an
+exports entry, so a consumer cannot reach it) and the **`./worker` subpath**,
+which is `browser.js` re-exported under the name a worker reaches for. A worker
+`init_sync({module})`s the module it was handed instead of reading and compiling
+the WASM again. V8 keeps a process-wide native-module cache, so a worker that
+recompiles the same bytes is not paying full codegen either — but it is paying
+module resolution, a redundant 2.4 MB read, and per-isolate setup, which the
+handoff skips.
+
+Two reasons the subpath aliases `browser.js` rather than adding a second copy of
+the wrappers. It is already exactly the entry a worker wants — lazy `init` /
+`init_sync` plus not-initialized guards — and `export *` keeps it the **same
+module instance**, so `init_sync` there initializes the singleton every other
+import of it observes. What it fixes is reachability: Node and Bun resolve the
+bare specifier through the `node` condition, which always lands on the auto-init
+`index.js`, leaving the lazy entry unreachable off the browser path.
+
+`npm/cli.js` is the first consumer (see [Files](#files)), but the pair is public
+API — `scripts/test_npm.ts` drives a real worker through it.
+
+The declarations are **one file per entry**, and that is what makes
+`wasm_module` non-optional where it exists. `index.d.ts` (the Node/Bun entry)
+declares it `WebAssembly.Module`; `browser.d.ts` — serving both `browser.js`
+and the `./worker` subpath that re-exports it — does not declare it at all,
+because neither compiles anything until initialized and neither *has* the
+export. A single shared declaration would have to spell it
+`WebAssembly.Module | undefined`, which reads as merely inconvenient but is
+worse than that: it names an export the browser entry does not have, so a
+bundler build fails on something the compiler waved through. The `exports` map
+therefore nests `types` inside each condition rather than hoisting it.
 
 ## Discovery Matcher + Policy (`IgnoreStack`)
 
@@ -323,7 +367,7 @@ require dual updates.
 
 - `src/lib.rs` — WASM bindings (`lang_bindings!` macro + `read_options` + the hand-written `TS_PARSE_DECLS` / `TS_FORMAT_DECLS` declarations) + the wasm32-gated talc `#[global_allocator]` and panic hook
 - `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
-- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below. In the native package it is the *fallback*: the bin there is a napi-only dispatcher (`tsv_napi/npm/bin.js`) that execs the platform package's real `tsv_cli` binary, deferring to cli.js only when no binary is reachable — the dispatcher deliberately does NOT live in this shared source, so the wasm copy stays byte-identical and can never resolve a sibling-installed native binary
+- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps. Path mode fans onto `node:worker_threads` behind `--jobs`, spawning **itself** as the worker (`isMainThread` splits the two roles) and claiming work off one `Atomics` cursor. `WORKER_FILE_THRESHOLD` gates the **default** only — a JS pool costs tens of milliseconds to bring up against the native pool's ~50 µs thread spawn — while an explicit `--jobs N` is obeyed at any file count, matching the native CLI and giving the threshold something to be calibrated against. Both the threshold and `default_jobs` are **per engine**, keyed off the same `wasm_module` export that decides how a worker binds: the crossover and the knee are properties of the engine, not the driver (see [../../docs/cli.md](../../docs/cli.md) §Binary Structure). On WASM the pool peaks at *half* the physical cores because V8's wasm tier-up is itself multithreaded and has claimed the rest before the first worker exists; over the N-API addon there is no compiler thread to compete with and it peaks at the core count. Which engine a worker binds is decided by whether the main thread's `./index.js` exported a `wasm_module`: here it did, so the worker takes it through the [`./worker` entry](#the-worker-entry) and recompiles nothing; in the native package it didn't, so the worker loads the addon. That is why the engine import is **dynamic** — a static one is hoisted above the branch, and the worker would have paid for `./index.js` before it could ask. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below. In the native package it is the *fallback*: the bin there is a napi-only dispatcher (`tsv_napi/npm/bin.js`) that execs the platform package's real `tsv_cli` binary, deferring to cli.js only when no binary is reachable — the dispatcher deliberately does NOT live in this shared source, so the wasm copy stays byte-identical and can never resolve a sibling-installed native binary
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only `no-locations` wire; ships in the parse-capable packages, re-exported from index.js/browser.js by `patch_npm_package.ts`. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv_format_wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv_parse_wasm` (copied by `patch_npm_package.ts`)
