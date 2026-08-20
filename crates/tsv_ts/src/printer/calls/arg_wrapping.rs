@@ -15,7 +15,7 @@ use super::arg_comments::{
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_react_hook_call_with_deps_array,
-    is_short_second_arg_for_expand_first,
+    is_short_second_arg_for_expand_first, is_ternary_arrow_body,
 };
 use crate::ast::internal;
 use crate::printer::expressions::functions::{
@@ -305,6 +305,31 @@ pub(super) fn could_expand_arrow_chain(arrow: &internal::ArrowFunctionExpression
             internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
         )
     })
+}
+
+/// Prettier's `couldExpandArg` for an **arrow** argument — the pure body-kind half of
+/// `shouldExpandLastArg`, with none of the comment refusals layered over it.
+///
+/// The chain half is [`could_expand_arrow_chain`] (block / object / array terminal, at any
+/// nesting); the two direct-body kinds beside it are the ones `arrowChainRecursion` turns
+/// off one level down, so they are asked of THIS arrow's body rather than the terminal's.
+/// Anything else — a member, an identifier, a binary, a template, a `new` — prettier never
+/// prints with `expandLastArg` at all: `printCallArguments` falls through to its default
+/// `group(contents)`, where a break anywhere inside the arguments breaks every one of them
+/// out.
+///
+/// Kept separate from the hug-eligibility spellings that layer
+/// [`arrow_hug_refused_by_comments`] on top: a comment refusal answers "can THIS arm render
+/// the argument", a different question from "would prettier expand it at all", and the gap
+/// break below needs the second one alone.
+fn could_expand_arrow_arg(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
+    could_expand_arrow_chain(arrow)
+        || match &arrow.body {
+            internal::ArrowFunctionBody::Expression(body) => {
+                arrow_body_is_call_through_non_null(body) || is_ternary_arrow_body(body)
+            }
+            internal::ArrowFunctionBody::BlockStatement(_) => false,
+        }
 }
 
 /// Classify how an expression body should be formatted.
@@ -678,8 +703,17 @@ pub(super) struct ArrowGapBreak {
 /// `trailingComma + trailingSpace`, where `trailingSpace` is a **softline under
 /// `expandLastArg`** (`print/arrow-function.js`, `printArrowFunctionBody`). That softline is
 /// the only thing that lands the call's `)` on its own line, and it is appended for **every
-/// body kind** — block, object, array, arrow chain alike — which is why this question is
-/// asked of the gap and not of the body's type.
+/// body kind** — block, object, array, arrow chain alike — which is why, *among the bodies
+/// that reach that printing at all*, this question is asked of the gap and not of the body's
+/// type.
+///
+/// ⚠️ **Which bodies reach it is still `couldExpandArg`'s answer** ([`could_expand_arrow_arg`],
+/// the gate this opens with). `expandLastArg` is set by `shouldExpandLastArg`, so a member,
+/// identifier, binary or template body never enters the arrow printer's hug branch: prettier
+/// falls through to `printCallArguments`' default `group(contents)`, where the comment's own
+/// forced break breaks every argument out. Answering the gap above that gate hugged a body
+/// the same call expands when the comment is absent — the comment deciding a layout it has
+/// nothing to do with (`calls/arrow_member_body_own_line_comment`).
 ///
 /// ⚠️ **It is the gap's BREAK, not one spelling of it.** Prettier's `line` (which drops the
 /// body) and its `trailingSpace` (which drops the `)`) sit in one group, so the two cannot
@@ -701,6 +735,17 @@ pub(super) fn last_arg_arrow_gap_break(
     let internal::Expression::ArrowFunctionExpression(arrow) = last_arg else {
         return None;
     };
+    // The softline is appended for every body KIND, but only inside a printing prettier
+    // reaches with `expandLastArg` — which `shouldExpandLastArg` gates on `couldExpandArg`.
+    // A body it would not expand (a member, an identifier, a binary, a template) never gets
+    // that printing at all: prettier takes `printCallArguments`' default `group(contents)`,
+    // which the comment's own forced break then breaks out ARGUMENT BY ARGUMENT. So the gap
+    // question is asked below this gate, not above it — hugging a non-expandable body
+    // because a comment happens to sit in its gap makes the comment decide a layout it has
+    // nothing to do with, and contradicts the same call's own comment-free answer.
+    if !could_expand_arrow_arg(arrow) {
+        return None;
+    }
     let arrow = terminal_arrow(arrow);
     let sig_end = arrow_token_end(arrow);
     let body_start = arrow.body.span().start;
