@@ -95,17 +95,18 @@ interface CompareResult {
 }
 
 /**
- * Format a source file's size, binary units (`B`/`KB`, 1024-based) — corpus files
- * are KB-scale, so this never reaches MB.
+ * Format a source file's size, decimal (1000-based) like every other byte
+ * formatter in the repo — corpus files are KB-scale, so this never reaches MB, and
+ * it stays unspaced (`12KB`) because it annotates a path inside a diff listing
+ * rather than heading a column.
  *
- * NOT `binary_sizes.ts`'s `format_bytes`, which is decimal (1000-based)
- * and MB-first because it sizes shipped artifacts. Two conventions, deliberately:
- * the name here says which one, so a reader doesn't carry the other module's
- * answer over.
+ * Tiering and spacing are its own; the CONVENTION is not. A number here gets read
+ * against the corpus totals `lib/corpus.ts`'s `format_mb` prints, so a `KB` that
+ * meant 1024 B while those meant 1000 was one exception a reader had to know about.
  */
 function format_source_size(bytes: number): string {
-	if (bytes < 1024) return `${bytes}B`;
-	const kb = bytes / 1024;
+	if (bytes < 1000) return `${bytes}B`;
+	const kb = bytes / 1000;
 	if (kb < 10) return `${kb.toFixed(1)}KB`;
 	return `${Math.round(kb)}KB`;
 }

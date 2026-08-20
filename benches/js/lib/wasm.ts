@@ -16,6 +16,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { wasm_target } from './runtime.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { assert_binding_reports_rejection } from './reject_probe.ts';
 
 /** The `{locations?, goal?}` options bag the parse exports take (`goal` is
  * TypeScript-only — the other languages reject the key). */
@@ -43,8 +44,23 @@ interface WasmModule {
 	format_css: (source: string, options?: WasmFormatOptions) => string;
 }
 
+/**
+ * The per-language export tables, resolved ONCE in `init()`.
+ *
+ * The native siblings' `FfiTables` / `NapiTables` for the same reason: these were
+ * getters returning a fresh object literal, so every timed call allocated one —
+ * harness-side allocation charged to whichever row it sat under, which belongs to
+ * no impl.
+ */
+interface WasmTables {
+	parse: Record<Language, (source: string, options?: WasmParseOptions) => unknown>;
+	parse_internal: Record<Language, (source: string, options?: WasmParseOptions) => void>;
+	format: Record<Language, (source: string, options?: WasmFormatOptions) => string>;
+}
+
 export class WasmImplementation extends BaseImplementation {
 	private _module: WasmModule | null = null;
+	private _tables: WasmTables | null = null;
 
 	readonly parse_languages = LANGUAGES;
 	readonly format_languages = LANGUAGES;
@@ -55,38 +71,10 @@ export class WasmImplementation extends BaseImplementation {
 		return this._module;
 	}
 
-	// Lookup tables for WASM functions by language
-	private get parse_fns(): Record<
-		Language,
-		(source: string, options?: WasmParseOptions) => unknown
-	> {
-		return {
-			svelte: this.module.parse_svelte,
-			typescript: this.module.parse_typescript,
-			css: this.module.parse_css
-		};
-	}
-
-	private get parse_internal_fns(): Record<
-		Language,
-		(source: string, options?: WasmParseOptions) => void
-	> {
-		return {
-			svelte: this.module.parse_internal_svelte,
-			typescript: this.module.parse_internal_typescript,
-			css: this.module.parse_internal_css
-		};
-	}
-
-	private get format_fns(): Record<
-		Language,
-		(source: string, options?: WasmFormatOptions) => string
-	> {
-		return {
-			svelte: this.module.format_svelte,
-			typescript: this.module.format_typescript,
-			css: this.module.format_css
-		};
+	/** The per-language export tables, or throw if `init()` hasn't run. */
+	private get tables(): WasmTables {
+		if (!this._tables) throw new Error('WASM module not initialized');
+		return this._tables;
 	}
 
 	async init(): Promise<void> {
@@ -134,6 +122,25 @@ export class WasmImplementation extends BaseImplementation {
 			format_css: module.format_css
 		};
 
+		// Resolve every export table once — see `WasmTables`.
+		this._tables = {
+			parse: {
+				svelte: this._module.parse_svelte,
+				typescript: this._module.parse_typescript,
+				css: this._module.parse_css
+			},
+			parse_internal: {
+				svelte: this._module.parse_internal_svelte,
+				typescript: this._module.parse_internal_typescript,
+				css: this._module.parse_internal_css
+			},
+			format: {
+				svelte: this._module.format_svelte,
+				typescript: this._module.format_typescript,
+				css: this._module.format_css
+			}
+		};
+
 		// Fairness guard for the parse rows: the wasm parse fns must return a
 		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
 		// Rust). If a glue/build regression ever handed back the raw JSON string
@@ -146,36 +153,46 @@ export class WasmImplementation extends BaseImplementation {
 				`tsv_wasm parse returned a ${typeof probe} — expected a materialized AST object`
 			);
 		}
+
+		// The bindings throw natively today; probed anyway so the three can't come to
+		// disagree about what surfacing a refusal MEANS — see `lib/reject_probe.ts`.
+		// The guard above asks what a SUCCESS returns; this asks what a REFUSAL does.
+		assert_binding_reports_rejection('tsv (WASM)', this);
 	}
 
-	// The `goal` option is TypeScript-only (the other languages reject the key),
-	// so it's withheld unless the language is typescript.
+	// `goal` is TypeScript's alone — the other languages reject a SET goal, not
+	// the key itself: `crates/tsv_wasm/src/lib.rs` declares `goal?: undefined` on
+	// `ParseOptions` precisely so one options bag can be forwarded to whichever
+	// export (the documented forwarding idiom `npm/cli.js` uses). So `parse` withholds
+	// the bag for tidiness, and `parse_no_locations` below spells the inapplicable
+	// goal `undefined` — both legal, neither one relying on the other's rule.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		return this.parse_fns[language](
+		return this.tables.parse[language](
 			source,
 			goal && language === 'typescript' ? { goal } : undefined
 		);
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		this.parse_internal_fns[language](
+		this.tables.parse_internal[language](
 			source,
 			goal && language === 'typescript' ? { goal } : undefined
 		);
 	}
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
-		return this.parse_fns[language](source, {
+		return this.tables.parse[language](source, {
 			locations: false,
 			goal: goal && language === 'typescript' ? goal : undefined
 		});
 	}
 
 	format(source: string, language: Language): string {
-		return this.format_fns[language](source);
+		return this.tables.format[language](source);
 	}
 
 	dispose(): void {
 		this._module = null;
+		this._tables = null;
 	}
 }

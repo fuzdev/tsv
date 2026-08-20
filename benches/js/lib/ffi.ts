@@ -7,6 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { native_library_filename } from './runtime.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { assert_binding_reports_rejection } from './reject_probe.ts';
 
 // FFI symbol definitions.
 //
@@ -134,6 +135,22 @@ interface MarshalState {
 	result_buffer: Uint8Array;
 }
 
+/**
+ * The per-language symbol tables, resolved ONCE in `init()`.
+ *
+ * These were getters returning a fresh object literal, so every timed call
+ * allocated one — harness-side allocation charged to whichever row it sat under,
+ * which belongs to no impl. Same reason `lib/canonical.ts` hoists its prettier
+ * plugins array out of the per-call path.
+ */
+interface FfiTables {
+	parse: Record<Language, FfiFn>;
+	parse_internal: Record<Language, FfiFn>;
+	/** Span-only wire — svelte + typescript only (CSS emits no `loc`). */
+	parse_no_locations: Partial<Record<Language, FfiFn>>;
+	format: Record<Language, FfiFn>;
+}
+
 /** Grow-only sizing: double `current` until it holds `needed`. */
 const next_capacity = (needed: number, current: number): number => {
 	let cap = current;
@@ -146,6 +163,7 @@ const INITIAL_BUFFER_CAPACITY = 1 << 16;
 export class NativeImplementation extends BaseImplementation {
 	private _lib: Deno.DynamicLibrary<typeof symbols> | null = null;
 	private _marshal: MarshalState | null = null;
+	private _tables: FfiTables | null = null;
 	private encoder = new TextEncoder();
 	private decoder = new TextDecoder();
 
@@ -161,6 +179,12 @@ export class NativeImplementation extends BaseImplementation {
 	/** Get symbols with proper typing */
 	private get symbols(): LibSymbols {
 		return this.lib.symbols;
+	}
+
+	/** The per-language symbol tables, or throw if `init()` hasn't run. */
+	private get tables(): FfiTables {
+		if (!this._tables) throw new Error('Native library not initialized');
+		return this._tables;
 	}
 
 	async init(): Promise<void> {
@@ -193,6 +217,34 @@ export class NativeImplementation extends BaseImplementation {
 			source_ptr: Deno.UnsafePointer.of(source_buffer),
 			result_buffer: new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY))
 		};
+
+		// Resolve every symbol table once — see `FfiTables`.
+		this._tables = {
+			parse: {
+				svelte: this.symbols.tsv_parse_svelte as FfiFn,
+				typescript: this.symbols.tsv_parse_typescript as FfiFn,
+				css: this.symbols.tsv_parse_css as FfiFn
+			},
+			parse_internal: {
+				svelte: this.symbols.tsv_parse_internal_svelte as FfiFn,
+				typescript: this.symbols.tsv_parse_internal_typescript as FfiFn,
+				css: this.symbols.tsv_parse_internal_css as FfiFn
+			},
+			parse_no_locations: {
+				svelte: this.symbols.tsv_parse_svelte_no_locations as FfiFn,
+				typescript: this.symbols.tsv_parse_typescript_no_locations as FfiFn
+			},
+			format: {
+				svelte: this.symbols.tsv_format_svelte as FfiFn,
+				typescript: this.symbols.tsv_format_typescript as FfiFn,
+				css: this.symbols.tsv_format_css as FfiFn
+			}
+		};
+
+		// This binding returns a STRING either way, so `check_error`'s envelope-prefix
+		// test is the only thing that tells a refusal from a formatted file. Prove it
+		// still fires — see `lib/reject_probe.ts`.
+		assert_binding_reports_rejection('tsv (FFI)', this);
 	}
 
 	private call_ffi(fn: FfiFn, source: string): string {
@@ -281,60 +333,33 @@ export class NativeImplementation extends BaseImplementation {
 
 	/** Check FFI result for error and throw if present */
 	private check_error(result: string): void {
-		// Error responses are JSON objects with an "error" key
-		// Check prefix first to avoid JSON.parse overhead on success
-		if (result.length > 0 && result[0] === '{') {
-			let parsed;
-			try {
-				parsed = JSON.parse(result);
-			} catch {
-				// Not valid JSON, not an error response
-				return;
-			}
-			if (parsed.error) {
-				throw new Error(parsed.error);
-			}
+		// The error payload is `error_result`'s compact `serde_json` object, so the
+		// whole envelope prefix is the test. A bare `{` is NOT: a formatted Svelte
+		// file can legitimately start with one (a `{#if …}` block at position 0), and
+		// the loose test then ran a full `JSON.parse` — and a thrown SyntaxError —
+		// over that file's entire output on every timed call, a cost neither sibling
+		// binding pays (`napi.ts` throws natively, `wasm.ts` returns the string), so
+		// it would land in the cross-runtime table as a binding-boundary delta.
+		// Formatted output cannot begin `{"error"`: a `{` at statement position is a
+		// block, and tsv normalizes a Svelte mustache's string to single quotes.
+		if (!result.startsWith('{"error"')) return;
+		let parsed;
+		try {
+			parsed = JSON.parse(result);
+		} catch {
+			// Not valid JSON, not an error response
+			return;
 		}
-	}
-
-	// Lookup tables for FFI functions by language
-	private get parse_fns(): Record<Language, FfiFn> {
-		return {
-			svelte: this.symbols.tsv_parse_svelte as FfiFn,
-			typescript: this.symbols.tsv_parse_typescript as FfiFn,
-			css: this.symbols.tsv_parse_css as FfiFn
-		};
-	}
-
-	private get parse_internal_fns(): Record<Language, FfiFn> {
-		return {
-			svelte: this.symbols.tsv_parse_internal_svelte as FfiFn,
-			typescript: this.symbols.tsv_parse_internal_typescript as FfiFn,
-			css: this.symbols.tsv_parse_internal_css as FfiFn
-		};
-	}
-
-	// Span-only wire — svelte + typescript only (CSS has no `loc`).
-	private get parse_no_locations_fns(): Partial<Record<Language, FfiFn>> {
-		return {
-			svelte: this.symbols.tsv_parse_svelte_no_locations as FfiFn,
-			typescript: this.symbols.tsv_parse_typescript_no_locations as FfiFn
-		};
-	}
-
-	private get format_fns(): Record<Language, FfiFn> {
-		return {
-			svelte: this.symbols.tsv_format_svelte as FfiFn,
-			typescript: this.symbols.tsv_format_typescript as FfiFn,
-			css: this.symbols.tsv_format_css as FfiFn
-		};
+		if (parsed.error) {
+			throw new Error(parsed.error);
+		}
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		const result =
 			goal && language === 'typescript'
 				? this.call_ffi_goal(this.symbols.tsv_parse_typescript_with_goal as FfiGoalFn, source, goal)
-				: this.call_ffi(this.parse_fns[language], source);
+				: this.call_ffi(this.tables.parse[language], source);
 		const parsed = JSON.parse(result);
 		if (parsed.error) {
 			throw new Error(parsed.error);
@@ -350,7 +375,7 @@ export class NativeImplementation extends BaseImplementation {
 						source,
 						goal
 					)
-				: this.call_ffi(this.parse_internal_fns[language], source);
+				: this.call_ffi(this.tables.parse_internal[language], source);
 		this.check_error(result);
 	}
 
@@ -363,7 +388,7 @@ export class NativeImplementation extends BaseImplementation {
 				goal
 			);
 		} else {
-			const fn = this.parse_no_locations_fns[language];
+			const fn = this.tables.parse_no_locations[language];
 			if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
 			result = this.call_ffi(fn, source);
 		}
@@ -375,7 +400,7 @@ export class NativeImplementation extends BaseImplementation {
 	}
 
 	format(source: string, language: Language): string {
-		const result = this.call_ffi(this.format_fns[language], source);
+		const result = this.call_ffi(this.tables.format[language], source);
 		this.check_error(result);
 		return result;
 	}
@@ -386,5 +411,6 @@ export class NativeImplementation extends BaseImplementation {
 			this._lib = null;
 		}
 		this._marshal = null;
+		this._tables = null;
 	}
 }

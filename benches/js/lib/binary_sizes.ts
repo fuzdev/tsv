@@ -479,13 +479,16 @@ export async function collect_binary_sizes(
 /**
  * Format an ARTIFACT size, decimal units (`B`/`KB`/`MB`, 1000-based).
  *
- * Module-local, and the counterpart to the harness's two SOURCE-size formatters —
- * `corpus_compare_format.ts`'s `format_source_size` and
- * `diagnostics/corpus_stats.ts`'s `format_corpus_size`, both binary (1024-based).
- * Three formatters over two conventions, each named for the thing it sizes, so a
- * reader doesn't carry one module's answer over to another. Those two were named
- * `format_bytes` too until the collision made that carry-over easy; this one is
- * unexported so a fourth can't reintroduce it by importing.
+ * Module-local, and one of the repo's byte formatters that ALL now share this
+ * decimal convention: `lib/corpus.ts`'s `format_mb` (corpus totals, the one every
+ * corpus-size printer routes through), `diagnostics/corpus_stats.ts`'s
+ * `format_corpus_size`, `corpus_compare_format.ts`'s `format_source_size`, and
+ * `scripts/size.ts`'s `format_size` (shipped artifacts, publish-side). They differ
+ * in tiering and spacing, never in what a `MB` means — a size and the `MB/s` rate
+ * over it get read against each other, and two conventions under one label made a
+ * larger corpus print as fewer MB than a smaller one. These were all named
+ * `format_bytes` once, which made carrying one module's answer to another easy;
+ * this one stays unexported so a new caller reaches for the named one instead.
  */
 function format_bytes(bytes: number): string {
 	if (bytes >= 1_000_000) {

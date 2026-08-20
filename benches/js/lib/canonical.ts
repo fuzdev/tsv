@@ -15,6 +15,7 @@ import {
 	type ParseGoal
 } from './types.ts';
 import type { CanonicalVersions } from './versions.ts';
+import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 
 /** Prettier module */
 interface PrettierModule {
@@ -24,16 +25,26 @@ interface PrettierModule {
 /** Parser function type */
 type ParserFn = (source: string) => unknown;
 
+/** Shared empty plugins array — hoisted so the timed loop doesn't allocate one per call. */
+const NO_PLUGINS: unknown[] = [];
+
 /**
  * Prettier formatting options, fixed to tsv's settings and passed explicitly on
  * every call. Mirrors the inline options in the fixture oracle
  * (`crates/tsv_debug/src/deno/sidecar.ts`), the source of truth for fixture
  * correctness — tsv ships no prettier config file, so the corpus oracle reads
- * none either. Keep these two option sets identical.
+ * none either. Keep these two option sets identical — `deno task pins:audit` gates
+ * it (a differing value OR a one-sided addition fails), so the invariant is checked
+ * rather than merely stated.
+ *
+ * `init` proves they LAND (`lib/format_config_probe.ts`). Prettier accepts an
+ * unrecognized option key SILENTLY — no throw, no warning through the API
+ * (verified: renaming all four drops the output to 2-space indent, double quotes,
+ * width 80) — and this bag is the one whose loss is worst, because it is not one
+ * row among many: it is the DENOMINATOR of every published `Nx`, and the divergence
+ * ORACLE `corpus:compare:format` grades tsv against. A silent drop here would move
+ * every ratio in the report and manufacture thousands of false divergences.
  */
-/** Shared empty plugins array — hoisted so the timed loop doesn't allocate one per call. */
-const NO_PLUGINS: unknown[] = [];
-
 const PRETTIER_OPTIONS = {
 	useTabs: true,
 	printWidth: 100,
@@ -54,6 +65,16 @@ export class CanonicalImplementation extends BaseImplementation {
 	#svelte_compiler: any = null;
 	// deno-lint-ignore no-explicit-any
 	#acorn_ts_parser: any = null;
+	/**
+	 * Per-language parse entry points, built ONCE in `init()`.
+	 *
+	 * This was a getter returning a fresh object of three closures, so every timed
+	 * parse call allocated four objects before doing any parse work — harness-side
+	 * allocation charged to the ORACLE row, which belongs to no impl. Hoisted for
+	 * the same reason `NO_PLUGINS` and `#svelte_plugins` are, and matching the
+	 * `*Tables` fields in `lib/ffi.ts` / `lib/napi.ts` / `lib/wasm.ts`.
+	 */
+	#parse_fns: Record<Language, ParserFn> | null = null;
 
 	readonly parse_languages = LANGUAGES;
 	readonly format_languages = LANGUAGES;
@@ -88,24 +109,10 @@ export class CanonicalImplementation extends BaseImplementation {
 		// Create TypeScript parser once (acorn.Parser.extend is expensive)
 		// deno-lint-ignore no-explicit-any
 		this.#acorn_ts_parser = acorn_mod.Parser.extend(acorn_ts_mod.tsPlugin() as any);
-	}
 
-	/**
-	 * Opt into the content-addressed prettier-output cache (`lib/prettier_cache.ts`)
-	 * for `format_async` — used by `corpus:compare:format` and the conformance
-	 * driver ONLY (never the bench, which times prettier; never the fixture
-	 * validator, which live-verifies by design). Returns the cache so the caller
-	 * can report hit/miss stats, or null when `TSV_PRETTIER_CACHE=0` disables it.
-	 */
-	enable_format_cache(): PrettierCache | null {
-		if (!prettier_cache_enabled()) return null;
-		this.#format_cache = new PrettierCache(this.versions, JSON.stringify(PRETTIER_OPTIONS));
-		return this.#format_cache;
-	}
-
-	// Lookup table for parse functions by language
-	get #parse_fns(): Record<Language, ParserFn> {
-		return {
+		// Build the parse table once — see `#parse_fns`. Each closure keeps its own
+		// null check: it costs nothing and leaves the closure self-describing.
+		this.#parse_fns = {
 			svelte: (source) => {
 				if (!this.#svelte_compiler) throw new Error('Svelte compiler not initialized');
 				return this.#svelte_compiler.parse(source, { modern: true });
@@ -123,6 +130,41 @@ export class CanonicalImplementation extends BaseImplementation {
 				return this.#svelte_compiler.parseCss(source);
 			}
 		};
+
+		// Assert the pins actually LANDED, per language — see `PRETTIER_OPTIONS`, and
+		// `lib/format_config_probe.ts` for why the check is behavioral. Prettier is the
+		// only impl here whose probe runs on all three languages for coverage rather
+		// than corroboration: each routes through a different printer (typescript,
+		// postcss, prettier-plugin-svelte), and the plugin is loaded separately, so the
+		// svelte pass is also the standing proof that the options reach it.
+		//
+		// This is `init_required`, so a failure STOPS THE RUN rather than dropping a
+		// row, and that is the same rule the optional impls follow, not a different one:
+		// a probe failure withdraws whatever the bad config contaminates. For an
+		// alternative that is its own row. For the baseline there is no row to withdraw
+		// — it is what every other row is a ratio against, and the oracle
+		// `corpus:compare:format` and the conformance driver grade tsv against — so the
+		// contaminated unit is the whole run.
+		for (const language of LANGUAGES) {
+			assert_format_config_landed(
+				'prettier',
+				language,
+				await this.format_async(FORMAT_CONFIG_PROBES[language], language)
+			);
+		}
+	}
+
+	/**
+	 * Opt into the content-addressed prettier-output cache (`lib/prettier_cache.ts`)
+	 * for `format_async` — used by `corpus:compare:format` and the conformance
+	 * driver ONLY (never the bench, which times prettier; never the fixture
+	 * validator, which live-verifies by design). Returns the cache so the caller
+	 * can report hit/miss stats, or null when `TSV_PRETTIER_CACHE=0` disables it.
+	 */
+	enable_format_cache(): PrettierCache | null {
+		if (!prettier_cache_enabled()) return null;
+		this.#format_cache = new PrettierCache(this.versions, JSON.stringify(PRETTIER_OPTIONS));
+		return this.#format_cache;
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
@@ -138,7 +180,9 @@ export class CanonicalImplementation extends BaseImplementation {
 				locations: true
 			});
 		}
-		return this.#parse_fns[language](source);
+		const parse_fns = this.#parse_fns;
+		if (!parse_fns) throw new Error('Canonical parsers not initialized');
+		return parse_fns[language](source);
 	}
 
 	async format_async(source: string, language: Language, source_path?: string): Promise<string> {
@@ -184,6 +228,7 @@ export class CanonicalImplementation extends BaseImplementation {
 	}
 
 	dispose(): void {
+		this.#parse_fns = null;
 		this.#prettier = null;
 		this.#prettier_svelte = null;
 		this.#svelte_compiler = null;

@@ -31,6 +31,7 @@
 import { parseArgs } from 'node:util';
 
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
+import { format_size } from './size.ts';
 
 const { values: args } = parseArgs({
 	options: {
@@ -255,5 +256,5 @@ write_pkg(platform_dir, {
 const size = Deno.statSync(`${platform_dir}/tsv_napi.node`).size;
 const cli_size = Deno.statSync(`${platform_dir}/${cli_binary_name}`).size;
 console.log(
-	`Staged ${platform_dir}: @fuzdev/tsv-${triple} ${version} (tsv_napi.node ${(size / 1024 / 1024).toFixed(1)} MB, ${cli_binary_name} ${(cli_size / 1024 / 1024).toFixed(1)} MB)`
+	`Staged ${platform_dir}: @fuzdev/tsv-${triple} ${version} (tsv_napi.node ${format_size(size)}, ${cli_binary_name} ${format_size(cli_size)})`
 );

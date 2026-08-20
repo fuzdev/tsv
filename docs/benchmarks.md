@@ -36,11 +36,44 @@ Things the published numbers measure that aren't quite what they look like.
   (`dprint.ts` `setConfig`; `quoteStyle: preferSingle` is the faithful analogue
   of prettier's `singleQuote: true`, which likewise switches quotes to avoid
   escaping, and `trailingCommas: never` fans out to dprint's 12 per-construct
-  keys), malva (`malva.ts`), and rsvelte-fmt (`rsvelte.ts`). Unmatched defaults (biome's width is 80; oxfmt and biome default to
-  double quotes) would make rows wrap/rewrite different amounts of code,
-  conflating config with engine speed. oxfmt's own width default is already 100 —
-  pinned anyway so a default change can't silently skew the rows; the options
-  provably reach its bundled-prettier Svelte fallback too. `prettier` is the
+  keys), malva (`malva.ts`), and rsvelte-fmt (`rsvelte.ts`). Unmatched defaults
+  (biome's width is 80; oxfmt and biome default to double quotes) would make rows
+  wrap/rewrite different amounts of code, conflating config with engine speed.
+  **Every formatter whose config can move a ratio proves its pins actually
+  LANDED** — the four timed alternatives (oxfmt, biome, dprint, malva) *and*
+  `prettier` itself, which matters most: it is not one row among many but the
+  DENOMINATOR of every published `Nx`, and the oracle `corpus:compare:format`
+  grades tsv against, so a silent drop there moves every ratio in the report and
+  manufactures thousands of false divergences (verified: renaming prettier's four
+  options drops its output to 2-space indent, double quotes, width 80, with no
+  throw and no warning through the API). rsvelte-fmt is exempt as the one
+  coverage-only row — its config can't move a ratio. The check exists because a
+  silently-ignored key produces exactly that conflation with nothing in the report
+  to show it: dprint and malva fail init on a non-empty
+  `getConfigDiagnostics()`, while biome's `applyConfiguration` and oxfmt's per-call
+  options bag accept an unknown key with no throw and no diagnostic (verified —
+  biome then falls back to width 80 + double quotes + trailing commas, oxfmt to
+  spaces + double quotes + trailing commas), so those two are checked behaviorally:
+  `init` formats a probe source whose output differs under each pinned option and
+  reads the answer back (`lib/format_config_probe.ts` — one probe set and one grader
+  for both tools, so they can't drift on what "landed" means). **Per LANGUAGE**, not
+  per tool: biome's config is a stack of per-language sections
+  (`javascript`/`css`/`html`), each feeding a different row, so a TypeScript-only
+  probe would prove one section and leave the CSS and svelte rows free to un-pin
+  silently. The svelte probe doubles as the only guard on biome's
+  `html.experimentalFullSupportEnabled` — without it biome returns an EMPTY string
+  for `.svelte`, which the timed row would otherwise score as a successful format.
+  A tool whose pins stop landing goes ABSENT, with the option and the language named
+  in the report's `unavailable`, rather than staying present and publishing a number
+  produced at some other tool's defaults. `prettier`'s failure STOPS THE RUN instead,
+  and that is the same rule rather than a different one: a failed self-check
+  withdraws whatever the bad config contaminates, and the baseline has no row to
+  withdraw — every other row is a ratio against it. An option matching the tool's own default
+  is unfalsifiable this way and is pinned for the other reason — it still catches an
+  upstream DEFAULT change: biome already indents with tabs, and oxfmt's own width
+  default is already 100 (its probes do prove tabs, quotes and the trailing comma,
+  and the svelte one proves the options reach its bundled-prettier fallback).
+  `prettier` is the
   reference and `oxfmt` also targets prettier conformance, so `prettier` vs
   `oxfmt` is the closest to a same-output race; `tsv` tracks prettier closely but
   _intentionally diverges_ in documented cases (the `_prettier_divergence` fixtures
@@ -72,6 +105,12 @@ Things the published numbers measure that aren't quite what they look like.
   concatenated per repo (~3× the standalone bytes, naturally-sized files). Those
   harvest bytes are also timed inside the svelte rows (rows are never summed, so
   this is disclosure, not distortion), and CSS per-file ratios stay the noisiest.
+  One shape note on that harvest: the blocks keep their authored bytes verbatim,
+  which includes the one level of indent they carried inside `<style>`, so the
+  concatenated file is uniformly indented by one tab. Every tool re-indents it
+  identically — same input, no per-tool advantage — but it does mean the dominant
+  CSS sample measures a full re-indent rather than the steady-state
+  already-formatted case the standalone `.css` files represent.
 - **PGO native flagship (forthcoming — policy; no such row ships today).** The
   standalone native flagship — the `tsv` binary the `@fuzdev/tsv` platform
   packages already ship, un-PGO'd, under the one name rather than a second
@@ -164,9 +203,9 @@ Things the published numbers measure that aren't quite what they look like.
   (c) Task return values are discarded uniformly for all impls; the FFI/WASM/async
   boundaries block dead-code elimination, so no impl's work is optimized away.
 - **`tsv_wasm` is measured on the full build.** The WASM bench loads
-  `pkg/all/deno` (the default both-features artifact, ~2.4 MB — what
+  `pkg/all/deno` (the default both-features artifact, ~2.5 MB — what
   `@fuzdev/tsv_wasm` ships) for _both_ parse and format, while subset consumers
-  ship the smaller `@fuzdev/tsv_format_wasm` (~2.1 MB, no convert layer) or
+  ship the smaller `@fuzdev/tsv_format_wasm` (~2.2 MB, no convert layer) or
   `@fuzdev/tsv_parse_wasm` (~0.9 MB, no printers). Same story natively: the perf
   row loads the full `libtsv_ffi`, while the Binary Sizes table also lists the
   `tsv format (ffi)` / `tsv parse (ffi)` subset builds (no perf rows of their own
@@ -187,6 +226,43 @@ Things the published numbers measure that aren't quite what they look like.
   out (`vs prettier (speedup)`, `vs Best (speedup)`). The only exception is
   `JSON overhead` rows, explicitly labeled `json_ns / internal_ns` (higher = more
   cost) because overhead is inherently a slowdown ratio.
+- **Task order, and the inter-task heap settle.** Within a group the tasks run
+  sequentially in registration order (canonical first, then tsv's rows, then the
+  alternatives) with the timing library's inter-task cooldown disabled — a
+  workaround for an oxfmt × Deno timer-wheel hang, applied uniformly so a
+  runtime-conditional settle can't bias the cross-runtime ratios (../benches/js/CLAUDE.md
+  §Known Issues). Back-to-back tasks share a heap, so without a control the garbage
+  one task leaves behind is collected on the *next* task's clock and a fixed order
+  turns that carryover into a systematic per-position effect. So each task's untimed
+  `setup` forces a major GC (`settle_heap` in `bench.ts`), and every task — the
+  first one after pre-flight included — begins its warmup from a comparable heap.
+  This is deliberately NOT the same knob as the per-iteration hook below: it
+  normalizes where a task *starts* without touching the measured workload's own GC
+  profile, which is why it is always on where that one is off. It needs
+  `--expose-gc` (every timed `bench:*:run` task passes it); without the flag it
+  silently no-ops, so the run prints a ⚠ before the timed phase rather than
+  publishing numbers with the control quietly gone. Nothing here randomizes or
+  interleaves task order — the settle bounds the carryover rather than eliminating
+  order as a variable.
+- **Measurement stability is disclosed, not assumed.** Every published `Nx` divides
+  two means, so it inherits both means' noise — and nothing in the report used to
+  say how noisy either was. A per-runtime report now carries a **§Unstable Rows**
+  section for any row whose cv (`std_dev / mean`, post-outlier-removal) reaches 10%,
+  and the cross-runtime report names the **within-noise** deltas whose difference is
+  smaller than the combined cv of the two rows they divide. Both are reading aids,
+  not significance tests — the Welch test lives in `benchmark_baseline_compare` and
+  needs `--compare-baseline`, which a plain `deno task bench` never runs, so before
+  this a full bench reached no stability check at all. Calibration: across the three
+  committed reports (128 timed rows) cv runs median 1.0% / p90 3.1%, so 10% is ~3× the
+  p90 rather than a round number; the live outlier is `format/css/biome-wasm`, at 24%
+  under Node against 3% on its Deno sibling. Five of 44 node/deno deltas currently land
+  inside their noise, all of them at ~1.00x — i.e. today this confirms "no difference"
+  rather than overturning a reading. The within-noise half also needs ten cleaned
+  timings a side before it will call a cell quiet, and prints `n` for each: sample
+  count varies by two orders of magnitude across one table (a microsecond row gets
+  four figures; a multi-second row gets the iteration floor of 5, or 7 on the slow
+  tier), and a cv from three timings that happen to agree is not evidence of quiet.
+  That floor is what excludes a sixth cell, `format/svelte/prettier` at n=7.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the
@@ -351,7 +427,20 @@ prettier. Load-bearing on two axes:
   parse goal from the file rather than accepting one, so the conformance corpus's
   declared `goal` is ignored for this row alone. 6.x is the last JS implementation;
   7.x is the Go port, whose npm package ships a binary with no in-process parser API.
-- **oxc-parser (NAPI)** — fast TypeScript parser; TypeScript, JS.
+- **oxc-parser (NAPI)** — fast TypeScript parser; TypeScript, JS. Like tsc and yuku
+  it does not throw its verdict, it reports it: `parseSync` returns an `errors`
+  array whose entries carry a severity (`Error` | `Warning` | `Advice`), so an
+  accept is defined as "no FATAL entry" (`oxc_fatal_errors` in `lib/oxc.ts`, shared
+  by both bindings). Counting the array's length instead would score a merely
+  warned-about file as a rejection — under-reporting oxc's coverage and, in the
+  default intersection mode, dropping that file out of the set every row in the
+  group is timed on. Measured across 52,106 conformance-corpus files, every
+  diagnostic oxc produced was `Error`, so this moves no published number today; it
+  is stated because the accept definition should be correct rather than accidentally
+  correct. The classification is written as a NON-fatal denylist rather than an
+  `Error` allowlist, so an upstream rename of that value degrades to the
+  conservative reading instead of fabricating a 100% row, and `init` additionally
+  proves a real syntax error still lands as fatal.
 - **oxfmt (NAPI)** — fast formatter; TypeScript, JS, CSS, Svelte (experimental).
   As of 0.57 the native Rust formatter handles **JS/TS *and* CSS**; only **Svelte**
   routes through a JS-side fallback into oxfmt's **bundled prettier**
@@ -361,11 +450,22 @@ prettier. Load-bearing on two axes:
   **TypeScript AND CSS**; only the **svelte** oxfmt row is (mostly) a
   prettier-pipeline number in oxfmt packaging — read that one ratio accordingly.
   The report corroborates: oxfmt ≈ prettier on svelte (~1x), but ~28x prettier on
-  css and ~14x on TS.
+  css and ~14x on TS. Its pinned options are hoisted out of the per-call path and
+  proven to land at `init` — once per language it formats, so the Svelte fallback's
+  own layout is proven too (see the pinning bullet in
+  [Fairness caveats](#fairness-caveats)).
 - **biome (WASM)** — formatter/linter; TypeScript, JS, CSS, and Svelte (via
   biome's experimental HTML-superset support, `html.experimentalFullSupportEnabled`;
   it formats the template **and** the embedded `<script>`/`<style>`, so it's
   comparable work to prettier-plugin-svelte / tsv, just on an experimental path).
+  Its per-language `formatter` sections inherit the top-level one and override it
+  where they set a key (measured in both directions); each repeats the shared
+  values anyway, so a rename reaching only the top-level block can't un-pin every
+  language at once. The pins are proven to land at `init`, **per language** — the
+  sections are separate, so proving one proves only its own row, and the svelte
+  probe is also what catches a lost `experimentalFullSupportEnabled` (biome then
+  returns empty output, which a timed row reads as success). See the pinning bullet
+  in [Fairness caveats](#fairness-caveats).
 - **dprint (WASM)** — formatter; **TypeScript, JS only**. This is the engine
   **`deno fmt` runs** for TS/JS (`dprint-plugin-typescript`), loaded in-process as
   its Wasm plugin. Deliberately NOT a `deno fmt` subprocess row: that would exist
@@ -407,7 +507,9 @@ prettier. Load-bearing on two axes:
   measured against its own reference and nothing else. Two rows. `rsvelte-parse` is matched
   to `tsv-json` on **both** axes — mechanism (each returns a compact JSON string
   the caller `JSON.parse`s, so both pay the identical serialize + boundary + parse
-  cost) and payload (within ~1.5% of `tsv-json`'s bytes on a real component) —
+  cost) and payload (within ~1.5% of `tsv-json`'s bytes across the corpus — the
+  axis a throughput ratio integrates over; per component the spread is wider, p90
+  3% and up to 12%, so the aggregate is the claim) —
   which earns it a curated comparison line, the only one the Svelte surface has.
   Because rsvelte claims the same drop-in contract tsv does, the row is a
   conformance datum too: on that same component its AST differs from
@@ -574,6 +676,18 @@ Benchmark output includes a binary/WASM size comparison. Each row reports **raw
 on-disk size** plus **gzipped size** (≈ npm-tarball wire size), grouped by kind
 (WASM vs native) with ratios relative to `tsv` for both. Implementation:
 `lib/binary_sizes.ts`; JSON output carries a per-entry `gzip_bytes: number | null`.
+
+Sizes are **decimal** (`MB` = 1,000,000 B) — the convention shared by every byte
+figure the harness prints (this table, the report's `**Corpus:**` line, the terminal
+corpus block) and by the publish scripts' `format_size`, so an artifact sized in a
+publish log and the same artifact in this table can be compared without asking which
+`MB` each meant. The same label over two conventions is a disagreement no output can
+resolve; the JSON carries raw byte counts for anyone who wants binary units.
+
+The deliberate holdout is `tsv_debug profile`, whose sizes are binary and whose
+headline metric is µs per binary KB — a rate whose divisor defines it, with recorded
+baselines in [performance.md](performance.md) that redefining it would silently
+invalidate. It never sits beside these numbers.
 
 **A row exists only for an artifact on disk**, which makes this the one report
 section whose *composition* varies by machine — and the ratios read the same either

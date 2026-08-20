@@ -1,5 +1,7 @@
 {
 	"//deps": "npm dep versions are the source of truth in ./package.json (read by BOTH runtimes). Deno consumes that node_modules via `nodeModulesDir: manual` — run `deno task bench:install` first. The bench/diagnostics import npm packages by bare specifier (resolved from package.json); there are no jsr or remote deps, so `lock: false` (no deno.lock — npm integrity is package-lock.json's job). Canonical-sync note lives in package.json.",
+	"//exclude": "Per-machine scratch (`*.local.*`, gitignored repo-wide) is not repo source: `typecheck:js` walks this directory, so without this an abandoned local probe reds a gate for code the repo does not contain. CI never sees these files, which is exactly why the failure would be local-only and confusing.",
+	"exclude": ["*.local.*"],
 	"nodeModulesDir": "manual",
 	"lock": false
 }

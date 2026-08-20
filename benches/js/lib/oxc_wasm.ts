@@ -10,6 +10,7 @@
 
 import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS, type ParseGoal } from './types.ts';
 import type { OxcVersions } from './versions.ts';
+import { assert_oxc_rejects_invalid, type OxcDiagnostic, oxc_fatal_errors } from './oxc.ts';
 import { current_runtime } from './runtime.ts';
 
 /** oxc-parser WASM module types (same API as native) */
@@ -18,7 +19,7 @@ interface OxcParserWasmModule {
 		filename: string,
 		source: string,
 		options?: { sourceType?: 'script' | 'module' }
-	) => { program: unknown; errors: unknown[] };
+	) => { program: unknown; errors: OxcDiagnostic[] };
 }
 
 /** oxc-parser's own `{node, fixes}` deserializer (`src-js/wrap.js`, untyped). */
@@ -63,6 +64,12 @@ export class OxcWasmImplementation extends BaseImplementation {
 		// tracks the pinned oxc-parser version; a moved upstream path fails init loudly.
 		const wrap = await import('oxc-parser/src-js/wrap.js');
 		this._json_parse_ast = (wrap as { jsonParseAst: JsonParseAst }).jsonParseAst;
+
+		// The same rejection probe the native binding runs, from the same module, so
+		// the two bindings cannot come to disagree about what an oxc rejection IS.
+		// That disagreement is exactly how this row broke once before — a different
+		// cause (the consume-once `errors` getter above), the same shape.
+		assert_oxc_rejects_invalid(this._parser, 'oxc-parser-wasm');
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
@@ -80,9 +87,10 @@ export class OxcWasmImplementation extends BaseImplementation {
 		// the real array in the truthiness test and always sees length 0, silently
 		// accepting every file (invalid input yields an empty Program with end 0) —
 		// which fabricated a 100% conformance-coverage row. See
-		// benches/js/CLAUDE.md §Known Issues.
-		const errors = result.errors;
-		if (errors && errors.length > 0) {
+		// benches/js/CLAUDE.md §Known Issues. `oxc_fatal_errors` (shared with the
+		// native binding) then decides which of those entries are a rejection.
+		const errors = oxc_fatal_errors(result.errors);
+		if (errors.length > 0) {
 			throw new Error(`Parse errors: ${JSON.stringify(errors)}`);
 		}
 

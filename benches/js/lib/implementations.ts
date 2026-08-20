@@ -188,14 +188,34 @@ export interface InitOptions {
 	logger?: Logger;
 }
 
+// Deliberately NOT surface-scoped: every impl initializes on every run, including
+// the format-only ones (biome, dprint, malva, rsvelte-fmt) on the parse-only
+// conformance surface, where they back no row. Gating init on `OPERATIONS` is the
+// obvious saving and it isn't worth taking — measured, the four cost ~233 ms total
+// (biome 187, dprint 23, malva 9, rsvelte-fmt 14) against a multi-minute run, and
+// two disclosures read the LIVE set rather than `complete`: `collect_binary_sizes`
+// gates each artifact on `impls.<key>`, so a skipped impl silently drops its row
+// from the published BINARY SIZES table (a catalog of what is on disk, which the
+// surface's operation list has no business thinning), and `get_alternative_versions`
+// feeds the report's `Versions:` line from the same set. The cost of the saving is a
+// thinner published report; the cost of not taking it is a fifth of a second.
+
 /**
  * Initialize one REQUIRED implementation, rethrowing when it can't load.
  *
  * Three impls take this path: `canonical` (the oracle every comparison is
  * against) and tsv's own `native` + `wasm` (the subject every caller of
  * `init_implementations` exists to measure or compare). A failure in any of them
- * is a broken tree — an unbuilt artifact, a corrupt bundle — not a machine coming
+ * is a broken tree — an unbuilt artifact, a corrupt bundle, or a self-check these
+ * three run that the alternatives' rows can't invalidate (`canonical`'s
+ * prettier-config probe, the tsv bindings' rejection probes) — not a machine coming
  * up short, so it must stop the run rather than join `unavailable`.
+ *
+ * That is the SAME rule `init_optional` follows, not a competing one: a failed
+ * self-check withdraws whatever it contaminates. For an alternative that is its own
+ * row, so the row goes to `unavailable`. For these three there is no row to
+ * withdraw — the baseline is what every other row is a ratio against, and tsv's
+ * bindings are the subject — so the contaminated unit is the whole run.
  *
  * Being fatal is also what lets their slots be non-`undefined` in
  * `ImplementationSet`. That was worth more than the tolerance it replaces: the

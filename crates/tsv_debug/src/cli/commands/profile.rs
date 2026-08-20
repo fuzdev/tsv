@@ -397,6 +397,14 @@ pub(crate) fn format_duration(us: f64) -> String {
     }
 }
 
+/// Format a corpus-file size for the profile table, BINARY (`KB` = 1024 B).
+///
+/// The deliberate exception to the decimal convention every other size in the repo
+/// uses (the bench harness's tables, the publish scripts' `format_size`). This
+/// command's headline metric is µs per KB — a rate whose divisor defines it — and
+/// the recorded baselines in `docs/performance.md` were measured against a binary
+/// KB, so redefining it here would shift every historical comparison without
+/// changing a single measurement. These numbers never sit beside the harness's.
 #[allow(clippy::cast_precision_loss)]
 pub(crate) fn format_size(bytes: usize) -> String {
     if bytes >= 1024 {

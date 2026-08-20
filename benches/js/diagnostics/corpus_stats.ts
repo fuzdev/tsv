@@ -33,6 +33,7 @@ import {
 	type CorpusView,
 	DevReposLoader,
 	DirectoryLoader,
+	format_mb,
 	stream_perf_candidate
 } from '../lib/corpus.ts';
 import { LANGUAGES, type Language, type SourceFile } from '../lib/types.ts';
@@ -89,18 +90,20 @@ function stats_of(files: SourceFile[]): Stats {
 }
 
 /**
- * Format a corpus size, binary units (`B`/`KB`/`MB`, 1024-based) — every number
- * this tool prints, from one file to the whole corpus.
+ * Format a corpus size, decimal units (`B`/`KB`/`MB`, 1000-based) — every number
+ * this tool prints, from one file to the whole corpus. The MB tier IS
+ * `lib/corpus.ts`'s `format_mb`, so a candidate directory sized here is directly
+ * comparable to the corpus total the benchmark report publishes — carrying one
+ * module's number over to the other is the point here, not the hazard.
  *
- * NOT `binary_sizes.ts`'s `format_bytes`, which is decimal (1000-based)
- * because it sizes shipped artifacts, and not `corpus_compare_format.ts`'s
- * `format_source_size`, which is binary like this one but unspaced and never
- * reaches MB. Three formats over two conventions, so each name says which — a
- * reader carrying another module's answer over is the failure this prevents.
+ * Decimal like `binary_sizes.ts`'s `format_bytes` (which sizes shipped
+ * artifacts), and unlike `corpus_compare_format.ts`'s `format_source_size`, which
+ * stays binary because it spells ONE file's size inside a diff listing —
+ * unspaced, never reaching MB, never summed against a corpus.
  */
 function format_corpus_size(n: number): string {
-	if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(2)} MB`;
-	if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
+	if (n >= 1_000_000) return format_mb(n);
+	if (n >= 1000) return `${(n / 1000).toFixed(1)} KB`;
 	return `${n} B`;
 }
 
