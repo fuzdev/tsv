@@ -62,8 +62,24 @@ export function get_napi_library_path(): string {
 	return `${project_root}target/napi/${native_library_filename('tsv_napi')}`;
 }
 
+/**
+ * The per-language export tables, resolved ONCE in `init()`.
+ *
+ * The FFI sibling's `FfiTables` for the same reason: these were getters returning a
+ * fresh object literal, so every timed call allocated one — harness-side allocation
+ * charged to whichever row it sat under, which belongs to no impl.
+ */
+interface NapiTables {
+	parse: Record<Language, (source: string) => string>;
+	parse_internal: Record<Language, (source: string) => void>;
+	/** Span-only wire — svelte + typescript only (CSS emits no `loc`). */
+	parse_no_locations: Partial<Record<Language, (source: string) => string>>;
+	format: Record<Language, (source: string) => string>;
+}
+
 export class NapiImplementation extends BaseImplementation {
 	private _addon: NapiAddon | null = null;
+	private _tables: NapiTables | null = null;
 
 	readonly parse_languages = LANGUAGES;
 	readonly format_languages = LANGUAGES;
@@ -71,6 +87,12 @@ export class NapiImplementation extends BaseImplementation {
 	private get addon(): NapiAddon {
 		if (!this._addon) throw new Error('N-API addon not initialized');
 		return this._addon;
+	}
+
+	/** The per-language export tables, or throw if `init()` hasn't run. */
+	private get tables(): NapiTables {
+		if (!this._tables) throw new Error('N-API addon not initialized');
+		return this._tables;
 	}
 
 	async init(): Promise<void> {
@@ -86,37 +108,29 @@ export class NapiImplementation extends BaseImplementation {
 		const mod: { exports: NapiAddon } = { exports: {} as NapiAddon };
 		process.dlopen(mod, path);
 		this._addon = mod.exports;
-	}
 
-	private get parse_fns(): Record<Language, (source: string) => string> {
-		return {
-			svelte: this.addon.parse_svelte,
-			typescript: this.addon.parse_typescript,
-			css: this.addon.parse_css
-		};
-	}
-
-	private get parse_internal_fns(): Record<Language, (source: string) => void> {
-		return {
-			svelte: this.addon.parse_internal_svelte,
-			typescript: this.addon.parse_internal_typescript,
-			css: this.addon.parse_internal_css
-		};
-	}
-
-	private get format_fns(): Record<Language, (source: string) => string> {
-		return {
-			svelte: this.addon.format_svelte,
-			typescript: this.addon.format_typescript,
-			css: this.addon.format_css
-		};
-	}
-
-	// Span-only wire — svelte + typescript only (CSS has no `loc`).
-	private get parse_no_locations_fns(): Partial<Record<Language, (source: string) => string>> {
-		return {
-			svelte: this.addon.parse_svelte_no_locations,
-			typescript: this.addon.parse_typescript_no_locations
+		// Resolve every export table once — see `NapiTables`.
+		const addon = this.addon;
+		this._tables = {
+			parse: {
+				svelte: addon.parse_svelte,
+				typescript: addon.parse_typescript,
+				css: addon.parse_css
+			},
+			parse_internal: {
+				svelte: addon.parse_internal_svelte,
+				typescript: addon.parse_internal_typescript,
+				css: addon.parse_internal_css
+			},
+			parse_no_locations: {
+				svelte: addon.parse_svelte_no_locations,
+				typescript: addon.parse_typescript_no_locations
+			},
+			format: {
+				svelte: addon.format_svelte,
+				typescript: addon.format_typescript,
+				css: addon.format_css
+			}
 		};
 	}
 
@@ -127,7 +141,7 @@ export class NapiImplementation extends BaseImplementation {
 		if (goal && language === 'typescript') {
 			return JSON.parse(this.addon.parse_typescript_with_goal(source, goal));
 		}
-		return JSON.parse(this.parse_fns[language](source));
+		return JSON.parse(this.tables.parse[language](source));
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
@@ -135,23 +149,24 @@ export class NapiImplementation extends BaseImplementation {
 			this.addon.parse_internal_typescript_with_goal(source, goal);
 			return;
 		}
-		this.parse_internal_fns[language](source);
+		this.tables.parse_internal[language](source);
 	}
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
 		if (goal && language === 'typescript') {
 			return JSON.parse(this.addon.parse_typescript_no_locations_with_goal(source, goal));
 		}
-		const fn = this.parse_no_locations_fns[language];
+		const fn = this.tables.parse_no_locations[language];
 		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
 		return JSON.parse(fn(source));
 	}
 
 	format(source: string, language: Language): string {
-		return this.format_fns[language](source);
+		return this.tables.format[language](source);
 	}
 
 	dispose(): void {
 		this._addon = null;
+		this._tables = null;
 	}
 }

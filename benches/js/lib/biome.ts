@@ -10,6 +10,7 @@ import type { BiomeVersions } from './versions.ts';
 // the WASM package at this module's import. The value import is deferred to
 // `init()` (see there) so a load-time crash can't escape the registry's skip.
 import type { Biome } from '@biomejs/js-api/bundler';
+import { assert_format_config_landed, FORMAT_CONFIG_PROBE } from './format_config_probe.ts';
 
 /**
  * Biome implementation using WASM.
@@ -51,8 +52,10 @@ export class BiomeImplementation extends BaseImplementation {
 		// trailing commas — so every format row does the same layout work (at
 		// biome's defaults, width 80 + double quotes, the rows wrap different
 		// amounts of code and the ratios conflate config with engine speed). The
-		// per-language `formatter.*` keys don't inherit the top-level ones, so
-		// each section repeats them. Biome has no
+		// per-language `formatter.*` sections DO inherit the top-level ones and
+		// override them where they set a key (measured in both directions); each
+		// repeats the shared values anyway, so a rename that reached only the
+		// top-level block can't silently un-pin every language at once. Biome has no
 		// dedicated Svelte formatter — `html.experimentalFullSupportEnabled` is what lets
 		// it format `.svelte` at all, via its experimental HTML-superset pipeline; that
 		// path formats the embedded `<script>`/`<style>` too (verified), so the svelte row
@@ -85,6 +88,17 @@ export class BiomeImplementation extends BaseImplementation {
 				}
 			}
 		});
+
+		// Assert the configuration actually LANDED. `applyConfiguration` accepts an
+		// unrecognized key SILENTLY — no throw, no diagnostic (verified) — so a
+		// renamed key in a future biome major would leave this row formatting at
+		// biome's own defaults (measured: width 80, double quotes, trailing commas)
+		// and wrapping a different amount of code than every other format row, with
+		// nothing in the report to say so. dprint and malva have a diagnostic channel
+		// for this (`getConfigDiagnostics`); biome has none, so the check is
+		// behavioral. Routed through `format` rather than `formatContent` so the probe
+		// exercises the exact call the timed row makes.
+		assert_format_config_landed('biome', this.format(FORMAT_CONFIG_PROBE, 'typescript'));
 	}
 
 	parse(_source: string, _language: Language): unknown {
@@ -92,7 +106,9 @@ export class BiomeImplementation extends BaseImplementation {
 	}
 
 	format(source: string, language: Language): string {
-		if (!this._biome || !this._project_key) {
+		// `=== null` on the key, not a truthiness test: `openProject` hands back a
+		// numeric handle, and a legitimate `0` would read as uninitialized.
+		if (!this._biome || this._project_key === null) {
 			throw new Error('Biome not initialized');
 		}
 		if (!this.supports_format_language(language)) {

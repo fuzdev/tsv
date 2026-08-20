@@ -38,7 +38,22 @@ Things the published numbers measure that aren't quite what they look like.
   escaping, and `trailingCommas: never` fans out to dprint's 12 per-construct
   keys), malva (`malva.ts`), and rsvelte-fmt (`rsvelte.ts`). Unmatched defaults (biome's width is 80; oxfmt and biome default to
   double quotes) would make rows wrap/rewrite different amounts of code,
-  conflating config with engine speed. oxfmt's own width default is already 100 —
+  conflating config with engine speed. **Each of the four TIMED alternatives —
+  oxfmt, biome, dprint, malva — proves its pins actually LANDED** (rsvelte-fmt is
+  coverage-only, so its config can't move a ratio), because a silently-ignored key
+  produces
+  exactly that conflation with nothing in the report to show it: dprint and malva
+  fail init on a non-empty `getConfigDiagnostics()`, while biome's
+  `applyConfiguration` and oxfmt's per-call options bag accept an unknown key with
+  no throw and no diagnostic (verified — biome then falls back to width 80 + double
+  quotes + trailing commas, oxfmt to spaces + double quotes + trailing commas), so
+  those two are checked behaviorally: `init` formats one probe source whose output
+  differs under each pinned option and reads the answer back
+  (`lib/format_config_probe.ts` — one probe and one grader for both tools, so they
+  can't drift on what "landed" means). A tool whose pins stop landing goes ABSENT,
+  with the option named in the report's `unavailable`, rather than staying present
+  and publishing a number produced at some other tool's defaults. oxfmt's own width
+  default is already 100 —
   pinned anyway so a default change can't silently skew the rows; the options
   provably reach its bundled-prettier Svelte fallback too. `prettier` is the
   reference and `oxfmt` also targets prettier conformance, so `prettier` vs
@@ -72,6 +87,12 @@ Things the published numbers measure that aren't quite what they look like.
   concatenated per repo (~3× the standalone bytes, naturally-sized files). Those
   harvest bytes are also timed inside the svelte rows (rows are never summed, so
   this is disclosure, not distortion), and CSS per-file ratios stay the noisiest.
+  One shape note on that harvest: the blocks keep their authored bytes verbatim,
+  which includes the one level of indent they carried inside `<style>`, so the
+  concatenated file is uniformly indented by one tab. Every tool re-indents it
+  identically — same input, no per-tool advantage — but it does mean the dominant
+  CSS sample measures a full re-indent rather than the steady-state
+  already-formatted case the standalone `.css` files represent.
 - **PGO native flagship (forthcoming — policy; no such row ships today).** The
   standalone native flagship — the `tsv` binary the `@fuzdev/tsv` platform
   packages already ship, un-PGO'd, under the one name rather than a second
@@ -187,6 +208,24 @@ Things the published numbers measure that aren't quite what they look like.
   out (`vs prettier (speedup)`, `vs Best (speedup)`). The only exception is
   `JSON overhead` rows, explicitly labeled `json_ns / internal_ns` (higher = more
   cost) because overhead is inherently a slowdown ratio.
+- **Task order, and the inter-task heap settle.** Within a group the tasks run
+  sequentially in registration order (canonical first, then tsv's rows, then the
+  alternatives) with the timing library's inter-task cooldown disabled — a
+  workaround for an oxfmt × Deno timer-wheel hang, applied uniformly so a
+  runtime-conditional settle can't bias the cross-runtime ratios (../benches/js/CLAUDE.md
+  §Known Issues). Back-to-back tasks share a heap, so without a control the garbage
+  one task leaves behind is collected on the *next* task's clock and a fixed order
+  turns that carryover into a systematic per-position effect. So each task's untimed
+  `setup` forces a major GC (`settle_heap` in `bench.ts`), and every task — the
+  first one after pre-flight included — begins its warmup from a comparable heap.
+  This is deliberately NOT the same knob as the per-iteration hook below: it
+  normalizes where a task *starts* without touching the measured workload's own GC
+  profile, which is why it is always on where that one is off. It needs
+  `--expose-gc` (every timed `bench:*:run` task passes it); without the flag it
+  silently no-ops, so the run prints a ⚠ before the timed phase rather than
+  publishing numbers with the control quietly gone. Nothing here randomizes or
+  interleaves task order — the settle bounds the carryover rather than eliminating
+  order as a variable.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the
@@ -351,7 +390,20 @@ prettier. Load-bearing on two axes:
   parse goal from the file rather than accepting one, so the conformance corpus's
   declared `goal` is ignored for this row alone. 6.x is the last JS implementation;
   7.x is the Go port, whose npm package ships a binary with no in-process parser API.
-- **oxc-parser (NAPI)** — fast TypeScript parser; TypeScript, JS.
+- **oxc-parser (NAPI)** — fast TypeScript parser; TypeScript, JS. Like tsc and yuku
+  it does not throw its verdict, it reports it: `parseSync` returns an `errors`
+  array whose entries carry a severity (`Error` | `Warning` | `Advice`), so an
+  accept is defined as "no FATAL entry" (`oxc_fatal_errors` in `lib/oxc.ts`, shared
+  by both bindings). Counting the array's length instead would score a merely
+  warned-about file as a rejection — under-reporting oxc's coverage and, in the
+  default intersection mode, dropping that file out of the set every row in the
+  group is timed on. Measured across 52,106 conformance-corpus files, every
+  diagnostic oxc produced was `Error`, so this moves no published number today; it
+  is stated because the accept definition should be correct rather than accidentally
+  correct. The classification is written as a NON-fatal denylist rather than an
+  `Error` allowlist, so an upstream rename of that value degrades to the
+  conservative reading instead of fabricating a 100% row, and `init` additionally
+  proves a real syntax error still lands as fatal.
 - **oxfmt (NAPI)** — fast formatter; TypeScript, JS, CSS, Svelte (experimental).
   As of 0.57 the native Rust formatter handles **JS/TS *and* CSS**; only **Svelte**
   routes through a JS-side fallback into oxfmt's **bundled prettier**
@@ -361,11 +413,18 @@ prettier. Load-bearing on two axes:
   **TypeScript AND CSS**; only the **svelte** oxfmt row is (mostly) a
   prettier-pipeline number in oxfmt packaging — read that one ratio accordingly.
   The report corroborates: oxfmt ≈ prettier on svelte (~1x), but ~28x prettier on
-  css and ~14x on TS.
+  css and ~14x on TS. Its pinned options are hoisted out of the per-call path and
+  proven to land at `init` (see the pinning bullet in
+  [Fairness caveats](#fairness-caveats)).
 - **biome (WASM)** — formatter/linter; TypeScript, JS, CSS, and Svelte (via
   biome's experimental HTML-superset support, `html.experimentalFullSupportEnabled`;
   it formats the template **and** the embedded `<script>`/`<style>`, so it's
   comparable work to prettier-plugin-svelte / tsv, just on an experimental path).
+  Its per-language `formatter` sections inherit the top-level one and override it
+  where they set a key (measured in both directions); each repeats the shared
+  values anyway, so a rename reaching only the top-level block can't un-pin every
+  language at once. The pins are proven to land at `init` (see the pinning bullet
+  in [Fairness caveats](#fairness-caveats)).
 - **dprint (WASM)** — formatter; **TypeScript, JS only**. This is the engine
   **`deno fmt` runs** for TS/JS (`dprint-plugin-typescript`), loaded in-process as
   its Wasm plugin. Deliberately NOT a `deno fmt` subprocess row: that would exist

@@ -99,10 +99,16 @@ delta on the same row is the detector.
   whatever exists, so a fresh `report.deno.*` beside a stale `report.node.*` would
   otherwise read as a runtime effect; **mixed machines** (`mixed_machine`) when the
   siblings' hardware identity disagrees, since cross-runtime ratios are only
-  meaningful on same-box siblings; and any row whose per-runtime intersections
+  meaningful on same-box siblings; any row whose per-runtime intersections
   differ (`⚠ files a/b/c`) — each runtime times the files *its* impls passed
   preflight on, so unequal counts mean a sliver of the ratio is file-set, not
-  runtime. The conformance surface writes its own `report.conformance.node.*`,
+  runtime; and **partially measured** rows (`partial_rows`), which one sibling
+  measured and another doesn't carry at all with no recorded load failure to
+  explain the gap — a bare `—` cell otherwise reads identically to an impl that
+  couldn't load, so a row added since a sibling was last run is named rather than
+  left to the vintage banner. A runtime whose sibling predates the `unavailable`
+  field is skipped there rather than accused: with nothing recorded, an absent row
+  can't be told from an unloadable impl. The conformance surface writes its own `report.conformance.node.*`,
   outside the compose glob.
 - **One bench body, runtime-detected.** `bench.ts` detects the runtime
   (`lib/runtime.ts` `current_runtime()`) and selects the runtime-specific artifacts.
@@ -664,8 +670,8 @@ below, field for field and version note for version note, so a new top-level fie
 here is a change there too — it declares them optional and degrades on an older
 report, which is what makes the drift silent rather than loud.
 
-The committed JSON (per-runtime `version: 12` — the combined compose report carries its
-own `version: 9`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
+The committed JSON (per-runtime `version: 13` — the combined compose report carries its
+own `version: 10`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
 `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
 numbers are machine-relative, so this travels with them; excludes hostname and
 volatile fields so it doesn't churn); `corpus_kind` (`perf` | `conformance`);
@@ -681,7 +687,12 @@ is identifiable by `files_iterated: null` — it was timed on nothing, rather th
 timed on the group's intersection. A consumer that reads `entries[]` as speeds must
 skip a row with null `ops_per_second`, not treat it as a zero. Top-level
 `suppressed_noise` records silenced third-party stderr crashes as `{pattern:
-count}`; top-level `variant_parity` records any same-engine pair (two bindings, or one
+count}`; top-level `output_digest_ungraded` records files a byte-graded row
+ACCEPTED whose output the byte-parity check could not digest, as `{"<group>/<row>":
+count}` — the one known cause is a pathologically deep AST overflowing V8's
+recursive `JSON.stringify` (tsc's `binderBinaryExpressionStress.ts`), and it is the
+one field that records a measurement the run could NOT make, so a growing count is
+the byte check quietly covering less; top-level `variant_parity` records any same-engine pair (two bindings, or one
 binding under two options) whose
 pre-flight accept sets disagreed (`[]` when healthy — a non-empty list in a
 committed report is a binding-boundary bug surfacing in the diff); top-level
@@ -993,6 +1004,8 @@ benches/js/
     ├── dprint.ts          # dprint WASM wrapper (TypeScript/JS only; the engine `deno fmt` runs)
     ├── ffi.ts             # Deno.dlopen bindings (NativeImplementation — Deno native)
     ├── fixtures_gate.ts   # Shared per-language parse-conformance gate engine
+    ├── format_config_probe.ts # Behavioral "did the pinned layout config LAND" check, shared by
+    │                      # the two format impls with no config-diagnostic channel (biome, oxfmt)
     ├── gate_counts.ts     # Pinned gate counts — see ../../docs/gate_counts.md
     ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins)
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
@@ -1173,7 +1186,12 @@ and skip counts make it visible without `--verbose`.
   `await wait(cooldown_ms)`, which never fires. Workaround: `cooldown_ms: 0` in
   `run_benchmark_group`'s `Benchmark` config. Async measurement loops (`prettier`,
   `oxfmt` itself) are unaffected because their per-iteration awaits resolve via
-  microtasks, not timers.
+  microtasks, not timers. The inter-task SETTLE the cooldown used to supply is not
+  lost with it: each task's untimed `setup` forces a major GC (`settle_heap`), which
+  is timer-free and uniform across the three runtimes — a runtime-conditional
+  cooldown would put a settle under Node/Bun and none under Deno, biasing the very
+  cross-runtime ratios this design exists to read (../../docs/benchmarks.md
+  §Fairness caveats).
 - **wasm-opt** runs with explicit feature flags in `crates/tsv_wasm/Cargo.toml` —
   Rust 2024's bulk-memory and nontrapping-float-to-int ops, plus the simd128 and
   multivalue features the `.cargo/config.toml` rustflags enable, are passed by name

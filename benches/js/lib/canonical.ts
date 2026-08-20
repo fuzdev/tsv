@@ -54,6 +54,16 @@ export class CanonicalImplementation extends BaseImplementation {
 	#svelte_compiler: any = null;
 	// deno-lint-ignore no-explicit-any
 	#acorn_ts_parser: any = null;
+	/**
+	 * Per-language parse entry points, built ONCE in `init()`.
+	 *
+	 * This was a getter returning a fresh object of three closures, so every timed
+	 * parse call allocated four objects before doing any parse work — harness-side
+	 * allocation charged to the ORACLE row, which belongs to no impl. Hoisted for
+	 * the same reason `NO_PLUGINS` and `#svelte_plugins` are, and matching the
+	 * `*Tables` fields in `lib/ffi.ts` / `lib/napi.ts` / `lib/wasm.ts`.
+	 */
+	#parse_fns: Record<Language, ParserFn> | null = null;
 
 	readonly parse_languages = LANGUAGES;
 	readonly format_languages = LANGUAGES;
@@ -88,24 +98,10 @@ export class CanonicalImplementation extends BaseImplementation {
 		// Create TypeScript parser once (acorn.Parser.extend is expensive)
 		// deno-lint-ignore no-explicit-any
 		this.#acorn_ts_parser = acorn_mod.Parser.extend(acorn_ts_mod.tsPlugin() as any);
-	}
 
-	/**
-	 * Opt into the content-addressed prettier-output cache (`lib/prettier_cache.ts`)
-	 * for `format_async` — used by `corpus:compare:format` and the conformance
-	 * driver ONLY (never the bench, which times prettier; never the fixture
-	 * validator, which live-verifies by design). Returns the cache so the caller
-	 * can report hit/miss stats, or null when `TSV_PRETTIER_CACHE=0` disables it.
-	 */
-	enable_format_cache(): PrettierCache | null {
-		if (!prettier_cache_enabled()) return null;
-		this.#format_cache = new PrettierCache(this.versions, JSON.stringify(PRETTIER_OPTIONS));
-		return this.#format_cache;
-	}
-
-	// Lookup table for parse functions by language
-	get #parse_fns(): Record<Language, ParserFn> {
-		return {
+		// Build the parse table once — see `#parse_fns`. Each closure keeps its own
+		// null check: it costs nothing and leaves the closure self-describing.
+		this.#parse_fns = {
 			svelte: (source) => {
 				if (!this.#svelte_compiler) throw new Error('Svelte compiler not initialized');
 				return this.#svelte_compiler.parse(source, { modern: true });
@@ -125,6 +121,19 @@ export class CanonicalImplementation extends BaseImplementation {
 		};
 	}
 
+	/**
+	 * Opt into the content-addressed prettier-output cache (`lib/prettier_cache.ts`)
+	 * for `format_async` — used by `corpus:compare:format` and the conformance
+	 * driver ONLY (never the bench, which times prettier; never the fixture
+	 * validator, which live-verifies by design). Returns the cache so the caller
+	 * can report hit/miss stats, or null when `TSV_PRETTIER_CACHE=0` disables it.
+	 */
+	enable_format_cache(): PrettierCache | null {
+		if (!prettier_cache_enabled()) return null;
+		this.#format_cache = new PrettierCache(this.versions, JSON.stringify(PRETTIER_OPTIONS));
+		return this.#format_cache;
+	}
+
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		// A test262 goal overrides the default module `sourceType` so acorn scores
 		// each script-goal file at its declared goal (e.g. `await` as an ordinary
@@ -138,7 +147,9 @@ export class CanonicalImplementation extends BaseImplementation {
 				locations: true
 			});
 		}
-		return this.#parse_fns[language](source);
+		const parse_fns = this.#parse_fns;
+		if (!parse_fns) throw new Error('Canonical parsers not initialized');
+		return parse_fns[language](source);
 	}
 
 	async format_async(source: string, language: Language, source_path?: string): Promise<string> {
@@ -184,6 +195,7 @@ export class CanonicalImplementation extends BaseImplementation {
 	}
 
 	dispose(): void {
+		this.#parse_fns = null;
 		this.#prettier = null;
 		this.#prettier_svelte = null;
 		this.#svelte_compiler = null;

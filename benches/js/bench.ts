@@ -271,6 +271,28 @@ const BENCH_WARMUP = BENCH_WARMUP_EXPLICIT ?? 3;
 const BENCH_GC = env.BENCH_GC === '1';
 
 /**
+ * Force a major GC — outside every timing loop — or no-op when the runtime wasn't
+ * started with `--expose-gc`.
+ *
+ * The INTER-TASK settle, and it is a fairness control rather than a tuning knob.
+ * Tasks run back-to-back in registration order with `cooldown_ms: 0` (the
+ * oxfmt × Deno timer workaround — benches/js/CLAUDE.md §Known Issues), so without
+ * it the garbage one task leaves behind is collected on the NEXT task's clock, and
+ * a fixed task order turns that carryover into a systematic per-position bias:
+ * `prettier` leads every format group and the alternatives always trail it.
+ *
+ * Run from each task's `setup` (which the timing library excludes from its
+ * measurements), so every task — the first one after pre-flight included — starts
+ * its warmup from a comparable heap. That is a different question from `BENCH_GC`,
+ * which forces a collection between every ITERATION and so reshapes the measured
+ * workload's own GC profile; this one only normalizes where each task begins, and
+ * is therefore always on.
+ */
+const settle_heap = (): void => {
+	globalThis.gc?.();
+};
+
+/**
  * Include the `tsv-forced-async` control row (default off). Same native engine
  * as `tsv`, routed through the awaited async path, to re-confirm that the
  * per-file await tax the async-only impls (`prettier`, `oxfmt`) pay is below the
@@ -941,12 +963,26 @@ const sibling_outputs_must_match = (name: string): boolean =>
  * without serializing and return `undefined` — nothing to grade, hence `null`
  * rather than a digest of `"undefined"`, which would grade two blanks as equal
  * and read as coverage.
+ *
+ * TOTAL by construction, and that is load-bearing rather than defensive: V8's
+ * `JSON.stringify` recurses once per AST level, so a pathologically deep tree
+ * overflows the stack — tsc's `binderBinaryExpressionStress.ts` is ~10k nested
+ * binary expressions and does exactly that. The row PARSED that file and its
+ * output is fine; there is simply no digest for it. A throw escaping here is
+ * caught by the pre-flight's skip handler and recorded as the TOOL failing on a
+ * file it actually handled — which is what it did, moving four rows' published
+ * skip counts by one and, had such a file been in the perf corpus, arming
+ * `enforce_perf_coverage` to hard-fail on a phantom.
  */
 function output_digest(result: unknown): string | null {
 	if (result === undefined || result === null) return null;
-	const text = typeof result === 'string' ? result : JSON.stringify(result);
-	if (text === undefined) return null;
-	return createHash('sha1').update(text).digest('hex');
+	try {
+		const text = typeof result === 'string' ? result : JSON.stringify(result);
+		if (text === undefined) return null;
+		return createHash('sha1').update(text).digest('hex');
+	} catch {
+		return null;
+	}
 }
 
 /** One same-engine pair that disagreed — on its accept set, its output, or both. */
@@ -978,6 +1014,20 @@ const variant_parity_findings: VariantParityFinding[] = [];
  * pre-flight for the rows `sibling_outputs_must_match` grades and no others.
  */
 const output_digests: Map<string, Map<string, string>> = new Map();
+
+/**
+ * Files a byte-graded row ACCEPTED but whose output `output_digest` could not
+ * digest, keyed by tracking_key — the byte check's own blind spot, counted rather
+ * than assumed away.
+ *
+ * Not a failure of anything: the row parsed the file and its output is fine, so it
+ * belongs in neither `skipped_files` (it isn't a skip) nor the digest map (there is
+ * nothing to compare against). But an ungraded file IS a hole in the standing
+ * correctness check on the shipped native artifact, and a hole nothing records is a
+ * hole nobody finds — so it is reported both ways: a ⚠ at the pair, and
+ * `output_digest_ungraded` in the committed JSON.
+ */
+const ungraded_digests: Map<string, { count: number; example: string }> = new Map();
 
 /**
  * Grade every same-engine pair on the two things one engine behind two front-ends
@@ -1065,6 +1115,19 @@ function check_variant_parity(): void {
 						`harness; a green run here proves nothing.`
 				);
 				exit(1);
+			}
+
+			// The byte check's blind spot, named where it applies. Not fatal — the row
+			// accepted the file and its output is fine — but a pair that grades fewer
+			// files than it accepted should say so rather than read as full coverage.
+			const ungraded = ungraded_digests.get(tracking_key);
+			if (ungraded !== undefined) {
+				console.error(
+					`⚠ variant parity (${group_name}): ${name} accepted ${ungraded.count} file(s) whose ` +
+						`output could not be digested, so the byte check did not grade ${
+							ungraded.count === 1 ? 'it' : 'them'
+						} (first: ${ungraded.example}). Not a tool failure — see \`output_digest\`.`
+				);
 			}
 
 			if (impl_only === 0 && sibling_only === 0 && output_mismatch === 0) continue;
@@ -1156,6 +1219,22 @@ function get_coverage_by_source(): CoverageBySource {
 }
 
 /**
+ * `ungraded_digests` as plain JSON, keyed `"<group>/<row>"` — the two identities a
+ * report consumer already holds (`entries[].group` + `entries[].name`), rather than
+ * the internal tracking key, which appears nowhere else in the emitted shape.
+ */
+function serialize_ungraded_digests(): Record<string, number> {
+	const out: Record<string, number> = {};
+	for (const [group_name, task_tracking] of task_tracking_by_group) {
+		for (const [name, tracking_key] of task_tracking) {
+			const entry = ungraded_digests.get(tracking_key);
+			if (entry) out[`${group_name}/${name}`] = entry.count;
+		}
+	}
+	return out;
+}
+
+/**
  * `compute_coverage_by_source` as plain JSON — `group → source → impl → {processed,
  * total}` — for the committed report. Maps don't survive `JSON.stringify`, and the
  * markdown tables alone would leave a consumer (tsv.fuz.dev, a diff at review time)
@@ -1244,20 +1323,34 @@ async function run_preflight(
 		let bytes = 0;
 		const start_ms = performance.now();
 		for (const file of files) {
+			// ONLY the impl call belongs inside the skip-recording try. Anything else
+			// in it — the digest below was — turns a HARNESS-side failure on a file the
+			// tool handled into a recorded skip against the tool. See `output_digest`.
+			let result: unknown;
 			try {
 				// `file.goal` is set only for test262 (conformance surface); every
 				// other corpus leaves it undefined → the default module parse.
-				const result = task.is_async
+				result = task.is_async
 					? await task.run_async!(file.content, language, file.goal)
 					: task.run(file.content, language, file.goal);
-				success.add(file.path);
-				bytes += file.bytes;
-				if (digests !== null) {
-					const digest = output_digest(result);
-					if (digest !== null) digests.set(file.path, digest);
-				}
 			} catch (e) {
 				record_skip(task.tracking_key, file.path, e);
+				continue;
+			}
+			success.add(file.path);
+			bytes += file.bytes;
+			if (digests !== null) {
+				const digest = output_digest(result);
+				if (digest !== null) {
+					digests.set(file.path, digest);
+				} else if (result !== undefined && result !== null) {
+					// An accepted output that produced no digest — see `ungraded_digests`.
+					// A nullish result is the `-internal` shape, which has nothing to
+					// grade by design and so is not a hole.
+					const seen = ungraded_digests.get(task.tracking_key);
+					if (seen) seen.count += 1;
+					else ungraded_digests.set(task.tracking_key, { count: 1, example: file.path });
+				}
 			}
 		}
 		const elapsed_ms = performance.now() - start_ms;
@@ -1419,6 +1512,11 @@ async function run_benchmark_group(
 		// 100ms inter-task cooldown is the only timer-dependent await in
 		// the loop, so dropping it sidesteps the hang.
 		// See benches/js/CLAUDE.md → Known Issues.
+		// The inter-task SETTLE the cooldown used to supply is not lost with it:
+		// each task's `setup` forces a major GC (`settle_heap`), which is both
+		// timer-free and uniform across the three runtimes — a runtime-conditional
+		// cooldown would put a settle under Node/Bun and none under Deno, biasing
+		// the very cross-runtime ratios this bench exists to read.
 		cooldown_ms: 0,
 		on_iteration: BENCH_GC ? () => globalThis.gc?.() : undefined,
 		on_task_complete: (result: BenchmarkResult, index: number, total: number) => {
@@ -1456,7 +1554,14 @@ async function run_benchmark_group(
 		// An explicit `BENCH_WARMUP` wins — it's the knob for deliberately
 		// studying warmup effects, so tiering must not silently override it.
 		const warmup_iter = preflight_ms > 5000 && BENCH_WARMUP_EXPLICIT === undefined ? 1 : undefined;
-		const base_task = { name: task.name, min_iterations: min_iter, warmup_iterations: warmup_iter };
+		const base_task = {
+			name: task.name,
+			min_iterations: min_iter,
+			warmup_iterations: warmup_iter,
+			// Untimed (the library excludes `setup`), so every task's warmup and
+			// measurement start from a comparable heap — see `settle_heap`.
+			setup: settle_heap
+		};
 		if (task.is_async) {
 			bench.add({
 				...base_task,
@@ -1517,6 +1622,20 @@ if (COVERAGE_ONLY) {
 		'\nCoverage-only mode: skipping the timed benchmark phase (coverage is a pre-flight product).'
 	);
 } else {
+	// Both the inter-task settle and the opt-in per-iteration hook go through
+	// `globalThis.gc`, which exists only when the runtime was started with
+	// `--expose-gc` (every timed `bench:*:run` task passes it). A silent no-op would
+	// remove the ordering control while the numbers still looked publishable, so say
+	// so — here rather than at startup, since the coverage-only run has no timed
+	// phase to bias and its task passes no such flag.
+	if (typeof globalThis.gc !== 'function') {
+		log(
+			'⚠ globalThis.gc is unavailable (no --expose-gc): tasks run without the inter-task heap ' +
+				'settle, so task order can bias the results' +
+				(BENCH_GC ? ', and BENCH_GC=1 is inert' : '')
+		);
+	}
+
 	log('\nRunning benchmarks:');
 	for (const lang of LANGUAGES) {
 		for (const operation of OPERATIONS) {
@@ -1604,11 +1723,11 @@ interface BaselineVersions extends ReportVersions {
  * that type to describe sibling reports written by older benches, so a field added
  * there is absent from data the composer already reads (see `Machine`).
  *
- * 12: `unavailable[]` entries carry `rows` — the row NAMES each load failure removed
- * from this surface. Every other identity the report publishes is a row name, so the
- * init label alone (`Biome`, `OXC WASM`) could not be joined against any table.
+ * 13: `output_digest_ungraded` — files a byte-graded row accepted whose output the
+ * byte-parity check could not digest, keyed `"<group>/<row>"`. Records a
+ * measurement the run could not make, where every other field records one it did.
  */
-const REPORT_SCHEMA_VERSION = 12;
+const REPORT_SCHEMA_VERSION = 13;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -1686,6 +1805,18 @@ interface Baseline {
 	 * report). Empty `{}` when nothing was suppressed.
 	 */
 	suppressed_noise: Record<string, number>;
+	/**
+	 * Files a byte-graded row ACCEPTED but whose output could not be digested, as
+	 * `{"<group>/<row>": count}` — so `check_variant_parity`'s byte half did not
+	 * grade them. Empty `{}` when every accepted output was gradeable, which is the
+	 * healthy state.
+	 *
+	 * JSON-only, like `suppressed_noise`, and here for the same reason: it records a
+	 * measurement the run could NOT make. The one known cause is a pathologically
+	 * deep AST overflowing V8's recursive `JSON.stringify` (see `output_digest`);
+	 * a count that grows is the byte check quietly covering less.
+	 */
+	output_digest_ungraded: Record<string, number>;
 	/**
 	 * Same-engine pairs — one engine behind two bindings, or one binding under two
 	 * options — whose pre-flight accept sets or output bytes
@@ -1878,6 +2009,7 @@ async function build_results_data(
 		binary_sizes_absent: collected_sizes.absent,
 		entries,
 		suppressed_noise: Object.fromEntries(suppressed_noise),
+		output_digest_ungraded: serialize_ungraded_digests(),
 		variant_parity: variant_parity_findings,
 		unavailable: unavailable_with_rows(impls.unavailable, DEFINED_ROWS)
 	};

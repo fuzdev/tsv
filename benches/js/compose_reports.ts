@@ -204,6 +204,48 @@ const unavailable_by_runtime = sources
 const mixed_vintage =
 	new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}`)).size > 1;
 
+/**
+ * Row names each sibling recorded as unavailable, or `null` when the sibling
+ * predates the field — "not recorded" and "nothing was missing" are different
+ * claims, and only one of them is safe to make.
+ */
+const unavailable_rows_by_runtime = new Map<Runtime, ReadonlySet<string> | null>(
+	sources.map((s) => [
+		s.runtime,
+		s.unavailable === null ? null : new Set(s.unavailable.flatMap((u) => u.rows ?? []))
+	])
+);
+
+/**
+ * Rows one sibling MEASURED that another doesn't carry at all, with no load failure
+ * on that side to explain the gap.
+ *
+ * The composer folds whatever reports exist, so a row added to the harness after a
+ * sibling was last run lands in its column as a bare `—` — visually identical to a
+ * row whose impl failed to load, which `unavailable_by_runtime` above DOES explain,
+ * and to a language a row doesn't cover, which never reaches the group at all.
+ * `mixed_vintage` flags the general condition; this names the rows it actually cost,
+ * which is the part a reader of one group's table can act on.
+ *
+ * A runtime whose sibling predates `unavailable` is skipped rather than counted:
+ * with nothing recorded there, an absent row can't be told from an unloadable impl,
+ * and claiming drift would be the unsafe half of that pair. (A sibling from the
+ * brief `version` 10–11 window records failures WITHOUT `rows`, so its absences do
+ * read as unexplained here — the same data shortfall `unavailable_by_runtime`
+ * carries, and it clears on the next full `bench:perf`.)
+ */
+const partial_rows = order
+	.map((key) => {
+		const row = rows.get(key)!;
+		const missing = present.filter((r) => {
+			if (row.ops[r] !== undefined) return false;
+			const recorded = unavailable_rows_by_runtime.get(r) ?? null;
+			return recorded !== null && !recorded.has(row.name);
+		});
+		return { group: row.group, name: row.name, missing };
+	})
+	.filter((entry) => entry.missing.length > 0);
+
 // Loud flag when the siblings were produced on DIFFERENT boxes — the
 // throughput numbers are machine-relative, so cross-runtime ratios are only
 // meaningful on same-machine siblings. Compares the HARDWARE identity only
@@ -226,10 +268,11 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * names changed, and say what the new number means in one line below, so a consumer
  * can tell "this composer didn't record it" from "there was nothing to record".
  *
- * 9: `unavailable_by_runtime[]` entries carry `rows` (was `impls`) — the row names a
- * runtime's load failures removed, which is the identity these tables are keyed by.
+ * 10: `partial_rows[]` — rows one sibling measured that another doesn't carry, with
+ * no recorded load failure to explain the gap (i.e. a stale sibling, not a machine
+ * shortfall).
  */
-const COMBINED_SCHEMA_VERSION = 9;
+const COMBINED_SCHEMA_VERSION = 10;
 
 // JSON: metadata + provenance per source + the comparison rows.
 const combined = {
@@ -240,6 +283,7 @@ const combined = {
 	mixed_vintage,
 	mixed_machine,
 	unavailable_by_runtime,
+	partial_rows,
 	sources,
 	rows: order.map((key) => {
 		const row = rows.get(key)!;
@@ -305,6 +349,17 @@ if (unavailable_by_runtime.length > 0) {
 			'contributes no measurement there — a row thinner than its neighbours, or missing ' +
 			'outright, is a load failure rather than a speed result. The per-runtime report’s ' +
 			'`unavailable` carries the impl and the cause.\n'
+	);
+}
+if (partial_rows.length > 0) {
+	md.push(
+		'**Partially measured:** ' +
+			partial_rows
+				.map((r) => `\`${r.group}/${r.name}\` (absent: ${r.missing.join(', ')})`)
+				.join('; ') +
+			'. Those runtimes recorded no load failure for the row, so its absence is unexplained — ' +
+			'usually a sibling report predating the row. Re-run the stale runtimes ' +
+			'(`deno task bench:perf`) before reading the ratios in its group.\n'
 	);
 }
 md.push(
@@ -385,6 +440,13 @@ if (mixed_machine) {
 		'⚠ compose: sibling reports were produced on DIFFERENT machines (' +
 			sources.map((s) => `${s.runtime}=${s.machine?.cpu_model ?? '?'}`).join(' | ') +
 			') — cross-runtime ratios are not comparable; re-run every runtime on one box.'
+	);
+}
+if (partial_rows.length > 0) {
+	console.error(
+		'⚠ compose: rows measured on some runtimes and ABSENT on others with no load failure (' +
+			partial_rows.map((r) => `${r.group}/${r.name}=${r.missing.join('+')}`).join(' | ') +
+			') — unexplained, usually a sibling predating the row; re-run them.'
 	);
 }
 if (unavailable_by_runtime.length > 0) {
