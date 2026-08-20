@@ -145,8 +145,8 @@ fn starts_segment(node: &ChainNode<'_>) -> bool {
 /// The widening is tsv's and predates the target clause; it is inert in practice, since
 /// a lone lookup off `this` only reaches the width where an enclosing group breaks first
 /// (probed against prettier in argument, statement and assignment position — no
-/// divergence). Keep it separable from `inline_lookups` above rather than folding the
-/// two: they answer to different prettier clauses and only agree on the output.
+/// divergence). Keep it separable from `inline_every_lookup` above rather than folding
+/// the two: they answer to different prettier clauses and only agree on the output.
 fn lone_lookup_off_bare_base(nodes: &[&ChainNode<'_>], segment_count: usize) -> bool {
     segment_count == 1
         && matches!(
@@ -179,11 +179,12 @@ fn lone_lookup_off_bare_base(nodes: &[&ChainNode<'_>], segment_count: usize) -> 
 ///     .c!
 /// ```
 ///
-/// `inline_lookups` suppresses every one of those break points: an assignment TARGET
-/// prints as one unbreakable unit ([`Printer::mark_inline_member_target`]).
+/// `inline_every_lookup` suppresses every one of those break points: a chain the parent
+/// marked — an assignment TARGET, a `new` CALLEE — prints as one unbreakable unit (see
+/// [`crate::printer::chain::resolve_inline_lookups`]).
 pub(super) fn build_member_only_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
-    inline_lookups: bool,
+    inline_every_lookup: bool,
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
@@ -271,25 +272,26 @@ pub(super) fn build_member_only_chain_doc<'a>(
         return first_doc;
     }
 
-    // The chain takes NO break point at all — one flat concat. Two of prettier's
-    // `shouldInline` clauses (member.js) reach a member-only chain, and both make the
-    // whole chain flat, so they meet here as one decision rather than as two adjacent
-    // spellings of the same answer:
+    // The chain takes NO break point at all — one flat concat. Three of prettier's
+    // `shouldInline` clauses (member.js) make a member-only chain flat, so they meet here
+    // as one decision rather than as adjacent spellings of the same answer:
     //
-    // - the assignment **target** clause (`inline_lookups`, marked by the assignment
-    //   before it builds its left) — the target prints as one unbreakable unit, so the
-    //   assignment sheds width after the operator instead of splitting the thing being
-    //   assigned to, and holds its line outright when the value is unbreakable too;
+    // - the assignment **target** clause and the `new` **callee** clause, which the
+    //   parent marks before it builds the operand (`inline_every_lookup`) — the chain
+    //   prints as one unbreakable unit, so the assignment sheds width after the operator
+    //   instead of splitting the thing being assigned to and the `new` sheds into its
+    //   argument list, each holding its line outright when nothing else can break;
     // - a lone `a.prop` off a bare base ([`lone_lookup_off_bare_base`]).
     //
-    // The third clause, `node.computed`, is answered earlier by `starts_segment`: a
+    // A fourth clause reaches this builder without deciding anything here —
+    // `node.computed` is answered earlier by `starts_segment`: a
     // computed lookup is glued into its preceding segment either way, so its own bracket
     // group survives here untouched — which is what keeps `chooseLayout`'s
     // `canBreakLeftDoc` true for `params['key'] = …`.
     //
     // Asked AFTER the segment walk rather than before it, so both shapes share one
     // segmentation.
-    if inline_lookups || lone_lookup_off_bare_base(&all_nodes, segments.len()) {
+    if inline_every_lookup || lone_lookup_off_bare_base(&all_nodes, segments.len()) {
         let mut parts: DocBuf = DocBuf::with_capacity(segments.len() + 1);
         parts.push(first_doc);
         parts.extend(segments.iter().copied());

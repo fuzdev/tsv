@@ -24,6 +24,8 @@
 //
 // - **analysis.rs**: Linearization, grouping, merge decisions
 // - **types.rs**: Core data structures (ChainNode, ChainGroup)
+// - **inline_lookups.rs**: which lookups carry a break point, as marked by the chain's
+//   PARENT (prettier's `shouldInline` clauses a chain cannot answer for itself)
 // - **printing.rs**: Node/group rendering
 // - **adapter.rs**: chain-helper methods on the main Printer
 // - **builder/**: Doc building logic split into focused submodules
@@ -38,6 +40,7 @@
 mod adapter;
 mod analysis;
 mod builder;
+mod inline_lookups;
 mod printing;
 mod types;
 
@@ -48,6 +51,7 @@ pub use analysis::{
 };
 pub(crate) use analysis::{call_callee_paren_leading_start, tag_paren_leading_start};
 pub use builder::build_chain_doc;
+pub(crate) use inline_lookups::{InlineLookups, resolve_inline_lookups};
 pub(crate) use printing::find_bracket_position;
 pub use types::{ChainCall, ChainNode};
 #[cfg(feature = "buffer_stats")]

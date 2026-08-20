@@ -73,6 +73,12 @@ impl<'a> Printer<'a> {
         if frozen.is_none() {
             self.mark_ternary_extra_indent(init);
         }
+        // A declarator initializer is the second position prettier's call-object clause
+        // names ([`Printer::mark_member_call_tail_operand`]). ⚠️ A for-header's own
+        // declarator does NOT reach here — it is built in `build_for_init_doc` and marks
+        // itself; `VariableDeclarator` is `VariableDeclarator` to prettier either way, so
+        // unlike the `[~In]` asymmetry above, the two DO have to agree here.
+        self.mark_member_call_tail_operand(init);
         let position_parens =
             needs_parens(init, ParenContext::VariableInit, self.in_for_init.get());
         let inner = match frozen {
