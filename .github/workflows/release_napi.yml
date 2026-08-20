@@ -150,8 +150,8 @@ jobs:
       - name: Build (native)
         if: matrix.build == 'native'
         run: |
-          cargo build -p tsv_napi --profile napi
-          cargo build -p tsv_cli --release
+          cargo build --locked -p tsv_napi --profile napi
+          cargo build --locked -p tsv_cli --release
 
       - name: Build (almalinux:8 — glibc 2.28 floor)
         if: matrix.build == 'gnu-container'
@@ -163,8 +163,8 @@ jobs:
               dnf install -y -q gcc curl
               curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.94.1
               export PATH="/work/.container-cargo/bin:$PATH"
-              cargo build -p tsv_napi --profile napi
-              cargo build -p tsv_cli --release'
+              cargo build --locked -p tsv_napi --profile napi
+              cargo build --locked -p tsv_cli --release'
 
       - name: Build (rust:alpine — musl)
         if: matrix.build == 'musl-container'
@@ -178,8 +178,8 @@ jobs:
             -e RUSTFLAGS='-C target-feature=-crt-static' \
             rust:1.94.1-alpine sh -ec '
               apk add --no-cache musl-dev
-              cargo build -p tsv_napi --profile napi
-              cargo build -p tsv_cli --release'
+              cargo build --locked -p tsv_napi --profile napi
+              cargo build --locked -p tsv_cli --release'
 
       # The measured floor: the highest versioned glibc symbol each shipped
       # artifact references must not exceed 2.28 — the gate that keeps the

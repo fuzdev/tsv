@@ -249,7 +249,7 @@ jobs:
       # default, hiding every later suite — the platform burn-down wants all
       # failures per run, not one per push.
       - name: Test
-        run: cargo test --workspace --no-fail-fast
+        run: cargo test --locked --workspace --no-fail-fast
 
       # The real N-API JS boundary against this OS's napi-profile cdylib
       # (release + unwind, built with the test-only panic probe so the
