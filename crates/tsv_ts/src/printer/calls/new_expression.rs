@@ -127,7 +127,7 @@ impl<'a> Printer<'a> {
                 ]))
             } else {
                 let callee_doc = self.build_expression_doc(new_expr.callee);
-                d.parens(callee_doc)
+                super::build_callee_parens_doc(self, new_expr.callee, callee_doc)
             }
         } else {
             self.build_expression_doc(new_expr.callee)

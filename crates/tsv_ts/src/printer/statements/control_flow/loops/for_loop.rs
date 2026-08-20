@@ -4,11 +4,11 @@
 // for-in/for-of left/right printing.
 
 use crate::ast::internal::{self, Expression, Statement};
-use crate::printer::layout::hang_after_operator;
 use crate::printer::statements::StatementContext;
+use crate::printer::statements::variable::{DeclaratorEqGap, DeclaratorInitInputs};
 use crate::printer::{
-    CommentVec, ContinuationValue, LeadingGlue, OwnedCommentEffect, ParenContext, Printer,
-    RunLeadingBlank, needs_parens,
+    CommentVec, ContinuationValue, LeadingGlue, ParenContext, Printer, RunLeadingBlank,
+    needs_parens,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -1822,8 +1822,8 @@ impl<'a> Printer<'a> {
                         decl_docs.push(self.build_frozen_node_doc(declarator.span));
                         continue;
                     }
-                    let mut one: DocBuf = smallvec![self.build_expression_doc(&declarator.id)];
-                    if let Some(init) = &declarator.init {
+                    let id_doc = self.build_expression_doc(&declarator.id);
+                    let one = if let Some(init) = &declarator.init {
                         let id_end = declarator.id.span().end;
                         let init_start = init.span().start;
                         let eq_pos = self.find_equals_position(id_end, init_start);
@@ -1865,13 +1865,6 @@ impl<'a> Printer<'a> {
                         // never asks where the declaration sits, so this marks exactly
                         // what the statement-level twin marks
                         // (`build_init_value_doc` → [`Printer::mark_member_call_tail_operand`]).
-                        //
-                        // Gated by `tests/for_header_declarator_call_tail.rs`, not by a
-                        // fixture — the `=` below is a flat concat with no assignment
-                        // layout, so prettier breaks after it and tsv never does, and NO
-                        // over-width initializer in this position can be a fixture input.
-                        // The test asserts the clause's own effect, which is the inner
-                        // shape both formatters do agree on.
                         self.mark_member_call_tail_operand(init);
                         let build_value = || {
                             let inner = self.build_for_init_value_doc(
@@ -1904,6 +1897,7 @@ impl<'a> Printer<'a> {
                         // comment is dropped outright, which is what this one used to do
                         // for every comment kind in it.
                         let before_eq = self.has_comments_to_emit_between(id_end, eq_pos);
+                        let after_eq = self.has_comments_to_emit_between(eq_pos + 1, init_start);
                         let continuation = before_eq
                             .then(|| {
                                 self.build_initializer_line_continuation(
@@ -1921,51 +1915,40 @@ impl<'a> Printer<'a> {
                             })
                             .flatten();
                         if let Some(cont) = continuation {
-                            one.push(cont);
+                            d.concat(&[id_doc, cont])
                         } else {
-                            if before_eq {
-                                one.push(self.build_inline_comments_between_doc(id_end, eq_pos));
-                            }
-                            // A comment after `=` that forces a break (line comment, or an
-                            // own-line / multiline block) breaks after the `=` and keeps the
-                            // comment on its own line — the same handling as a variable
-                            // declarator (gluing it up onto the `=` line would be
-                            // non-idempotent). A single-line block glued inline to `=` still
-                            // hugs the value across a source newline (`i = /* c */⏎0` →
-                            // `i = /* c */ 0`) and keeps the header flat.
-                            if let Some(rhs) = self.build_eq_comment_break_rhs(
-                                eq_pos,
-                                init_start,
-                                " =",
-                                build_value,
-                            ) {
-                                one.push(rhs);
-                            } else if self.owned_leading_comment_effect(init)
-                                == Some(OwnedCommentEffect::Hangs)
-                            {
-                                // The owned half of the same question: a comment the value
-                                // OWNS (an own-line JSDoc cast) is glued to its first token
-                                // and travels inside its doc, so the gap probe above cannot
-                                // see it — docs/comments.md hazard 2. It still ends the `=`
-                                // line, so the value hangs, the layout the statement
-                                // declarator's break-after-operator branch gives it. Printed
-                                // flat, the cast's hardline landed mid-line and the authoring
-                                // had NO fixed point: pass 2 read the comment as mid-line and
-                                // collapsed the whole header.
-                                one.push(d.text(" ="));
-                                one.push(hang_after_operator(d, build_value()));
-                            } else {
-                                one.push(d.text(" = "));
-                                if let Some(comments) =
-                                    self.build_rhs_comments_glued_opt(eq_pos + 1, init_start)
-                                {
-                                    one.push(comments);
-                                }
-                                one.push(build_value());
-                            }
+                            // Everything the `=` still has to decide is the declarator's own
+                            // `printAssignment`, which a for header's declarator takes exactly
+                            // as a statement-level one does — the layout selection, the
+                            // after-`=` comment breaks, and the owned-comment hang all live in
+                            // the shared builder ([`Printer::build_declarator_init_doc`]). Only
+                            // the VALUE differs, and it arrives as the closure above.
+                            self.build_declarator_init_doc(
+                                &DeclaratorInitInputs {
+                                    declarator,
+                                    init,
+                                    decl_start: decl.span.start,
+                                    id_doc,
+                                    can_break_left: d.can_break(id_doc),
+                                    gap: DeclaratorEqGap {
+                                        id_end,
+                                        equals_pos: eq_pos,
+                                        init_start,
+                                        has_comments_before_eq: before_eq,
+                                        has_comments_after_eq: after_eq,
+                                    },
+                                    // A header separates its declarators on WIDTH, never with
+                                    // hardlines — prettier's `hasValue && !isParentForLoop`.
+                                    should_break: false,
+                                    is_first: i == 0,
+                                },
+                                &build_value,
+                            )
                         }
-                    }
-                    decl_docs.push(d.concat(&one));
+                    } else {
+                        id_doc
+                    };
+                    decl_docs.push(one);
                 }
                 // Multiple declarators break on width: they stay on one line when the init
                 // clause fits and drop onto their own lines (continuation indented one

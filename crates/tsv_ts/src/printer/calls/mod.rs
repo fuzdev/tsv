@@ -260,6 +260,37 @@ pub(in crate::printer) fn chain_has_calls(expr: &internal::Expression<'_>) -> bo
     }
 }
 
+/// The required paren pair around a CALLEE — `(x as T)()`, `new (x as T)()`.
+///
+/// Prettier's `printBinaryCastExpression` (print/binary-cast-expression.js) gives an
+/// `as` / `satisfies` cast its own hanging group in exactly two positions: the callee of a
+/// call or `new`, and the OBJECT of a member access. tsv already spells the object half
+/// (the chain base's `build_expanding_parens_body_doc`), and this is the callee half — so
+/// the pair breaks around the operand (`new (⏎\tx as T⏎)()`) instead of welding `new (` to
+/// it and breaking inside the operand, which is the shape the same cast takes one position
+/// over.
+///
+/// Every other callee kind takes the plain pair, and that is prettier's answer too: a
+/// ternary, an `await`, an optional chain and a sequence callee all weld. A BINARY callee
+/// hangs as well, through the `new` printer's own arm — it needs the ungrouped operand doc,
+/// which this seam does not build.
+pub(super) fn build_callee_parens_doc(
+    printer: &Printer<'_>,
+    callee: &internal::Expression<'_>,
+    callee_doc: DocId,
+) -> DocId {
+    let d = printer.arena();
+    let body = if matches!(
+        callee,
+        internal::Expression::TSAsExpression(_) | internal::Expression::TSSatisfiesExpression(_)
+    ) {
+        printer.build_expanding_parens_body_doc(callee_doc)
+    } else {
+        callee_doc
+    };
+    d.parens(body)
+}
+
 /// Check if callee is a member expression (used for chain detection)
 ///
 /// Prettier's `isMemberish`, and the gate on BOTH of its chain decisions: the

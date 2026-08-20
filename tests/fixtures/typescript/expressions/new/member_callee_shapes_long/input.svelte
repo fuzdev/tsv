@@ -38,4 +38,11 @@
 	// NOT the callee: members trailing the `new` expression keep their break points
 	new aaaa.bbbb().cccccccccccc.dddddddddddd.eeeeeeeeeeee.ffffffffffff.gggggggggggg
 		.hhhhhhhhhhhhhhhhh;
+
+	// NOT the callee: the callee IS a cast, so the mark stops at it — the cast hangs its
+	// own pair and the operand chain inside keeps every lookup's break point
+	new (
+		aaaaaaaaaaaa.bbbbbbbbbbbb.cccccccccccc.dddddddddddd.eeeeeeeeeeee.ffffffffffff
+			.gggggggggggg as Tttt
+	)();
 </script>

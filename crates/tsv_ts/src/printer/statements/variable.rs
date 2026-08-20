@@ -33,7 +33,532 @@ fn build_fluid_assignment_doc(d: &DocArena, id_doc: DocId, init_doc: DocId) -> D
     ]))
 }
 
+/// One declarator's `=` and what sits around it — the spans
+/// [`Printer::build_declarator_init_doc`] bounds its comment reads with, plus the two
+/// answers its caller already resolved. Grouped because they are one fact about one gap,
+/// and because the layout arms read them in pairs.
+pub(in crate::printer) struct DeclaratorEqGap {
+    /// End of the binding, past a definite `!` — the near edge of the `=` gap.
+    pub id_end: u32,
+    /// Position of the `=`.
+    pub equals_pos: u32,
+    /// Start of the initializer — the far edge of the `=` gap.
+    pub init_start: u32,
+    /// Whether the binding→`=` gap holds a comment to emit. Only BLOCK comments reach
+    /// here; a line comment there took its caller's continuation path.
+    pub has_comments_before_eq: bool,
+    /// Whether the `=`→initializer gap holds a comment to emit.
+    pub has_comments_after_eq: bool,
+}
+
+/// What [`Printer::build_declarator_init_doc`] needs from the position a declarator sits
+/// in. Every field is a fact the caller already has in hand: the binding's printed doc, the
+/// spans bounding its `=`, and what the gaps around that `=` hold.
+pub(in crate::printer) struct DeclaratorInitInputs<'e, 'a> {
+    /// The declarator itself — read for its binding (the break-lhs arms rebuild the id doc
+    /// with a wrapping / non-wrapping type annotation) and its definite `!`.
+    pub declarator: &'e internal::VariableDeclarator<'a>,
+    /// Its initializer. Passed rather than read back off `declarator.init`, since the caller
+    /// has already matched on it to get here.
+    pub init: &'e Expression<'a>,
+    /// Start of the enclosing DECLARATION — the anchor for the expandable-member-call
+    /// width check's source indent, which measures the call head from the statement's
+    /// own column.
+    pub decl_start: u32,
+    /// The printed binding.
+    pub id_doc: DocId,
+    /// `can_break(id_doc)` — prettier's `canBreak(leftDoc)`, which decides the fluid arm.
+    pub can_break_left: bool,
+    /// The `=` and what the gaps on either side of it hold.
+    pub gap: DeclaratorEqGap,
+    /// Whether the declaration hardline-separates its declarators (a multi-declarator
+    /// statement with initializers). Always `false` under a for header, which separates
+    /// on width.
+    pub should_break: bool,
+    /// Whether this is the declaration's FIRST declarator — the break-lhs arms apply to it
+    /// alone unless the list is already broken.
+    pub is_first: bool,
+}
+
 impl<'a> Printer<'a> {
+    /// The `<id> = <value>` half of ONE variable declarator — prettier's `printAssignment`
+    /// for a `VariableDeclarator`, stated once for the two positions a declarator occurs
+    /// in: a declaration statement ([`Printer::build_variable_declaration_doc`]) and a
+    /// `for` header's init clause (`build_for_init_doc`). Prettier prints both through
+    /// `printVariableDeclaration` and differs only in the separator BETWEEN declarators
+    /// (`hardline` in a statement, `line` under a for header), so the layout inside one
+    /// declarator cannot be allowed to differ either — the header spelling its own flat
+    /// `" = " + value` is how that position came to have no break-after-operator arm at
+    /// all, and no over-width initializer written there could be a fixture input.
+    ///
+    /// The caller supplies the id doc, the comment answers it resolved around its own `=`,
+    /// and `value` — the position's own value builder, which is the one thing that really
+    /// does differ (a header declarator's initializer carries the `[~In]` paren shell its
+    /// clause needs, and each position resolves its own value-head freeze).
+    ///
+    /// `value` is `&dyn` rather than a generic: the body is long and its two callers would
+    /// otherwise monomorphize the whole cascade twice for no gain — every layout arm calls
+    /// it at most once.
+    ///
+    /// ⚠️ The layout cascade below is a hand-rolled twin of `assignment.rs::choose_layout`
+    /// — one prettier function answered twice, once for a declarator and once for every
+    /// other assignment. It reaches arms `choose_layout` does not (the three chain shapes),
+    /// so the two cannot simply be merged — but they DRIFT, and a `chooseLayout` fact added
+    /// to one belongs in both.
+    pub(in crate::printer) fn build_declarator_init_doc(
+        &self,
+        inputs: &DeclaratorInitInputs<'_, '_>,
+        value: &dyn Fn() -> DocId,
+    ) -> DocId {
+        let d = self.d();
+        let &DeclaratorInitInputs {
+            declarator,
+            init,
+            decl_start,
+            id_doc,
+            can_break_left,
+            gap:
+                DeclaratorEqGap {
+                    id_end,
+                    equals_pos,
+                    init_start,
+                    has_comments_before_eq,
+                    has_comments_after_eq,
+                },
+            should_break,
+            is_first,
+        } = inputs;
+        let mut parts: DocBuf = DocBuf::new();
+        // Comments after `=` all stay after `=`, matching prettier — a JSDoc
+        // cast (`= /** @type {T} */ (expr)`) keeps its parens via the
+        // `JsdocCast` node, so its comment lives inside the init expression and
+        // never reaches this gap.
+        let rhs_comments_start = equals_pos + 1;
+
+        // Helpers for LHS doc handling. Most branches use id_doc as-is;
+        // some rebuild it (break-lhs wrapping type, fluid non-wrapping type).
+        // Comments before `=` are always appended after the LHS. (Only block
+        // comments reach here — a before-`=` *line* comment took the
+        // continuation `continue` path above.)
+        // The LHS every arm emits: the binding, plus the before-`=` comments appended to it.
+        // ONE doc rather than a push-pair, because the fluid arms need it as a single doc
+        // (it goes inside their group) and no other arm can tell the difference — two
+        // spellings of one append is how they drift. Only block comments reach here; a
+        // before-`=` *line* comment took the caller's continuation path.
+        let lhs_doc_with_comments = |lhs_doc: DocId| -> DocId {
+            if has_comments_before_eq {
+                d.concat(&[
+                    lhs_doc,
+                    self.build_inline_comments_between_doc(id_end, equals_pos),
+                ])
+            } else {
+                lhs_doc
+            }
+        };
+
+        // Build optional inline block comment doc between `=` and init.
+        // These are comments like `const x = /* comment */ expr` that should be
+        // part of the RHS doc in assignment layout decisions. Line comments are
+        // handled separately (mandatory break path).
+        let rhs_block_comment_doc = if has_comments_after_eq {
+            self.build_comments_between_filtered_opt(
+                rhs_comments_start,
+                init_start,
+                CommentSpacing::Trailing,
+                CommentFilter::BlockOnly,
+            )
+        } else {
+            None
+        };
+
+        // A declarator `=` is a value gap (`mark_jsdoc_cast_value_gap`). Marked
+        // before any branch below builds the value; the flag is span-keyed, so it is
+        // read wherever that build lands.
+        self.mark_jsdoc_cast_value_gap(init);
+
+        // Helper: build init doc with optional inline block comments prepended.
+        // Comments use Trailing spacing (`/* comment */ `) so no extra space needed.
+        let make_init_doc = |init_doc: DocId| -> DocId {
+            if let Some(comment_doc) = rhs_block_comment_doc {
+                d.concat(&[comment_doc, init_doc])
+            } else {
+                init_doc
+            }
+        };
+
+        // A block run the author broke AFTER (`const y = /* c */⏎<value>`):
+        // the shared `=` broke-after arm ([`Printer::broke_after_operator_rhs_doc`]
+        // — the two-half rule, its declines, and what falls through live there).
+        if rhs_block_comment_doc.is_some()
+            && let Some(rhs_doc) =
+                self.broke_after_operator_rhs_doc(rhs_comments_start, init_start, value)
+        {
+            parts.push(lhs_doc_with_comments(id_doc));
+            parts.push(d.text(" ="));
+            parts.push(rhs_doc);
+            return d.concat(&parts);
+        }
+
+        // Check if RHS is a multiline string (line continuations)
+        let is_multiline_string = is_multiline_string_literal(init, self.source);
+
+        // Check if LHS triggers break-lhs layout:
+        // 1. Complex type annotation - nested generics that should break internally
+        // 2. Complex destructuring - >2 properties with defaults/non-shorthand
+        // 3. Arrow function with breakable LHS (long type annotation)
+        //
+        // Example type annotation: `const x: Map<string, Array<number>> = getLongValue()`
+        // Should break as:
+        //   const x: Map<
+        //     string,
+        //     Array<number>
+        //   > = getLongValue();
+        //
+        // Example destructuring: `const { a, b = 1, c } = obj`
+        // Should break as:
+        //   const {
+        //     a,
+        //     b = 1,
+        //     c,
+        //   } = obj;
+        //
+        // Example arrow with long type: `const fn: (x: number) => void = (x) => {}`
+        // When type is long enough to wrap:
+        //   const fn: (
+        //     x: number,
+        //   ) => void = (x) => {};
+        let has_complex_type_annotation = self.id_has_complex_type_annotation(&declarator.id);
+        let has_complex_destructuring = self.id_has_complex_destructuring(&declarator.id);
+        let is_arrow_with_breakable_left =
+            matches!(init, Expression::ArrowFunctionExpression(_)) && can_break_left;
+
+        // Break-after-operator layout: group([left, " =", group(indent([line, right]))])
+        // Used for fluid RHS or simple RHS when LHS can break.
+
+        // Calls and imports with trailing comments expand internally and should not use fluid layout
+        let is_call_with_trailing_comments = if let Expression::CallExpression(call) = init {
+            call.arguments.last().is_some_and(|last_arg| {
+                self.has_line_comments_between(last_arg.span().end, call.span.end)
+            })
+        } else {
+            false
+        };
+
+        // Import expressions with trailing comments also expand internally
+        // (handles `await import('./x' // comment)`)
+        let is_import_with_trailing_comments = self.has_import_with_trailing_comments(init);
+
+        // Call chains AND member-only chains with line comments should NOT be
+        // treated as fluid / break-after-operator. The chain formatter breaks
+        // internally at the comment location, so keep the chain with `=`
+        // (otherwise it breaks after `=` too → double indent). E.g.
+        // `const a = items // comment\n  .foo()` and `const b = foo.bar // c\n  .baz`.
+        let has_line_comments_in_chain = self.has_line_comments_in_call_chain(init)
+            || self.has_line_comments_in_member_chain(init);
+
+        // Combined flag for expressions with trailing comments that expand internally
+        let has_trailing_comment_expansion =
+            is_call_with_trailing_comments || is_import_with_trailing_comments;
+
+        // Common exclusion: layout strategies don't apply when the init
+        // self-expands (object/array), has trailing comment expansion, or
+        // has line comments in a chain — those need special handling.
+        let is_layout_eligible = !is_self_expanding_value(init)
+            && !has_trailing_comment_expansion
+            && !has_line_comments_in_chain;
+
+        // RHS expressions that should use break-after-operator layout.
+        // Matches Prettier's shouldBreakAfterOperator: poorly breakable chains,
+        // string literals, etc. These don't break well internally, so the
+        // assignment breaks at `=` with group(indent([line, rightDoc])).
+        //
+        // ⚠️ **This chain is a hand-rolled twin of `assignment.rs::choose_layout`** —
+        // one prettier function answered twice, once for `const x = …` and once for
+        // every other assignment. It reaches arms `choose_layout` does not (the three
+        // chain shapes below), so the two cannot simply be merged — but they DRIFT, and
+        // the sequence arm is the proof: `choose_layout` has had it from the start while
+        // this list did not, so `const a = (a, b)` hung its operands off the `=` column.
+        // A `chooseLayout` fact added to one belongs in both.
+        let should_break_after_op_rhs = (is_module_path_fluid_call(init, self.source)
+            || is_pure_property_chain(init)
+            || is_poorly_breakable_chain(init, self.source, PRINT_WIDTH, self.comments)
+            || is_string_literal(init)
+            // A SEQUENCE init breaks after the `=` and lays its operands out under
+            // one indent, prettier's own `shouldBreakAfterOperator` switch arm —
+            // the same fact `choose_layout` states for the assignment-RHS twin.
+            // Without it the sequence's internal break satisfies the fluid layout's
+            // fits() and the operands hang off the `=` column instead.
+            || matches!(init, Expression::SequenceExpression(_))
+            || matches!(init, Expression::RegexLiteral(_)))
+            && is_layout_eligible;
+
+        // Decorated class expression → break after operator, each decorator
+        // on its own line (`const C =\n\t@dec\n\tclass {}`).
+        let is_decorated_class_expr = is_layout_eligible
+            && matches!(init, Expression::ClassExpression(c) if class_expr_has_decorators(c));
+
+        // Single-call member chains with complex args (arrows, objects, arrays):
+        // Use TRUE fluid layout to break at `=` only when necessary.
+        // E.g., `const x = a.b.c.filter((x) => ...)` breaks at `=` if > print_width
+        let is_single_call_member_chain = is_call_on_member_chain(init) && is_layout_eligible;
+
+        // Regex-rooted member chain calls: /regex/.exec(b)
+        // Prettier returns "fluid" layout (its default) because regex roots are NOT
+        // accepted by isPoorlyBreakableMemberOrCallChain (only Identifier/ThisExpression).
+        // Our is_poorly_breakable_chain similarly rejects regex roots. Route to fluid
+        // so fits() can decide whether to break at `=` or let the call expand args.
+        let is_regex_chain_call = is_regex_root_chain(init) && is_layout_eligible;
+
+        // Member-only chains on literal bases: 'string'.length, `template`.length
+        // These need Fluid layout so the assignment can break at `=` when the
+        // literal base exceeds print_width on the assignment line.
+        let is_literal_member = is_literal_member_chain(init) && is_layout_eligible;
+
+        // Expressions that need break-after-operator layout:
+        // group([left, " =", indent([line, right])])
+        // For binary/logical expressions, breaking happens at operators within the RHS,
+        // and the entire RHS is indented together after `=`.
+        //
+        // Excludes logical expressions with inline-able RHS (non-empty object/array).
+        // Those use default layout so the RHS self-expands:
+        //   `const x = foo || { a: 1 }` not `const x =\n  foo || {a: 1}`
+        // Prettier ref: assignment.js:199, binaryish.js:361
+        let is_non_inline_binary = if let Expression::BinaryExpression(binary) = init {
+            !should_inline_logical_expression(binary)
+        } else {
+            false
+        };
+        let needs_break_after_op_layout =
+            (is_non_inline_binary || conditional_should_break_after_op(init)) && is_layout_eligible;
+
+        // Member-chain call (a.fn(...)) where the call head fits within print_width:
+        // Use default layout and let the call expand its own args rather than breaking
+        // at `=`. E.g., `const {a, b} = vi.mocked(longArg)` with short LHS keeps
+        // `= vi.mocked(` on line 1 and expands the arg — matching Prettier's behavior.
+        // Only fires when call head (decl_start to callee_end + "(") fits in print_width.
+        // is_single_call_on_member_chain guarantees CallExpression
+        let is_expandable_member_call = if let Expression::CallExpression(call) = init
+            && is_single_call_on_member_chain(init)
+        {
+            // Include actual source indentation (JS nesting) in the width check.
+            // Without this, deeply-nested declarations would incorrectly use
+            // default layout even when the call head exceeds print_width.
+            let indent_visual = self.source_indent_visual(decl_start);
+            let call_head_width =
+                indent_visual + (call.callee.span().end as usize - decl_start as usize) + 1; // +1 for "(" after callee
+            call_head_width < PRINT_WIDTH
+        } else {
+            false
+        };
+
+        // A comment the initializer *owns* (a JSDoc cast, a bundler annotation) is
+        // glued to its first token and travels inside its doc, so the gap probes
+        // above cannot see it. It is still on the page and still decides the `=`
+        // layout — this declarator builds its own layout rather than routing
+        // through `build_assignment_layout`, so it applies the rule itself. Both
+        // halves come off one lookup; see `owned_leading_comment_effect`.
+        let owned_comment_effect = self.owned_leading_comment_effect(init);
+
+        let is_break_after_op_rhs = should_break_after_op_rhs
+            || needs_break_after_op_layout
+            || is_decorated_class_expr
+            // An indentable owned comment hangs the value.
+            || owned_comment_effect == Some(OwnedCommentEffect::Hangs);
+
+        // The other half: a *preserved* multi-line comment the initializer owns
+        // ends the `=` line inside itself, so no width-decided break at `=` is
+        // meaningful and the plain `= value` form is the layout
+        // (`const a = /* line1⏎line2 */ x;`). Without this the fluid branches broke
+        // at `=` on the comment's own `literalline`s.
+        let init_pinned_to_eq = owned_comment_effect == Some(OwnedCommentEffect::Pins);
+
+        // Breakable LHS (destructuring patterns) with non-self-expanding RHS:
+        // Use fluid layout so the printer breaks at `=` before expanding the
+        // destructuring pattern. Matches Prettier's `canBreak(leftDoc) → "fluid"`.
+        // E.g., `const {a, b, c} = resolve(x, y, z)` breaks after `=`, not inside `{}`
+        //
+        // Excludes break-after-operator RHS (binary, conditional, strings, chains) —
+        // those go through needs_break_after_operator with their own layout.
+        // In Prettier, shouldBreakAfterOperator() handles those before the canBreak fallback.
+        //
+        // Excludes is_expandable_member_call: when the call head fits, the call's own
+        // arg-expansion handles line breaking via default layout.
+        let needs_fluid_for_breakable_lhs = can_break_left
+            && is_layout_eligible
+            && !should_break
+            && !is_break_after_op_rhs
+            && !is_expandable_member_call
+            && !init_pinned_to_eq;
+
+        // Type assertion calls with LHS type annotation need special fluid handling
+        // (handled separately below because they need non-wrapping LHS type)
+        let is_type_assertion_with_lhs_type = is_type_assertion_call(
+            init,
+            self.source,
+            PRINT_WIDTH,
+        ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation().is_some());
+
+        let is_simple_rhs_with_breakable_lhs = can_break_left && is_simple_self_expanding(init);
+
+        // `should_break` (a multi-declarator with initializers) withholds the
+        // width-decided break at `=` because the declarators are hardline-separated
+        // already — but an owned comment that HANGS is not width-decided. Its break
+        // is inside the value's doc whatever this layout picks, so withholding the
+        // hang only strands what follows the comment at the declarator list's own
+        // indent: for a cast, a form the next pass reads as mid-line and collapses,
+        // leaving that authoring no fixed point at all. The gap-emitted spelling of
+        // the same comment already hangs here (`build_eq_comment_break_rhs`, the
+        // first branch below, which `should_break` does not gate), so this is the
+        // owned half catching up to it
+        // (`multiple/value_own_line_comment_hang_prettier_divergence`).
+        let needs_break_after_operator = (!should_break
+            || owned_comment_effect == Some(OwnedCommentEffect::Hangs))
+            && (is_break_after_op_rhs || is_simple_rhs_with_breakable_lhs)
+            && !d.will_break(id_doc)
+            && !has_complex_type_annotation
+            && !has_complex_destructuring
+            && !is_arrow_with_breakable_left;
+
+        // A curried chain whose heads trigger `arrow_chain_should_break` breaks
+        // after `=` unconditionally; every other curried chain goes fluid below.
+        // ⚠️ This pair is the declarator's hand-rolled twin of `choose_layout`'s
+        // `Fluid` / `BreakAfterOperator` arms — see the ⚠️ on `build_assignment_layout`.
+        let is_curried_arrow = is_curried_arrow_chain_that_breaks(init);
+
+        if has_comments_after_eq
+            && let Some(rhs) = self.build_eq_comment_break_rhs(equals_pos, init_start, " =", value)
+        {
+            // A comment after `=` forces a break (line comment → partition;
+            // own-line / multiline block → break-after-operator hang). Shared
+            // with the for-loop init clause.
+            parts.push(lhs_doc_with_comments(id_doc));
+            parts.push(rhs);
+        } else if is_multiline_string {
+            // Multiline string with no comment forcing a break: mandatory break
+            // after `=`. An inline block glued to `=` trails it on that line.
+            parts.push(lhs_doc_with_comments(id_doc));
+            parts.push(d.text(" ="));
+            if has_comments_after_eq
+                && let Some(inline) =
+                    self.build_inline_comments_between_doc_opt(equals_pos + 1, init_start)
+            {
+                parts.push(inline);
+            }
+            parts.push(d.indent_hardline(value()));
+        } else if is_curried_arrow {
+            // Mandatory break after `=`; the arrow printer stacks the heads under it.
+            // ⚠️ Deliberately does NOT set `ArrowChainContext::AssignmentRhs`, unlike
+            // the arm below — and it is only equivalent to setting it because
+            // `should_use_arrow_chain_layout` declines a `shouldBreakChain` chain in
+            // exactly that context, precisely so this `=` can own the break instead.
+            // `build_assignment_layout` sets the context for EVERY curried chain and
+            // leans on the same decline; if that decline ever moves, both sites move.
+            parts.push(lhs_doc_with_comments(id_doc));
+            parts.push(d.text(" ="));
+            parts.push(d.indent_hardline(value()));
+        } else if is_curried_arrow_chain(init) {
+            // Every other curried chain: fluid break after `=`. The chain's
+            // signature heads break only when they don't fit on the operator
+            // line; a hugging body otherwise expands in place. The context tells
+            // the arrow printer to use the assignment-RHS chain layout.
+            let init_doc = self.build_with_arrow_chain_context(
+                crate::printer::ArrowChainContext::AssignmentRhs,
+                || make_init_doc(value()),
+            );
+            parts.push(build_fluid_assignment_doc(
+                d,
+                lhs_doc_with_comments(id_doc),
+                init_doc,
+            ));
+        } else if (has_complex_type_annotation
+            || has_complex_destructuring
+            || is_arrow_with_breakable_left)
+            && (should_break || is_first)
+        {
+            // Break-lhs layout: LHS breaks internally, `=` stays on same line with RHS
+            // Only applies to first declarator or multi-declarator with breaks
+            //
+            // For complex type annotations, rebuild with wrapping type.
+            // Complex destructuring and arrow with breakable left already have correct id_doc.
+            if has_complex_type_annotation && let Expression::Identifier(ident) = &declarator.id {
+                parts.push(lhs_doc_with_comments(self.build_typed_identifier_doc(
+                    ident,
+                    declarator.definite,
+                    true, // wrap_type
+                )));
+            } else if has_complex_destructuring {
+                // Strip the outer group from the destructuring id_doc so it
+                // participates in the outer group's fit check. Without this,
+                // the destructuring group evaluates independently via fits()
+                // and stays flat even when the full line exceeds print_width.
+                // Prettier's break-lhs does not wrap leftDoc in an extra group.
+                parts.push(lhs_doc_with_comments(d.unwrap_group(id_doc)));
+            } else {
+                parts.push(lhs_doc_with_comments(id_doc));
+            }
+
+            // Add ` = rightDoc` (right side grouped)
+            parts.push(d.text(" = "));
+            let init_doc = make_init_doc(value());
+            parts.push(d.group(init_doc));
+        } else if is_type_assertion_with_lhs_type
+            || is_single_call_member_chain
+            || needs_fluid_for_breakable_lhs
+            || is_regex_chain_call
+            || is_literal_member
+        {
+            // Fluid layout for specific RHS patterns: break after `=` only
+            // when the full line exceeds print_width. Type assertion case
+            // rebuilds LHS with non-wrapping type annotation.
+            let fluid_id_doc = if is_type_assertion_with_lhs_type
+                && let Expression::Identifier(ident) = &declarator.id
+            {
+                self.build_typed_identifier_doc(
+                    ident,
+                    declarator.definite,
+                    false, // non-wrapping
+                )
+            } else {
+                id_doc
+            };
+            let init_doc = make_init_doc(value());
+            parts.push(build_fluid_assignment_doc(
+                d,
+                lhs_doc_with_comments(fluid_id_doc),
+                init_doc,
+            ));
+        } else if needs_break_after_operator {
+            // Break-after-operator layout for binary/conditional expressions:
+            // Structure: [" =", group(indent([line, init]))]
+            //
+            // The init IS inside the group with the line. This allows the binary/conditional
+            // expression to control its own breaking at operators. The entire RHS is
+            // indented together after the `=` break.
+            parts.push(lhs_doc_with_comments(id_doc));
+            parts.push(d.text(" ="));
+            let init_doc = make_init_doc(value());
+            parts.push(hang_after_operator(d, init_doc));
+        } else if is_layout_eligible && !is_simple_value(init) && !init_pinned_to_eq {
+            // Fluid layout (default for layout-eligible values)
+            //
+            // Matches prettier's chooseLayout default: when no special layout
+            // applies, use fluid so the marker can break at `=` only if needed,
+            // while allowing the RHS to break internally first.
+            let init_doc = make_init_doc(value());
+            parts.push(build_fluid_assignment_doc(
+                d,
+                lhs_doc_with_comments(id_doc),
+                init_doc,
+            ));
+        } else {
+            parts.push(lhs_doc_with_comments(id_doc));
+            parts.push(d.text(" = "));
+            let init_doc = make_init_doc(value());
+            parts.push(init_doc);
+        }
+        d.concat(&parts)
+    }
+
     /// Build a variable initializer value, wrapping it in parens for the value
     /// position when needed (`const x = (a = b)`) — but NOT double-wrapping when
     /// `build_expression_doc_with_paren_comments` already added its own pair around a
@@ -444,458 +969,25 @@ impl<'a> Printer<'a> {
                     continue;
                 }
 
-                // Comments after `=` all stay after `=`, matching prettier — a JSDoc
-                // cast (`= /** @type {T} */ (expr)`) keeps its parens via the
-                // `JsdocCast` node, so its comment lives inside the init expression and
-                // never reaches this gap.
-                let rhs_comments_start = equals_pos + 1;
-
-                // Helpers for LHS doc handling. Most branches use id_doc as-is;
-                // some rebuild it (break-lhs wrapping type, fluid non-wrapping type).
-                // Comments before `=` are always appended after the LHS. (Only block
-                // comments reach here — a before-`=` *line* comment took the
-                // continuation `continue` path above.)
-                let push_lhs = |parts: &mut DocBuf, lhs_doc: DocId| {
-                    parts.push(lhs_doc);
-                    if has_comments_before_eq {
-                        parts.push(self.build_inline_comments_between_doc(id_end, equals_pos));
-                    }
-                };
-                // For fluid layout, LHS + comments must be a single doc (inside the fluid group)
-                let make_fluid_lhs = |lhs_doc: DocId| -> DocId {
-                    if has_comments_before_eq {
-                        let mut lhs_parts: DocBuf = smallvec![lhs_doc];
-                        lhs_parts.push(self.build_inline_comments_between_doc(id_end, equals_pos));
-                        d.concat(&lhs_parts)
-                    } else {
-                        lhs_doc
-                    }
-                };
-
-                // Build optional inline block comment doc between `=` and init.
-                // These are comments like `const x = /* comment */ expr` that should be
-                // part of the RHS doc in assignment layout decisions. Line comments are
-                // handled separately (mandatory break path).
-                let rhs_block_comment_doc = if has_comments_after_eq {
-                    self.build_comments_between_filtered_opt(
-                        rhs_comments_start,
-                        init_start,
-                        CommentSpacing::Trailing,
-                        CommentFilter::BlockOnly,
-                    )
-                } else {
-                    None
-                };
-
-                // A declarator `=` is a value gap (`mark_jsdoc_cast_value_gap`). Marked
-                // before any branch below builds the value; the flag is span-keyed, so it is
-                // read wherever that build lands.
-                self.mark_jsdoc_cast_value_gap(init);
-
-                // Helper: build the initializer's value — the same three arguments at every
-                // layout branch below, so they are spelled once.
-                let init_value_doc =
-                    || self.build_init_value_doc(init, declarator.span.end, init_frozen);
-
-                // Helper: build init doc with optional inline block comments prepended.
-                // Comments use Trailing spacing (`/* comment */ `) so no extra space needed.
-                let make_init_doc = |init_doc: DocId| -> DocId {
-                    if let Some(comment_doc) = rhs_block_comment_doc {
-                        d.concat(&[comment_doc, init_doc])
-                    } else {
-                        init_doc
-                    }
-                };
-
-                // A block run the author broke AFTER (`const y = /* c */⏎<value>`):
-                // the shared `=` broke-after arm ([`Printer::broke_after_operator_rhs_doc`]
-                // — the two-half rule, its declines, and what falls through live there).
-                if rhs_block_comment_doc.is_some()
-                    && let Some(rhs_doc) = self.broke_after_operator_rhs_doc(
-                        rhs_comments_start,
-                        init_start,
-                        init_value_doc,
-                    )
-                {
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(d.text(" ="));
-                    parts.push(rhs_doc);
-                    continue;
-                }
-
-                // Check if RHS is a multiline string (line continuations)
-                let is_multiline_string = is_multiline_string_literal(init, self.source);
-
-                // Check if LHS triggers break-lhs layout:
-                // 1. Complex type annotation - nested generics that should break internally
-                // 2. Complex destructuring - >2 properties with defaults/non-shorthand
-                // 3. Arrow function with breakable LHS (long type annotation)
-                //
-                // Example type annotation: `const x: Map<string, Array<number>> = getLongValue()`
-                // Should break as:
-                //   const x: Map<
-                //     string,
-                //     Array<number>
-                //   > = getLongValue();
-                //
-                // Example destructuring: `const { a, b = 1, c } = obj`
-                // Should break as:
-                //   const {
-                //     a,
-                //     b = 1,
-                //     c,
-                //   } = obj;
-                //
-                // Example arrow with long type: `const fn: (x: number) => void = (x) => {}`
-                // When type is long enough to wrap:
-                //   const fn: (
-                //     x: number,
-                //   ) => void = (x) => {};
-                let has_complex_type_annotation =
-                    self.id_has_complex_type_annotation(&declarator.id);
-                let has_complex_destructuring = self.id_has_complex_destructuring(&declarator.id);
-                let is_arrow_with_breakable_left =
-                    matches!(init, Expression::ArrowFunctionExpression(_)) && can_break_left;
-
-                // Break-after-operator layout: group([left, " =", group(indent([line, right]))])
-                // Used for fluid RHS or simple RHS when LHS can break.
-
-                // Calls and imports with trailing comments expand internally and should not use fluid layout
-                let is_call_with_trailing_comments = if let Expression::CallExpression(call) = init
-                {
-                    call.arguments.last().is_some_and(|last_arg| {
-                        self.has_line_comments_between(last_arg.span().end, call.span.end)
-                    })
-                } else {
-                    false
-                };
-
-                // Import expressions with trailing comments also expand internally
-                // (handles `await import('./x' // comment)`)
-                let is_import_with_trailing_comments = self.has_import_with_trailing_comments(init);
-
-                // Call chains AND member-only chains with line comments should NOT be
-                // treated as fluid / break-after-operator. The chain formatter breaks
-                // internally at the comment location, so keep the chain with `=`
-                // (otherwise it breaks after `=` too → double indent). E.g.
-                // `const a = items // comment\n  .foo()` and `const b = foo.bar // c\n  .baz`.
-                let has_line_comments_in_chain = self.has_line_comments_in_call_chain(init)
-                    || self.has_line_comments_in_member_chain(init);
-
-                // Combined flag for expressions with trailing comments that expand internally
-                let has_trailing_comment_expansion =
-                    is_call_with_trailing_comments || is_import_with_trailing_comments;
-
-                // Common exclusion: layout strategies don't apply when the init
-                // self-expands (object/array), has trailing comment expansion, or
-                // has line comments in a chain — those need special handling.
-                let is_layout_eligible = !is_self_expanding_value(init)
-                    && !has_trailing_comment_expansion
-                    && !has_line_comments_in_chain;
-
-                // RHS expressions that should use break-after-operator layout.
-                // Matches Prettier's shouldBreakAfterOperator: poorly breakable chains,
-                // string literals, etc. These don't break well internally, so the
-                // assignment breaks at `=` with group(indent([line, rightDoc])).
-                //
-                // ⚠️ **This chain is a hand-rolled twin of `assignment.rs::choose_layout`** —
-                // one prettier function answered twice, once for `const x = …` and once for
-                // every other assignment. It reaches arms `choose_layout` does not (the three
-                // chain shapes below), so the two cannot simply be merged — but they DRIFT, and
-                // the sequence arm is the proof: `choose_layout` has had it from the start while
-                // this list did not, so `const a = (a, b)` hung its operands off the `=` column.
-                // A `chooseLayout` fact added to one belongs in both.
-                let should_break_after_op_rhs = (is_module_path_fluid_call(init, self.source)
-                    || is_pure_property_chain(init)
-                    || is_poorly_breakable_chain(init, self.source, PRINT_WIDTH, self.comments)
-                    || is_string_literal(init)
-                    // A SEQUENCE init breaks after the `=` and lays its operands out under
-                    // one indent, prettier's own `shouldBreakAfterOperator` switch arm —
-                    // the same fact `choose_layout` states for the assignment-RHS twin.
-                    // Without it the sequence's internal break satisfies the fluid layout's
-                    // fits() and the operands hang off the `=` column instead.
-                    || matches!(init, Expression::SequenceExpression(_))
-                    || matches!(init, Expression::RegexLiteral(_)))
-                    && is_layout_eligible;
-
-                // Decorated class expression → break after operator, each decorator
-                // on its own line (`const C =\n\t@dec\n\tclass {}`).
-                let is_decorated_class_expr = is_layout_eligible
-                    && matches!(init, Expression::ClassExpression(c) if class_expr_has_decorators(c));
-
-                // Single-call member chains with complex args (arrows, objects, arrays):
-                // Use TRUE fluid layout to break at `=` only when necessary.
-                // E.g., `const x = a.b.c.filter((x) => ...)` breaks at `=` if > print_width
-                let is_single_call_member_chain =
-                    is_call_on_member_chain(init) && is_layout_eligible;
-
-                // Regex-rooted member chain calls: /regex/.exec(b)
-                // Prettier returns "fluid" layout (its default) because regex roots are NOT
-                // accepted by isPoorlyBreakableMemberOrCallChain (only Identifier/ThisExpression).
-                // Our is_poorly_breakable_chain similarly rejects regex roots. Route to fluid
-                // so fits() can decide whether to break at `=` or let the call expand args.
-                let is_regex_chain_call = is_regex_root_chain(init) && is_layout_eligible;
-
-                // Member-only chains on literal bases: 'string'.length, `template`.length
-                // These need Fluid layout so the assignment can break at `=` when the
-                // literal base exceeds print_width on the assignment line.
-                let is_literal_member = is_literal_member_chain(init) && is_layout_eligible;
-
-                // Expressions that need break-after-operator layout:
-                // group([left, " =", indent([line, right])])
-                // For binary/logical expressions, breaking happens at operators within the RHS,
-                // and the entire RHS is indented together after `=`.
-                //
-                // Excludes logical expressions with inline-able RHS (non-empty object/array).
-                // Those use default layout so the RHS self-expands:
-                //   `const x = foo || { a: 1 }` not `const x =\n  foo || {a: 1}`
-                // Prettier ref: assignment.js:199, binaryish.js:361
-                let is_non_inline_binary = if let Expression::BinaryExpression(binary) = init {
-                    !should_inline_logical_expression(binary)
-                } else {
-                    false
-                };
-                let needs_break_after_op_layout = (is_non_inline_binary
-                    || conditional_should_break_after_op(init))
-                    && is_layout_eligible;
-
-                // Member-chain call (a.fn(...)) where the call head fits within print_width:
-                // Use default layout and let the call expand its own args rather than breaking
-                // at `=`. E.g., `const {a, b} = vi.mocked(longArg)` with short LHS keeps
-                // `= vi.mocked(` on line 1 and expands the arg — matching Prettier's behavior.
-                // Only fires when call head (decl_start to callee_end + "(") fits in print_width.
-                // is_single_call_on_member_chain guarantees CallExpression
-                let is_expandable_member_call = if let Expression::CallExpression(call) = init
-                    && is_single_call_on_member_chain(init)
-                {
-                    // Include actual source indentation (JS nesting) in the width check.
-                    // Without this, deeply-nested declarations would incorrectly use
-                    // default layout even when the call head exceeds print_width.
-                    let indent_visual = self.source_indent_visual(decl.span.start);
-                    let call_head_width = indent_visual
-                        + (call.callee.span().end as usize - decl.span.start as usize)
-                        + 1; // +1 for "(" after callee
-                    call_head_width < PRINT_WIDTH
-                } else {
-                    false
-                };
-
-                // A comment the initializer *owns* (a JSDoc cast, a bundler annotation) is
-                // glued to its first token and travels inside its doc, so the gap probes
-                // above cannot see it. It is still on the page and still decides the `=`
-                // layout — this declarator builds its own layout rather than routing
-                // through `build_assignment_layout`, so it applies the rule itself. Both
-                // halves come off one lookup; see `owned_leading_comment_effect`.
-                let owned_comment_effect = self.owned_leading_comment_effect(init);
-
-                let is_break_after_op_rhs = should_break_after_op_rhs
-                    || needs_break_after_op_layout
-                    || is_decorated_class_expr
-                    // An indentable owned comment hangs the value.
-                    || owned_comment_effect == Some(OwnedCommentEffect::Hangs);
-
-                // The other half: a *preserved* multi-line comment the initializer owns
-                // ends the `=` line inside itself, so no width-decided break at `=` is
-                // meaningful and the plain `= value` form is the layout
-                // (`const a = /* line1⏎line2 */ x;`). Without this the fluid branches broke
-                // at `=` on the comment's own `literalline`s.
-                let init_pinned_to_eq = owned_comment_effect == Some(OwnedCommentEffect::Pins);
-
-                // Breakable LHS (destructuring patterns) with non-self-expanding RHS:
-                // Use fluid layout so the printer breaks at `=` before expanding the
-                // destructuring pattern. Matches Prettier's `canBreak(leftDoc) → "fluid"`.
-                // E.g., `const {a, b, c} = resolve(x, y, z)` breaks after `=`, not inside `{}`
-                //
-                // Excludes break-after-operator RHS (binary, conditional, strings, chains) —
-                // those go through needs_break_after_operator with their own layout.
-                // In Prettier, shouldBreakAfterOperator() handles those before the canBreak fallback.
-                //
-                // Excludes is_expandable_member_call: when the call head fits, the call's own
-                // arg-expansion handles line breaking via default layout.
-                let needs_fluid_for_breakable_lhs = can_break_left
-                    && is_layout_eligible
-                    && !should_break
-                    && !is_break_after_op_rhs
-                    && !is_expandable_member_call
-                    && !init_pinned_to_eq;
-
-                // Type assertion calls with LHS type annotation need special fluid handling
-                // (handled separately below because they need non-wrapping LHS type)
-                let is_type_assertion_with_lhs_type = is_type_assertion_call(
-                    init,
-                    self.source,
-                    PRINT_WIDTH,
-                ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation().is_some());
-
-                let is_simple_rhs_with_breakable_lhs =
-                    can_break_left && is_simple_self_expanding(init);
-
-                // `should_break` (a multi-declarator with initializers) withholds the
-                // width-decided break at `=` because the declarators are hardline-separated
-                // already — but an owned comment that HANGS is not width-decided. Its break
-                // is inside the value's doc whatever this layout picks, so withholding the
-                // hang only strands what follows the comment at the declarator list's own
-                // indent: for a cast, a form the next pass reads as mid-line and collapses,
-                // leaving that authoring no fixed point at all. The gap-emitted spelling of
-                // the same comment already hangs here (`build_eq_comment_break_rhs`, the
-                // first branch below, which `should_break` does not gate), so this is the
-                // owned half catching up to it
-                // (`multiple/value_own_line_comment_hang_prettier_divergence`).
-                let needs_break_after_operator = (!should_break
-                    || owned_comment_effect == Some(OwnedCommentEffect::Hangs))
-                    && (is_break_after_op_rhs || is_simple_rhs_with_breakable_lhs)
-                    && !d.will_break(id_doc)
-                    && !has_complex_type_annotation
-                    && !has_complex_destructuring
-                    && !is_arrow_with_breakable_left;
-
-                // A curried chain whose heads trigger `arrow_chain_should_break` breaks
-                // after `=` unconditionally; every other curried chain goes fluid below.
-                // ⚠️ This pair is the declarator's hand-rolled twin of `choose_layout`'s
-                // `Fluid` / `BreakAfterOperator` arms — see the ⚠️ on `build_assignment_layout`.
-                let is_curried_arrow = is_curried_arrow_chain_that_breaks(init);
-
-                if has_comments_after_eq
-                    && let Some(rhs) = self.build_eq_comment_break_rhs(
-                        equals_pos,
-                        init_start,
-                        " =",
-                        init_value_doc,
-                    )
-                {
-                    // A comment after `=` forces a break (line comment → partition;
-                    // own-line / multiline block → break-after-operator hang). Shared
-                    // with the for-loop init clause.
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(rhs);
-                } else if is_multiline_string {
-                    // Multiline string with no comment forcing a break: mandatory break
-                    // after `=`. An inline block glued to `=` trails it on that line.
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(d.text(" ="));
-                    if has_comments_after_eq
-                        && let Some(inline) =
-                            self.build_inline_comments_between_doc_opt(equals_pos + 1, init_start)
-                    {
-                        parts.push(inline);
-                    }
-                    parts.push(d.indent_hardline(init_value_doc()));
-                } else if is_curried_arrow {
-                    // Mandatory break after `=`; the arrow printer stacks the heads under it.
-                    // ⚠️ Deliberately does NOT set `ArrowChainContext::AssignmentRhs`, unlike
-                    // the arm below — and it is only equivalent to setting it because
-                    // `should_use_arrow_chain_layout` declines a `shouldBreakChain` chain in
-                    // exactly that context, precisely so this `=` can own the break instead.
-                    // `build_assignment_layout` sets the context for EVERY curried chain and
-                    // leans on the same decline; if that decline ever moves, both sites move.
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(d.text(" ="));
-                    parts.push(d.indent_hardline(init_value_doc()));
-                } else if is_curried_arrow_chain(init) {
-                    // Every other curried chain: fluid break after `=`. The chain's
-                    // signature heads break only when they don't fit on the operator
-                    // line; a hugging body otherwise expands in place. The context tells
-                    // the arrow printer to use the assignment-RHS chain layout.
-                    let init_doc = self.build_with_arrow_chain_context(
-                        crate::printer::ArrowChainContext::AssignmentRhs,
-                        || make_init_doc(init_value_doc()),
-                    );
-                    parts.push(build_fluid_assignment_doc(
-                        d,
-                        make_fluid_lhs(id_doc),
-                        init_doc,
-                    ));
-                } else if (has_complex_type_annotation
-                    || has_complex_destructuring
-                    || is_arrow_with_breakable_left)
-                    && (should_break || i == 0)
-                {
-                    // Break-lhs layout: LHS breaks internally, `=` stays on same line with RHS
-                    // Only applies to first declarator or multi-declarator with breaks
-                    //
-                    // For complex type annotations, rebuild with wrapping type.
-                    // Complex destructuring and arrow with breakable left already have correct id_doc.
-                    if has_complex_type_annotation
-                        && let Expression::Identifier(ident) = &declarator.id
-                    {
-                        push_lhs(
-                            &mut parts,
-                            self.build_typed_identifier_doc(
-                                ident,
-                                declarator.definite,
-                                true, // wrap_type
-                            ),
-                        );
-                    } else if has_complex_destructuring {
-                        // Strip the outer group from the destructuring id_doc so it
-                        // participates in the outer group's fit check. Without this,
-                        // the destructuring group evaluates independently via fits()
-                        // and stays flat even when the full line exceeds print_width.
-                        // Prettier's break-lhs does not wrap leftDoc in an extra group.
-                        push_lhs(&mut parts, d.unwrap_group(id_doc));
-                    } else {
-                        push_lhs(&mut parts, id_doc);
-                    }
-
-                    // Add ` = rightDoc` (right side grouped)
-                    parts.push(d.text(" = "));
-                    let init_doc = make_init_doc(init_value_doc());
-                    parts.push(d.group(init_doc));
-                } else if is_type_assertion_with_lhs_type
-                    || is_single_call_member_chain
-                    || needs_fluid_for_breakable_lhs
-                    || is_regex_chain_call
-                    || is_literal_member
-                {
-                    // Fluid layout for specific RHS patterns: break after `=` only
-                    // when the full line exceeds print_width. Type assertion case
-                    // rebuilds LHS with non-wrapping type annotation.
-                    let fluid_id_doc = if is_type_assertion_with_lhs_type
-                        && let Expression::Identifier(ident) = &declarator.id
-                    {
-                        self.build_typed_identifier_doc(
-                            ident,
-                            declarator.definite,
-                            false, // non-wrapping
-                        )
-                    } else {
-                        id_doc
-                    };
-                    let init_doc = make_init_doc(init_value_doc());
-                    parts.push(build_fluid_assignment_doc(
-                        d,
-                        make_fluid_lhs(fluid_id_doc),
-                        init_doc,
-                    ));
-                } else if needs_break_after_operator {
-                    // Break-after-operator layout for binary/conditional expressions:
-                    // Structure: [" =", group(indent([line, init]))]
-                    //
-                    // The init IS inside the group with the line. This allows the binary/conditional
-                    // expression to control its own breaking at operators. The entire RHS is
-                    // indented together after the `=` break.
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(d.text(" ="));
-                    let init_doc = make_init_doc(init_value_doc());
-                    parts.push(hang_after_operator(d, init_doc));
-                } else if is_layout_eligible && !is_simple_value(init) && !init_pinned_to_eq {
-                    // Fluid layout (default for layout-eligible values)
-                    //
-                    // Matches prettier's chooseLayout default: when no special layout
-                    // applies, use fluid so the marker can break at `=` only if needed,
-                    // while allowing the RHS to break internally first.
-                    let init_doc = make_init_doc(init_value_doc());
-                    parts.push(build_fluid_assignment_doc(
-                        d,
-                        make_fluid_lhs(id_doc),
-                        init_doc,
-                    ));
-                } else {
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(d.text(" = "));
-                    let init_doc = make_init_doc(init_value_doc());
-                    parts.push(init_doc);
-                }
+                parts.push(self.build_declarator_init_doc(
+                    &DeclaratorInitInputs {
+                        declarator,
+                        init,
+                        decl_start: decl.span.start,
+                        id_doc,
+                        can_break_left,
+                        gap: DeclaratorEqGap {
+                            id_end,
+                            equals_pos,
+                            init_start,
+                            has_comments_before_eq,
+                            has_comments_after_eq,
+                        },
+                        should_break,
+                        is_first: i == 0,
+                    },
+                    &|| self.build_init_value_doc(init, declarator.span.end, init_frozen),
+                ));
             } else if should_break || i == 0 {
                 // No initializer: push id_doc directly
                 parts.push(id_doc);

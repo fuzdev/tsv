@@ -17,7 +17,7 @@ mod head_parens;
 mod modules;
 mod restricted_production;
 mod type_declarations;
-mod variable;
+pub(in crate::printer) mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
 pub(super) use super::{Printer, build_entity_name_doc, is_effectively_empty_body};

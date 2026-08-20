@@ -125,8 +125,8 @@ pub fn build_chain_doc<'a>(
 /// lookup's break point — the member-only fold, the short chain's paren-base lookup, and
 /// the peeled member tail — because they answer one question in three shapes, and a
 /// subset would leave the chain breakable through whichever spelling was missed; its
-/// `call_tail` arm reaches the peel alone, the only site that gives a bare-base call's
-/// tail a break point. Both apply only to the WHOLE chain: the recursive calls below pass
+/// `call_tail` arm reaches the peel alone, the only site holding a lookup whose parent is
+/// the marked position. Both apply only to the WHOLE chain: the recursive calls below pass
 /// [`InlineLookups::NONE`], since a peeled sub-chain is not the span either mark named.
 fn build_chain_doc_impl<'a>(
     groups: &[ChainGroup<'a>],
@@ -171,7 +171,8 @@ fn build_chain_doc_impl<'a>(
     // (`any_non_last_breaks`, the call-count rules) never sees it, which is what
     // keeps `obj.aa(x).bb(cb)` flat with the arrow hugged and `.prop` trailing.
     // Folding the tail into the chain made `.bb` non-last and force-expanded it.
-    if has_calls && let Some(peeled) = peel_trailing_member_tail(groups, inline, printer) {
+    if has_calls && let Some(peeled) = peel_trailing_member_tail(groups, chain_end, inline, printer)
+    {
         return build_peeled_tail_doc(groups, chain_end, &peeled, inline, printer);
     }
 
@@ -453,10 +454,11 @@ struct PeeledTail<'a, 'p> {
     /// construction (the peel refuses break-forcing ones). `None` when the chain
     /// window holds no comments or the tail's first node has no gap.
     gap_comments: Option<ClassifiedComments<'p>>,
-    /// Bare base call (`fn(args).a.b` — one call, nothing else before the tail):
-    /// the tail keeps member.js's per-member break points. Cleared for the one shape
-    /// prettier's call-object clause takes them back for — see the peel.
-    per_member_breaks: bool,
+    /// The tail's LAST member takes no break point — prettier's call-object clause
+    /// (member.js `shouldInline`), the only one of its clauses that can reach a peeled
+    /// tail from the parent. Every other member keeps member.js's per-member break
+    /// point; see the peel.
+    inlined_last: bool,
 }
 
 /// Split off the trailing member tail — every node AFTER the chain's last call,
@@ -482,6 +484,7 @@ struct PeeledTail<'a, 'p> {
 /// blank-injection audit reaches. See `expressions/member/call_base_tail_blank`.
 fn peel_trailing_member_tail<'a, 'p>(
     groups: &[ChainGroup<'a>],
+    chain_end: u32,
     inline: InlineLookups,
     printer: &'p Printer<'_>,
 ) -> Option<PeeledTail<'a, 'p>> {
@@ -530,40 +533,69 @@ fn peel_trailing_member_tail<'a, 'p>(
         return None;
     }
 
-    let bare_base_call = last_call_group == 0
-        && last_call_idx == 1
-        && matches!(
-            groups[0].nodes[0],
-            ChainNode::Base {
-                needs_parens: false,
-                ..
-            }
-        );
-    // Prettier's call-object clause takes that break point back for ONE shape: a chain
-    // sitting directly under an assignment or declarator whose lone `.prop` tail hangs off
-    // a call WITH ARGUMENTS (`const x = fn(a).prop`). Both halves are read here — the
-    // POSITION from the parent's mark, the OBJECT and the tail from the chain — so
-    // `const x = fn().prop` (no arguments) and `const x = fn(a).b.c` (two lookups) keep
-    // their break points, exactly as prettier does. See [`super::inline_lookups`].
+    // Prettier's call-object clause (member.js `shouldInline`) takes the break point back
+    // in ONE position — a chain sitting directly under an assignment or a declarator — and
+    // it can only ever reach the tail's LAST member: `findAncestor` skips member ancestors,
+    // so every member below the last one has a MEMBER parent, which the clause does not
+    // name. Both halves are read here, the POSITION from the parent's mark and the OBJECT
+    // from the chain. See [`super::inline_lookups`].
     //
-    // `bare_base_call` is what makes `nodes[1]` the tail's object: it says the last call
-    // sits at index 1 of the first group, so this reads the very call the clause asks
-    // about rather than whatever else a longer prefix would put there.
-    let call_object_clause = bare_base_call
-        && inline.call_tail
-        && tail.len() == 1
+    // Its two disjuncts are the two things that object can be:
+    //
+    // - a call WITH ARGUMENTS (`isCallExpressionWithArguments`), which the last member's
+    //   object is only when the tail is a LONE lookup — with two, the last one's object is
+    //   the member below it (`const x = fn(a).b⏎\t.c`, prettier's own layout);
+    // - a doc prettier LABELLED `memberChain`, which every chain carries except the
+    //   `groups.length <= cutoff` shortcut. `printMemberExpression` propagates that label
+    //   up through the tail, so a labelled prefix reaches the last member across any number
+    //   of lookups.
+    //
+    // Both disjuncts sit behind the POSITION, which is one flag: a chain in any other
+    // position never pays for either question.
+    let lone_tail_off_call_with_args = tail.len() == 1
         && matches!(
-            groups[0].nodes.get(1),
-            Some(ChainNode::Call { call, .. }) if !call.arguments.is_empty()
+            groups[last_call_group].nodes[last_call_idx],
+            ChainNode::Call { call, .. } if !call.arguments.is_empty()
         );
-    let per_member_breaks = bare_base_call && !call_object_clause;
+    let inlined_last = inline.call_tail
+        && (lone_tail_off_call_with_args
+            || prefix_prints_as_member_chain(groups, last_call_group, chain_end, printer));
     Some(PeeledTail {
         last_call_group,
         last_call_idx,
         tail,
         gap_comments,
-        per_member_breaks,
+        inlined_last,
     })
+}
+
+/// Whether the peeled PREFIX prints as a doc prettier would label `memberChain` — the
+/// second disjunct of the call-object clause (see [`peel_trailing_member_tail`]).
+///
+/// Prettier labels every `printMemberChain` result except the `groups.length <= cutoff`
+/// shortcut, so this asks exactly the question `build_chain_doc_impl` is about to answer
+/// for the same groups: the prefix's own group count against its own merge-adjusted
+/// cutoff, plus the comment check that sends a short chain down the long path anyway.
+///
+/// Asked from the peel because `build_chain_doc_impl` CLEARS the expression-statement flag
+/// `should_merge_first_groups` reads. Truncating the last group cannot change the answer —
+/// the merge reads only the first two groups' leading nodes — so the untruncated slice
+/// stands in for the prefix the build assembles.
+fn prefix_prints_as_member_chain(
+    groups: &[ChainGroup<'_>],
+    last_call_group: usize,
+    chain_end: u32,
+    printer: &Printer<'_>,
+) -> bool {
+    let prefix = &groups[..=last_call_group];
+    let cutoff = if should_merge_first_groups(prefix, printer) {
+        SHORT_CHAIN_CUTOFF_MERGED
+    } else {
+        SHORT_CHAIN_CUTOFF
+    };
+    prefix.len() > cutoff
+        || (printer.chain_has_comments()
+            && has_comments_forcing_expansion(prefix, chain_end, printer))
 }
 
 /// Build the doc for a peeled chain: the prefix (everything through the last
@@ -603,26 +635,24 @@ fn build_peeled_tail_doc<'a>(
 }
 
 /// Append a peeled member tail to the chain's doc. The gap's same-line block
-/// comments stay inline; how the members land depends on `per_member_breaks`:
+/// comments stay inline; the members keep member.js's per-member break points —
+/// each `.prop` rides [`member_lookup_group`], so the overflowing member drops to
+/// its own line while everything before it stays where the width left it
+/// (`expressions/member/call_base_trailing_members_long`,
+/// `expressions/member/chain_base_tail_long`). A member that FITS still hugs: the
+/// group's fit look-ahead ends at the next lookup's own softline, so only the
+/// member that overflows takes its break.
 ///
-/// - A **bare base call** (`fn(args).a.b` — one call, nothing else) keeps
-///   member.js's per-member break points: each `.prop` rides
-///   [`member_lookup_group`], so the overflowing member drops to its own
-///   line while the call's arguments stay inline
-///   (`expressions/member/call_base_trailing_members_long`).
-/// - Every other prefix GLUES the tail: it takes no break point of its own, so
-///   its width lands in the preceding group's fit reserve and the break falls
-///   inside the chain or the call's arguments (`X.f({…}).success` expands the
-///   object, `.success` staying on the `}` — tsv's §Print Width stance,
-///   `trailing_member_expand_args_long_prettier_divergence`). The same glue
-///   `add_group_no_break` applies when the chain prints a tail itself.
+/// The two ways a lookup gives that break point up are both prettier's
+/// `shouldInline` (member.js), and each enters here already answered:
 ///
-/// `inline_every_lookup` forces the glue at every prefix: a chain the parent marked —
-/// an assignment TARGET, a `new` CALLEE — carries no break point at any lookup, so the
-/// width falls to the call's arguments or to the operator ([`super::inline_lookups`]).
-/// The narrower `call_tail` clause is not read here: it acts by clearing
-/// [`PeeledTail::per_member_breaks`] at the peel, where the shape it is gated on is
-/// visible.
+/// - `inline_every_lookup` glues EVERY member — a chain the parent marked, an
+///   assignment TARGET or a `new` CALLEE, carries no break point at any lookup, so
+///   the width falls to the call's arguments or to the operator
+///   ([`super::inline_lookups`]).
+/// - [`PeeledTail::inlined_last`] glues the LAST one — the call-object clause,
+///   resolved at the peel where the object's shape is visible
+///   (`expressions/member/chain_base_tail_inlined_long`).
 fn append_member_tail(
     chain_doc: DocId,
     peeled: &PeeledTail<'_, '_>,
@@ -638,10 +668,11 @@ fn append_member_tail(
         // The first member's gap comments were just emitted above — skip them in the
         // node print so they can't double-print (the add_group_no_break seam).
         let member = print_node_inner(node, printer, false, i == 0);
-        parts.push(if peeled.per_member_breaks && !inline_every_lookup {
-            member_lookup_group(d, member)
-        } else {
+        let inlined = inline_every_lookup || (peeled.inlined_last && i + 1 == peeled.tail.len());
+        parts.push(if inlined {
             member
+        } else {
+            member_lookup_group(d, member)
         });
     }
     d.concat(&parts)
