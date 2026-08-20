@@ -681,6 +681,45 @@ guard. Since acorn accepts, the class half is pinned by the
 property path omits the `hasPrecedingLineBreak` guard its variable-declarator
 path spells.
 
+**Definite `!` on a `for` header's binding (rejected)**: the same marker, barred by
+*position* rather than by a line break. tsc's `parseVariableDeclaration` reads the
+`!` under three conjuncts — `allowExclamation && name.kind === Identifier &&
+!scanner.hasPrecedingLineBreak()` — and
+`parseVariableDeclarationList(/*inForStatementInitializer*/ true)` selects the
+`allowExclamation: false` spelling for the whole `for` head, C-style init and
+`in`/`of` left alike. A grammar parameter barring a production is the parser's
+rule, so tsc rejects every spelling at parse time (`for (let a!: number; ;)` →
+three `parseDiagnostics`, `for (const a!: number of xs)` → six), and prettier with
+it. That is the line separating this from the definite-marker errors tsv *does*
+defer: a bare `b!;` class property (TS1264) and `let a!: number = x;` (TS1263) are
+`checkGrammar*` diagnostics over an **empty** `parseDiagnostics`, so tsv accepts
+and formats them. Position is the only defect here — `for (let a: number; ;)` and
+`let a!: number;` each parse *and* check clean.
+
+acorn-typescript accepts, building the declarator it builds for a variable
+statement (`definite: true` with the annotation). tsv built that tree until this
+rejection landed, and its printer then **dropped the `!`** on the way out
+(`for (let a!: number; ;)` → `for (let a: number; ;)`) — a silent deletion of
+authored source whose output re-parsed as a different program, which is the
+faithful-reprint floor failing rather than a layout choice. tsv now rejects
+(`a definite assignment assertion is not permitted in a for header`), stated once
+for all four keyword spellings (`let`/`const`/`var`, `using`, `await using`), and
+already spelled the guard's other two conjuncts — the `[no LineTerminator here]`
+one at
+[declarations/variable/definite_newline_invalid](../tests/fixtures/typescript/declarations/variable/definite_newline_invalid/),
+the pattern arm structurally. Since acorn accepts, the two acorn-visible halves
+are pinned by the
+[statements/for/init_definite](../tests/fixtures/typescript/statements/for/init_definite_svelte_divergence/)
+and
+[statements/for/in_of_definite](../tests/fixtures/typescript/statements/for/in_of_definite_svelte_divergence/)
+`tsv_rejects.txt` fixtures; the `using` spelling is an ordinary both-reject
+`input_invalid_*` file in
+[using/basic](../tests/fixtures/typescript/typescript_specific/using/basic_svelte_divergence/),
+acorn having no `using` declarations at all. **Upstream candidate**:
+acorn-typescript — its `parseVarId` override spells the `hasPrecedingLineBreak`
+conjunct but takes no for-header parameter, though base acorn's `parseVar` already
+carries the `isFor` flag it would key on.
+
 **Arrow function as an operand (rejected)**: an `ArrowFunction` is a complete
 `AssignmentExpression` — a top-level alternative of that production
 ([ecma262 §13.15](https://tc39.es/ecma262/#prod-AssignmentExpression)), not a
