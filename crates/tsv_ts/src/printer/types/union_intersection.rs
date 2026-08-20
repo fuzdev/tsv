@@ -40,6 +40,42 @@ enum LeadingGap {
     Claimed,
 }
 
+/// An intersection's first-member leading run, and how the body must then be built — the
+/// shared answer for the two routes that own the leading-`&` gap and emit it themselves
+/// ([`Printer::build_intersection_leading_gap_line_comment_doc`] and the hoist inside
+/// [`Printer::build_intersection_type_doc`]).
+///
+/// Two shapes reach it, disjoint by construction because
+/// [`Printer::head_stripped_paren_shell`] never returns the node it was asked about:
+///
+/// - the member **is** a redundant shell, whose run hoists out and whose parens are then
+///   stripped from the rebuilt member
+///   ([`Printer::intersection_first_member_hoist_comments`]);
+/// - the shell sits one link **inside** the member (`(⏎// c⏎A)[] & B`), where there is
+///   nothing to strip — the member keeps its shape and only the shell's own copy of the
+///   run stands down, under the claim named here.
+///
+/// ⚠️ Both shapes must be answered at BOTH routes. Answered at only one, the sibling left
+/// the edge shell printing its run at whatever indent it was built at, welded onto the
+/// block the gap had already emitted — the same defect, one route over.
+struct IntersectionHeadRun<'c> {
+    /// The comments this route emits ahead of the body, in source order. Empty when
+    /// neither shape applies (or the first member is frozen, whose shell comments ride
+    /// inside its verbatim slice).
+    run: CommentVec<'c>,
+    /// The leading-EDGE shell whose own copy of `run` must stand down while the body
+    /// builds. `None` for the hoist shape, which strips the member instead.
+    claimed_shell: Option<Span>,
+}
+
+impl IntersectionHeadRun<'_> {
+    /// Whether the first member is rebuilt with its parens stripped — the hoist shape,
+    /// which is exactly "there is a run and no edge shell claimed it".
+    fn strips_first_paren(&self) -> bool {
+        !self.run.is_empty() && self.claimed_shell.is_none()
+    }
+}
+
 /// Member-parens predicate for a union/intersection with `member_count` members.
 ///
 /// A single-member union/intersection collapses to its member (Prettier drops
@@ -604,17 +640,34 @@ impl<'a> Printer<'a> {
         // - Inside a member's parens (`A | (// c\n  B)`) — a retained paren keeps the
         //   comment inside; a redundant one leads its member on its own line. Either way
         //   the comment is a line comment, so the multiline layout is required.
-        if has_comments {
+
+        // An enclosing gap may own this node's whole transparent head region — a ONE-member
+        // union prints as its member, so its leading-`|` gap is that gap's, not this
+        // builder's (see [`Printer::composite_head_region_claimed`]). Both the multiline
+        // route below and the collapse's own leading emitter stand down under it.
+        let head_region_claimed = self.composite_head_region_claimed(union.span.start, union.types);
+
+        if has_comments && !head_region_claimed {
             let first_type_start = union.types.first().map(|t| t.span().start);
             let has_leading_line_comments = first_type_start
                 .is_some_and(|start| self.has_line_comments_between(union.span.start, start));
             // A line comment inside a member's parens (before the — possibly nested —
             // inner type), matching the window `build_union_type_doc_with_line_comments`
             // reads for its retained-paren, stripped-redundant-paren and leading-edge arms.
-            let has_paren_inner_leading_line_comments = union
-                .types
-                .iter()
-                .any(|t| self.union_member_paren_leading_line_comment(t));
+            //
+            // ⚠️ Asked only of a MULTI-member union. With one member the union collapses to
+            // that member below, so a `//` in the member's own shell is a question about
+            // the MEMBER — which parens it keeps and where its run lands — and the answer
+            // is the enclosing gap's, reached through the leading-edge seam. Routed here
+            // instead, the multiline layout emitted a `| ` the collapse would have dropped
+            // and asked the retained-paren rule as if the union had two members, so the
+            // pair came back retained and the pipe fabricated purely because of the
+            // comment (`single_member_union_shell_line_comment`).
+            let has_paren_inner_leading_line_comments = union.types.len() > 1
+                && union
+                    .types
+                    .iter()
+                    .any(|t| self.union_member_paren_leading_line_comment(t));
             if has_leading_line_comments
                 || self.union_has_own_line_member_comment(union)
                 || has_paren_inner_leading_line_comments
@@ -653,10 +706,17 @@ impl<'a> Printer<'a> {
                     self.build_type_doc_maybe_parens(member, member_parens),
                 );
             }
-            // The union's own group decides the run's `line`, so the break flag is the
-            // caller's only where no group is guaranteed (the intersection's boundaries).
-            let (leading, _) =
-                self.build_member_leading_block_comments(union.span.start, member.span().start);
+            // Block comments only, and that is complete: a `//` in this gap routed to
+            // the multiline layout above. The run's own break flag is dropped — the
+            // union's own group decides its `line`; the flag is the caller's only where
+            // no group is guaranteed (the intersection's boundaries). Under an enclosing
+            // gap's head-region claim the run is that gap's, so this branch adds nothing.
+            let leading = if head_region_claimed {
+                d.empty()
+            } else {
+                self.build_member_leading_block_comments(union.span.start, member.span().start)
+                    .0
+            };
             let member_doc = self.build_type_doc_maybe_parens(member, member_parens);
             return self.with_union_external_run_prefix(
                 external_run_start,
@@ -1471,10 +1531,7 @@ impl<'a> Printer<'a> {
     /// — but the claim is matched by CONTAINMENT rather than equality, and a claim over a
     /// wider region is the residue that argument does not cover.
     fn first_member_shell_run_claimed(&self, first_member: &TSType<'_>) -> bool {
-        self.shell_leading_run_claimed(
-            first_member.span().start,
-            unwrap_parenthesized(first_member).span().start,
-        )
+        self.head_run_claimed(first_member.span().start, first_member)
     }
 
     /// Emit one intersection member→member gap — the comments before the `&`, the `&`
@@ -1664,6 +1721,14 @@ impl<'a> Printer<'a> {
         let has_comments =
             self.has_comments_on_page_between(intersection.span.start, intersection.span.end);
 
+        // An enclosing gap may own this node's whole transparent head region — a ONE-member
+        // intersection prints as its member, so its leading-`&` gap is that gap's, not
+        // this builder's (see `Printer::composite_head_region_claimed`). Every route below
+        // that would emit the gap stands down; the member's own shell run is already
+        // declined by the hoist's `first_member_shell_run_claimed`.
+        let head_region_claimed =
+            self.composite_head_region_claimed(intersection.span.start, intersection.types);
+
         // A LINE comment in the leading-`&` gap `[span.start, first.start)` can't be
         // carried by the compact path's block-only extraction (a `//` runs to EOL), and
         // no other route scans this gap for line comments — it was silently dropped
@@ -1671,6 +1736,7 @@ impl<'a> Printer<'a> {
         // phantom one-pass freeze (member frozen on pass 1, freeze lost on pass 2).
         // Route through the leading-gap run emitter, which owns the WHOLE gap run.
         if has_comments
+            && !head_region_claimed
             && let Some(first_member) = intersection.types.first()
             && self.has_line_comments_between(intersection.span.start, first_member.span().start)
         {
@@ -1698,18 +1764,22 @@ impl<'a> Printer<'a> {
         // the hoist still won, so a `//` in the shell lost the freeze outright while the
         // block spelling kept it. `build_intersection_leading_gap_line_comment_doc` states
         // the identical suppression for the leading-gap route.
+        //
+        // A shell one link INSIDE the first member (`& /* c */ (// c2⏎A)[] & B`) is the
+        // second shape [`IntersectionHeadRun`] resolves, reached only where the ENCLOSING
+        // gap declined the claim — which for a multi-member intersection is exactly a
+        // leading-`&` gap holding a comment of its own
+        // ([`Printer::head_stripped_paren_shell`]'s ⚠️), leaving this the innermost gap
+        // that can own the run.
         if has_comments && let Some(first_member) = intersection.types.first() {
-            let first_paren_leading = if self.list_member_frozen(
+            let first_frozen = self.list_member_frozen(
                 intersection.span.start,
                 intersection.types,
                 0,
                 freeze_first,
-            ) {
-                smallvec![]
-            } else {
-                self.intersection_first_member_hoist_comments(intersection)
-            };
-            if !first_paren_leading.is_empty() {
+            );
+            let head = self.intersection_first_member_head_run(intersection, first_frozen);
+            if !head.run.is_empty() {
                 // The leading-`&` gap rides the SAME run, ahead of the hoisted shell comments
                 // — the two windows are contiguous in source (`& /* c */ (// c2⏎ A)`), so one
                 // emission in source order is the only way to keep it. Emitted by the body
@@ -1723,22 +1793,20 @@ impl<'a> Printer<'a> {
                     first_member.span().start,
                 )
                 .collect();
-                run.extend(first_paren_leading);
+                run.extend(head.run.iter().copied());
                 // The compact inline body can't represent an *isolated* between-member
                 // comment (a line/own-line comment forces multiline); route those through
                 // the line-comment path with the first member's (now-hoisted) paren-leading
                 // stripped, so the other comments aren't dropped. Otherwise stay compact
-                // inline (block comments emitted in place).
+                // inline (block comments emitted in place). The shared builder answers all
+                // of that once, for this route and the leading-gap one alike.
                 let line_comment_layout = self.intersection_needs_line_comment_layout(intersection);
-                let inner = if line_comment_layout {
-                    self.build_intersection_type_doc_with_line_comments(
-                        intersection,
-                        true,
-                        LeadingGap::Claimed,
-                    )
-                } else {
-                    self.build_intersection_type_doc_with_first_paren_leading_stripped(intersection)
-                };
+                let inner = self.build_intersection_claimed_body_doc(
+                    intersection,
+                    wrap_in_group,
+                    &head,
+                    leading_freeze,
+                );
                 let mut parts = DocBuf::new();
                 for comment in &run {
                     parts.push(self.build_comment_doc(comment));
@@ -1762,11 +1830,17 @@ impl<'a> Printer<'a> {
             }
         }
 
+        let leading_gap = if head_region_claimed {
+            LeadingGap::Claimed
+        } else {
+            LeadingGap::Emit
+        };
+
         if has_comments && self.intersection_needs_line_comment_layout(intersection) {
             let doc = self.build_intersection_type_doc_with_line_comments(
                 intersection,
                 false,
-                LeadingGap::Emit,
+                leading_gap,
             );
             // The line-comment layout self-indents per member (mirroring the no-comment
             // loop and Prettier's `printIntersectionType`), so no outer indent is added.
@@ -1781,7 +1855,7 @@ impl<'a> Printer<'a> {
             wrap_in_group,
             has_comments,
             leading_freeze,
-            LeadingGap::Emit,
+            leading_gap,
         )
     }
 
@@ -2032,12 +2106,7 @@ impl<'a> Printer<'a> {
         let first_member = &intersection.types[0];
         let first_frozen =
             self.list_member_frozen(intersection.span.start, intersection.types, 0, freeze_first);
-        let paren_leading = if first_frozen {
-            smallvec![]
-        } else {
-            self.intersection_first_member_hoist_comments(intersection)
-        };
-        let strip_first_paren = !paren_leading.is_empty();
+        let head = self.intersection_first_member_head_run(intersection, first_frozen);
         // To-emit axis: this is the gap's emitter (docs/comments.md).
         let mut run: CommentVec<'_> = comments_to_emit_in_range(
             self.comments,
@@ -2045,27 +2114,16 @@ impl<'a> Printer<'a> {
             first_member.span().start,
         )
         .collect();
-        run.extend(paren_leading);
+        run.extend(head.run.iter().copied());
 
-        // The body, with the leading gap (and any stripped first-member shell) claimed
+        // The body, with the leading gap (and the first member's own head run) claimed
         // by the run above — the print-once seam: exactly one of the two emits it.
-        let body = if self.intersection_needs_line_comment_layout(intersection) {
-            self.build_intersection_type_doc_with_line_comments(
-                intersection,
-                strip_first_paren,
-                LeadingGap::Claimed,
-            )
-        } else if strip_first_paren {
-            self.build_intersection_type_doc_with_first_paren_leading_stripped(intersection)
-        } else {
-            self.build_intersection_compact_doc(
-                intersection,
-                wrap_in_group,
-                true,
-                leading_freeze,
-                LeadingGap::Claimed,
-            )
-        };
+        let body = self.build_intersection_claimed_body_doc(
+            intersection,
+            wrap_in_group,
+            &head,
+            leading_freeze,
+        );
 
         let mut parts = DocBuf::new();
         if first_frozen && !own_line {
@@ -2510,6 +2568,15 @@ impl<'a> Printer<'a> {
         if self.first_member_shell_run_claimed(first_member) {
             return smallvec![];
         }
+        // The pair the run sits in is RETAINED by the trailing-run rule, so it emits the
+        // run inside itself ([`Printer::paren_retains_for_trailing_run`]). Hoisting would
+        // strip a shell that survives, and its trailing `//` — deferred by the strip —
+        // would then escape past the construct's own terminator, which is the relocation
+        // that rule exists to prevent (`docs/comments.md`: a deferred run must not leave
+        // the construct it was written in).
+        if self.paren_retains_for_trailing_run(first_member) {
+            return smallvec![];
+        }
         // The pair that DIRECTLY holds the run SURVIVES, so
         // `build_intersection_line_comment_member_doc` emits the run inside it — declining
         // here is what keeps the comment where the author wrote it, the answer every LATER
@@ -2553,6 +2620,80 @@ impl<'a> Printer<'a> {
             return lead;
         }
         smallvec![]
+    }
+
+    /// Resolve [`IntersectionHeadRun`] for `intersection` — the first member's own leading
+    /// run and the edge shell (if any) it was taken from. Empty for a frozen first member.
+    fn intersection_first_member_head_run(
+        &self,
+        intersection: &TSIntersectionType<'_>,
+        first_frozen: bool,
+    ) -> IntersectionHeadRun<'_> {
+        let empty = IntersectionHeadRun {
+            run: smallvec![],
+            claimed_shell: None,
+        };
+        if first_frozen {
+            return empty;
+        }
+        let hoist = self.intersection_first_member_hoist_comments(intersection);
+        if !hoist.is_empty() {
+            return IntersectionHeadRun {
+                run: hoist,
+                claimed_shell: None,
+            };
+        }
+        let Some(first_member) = intersection.types.first() else {
+            return empty;
+        };
+        // An ENCLOSING gap may already own the edge shell's run — the whole intersection
+        // can itself sit at some outer gap's leading edge — in which case this route would
+        // be a second emitter for one run (docs/comments.md hazard 3), exactly as the
+        // hoist's own `first_member_shell_run_claimed` decline is.
+        let Some(claim) = self
+            .leading_edge_shell_line_comment_claim(first_member)
+            .filter(|claim| !self.shell_leading_run_claimed(claim.start, claim.end))
+        else {
+            return empty;
+        };
+        IntersectionHeadRun {
+            run: comments_to_emit_in_range(self.comments, claim.start, claim.end).collect(),
+            claimed_shell: Some(claim),
+        }
+    }
+
+    /// The intersection body for a route that has already emitted the leading-`&` gap and
+    /// `head`'s run — the print-once seam: the body takes [`LeadingGap::Claimed`], and the
+    /// first member is either rebuilt paren-stripped (the hoist shape) or built whole with
+    /// its edge shell silenced. Shared by both such routes so they cannot answer the shape
+    /// question differently.
+    fn build_intersection_claimed_body_doc(
+        &self,
+        intersection: &TSIntersectionType<'_>,
+        wrap_in_group: bool,
+        head: &IntersectionHeadRun<'_>,
+        leading_freeze: Option<LeadingRunFreeze>,
+    ) -> DocId {
+        let strip_first_paren = head.strips_first_paren();
+        self.with_claimed_shell_leading_run(head.claimed_shell, || {
+            if self.intersection_needs_line_comment_layout(intersection) {
+                self.build_intersection_type_doc_with_line_comments(
+                    intersection,
+                    strip_first_paren,
+                    LeadingGap::Claimed,
+                )
+            } else if strip_first_paren {
+                self.build_intersection_type_doc_with_first_paren_leading_stripped(intersection)
+            } else {
+                self.build_intersection_compact_doc(
+                    intersection,
+                    wrap_in_group,
+                    true,
+                    leading_freeze,
+                    LeadingGap::Claimed,
+                )
+            }
+        })
     }
 
     /// Build the first intersection member's type doc with its parenthesized leading

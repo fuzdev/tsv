@@ -28,8 +28,17 @@ it shares with another construct's escaped comment, the two render back to back 
 `//` becomes text of the first. Keeping the run inside the brackets means the collision cannot
 be assembled in the first place.
 
-`unformatted_ours_flat.svelte` carries the flat authoring, which reaches `input` under tsv
-only.
+The retain question is asked of the whole **nest**, not of the author's outermost layer:
+redundant layers strip as a unit and print one pair between them, so a trailing `//` sitting
+one layer in still retains (`Printer::paren_retains_for_trailing_run` reads to the
+fully-unwrapped inner's end, the symmetry the leading side already had). Asked of the outer
+layer alone it read an empty gap, called the nest stripped, and let an enclosing gap claim the
+LEADING run out of a pair that then printed it too — the same comment twice (`B3`).
+
+`unformatted_ours_flat.svelte` carries the flat authoring and
+`unformatted_ours_paren_layer.svelte` the same thing with one extra redundant layer on each
+shell; both reach `input` under tsv only. Prettier is non-idempotent on its own output here —
+`audit_signature.txt` pins that chain.
 
 See [conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 and [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

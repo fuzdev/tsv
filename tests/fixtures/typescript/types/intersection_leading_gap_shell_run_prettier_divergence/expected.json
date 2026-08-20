@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 742,
+	"end": 1132,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -329,24 +329,152 @@
 					"column": 7
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the shell one link DEEPER, under an array suffix on a 2-member intersection: the",
+			"start": 734,
+			"end": 817,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leading gap is the intersection's own, and the member's leading-EDGE shell rides it",
+			"start": 819,
+			"end": 905,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 916,
+			"end": 924,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 10
+				},
+				"end": {
+					"line": 36,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d7",
+			"start": 927,
+			"end": 932,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " and the same deeper shell reached through the LINE-comment route, which owns the gap",
+			"start": 946,
+			"end": 1033,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " through its own emitter - one shape, both routes",
+			"start": 1035,
+			"end": 1086,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 1097,
+			"end": 1102,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 10
+				},
+				"end": {
+					"line": 42,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d8",
+			"start": 1105,
+			"end": 1110,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 2
+				},
+				"end": {
+					"line": 43,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 741,
+		"end": 1131,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 732,
+			"end": 1122,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 33,
+					"line": 45,
 					"column": 9
 				}
 			},
@@ -975,6 +1103,312 @@
 							"value": " a line comment in the gap takes the same run, ahead of the shell's",
 							"start": 633,
 							"end": 702
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 907,
+					"end": 943,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 10
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 912,
+						"end": 913,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 6
+							},
+							"end": {
+								"line": 36,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 935,
+						"end": 942,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 2
+							},
+							"end": {
+								"line": 38,
+								"column": 9
+							}
+						},
+						"types": [
+							{
+								"type": "TSArrayType",
+								"start": 935,
+								"end": 938,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 5
+									}
+								},
+								"elementType": {
+									"type": "TSTypeReference",
+									"start": 935,
+									"end": 936,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 935,
+										"end": 936,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 3
+											}
+										},
+										"name": "i"
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 941,
+								"end": 942,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 8
+									},
+									"end": {
+										"line": 38,
+										"column": 9
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 941,
+									"end": 942,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 8
+										},
+										"end": {
+											"line": 38,
+											"column": 9
+										}
+									},
+									"name": "j"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c7 ",
+								"start": 916,
+								"end": 924
+							},
+							{
+								"type": "Line",
+								"value": " d7",
+								"start": 927,
+								"end": 932
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the shell one link DEEPER, under an array suffix on a 2-member intersection: the",
+							"start": 734,
+							"end": 817
+						},
+						{
+							"type": "Line",
+							"value": " leading gap is the intersection's own, and the member's leading-EDGE shell rides it",
+							"start": 819,
+							"end": 905
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1088,
+					"end": 1121,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 44,
+							"column": 10
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1093,
+						"end": 1094,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 6
+							},
+							"end": {
+								"line": 42,
+								"column": 7
+							}
+						},
+						"name": "J"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 1113,
+						"end": 1120,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 2
+							},
+							"end": {
+								"line": 44,
+								"column": 9
+							}
+						},
+						"types": [
+							{
+								"type": "TSArrayType",
+								"start": 1113,
+								"end": 1116,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 5
+									}
+								},
+								"elementType": {
+									"type": "TSTypeReference",
+									"start": 1113,
+									"end": 1114,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 2
+										},
+										"end": {
+											"line": 44,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1113,
+										"end": 1114,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 2
+											},
+											"end": {
+												"line": 44,
+												"column": 3
+											}
+										},
+										"name": "k"
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1119,
+								"end": 1120,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 8
+									},
+									"end": {
+										"line": 44,
+										"column": 9
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1119,
+									"end": 1120,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 8
+										},
+										"end": {
+											"line": 44,
+											"column": 9
+										}
+									},
+									"name": "l"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c8",
+								"start": 1097,
+								"end": 1102
+							},
+							{
+								"type": "Line",
+								"value": " d8",
+								"start": 1105,
+								"end": 1110
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " and the same deeper shell reached through the LINE-comment route, which owns the gap",
+							"start": 946,
+							"end": 1033
+						},
+						{
+							"type": "Line",
+							"value": " through its own emitter - one shape, both routes",
+							"start": 1035,
+							"end": 1086
 						}
 					]
 				}

@@ -1,0 +1,87 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// a one-member intersection prints as its member, so the `&` is dropped and its own
+	// leading gap is the ENCLOSING gap's - one run, in source order, at that gap's indent
+
+	// a type argument
+	type A = q<
+		/* c1 */ // d1
+		B
+	>;
+
+	// an object type's value
+	type C = {
+		p /* c2 */: D; // d2
+	};
+
+	// a union member
+	type E =
+		| F /* c3 */ // d3
+		| G;
+
+	// an optional tuple element
+	type H = [
+		/* c4 */ // d4
+		I?
+	];
+
+	// a conditional's check type
+	type J = /* c5 */ // d5
+	K extends L
+		? M
+		: N;
+
+	// the one-member UNION spelling of the same shape
+	type O = q<
+		/* c6 */ // d6
+		P
+	>;
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a one-member intersection prints as its member, so the `&` is dropped and its own
+	// leading gap is the ENCLOSING gap's - one run, in source order, at that gap's indent
+
+	// a type argument
+	type A = q<
+		/* c1 */ // d1
+		B
+	>;
+
+	// an object type's value
+	type C = {
+		p /* c2 */: D; // d2
+	};
+
+	// a union member
+	type E =
+		| F /* c3 */ // d3
+		| G;
+
+	// an optional tuple element
+	type H = [
+		/* c4 */ // d4
+		I?
+	];
+
+	// a conditional's check type
+	type J =
+		/* c5 */ // d5
+		K extends L ? M : N;
+
+	// the one-member UNION spelling of the same shape
+	type O = q<
+		/* c6 */ // d6
+		P
+	>;
+</script>

@@ -102,6 +102,32 @@ pub(in crate::printer) struct StrippedParenHang<'t> {
     pub(in crate::printer) claimed_shell: Option<Span>,
 }
 
+/// The redundant paren shell at a value's leading printed **edge**, plus the start of
+/// the transparent head REGION the enclosing gap owns — see
+/// [`Printer::head_stripped_paren_shell`].
+///
+/// The two travel together because the claim is built from both: it runs from
+/// `region_start` to the fully-unwrapped inner's start. `region_start` is the shell's own
+/// `(` at every link whose head IS the shell's node, and opens EARLIER at a one-member
+/// union / intersection, whose leading `|` / `&` is dropped outright — that operator's own
+/// gap is the enclosing gap's too, exactly as it would be for the operator-less authoring.
+#[derive(Clone, Copy)]
+struct HeadShell<'t> {
+    shell: &'t TSType<'t>,
+    region_start: u32,
+}
+
+impl<'t> HeadShell<'t> {
+    /// Open the region at `start` — a transparent composite's own span start, which
+    /// always precedes whatever the descent below it found.
+    fn opened_at(self, start: u32) -> Self {
+        Self {
+            region_start: start.min(self.region_start),
+            ..self
+        }
+    }
+}
+
 /// Which shell supplies the leading `//` run a **required** paren pair opens over — see
 /// [`Printer::required_paren_open_run`], which resolves it, and
 /// [`Printer::build_open_required_paren_doc`], which emits from it.
@@ -974,10 +1000,10 @@ impl<'a> Printer<'a> {
     /// shell that IS the item (a union member hoists it, a retained one keeps its parens),
     /// so only the leading-EDGE half is theirs to claim.
     pub(in crate::printer) fn leading_edge_shell_claim(&self, ty: &TSType<'_>) -> Option<Span> {
-        let shell = self.head_stripped_paren_shell(ty)?;
+        let head = self.head_stripped_paren_shell(ty)?;
         Some(Span::new(
-            shell.span().start,
-            unwrap_parenthesized(shell).span().start,
+            head.region_start,
+            unwrap_parenthesized(head.shell).span().start,
         ))
     }
 
@@ -1105,7 +1131,7 @@ impl<'a> Printer<'a> {
     /// see [`Self::intersection_member_run_owned_downstream`]. A shell the trailing-run
     /// rule retains, and one holding a routed format-ignore directive, decline for the
     /// reasons the seam above and [`Self::paren_interior_routed_inner`] give.
-    fn head_stripped_paren_shell<'t>(&self, ty: &'t TSType<'t>) -> Option<&'t TSType<'t>> {
+    fn head_stripped_paren_shell<'t>(&self, ty: &'t TSType<'t>) -> Option<HeadShell<'t>> {
         match ty {
             TSType::Array(a) => {
                 self.required_pair_head_shell(a.element_type, type_needs_parens_for_array_element)
@@ -1117,6 +1143,10 @@ impl<'a> Printer<'a> {
             TSType::Conditional(c) => {
                 self.required_pair_head_shell(c.check_type, type_needs_parens_for_conditional_check)
             }
+            TSType::Optional(o) => self.required_pair_head_shell(
+                o.type_annotation,
+                type_needs_parens_for_optional_element,
+            ),
             TSType::Intersection(i) => {
                 // ⚠️ The intersection's OWN Rule A leading-run freeze slices its first
                 // member verbatim, shell and all — so widening an enclosing gap over that
@@ -1133,24 +1163,53 @@ impl<'a> Printer<'a> {
                     return None;
                 }
                 let first = i.types.first()?;
-                // ⚠️ A **leading-operator** intersection (`& /* c */ (⏎// d⏎A)`, whose span
-                // opens at the `&`) owns bytes AHEAD of the shell — its own leading-`&`
-                // gap, which the intersection emits itself. An enclosing gap's window opens
-                // at ITS start and closes at the claim's END, so a claim here would hand it
-                // that gap too and every comment in it printed TWICE
-                // ([`comments.md`](../../../../docs/comments.md): the parent's share is a
-                // partition, and an anchor shift is not one). Only where that gap actually
+                // ⚠️ A **leading-operator** MULTI-member intersection (`& /* c */ (⏎// d⏎A) & B`,
+                // whose span opens at the `&`) owns bytes AHEAD of the shell — its own
+                // leading-`&` gap, which the intersection emits itself. An enclosing gap's
+                // window opens at ITS start and closes at the claim's END, so a claim over
+                // only the shell would hand it that gap too and every comment in it printed
+                // TWICE ([`comments.md`](../../../../docs/comments.md): the parent's share is
+                // a partition, and an anchor shift is not one). Only where that gap actually
                 // holds a comment, though — empty, the two windows coincide and the claim
                 // is exactly the shell's, which is what the array / indexed-access /
                 // conditional / value positions over a leading-`&` intersection need. Every
                 // other spelling starts its span at the first member, where the question
                 // cannot arise.
-                if i.span.start != first.span().start
+                //
+                // A **one-member** intersection is the exception, and transparency is why:
+                // it prints as its member — the `&` is dropped outright — so that gap is
+                // not the intersection's to emit at all, it is the ENCLOSING gap's, exactly
+                // as it would be for the `&`-less authoring. The region therefore opens at
+                // the `&` ([`HeadShell::region_start`]) and the composite declines its own
+                // leading-gap emitter under the claim
+                // ([`Printer::composite_head_region_claimed`]) — one emitter, one gap.
+                if i.types.len() > 1
+                    && i.span.start != first.span().start
                     && self.has_comments_on_page_between(i.span.start, first.span().start)
                 {
                     return None;
                 }
                 self.leading_edge_shell(first, self.intersection_member_run_owned_downstream(i))
+                    .map(|head| head.opened_at(i.span.start))
+            }
+            // A ONE-member union is the intersection link's twin, and only in the
+            // one-member spelling: prettier drops the node in postprocess, so it prints as
+            // its member with no `|` of its own and the member's head sits at the enclosing
+            // gap's own indent. A MULTI-member union is NOT a link — see the ⚠️ above; the
+            // union's own member loop claims its first member's shell instead.
+            TSType::Union(u) if u.types.len() == 1 => {
+                if self
+                    .composite_leading_run_freeze(u.span.start, u.types)
+                    .is_some()
+                {
+                    return None;
+                }
+                let first = u.types.first()?;
+                // The collapse builds the member with `union_member_parens(1)`, which
+                // requires no pair of its own, so nothing downstream of this gap emits the
+                // run.
+                self.leading_edge_shell(first, false)
+                    .map(|head| head.opened_at(u.span.start))
             }
             TSType::Parenthesized(p) if self.paren_inner_comment_flags(p) == (false, false) => {
                 self.head_stripped_paren_shell(p.type_annotation)
@@ -1183,14 +1242,17 @@ impl<'a> Printer<'a> {
         &self,
         head: &'t TSType<'t>,
         downstream_owns_run: bool,
-    ) -> Option<&'t TSType<'t>> {
+    ) -> Option<HeadShell<'t>> {
         if downstream_owns_run || self.paren_interior_routed_inner(head).is_some() {
             return None;
         }
         if self.stripped_paren_hang_has_leading_line_comment(head)
             && !self.paren_retains_for_trailing_run(head)
         {
-            return Some(head);
+            return Some(HeadShell {
+                shell: head,
+                region_start: head.span().start,
+            });
         }
         self.head_stripped_paren_shell(head)
     }
@@ -1205,7 +1267,7 @@ impl<'a> Printer<'a> {
         &self,
         head: &'t TSType<'t>,
         needs_parens: fn(&TSType<'_>) -> bool,
-    ) -> Option<&'t TSType<'t>> {
+    ) -> Option<HeadShell<'t>> {
         self.leading_edge_shell(
             head,
             self.required_paren_pair_opens_for_leading_run(head, needs_parens),
@@ -1272,6 +1334,44 @@ impl<'a> Printer<'a> {
         let doc = build();
         self.claimed_shell_leading_run.set(saved);
         doc
+    }
+
+    /// Whether an enclosing gap has claimed a ONE-member union / intersection's
+    /// transparent head REGION — its leading `|` / `&` gap together with its member's
+    /// shell (see [`HeadShell::region_start`]).
+    ///
+    /// Such a composite prints as its member, the operator dropped, so both halves of that
+    /// region belong to the enclosing gap and the composite's own leading-gap emitter must
+    /// stand down — otherwise the two print it twice
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 3). Read on the composite's
+    /// OWN span start, the same byte [`Self::head_stripped_paren_shell`] opened the region
+    /// at, so the claim and the decline cannot name different regions.
+    pub(in crate::printer) fn composite_head_region_claimed(
+        &self,
+        span_start: u32,
+        types: &[TSType<'_>],
+    ) -> bool {
+        types.len() == 1
+            && types
+                .first()
+                .is_some_and(|first| self.head_run_claimed(span_start, first))
+    }
+
+    /// Whether the leading run of the shell at `head` — the region opening at
+    /// `region_start` — falls inside an enclosing gap's claim.
+    ///
+    /// The one read behind [`Self::composite_head_region_claimed`] and
+    /// `Printer::first_member_shell_run_claimed`, which differ only in where the region
+    /// opens: at the node's own `(` for a member, at the dropped operator for a
+    /// transparent one-member composite — the same distinction
+    /// [`HeadShell::region_start`] makes on the claiming side. Stating it twice is how
+    /// the two come to read regions the claim never named.
+    pub(in crate::printer) fn head_run_claimed(
+        &self,
+        region_start: u32,
+        head: &TSType<'_>,
+    ) -> bool {
+        self.shell_leading_run_claimed(region_start, unwrap_parenthesized(head).span().start)
     }
 
     /// Whether the leading gap of the shell at `paren_open` wrapping a type at
@@ -1867,8 +1967,17 @@ impl<'a> Printer<'a> {
         // "has a trailing comment to emit". The leading gap is deliberately NOT consulted:
         // a leading comment takes its own real `hardline` either way, so it neither adds
         // to nor cancels the retention.
-        let inner = p.type_annotation.span();
-        self.has_line_comments_between(inner.end, p.span.end)
+        //
+        // The window is the DEEP one — from the fully-unwrapped inner's end, not from the
+        // direct child's — because redundant layers strip as a UNIT and print one pair
+        // between them: `((⏎// c⏎A // t⏎))` retains, and asking only the outer layer's own
+        // trailing gap (empty, the `// t` sitting one layer in) called it stripped while
+        // the inner pair retained and printed the leading run itself, beside the enclosing
+        // gap's copy — a DOUBLE-PRINT. It is also the symmetry the leading side already
+        // has ([`Self::stripped_paren_hang_has_leading_line_comment`] reads to the
+        // unwrapped inner's START).
+        let inner_end = unwrap_parenthesized(p.type_annotation).span().end;
+        self.has_line_comments_between(inner_end, p.span.end)
             && !self.type_member_separator_follows(p.span.end)
     }
 

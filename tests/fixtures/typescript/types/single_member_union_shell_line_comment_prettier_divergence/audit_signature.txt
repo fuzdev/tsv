@@ -1,0 +1,61 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a one-member union prints as its member, so a `//` in that member's shell changes
+	// only where it renders - never which parens survive, and never a `|` of its own
+	type A =
+		// c1
+		B | C;
+
+	// the same run one redundant layer deeper
+	type D =
+		// c2
+		E | F;
+
+	// a type argument
+	type G = q<
+		// c3
+		H | I
+	>;
+
+	// an object type's value
+	type J = {
+		p:
+			// c4
+			K | L;
+	};
+
+	// a tuple element
+	type M = [
+		// c5
+		N | O
+	];
+
+	// an indexed access's object
+	type P = (
+		// c6
+		Q | R
+	)['k'];
+
+	// a conditional's check type
+	type S =
+		// c7
+		T | U extends V ? W : X;
+
+	// the member's own pair is REQUIRED, so it survives and keeps the comment inside
+	type Y =
+		// c8
+		(Z | A1) & B1;
+
+	// control: the same authoring without the leading `|`, which lands on the same form
+	type C1 =
+		// c9
+		D1 | E1;
+</script>
