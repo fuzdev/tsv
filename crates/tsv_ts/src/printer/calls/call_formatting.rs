@@ -119,7 +119,7 @@ pub(super) fn build_call_doc_with_wrapping(
         // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
         // This must happen BEFORE adding removed-paren comments so comments stay outside
         let callee_doc = if needs_parens {
-            d.parens(callee_doc)
+            super::build_callee_parens_doc(printer, call.callee, callee_doc)
         } else {
             callee_doc
         };
