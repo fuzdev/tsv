@@ -67,6 +67,17 @@ interface Entry {
 	 * here is a RATIO of two sibling means, and a ratio inherits the noise of both.
 	 */
 	cv?: number | null;
+	/**
+	 * Timings behind `cv` and `mean_ns` — the MAD-cleaned count, not the raw
+	 * iterations. Optional on the same terms as `cv`.
+	 *
+	 * Read together with it, never separately: a cv is an ESTIMATE, and its own
+	 * error falls off with n. The bench drives sample count from `duration_ms` with
+	 * a floor of 5 (7 on the slow tier), so a multi-second row can land at 3–7
+	 * cleaned timings while a microsecond row lands at four figures — a spread of
+	 * two orders of magnitude inside one table.
+	 */
+	sample_size?: number | null;
 }
 
 /**
@@ -162,6 +173,8 @@ interface Row {
 	files_iterated: Partial<Record<Runtime, number | null>>;
 	/** Per-runtime measurement noise, for `within_noise` below. */
 	cv: Partial<Record<Runtime, number>>;
+	/** Timings behind each `cv` — the precondition for trusting it. */
+	samples: Partial<Record<Runtime, number>>;
 }
 
 const rows = new Map<string, Row>();
@@ -177,7 +190,15 @@ for (const r of present) {
 		const key = `${e.group}/${e.name}`;
 		let row = rows.get(key);
 		if (!row) {
-			row = { group: e.group, name: e.name, ops: {}, mean_ns: {}, files_iterated: {}, cv: {} };
+			row = {
+				group: e.group,
+				name: e.name,
+				ops: {},
+				mean_ns: {},
+				files_iterated: {},
+				cv: {},
+				samples: {}
+			};
 			rows.set(key, row);
 			order.push(key);
 		}
@@ -185,6 +206,7 @@ for (const r of present) {
 		row.mean_ns[r] = e.mean_ns;
 		row.files_iterated[r] = e.files_iterated;
 		if (e.cv != null) row.cv[r] = e.cv;
+		if (e.sample_size != null) row.samples[r] = e.sample_size;
 	}
 }
 
@@ -315,10 +337,25 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * no recorded load failure to explain it. Kept beside 11 rather than replaced by it:
  * both landed before any consumer saw either, so a reader at 11 would otherwise find
  * one of the two fields undocumented at the only place this file documents them.
+ *
+ * 12: `within_noise[]` entries carry `samples` — `[base runtime, cell runtime]`
+ * cleaned timing counts — and a cell is only classified when BOTH clear
+ * `MIN_NOISE_SAMPLES`, so membership narrowed. A consumer that read 11's list as "every quiet cell" would
+ * read 12's as the same claim, and it is a stricter one.
  */
-const COMBINED_SCHEMA_VERSION = 11;
+const COMBINED_SCHEMA_VERSION = 12;
 
 // JSON: metadata + provenance per source + the comparison rows.
+/**
+ * The cleaned-timing count below which a row's cv is not a usable noise estimate.
+ *
+ * Ten, not the 30 `benchmark.ts` names as the central-limit floor for its Welch
+ * test: this is a reading aid, and 30 would silence it on every row the bench
+ * measures in seconds — most of the format surface. Ten keeps the aid where the
+ * estimate is merely rough and withdraws it where it is arbitrary.
+ */
+const MIN_NOISE_SAMPLES = 10;
+
 /**
  * Per-runtime deltas that are smaller than the noise of the two measurements they
  * divide — i.e. the cells a reader must NOT read as a runtime effect.
@@ -336,10 +373,21 @@ const COMBINED_SCHEMA_VERSION = 11;
  * rather than assumed quiet — a sibling predating the field would otherwise read as
  * noiseless.
  *
+ * ⚠ A row too thinly sampled to have a trustworthy cv is skipped on the SAME
+ * argument (`MIN_NOISE_SAMPLES`), and it is the more reachable half. A cv is an
+ * estimate, and this test consumes it in the direction where being wrong is
+ * expensive: too SMALL a cv makes a real per-runtime difference read as "no
+ * difference", which is the one verdict here a reader cannot check from the table.
+ * The bench floors iterations at 5 (7 on the slow tier) and drives the rest from
+ * `duration_ms`, so a multi-second row lands at a handful of cleaned timings —
+ * measured, 17 of 44 rows per runtime sit under ten — while a fast row lands at
+ * four figures. Three timings that happen to agree are not evidence of quiet.
+ *
  * Measured when this was written: across the three committed reports, 6 of 44
- * node/deno deltas land inside their combined cv, and all six sit at ~1.00x — so
- * this currently confirms "no difference" rather than overturning anything. It is
- * here for the case it does overturn.
+ * node/deno deltas land inside their combined cv, all six at ~1.00x — and one of
+ * the six rests on 7 timings a side, which is exactly the cell this guard now
+ * declines to call. So it currently confirms "no difference" rather than
+ * overturning anything; it is here for the case it does overturn.
  */
 const within_noise = order.flatMap((key) => {
 	const row = rows.get(key)!;
@@ -349,18 +397,33 @@ const within_noise = order.flatMap((key) => {
 		runtime: Runtime;
 		delta: number;
 		noise: number;
+		/** `[base runtime, this cell's runtime]` — the order the md renders as `n=a/b`. */
+		samples: [number, number];
 	}> = [];
 	const base_ops = row.ops[base_runtime];
 	const base_cv = row.cv[base_runtime];
+	const base_n = row.samples[base_runtime];
 	if (base_ops === undefined || base_cv === undefined) return cells;
+	if (base_n === undefined || base_n < MIN_NOISE_SAMPLES) return cells;
 	for (const r of present) {
 		if (r === base_runtime) continue;
 		const ops = row.ops[r];
 		const cv = row.cv[r];
+		const n = row.samples[r];
 		if (ops === undefined || cv === undefined) continue;
+		if (n === undefined || n < MIN_NOISE_SAMPLES) continue;
 		const delta = Math.abs(ops / base_ops - 1);
 		const noise = Math.sqrt(base_cv ** 2 + cv ** 2);
-		if (delta < noise) cells.push({ group: row.group, name: row.name, runtime: r, delta, noise });
+		if (delta < noise) {
+			cells.push({
+				group: row.group,
+				name: row.name,
+				runtime: r,
+				delta,
+				noise,
+				samples: [base_n, n]
+			});
+		}
 	}
 	return cells;
 });
@@ -461,14 +524,15 @@ if (within_noise.length > 0) {
 				.map(
 					(c) =>
 						`\`${c.group}/${c.name}\` ${c.runtime} (${(c.delta * 100).toFixed(1)}% vs ` +
-						`${(c.noise * 100).toFixed(1)}% noise)`
+						`${(c.noise * 100).toFixed(1)}% noise, n=${c.samples.join('/')})`
 				)
 				.join('; ') +
 			'. Read those cells as "no difference". The two cv values behind each are ' +
 			"`entries[].cv` in the per-runtime JSON — NOT that report's §Unstable Rows, which lists " +
 			'only rows past its own 10% threshold and so names none of these: a cell lands here ' +
 			'whenever the delta is small relative to the noise, which two perfectly ordinary 3% rows ' +
-			'satisfy.\n'
+			`satisfy. \`n\` is the cleaned timings behind each cv — a row under ${MIN_NOISE_SAMPLES} ` +
+			'a side is left unclassified rather than called quiet on an estimate that thin.\n'
 	);
 }
 md.push(

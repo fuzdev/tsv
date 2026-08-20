@@ -255,9 +255,14 @@ Things the published numbers measure that aren't quite what they look like.
   this a full bench reached no stability check at all. Calibration: across the three
   committed reports (128 timed rows) cv runs median 1.0% / p90 3.1%, so 10% is ~3× the
   p90 rather than a round number; the live outlier is `format/css/biome-wasm`, at 24%
-  under Node against 3% on its Deno sibling. Six of 44 node/deno deltas currently land
+  under Node against 3% on its Deno sibling. Five of 44 node/deno deltas currently land
   inside their noise, all of them at ~1.00x — i.e. today this confirms "no difference"
-  rather than overturning a reading.
+  rather than overturning a reading. The within-noise half also needs ten cleaned
+  timings a side before it will call a cell quiet, and prints `n` for each: sample
+  count varies by two orders of magnitude across one table (a microsecond row gets
+  four figures; a multi-second row gets the iteration floor of 5, or 7 on the slow
+  tier), and a cv from three timings that happen to agree is not evidence of quiet.
+  That floor is what excludes a sixth cell, `format/svelte/prettier` at n=7.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the

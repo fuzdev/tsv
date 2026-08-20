@@ -1,6 +1,6 @@
 # tsv benchmark results — cross-runtime
 
-**Generated:** 2026-08-20T13:04:13.184Z
+**Generated:** 2026-08-20T13:27:56.543Z
 
 **Runtimes:** deno, node, bun — each runtime’s full report is its `report.<runtime>.{json,md}` sibling.
 
@@ -12,7 +12,7 @@
 
 **Not measured everywhere:** bun — oxc-parser-wasm, biome-wasm. The implementation behind each row failed to load on the runtime(s) named, so it contributes no measurement there — a row thinner than its neighbours, or missing outright, is a load failure rather than a speed result. The per-runtime report’s `unavailable` carries the impl and the cause.
 
-**Within noise:** 6 per-runtime delta(s) are smaller than the two measurements' combined variation, so they are not runtime effects — `parse/svelte/svelte/compiler` node (0.8% vs 4.4% noise); `format/svelte/prettier` node (2.3% vs 3.7% noise); `format/svelte/tsv` node (0.8% vs 1.5% noise); `parse/css/svelte/compiler` node (3.5% vs 5.5% noise); `parse/css/postcss` node (1.2% vs 4.3% noise); `format/css/oxfmt` node (0.1% vs 4.9% noise). Read those cells as "no difference". The two cv values behind each are `entries[].cv` in the per-runtime JSON — NOT that report's §Unstable Rows, which lists only rows past its own 10% threshold and so names none of these: a cell lands here whenever the delta is small relative to the noise, which two perfectly ordinary 3% rows satisfy.
+**Within noise:** 5 per-runtime delta(s) are smaller than the two measurements' combined variation, so they are not runtime effects — `parse/svelte/svelte/compiler` node (0.8% vs 4.4% noise, n=11/11); `format/svelte/tsv` node (0.8% vs 1.5% noise, n=59/63); `parse/css/svelte/compiler` node (3.5% vs 5.5% noise, n=549/500); `parse/css/postcss` node (1.2% vs 4.3% noise, n=491/480); `format/css/oxfmt` node (0.1% vs 4.9% noise, n=290/287). Read those cells as "no difference". The two cv values behind each are `entries[].cv` in the per-runtime JSON — NOT that report's §Unstable Rows, which lists only rows past its own 10% threshold and so names none of these: a cell lands here whenever the delta is small relative to the noise, which two perfectly ordinary 3% rows satisfy. `n` is the cleaned timings behind each cv — a row under 10 a side is left unclassified rather than called quiet on an estimate that thin.
 
 A per-runtime delta on the same row is the signal: same engine, different runtime + binding boundary (Deno → FFI, Node/Bun → N-API). Ratios are vs `deno` (> 1 = faster than deno). A group (or row) flagged `⚠ files …` iterated *different per-runtime intersections* (each runtime times the files all its impls passed preflight on), so a sliver of the ratio can be file-set difference rather than runtime effect.
 

@@ -114,7 +114,14 @@ delta on the same row is the detector.
   couldn't load, so a row added since a sibling was last run is named rather than
   left to the vintage banner. A runtime whose sibling predates the `unavailable`
   field is skipped there rather than accused: with nothing recorded, an absent row
-  can't be told from an unloadable impl. The conformance surface writes its own
+  can't be told from an unloadable impl. `within_noise` skips on its own precondition
+  — a row needs ten cleaned timings a side, and prints `n` for the ones it does call.
+  The bench floors iterations at 5 (7 on the slow tier) and drives the rest from
+  `duration_ms`, so sample count spans two orders of magnitude inside one table and
+  17 of 44 rows per runtime sit under ten; this test consumes cv in the direction
+  where an UNDERestimate is expensive, since it would report a real runtime
+  difference as "no difference" — the one verdict a reader cannot check against the
+  table. The conformance surface writes its own
   `report.conformance.node.*`, outside the compose glob.
 - **One bench body, runtime-detected.** `bench.ts` detects the runtime
   (`lib/runtime.ts` `current_runtime()`) and selects the runtime-specific artifacts.
@@ -686,7 +693,7 @@ here is a change there too — it declares them optional and degrades on an olde
 report, which is what makes the drift silent rather than loud.
 
 The committed JSON (per-runtime `version: 13` — the combined compose report carries
-its own `version: 11`; coverage-only runs add `coverage_by_source`) carries, beyond
+its own `version: 12`; coverage-only runs add `coverage_by_source`) carries, beyond
 timing stats: top-level
 `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
 numbers are machine-relative, so this travels with them; excludes hostname and

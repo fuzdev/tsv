@@ -1,7 +1,7 @@
 {
-	"version": 11,
+	"version": 12,
 	"kind": "combined",
-	"generated": "2026-08-20T13:04:13.184Z",
+	"generated": "2026-08-20T13:27:56.543Z",
 	"runtimes": [
 		"deno",
 		"node",
@@ -25,42 +25,55 @@
 			"name": "svelte/compiler",
 			"runtime": "node",
 			"delta": 0.008233392113283777,
-			"noise": 0.043720326707686094
-		},
-		{
-			"group": "format/svelte",
-			"name": "prettier",
-			"runtime": "node",
-			"delta": 0.023263326225617553,
-			"noise": 0.03672015565701762
+			"noise": 0.043720326707686094,
+			"samples": [
+				11,
+				11
+			]
 		},
 		{
 			"group": "format/svelte",
 			"name": "tsv",
 			"runtime": "node",
 			"delta": 0.008079072030239498,
-			"noise": 0.014643940762749256
+			"noise": 0.014643940762749256,
+			"samples": [
+				59,
+				63
+			]
 		},
 		{
 			"group": "parse/css",
 			"name": "svelte/compiler",
 			"runtime": "node",
 			"delta": 0.03473851667950212,
-			"noise": 0.05458774870321619
+			"noise": 0.05458774870321619,
+			"samples": [
+				549,
+				500
+			]
 		},
 		{
 			"group": "parse/css",
 			"name": "postcss",
 			"runtime": "node",
 			"delta": 0.012195796412697746,
-			"noise": 0.04293239486399177
+			"noise": 0.04293239486399177,
+			"samples": [
+				491,
+				480
+			]
 		},
 		{
 			"group": "format/css",
 			"name": "oxfmt",
 			"runtime": "node",
 			"delta": 0.000911316603089185,
-			"noise": 0.049188079879167936
+			"noise": 0.049188079879167936,
+			"samples": [
+				290,
+				287
+			]
 		}
 	],
 	"sources": [
