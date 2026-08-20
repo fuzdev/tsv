@@ -2,8 +2,8 @@
 	"version": 13,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-08-20T03:00:09.900Z",
-	"git_commit": "8a87d997",
+	"timestamp": "2026-08-20T14:11:34.662Z",
+	"git_commit": "1b4e0011",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -102,7 +102,7 @@
 			"repo": {
 				"url": "https://github.com/sveltejs/svelte",
 				"slug": "sveltejs/svelte",
-				"commit": "20b341f10048cf1016a2028ac7eee5595cfef6a5",
+				"commit": "f145959ea73b572d3b2ffdbffad1c60b93b93516",
 				"subpath": "packages/svelte/tests"
 			}
 		},
