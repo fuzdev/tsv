@@ -13,11 +13,18 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     start: usize,
 ) -> Result<SimpleSelector<'arena>, ParseError> {
     parser.advance()?; // consume first :
+    // selectors-4 forbids white space "between the ':'s, or between the ':' and
+    // <ident-token> or <function-token>" — and a comment is not a `<whitespace-token>`,
+    // so it may sit at either juncture and stays GLUED. Skipped BEFORE the `::` test:
+    // with a comment between the colons (`:/* c */:before`) the second `:` is not the
+    // current token yet. Registered so the printer's verbatim prefix keeps it in place.
+    parser.register_and_skip_comments()?;
 
     // Check for :: (pseudo-element)
     let is_pseudo_element = parser.check(TokenKind::Colon);
     if is_pseudo_element {
         parser.advance()?; // consume second :
+        parser.register_and_skip_comments()?;
     }
 
     if !parser.check(TokenKind::Identifier) {
@@ -49,7 +56,11 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     } else {
         None
     };
-    let mut end = parser.span_pos(parser.current_end); // Capture end of name token
+    // The name token's end is kept on the node: it is where the `<function-token>`'s `(`
+    // begins, and no later scan of the span can re-derive it (an identity-escaped `(`
+    // inside the name — `:foo\(bar(.x)` — is an earlier one).
+    let name_end = parser.span_pos(parser.current_end);
+    let mut end = name_end;
     parser.advance()?;
 
     let args = if let Some(arg_kind) = arg_kind {
@@ -63,6 +74,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     if is_pseudo_element {
         Ok(SimpleSelector::PseudoElement {
             args,
+            name_end,
             span: Span {
                 start: start as u32,
                 end,
@@ -71,6 +83,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     } else {
         Ok(SimpleSelector::PseudoClass {
             args,
+            name_end,
             span: Span {
                 start: start as u32,
                 end,

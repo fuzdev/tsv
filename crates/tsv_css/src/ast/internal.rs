@@ -142,14 +142,21 @@ impl Combinator {
 #[derive(Debug, Clone)]
 pub enum SimpleSelector<'arena> {
     Type {
-        /// Presence of a namespace prefix (`svg|rect`). The prefix text is kept only
-        /// for the rare namespaced form; the element name is recovered from `span` at
-        /// print time, so no separate `name` copy is stored (span-for-verbatim).
-        namespace: Option<&'arena str>,
+        /// Span of the `<ns-prefix>`'s leading token — the `svg` of `svg|rect`, the `*`
+        /// of `*|div`, or an EMPTY span at the `|` of `|div` — and `None` for a bare type
+        /// selector. Verbatim, never a decoded copy: an escape can put a `|` *inside* the
+        /// prefix (`a\|b|rect`), so a reader that scans for the first `|` reads the
+        /// escape as the separator and the rest of the prefix as the element name. Every
+        /// reader instead steps forward from this span's end, where the next non-trivia
+        /// byte is the separator by construction. The element name is likewise recovered
+        /// from `span` at print time, so no `name` copy is stored (span-for-verbatim).
+        namespace_span: Option<Span>,
         span: Span,
     },
     Universal {
-        namespace: Option<&'arena str>,
+        /// The `<ns-prefix>` span, as [`Self::Type`]'s (only the empty-prefix `|*` form
+        /// is reachable — `svg|*` and `*|*` are not parsed). `None` for a bare `*`.
+        namespace_span: Option<Span>,
         span: Span,
     },
     /// Class selector. Name (including the `.`) recovered verbatim from `span`.
@@ -157,7 +164,11 @@ pub enum SimpleSelector<'arena> {
     /// Id selector. Name (including the `#`) recovered verbatim from `span`.
     Id { span: Span },
     Attribute {
-        namespace: Option<&'arena str>,
+        /// Span of the `<ns-prefix>`'s leading token, as [`Self::Type`]'s — the `svg` of
+        /// `[svg|attr]`, the `*` of `[*|attr]`, an EMPTY span at the `|` of `[|attr]`.
+        /// The printer emits it verbatim and the wire half-decodes it like every other
+        /// selector name; neither re-derives it from a scan for `|`.
+        namespace_span: Option<Span>,
         /// Span of the attribute name only (the `attr` in `[ns|attr op 'value' flags]`),
         /// verbatim. The name carries no decoded copy: the printer emits it raw from source
         /// (escapes preserved — `[f\oo]` stays `[f\oo]`, never `[foo]`) and convert
@@ -181,10 +192,18 @@ pub enum SimpleSelector<'arena> {
     // (Svelte) form anyway.
     PseudoClass {
         args: Option<PseudoClassArgs<'arena>>,
+        /// End of the name token, from the parser rather than from a scan of `span`.
+        /// A functional pseudo's name runs to the `<function-token>`'s `(` — which is
+        /// **not** the first `(` in the span, since an identity escape can put one
+        /// inside the name (`:foo\(bar(.x)`, name `foo\(bar`). Equals `span.end` when
+        /// there are no args.
+        name_end: u32,
         span: Span,
     },
     PseudoElement {
         args: Option<PseudoClassArgs<'arena>>,
+        /// End of the name token, as [`Self::PseudoClass`]'s.
+        name_end: u32,
         span: Span,
     },
     Nesting {

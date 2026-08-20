@@ -67,6 +67,21 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
   tail), after it, around `of`, and after the `of` list. The term normalizes around the
   comment and the comment itself is opaque to the operator respacing, so its content is
   never rewritten
+- Comments in **attribute selectors** — every juncture of the token-level
+  `<attribute-selector>` production: after `[`, either side of the matcher, either side of
+  the `i`/`s` flag, and before `]`. Spacing-safe there (the brackets bound the gap), so the
+  comment is padded off its neighbours and glued to the brackets
+- Comments between a selector's **sigil and the name it introduces** — `./* c */cls`,
+  `:/* c */hover`, `::/* c */before`, `:/* c */:before`, `:/* c */not(.a)`. selectors-4
+  forbids white space at exactly these junctures and a comment is no token, so it is
+  admitted and stays **glued**; the pseudo-name case fold still runs, on the name only.
+  Rejected by parseCss, and prettier's freeze diverges only on the fold, so a
+  `_svelte_prettier_divergence`
+- Comments splitting a **`<wq-name>` separator** (`svg/* c */|rect`, `[svg|/* c */attr]`) or
+  an **`<attr-matcher>`** (`[attr~/* c */='value']`) — selectors-4 forbids white space
+  between either production's components, and a comment is no token, so it is admitted and
+  stays **glued** (a run included). Both are rejected by parseCss, so both are
+  `_svelte_divergence`s
 - Comments in `::slotted()` / `::part()` / unknown-pseudo args (leading/trailing gaps preserved; the interior positions — between `::part()` names, or `::slotted()` compound-internal — are rejected by parseCss but preserved + normalized by tsv, a `_svelte_prettier_divergence`)
 - Comments in `:dir()` / `:lang()` / `::highlight()` identifier args (leading/trailing gaps preserved + normalized; parseCss accepts → a `_prettier_divergence`)
 - Comments in a `@supports`/`@import` `selector()` argument — an argument that parses as a
@@ -625,14 +640,18 @@ Features that parse correctly through generic handling.
 The constructs tsv rejects outright:
 
 - Reference combinator (`/ref/`, `selectors-5`) for IDREF-based relationships — no parse support
-- A comment inside an **attribute selector** (`[a /* c */ = 'b']`, `[a=/* c */'b']`,
-  `[a='b' /* c */]`, `[/* c */ a]`, either side of the `i`/`s` flag) or splitting a
-  **namespace separator** (`ns/* c */|a`) — rejected, matching `parseCss`. Per css-syntax-3
-  §4 comments are removed at tokenization and selectors-4's `<attribute-selector>` is a
-  token-level production, so the spec accepts these (prettier does too, by freezing the
-  selector). These are the only spec-valid selector positions still rejected — every other
-  one is listed under [Comments](#comments). An ident glued to `(` (`:not/* c */(`) is a
-  single `<function-token>` and is correctly rejected, not a gap
+- A comment splitting a **column combinator** (`col |/* c */| td`) — rejected, because tsv
+  lexes `||` as one token. css-syntax-3 gives U+007C no case in *consume a token*, so the
+  spec reads it as two `<delim-token>`s that a comment may sit between. The **whitespace**
+  form (`col | | td`) rejects too, and there that is the *correct* answer rather than a
+  side effect: the column combinator lives in selectors-5, whose grammar
+  (`<combinator> = '>' | '+' | '~' | [ '|' '|' ] | [ / <wq-name> / ]`) adds its own *white
+  space is forbidden* rule — "Between the components of a `<combinator>`" — so only the
+  comment form is a gap. Prettier has no usable oracle for either (it rewrites
+  `col | | td` to `col|td`). The **last** spec-valid selector position tsv rejects a
+  comment in; every other one is listed under [Comments](#comments). An ident glued to `(`
+  (`:not/* c */(`) is a single `<function-token>` and is correctly rejected, not a gap —
+  and `#id` is a single `<hash-token>`, so it has no juncture to split either
 
 ## Parsed Generically, Not Modeled
 

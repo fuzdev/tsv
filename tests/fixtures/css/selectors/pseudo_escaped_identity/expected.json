@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 399,
+		"end": 629,
 		"attributes": [],
 		"children": [
 			{
@@ -99,6 +99,156 @@
 				},
 				"start": 363,
 				"end": 390
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 552,
+					"end": 565,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 552,
+							"end": 565,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "foo\\(bar",
+											"args": {
+												"type": "SelectorList",
+												"start": 562,
+												"end": 564,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 562,
+														"end": 564,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "x",
+																		"start": 562,
+																		"end": 564
+																	}
+																],
+																"start": 562,
+																"end": 564
+															}
+														]
+													}
+												]
+											},
+											"start": 552,
+											"end": 565
+										}
+									],
+									"start": 552,
+									"end": 565
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 566,
+					"end": 586,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 570,
+							"end": 582,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 552,
+				"end": 586
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 589,
+					"end": 600,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 589,
+							"end": 600,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "baz\\(",
+											"start": 589,
+											"end": 600,
+											"args": {
+												"type": "SelectorList",
+												"start": 597,
+												"end": 599,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 597,
+														"end": 599,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "y",
+																		"start": 597,
+																		"end": 599
+																	}
+																],
+																"start": 597,
+																"end": 599
+															}
+														]
+													}
+												]
+											}
+										}
+									],
+									"start": 589,
+									"end": 600
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 601,
+					"end": 620,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 605,
+							"end": 616,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 589,
+				"end": 620
 			}
 		],
 		"comments": [
@@ -107,18 +257,24 @@
 				"value": " Identity escapes (a backslash before a non-hex char) are kept verbatim in the\n\t   selector-name AST, matching Svelte's read_identifier half-decode: hex escapes\n\t   decode, identity escapes keep the backslash. The formatter preserves the raw\n\t   source either way. Mirrors class/id/type in escaped_names, now for pseudos. ",
 				"start": 9,
 				"end": 335
+			},
+			{
+				"type": "CSSComment",
+				"value": " An identity-escaped `(` is part of the NAME: the function-token's `(` is the\n\t   NEXT one, so the name runs past the escape rather than stopping at it. ",
+				"start": 393,
+				"end": 550
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 391,
-			"styles": "\n\t/* Identity escapes (a backslash before a non-hex char) are kept verbatim in the\n\t   selector-name AST, matching Svelte's read_identifier half-decode: hex escapes\n\t   decode, identity escapes keep the backslash. The formatter preserves the raw\n\t   source either way. Mirrors class/id/type in escaped_names, now for pseudos. */\n\t:f\\oo {\n\t\tcolor: red;\n\t}\n\t::b\\gar {\n\t\tcolor: blue;\n\t}\n",
+			"end": 621,
+			"styles": "\n\t/* Identity escapes (a backslash before a non-hex char) are kept verbatim in the\n\t   selector-name AST, matching Svelte's read_identifier half-decode: hex escapes\n\t   decode, identity escapes keep the backslash. The formatter preserves the raw\n\t   source either way. Mirrors class/id/type in escaped_names, now for pseudos. */\n\t:f\\oo {\n\t\tcolor: red;\n\t}\n\t::b\\gar {\n\t\tcolor: blue;\n\t}\n\n\t/* An identity-escaped `(` is part of the NAME: the function-token's `(` is the\n\t   NEXT one, so the name runs past the escape rather than stopping at it. */\n\t:foo\\(bar(.x) {\n\t\tcolor: green;\n\t}\n\n\t::baz\\((.y) {\n\t\tcolor: teal;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 400,
+	"end": 630,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

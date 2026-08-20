@@ -382,21 +382,6 @@ pub(super) fn raw_selector_name(source: &str, span: Span, prefix_len: usize) -> 
     Cow::Owned(out)
 }
 
-/// The end position of a pseudo selector's name, excluding any `(args)`.
-///
-/// A pseudo's `span` covers the whole `:name(args)` / `::name(args)`, so when it has
-/// arguments the name runs only up to the first `(`; without arguments the whole span is
-/// the name. Used to bound the `raw_selector_name` slice to just the name — the decoded
-/// internal name is never re-serialized. The public `end` is the whole span, args and all.
-pub(super) fn pseudo_name_end(source: &str, span: Span, has_args: bool) -> u32 {
-    if has_args {
-        let raw = &source[span.start as usize..span.end as usize];
-        raw.find('(').map_or(span.end, |i| span.start + i as u32)
-    } else {
-        span.end
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

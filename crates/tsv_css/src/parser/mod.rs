@@ -249,18 +249,58 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// This creates a temporary lexer to look ahead without modifying parser state.
     /// Used for disambiguating declarations vs nested rules.
     pub(crate) fn peek_past_whitespace(&self) -> Result<TokenKind, ParseError> {
-        // Create a temporary lexer from current position
+        self.peek_past(true)
+    }
+
+    /// Peek past a run of `/* */` comments — and **only** comments — to the next
+    /// token's kind, without consuming anything.
+    ///
+    /// The comments-only twin of [`Self::peek_past_whitespace`], for the selector
+    /// positions where a comment is inter-token trivia but a `<whitespace-token>` is
+    /// forbidden by the grammar: the components of a `<wq-name>` (`svg/* c */|rect`) and
+    /// of an `<attr-matcher>` (`[attr~/* c */='value']`). Skipping whitespace here would
+    /// widen the accepted grammar, not just the trivia.
+    ///
+    /// Answers from the cached [`Self::peek_kind`] slot whenever the very next token is
+    /// not a comment, which is every type selector in a real stylesheet: the temp-lexer
+    /// walk below caches nothing, so taking it unconditionally would re-lex that token
+    /// again at the following `advance()`.
+    pub(crate) fn peek_past_comments(&mut self) -> Result<TokenKind, ParseError> {
+        let next = self.peek_kind()?;
+        if !matches!(next, TokenKind::Comment) {
+            return Ok(next);
+        }
+        self.peek_past(false)
+    }
+
+    /// The lookahead both `peek_past_*` spell: a temporary lexer from the current token's
+    /// end, so parser state (including the `peek` slot) is untouched.
+    fn peek_past(&self, whitespace: bool) -> Result<TokenKind, ParseError> {
         let remaining = &self.source()[self.current_end..];
         let mut temp_lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end);
-
-        // Skip whitespace and comments
         loop {
             let token = temp_lexer.next_token()?;
             match &token.kind {
-                TokenKind::Whitespace | TokenKind::Comment => continue,
+                TokenKind::Comment => continue,
+                TokenKind::Whitespace if whitespace => continue,
                 _ => return Ok(token.kind),
             }
         }
+    }
+
+    /// Advance past a run of `/* */` comments — and **only** comments — registering each
+    /// into `self.comments`.
+    ///
+    /// The consuming counterpart of [`Self::peek_past_comments`], with the same reason for
+    /// leaving whitespace alone. Registration (rather than
+    /// [`Self::skip_whitespace_and_comments`]'s drop) is what lets the printer re-emit the
+    /// comment at its authored position.
+    pub(crate) fn register_and_skip_comments(&mut self) -> Result<(), ParseError> {
+        while matches!(&self.current_kind, TokenKind::Comment) {
+            self.register_current_comment();
+            self.advance()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn check(&self, kind: TokenKind) -> bool {
@@ -336,9 +376,17 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// they're stripped from the public-AST prelude string (matching Svelte). Unlike
     /// `skip_whitespace_and_comments`, this preserves the comments rather than dropping
     /// them.
-    pub(crate) fn skip_whitespace_registering_comments(&mut self) -> Result<(), ParseError> {
+    ///
+    /// Returns whether a `<whitespace-token>` was among what it skipped. The attribute
+    /// selector's name→`|` gap is the caller that needs it: the same gap is
+    /// spacing-safe when the `|` turns out to open an `<attr-matcher>` (`[attr |= 'v']`)
+    /// and whitespace-forbidden when it separates a `<wq-name>` (`[svg |attr]`), and
+    /// which it is isn't known until the token *after* the `|` is in hand.
+    pub(crate) fn skip_whitespace_registering_comments(&mut self) -> Result<bool, ParseError> {
+        let mut saw_whitespace = false;
         loop {
             if self.check(TokenKind::Whitespace) {
+                saw_whitespace = true;
                 self.advance()?;
             } else if matches!(&self.current_kind, TokenKind::Comment) {
                 self.register_current_comment();
@@ -347,7 +395,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
                 break;
             }
         }
-        Ok(())
+        Ok(saw_whitespace)
     }
 
     /// Abandon a speculative parse: reposition at `pos` (a `source`-relative byte

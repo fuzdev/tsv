@@ -506,7 +506,7 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     // whitespace and comments — an identifier spelling `important`, and then nothing but
     // whitespace and comments to the terminator.
     let important = last_bang.and_then(|bang| {
-        let name_start = skip_trivia(bytes, bang + 1, terminator);
+        let name_start = crate::comments::skip_trivia_forward(bytes, bang + 1, terminator);
         let mut name_end = name_start;
         while name_end < terminator && IDENT_CONTINUE_LUT[bytes[name_end] as usize] {
             name_end += 1;
@@ -514,7 +514,7 @@ fn scan_value_core<const WANT_VERDICT: bool>(
         if !source[name_start..name_end].eq_ignore_ascii_case("important") {
             return None;
         }
-        if skip_trivia(bytes, name_end, terminator) < terminator {
+        if crate::comments::skip_trivia_forward(bytes, name_end, terminator) < terminator {
             return None;
         }
         Some((bang, name_end))
@@ -530,7 +530,7 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     let value_end = trim_end(bytes, value_start, span_end);
 
     // Empty = no tokens besides whitespace, comments, and the `!important`.
-    let is_empty = skip_trivia(bytes, value_start, span_end) >= span_end;
+    let is_empty = crate::comments::skip_trivia_forward(bytes, value_start, span_end) >= span_end;
 
     Some(ValueScanOutcome::Value(ValueFacts {
         terminator,
@@ -588,25 +588,6 @@ fn url_token_end(source: &str, bytes: &[u8], value_start: usize, open: usize) ->
     // escape's terminator — is already declined by the main loop's `\` arm, which this
     // helper is what hides.
     url_token_close(bytes, open + 1)
-}
-
-/// First offset in `[from, to)` that is neither whitespace nor inside a comment, or `to`.
-/// Every comment in the range is known terminated — the scan already walked it.
-fn skip_trivia(bytes: &[u8], from: usize, to: usize) -> usize {
-    let mut i = from;
-    while i < to {
-        if is_ascii_css_whitespace(bytes[i]) {
-            i += 1;
-        } else if is_comment_start(bytes, i) {
-            match comment_end_checked(bytes, i) {
-                Some(end) => i = end,
-                None => return to,
-            }
-        } else {
-            return i;
-        }
-    }
-    to
 }
 
 /// `to`, walked back over trailing whitespace (never below `from`).
