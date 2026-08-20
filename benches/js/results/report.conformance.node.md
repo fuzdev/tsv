@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-08-20T02:04:34.057Z — tsv 0.2.0 (c289736f)
+**Date:** 2026-08-20T03:00:09.900Z — tsv 0.2.0 (8a87d997)
 
 **Corpus:** 4556 Svelte (1.1 MB), 52321 TypeScript (69.0 MB), 22641 CSS (7.7 MB) — 79518 files, 77.8 MB total
 
@@ -63,17 +63,17 @@
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv_format_wasm | 2.2 MB | 811.1 KB | 0.9x | 0.9x |
-| tsv_parse_wasm | 927.6 KB | 363.8 KB | 0.4x | 0.4x |
-| tsv_wasm | 2.4 MB | 903.0 KB | — | — |
-| biome (wasm) | 44.6 MB | 11.1 MB | 18.4x | 12.3x |
+| tsv_format_wasm | 2.2 MB | 825.5 KB | 0.9x | 0.9x |
+| tsv_parse_wasm | 927.5 KB | 364.0 KB | 0.4x | 0.4x |
+| tsv_wasm | 2.5 MB | 917.2 KB | — | — |
+| biome (wasm) | 44.6 MB | 11.1 MB | 18.1x | 12.1x |
 | dprint (wasm) | 4.2 MB | 1.2 MB | 1.7x | 1.3x |
 | oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.6x | 0.5x |
 | yuku-parser (wasm) | 673.9 KB | 200.3 KB | 0.3x | 0.2x |
 | malva (wasm) | 1.5 MB | 414.0 KB | 0.6x | 0.5x |
-| tsv (ffi) | 3.4 MB | 1.5 MB | 0.9x | 0.9x |
-| tsv format (ffi) | 3.1 MB | 1.4 MB | 0.8x | 0.8x |
-| tsv parse (ffi) | 1.5 MB | 665.9 KB | 0.4x | 0.4x |
+| tsv (ffi) | 3.5 MB | 1.5 MB | 0.9x | 0.9x |
+| tsv format (ffi) | 3.2 MB | 1.4 MB | 0.8x | 0.8x |
+| tsv parse (ffi) | 1.5 MB | 666.1 KB | 0.4x | 0.4x |
 | tsv (napi) | 3.8 MB | 1.6 MB | — | — |
 | oxc-parser+oxfmt (napi) | 11.2 MB | 4.6 MB | 2.9x | 2.8x |
 | oxc-parser (napi) | 2.1 MB | 885.7 KB | 0.6x | 0.5x |

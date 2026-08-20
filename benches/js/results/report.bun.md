@@ -6,112 +6,121 @@
 
 **Corpus kind:** perf — real-world code only (fixture suites excluded)
 
-**Date:** 2026-07-22T09:27:00.825Z — tsv 0.1.0 (d063479a)
+**Date:** 2026-08-20T02:58:53.219Z — tsv 0.2.0 (8a87d997)
 
-**Corpus:** 767 Svelte (1.9 MB), 2448 TypeScript (17.0 MB), 50 CSS (0.3 MB) — 3265 files, 19.2 MB total
+**Corpus:** 773 Svelte (2.0 MB), 2505 TypeScript (18.0 MB), 49 CSS (0.3 MB) — 3327 files, 20.3 MB total
 
-**Sources:** ../zzz/src (326), ../fuz_app/src (665), ../fuz_blog/src (37), ../fuz_code/src (74), ../fuz_css/src (146), ../fuz_docs/src (65), ../fuz_gitops/src (99), ../fuz_mastodon/src (25), ../fuz_template/src (18), ../fuz_ui/src (216), ../fuz_util/src (145), ../mdz/src (71), ../gro/src (156), ../svelte-docinfo/src (99), ../tsv.fuz.dev/src (34), ../ryanatkn.com/src (52), ../webdevladder.net/src (39), benches/js/.cache/svelte_styles (18), ../kit/packages/kit/src (297), ../svelte/packages/svelte/src (415), ../svelte.dev/apps/svelte.dev/src (145), ../svelte.dev/packages/repl/src (53), ../svelte.dev/packages/site-kit/src (70)
+**Sources:** ../zzz/src (326), ../fuz_app/src (671), ../fuz_blog/src (38), ../fuz_code/src (66), ../fuz_css/src (167), ../fuz_docs/src (65), ../fuz_gitops/src (99), ../fuz_mastodon/src (25), ../fuz_template/src (18), ../fuz_ui/src (233), ../fuz_util/src (147), ../mdz/src (69), ../gro/src (161), ../svelte-docinfo/src (119), ../tsv.fuz.dev/src (33), ../ryanatkn.com/src (52), ../webdevladder.net/src (39), benches/js/.cache/svelte_styles (18), ../kit/packages/kit/src (298), ../svelte/packages/svelte/src (415), ../svelte.dev/apps/svelte.dev/src (145), ../svelte.dev/packages/repl/src (53), ../svelte.dev/packages/site-kit/src (70)
 
-**Versions:** svelte@5.56.4, acorn@8.16.0, acorn-typescript@1.0.11, prettier@3.9.5, prettier-plugin-svelte@4.1.1, oxc-parser@0.140.0, oxfmt@0.60.0, @dprint/typescript@0.96.1
+**Versions:** svelte@5.56.9, acorn@8.16.0, acorn-typescript@1.0.13, prettier@3.9.6, prettier-plugin-svelte@4.1.1, oxc-parser@0.142.0, oxfmt@0.63.0, yuku-parser@0.8.7, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, postcss@8.5.26, @rsvelte/fmt@0.7.11, @rsvelte/vite-plugin-svelte-native@0.3.7 (targets svelte@5.56.9), @swc/core@1.16.0
 
 **Methodology:** Single-threaded — every implementation formats/parses one file at a time, measured sequentially with no cross-file parallelism. One timed iteration is one full sweep over the group’s iterated file set, so the absolute columns (sweeps/sec, p50–p99, min/max) are per-sweep, not per-file — divide by the group’s file count (the Files lines / `(Mf)` annotations) for per-file figures; ratios and MB/s are denominated consistently either way. This is single-core throughput, not the multi-core batch throughput a CLI gets formatting many files at once.
 
 ## parse/svelte
 
-| Task Name                  | sweeps/sec | n   | p50 (ms) | p75 (ms) | p90 (ms) | p95 (ms) | p99 (ms) | min (ms) | max (ms) | vs svelte/compiler (speedup) |
-| -------------------------- | ---------- | --- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | ---------------------------- |
-| svelte/compiler            | 1.41       | 7   | 708.87   | 714.79   | 727.57   | —        | —        | 693.86   | 746.80   | baseline                     |
-| tsv-json                   | 6.02       | 31  | 166.28   | 168.67   | 169.92   | 170.69   | 173.36   | 161.43   | 174.27   | 4.26x                        |
-| tsv-json-no-locations      | 8.43       | 42  | 118.25   | 120.52   | 121.78   | 123.61   | 126.02   | 114.30   | 127.55   | 5.96x                        |
-| tsv_wasm-json              | 5.60       | 27  | 178.57   | 180.77   | 182.93   | 183.88   | 190.34   | 174.65   | 192.60   | 3.96x                        |
-| tsv_wasm-json-no-locations | 7.63       | 39  | 130.72   | 133.94   | 135.03   | 136.89   | 137.24   | 126.87   | 137.40   | 5.40x                        |
-| tsv-internal               | 52.80      | 264 | 18.78    | 19.36    | 19.52    | 19.61    | 19.77    | 18.45    | 19.93    | 37.4x                        |
-| tsv_wasm-internal          | 37.67      | 182 | 26.35    | 27.04    | 27.26    | 27.39    | 27.53    | 26.06    | 27.77    | 26.7x                        |
+| Task Name                   | sweeps/sec | n   | p50 (ms) | p75 (ms) | p90 (ms) | p95 (ms) | p99 (ms) | min (ms) | max (ms) | vs svelte/compiler (speedup) |
+| --------------------------- | ---------- | --- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | ---------------------------- |
+| svelte/compiler             | 1.44       | 7   | 694.91   | 703.75   | 715.14   | —        | —        | 691.09   | 728.97   | baseline                     |
+| tsv-json                    | 6.06       | 30  | 164.72   | 167.45   | 169.37   | 171.18   | 195.42   | 158.44   | 205.23   | 4.22x                        |
+| tsv_wasm-json               | 5.81       | 28  | 172.45   | 174.06   | 176.78   | 178.50   | 205.75   | 166.55   | 216.02   | 4.05x                        |
+| tsv-json-no-locations       | 8.50       | 38  | 117.30   | 119.01   | 121.71   | 142.77   | 150.85   | 114.58   | 151.74   | 5.92x                        |
+| tsv_wasm-json-no-locations  | 7.87       | 35  | 126.69   | 129.74   | 135.64   | 154.57   | 158.46   | 123.57   | 159.43   | 5.48x                        |
+| tsv-internal                | 52.79      | 261 | 18.85    | 19.29    | 19.44    | 19.61    | 20.13    | 18.47    | 21.61    | 36.8x                        |
+| tsv_wasm-internal           | 38.32      | 185 | 25.94    | 26.46    | 26.72    | 26.94    | 27.19    | 25.67    | 29.46    | 26.7x                        |
+| rsvelte-parse               | 3.05       | 15  | 327.15   | 330.24   | 335.03   | 343.73   | 356.39   | 321.19   | 359.55   | 2.13x                        |
+| rsvelte-parse-skip-expr-loc | 4.93       | 21  | 203.67   | 207.14   | 225.35   | 225.78   | 232.87   | 198.45   | 235.10   | 3.43x                        |
 
-**Files (intersection):** 767
+**Files (intersection):** 773
 
-**Throughput:** svelte/compiler 2.7 MB/s, tsv-json 11.4 MB/s, tsv-json-no-locations 16.0 MB/s, tsv_wasm-json 10.6 MB/s, tsv_wasm-json-no-locations 14.5 MB/s, tsv-internal 100.4 MB/s, tsv_wasm-internal 71.6 MB/s
+**Throughput:** svelte/compiler 2.8 MB/s, tsv-json 11.9 MB/s, tsv_wasm-json 11.4 MB/s, tsv-json-no-locations 16.7 MB/s, tsv_wasm-json-no-locations 15.4 MB/s, tsv-internal 103.5 MB/s, tsv_wasm-internal 75.1 MB/s, rsvelte-parse 6.0 MB/s, rsvelte-parse-skip-expr-loc 9.7 MB/s
 
-**JSON overhead** (json_ns / internal_ns, higher = more cost): tsv-json 8.8x tsv-internal, tsv_wasm-json 6.7x tsv_wasm-internal
+**JSON overhead** (json_ns / internal_ns, higher = more cost): tsv-json 8.7x tsv-internal, tsv_wasm-json 6.6x tsv_wasm-internal
 
 ## format/svelte
 
 | Task Name | sweeps/sec | n  | p50 (s) | p75 (s) | p90 (s) | p95 (s) | p99 (s) | min (s) | max (s) | vs prettier (speedup) |
 | --------- | ---------- | -- | ------- | ------- | ------- | ------- | ------- | ------- | ------- | --------------------- |
-| prettier  | 0.26       | 7  | 3.85    | 3.92    | 3.98    | —       | —       | 3.77    | 4.02    | baseline              |
-| tsv       | 14.47      | 72 | 0.07    | 0.07    | 0.07    | 0.07    | 0.07    | 0.07    | 0.08    | 55.9x                 |
-| tsv_wasm  | 10.52      | 52 | 0.09    | 0.10    | 0.10    | 0.10    | 0.10    | 0.09    | 0.10    | 40.7x                 |
-| oxfmt     | 0.20       | 7  | 5.04    | 5.21    | 5.23    | —       | —       | 4.91    | 5.26    | 0.76x                 |
+| prettier  | 0.26       | 7  | 3.93    | 3.98    | 4.00    | —       | —       | 3.76    | 4.02    | baseline              |
+| tsv       | 12.93      | 61 | 0.08    | 0.08    | 0.08    | 0.08    | 0.08    | 0.08    | 0.09    | 50.4x                 |
+| tsv_wasm  | 9.32       | 46 | 0.11    | 0.11    | 0.11    | 0.11    | 0.11    | 0.11    | 0.11    | 36.4x                 |
+| oxfmt     | 0.19       | 7  | 5.26    | 5.31    | 5.38    | —       | —       | 5.00    | 5.44    | 0.74x                 |
 
-**Files (intersection):** 767
+**Files (intersection):** 773
 
-**Throughput:** prettier 0.5 MB/s, tsv 27.5 MB/s, tsv_wasm 20.0 MB/s, oxfmt 0.4 MB/s
+**Throughput:** prettier 0.5 MB/s, tsv 25.4 MB/s, tsv_wasm 18.3 MB/s, oxfmt 0.4 MB/s
+
+**Coverage-only (not timed):** rsvelte-fmt 773/773 (100%) — no in-process API, so a timed row would measure process spawn rather than format work; these are accept rates, not speeds.
 
 ## parse/typescript
 
 | Task Name                  | sweeps/sec | n  | p50 (ms) | p75 (ms) | p90 (ms) | p95 (ms) | p99 (ms) | min (ms) | max (ms) | vs acorn-typescript (speedup) |
 | -------------------------- | ---------- | -- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | ----------------------------- |
-| acorn-typescript           | 0.15       | 7  | 6843.31  | 6927.82  | 7016.61  | —        | —        | 6717.40  | 7123.09  | baseline                      |
-| tsv-json                   | 0.72       | 5  | 1392.02  | 1392.19  | 1393.37  | —        | —        | 1387.07  | 1394.15  | 4.93x                         |
-| tsv-json-no-locations      | 1.26       | 7  | 796.60   | 797.70   | 800.39   | —        | —        | 791.76   | 803.24   | 8.62x                         |
-| tsv_wasm-json              | 0.68       | 4  | 1481.03  | 1483.13  | 1487.21  | —        | —        | 1479.50  | 1489.93  | 4.63x                         |
-| tsv_wasm-json-no-locations | 1.15       | 6  | 868.63   | 870.87   | 872.80   | —        | —        | 857.30   | 874.47   | 7.91x                         |
-| tsv-internal               | 8.28       | 34 | 120.68   | 121.73   | 123.29   | 123.66   | 123.80   | 119.89   | 123.80   | 56.8x                         |
-| tsv_wasm-internal          | 5.90       | 24 | 169.29   | 170.73   | 173.32   | 173.41   | 174.08   | 168.36   | 174.33   | 40.5x                         |
-| oxc-parser                 | 1.03       | 6  | 970.24   | 973.78   | 977.08   | —        | —        | 967.24   | 979.43   | 7.06x                         |
+| acorn-typescript           | 0.17       | 7  | 5810.38  | 5907.86  | 5944.59  | —        | —        | 5727.36  | 5986.10  | baseline                      |
+| tsv-json                   | 0.73       | 5  | 1374.72  | 1377.15  | 1381.70  | —        | —        | 1367.03  | 1384.73  | 4.25x                         |
+| tsv_wasm-json              | 0.72       | 4  | 1394.89  | 1398.64  | 1401.37  | —        | —        | 1393.90  | 1403.19  | 4.18x                         |
+| tsv-json-no-locations      | 1.24       | 6  | 802.89   | 805.78   | 809.51   | —        | —        | 800.65   | 813.93   | 7.26x                         |
+| tsv_wasm-json-no-locations | 1.17       | 6  | 856.56   | 859.73   | 860.01   | —        | —        | 845.47   | 860.01   | 6.83x                         |
+| tsv-internal               | 8.12       | 37 | 122.89   | 123.83   | 126.00   | 126.25   | 126.64   | 122.09   | 126.77   | 47.4x                         |
+| tsv_wasm-internal          | 6.02       | 25 | 166.13   | 166.87   | 169.23   | 169.51   | 171.63   | 164.88   | 172.46   | 35.1x                         |
+| oxc-parser                 | 0.99       | 5  | 1006.98  | 1007.92  | 1010.28  | —        | —        | 999.95   | 1011.85  | 5.80x                         |
+| yuku-parser                | 2.88       | 10 | 343.72   | 382.76   | 391.64   | 398.25   | 407.41   | 335.32   | 409.70   | 16.8x                         |
+| yuku-parser-wasm           | 3.67       | 12 | 273.88   | 311.52   | 318.07   | 321.33   | 321.90   | 266.78   | 322.04   | 21.4x                         |
+| swc                        | 0.71       | 5  | 1410.79  | 1412.09  | 1413.45  | —        | —        | 1405.89  | 1414.35  | 4.14x                         |
 
-**Files (intersection):** 2445
+**Files (intersection):** 2502
 
-**Throughput:** acorn-typescript 2.5 MB/s, tsv-json 12.2 MB/s, tsv-json-no-locations 21.3 MB/s, tsv_wasm-json 11.4 MB/s, tsv_wasm-json-no-locations 19.5 MB/s, tsv-internal 140.4 MB/s, tsv_wasm-internal 100.0 MB/s, oxc-parser 17.4 MB/s
+**Throughput:** acorn-typescript 3.1 MB/s, tsv-json 13.1 MB/s, tsv_wasm-json 12.9 MB/s, tsv-json-no-locations 22.4 MB/s, tsv_wasm-json-no-locations 21.0 MB/s, tsv-internal 145.9 MB/s, tsv_wasm-internal 108.1 MB/s, oxc-parser 17.9 MB/s, yuku-parser 51.8 MB/s, yuku-parser-wasm 66.0 MB/s, swc 12.7 MB/s
 
-**Coverage:** acorn-typescript 2445/2448 (99%), tsv-json 2448/2448 (100%), tsv-json-no-locations 2448/2448 (100%), tsv_wasm-json 2448/2448 (100%), tsv_wasm-json-no-locations 2448/2448 (100%), tsv-internal 2448/2448 (100%), tsv_wasm-internal 2448/2448 (100%), oxc-parser 2446/2448 (99%)
+**Coverage:** acorn-typescript 2502/2505 (99%), tsv-json 2505/2505 (100%), tsv_wasm-json 2505/2505 (100%), tsv-json-no-locations 2505/2505 (100%), tsv_wasm-json-no-locations 2505/2505 (100%), tsv-internal 2505/2505 (100%), tsv_wasm-internal 2505/2505 (100%), oxc-parser 2503/2505 (99%), yuku-parser 2503/2505 (99%), yuku-parser-wasm 2503/2505 (99%), swc 2502/2505 (99%)
 
-**JSON overhead** (json_ns / internal_ns, higher = more cost): tsv-json 11.5x tsv-internal, tsv_wasm-json 8.7x tsv_wasm-internal
+**JSON overhead** (json_ns / internal_ns, higher = more cost): tsv-json 11.2x tsv-internal, tsv_wasm-json 8.4x tsv_wasm-internal
 
 ## format/typescript
 
-| Task Name   | sweeps/sec | n  | p50 (s) | p75 (s) | p90 (s) | p95 (s) | p99 (s) | min (s) | max (s) | vs prettier (speedup) |
-| ----------- | ---------- | -- | ------- | ------- | ------- | ------- | ------- | ------- | ------- | --------------------- |
-| prettier    | 0.06       | 7  | 15.54   | 15.68   | 15.84   | —       | —       | 15.35   | 16.01   | baseline              |
-| tsv         | 1.95       | 10 | 0.51    | 0.52    | 0.52    | 0.52    | 0.53    | 0.50    | 0.53    | 30.4x                 |
-| tsv_wasm    | 1.48       | 7  | 0.68    | 0.68    | 0.69    | —       | —       | 0.67    | 0.70    | 23.1x                 |
-| oxfmt       | 0.97       | 5  | 1.04    | 1.04    | 1.04    | —       | —       | 1.03    | 1.04    | 15.1x                 |
-| dprint-wasm | 0.34       | 5  | 2.97    | 2.99    | 2.99    | —       | —       | 2.96    | 2.99    | 5.24x                 |
+| Task Name   | sweeps/sec | n | p50 (s) | p75 (s) | p90 (s) | p95 (s) | p99 (s) | min (s) | max (s) | vs prettier (speedup) |
+| ----------- | ---------- | - | ------- | ------- | ------- | ------- | ------- | ------- | ------- | --------------------- |
+| prettier    | 0.06       | 7 | 15.82   | 15.85   | 15.92   | —       | —       | 15.11   | 16.02   | baseline              |
+| tsv         | 1.72       | 7 | 0.58    | 0.58    | 0.59    | —       | —       | 0.58    | 0.59    | 26.9x                 |
+| tsv_wasm    | 1.30       | 6 | 0.77    | 0.77    | 0.78    | —       | —       | 0.77    | 0.78    | 20.4x                 |
+| oxfmt       | 0.97       | 5 | 1.03    | 1.03    | 1.04    | —       | —       | 1.02    | 1.04    | 15.2x                 |
+| dprint-wasm | 0.32       | 5 | 3.15    | 3.15    | 3.15    | —       | —       | 3.14    | 3.16    | 4.98x                 |
 
-**Files (intersection):** 2446
+**Files (intersection):** 2503
 
-**Throughput:** prettier 1.1 MB/s, tsv 33.1 MB/s, tsv_wasm 25.1 MB/s, oxfmt 16.4 MB/s, dprint-wasm 5.7 MB/s
+**Throughput:** prettier 1.1 MB/s, tsv 30.9 MB/s, tsv_wasm 23.3 MB/s, oxfmt 17.4 MB/s, dprint-wasm 5.7 MB/s
 
-**Coverage:** prettier 2448/2448 (100%), tsv 2448/2448 (100%), tsv_wasm 2448/2448 (100%), oxfmt 2446/2448 (99%), dprint-wasm 2448/2448 (100%)
+**Coverage:** prettier 2505/2505 (100%), tsv 2505/2505 (100%), tsv_wasm 2505/2505 (100%), oxfmt 2503/2505 (99%), dprint-wasm 2505/2505 (100%)
 
 ## parse/css
 
 | Task Name         | sweeps/sec | n    | p50 (ms) | p75 (ms) | p90 (ms) | p95 (ms) | p99 (ms) | min (ms) | max (ms) | vs svelte/compiler (speedup) |
 | ----------------- | ---------- | ---- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | ---------------------------- |
-| svelte/compiler   | 68.15      | 287  | 14.66    | 14.96    | 18.66    | 19.47    | 23.66    | 14.24    | 72.16    | baseline                     |
-| tsv-json          | 74.46      | 346  | 13.30    | 13.80    | 14.57    | 14.95    | 17.95    | 12.72    | 20.71    | 1.09x                        |
-| tsv_wasm-json     | 69.70      | 313  | 14.32    | 14.63    | 15.50    | 15.86    | 18.80    | 13.91    | 19.45    | 1.02x                        |
-| tsv-internal      | 343.22     | 1579 | 2.91     | 2.93     | 2.97     | 2.99     | 3.04     | 2.86     | 6.31     | 5.04x                        |
-| tsv_wasm-internal | 218.37     | 979  | 4.57     | 4.61     | 4.67     | 4.69     | 4.72     | 4.54     | 5.11     | 3.20x                        |
+| svelte/compiler   | 67.47      | 283  | 14.78    | 15.08    | 19.16    | 20.90    | 25.97    | 14.49    | 27.95    | baseline                     |
+| tsv-json          | 69.85      | 298  | 14.30    | 14.77    | 16.48    | 18.85    | 19.61    | 13.69    | 23.20    | 1.04x                        |
+| tsv_wasm-json     | 70.31      | 295  | 14.21    | 14.47    | 15.43    | 18.87    | 19.45    | 13.72    | 22.68    | 1.04x                        |
+| tsv-internal      | 337.40     | 1475 | 2.96     | 2.99     | 3.04     | 3.07     | 3.21     | 2.92     | 3.59     | 5.00x                        |
+| tsv_wasm-internal | 233.03     | 995  | 4.29     | 4.33     | 4.43     | 4.53     | 4.74     | 4.26     | 8.48     | 3.45x                        |
+| postcss           | 87.23      | 358  | 11.36    | 12.01    | 13.64    | 19.45    | 23.43    | 10.91    | 25.03    | 1.29x                        |
 
-**Files (intersection):** 50
+**Files (intersection):** 49
 
-**Throughput:** svelte/compiler 22.6 MB/s, tsv-json 24.6 MB/s, tsv_wasm-json 23.1 MB/s, tsv-internal 113.6 MB/s, tsv_wasm-internal 72.3 MB/s
+**Throughput:** svelte/compiler 22.6 MB/s, tsv-json 23.4 MB/s, tsv_wasm-json 23.5 MB/s, tsv-internal 112.9 MB/s, tsv_wasm-internal 78.0 MB/s, postcss 29.2 MB/s
 
-**JSON overhead** (json_ns / internal_ns, higher = more cost): tsv-json 4.6x tsv-internal, tsv_wasm-json 3.1x tsv_wasm-internal
+**JSON overhead** (json_ns / internal_ns, higher = more cost): tsv-json 4.8x tsv-internal, tsv_wasm-json 3.3x tsv_wasm-internal
 
 ## format/css
 
-| Task Name | sweeps/sec | n   | p50 (ms) | p75 (ms) | p90 (ms) | p95 (ms) | p99 (ms) | min (ms) | max (ms) | vs prettier (speedup) |
-| --------- | ---------- | --- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | --------------------- |
-| prettier  | 1.98       | 8   | 508.41   | 512.01   | 536.17   | —        | —        | 490.49   | 541.62   | baseline              |
-| tsv       | 153.79     | 746 | 6.50     | 6.57     | 6.70     | 6.76     | 6.97     | 6.26     | 10.64    | 77.8x                 |
-| tsv_wasm  | 104.10     | 512 | 9.59     | 9.71     | 9.84     | 9.88     | 10.21    | 9.32     | 14.13    | 52.6x                 |
-| oxfmt     | 46.70      | 234 | 21.27    | 23.13    | 24.80    | 25.52    | 26.60    | 17.69    | 28.02    | 23.6x                 |
+| Task Name  | sweeps/sec | n   | p50 (ms) | p75 (ms) | p90 (ms) | p95 (ms) | p99 (ms) | min (ms) | max (ms) | vs prettier (speedup) |
+| ---------- | ---------- | --- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | --------------------- |
+| prettier   | 2.12       | 10  | 471.09   | 481.49   | 490.00   | 500.48   | 508.86   | 461.90   | 510.96   | baseline              |
+| tsv        | 147.95     | 708 | 6.74     | 6.84     | 6.94     | 6.99     | 7.61     | 6.46     | 10.39    | 69.9x                 |
+| tsv_wasm   | 102.76     | 463 | 9.69     | 9.87     | 10.04    | 10.12    | 10.41    | 9.59     | 10.83    | 48.6x                 |
+| oxfmt      | 48.91      | 245 | 20.10    | 22.17    | 23.31    | 23.74    | 24.98    | 17.31    | 26.71    | 23.1x                 |
+| malva-wasm | 17.80      | 88  | 55.92    | 56.73    | 57.41    | 57.87    | 59.28    | 55.24    | 63.13    | 8.41x                 |
 
-**Files (intersection):** 50
+**Files (intersection):** 49
 
-**Throughput:** prettier 0.7 MB/s, tsv 50.9 MB/s, tsv_wasm 34.5 MB/s, oxfmt 15.5 MB/s
+**Throughput:** prettier 0.7 MB/s, tsv 49.5 MB/s, tsv_wasm 34.4 MB/s, oxfmt 16.4 MB/s, malva-wasm 6.0 MB/s
 
 _Note: every `Nx` is speedup form — values > 1 mean self is faster. File counts come from the per-group `Files (intersection):` / `Coverage:` lines and the Comparisons table row labels._
 
@@ -119,18 +128,24 @@ _Note: every `Nx` is speedup form — values > 1 mean self is faster. File count
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv_format_wasm | 2.2 MB | 787.9 KB | 0.9x | 0.9x |
-| tsv_parse_wasm | 1.1 MB | 388.7 KB | 0.4x | 0.4x |
-| tsv_wasm | 2.4 MB | 867.8 KB | — | — |
+| tsv_format_wasm | 2.2 MB | 825.5 KB | 0.9x | 0.9x |
+| tsv_parse_wasm | 927.5 KB | 364.0 KB | 0.4x | 0.4x |
+| tsv_wasm | 2.5 MB | 917.2 KB | — | — |
 | dprint (wasm) | 4.2 MB | 1.2 MB | 1.7x | 1.3x |
-| oxc-parser (wasm) | 1.5 MB | 495.2 KB | 0.6x | 0.6x |
-| tsv (ffi) | 3.3 MB | 1.4 MB | 1.0x | 1.0x |
-| tsv format (ffi) | 3.1 MB | 1.3 MB | 0.9x | 0.9x |
-| tsv parse (ffi) | 1.6 MB | 703.2 KB | 0.5x | 0.5x |
-| tsv (napi) | 3.5 MB | 1.5 MB | — | — |
-| oxc-parser+oxfmt (napi) | 11.2 MB | 4.5 MB | 3.2x | 3.0x |
-| oxc-parser (napi) | 2.4 MB | 954.8 KB | 0.7x | 0.6x |
-| oxfmt (napi) | 8.8 MB | 3.6 MB | 2.5x | 2.4x |
+| oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.6x | 0.5x |
+| yuku-parser (wasm) | 673.9 KB | 200.3 KB | 0.3x | 0.2x |
+| malva (wasm) | 1.5 MB | 414.0 KB | 0.6x | 0.5x |
+| tsv (ffi) | 3.5 MB | 1.5 MB | 0.9x | 0.9x |
+| tsv format (ffi) | 3.2 MB | 1.4 MB | 0.8x | 0.8x |
+| tsv parse (ffi) | 1.5 MB | 666.1 KB | 0.4x | 0.4x |
+| tsv (napi) | 3.8 MB | 1.6 MB | — | — |
+| oxc-parser+oxfmt (napi) | 11.2 MB | 4.6 MB | 2.9x | 2.8x |
+| oxc-parser (napi) | 2.1 MB | 885.7 KB | 0.6x | 0.5x |
+| oxfmt (napi) | 9.0 MB | 3.7 MB | 2.4x | 2.2x |
+| yuku-parser (napi) | 741.1 KB | 310.4 KB | 0.2x | 0.2x |
+| rsvelte-fmt (binary) | 8.3 MB | 3.3 MB | 2.2x | 2.0x |
+| rsvelte compiler (napi) | 14.5 MB | 6.0 MB | 3.8x | 3.7x |
+| swc (napi) | 31.9 MB | 11.9 MB | 8.4x | 7.3x |
 
 _Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
 
@@ -138,35 +153,38 @@ _Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (g
 
 | Benchmark | Comparisons |
 | --- | --- |
-| format svelte (767f) | **55.9x** prettier, **73.7x** oxfmt |
-| format typescript (2446f) | **30.4x** prettier, **2.02x** oxfmt |
-| format css (50f) | **77.8x** prettier, **3.29x** oxfmt |
-| parse svelte (767f) | **4.26x** svelte |
-| parse typescript (2445f) | **4.93x** svelte, **0.70x** oxc-parser |
-| parse css (50f) | **1.09x** svelte |
+| format svelte (773f) | **50.4x** prettier, **67.7x** oxfmt |
+| format typescript (2503f) | **26.9x** prettier, **1.77x** oxfmt |
+| format css (49f) | **69.9x** prettier, **3.03x** oxfmt |
+| parse svelte (773f) | **4.22x** svelte/compiler, **1.99x** rsvelte-parse |
+| parse typescript (2502f) | **4.25x** acorn-typescript, **0.73x** oxc-parser, **0.25x** yuku-parser, **1.03x** swc |
+| parse css (49f) | **1.04x** svelte/compiler, **0.80x** postcss |
 
 ## Comparisons to tsv_wasm (speedup)
 
 | Benchmark | Comparisons |
 | --- | --- |
-| format svelte (767f) | **40.7x** prettier |
-| format typescript (2446f) | **23.1x** prettier, **4.40x** dprint-wasm |
-| format css (50f) | **52.6x** prettier |
-| parse svelte (767f) | **3.96x** svelte |
-| parse typescript (2445f) | **4.63x** svelte |
-| parse css (50f) | **1.02x** svelte |
+| format svelte (773f) | **36.4x** prettier |
+| format typescript (2503f) | **20.4x** prettier, **4.09x** dprint-wasm |
+| format css (49f) | **48.6x** prettier, **5.77x** malva-wasm |
+| parse svelte (773f) | **4.05x** svelte/compiler |
+| parse typescript (2502f) | **4.18x** acorn-typescript, **0.19x** yuku-parser-wasm |
+| parse css (49f) | **1.04x** svelte/compiler, **0.81x** postcss |
 
-_`Nx` is speedup — self is N× faster than the named opponent. `(Mf)` is the self impl's iterated count (per-group intersection in default mode; per-impl success set in `BENCH_MODE=union`). Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts. oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples. tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no oxc counterpart — oxc exposes no comparably cheap mode (its JS API always serializes; experimentalLazy is setup-dominated). Format groups include parse time — each formatter parses internally. oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only._
+_`Nx` is speedup — self is N× faster than the named opponent. `(Mf)` is the self impl's iterated count (per-group intersection in default mode; per-impl success set in `BENCH_MODE=union`). Parse canonical: svelte/compiler for svelte + css, acorn-typescript for typescript — each named by its own row. Format groups include parse time — each formatter parses internally. oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only. oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples. yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built. swc parses to its own AST dialect (root `Module`, `span` rather than `loc`, `Ts`-prefixed kinds), so it carries the same payload disclosure oxc-parser does — the mechanism matches `tsv-json` (serialize, cross, materialize) while the tree it produces is neither tsv’s loc-bearing drop-in shape nor its span-only wire. rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload on a real component, so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire. postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since no Rust CSS parser exposes an AST to JS. malva-wasm is dprint’s CSS plugin running over the same `@dprint/formatter` wasm host as dprint-wasm — a same-tier wasm-vs-wasm read, and with biome-wasm the only other engine on `format/css`. tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku still serializes to a binary buffer before its decode, so neither is the same tier._
 
-_Consumer-side: for full `loc`, fetching the span-only `no-locations` wire and reconstructing `loc` in JS (`reconstruct_locations`, shipped in `@fuzdev/tsv_parse_wasm` / `@fuzdev/tsv_wasm`) beats the full loc-bearing `tsv-json` wire end-to-end — ~1.7x faster reconstructing every node, ~2.2x loc-free (TypeScript, exact; measured by `diagnostics/reconstruct_vs_materialize.ts`). Pre-materializing `loc` in Rust is not optimal for JS consumers._
+_Consumer-side: for full `loc`, fetching the span-only `no-locations` wire and reconstructing `loc` in JS (`reconstruct_locations`, shipped in every parse-capable package) beats the full loc-bearing `tsv-json` wire end-to-end — ~1.7x faster reconstructing every node, ~2.2x loc-free (TypeScript, exact; measured by `diagnostics/reconstruct_vs_materialize.ts`). Pre-materializing `loc` in Rust is not optimal for JS consumers._
 
 ## Skipped Files
 
-7 unique file+error combinations — Svelte 0, TypeScript 7, CSS 0.
+12 unique file+error combinations — Svelte 0, TypeScript 12, CSS 0.
 
 **Per-benchmark skip counts:**
 - parse/typescript: acorn-typescript: 3
+- parse/typescript: swc: 3
 - parse/typescript: oxc-parser: 2
+- parse/typescript: yuku-parser: 2
+- parse/typescript: yuku-parser-wasm: 2
 - format/typescript: oxfmt: 2
 
 _Per-file detail omitted. Re-run with `--verbose` to include error messages and failure sets per file._
