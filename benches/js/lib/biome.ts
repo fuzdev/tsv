@@ -106,6 +106,15 @@ export class BiomeImplementation extends BaseImplementation {
 		// svelte pass doubles as the only guard on `experimentalFullSupportEnabled`:
 		// without it biome returns an EMPTY string for `.svelte`, which the timed row
 		// would otherwise score as a successful format.
+		//
+		// ⚠️ Per-language coverage, impl-wide COST — the same shape `lib/oxc.ts` carries
+		// for its two tools: the registry's unit of absence is the impl, so a probe
+		// failing on ONE language takes biome's other rows down with it. Sharper here
+		// than there, because the likeliest failure is the language whose support is
+		// itself experimental: a biome release that changes `.svelte` handling removes
+		// the TypeScript and CSS rows too. Deliberate — the alternative is a row
+		// publishing a number produced at biome's own defaults — and disclosed rather
+		// than silent: `unavailable[].rows` names every row the failure removed.
 		for (const language of this.format_languages) {
 			assert_format_config_landed(
 				'biome',

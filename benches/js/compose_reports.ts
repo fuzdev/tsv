@@ -310,6 +310,11 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * 11: `within_noise[]` — per-runtime deltas smaller than the combined cv of the two
  * measurements they divide, i.e. the cells that are not runtime effects. The first
  * field here that qualifies a number this report prints rather than adding one.
+ *
+ * 10: `partial_rows[]` — rows one sibling measured and another doesn't carry, with
+ * no recorded load failure to explain it. Kept beside 11 rather than replaced by it:
+ * both landed before any consumer saw either, so a reader at 11 would otherwise find
+ * one of the two fields undocumented at the only place this file documents them.
  */
 const COMBINED_SCHEMA_VERSION = 11;
 
@@ -459,8 +464,11 @@ if (within_noise.length > 0) {
 						`${(c.noise * 100).toFixed(1)}% noise)`
 				)
 				.join('; ') +
-			'. Read those cells as "no difference", and see each per-runtime report\'s §Unstable Rows ' +
-			'for the noisy row itself.\n'
+			'. Read those cells as "no difference". The two cv values behind each are ' +
+			"`entries[].cv` in the per-runtime JSON — NOT that report's §Unstable Rows, which lists " +
+			'only rows past its own 10% threshold and so names none of these: a cell lands here ' +
+			'whenever the delta is small relative to the noise, which two perfectly ordinary 3% rows ' +
+			'satisfy.\n'
 	);
 }
 md.push(

@@ -79,6 +79,53 @@ function read_pkg_version(path: string): string | null {
 	}
 }
 
+/**
+ * The distinct versions `check.yml` installs for `tool` — one entry when its jobs
+ * agree, empty when the workflow can't be read.
+ *
+ * READ from the workflow rather than mirrored into a constant here, unlike
+ * `WASM_PACK_PIN` below: that one pins a calibration this repo owns (the wasm size
+ * bounds), so a local constant IS its source of truth, while deno and node are
+ * pinned in CI and nowhere else — a mirror would just be a second place to forget.
+ * The drift this catches is one-directional and quiet: an upgraded local runtime
+ * leaves CI on the old one, every gate stays green on both, and the machine that
+ * produced the committed bench reports is no longer the machine CI verifies.
+ */
+function ci_pin(tool: 'deno' | 'node'): ReadonlyArray<string> {
+	try {
+		const yml = Deno.readTextFileSync('.github/workflows/check.yml');
+		// `node-version: '24.14.1'` is quoted, `deno-version: 2.9.5` is not. EVERY
+		// occurrence, not the first: the workflow sets each pin once per job, so a
+		// bump that reached one job and not the others is its own drift — and reading
+		// only the first would report the machine aligned while a job trails.
+		const all = [...yml.matchAll(new RegExp(`${tool}-version:\\s*'?([\\d.]+)'?`, 'g'))];
+		return [...new Set(all.map((m) => m[1]))];
+	} catch {
+		return [];
+	}
+}
+
+/** Warn when the installed version differs from what CI pins — see `ci_pin`. */
+function check_ci_pin(tool: 'deno' | 'node', installed: string): void {
+	const pins = ci_pin(tool);
+	if (pins.length === 0) return;
+	if (pins.length > 1) {
+		warn(
+			`${tool} — .github/workflows/check.yml pins more than one version (${pins.join(', ')}); ` +
+				`its jobs disagree about which ${tool} verifies this repo`
+		);
+		return;
+	}
+	// Exact, not `includes` as the wasm-pack check below does: both versions here are
+	// already bare (`2.9.5`, and node's `v` stripped by the caller), so a substring
+	// test would only buy the false pass where `2.9.5` matches an installed `2.9.50`.
+	if (installed === pins[0]) return;
+	warn(
+		`${tool} ${installed} — differs from the ${pins[0]} .github/workflows/check.yml installs; ` +
+			`bump the workflow (${tool}-version) so CI verifies what you develop against`
+	);
+}
+
 const strict = Deno.args.includes('--strict');
 
 console.log(
@@ -89,6 +136,7 @@ console.log(
 
 section('Runtimes');
 ok(`deno ${Deno.version.deno}`);
+check_ci_pin('deno', Deno.version.deno);
 
 const node_version = run_version('node');
 if (node_version === null) {
@@ -103,6 +151,7 @@ if (node_version === null) {
 	else warn(
 		`node ${node_version} — < 22.18 lacks native TS type-stripping; the harness entries fail to parse`
 	);
+	check_ci_pin('node', node_version.replace(/^v/, ''));
 }
 
 const bun_version = run_version('bun');

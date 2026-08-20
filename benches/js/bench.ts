@@ -998,8 +998,10 @@ const sibling_outputs_must_match = (name: string): boolean =>
  * success set is added to BEFORE this point, the file would count as processed AND
  * skipped at once — a phantom skip on all four byte-graded rows, and in the perf
  * corpus a `enforce_perf_coverage` hard-fail on a file nothing failed. No committed
- * report carries one: the byte-parity pass landed after the last conformance rerun,
- * so the shape never reached a published number.
+ * report carries one, and the committed conformance report is the positive evidence
+ * rather than the absence of a run: it was regenerated with the digest already
+ * outside the try, so the four files that would have been phantom skips are recorded
+ * as `output_digest_ungraded` — the disclosure — instead.
  */
 function output_digest(result: unknown): string | null {
 	if (result === undefined || result === null) return null;

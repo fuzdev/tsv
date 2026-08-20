@@ -608,7 +608,16 @@ BENCH_ALLOW_MISSING=1   # tolerate a partial corpus
 
 `deno task bench` regenerates EVERY committed artifact the site consumes, reusing
 the node artifacts the perf half just built for the coverage run. It FAILS FAST if
-node or bun isn't installed (the `&&` chain stops at the missing binary). Deno is
+node or bun isn't installed — `bench:runtimes` preflights `bench:perf`, ahead of the
+~8 minutes it would otherwise take to discover the miss (by which point two of the
+three siblings have been regenerated and `bench:compose` skipped, leaving the
+committed combined report stale against fresh siblings). ⚠️ Its node arm asks what
+the binary IS, not whether the name resolves: `deno task` prepends its node-compat
+shim (`~/.cache/deno/node_compat_bin/node` → the deno binary) to PATH, so `which
+node` succeeds inside every deno task on a machine with no node — and that shim RUNS
+the harness, where `current_runtime()` reports `deno` and `bench:node` overwrites
+`report.deno.*` rather than producing a node sibling. `globalThis.Deno` is the tell
+the shim cannot hide. Deno is
 the only hard dependency, so without node and/or bun run the per-runtime tasks you
 DO have — each writes its own sibling and `bench:compose` folds whatever exists.
 
