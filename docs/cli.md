@@ -110,6 +110,70 @@ consumer that has the source; it mirrors acorn's `locations: false`. No-op for C
 
 Implemented in `tsv_cli/src/cli/input.rs`
 
+## Recursion Depth
+
+The parser and the printer are recursive descents, so nesting depth costs stack — and a
+stack overflow is not a catchable panic. No `catch_unwind` and no panic contract can
+turn it into a per-file error the way they do every other failure; it kills the process,
+and a directory format that dies that way has already rewritten some files, having
+printed none of them (changed paths are reported after the run, not as they are
+written). What the user sees is exit 134 (SIGABRT on Unix), two lines of runtime message naming
+the thread that overflowed (`tsv` for the subcommand, `tsv-format` for a pool worker —
+which is why those threads are named at all: it is the only diagnostic the failure
+leaves), and no record of what changed.
+
+So the ceiling is stated rather than inherited. `main` runs the whole subcommand on a
+thread with `STACK_SIZE` reserved (`cli/stack.rs`), and the format workers reserve the
+same, which makes the depth a property of tsv instead of a property of the route, the
+host and the platform:
+
+- inherited, the main thread's stack is the process `RLIMIT_STACK` on Unix — commonly
+  8 MiB, but whatever the machine says — and **1 MiB on Windows**, where the linker
+  writes it into the executable header and nothing at run time can raise it. A spawned
+  thread inherits Rust's 2 MiB instead, and `RUST_MIN_STACK` moves that one but not the
+  main thread's.
+- so without the reservation, one binary has an **8x** depth difference between
+  `tsv format <path>` and `tsv format --content` on the same input on the same Windows
+  machine — and the asymmetry points the *other* way on a machine whose `RLIMIT_STACK`
+  is above the pool's own reservation, where the pool becomes the shallower route.
+  `tsv parse` has no pool at all, so it took the inherited stack on every platform.
+- which recursion binds is the **parser**, on all three languages: at a fixed stack,
+  `parse` reaches within ~0.3% of `format` on the same input (1,494 vs 1,490 parens at
+  8 MiB), so neither the printer nor the wire-JSON writer adds a second depth's worth on
+  top of it.
+
+Measured on `const x = ((((…1…))));`, one nesting level costs ~5.5 KiB of stack in a
+release build (~35 KiB in a debug build, where frames are much larger), so the shipped
+CLI reaches ~5,900 levels on every route and every platform. For scale: the parsers tsv
+stands in for stop earlier and on the same input — acorn + `@sveltejs/acorn-typescript`
+at 497 levels and prettier at 805, both through V8's own checked stack limit, which is
+why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the tsc
+corpus nests 69 levels; the exposure is generated and minified code.
+
+Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
+release build: **TS object literals ~7.5 KiB** (the worst measured), binary chains
+~6.1, calls ~5.5, parens and member chains ~5.5, statement nesting ~5.3, TS *types*
+~3.2, Svelte elements ~3.2, CSS rules ~0.4. The spread inside TypeScript is narrow
+while the gap to CSS is ~13x, so the cost is a property of the parser's recursion
+cycle rather than of any one construct.
+
+**The other surfaces have their own ceilings, set by their hosts, and the CLI's
+reservation does not reach them:**
+
+| surface | stack | depth |
+| --- | --- | --- |
+| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~5,900 |
+| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~1,400 at 8 MiB |
+| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~710 |
+| WASM, any host | the wasm shadow stack, 1 MiB by link default | ~300 |
+
+The two binding rows are the host's thread, so the addon cannot size them; a host that
+needs the depth raises it itself (`new Worker(…, {resourceLimits: {stackSizeMb}})`), which
+is the same shape as the arena-retention advice in
+[tsv_napi/CLAUDE.md §Threading & host residency](../crates/tsv_napi/CLAUDE.md). A native
+overflow there is a bare `SIGSEGV` with no message, since Rust's guard-page handler is
+installed by its runtime startup and a cdylib loaded into Node never runs it.
+
 ## Multi-File Formatting
 
 `tsv format` accepts any mix of files and directories:
@@ -133,7 +197,7 @@ Implemented in `tsv_cli/src/cli/input.rs`
 - **In-place writes**: files are rewritten only when output differs (no mtime churn). `--content`/`--stdin` keep printing to stdout.
 - **`--check`**: lists files that would change without writing; exits 1 if any would. For CI. Also works with `--content`/`--stdin` (nothing printed to stdout; the exit code is the API) for editor integrations.
 - **`--list`**: prints the discovered in-scope files (one per line) without formatting — a read-only view of the set `format` would touch, after the ignore files are applied. Path mode only (errors with `--content`/`--stdin`) and mutually exclusive with `--check`. Unlike the format action, an empty scope is a valid answer (exit 0, no output) rather than the "no supported files" error; traversal errors still exit 2. Useful for debugging ignore-file scoping and for scripting over the set.
-- **Parallelism**: files format concurrently on `std::thread::scope` workers claiming one file at a time from a shared queue — dynamic load balancing with no thread-pool dependency. `--jobs N` overrides the worker count, clamped to the file count and floored at 1 (`--jobs 0` is a width, not an opt-out — it means `--jobs 1`); path mode only, an error with `--content`/`--stdin`. Each worker reserves an 8 MiB stack (`WORKER_STACK_SIZE` — the common 2 MiB platform default aborts at ~360 nested parens, 8 MiB clears 1400), pinning the pool's ceiling against the platform-dependent main-thread default; the `--content`/`--stdin` path stays on the main thread.
+- **Parallelism**: files format concurrently on `std::thread::scope` workers claiming one file at a time from a shared queue — dynamic load balancing with no thread-pool dependency. `--jobs N` overrides the worker count, clamped to the file count and floored at 1 (`--jobs 0` is a width, not an opt-out — it means `--jobs 1`); path mode only, an error with `--content`/`--stdin`. Each worker reserves the same stack every other tsv thread runs on (`STACK_SIZE`, `cli/stack.rs`), so the pool is not a route with a depth ceiling of its own — see [§Recursion Depth](#recursion-depth).
 
   The default is **`min(logical CPUs, ceil(1.5 × physical cores))`**, not one worker per logical CPU. This workload does not scale onto SMT siblings — the per-file work is memory-bound, and on a large tree the discovery walk is the bottleneck, so extra workers compete with it for cores. One worker per logical CPU costs up to 28% on walk-bound trees while buying nothing on flat repos. The SMT width is read once from `/sys/devices/system/cpu/cpu0/topology/thread_siblings_list`; where that is unavailable (no SMT, or a non-Linux platform) the cap is inert and the default is the logical count, so it can only ever lower the worker count.
 - **Streaming discovery**: a single directory root — the common invocation — feeds the workers *as the walk finds files*, so the directory walk runs beside the first files' parse+format rather than in front of an idle pool. It is worth having: the walk is 5–10% of the wall on an application repo, and 40–67% on a repo with a large tree, where it can outrun what the pool consumes. Other argument shapes (explicit files, multiple roots) discover the whole set first, because the canonical-path dedup above is set-wide. The set of files formatted is identical either way, as is the reporting order below — only the order work is handed out differs.

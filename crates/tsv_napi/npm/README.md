@@ -56,7 +56,7 @@ Option semantics (identical to the WASM package): unknown keys throw whatever th
 
 File scoping: `IgnoreStack` is tsv's own hierarchical, git-faithful matcher plus its discovery policy, exported so tooling can reproduce exactly which files `tsv format` would touch — the same class `@fuzdev/tsv_wasm` exports.
 
-Errors: parse errors and engine errors are thrown JS errors. A Rust panic — always a tsv bug, please report it — is also thrown rather than aborting the process; stack overflow is the one crash that still aborts.
+Errors: parse errors and engine errors are thrown JS errors. A Rust panic — always a tsv bug, please report it — is also thrown rather than aborting the process; stack overflow is the one crash that still aborts, as a bare `SIGSEGV`. Its depth is your thread's, not the addon's: roughly 1,400 levels of nesting on a main thread with the usual 8 MiB stack, and roughly 710 on a `worker_threads` worker, whose default is 4 MiB — raise it with `new Worker(path, {resourceLimits: {stackSizeMb: 16}})` if you format generated or minified input. The bundled `tsv` CLI is unaffected; it sizes its own.
 
 ## Status
 
