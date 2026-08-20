@@ -324,8 +324,9 @@ impl<'a> Printer<'a> {
                     }
 
                     // A broken `=>`→body gap forces the closing paren onto its own line — the
-                    // rule is the gap's and not the body's, see
-                    // [`last_arg_arrow_gap_break`].
+                    // rule is the gap's and not the arms' body-kind split; the one body
+                    // question it does owe, prettier's `couldExpandArg`, the helper applies
+                    // itself, see [`last_arg_arrow_gap_break`].
                     if new_has_comments
                         && let Some(gap_break) = last_arg_arrow_gap_break(self, arg0)
                     {

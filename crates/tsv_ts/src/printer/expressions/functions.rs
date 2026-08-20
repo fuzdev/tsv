@@ -88,6 +88,40 @@ fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<Span> {
     }
 }
 
+/// Join a curried chain's head signatures with ` =>` and each gap's own tail — a bare
+/// `line`, or that gap's `=>`-glued comment run plus the break it forces
+/// ([`Printer::push_arrow_gap_glued_head`]).
+///
+/// A per-gap separator rather than one shared `join_doc`: the `=>` a glued run belongs to
+/// lives in the separator here, so the run cannot ride the following signature the way it
+/// does at every other arrow gap.
+///
+/// `tails[i]` sits between `sigs[i]` and `sigs[i + 1]`; a short slice falls back to a plain
+/// `line`, which is what the uncommented chain has always emitted.
+fn join_arrow_chain_heads(d: &DocArena, sigs: &[DocId], tails: &[DocId]) -> DocId {
+    let mut parts = DocBuf::with_capacity(sigs.len().saturating_mul(3).saturating_sub(2));
+    for (i, &sig) in sigs.iter().enumerate() {
+        if i > 0 {
+            parts.push(d.text(" =>"));
+            parts.push(tails.get(i - 1).copied().unwrap_or_else(|| d.line()));
+        }
+        parts.push(sig);
+    }
+    d.concat(&parts)
+}
+
+/// What [`Printer::push_arrow_gap_glued_head`] emitted onto the `=>` line, and what its
+/// caller still owes below. Its existence IS the "something was glued" answer — the
+/// emitter returns `None` when it pushed nothing, so there is no state in which a caller
+/// can read a resume position that never moved.
+struct ArrowGapGluedHead {
+    /// Where the remaining, own-line run resumes — past the `//` that ended the `=>` line.
+    resume: u32,
+    /// An author blank between that `//` and what follows it, which only this seam can
+    /// emit.
+    blank_below: bool,
+}
+
 /// Prepend an optional leading comment run to a doc, allocating nothing when there is none.
 ///
 /// One spelling for every consumer of an [`Printer::arrow_gap_leading_run`]-shaped
@@ -553,12 +587,9 @@ impl<'a> Printer<'a> {
             // `//` its line end: `() => // c⏎(x /* t */)` printed
             // `() => // c (x /* t */);`, the whole body swallowed into the comment.
             if self.has_own_line_post_arrow_comment(arrow_end, body_start) {
-                let with_leading = prepend_leading(
-                    d,
-                    self.arrow_gap_leading_run(arrow_end, body_start),
-                    body_doc,
-                );
-                parts.push(hang_after_operator(d, with_leading));
+                self.push_arrow_gap_tail(parts, arrow_end, body_start, |resume| {
+                    prepend_leading(d, self.arrow_gap_leading_run(resume, body_start), body_doc)
+                });
             } else {
                 // Leading comments between `=>` and body (if any):
                 // `() => /* lead */ (x /* trail */)` — emit inline leading,
@@ -693,10 +724,11 @@ impl<'a> Printer<'a> {
         // the chain layout and lands in the arms below. (It used to decline for a comment
         // anywhere in the chain at all, which made the whole flattened layout dead code.)
         if has_own_line_comment {
-            // Own-line or line comments — always break
-            let body_with_comments =
-                self.build_arrow_body_with_comments_doc(expr, arrow_end, body_start, frozen);
-            parts.push(hang_after_operator(d, body_with_comments));
+            // Own-line or line comments — always break. A run the author GLUED to `=>`
+            // keeps that line first; only what is left resumes on the leading-run route.
+            self.push_arrow_gap_tail(parts, arrow_end, body_start, |resume| {
+                self.build_arrow_body_with_comments_doc(expr, resume, body_start, frozen)
+            });
         } else if should_hug {
             // Hugged body (possibly with inline block comments):
             // `() => ({...})` or `() => /* c */ ({...})`
@@ -905,8 +937,9 @@ impl<'a> Printer<'a> {
         // (non-idempotent, non-reparseable). Mirrors the expression-body path
         // (`build_arrow_body_with_comments_doc`).
         if has_post_arrow_comments && self.has_own_line_post_arrow_comment(arrow_end, body_start) {
-            let run = self.arrow_gap_leading_run(arrow_end, body_start);
-            parts.push(hang_after_operator(d, prepend_leading(d, run, block_doc)));
+            self.push_arrow_gap_tail(parts, arrow_end, body_start, |resume| {
+                prepend_leading(d, self.arrow_gap_leading_run(resume, body_start), block_doc)
+            });
             return;
         }
 
@@ -1061,6 +1094,116 @@ impl<'a> Printer<'a> {
         self.build_rhs_comments_opt(start, end)
     }
 
+    /// Emit the `=>`-GLUED head of an arrow gap's comment run — the comments the author
+    /// wrote on the `=>`'s own line — and report where the remaining, own-line run resumes.
+    ///
+    /// This is the `=>` spelling of [§Uniform Forced-Continuation
+    /// Indent](../../../../docs/conformance_prettier.md): a `//` runs to end-of-line, so
+    /// whatever follows it cannot stay on that line, and tsv keeps the comment where the
+    /// author wrote it and drops the tail to the continuation. Every sibling gap already
+    /// answers this way through [`Printer::append_keyword_value_line_comments`] (`new`,
+    /// `await`, `keyof`, `: T`, and the **function-type** arrow's own `=>`), whose same-line
+    /// loop this mirrors — a glued block takes a space, a glued `//` takes the deferred
+    /// trailing form and ends the line.
+    ///
+    /// ⚠️ The *emission* is that emitter's; the **policy around it is not**, so the two are
+    /// deliberately not one function. The family emitter glues a same-line block whether or
+    /// not a `//` follows it; here a prefix with no `//` in it glues nothing, because a
+    /// multiline block the author broke after is a different rule at this gap (below).
+    ///
+    /// ⚠️ **Anything emitted here owes a HARDLINE below it**, not the soft
+    /// [`hang_after_operator`] line: a glued `//` is a `line_suffix`, so a tail that renders
+    /// flat behind it is swallowed into the comment — output that does not reparse. The
+    /// three `=>`→body sites get that for free from [`Self::push_arrow_gap_tail`], which is
+    /// the only way they reach this; the chain's head gap owes it by hand because its break
+    /// is a *separator* rather than a hang, and it pays through the same
+    /// [`Self::arrow_glued_head_break`].
+    ///
+    /// Returning the resume position rather than the whole run keeps the own-line half on
+    /// its existing route — [`Self::build_arrow_body_with_comments_doc`] hands that run to
+    /// the body so it lands on the correct side of the body's parens, which a wholesale
+    /// switch to the family emitter would lose.
+    fn push_arrow_gap_glued_head(
+        &self,
+        parts: &mut DocBuf,
+        sig_end: u32,
+        body_start: u32,
+    ) -> Option<ArrowGapGluedHead> {
+        let d = self.d();
+        // The same-line prefix, and whether it ends in the `//` that makes it one.
+        let glued: CommentVec<'_> = comments_to_emit_in_range(self.comments, sig_end, body_start)
+            .take_while(|c| self.is_same_line(sig_end, c.span.start))
+            .collect();
+        // ⚠️ **The rule is the LINE comment's**, not every glued comment's. A `//` runs to
+        // end-of-line, so the author could not have put the tail on that line and the
+        // comment's position is unambiguous; a **block** the author glued and then broke
+        // after is the [§Authored breaks in value
+        // position](../../../../docs/conformance_prettier.md) case instead, where the break
+        // is the signal and the run hangs own-line under `=>` with the body below it. So a
+        // same-line prefix with no `//` in it glues nothing and leaves the gap to the
+        // caller's existing route (`arrow/body_comment`'s `unformatted_inline` is the pin).
+        if glued.last().is_none_or(|c| c.is_block) {
+            return None;
+        }
+        let mut resume = sig_end;
+        for comment in &glued {
+            if comment.is_block {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            } else {
+                parts.push(self.build_trailing_line_comment_doc(comment));
+            }
+            resume = comment.span.end;
+        }
+        // The `//` ended the `=>` line, so the rest of the run is own-line by construction.
+        // An author blank below it has no other emitter — the break below is the next thing
+        // out — so it is measured here, stepping over any comment in the gap (the in-source
+        // axis).
+        let next = self.blank_scan_end(resume, body_start);
+        Some(ArrowGapGluedHead {
+            resume,
+            blank_below: self.has_blank_line_between_strict(resume, next),
+        })
+    }
+
+    /// The forced break a glued comment head owes below itself, carrying an author blank
+    /// that survived it. One spelling for the two shapes that need it — the `=>`→body
+    /// continuation and the chain's head→head separator — so the blank cannot be honored at
+    /// one and dropped at the other.
+    fn arrow_glued_head_break(&self, head: &ArrowGapGluedHead) -> DocId {
+        let d = self.d();
+        if head.blank_below {
+            d.concat(&[d.literalline(), d.hardline()])
+        } else {
+            d.hardline()
+        }
+    }
+
+    /// Emit an arrow's `=>`→body gap and the tail below it: the author's glued comment head
+    /// keeps the `=>` line, and the tail hangs under it.
+    ///
+    /// **The single route for all three `=>`→body sites** (expression body, block body, and
+    /// the retained-paren arm), and the reason none of them can get the break wrong: a glued
+    /// head forces a hardline continuation, an unglued gap keeps the soft
+    /// [`hang_after_operator`] the uncommented arrow has always used, and the choice is made
+    /// here rather than restated at each. `build_tail` receives the position the own-line
+    /// half of the run resumes at, which is all the three sites differ by.
+    fn push_arrow_gap_tail(
+        &self,
+        parts: &mut DocBuf,
+        sig_end: u32,
+        body_start: u32,
+        build_tail: impl FnOnce(u32) -> DocId,
+    ) {
+        let d = self.d();
+        let head = self.push_arrow_gap_glued_head(parts, sig_end, body_start);
+        let tail = build_tail(head.as_ref().map_or(sig_end, |h| h.resume));
+        parts.push(match head {
+            Some(head) => d.indent(d.concat(&[self.arrow_glued_head_break(&head), tail])),
+            None => hang_after_operator(d, tail),
+        });
+    }
+
     /// Build a flattened curried arrow chain: the signature heads
     /// (`(a) => (b) => …`) form a breakable group keyed on `GroupId::ArrowChain`,
     /// so they stay on one line when they fit and break otherwise. The terminal
@@ -1087,6 +1230,11 @@ impl<'a> Printer<'a> {
 
         // Collect each head's signature, in the walk the legality predicate shares.
         let mut sig_docs: DocBuf = DocBuf::new();
+        // The separator tail for the gap BEFORE each head past the first — a bare `line`,
+        // or that gap's `=>`-glued comment run plus the forced break it owes. Indexed
+        // against `sig_docs` one behind: `gap_tails[i]` sits between head `i` and head
+        // `i + 1`.
+        let mut gap_tails: DocBuf = DocBuf::new();
         let terminal = walk_arrow_chain(head, |current, gap_start| {
             // Each signature is its own group so its params break independently of
             // the chain (prettier wraps each `printArrowFunctionSignature` in a
@@ -1104,9 +1252,26 @@ impl<'a> Printer<'a> {
                 None => sig,
                 Some(gap_start) => {
                     let sig = self.prepend_owned_leading_comment_at(current.span.start, sig);
+                    // The head gap answers the `=>`-glued question exactly as the body gap
+                    // does; what differs is only where the run can go. Here the `=>` lives
+                    // in the SEPARATOR between two heads, so a glued run rides the gap tail
+                    // rather than the following signature — and takes the separator's line
+                    // with it, since a `//` is a `line_suffix` and the head behind it must
+                    // not render flat onto the comment's line.
+                    let mut glued: DocBuf = DocBuf::new();
+                    let head =
+                        self.push_arrow_gap_glued_head(&mut glued, gap_start, current.span.start);
+                    let resume = head.as_ref().map_or(gap_start, |h| h.resume);
+                    gap_tails.push(match head {
+                        Some(head) => {
+                            glued.push(self.arrow_glued_head_break(&head));
+                            d.concat(&glued)
+                        }
+                        None => d.line(),
+                    });
                     prepend_leading(
                         d,
-                        self.arrow_gap_leading_run(gap_start, current.span.start),
+                        self.arrow_gap_leading_run(resume, current.span.start),
                         sig,
                     )
                 }
@@ -1125,7 +1290,6 @@ impl<'a> Printer<'a> {
         // the parent context. Either way the terminal `=>` + body are emitted
         // after the group (below), and `indent_if_break` ties the body's indent
         // to this group's break decision.
-        let sep = d.concat(&[d.text(" =>"), d.line()]);
         let heads = match context {
             // Assignment-RHS: the inner group joins ALL heads with ` =>` + line so
             // they stay on one line when they fit and each drop to their own line
@@ -1135,7 +1299,7 @@ impl<'a> Printer<'a> {
             // enclosing fluid assignment marker stays flat — the break-after-`=`
             // is this softline.
             ArrowChainContext::AssignmentRhs => {
-                let inner = d.group(d.join_doc(sig_docs, sep));
+                let inner = d.group(join_arrow_chain_heads(d, &sig_docs, &gap_tails));
                 d.group_with_id(
                     d.indent(d.concat(&[d.softline(), inner])),
                     GroupId::ArrowChain,
@@ -1153,14 +1317,19 @@ impl<'a> Printer<'a> {
                 // back to the assignment-style joined group.
                 let heads_doc = match sig_docs.split_first() {
                     Some((&sig0, rest)) => {
-                        let rest_joined = d.join_doc(rest.iter().copied(), sep);
+                        // The first gap's tail is emitted here rather than by the join —
+                        // it is the one that carries the indent — so the join sees the
+                        // tails from the second gap on.
+                        let first_tail = gap_tails.first().copied().unwrap_or_else(|| d.line());
+                        let rest_joined =
+                            join_arrow_chain_heads(d, rest, gap_tails.get(1..).unwrap_or(&[]));
                         d.concat(&[
                             sig0,
                             d.text(" =>"),
-                            d.indent(d.concat(&[d.line(), rest_joined])),
+                            d.indent(d.concat(&[first_tail, rest_joined])),
                         ])
                     }
-                    None => d.join_doc(sig_docs, sep),
+                    None => join_arrow_chain_heads(d, &sig_docs, &gap_tails),
                 };
                 // Prettier's `shouldBreak: shouldBreakChain` on the same group. Only this
                 // arm passes it: `AssignmentRhs` never sees a triggering chain (see

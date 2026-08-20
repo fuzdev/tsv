@@ -27,9 +27,12 @@ A few cases go further:
   layout paren, which vanishes as soon as the body breaks; there tsv converges with
   prettier and puts the comment inside
   ([arrow/body_stripped_paren_comment_long](../../arrow/body_stripped_paren_comment_long/)).
-- A **leading** run that cannot end on the `=>` line — a `//`, or an own-line
-  block — drops below the `=>` with the retained parens under it, the same
-  hang the uncommented arm gives. Only a glued block still hugs `=>`. That gap
+- A **leading** run the author wrote below the `=>` — an own-line comment, or a
+  multiline block glued to `=>` and broken after — drops below it with the retained
+  parens under it, the same hang the uncommented arm gives. A run the author *glued*
+  to `=>` keeps that line instead, the `//` case of
+  [§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent);
+  a glued single-line block still hugs the body outright. That gap
   is answered here rather than by the main body cascade, since this arm
   reassembles the body around the retained parens; answering it inline for
   every kind is what once swallowed the whole body into a `//`

@@ -786,8 +786,9 @@ fn build_chain_args_single(
     let arg = &call.arguments[0];
 
     // A broken `=>`→body gap forces the closing paren onto its own
-    // line. Above every body-kind arm below, because the rule is the gap's and not the
-    // body's — see [`last_arg_arrow_gap_break`]. The argument doc is built
+    // line. Above every body-kind arm below, because the rule is the gap's and not the arms'
+    // body-kind split — the one body question it does owe, prettier's `couldExpandArg`, the
+    // helper applies itself — see [`last_arg_arrow_gap_break`]. The argument doc is built
     // here rather than reused from an arm because the arms below never run for this shape;
     // asking the cheap comment question first keeps that build off every other path.
     if has_any_comment_text
@@ -1188,7 +1189,9 @@ fn build_chain_args_multi(
 
     // A broken `=>`→body gap on the last argument forces the closing
     // paren onto its own line. Above every body-kind arm below, because the rule is the
-    // gap's and not the body's — see [`last_arg_arrow_gap_break`]. The
+    // gap's and not the arms' body-kind split — the one body question it does owe,
+    // prettier's `couldExpandArg`, the helper applies itself — see
+    // [`last_arg_arrow_gap_break`]. The
     // cheap comment question gates the split-last build, so no other path pays for it.
     if call.arguments.len() >= 2
         && has_any_comment_text

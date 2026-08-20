@@ -738,6 +738,20 @@ tsv diverges at six places:
   onto the keyword's line, leaves the operand flush, and is not idempotent on the block
   spelling — its second pass collapses the whole expression onto one line (chain pinned) —
   [await/new operand head](../tests/fixtures/typescript/expressions/await_new_operand_prettier_ignore_head_prettier_divergence/)
+- **Value-arrow `=>`→body** — ◆comment_preservation — the expression-level arrow's spelling of the
+  same parting, riding the
+  [§Uniform Forced-Continuation Indent](./conformance_prettier.md#uniform-forced-continuation-indent)
+  divergence its directive-free sibling
+  `expressions/arrow/post_arrow_glued_line_comment_prettier_divergence` records. An **own-line**
+  directive in the gap freezes the body in both formatters; a directive the author wrote **on the
+  `=>`'s line** is inert under the placement floor, so tsv keeps that line and the body normalizes,
+  where prettier honors it — relocating the `//` spelling down to its own line first and leaving the
+  **block** spelling glued, honoring it where it stands. So the block case parts on the floor alone,
+  with no relocation to point at. The three forms (tsv's, prettier's stable one, and the authored
+  source) are pinned by a `divergent_variant_*` —
+  [post-arrow head](../tests/fixtures/typescript/expressions/arrow/post_arrow_prettier_ignore_head_prettier_divergence/).
+  A curried chain's **head→head** gap is not a site of this rule: it heads another signature rather
+  than a value, so a directive there is inert in both placements and freezes nothing
 - **Default value** — ◆design_choice — tsv breaks the enclosing list around the frozen value,
   because the directive's own line is a mandatory break inside that list and a list holding a
   break prints expanded — the same layout a plain own-line comment in that gap already produces.

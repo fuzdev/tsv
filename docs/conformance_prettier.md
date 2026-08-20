@@ -267,6 +267,17 @@ its tail:
   the shared `append_keyword_value_line_comments`. A union return keeps its own
   break-after-arrow layout. See [Fn/ctor-type `=>`→return-type line
   comment](./conformance_prettier_ts_comments.md#comment-relocation).
+- **Value-arrow `=>`→body, and a curried chain's head→head gap** — the expression-level
+  spelling of the row above (`(e) => // c⏎\te.prop`), which the two `=>`s once answered
+  differently. The rule is the **gap's**, not the body's: object, block and ternary bodies
+  read the same, at both call-argument layouts. At the chain gap the `=>` lives in the
+  *separator* between two heads, so the glued run rides the gap's tail rather than the
+  following signature. ⚠️ **Line comments only** here: a multiline block the author glued
+  and then broke after is the [§Authored breaks in value
+  position](#authored-breaks-in-value-position) case and keeps the own-line hang. Since
+  own-line-ness is authoring signal for a leading position, the two authorings are **both**
+  stable under tsv while prettier collapses them; see [Value-arrow `=>`→body / chain head
+  glued line comment](./conformance_prettier_ts_comments.md#comment-relocation).
 - **Switch `case`→test and case head→`:`** — the label's two gaps, one rule. The
   separator gap (`case x // c⏎\t\t\t:`) hangs the bare `:` itself; the keyword→test
   gap one step earlier (`case // c⏎\t\t\tx:`) hangs the test *and* that `:`.

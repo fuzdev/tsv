@@ -1,6 +1,8 @@
 <script>
-	// A comment in the gap between two heads leads the head after it, on its own line, and
-	// the chain breaks after `=`
+	// A comment the author wrote on its own line in the gap between two heads leads the head
+	// after it, keeping that line, and the chain breaks after `=`. A comment glued to the
+	// `=>` instead keeps the `=>`'s line — see
+	// `arrow/post_arrow_glued_line_comment_prettier_divergence`
 	const lineComment =
 		(x) =>
 		// c
