@@ -63,6 +63,21 @@ above the hook in `src/lib.rs`.
 Diagnostic only: the call still traps. What makes the **instance survive** it is
 [`tsv_arena`](../tsv_arena/CLAUDE.md#abort-safety-take-and-park)'s take/park.
 
+⚠️ **A stack overflow is the one trap the instance does NOT survive** — a different
+trap with a different cause, and take/park has no reach over it. The shadow stack is
+1 MiB of linear memory (wasm-ld's default `-z stack-size`, placed first so an overflow
+walks off address 0 into `memory access out of bounds` rather than quietly over the
+data segments), and `__stack_pointer` is a plain mutable global that a trap does not
+restore. So the pointer stays where the deep call left it and **every later call on
+that instance throws the same error, in every language and on every entry point** —
+verified across `format_typescript` / `format_css` / `format_svelte` /
+`parse_typescript_json` after one deep `format_typescript`. Only a fresh instance
+recovers. The depth is ~300 nested parens at ~3.5 KiB of shadow stack per level, the
+lowest of any tsv surface — below acorn's 497 — and unlike the native builds it does
+not move with the host, since the shadow stack is inside the module. Consumers that
+loop over files on one instance therefore need to re-instantiate after a trap, or one
+outsized file turns every file after it into a spurious error.
+
 ## JSON-String Transport
 
 The AST crosses the JS↔WASM boundary as **one compact JSON string**:

@@ -490,6 +490,17 @@ function format_one(path, check) {
 	try {
 		formatted = FORMATTERS[parser_from_extension(path)](source);
 	} catch (error) {
+		// TODO: a WASM stack overflow (input nested past ~300 levels — generated or
+		// minified code) is not a per-file failure like a parse error is: the trap
+		// leaves `__stack_pointer` where the deep call left it, so this instance is
+		// poisoned and every later file throws `memory access out of bounds` too. On
+		// this path that turns the rest of the run into spurious errors; the worker
+		// path is contained only because the throw kills the worker and the shared
+		// cursor lets the survivors drain the list. Recovering needs a fresh instance,
+		// which `init_sync` does not give (wasm-bindgen's `initSync` short-circuits
+		// once initialized) — so the fix is either a re-instantiation hook out of the
+		// package patcher, or reporting the remainder as engine-reset rather than as
+		// per-file errors.
 		return { kind: 'error', message: error.message };
 	}
 	if (formatted === source) return { kind: 'unchanged' };

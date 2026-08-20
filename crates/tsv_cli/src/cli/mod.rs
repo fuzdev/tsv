@@ -2,6 +2,7 @@ pub mod commands;
 pub mod discover;
 pub mod format_source;
 pub mod input;
+pub mod stack;
 
 use argh::FromArgs;
 use commands::{format::FormatCommand, parse::ParseCommand};

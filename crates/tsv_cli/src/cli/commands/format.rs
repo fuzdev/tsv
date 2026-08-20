@@ -2,6 +2,7 @@ use crate::cli::commands::parse::parse_goal_arg;
 use crate::cli::discover::{Diagnostics, FileSink, discover_files, discover_into, path_sort_key};
 use crate::cli::format_source::{format_source_in, format_source_with_goal};
 use crate::cli::input::{InputArgs, ParserType};
+use crate::cli::stack::sized_thread;
 use argh::FromArgs;
 use std::fs;
 use std::num::NonZeroUsize;
@@ -342,38 +343,18 @@ fn cpu_list_len(list: &str) -> usize {
 /// should start on the first directory the walk finishes.
 const DISCOVERY_BATCH: usize = 8;
 
-/// Stack reserved for each format worker.
+/// Spawn one format worker into `scope` on the shared reservation.
 ///
-/// The parser and printer are recursive descents, so nesting depth costs stack, and
-/// **every ordinary `tsv format <path>` runs on this pool** — the `--content` /
-/// `--stdin` route is the only one that stays on the main thread. Rust's 2 MiB default
-/// for a spawned thread is therefore the wrong reservation for the *product* path: it
-/// is a quarter of a typical main thread, and the depth ceiling scales with it
-/// (measured on `const x = ((((…1…))));` in a release build, 2 MiB aborts around 360
-/// nested parens and this 8 MiB clears 1400).
-///
-/// Why it must not simply be left to the default: a stack overflow is not a catchable
-/// panic, so the `corpus` profile's `panic = "unwind"` cannot turn it into a per-file
-/// error the way it does for every other failure — it kills the whole run, and a
-/// directory sweep dies partway with some files already written.
-///
-/// The size is a *reservation*, not a commitment: pages are committed lazily on first
-/// touch, so it costs address space and ~0 RSS, and nothing the benchmarks measure
-/// moves. It is stated explicitly rather than inherited from the main thread because
-/// the main-thread default is itself platform-dependent (~8 MiB on Linux and macOS,
-/// 1 MiB on Windows) — pinning it is what makes the pool's ceiling identical
-/// everywhere, which is the property that matters for a formatter. The main thread
-/// still reaches further; giving `run_single` a matching ceiling needs a sized wrapper
-/// thread, which this deliberately does not add.
-const WORKER_STACK_SIZE: usize = 8 * 1024 * 1024;
-
-/// Spawn one format worker into `scope` with [`WORKER_STACK_SIZE`] reserved.
+/// [`sized_thread`] is the same constructor `main` runs the whole subcommand through
+/// (see `cli::stack`): the pool is one more thread tsv dispatches language work on,
+/// not a route with a ceiling of its own.
 ///
 /// `Scope::spawn` is documented to panic when the OS refuses the thread;
 /// `Builder::spawn_scoped` returns that same failure as an `Err` instead, so the
 /// `expect` below reproduces the existing behavior rather than introducing a new panic
-/// point — and there is no recovery to attempt, since the closure is consumed by the
-/// failed attempt and a plain spawn would fail for the same reason.
+/// point. Unlike `run_on_sized_stack`, there is no recovery worth attempting: a pool
+/// worker has no thread-free alternative to fall back to, and a plain spawn would fail
+/// for the same reason the sized one did.
 #[expect(
     clippy::expect_used,
     reason = "matches Scope::spawn's own documented panic-on-OS-failure behavior"
@@ -386,8 +367,7 @@ where
     F: FnOnce() -> T + Send + 'scope,
     T: Send + 'scope,
 {
-    thread::Builder::new()
-        .stack_size(WORKER_STACK_SIZE)
+    sized_thread("tsv-format")
         .spawn_scoped(scope, worker)
         .expect("format worker thread should spawn")
 }

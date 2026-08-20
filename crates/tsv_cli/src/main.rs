@@ -40,5 +40,8 @@ fn main() {
                 }
             })
         });
-    cmd.run();
+    // Every subcommand runs on one explicitly sized stack — see `cli::stack`. Doing it
+    // here rather than inside the recursive commands is what keeps the ceiling the
+    // same for `parse` and for both of `format`'s routes.
+    tsv_cli::cli::stack::run_on_sized_stack(move || cmd.run());
 }

@@ -159,9 +159,14 @@ pub enum MissingCause {
     Other,
 }
 
-/// Worker-thread stack for the sweep: the corpus has deeply-nested tests and
-/// tsv's recursive-descent parser has no depth guard, so the default 8 MiB
-/// overflows. 512 MiB is virtual-only reserve on Linux.
+/// Worker-thread stack for the sweep, far above the `tsv_cli::cli::stack::STACK_SIZE`
+/// reservation the rest of this binary already runs on.
+///
+/// This corpus is adversarially deep by construction — pathological-nesting tests, and
+/// tsv's recursive-descent parser has no depth guard — so it is the one place that
+/// wants its own number instead of the shared one. 512 MiB is virtual-only reserve on
+/// Linux, and the nested spawn is free: the dispatch thread's own reservation is
+/// unaffected by what this one asks for.
 const SKELETON_STACK: usize = 512 * 1024 * 1024;
 
 /// One expect-clean variant that graded non-clean (should never happen while the
