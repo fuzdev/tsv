@@ -1700,3 +1700,136 @@ fn test_format_target_scope_is_cwd_independent() {
         );
     }
 }
+
+/// Nesting depth for the stack-ceiling tests below.
+///
+/// Chosen against the two profiles that bound it. The floor: a 1 MiB main-thread stack
+/// — what Windows gives every process, the linker writing it into the executable
+/// header — reaches **27** levels in a **debug** build, the profile `cargo test` runs
+/// (measured on Linux under `ulimit -s 1024`; Windows frames differ somewhat, so read
+/// it as the order of magnitude, not the exact number). Anything past that fails on a
+/// route that inherits the platform default. The ceiling: the reservation in
+/// `cli::stack` clears ~950 levels in that same debug build, so 200 leaves room for
+/// per-target frame differences while staying far out of reach of an unsized thread.
+const NESTED_DEPTH: usize = 200;
+
+/// `const x = ((((…1…))));` nested [`NESTED_DEPTH`] deep — the cheapest input whose
+/// cost is linear in one number, and the shape the parser and the printer both recurse
+/// on.
+fn deeply_nested_ts() -> String {
+    format!(
+        "const x = {}1{};\n",
+        "(".repeat(NESTED_DEPTH),
+        ")".repeat(NESTED_DEPTH)
+    )
+}
+
+/// Assert the run neither aborted nor crashed, whatever it decided about the input.
+///
+/// A stack overflow is not a panic and not an error exit — it kills the process by
+/// signal, so `status.code()` is `None` on Unix and a large value on Windows. The
+/// contract under test is only "reached a verdict"; which verdict is the other tests'
+/// business.
+fn assert_reached_a_verdict(label: &str, out: &std::process::Output) {
+    let code = out.status.code();
+    assert!(
+        matches!(code, Some(0 | 1)),
+        "{label}: expected a verdict, got {code:?}; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn test_deeply_nested_input_survives_every_route() {
+    // Every route runs on the one reservation `cli::stack` states, so the depth a
+    // route reaches cannot depend on which route it is. Before that was true, the
+    // pool reserved its own stack while `--content`/`--stdin` and all of `parse`
+    // inherited the platform default — an 8x difference between two routes of one
+    // binary on one Windows machine, where the default is 1 MiB.
+    let src = deeply_nested_ts();
+    let dir = temp_dir("deep_nesting");
+    let file = dir.join("deep.ts");
+    fs::write(&file, &src).unwrap();
+    let path = file.to_str().unwrap();
+
+    // `--content` and `--stdin`: the routes that never reach the format pool.
+    assert_reached_a_verdict(
+        "format --content",
+        &tsv(&[
+            "format",
+            "--check",
+            "--parser",
+            "typescript",
+            "--content",
+            &src,
+        ]),
+    );
+    assert_reached_a_verdict(
+        "format --stdin",
+        &tsv_stdin(
+            &["format", "--check", "--parser", "typescript", "--stdin"],
+            &src,
+        ),
+    );
+    // A file path: the format pool.
+    assert_reached_a_verdict("format <path>", &tsv(&["format", "--check", path]));
+    // `parse`, which has no pool at all and runs a second recursion (the wire-JSON
+    // writer) on the same stack.
+    assert_reached_a_verdict("parse <path>", &tsv(&["parse", path]));
+    assert_reached_a_verdict(
+        "parse --content",
+        &tsv(&["parse", "--parser", "typescript", "--content", &src]),
+    );
+}
+
+/// The Unix half of the reservation check: the same depth under a **1 MiB** main-thread
+/// stack, which is what Windows gives every process and what `ulimit -s` can reproduce
+/// here.
+///
+/// Without this the sibling test above is vacuous on Linux and macOS — a dev box hands
+/// the main thread 8 MiB or more, which already clears [`NESTED_DEPTH`] whether or not
+/// the reservation is in effect, so only the Windows CI leg would ever grade it. Under
+/// 1 MiB the inherited stack reaches under 30 levels in this profile, so a route that
+/// lost its reservation aborts here instead.
+///
+/// `ulimit` is a shell builtin, so this shells out; a machine without a working
+/// `sh -c 'ulimit -s'` skips rather than fails, since the property under test is the
+/// binary's, not the shell's.
+#[cfg(unix)]
+#[test]
+fn test_deeply_nested_input_survives_a_1mib_main_stack() {
+    let src = deeply_nested_ts();
+    let bin = built_tsv();
+    let bin = bin.to_str().unwrap();
+
+    // Prove the harness itself works before trusting a pass out of it: a shell that
+    // silently ignores `ulimit -s` would make every assertion below vacuous.
+    let probe = Command::new("sh")
+        .args(["-c", "ulimit -s 1024 && ulimit -s"])
+        .output();
+    let Ok(probe) = probe else {
+        eprintln!("skipping: no usable `sh`");
+        return;
+    };
+    if String::from_utf8_lossy(&probe.stdout).trim() != "1024" {
+        eprintln!("skipping: `sh` did not apply `ulimit -s 1024`");
+        return;
+    }
+
+    for (label, args) in [
+        (
+            "format --content",
+            vec!["format", "--check", "--parser", "typescript", "--content"],
+        ),
+        (
+            "parse --content",
+            vec!["parse", "--parser", "typescript", "--content"],
+        ),
+    ] {
+        let mut argv = vec!["-c", "ulimit -s 1024; exec \"$@\"", "--", bin];
+        argv.extend_from_slice(&args);
+        argv.push(&src);
+        let out = Command::new("sh").args(&argv).output().unwrap();
+        assert_reached_a_verdict(&format!("{label} @ 1 MiB"), &out);
+    }
+}
