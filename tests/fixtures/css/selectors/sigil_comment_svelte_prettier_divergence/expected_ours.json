@@ -1,0 +1,412 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 558,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 49,
+					"end": 61,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 49,
+							"end": 61,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "cls",
+											"start": 49,
+											"end": 61
+										}
+									],
+									"start": 49,
+									"end": 61
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 62,
+					"end": 80,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 66,
+							"end": 76,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 49,
+				"end": 80
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 130,
+					"end": 144,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 130,
+							"end": 144,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 130,
+											"end": 144
+										}
+									],
+									"start": 130,
+									"end": 144
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 145,
+					"end": 164,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 149,
+							"end": 160,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 130,
+				"end": 164
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 217,
+					"end": 233,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 217,
+							"end": 233,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "before",
+											"start": 217,
+											"end": 233
+										}
+									],
+									"start": 217,
+									"end": 233
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 234,
+					"end": 254,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 238,
+							"end": 250,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 217,
+				"end": 254
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 307,
+					"end": 323,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 307,
+							"end": 323,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "before",
+											"start": 307,
+											"end": 323
+										}
+									],
+									"start": 307,
+									"end": 323
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 324,
+					"end": 343,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 328,
+							"end": 339,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 307,
+				"end": 343
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 405,
+					"end": 421,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 405,
+							"end": 421,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "not",
+											"args": {
+												"type": "SelectorList",
+												"start": 418,
+												"end": 420,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 418,
+														"end": 420,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "a",
+																		"start": 418,
+																		"end": 420
+																	}
+																],
+																"start": 418,
+																"end": 420
+															}
+														]
+													}
+												]
+											},
+											"start": 405,
+											"end": 421
+										}
+									],
+									"start": 405,
+									"end": 421
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 422,
+					"end": 441,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 426,
+							"end": 437,
+							"property": "color",
+							"value": "navy"
+						}
+					]
+				},
+				"start": 405,
+				"end": 441
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 514,
+					"end": 528,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 514,
+							"end": 528,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 514,
+											"end": 528
+										}
+									],
+									"start": 514,
+									"end": 528
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 529,
+					"end": 549,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 533,
+							"end": 545,
+							"property": "color",
+							"value": "olive"
+						}
+					]
+				},
+				"start": 514,
+				"end": 549
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " between the `.` and a class name ",
+				"start": 9,
+				"end": 47
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 50,
+				"end": 58
+			},
+			{
+				"type": "CSSComment",
+				"value": " between the `:` and a pseudo-class name ",
+				"start": 83,
+				"end": 128
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 131,
+				"end": 139
+			},
+			{
+				"type": "CSSComment",
+				"value": " between the `::` and a pseudo-element name ",
+				"start": 167,
+				"end": 215
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 219,
+				"end": 227
+			},
+			{
+				"type": "CSSComment",
+				"value": " between the two colons of a pseudo-element ",
+				"start": 257,
+				"end": 305
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 308,
+				"end": 316
+			},
+			{
+				"type": "CSSComment",
+				"value": " the functional form: the name still ends at the `(` ",
+				"start": 346,
+				"end": 403
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 406,
+				"end": 414
+			},
+			{
+				"type": "CSSComment",
+				"value": " the case fold acts on the NAME, never on the comment's content ",
+				"start": 444,
+				"end": 512
+			},
+			{
+				"type": "CSSComment",
+				"value": " C6 ",
+				"start": 515,
+				"end": 523
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 550,
+			"styles": "\n\t/* between the `.` and a class name */\n\t./* c1 */cls {\n\t\tcolor: red;\n\t}\n\n\t/* between the `:` and a pseudo-class name */\n\t:/* c2 */hover {\n\t\tcolor: blue;\n\t}\n\n\t/* between the `::` and a pseudo-element name */\n\t::/* c3 */before {\n\t\tcolor: green;\n\t}\n\n\t/* between the two colons of a pseudo-element */\n\t:/* c4 */:before {\n\t\tcolor: teal;\n\t}\n\n\t/* the functional form: the name still ends at the `(` */\n\t:/* c5 */not(.a) {\n\t\tcolor: navy;\n\t}\n\n\t/* the case fold acts on the NAME, never on the comment's content */\n\t:/* C6 */hover {\n\t\tcolor: olive;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 559,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

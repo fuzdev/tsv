@@ -9,6 +9,7 @@ Prettier: `col.selected||td` (spaces removed, Svelte parse error)
 
 Parser compat. Svelte's CSS parser requires spaces around `||` — without them it
 fails with "Expected a valid CSS identifier". tsv prioritizes Svelte
-compatibility. CSS Selectors Level 4 marks the column combinator as "At Risk".
+compatibility. The column combinator is specified in CSS Selectors Level 5 (Level 4
+moved it out), where it is still unimplemented by browsers.
 See
 [conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).

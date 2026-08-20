@@ -1,0 +1,1110 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1343,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An assignment target's `.prop` lookups never break — prettier's `printMemberExpression`",
+			"start": 10,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inlines every lookup when the assignment's left is not a plain identifier",
+			"start": 102,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (member.js `shouldInline`), so the whole target prints as one unbreakable unit.",
+			"start": 180,
+			"end": 262,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " What the rule measures is the target's own head, `<target> <operator>`.",
+			"start": 264,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " head exactly 100 — the value drops to its own line",
+			"start": 341,
+			"end": 394,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " head 101 — the target has no break point, so it stays intact and overflows",
+			"start": 504,
+			"end": 581,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Contrast: a computed lookup IS a break point, so an over-width head sheds width",
+			"start": 692,
+			"end": 774,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inside its own brackets",
+			"start": 776,
+			"end": 802,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The target has nowhere to break, so an unbreakable value stays welded to the",
+			"start": 916,
+			"end": 995,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " operator: 100 chars, then 101 chars overflowing rather than hanging the value",
+			"start": 997,
+			"end": 1077,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control: a target and value that fit",
+			"start": 1281,
+			"end": 1320,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 40
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1342,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1333,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 396,
+					"end": 501,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 396,
+						"end": 500,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 5
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 396,
+							"end": 492,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 97
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 396,
+								"end": 457,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 1
+									},
+									"end": {
+										"line": 8,
+										"column": 62
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 396,
+									"end": 426,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 1
+										},
+										"end": {
+											"line": 8,
+											"column": 31
+										}
+									},
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 427,
+									"end": 457,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 32
+										},
+										"end": {
+											"line": 8,
+											"column": 62
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 458,
+								"end": 492,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 63
+									},
+									"end": {
+										"line": 8,
+										"column": 97
+									}
+								},
+								"name": "cccccccccccccccccccccccccccccccccc"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 497,
+							"end": 500,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 5
+								}
+							},
+							"name": "eee"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An assignment target's `.prop` lookups never break — prettier's `printMemberExpression`",
+							"start": 10,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " inlines every lookup when the assignment's left is not a plain identifier",
+							"start": 102,
+							"end": 178
+						},
+						{
+							"type": "Line",
+							"value": " (member.js `shouldInline`), so the whole target prints as one unbreakable unit.",
+							"start": 180,
+							"end": 262
+						},
+						{
+							"type": "Line",
+							"value": " What the rule measures is the target's own head, `<target> <operator>`.",
+							"start": 264,
+							"end": 338
+						},
+						{
+							"type": "Line",
+							"value": " head exactly 100 — the value drops to its own line",
+							"start": 341,
+							"end": 394
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 583,
+					"end": 689,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 583,
+						"end": 688,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 5
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 583,
+							"end": 680,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 98
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 583,
+								"end": 644,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 1
+									},
+									"end": {
+										"line": 12,
+										"column": 62
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 583,
+									"end": 613,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 1
+										},
+										"end": {
+											"line": 12,
+											"column": 31
+										}
+									},
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 614,
+									"end": 644,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 32
+										},
+										"end": {
+											"line": 12,
+											"column": 62
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 645,
+								"end": 680,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 63
+									},
+									"end": {
+										"line": 12,
+										"column": 98
+									}
+								},
+								"name": "ccccccccccccccccccccccccccccccccccc"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 685,
+							"end": 688,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 5
+								}
+							},
+							"name": "eee"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " head 101 — the target has no break point, so it stays intact and overflows",
+							"start": 504,
+							"end": 581
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 804,
+					"end": 913,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 9
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 804,
+						"end": 912,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 19,
+								"column": 8
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 804,
+							"end": 906,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 804,
+								"end": 865,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 1
+									},
+									"end": {
+										"line": 17,
+										"column": 62
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 804,
+									"end": 834,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 1
+										},
+										"end": {
+											"line": 17,
+											"column": 31
+										}
+									},
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 835,
+									"end": 865,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 32
+										},
+										"end": {
+											"line": 17,
+											"column": 62
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Literal",
+								"start": 869,
+								"end": 903,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 36
+									}
+								},
+								"value": "cccccccccccccccccccccccccccccccc",
+								"raw": "'cccccccccccccccccccccccccccccccc'"
+							},
+							"computed": true,
+							"optional": false
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 909,
+							"end": 912,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 5
+								},
+								"end": {
+									"line": 19,
+									"column": 8
+								}
+							},
+							"name": "eee"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Contrast: a computed lookup IS a break point, so an over-width head sheds width",
+							"start": 692,
+							"end": 774
+						},
+						{
+							"type": "Line",
+							"value": " inside its own brackets",
+							"start": 776,
+							"end": 802
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1079,
+					"end": 1177,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 99
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1079,
+						"end": 1176,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 1
+							},
+							"end": {
+								"line": 23,
+								"column": 98
+							}
+						},
+						"operator": "+=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 1079,
+							"end": 1090,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 1
+								},
+								"end": {
+									"line": 23,
+									"column": 12
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 1079,
+								"end": 1086,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 1
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 1079,
+									"end": 1082,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 1
+										},
+										"end": {
+											"line": 23,
+											"column": 4
+										}
+									},
+									"name": "aaa"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1083,
+									"end": 1086,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 5
+										},
+										"end": {
+											"line": 23,
+											"column": 8
+										}
+									},
+									"name": "bbb"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1087,
+								"end": 1090,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 9
+									},
+									"end": {
+										"line": 23,
+										"column": 12
+									}
+								},
+								"name": "ccc"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "TemplateLiteral",
+							"start": 1094,
+							"end": 1176,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 16
+								},
+								"end": {
+									"line": 23,
+									"column": 98
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 1095,
+									"end": 1175,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 17
+										},
+										"end": {
+											"line": 23,
+											"column": 97
+										}
+									},
+									"value": {
+										"raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+										"cooked": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The target has nowhere to break, so an unbreakable value stays welded to the",
+							"start": 916,
+							"end": 995
+						},
+						{
+							"type": "Line",
+							"value": " operator: 100 chars, then 101 chars overflowing rather than hanging the value",
+							"start": 997,
+							"end": 1077
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1179,
+					"end": 1278,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 100
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1179,
+						"end": 1277,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 1
+							},
+							"end": {
+								"line": 24,
+								"column": 99
+							}
+						},
+						"operator": "+=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 1179,
+							"end": 1190,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 1
+								},
+								"end": {
+									"line": 24,
+									"column": 12
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 1179,
+								"end": 1186,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 1
+									},
+									"end": {
+										"line": 24,
+										"column": 8
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 1179,
+									"end": 1182,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 1
+										},
+										"end": {
+											"line": 24,
+											"column": 4
+										}
+									},
+									"name": "aaa"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1183,
+									"end": 1186,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 5
+										},
+										"end": {
+											"line": 24,
+											"column": 8
+										}
+									},
+									"name": "bbb"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1187,
+								"end": 1190,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 9
+									},
+									"end": {
+										"line": 24,
+										"column": 12
+									}
+								},
+								"name": "ccc"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "TemplateLiteral",
+							"start": 1194,
+							"end": 1277,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 16
+								},
+								"end": {
+									"line": 24,
+									"column": 99
+								}
+							},
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 1195,
+									"end": 1276,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 17
+										},
+										"end": {
+											"line": 24,
+											"column": 98
+										}
+									},
+									"value": {
+										"raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+										"cooked": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1322,
+					"end": 1332,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1322,
+						"end": 1331,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 10
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 1322,
+							"end": 1327,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 1
+								},
+								"end": {
+									"line": 27,
+									"column": 6
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 1322,
+								"end": 1325,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 1
+									},
+									"end": {
+										"line": 27,
+										"column": 4
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 1322,
+									"end": 1323,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 1
+										},
+										"end": {
+											"line": 27,
+											"column": 2
+										}
+									},
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1324,
+									"end": 1325,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 3
+										},
+										"end": {
+											"line": 27,
+											"column": 4
+										}
+									},
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1326,
+								"end": 1327,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 5
+									},
+									"end": {
+										"line": 27,
+										"column": 6
+									}
+								},
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1330,
+							"end": 1331,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 9
+								},
+								"end": {
+									"line": 27,
+									"column": 10
+								}
+							},
+							"name": "d"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a target and value that fit",
+							"start": 1281,
+							"end": 1320
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

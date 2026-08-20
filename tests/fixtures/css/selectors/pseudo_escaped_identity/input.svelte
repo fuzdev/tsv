@@ -9,4 +9,14 @@
 	::b\gar {
 		color: blue;
 	}
+
+	/* An identity-escaped `(` is part of the NAME: the function-token's `(` is the
+	   NEXT one, so the name runs past the escape rather than stopping at it. */
+	:foo\(bar(.x) {
+		color: green;
+	}
+
+	::baz\((.y) {
+		color: teal;
+	}
 </style>

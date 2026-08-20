@@ -335,6 +335,32 @@ pub struct Printer<'a> {
     /// [`Self::jsdoc_cast_value_gap_target`], whose per-gap marks overwrite each other.
     /// Span-keyed like it: a cast nested off the spine keeps its width-decided layout.
     pub(crate) jsdoc_cast_cannot_hang_target: Cell<Option<Span>>,
+    /// Span of the member chain that is an assignment **target**, whose `.prop` lookups
+    /// therefore carry no break point — prettier's `printMemberExpression` `shouldInline`
+    /// (member.js), the clause `firstNonMemberParent.type === "AssignmentExpression" &&
+    /// firstNonMemberParent.left.type !== "Identifier"`.
+    ///
+    /// The target is one unbreakable unit, so an over-width assignment breaks after the
+    /// operator instead of splitting the thing being assigned to — and, when the value is
+    /// unbreakable too, stays welded to the operator and overflows (`chooseLayout`'s
+    /// `!canBreakLeftDoc` gate, which the per-lookup groups were falsifying).
+    ///
+    /// Recorded by [`Printer::mark_inline_member_target`] and read once at the chain root
+    /// ([`Printer::member_target_inlines_lookups`]). Keyed by span and not consumed, like
+    /// the four targets above: a chain rebuilt across `conditional_group` variants must
+    /// answer the same way every time, and a same-shaped chain nested deeper — in a
+    /// computed index, or in the assignment's VALUE — has a different span and keeps its
+    /// width-driven break points. That last one is deliberate: prettier's `findAncestor`
+    /// walk is position-blind and inlines the value's chain too (`a.b = <long chain>`
+    /// overflows there), which is an artifact of the walk rather than the rule, and
+    /// against tsv's print-width stance — see `docs/conformance_prettier_ts.md`
+    /// §Assignment target member chains.
+    ///
+    /// A **computed** lookup is unaffected: its brackets are built by `computed_lookup_doc`,
+    /// which prettier also leaves breakable (`shouldInline` includes `node.computed` for the
+    /// break point *before* the `[`, never for the brackets themselves). That is what keeps
+    /// `canBreakLeftDoc` true for `params['key'] = …`.
+    pub(crate) inline_member_target: Cell<Option<Span>>,
     /// Start of an owned leading comment an **enclosing** node already claims, so the node
     /// beginning there must not claim it a second time
     /// ([`Printer::prepend_owned_leading_comment`]).
@@ -485,6 +511,7 @@ impl<'a> Printer<'a> {
             ternary_hang_target: Cell::new(None),
             jsdoc_cast_value_gap_target: Cell::new(None),
             jsdoc_cast_cannot_hang_target: Cell::new(None),
+            inline_member_target: Cell::new(None),
             claimed_owned_comment_start: Cell::new(None),
             claimed_shell_leading_run: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),

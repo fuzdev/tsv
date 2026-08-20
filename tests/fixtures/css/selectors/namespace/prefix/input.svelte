@@ -25,4 +25,14 @@
 	svg|text:hover {
 		text-decoration: underline;
 	}
+
+	/* An escaped `|` is part of the prefix's NAME, never the <wq-name> separator:
+	   the separator is the first `|` the escape rules leave as a delim. */
+	\||rect {
+		fill: purple;
+	}
+
+	a\7c b|circle {
+		fill: teal;
+	}
 </style>

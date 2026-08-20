@@ -85,9 +85,91 @@ pub(crate) fn comment_run_end(bytes: &[u8], i: usize) -> Option<usize> {
     Some(end)
 }
 
+/// The first offset in `[from, to)` that is neither whitespace nor inside a comment — where
+/// the region's next real token begins — or `to` when the region is nothing but trivia.
+///
+/// The composition of this module's rule with the lexer's whitespace set, and the single
+/// definition of it: every scanner that walks a *parsed* region looking for a token it has
+/// no span for (the declaration scanner's value bounds, the printer's attribute-selector
+/// rebuild) asks this rather than re-spelling the pair.
+///
+/// ⚠️ The whitespace set is the **lexer's** ([`crate::lexer::is_ascii_css_whitespace`], which carries the
+/// vertical tab to match `parseCss`), not [`crate::escapes`]'s §4.2 five. That is forced:
+/// the region was already tokenized, so a scanner stepping over "the whitespace the parser
+/// skipped" must use the set the parser skipped. Narrowing it stops the scan ON a vertical
+/// tab and mislocates the token behind it — which, in the attribute-selector rebuild, moved
+/// a comment across the matcher (`[attr\u{b}/* c */='value']` → `[attr= /* c */ 'value']`).
+///
+/// An unterminated comment yields `to`, so the caller stops at the bound rather than reading
+/// past it.
+pub(crate) fn skip_trivia_forward(bytes: &[u8], from: usize, to: usize) -> usize {
+    let mut i = from;
+    while i < to {
+        if crate::lexer::is_ascii_css_whitespace(bytes[i]) {
+            i += 1;
+        } else if is_comment_start(bytes, i) {
+            match comment_end_checked(bytes, i) {
+                Some(end) => i = end,
+                None => return to,
+            }
+        } else {
+            return i;
+        }
+    }
+    to
+}
+
+/// Where a pseudo selector's NAME begins, given the span that starts at its first `:` —
+/// past the colons and past any comment run glued to either of them.
+///
+/// selectors-4 forbids white space between a `<pseudo-class-selector>`'s / a
+/// `<pseudo-element-selector>`'s components, but a comment is no token at all
+/// (§4.3.2), so `:/* c */hover`, `::/* c */before` and `:/* c */:before` are all one
+/// selector. Every consumer of the name — the printer's case fold, the wire's
+/// half-decode, the scoping compiler's `:global` test — takes its start from here
+/// rather than assuming the sigil is one or two bytes wide.
+///
+/// Each step is ANCHORED at a known position rather than searching, which is what keeps
+/// it escape-proof: an escape can only begin where the name does, and `comment_run_end`
+/// answers `None` on a `\` (`.\/*x*/y` is an ident, not a comment).
+pub(crate) fn pseudo_name_start(bytes: &[u8], span_start: u32) -> u32 {
+    let mut i = span_start as usize + 1; // past the first `:`
+    i = comment_run_end(bytes, i).unwrap_or(i);
+    if bytes.get(i) == Some(&b':') {
+        i += 1;
+        i = comment_run_end(bytes, i).unwrap_or(i);
+    }
+    i as u32
+}
+
+/// Where a class selector's NAME begins — past the `.` and any comment run glued to it.
+///
+/// The one-juncture sibling of [`pseudo_name_start`], for the same selectors-4 rule
+/// ("between **any** of the components of a `<class-selector>`").
+pub(crate) fn class_name_start(bytes: &[u8], span_start: u32) -> u32 {
+    let i = span_start as usize + 1; // past the `.`
+    comment_run_end(bytes, i).unwrap_or(i) as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn skip_trivia_forward_uses_the_lexers_whitespace_set() {
+        // The vertical tab is whitespace to the lexer (parseCss parity) but not to
+        // `escapes`'s §4.2 set — a scan over a tokenized region must use the former, or it
+        // stops on the VT and reports it as the next token's start.
+        let src = b"attr/* c */='value'";
+        assert_eq!(skip_trivia_forward(src, 4, src.len()), 12);
+        assert_eq!(&src[12..13], b"=");
+        // The rest of the set, a glued run, and a trivia-only region.
+        assert_eq!(skip_trivia_forward(b"\t\n\r\x0c x", 0, 6), 5);
+        assert_eq!(skip_trivia_forward(b"/* a *//* b */x", 0, 15), 14);
+        assert_eq!(skip_trivia_forward(b"  /* a */ ", 0, 10), 10);
+        // An unterminated comment stops at the bound rather than running past it.
+        assert_eq!(skip_trivia_forward(b"/* a", 0, 4), 4);
+    }
 
     #[test]
     fn comment_end_spans_the_whole_comment() {

@@ -806,9 +806,10 @@ fn classify_relative(
     if simples.len() == 1
         && let SimpleSelector::PseudoClass {
             args: Some(args),
+            name_end,
             span,
         } = &simples[0]
-        && pseudo_name(span.extract(source)) == "global"
+        && is_global_name(source, *span, *name_end)
     {
         let inner = parse_global_args(args, source, keyframe_step)?;
         return Ok(ScopedRelative {
@@ -823,8 +824,12 @@ fn classify_relative(
 
     // BareGlobal: the compound leads with a bare `:global` (no args). `:global`
     // short-circuits the leaf to "matches", so the tail is unscoped but printed.
-    if let SimpleSelector::PseudoClass { args: None, span } = &simples[0]
-        && pseudo_name(span.extract(source)) == "global"
+    if let SimpleSelector::PseudoClass {
+        args: None,
+        name_end,
+        span,
+    } = &simples[0]
+        && is_global_name(source, *span, *name_end)
     {
         for simple in &simples[1..] {
             validate_bare_global_tail(simple, source)?;
@@ -878,10 +883,11 @@ fn parse_plain_compound(
             // refusing `CssUnsupportedSelector` (safe over-refusal, byte-unchanged).
             SimpleSelector::Percentage { .. } | SimpleSelector::Nth { .. } if keyframe_step => {}
             SimpleSelector::Universal {
-                namespace: None, ..
+                namespace_span: None,
+                ..
             } => predicates.push(Predicate::Universal),
             SimpleSelector::Type {
-                namespace: None,
+                namespace_span: None,
                 span,
             } => {
                 let name = span.extract(source);
@@ -890,7 +896,9 @@ fn parse_plain_compound(
                 predicates.push(Predicate::Type(name.to_string()));
             }
             SimpleSelector::Class { span } => {
-                let name = &span.extract(source)[1..];
+                let raw = span.extract(source);
+                refuse_if_comment(raw)?;
+                let name = &raw[1..];
                 refuse_if_escaped(name)?;
                 predicates.push(Predicate::Class(name.to_string()));
             }
@@ -900,7 +908,7 @@ fn parse_plain_compound(
                 predicates.push(Predicate::Id(name.to_string()));
             }
             SimpleSelector::Attribute {
-                namespace: None,
+                namespace_span: None,
                 name_span,
                 matcher,
                 value_span,
@@ -936,6 +944,7 @@ fn parse_plain_compound(
             }
             SimpleSelector::PseudoClass { span, .. } => {
                 let raw = span.extract(source);
+                refuse_if_comment(raw)?;
                 refuse_if_escaped(raw)?;
                 let name = pseudo_name(raw);
                 if name == "global" || REFUSED_PSEUDO_CLASSES.contains(&name.as_str()) {
@@ -943,6 +952,7 @@ fn parse_plain_compound(
                 }
             }
             SimpleSelector::PseudoElement { span, .. } => {
+                refuse_if_comment(span.extract(source))?;
                 refuse_if_escaped(span.extract(source))?;
             }
             _ => return Err(Refusal::CssUnsupportedSelector),
@@ -1027,7 +1037,11 @@ fn bare_global_strip(
 
 /// Whether `simple` is a `:global` pseudo-class (any form).
 fn is_global_pseudo(simple: &SimpleSelector<'_>, source: &str) -> bool {
-    matches!(simple, SimpleSelector::PseudoClass { span, .. } if pseudo_name(span.extract(source)) == "global")
+    matches!(
+        simple,
+        SimpleSelector::PseudoClass { name_end, span, .. }
+            if is_global_name(source, *span, *name_end)
+    )
 }
 
 /// Validate a simple selector that trails a bare `:global` in the same compound
@@ -1035,29 +1049,35 @@ fn is_global_pseudo(simple: &SimpleSelector<'_>, source: &str) -> bool {
 fn validate_bare_global_tail(simple: &SimpleSelector<'_>, source: &str) -> Result<(), Refusal> {
     match simple {
         SimpleSelector::Universal {
-            namespace: None, ..
+            namespace_span: None,
+            ..
         } => Ok(()),
         SimpleSelector::Type {
-            namespace: None,
+            namespace_span: None,
             span,
         } => {
             refuse_if_escaped(span.extract(source))?;
             refuse_if_non_ascii(span.extract(source))
         }
         SimpleSelector::Class { span } | SimpleSelector::Id { span } => {
+            refuse_if_comment(span.extract(source))?;
             refuse_if_escaped(span.extract(source))
         }
         SimpleSelector::Attribute {
-            namespace: None,
+            namespace_span: None,
             name_span,
             ..
         } => {
             refuse_if_escaped(name_span.extract(source))?;
             refuse_if_non_ascii(name_span.extract(source))
         }
-        SimpleSelector::PseudoElement { span, .. } => refuse_if_escaped(span.extract(source)),
+        SimpleSelector::PseudoElement { span, .. } => {
+            refuse_if_comment(span.extract(source))?;
+            refuse_if_escaped(span.extract(source))
+        }
         SimpleSelector::PseudoClass { span, .. } => {
             let raw = span.extract(source);
+            refuse_if_comment(raw)?;
             refuse_if_escaped(raw)?;
             let name = pseudo_name(raw);
             if name == "global" || REFUSED_PSEUDO_CLASSES.contains(&name.as_str()) {
@@ -1078,7 +1098,7 @@ fn compute_splice(simples: &[SimpleSelector<'_>]) -> Option<Splice> {
         match simple {
             SimpleSelector::PseudoClass { .. } | SimpleSelector::PseudoElement { .. } => continue,
             SimpleSelector::Universal {
-                namespace: None,
+                namespace_span: None,
                 span,
             } => {
                 return Some(Splice {
@@ -1111,6 +1131,28 @@ fn compute_splice(simples: &[SimpleSelector<'_>]) -> Option<Splice> {
 /// oracle-probed, and tsv reaches parity on each. A `str::trim` instead read the
 /// name as `:global` and took the global-handling path (strip / no hash) — an
 /// oracle-verified MISMATCH.
+/// Whether a pseudo-class's name is `global`, read from the parser's `name_end` rather
+/// than from a scan of the span for `(`.
+///
+/// The three `:global` predicates are the ones [`pseudo_name`]'s scan cannot serve: they
+/// run *before* [`refuse_if_escaped`], so the name may still hold an identity-escaped `(`
+/// (`:global\((x)`) that a scan would take for the argument list's. The answer happens to
+/// come out the same (a truncated name never equals `global`, and Svelte's own compiler
+/// reads that spelling as non-global too), but the question has one answer in the crate —
+/// and this one allocates nothing.
+fn is_global_name(source: &str, span: Span, name_end: u32) -> bool {
+    Span {
+        start: span.start,
+        end: name_end,
+    }
+    .extract(source)
+    .trim_start_matches(':')
+    .trim_matches(is_css_whitespace)
+    .eq_ignore_ascii_case("global")
+}
+
+/// The lowercased name of a pseudo-class whose raw text is already known escape-free
+/// (every caller runs [`refuse_if_escaped`] first), so scanning it for `(` is sound.
 fn pseudo_name(raw: &str) -> String {
     let stripped = raw.trim_start_matches(':');
     let end = stripped.find('(').unwrap_or(stripped.len());
@@ -1121,6 +1163,22 @@ fn pseudo_name(raw: &str) -> String {
 
 fn flags_has(flags: Option<&str>, ch: char) -> bool {
     flags.is_some_and(|f| f.contains(ch))
+}
+
+/// Refuse a selector name that carries a `/* */` comment glued to its sigil
+/// (`./* c */cls`, `:/* c */hover`, `::/* c */:before`).
+///
+/// tsv accepts those — selectors-4 forbids only a `<whitespace-token>` between a
+/// `<class-selector>`'s or a pseudo selector's components, and a comment is no token —
+/// but `parseCss` rejects them, so the ORACLE never compiles such a component. Compiling
+/// it here would be an over-acceptance, the refusal contract's own bug class. The check
+/// rides the name slice each caller already extracts, so it costs one `memchr`-shaped
+/// scan over a few bytes and cannot over-refuse: no other construct can put `/*` there.
+fn refuse_if_comment(text: &str) -> Result<(), Refusal> {
+    if text.contains("/*") {
+        return Err(Refusal::CssUnsupportedSelector);
+    }
+    Ok(())
 }
 
 fn refuse_if_escaped(text: &str) -> Result<(), Refusal> {

@@ -103,18 +103,6 @@ const ALLOW: &[Allow] = &[
         "comment-marker",
     ),
     (
-        "tsv_css/src/ast/convert/mod.rs",
-        "raw.find('(').map_or(span.end, |i| span.start + i as u32)",
-        "css-value",
-    ),
-    (
-        // The wire-JSON writer's namespace-prefix scan (a `|` in a bounded
-        // selector-name slice — no enclosed comment/string possible).
-        "tsv_css/src/ast/convert/write.rs",
-        "let prefix = raw.find('|').map_or(0, |i| i + 1);",
-        "css-value",
-    ),
-    (
         "tsv_css/src/printer/value_normalization/colors.rs",
         "if let Some(open_paren) = raw.find('(') {",
         "css-value",

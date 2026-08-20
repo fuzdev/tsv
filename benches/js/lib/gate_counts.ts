@@ -429,7 +429,18 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// own-line `// prettier-ignore`, the unary→operand head this cluster added. A/B'd against a
 	// HEAD worktree over the whole corpus: this is the ONLY mover in any bucket (the unknown
 	// lists are otherwise identical file-for-file, no new entry), SAFETY 0 both sides.
-	typescript: 106,
+	//
+	// 106 → 105 (`bug467`, the assignment-target member chain): `js/assignment/issue-1966.js`
+	// leaves for **match** — prettier's own regression test for this behavior, whose three
+	// cases are all a dotted target assigned an over-width value. An assignment target's
+	// `.prop` lookups now carry no break point (prettier's `printMemberExpression`
+	// `shouldInline`), so the target prints as one unbreakable unit and the assignment sheds
+	// width after the operator instead of splitting the thing being assigned to. A/B'd
+	// against the same tree with the mark disabled, over the whole corpus: this is the ONLY
+	// mover in any bucket (`match` 4416 → 4417, the unknown lists otherwise identical
+	// file-for-file, nothing arrived), and `partial` / `safety` / `errors` /
+	// `expected_errors` are byte-identical.
+	typescript: 105,
 	css: 23
 };
 

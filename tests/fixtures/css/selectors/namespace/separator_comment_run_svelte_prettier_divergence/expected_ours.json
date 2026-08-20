@@ -1,0 +1,230 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 447,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 154,
+					"end": 178,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 154,
+							"end": 178,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "rect",
+											"start": 154,
+											"end": 178
+										}
+									],
+									"start": 154,
+									"end": 178
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 179,
+					"end": 197,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 183,
+							"end": 193,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 154,
+				"end": 197
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 250,
+					"end": 276,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 250,
+							"end": 276,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 250,
+											"end": 276,
+											"name": "attr",
+											"matcher": null,
+											"value": null,
+											"flags": null,
+											"namespace": "svg"
+										}
+									],
+									"start": 250,
+									"end": 276
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 277,
+					"end": 296,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 281,
+							"end": 292,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 250,
+				"end": 296
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 386,
+					"end": 417,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 386,
+							"end": 417,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 386,
+											"end": 417,
+											"name": "attr",
+											"matcher": "~=",
+											"value": "value",
+											"flags": null
+										}
+									],
+									"start": 386,
+									"end": 417
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 418,
+					"end": 438,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 422,
+							"end": 434,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 386,
+				"end": 438
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a glued run stays glued: a space between the two comments would be a\n\t   <whitespace-token>, which selectors-4 forbids inside a <wq-name> ",
+				"start": 9,
+				"end": 152
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 157,
+				"end": 165
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 165,
+				"end": 173
+			},
+			{
+				"type": "CSSComment",
+				"value": " the attribute spelling of the same wq-name ",
+				"start": 200,
+				"end": 248
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 254,
+				"end": 262
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 262,
+				"end": 270
+			},
+			{
+				"type": "CSSComment",
+				"value": " and the <attr-matcher>'s own interior, whitespace-forbidden for the same reason ",
+				"start": 299,
+				"end": 384
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 392,
+				"end": 400
+			},
+			{
+				"type": "CSSComment",
+				"value": " c6 ",
+				"start": 400,
+				"end": 408
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 439,
+			"styles": "\n\t/* a glued run stays glued: a space between the two comments would be a\n\t   <whitespace-token>, which selectors-4 forbids inside a <wq-name> */\n\tsvg/* c1 *//* c2 */|rect {\n\t\tcolor: red;\n\t}\n\n\t/* the attribute spelling of the same wq-name */\n\t[svg/* c3 *//* c4 */|attr] {\n\t\tcolor: blue;\n\t}\n\n\t/* and the <attr-matcher>'s own interior, whitespace-forbidden for the same reason */\n\t[attr~/* c5 *//* c6 */='value'] {\n\t\tcolor: green;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 448,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

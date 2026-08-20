@@ -151,6 +151,12 @@ impl<'a> Printer<'a> {
         // though the public AST drops it from a simple `=` left. The shared target
         // seam also emits the `^`→left gap — the authored `(`'s interior, which no
         // other emitter reaches.
+        //
+        // A member chain in target position prints its `.prop` lookups with no break
+        // point (prettier's `printMemberExpression` `shouldInline`), so the mark goes up
+        // before the target is built and the chain root reads it — see
+        // [`Printer::mark_inline_member_target`].
+        self.mark_inline_member_target(assign.left);
         let left_doc = self.build_shell_operand_doc(
             assign.span.start,
             assign.left,
