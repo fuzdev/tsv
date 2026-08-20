@@ -435,15 +435,32 @@ export function generate_skipped_files_report(
 		return bench_diff !== 0 ? bench_diff : a.file_path.localeCompare(b.file_path);
 	});
 
-	const skips_by_lang = { svelte: 0, typescript: 0, css: 0 };
-	for (const { lang } of sorted_errors) {
-		if (lang !== 'other') skips_by_lang[lang]++;
-	}
+	// TWO counts, and on a real corpus they are far apart: `file_error_map` is keyed
+	// by path, `all_errors` by (path, error), so a file several impls reject splits
+	// into one entry per distinct MESSAGE — one file rejected by acorn, swc, oxc and
+	// tsc in four different words is four combinations. Printing the combination
+	// count under a `files` label therefore overstates how much of the corpus went
+	// unmeasured (on the conformance corpus, by about double), and the only way to
+	// catch it from the output is to difference the pre-flight intersection by hand.
+	// The file count answers "how much did we not measure"; the combination count is
+	// what the per-file detail below enumerates. Both, named.
+	const files_by_lang: Record<SkipLang, number> = { svelte: 0, typescript: 0, css: 0, other: 0 };
+	for (const file_path of file_error_map.keys()) files_by_lang[classify_lang(file_path)]++;
+	const combos_by_lang: Record<SkipLang, number> = { svelte: 0, typescript: 0, css: 0, other: 0 };
+	for (const { lang } of sorted_errors) combos_by_lang[lang]++;
 
-	lines.push(`Total unique file+error combinations: ${sorted_errors.length}`);
-	lines.push(`  Svelte:      ${skips_by_lang.svelte} files skipped`);
-	lines.push(`  TypeScript:  ${skips_by_lang.typescript} files skipped`);
-	lines.push(`  CSS:         ${skips_by_lang.css} files skipped`);
+	const skip_row = (label: string, files: number, combos: number) =>
+		`  ${label.padEnd(13)}${String(files).padStart(8)}${String(combos).padStart(20)}`;
+	lines.push(`${' '.repeat(15)}${'files'.padStart(8)}${'file+error combos'.padStart(20)}`);
+	lines.push(skip_row('Total:', file_error_map.size, sorted_errors.length));
+	lines.push(skip_row('Svelte:', files_by_lang.svelte, combos_by_lang.svelte));
+	lines.push(skip_row('TypeScript:', files_by_lang.typescript, combos_by_lang.typescript));
+	lines.push(skip_row('CSS:', files_by_lang.css, combos_by_lang.css));
+	// Only ever non-zero if a corpus entry yields an extension `classify_lang` doesn't
+	// name — silent otherwise, but never silently absent from the total it is inside.
+	if (files_by_lang.other > 0) {
+		lines.push(skip_row('Other:', files_by_lang.other, combos_by_lang.other));
+	}
 
 	// Per-benchmark skip counts (always shown). Display names instead of
 	// tracking_keys so the labels match the bench tables.
@@ -1626,10 +1643,19 @@ export function generate_skipped_files_markdown(
 	}
 	per_bench.sort((a, b) => b.skips - a.skips);
 
+	// Per-language FILE counts, beside the combination counts the buckets below hold:
+	// a file several impls reject with different messages is one file and several
+	// combinations, so the two differ by ~2x on the conformance corpus. See the
+	// terminal twin, `generate_skipped_files_report`.
+	const files_by_lang: Record<SkipLang, number> = { svelte: 0, typescript: 0, css: 0, other: 0 };
+	for (const file_path of file_error_map.keys()) files_by_lang[classify_lang(file_path)]++;
+
 	const lines: string[] = [];
 	lines.push('## Skipped Files\n');
 	lines.push(
-		`${all_errors.length} unique file+error combinations — Svelte ${by_lang.svelte.length}, TypeScript ${by_lang.typescript.length}, CSS ${by_lang.css.length}.\n`
+		`${file_error_map.size} files skipped, ${all_errors.length} unique file+error combinations — ` +
+			`Svelte ${files_by_lang.svelte}, TypeScript ${files_by_lang.typescript}, ` +
+			`CSS ${files_by_lang.css} files.\n`
 	);
 
 	if (per_bench.length > 0) {

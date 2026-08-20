@@ -188,6 +188,18 @@ export interface InitOptions {
 	logger?: Logger;
 }
 
+// Deliberately NOT surface-scoped: every impl initializes on every run, including
+// the format-only ones (biome, dprint, malva, rsvelte-fmt) on the parse-only
+// conformance surface, where they back no row. Gating init on `OPERATIONS` is the
+// obvious saving and it isn't worth taking — measured, the four cost ~233 ms total
+// (biome 187, dprint 23, malva 9, rsvelte-fmt 14) against a multi-minute run, and
+// two disclosures read the LIVE set rather than `complete`: `collect_binary_sizes`
+// gates each artifact on `impls.<key>`, so a skipped impl silently drops its row
+// from the published BINARY SIZES table (a catalog of what is on disk, which the
+// surface's operation list has no business thinning), and `get_alternative_versions`
+// feeds the report's `Versions:` line from the same set. The cost of the saving is a
+// thinner published report; the cost of not taking it is a fifth of a second.
+
 /**
  * Initialize one REQUIRED implementation, rethrowing when it can't load.
  *

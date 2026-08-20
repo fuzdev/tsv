@@ -65,7 +65,7 @@ export interface ExpectedErrorResult {
  * non-standard at-rules, front matter) so they cannot fire on the genuine
  * gaps tracked in Bucket A.
  */
-export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
+const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 	{
 		name: 'scss_style',
 		reason: "SCSS in <style> — Svelte's CSS parser doesn't support SCSS",

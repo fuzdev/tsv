@@ -46,7 +46,7 @@ import type { Language } from './types.ts';
  * language-independent (`tsv_ffi`'s `error_result` is one function for every
  * export), so one language proves the mechanism for all of them.
  */
-export const REJECT_PROBE_SOURCE = '<script>let x = ;</script>';
+const REJECT_PROBE_SOURCE = '<script>let x = ;</script>';
 
 /** The operations a tsv binding exposes, each of which is a published row. */
 export interface RejectProbeTarget {

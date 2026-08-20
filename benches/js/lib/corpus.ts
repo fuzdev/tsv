@@ -41,6 +41,15 @@ import type { Language, Logger, ParseGoal, SourceFile } from './types.ts';
 function detect_language(path: string): Language | null {
 	const ext = extname(path).toLowerCase();
 	switch (ext) {
+		// `.html` → svelte for `../prettier-plugin-svelte/test`, whose printer samples
+		// are `.html` files holding Svelte components — the extension is that suite's
+		// convention, not a claim about HTML. It reaches one other entry,
+		// `../prettier/tests/format/html`, where the files really are HTML documents:
+		// svelte/compiler rejects 40 of the 124 (harvested into the reject cache) and
+		// parses the rest, so 84 plain HTML files sit in the Svelte parse denominator
+		// at ~1.8% of it. Tolerated, not intended — Svelte's grammar is an HTML
+		// superset, so an accept there is a weaker claim than the rest of the set
+		// makes. The per-source coverage table keeps it separable.
 		case '.svelte':
 		case '.html':
 			return 'svelte';
