@@ -75,7 +75,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { type CorpusSource, DevReposLoader, group_by_language } from './lib/corpus.ts';
+import { type CorpusSource, DevReposLoader, format_mb, group_by_language } from './lib/corpus.ts';
 import { enrich_source_repos } from './lib/corpus_repos.ts';
 import { PERF_OMITS, type PerfOmit, perf_omit_matches, stale_perf_omits } from './lib/perf_omit.ts';
 import {
@@ -472,21 +472,12 @@ const bytes_by_language: Record<Language, number> = {
 /**
  * Format bytes/sec as MB/s. Always MB/s, even for sub-1-MB values
  * (renders as e.g. `0.4 MB/s`) so a column of throughput numbers scans
- * uniformly without unit-switching mid-table.
+ * uniformly without unit-switching mid-table. Decimal (1e6), the same convention
+ * as `lib/corpus.ts`'s `format_mb` — the corpus size and a rate over it are read
+ * against each other, so they cannot be denominated differently.
  */
 function format_throughput(bytes_per_sec: number): string {
 	return `${(bytes_per_sec / 1_000_000).toFixed(1)} MB/s`;
-}
-
-/**
- * Format bytes as MB with one decimal — corpus sizes, in the terminal summary and
- * in the markdown report's `**Corpus:**` line alike. Same always-MB convention as
- * `format_throughput` above, for the same reason, and ONE function because the two
- * surfaces report the same numbers: as a pair they were free to drift into
- * disagreeing about the corpus's size.
- */
-function format_mb(bytes: number): string {
-	return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
 // Compact corpus summary: file counts + MB per language + total. When
@@ -2522,7 +2513,8 @@ if (args.json) {
 
 	const effective_corpus_report = generate_effective_corpus_report(
 		effective_corpus_size,
-		task_tracking_by_group
+		task_tracking_by_group,
+		COVERAGE_ONLY
 	);
 	if (effective_corpus_report) {
 		console.log(effective_corpus_report);

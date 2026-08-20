@@ -1687,10 +1687,21 @@ export function generate_skipped_files_markdown(
  * (e.g. `svelte/compiler`, `tsv_wasm-internal`) instead of the tracking_key
  * suffix (e.g. `canonical`, `wasm-internal`) so the labels line up with
  * the bench tables.
+ *
+ * `coverage_only` re-frames the block for a run that skipped the timed phase
+ * (`BENCH_COVERAGE_ONLY=1`), where the same numbers answer a different question.
+ * A timed run prints them as a CAVEAT — implementations that swept unequal file
+ * sets can't be ranked against each other — but with nothing timed, the spread IS
+ * the measurement, and a fairness warning over it reads as a defect report on the
+ * surface's own deliverable. It also prints unconditionally there: this block is
+ * the coverage-only run's whole terminal result (the timed summary is suppressed),
+ * so a group at 100% across the board must still be shown rather than skipped as
+ * uneventful.
  */
 export function generate_effective_corpus_report(
 	effective_corpus_size: Map<string, EffectiveCorpusEntry>,
-	task_tracking_by_group?: Map<string, Map<string, string>>
+	task_tracking_by_group?: Map<string, Map<string, string>>,
+	coverage_only = false
 ): string | null {
 	// Check if any benchmarks had skipped files
 	let has_skips = false;
@@ -1701,7 +1712,7 @@ export function generate_effective_corpus_report(
 		}
 	}
 
-	if (!has_skips) return null;
+	if (!has_skips && !coverage_only) return null;
 
 	// Build tracking_key → display_name lookup
 	const tracking_to_display = new Map<string, string>();
@@ -1716,10 +1727,17 @@ export function generate_effective_corpus_report(
 	const lines: string[] = [];
 	lines.push('');
 	lines.push('-'.repeat(80));
-	lines.push('EFFECTIVE CORPUS SIZE (files actually processed per iteration):');
-	lines.push('');
-	lines.push('⚠️  Some benchmarks processed fewer files due to errors.');
-	lines.push('   Comparisons between implementations with different skip rates may be unfair.');
+	if (coverage_only) {
+		lines.push('COVERAGE (files each implementation accepted):');
+		lines.push('');
+		lines.push('   Differing accept rates are the measurement here, not a hazard to it:');
+		lines.push('   no throughput was timed, so nothing is being compared over unequal work.');
+	} else {
+		lines.push('EFFECTIVE CORPUS SIZE (files actually processed per iteration):');
+		lines.push('');
+		lines.push('⚠️  Some benchmarks processed fewer files due to errors.');
+		lines.push('   Comparisons between implementations with different skip rates may be unfair.');
+	}
 	lines.push('');
 
 	// Group by operation/language
@@ -1749,7 +1767,7 @@ export function generate_effective_corpus_report(
 	for (const [group_name, impls] of grouped) {
 		const entries = Array.from(impls.entries());
 		const any_skips = entries.some(([, e]) => e.processed < e.total);
-		if (!any_skips) continue;
+		if (!any_skips && !coverage_only) continue;
 
 		lines.push(`  ${group_name}:`);
 		for (const [label, entry] of entries) {

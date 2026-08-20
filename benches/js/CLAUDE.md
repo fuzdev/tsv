@@ -1082,15 +1082,18 @@ catalogued.
 
 Two surfaces summarize what was skipped: the **effective corpus report** (per-benchmark
 coverage rate, e.g. `⚠ biome 500/660 files (76%)`) and the **skipped files report**
-(total + per-benchmark counts, always shown). Per-file detail (paths, error messages,
-failure sets) is opt-in via `--verbose`, since most universal-tsv failures are
-unsupported-syntax fixtures (SCSS in `.css`, JSX in `.js`, early-stage proposals).
-When verbose, entries sort ascending by failure-set size so rare / impl-specific
-failures land at the top, and the `Failed in:` line collapses to `all tsv variants`
-when the failure set matches the canonical 6-element pattern. All labels use display
-names (`tsv-json`, `acorn-typescript`) rather than internal trackingKeys. If an impl
-fails on many files (e.g. WASM panics corrupting internal state), the coverage report
-and skip counts make it visible without `--verbose`.
+(total + per-benchmark counts, always shown). A coverage-only run
+(`BENCH_COVERAGE_ONLY=1`) retitles the first `COVERAGE` and prints every group, skips
+or not: with no timed phase it is the run's whole terminal result, and the spread
+across impls is the measurement there rather than a fairness caveat on it. Per-file
+detail (paths, error messages, failure sets) is opt-in via `--verbose`, since most
+universal-tsv failures are unsupported-syntax fixtures (SCSS in `.css`, JSX in `.js`,
+early-stage proposals). When verbose, entries sort ascending by failure-set size so
+rare / impl-specific failures land at the top, and the `Failed in:` line collapses to
+`all tsv variants` when the failure set matches the canonical 6-element pattern. All
+labels use display names (`tsv-json`, `acorn-typescript`) rather than internal
+trackingKeys. If an impl fails on many files (e.g. WASM panics corrupting internal
+state), the coverage report and skip counts make it visible without `--verbose`.
 
 ## Known Issues
 
