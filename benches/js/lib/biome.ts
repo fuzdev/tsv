@@ -10,7 +10,7 @@ import type { BiomeVersions } from './versions.ts';
 // the WASM package at this module's import. The value import is deferred to
 // `init()` (see there) so a load-time crash can't escape the registry's skip.
 import type { Biome } from '@biomejs/js-api/bundler';
-import { assert_format_config_landed, FORMAT_CONFIG_PROBE } from './format_config_probe.ts';
+import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 
 /**
  * Biome implementation using WASM.
@@ -98,7 +98,21 @@ export class BiomeImplementation extends BaseImplementation {
 		// for this (`getConfigDiagnostics`); biome has none, so the check is
 		// behavioral. Routed through `format` rather than `formatContent` so the probe
 		// exercises the exact call the timed row makes.
-		assert_format_config_landed('biome', this.format(FORMAT_CONFIG_PROBE, 'typescript'));
+		//
+		// ONE probe PER LANGUAGE, because the config above is one section per language
+		// and each feeds a different row: a TypeScript-only probe proves the
+		// `javascript` section and leaves `css` and `html` — the CSS and svelte rows —
+		// free to un-pin silently, which is the failure this check exists to catch. The
+		// svelte pass doubles as the only guard on `experimentalFullSupportEnabled`:
+		// without it biome returns an EMPTY string for `.svelte`, which the timed row
+		// would otherwise score as a successful format.
+		for (const language of this.format_languages) {
+			assert_format_config_landed(
+				'biome',
+				language,
+				this.format(FORMAT_CONFIG_PROBES[language], language)
+			);
+		}
 	}
 
 	parse(_source: string, _language: Language): unknown {

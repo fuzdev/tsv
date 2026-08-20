@@ -194,8 +194,16 @@ export interface InitOptions {
  * Three impls take this path: `canonical` (the oracle every comparison is
  * against) and tsv's own `native` + `wasm` (the subject every caller of
  * `init_implementations` exists to measure or compare). A failure in any of them
- * is a broken tree — an unbuilt artifact, a corrupt bundle — not a machine coming
+ * is a broken tree — an unbuilt artifact, a corrupt bundle, or a self-check these
+ * three run that the alternatives' rows can't invalidate (`canonical`'s
+ * prettier-config probe, the tsv bindings' rejection probes) — not a machine coming
  * up short, so it must stop the run rather than join `unavailable`.
+ *
+ * That is the SAME rule `init_optional` follows, not a competing one: a failed
+ * self-check withdraws whatever it contaminates. For an alternative that is its own
+ * row, so the row goes to `unavailable`. For these three there is no row to
+ * withdraw — the baseline is what every other row is a ratio against, and tsv's
+ * bindings are the subject — so the contaminated unit is the whole run.
  *
  * Being fatal is also what lets their slots be non-`undefined` in
  * `ImplementationSet`. That was worth more than the tolerance it replaces: the

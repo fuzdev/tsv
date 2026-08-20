@@ -99,7 +99,13 @@ delta on the same row is the detector.
   whatever exists, so a fresh `report.deno.*` beside a stale `report.node.*` would
   otherwise read as a runtime effect; **mixed machines** (`mixed_machine`) when the
   siblings' hardware identity disagrees, since cross-runtime ratios are only
-  meaningful on same-box siblings; any row whose per-runtime intersections
+  meaningful on same-box siblings; **within-noise** deltas (`within_noise`), the
+  per-runtime cells whose difference is smaller than the combined cv of the two
+  means they divide — this report's whole subject is those deltas, and a ratio
+  inherits both means' noise while printing neither, so the cells that are NOT a
+  runtime effect are named (a reading aid, not a significance test — that is
+  `benchmark_baseline_compare`'s Welch job, on a run the composer never sees); any
+  row whose per-runtime intersections
   differ (`⚠ files a/b/c`) — each runtime times the files *its* impls passed
   preflight on, so unequal counts mean a sliver of the ratio is file-set, not
   runtime; and **partially measured** rows (`partial_rows`), which one sibling
@@ -108,8 +114,8 @@ delta on the same row is the detector.
   couldn't load, so a row added since a sibling was last run is named rather than
   left to the vintage banner. A runtime whose sibling predates the `unavailable`
   field is skipped there rather than accused: with nothing recorded, an absent row
-  can't be told from an unloadable impl. The conformance surface writes its own `report.conformance.node.*`,
-  outside the compose glob.
+  can't be told from an unloadable impl. The conformance surface writes its own
+  `report.conformance.node.*`, outside the compose glob.
 - **One bench body, runtime-detected.** `bench.ts` detects the runtime
   (`lib/runtime.ts` `current_runtime()`) and selects the runtime-specific artifacts.
   No forked entry; `bench:node:run` is literally `node benches/js/bench.ts`.
@@ -670,8 +676,9 @@ below, field for field and version note for version note, so a new top-level fie
 here is a change there too — it declares them optional and degrades on an older
 report, which is what makes the drift silent rather than loud.
 
-The committed JSON (per-runtime `version: 13` — the combined compose report carries its
-own `version: 10`; coverage-only runs add `coverage_by_source`) carries, beyond timing stats: top-level
+The committed JSON (per-runtime `version: 13` — the combined compose report carries
+its own `version: 11`; coverage-only runs add `coverage_by_source`) carries, beyond
+timing stats: top-level
 `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
 numbers are machine-relative, so this travels with them; excludes hostname and
 volatile fields so it doesn't churn); `corpus_kind` (`perf` | `conformance`);
@@ -692,8 +699,8 @@ ACCEPTED whose output the byte-parity check could not digest, as `{"<group>/<row
 count}` — the one known cause is a pathologically deep AST overflowing V8's
 recursive `JSON.stringify` (tsc's `binderBinaryExpressionStress.ts`), and it is the
 one field that records a measurement the run could NOT make, so a growing count is
-the byte check quietly covering less; top-level `variant_parity` records any same-engine pair (two bindings, or one
-binding under two options) whose
+the byte check quietly covering less; top-level `variant_parity` records any
+same-engine pair (two bindings, or one binding under two options) whose
 pre-flight accept sets disagreed (`[]` when healthy — a non-empty list in a
 committed report is a binding-boundary bug surfacing in the diff); top-level
 `unavailable` records each optional impl that failed to init, as `{impl, reason,
@@ -1004,8 +1011,10 @@ benches/js/
     ├── dprint.ts          # dprint WASM wrapper (TypeScript/JS only; the engine `deno fmt` runs)
     ├── ffi.ts             # Deno.dlopen bindings (NativeImplementation — Deno native)
     ├── fixtures_gate.ts   # Shared per-language parse-conformance gate engine
-    ├── format_config_probe.ts # Behavioral "did the pinned layout config LAND" check, shared by
-    │                      # the two format impls with no config-diagnostic channel (biome, oxfmt)
+    ├── format_config_probe.ts # Behavioral "did the pinned layout config LAND" check —
+    │                      # one probe source + grading arm PER LANGUAGE, shared by prettier
+    │                      # (the baseline) and the format impls with no config-diagnostic
+    │                      # channel (biome, oxfmt); unit-tested by format_config_probe_test.ts
     ├── gate_counts.ts     # Pinned gate counts — see ../../docs/gate_counts.md
     ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins)
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
@@ -1017,6 +1026,9 @@ benches/js/
     ├── perf_omit.ts       # PERF_OMITS — the only excused per-file failures on the perf view
     ├── postcss.ts         # postcss wrapper (parse-only, CSS — the parser behind prettier's CSS printer)
     ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
+    ├── reject_probe.ts    # Behavioral "does this binding still REPORT a rejection" check,
+    │                      # shared by tsv's three front-ends (FFI decides by error-envelope
+    │                      # prefix, so a changed envelope would fabricate 100% coverage)
     ├── report.ts          # Summary report generation
     ├── rsvelte.ts         # rsvelte-fmt wrapper (Svelte only; COVERAGE-ONLY, never timed)
     ├── rsvelte_parse.ts   # rsvelte PARSE wrapper (N-API addon — a DIFFERENT package from rsvelte.ts,

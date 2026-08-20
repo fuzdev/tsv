@@ -7,6 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { native_library_filename } from './runtime.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { assert_binding_reports_rejection } from './reject_probe.ts';
 
 // FFI symbol definitions.
 //
@@ -239,6 +240,11 @@ export class NativeImplementation extends BaseImplementation {
 				css: this.symbols.tsv_format_css as FfiFn
 			}
 		};
+
+		// This binding returns a STRING either way, so `check_error`'s envelope-prefix
+		// test is the only thing that tells a refusal from a formatted file. Prove it
+		// still fires — see `lib/reject_probe.ts`.
+		assert_binding_reports_rejection('tsv (FFI)', this);
 	}
 
 	private call_ffi(fn: FfiFn, source: string): string {

@@ -514,6 +514,28 @@ log(
 log(`  Total:       ${String(total_files).padEnd(11)} files (${format_mb(total_bytes)})`);
 log();
 
+// A run that measures NOTHING must not look like a run that measured everything.
+// Without this, a mistyped `BENCH_FILTER` (the values are path substrings, so a
+// typo matches nothing) loads every impl, "benchmarks" an empty corpus, writes a
+// report with no entries and exits 0 — the same vacuity the byte check and the
+// config probes each guard against, reached at the top level. Worse on the
+// unfiltered path: `is_limited` is false there, so an empty corpus (every entry
+// missing under BENCH_ALLOW_MISSING=1) would OVERWRITE the canonical report with an
+// empty one. Refuse before init, and name whichever knob emptied it, since the
+// corpus block above prints `0 of 773` without saying why.
+if (total_files === 0) {
+	const cause: string[] = [];
+	if (FILE_FILTER !== undefined) cause.push(`BENCH_FILTER=${FILE_FILTER} matched no path`);
+	if (MAX_FILES_PER_LANGUAGE !== undefined) cause.push(`BENCH_LIMIT=${MAX_FILES_PER_LANGUAGE}`);
+	console.error(
+		`Empty corpus — nothing to measure${cause.length > 0 ? `: ${cause.join(', ')}` : ''}.` +
+			(cause.length > 0
+				? '\n  The corpus loaded fine (see the counts above); the filter/limit removed every file.'
+				: '\n  Every corpus entry loaded zero files — check the paths above and `deno task doctor`.')
+	);
+	exit(1);
+}
+
 // Refuse to measure stale binaries (the `:run` tasks skip the rebuild). Which
 // artifacts this runtime executes — FFI or N-API, plus that runtime's WASM target
 // — is `check_executed_artifacts`'s subject; override with BENCH_STALE_OK=1.
@@ -966,13 +988,18 @@ const sibling_outputs_must_match = (name: string): boolean =>
  *
  * TOTAL by construction, and that is load-bearing rather than defensive: V8's
  * `JSON.stringify` recurses once per AST level, so a pathologically deep tree
- * overflows the stack — tsc's `binderBinaryExpressionStress.ts` is ~10k nested
- * binary expressions and does exactly that. The row PARSED that file and its
- * output is fine; there is simply no digest for it. A throw escaping here is
- * caught by the pre-flight's skip handler and recorded as the TOOL failing on a
- * file it actually handled — which is what it did, moving four rows' published
- * skip counts by one and, had such a file been in the perf corpus, arming
- * `enforce_perf_coverage` to hard-fail on a phantom.
+ * overflows the stack — tsc's `binderBinaryExpressionStress.ts` is 40 KB of nested
+ * binary expressions and does exactly that. Only the WRITER recurses: the same
+ * tree's `JSON.parse` is fine (V8's parser is iterative), which is why the row
+ * PARSED that file and its output is fine — there is simply no digest for it.
+ *
+ * A throw escaping here would be caught by the pre-flight's skip handler and
+ * recorded as the TOOL failing on a file it actually handled; and because the
+ * success set is added to BEFORE this point, the file would count as processed AND
+ * skipped at once — a phantom skip on all four byte-graded rows, and in the perf
+ * corpus a `enforce_perf_coverage` hard-fail on a file nothing failed. No committed
+ * report carries one: the byte-parity pass landed after the last conformance rerun,
+ * so the shape never reached a published number.
  */
 function output_digest(result: unknown): string | null {
 	if (result === undefined || result === null) return null;
@@ -1087,10 +1114,12 @@ function check_variant_parity(): void {
 			const sibling_digests = output_digests.get(sibling_key);
 			let output_mismatch = 0;
 			const output_mismatch_examples: string[] = [];
+			let output_compared = 0;
 			if (impl_digests && sibling_digests) {
 				for (const [path, digest] of impl_digests) {
 					const sibling_digest = sibling_digests.get(path);
 					if (sibling_digest === undefined) continue;
+					output_compared++;
 					if (sibling_digest === digest) continue;
 					output_mismatch++;
 					if (output_mismatch_examples.length < 3) output_mismatch_examples.push(path);
@@ -1120,13 +1149,42 @@ function check_variant_parity(): void {
 			// The byte check's blind spot, named where it applies. Not fatal — the row
 			// accepted the file and its output is fine — but a pair that grades fewer
 			// files than it accepted should say so rather than read as full coverage.
-			const ungraded = ungraded_digests.get(tracking_key);
-			if (ungraded !== undefined) {
+			//
+			// BOTH sides, because `same_engine_sibling_name` names one direction only:
+			// keying this on `tracking_key` alone warned about the base row and left the
+			// sibling's hole to the JSON, so stderr and `output_digest_ungraded` reported
+			// different totals for the same run (2 vs 4 on the conformance surface).
+			//
+			// The count is reported against what the pair actually COMPARED, not against
+			// the hole alone: `output_digest` is total by construction, so "graded
+			// nothing" is now reachable with both digest maps present — a state the
+			// vacuity arm above cannot see, since it tests that the maps EXIST. Saying
+			// `graded N of M` is what keeps `output_mismatch: 0` from quietly widening
+			// from "agreed" to "never asked".
+			for (const [row_name, key] of [
+				[name, tracking_key],
+				[sibling_name, sibling_key]
+			] as const) {
+				const ungraded = ungraded_digests.get(key);
+				if (ungraded === undefined) continue;
 				console.error(
-					`⚠ variant parity (${group_name}): ${name} accepted ${ungraded.count} file(s) whose ` +
-						`output could not be digested, so the byte check did not grade ${
-							ungraded.count === 1 ? 'it' : 'them'
-						} (first: ${ungraded.example}). Not a tool failure — see \`output_digest\`.`
+					`⚠ variant parity (${group_name}): ${row_name} accepted ${ungraded.count} file(s) whose ` +
+						`output could not be digested, so the byte check graded ${output_compared} of the ` +
+						`${shared} file(s) the pair shares (first ungraded: ${ungraded.example}). Not a tool ` +
+						`failure — see \`output_digest\`.`
+				);
+			}
+
+			// …and when it graded NOTHING at all, that is the vacuity arm's own question
+			// reached by the other road, so it takes the same posture minus the exit: a
+			// pair whose every shared file went ungraded proves nothing, but the cause is
+			// a runtime limit rather than harness drift (a lowered V8 stack would do it),
+			// and hard-failing the run on it would accuse tsv of a defect it doesn't have.
+			if (sibling_outputs_must_match(name) && shared > 0 && output_compared === 0) {
+				console.error(
+					`⚠ variant parity (${group_name}): ${name}/${sibling_name} is byte-graded and shares ` +
+						`${shared} accepted file(s), but graded NONE of them — every output was ungraded, ` +
+						`so this pair's byte check is a no-op this run. See \`output_digest\`.`
 				);
 			}
 
@@ -1154,7 +1212,14 @@ function check_variant_parity(): void {
 					`✗ variant parity (${group_name}): ${name} and ${sibling_name} produced DIFFERENT ` +
 						`OUTPUT on ${output_mismatch} file(s) both accepted. One engine, two bindings — this ` +
 						`is a marshalling or build-profile bug, not an engine difference. First:\n` +
-						output_mismatch_examples.map((path) => `    ${path}`).join('\n')
+						output_mismatch_examples.map((path) => `    ${path}`).join('\n') +
+						// Every other failure in this harness names the next action; this is the
+						// most serious one, and the outputs themselves are gone by now (the check
+						// keeps digests, not bytes), so the remedy is how to get them BACK.
+						`\n  Isolate: BENCH_FILTER=${output_mismatch_examples[0]} deno task bench:${RUNTIME}:run` +
+						`\n  Both sides are reachable per file from ${
+							RUNTIME === 'deno' ? 'lib/ffi.ts' : 'lib/napi.ts'
+						} and lib/wasm.ts; \`deno task smoke\` exercises the same two bindings.`
 				);
 			}
 		}
@@ -1216,6 +1281,46 @@ function compute_coverage_by_source(): CoverageBySource {
 let coverage_by_source: CoverageBySource | null = null;
 function get_coverage_by_source(): CoverageBySource {
 	return (coverage_by_source ??= compute_coverage_by_source());
+}
+
+/**
+ * The coefficient-of-variation above which a timed row's number is disclosed as
+ * UNSTABLE rather than published bare.
+ *
+ * Every other shortfall this report can carry says so — `unavailable`,
+ * `binary_sizes_absent`, `suppressed_noise`, `output_digest_ungraded`, the `⚠ files`
+ * per-group note. How stable the timing itself was is the one property that never
+ * did, and it is the property every published `Nx` rests on.
+ *
+ * 10% is ~3× the measured p90. Across the three committed perf reports (128 timed
+ * rows) cv runs median 1.0%, p90 3.1% — so ordinary variation is nowhere near this,
+ * and a row that trips it is doing something other than varying: the live outlier is
+ * `format/css/biome-wasm`, which measures a 0.3 MB corpus through a 44 MB wasm module
+ * and lands at 24% under Node while its Deno sibling sits at 3%. Deliberately tighter
+ * than `benchmark_baseline_compare`'s 30% noise gate, which answers a different
+ * question (is a REGRESSION real) on a run this one never makes: that path needs
+ * `--compare-baseline`, so a plain `deno task bench` reaches no stability check at all.
+ */
+const UNSTABLE_CV_THRESHOLD = 0.1;
+
+/**
+ * Timed rows whose measurement was too noisy to read at face value, worst first.
+ *
+ * Ratios are the report's product and each one divides two of these means, so an
+ * unstable row silently widens every comparison it appears in — including the
+ * cross-runtime table, whose whole subject is small per-runtime deltas.
+ */
+function unstable_rows(
+	data: Baseline
+): Array<{ label: string; cv: number; samples: number | null }> {
+	return data.entries
+		.filter((e) => e.cv !== null && e.cv >= UNSTABLE_CV_THRESHOLD)
+		.map((e) => ({
+			label: `${e.group}/${e.name}`,
+			cv: e.cv as number,
+			samples: e.sample_size ?? null
+		}))
+		.sort((a, b) => b.cv - a.cv);
 }
 
 /**
@@ -2189,6 +2294,29 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 		lines.push(generate_reconstruct_note(), '');
 	}
 
+	// Stability disclosure — see `UNSTABLE_CV_THRESHOLD`. Sits with the other
+	// shortfall sections rather than in the tables: it qualifies a number that is
+	// already printed, and a reader comparing two runtimes' columns needs to know
+	// which of them was measured on shaky ground.
+	const unstable = unstable_rows(data);
+	if (unstable.length > 0) {
+		lines.push('## Unstable Rows');
+		lines.push('');
+		lines.push(
+			`${unstable.length} timed row(s) varied more than ${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}% ` +
+				`across iterations (cv = std_dev / mean, post-outlier-removal). Every \`Nx\` involving one ` +
+				`of these divides an unstable mean — read it as approximate, and prefer re-running before ` +
+				`drawing a conclusion from it.`
+		);
+		lines.push('');
+		lines.push('| Row | cv | samples |');
+		lines.push('| --- | ---: | ---: |');
+		for (const u of unstable) {
+			lines.push(`| ${u.label} | ${(u.cv * 100).toFixed(1)}% | ${u.samples ?? '—'} |`);
+		}
+		lines.push('');
+	}
+
 	const skipped_markdown = generate_skipped_files_markdown(
 		skipped,
 		MAX_ERROR_MESSAGE_LENGTH,
@@ -2474,6 +2602,17 @@ if (write_report) {
 		log(
 			`  ⚠ size table missing ${results_data.binary_sizes_absent.length} artifact(s): ` +
 				`${results_data.binary_sizes_absent.join(', ')} (recorded in \`binary_sizes_absent\`)`
+		);
+	}
+	// Named here for the same reason as the two above: this file is about to be
+	// committed, and the shortfall it carries leaves no trace in the tables — an
+	// unstable row prints exactly like a stable one. See `UNSTABLE_CV_THRESHOLD`.
+	const unstable_published = unstable_rows(results_data);
+	if (unstable_published.length > 0) {
+		log(
+			`  ⚠ ${unstable_published.length} unstable row(s) (cv ≥ ${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}%): ` +
+				`${unstable_published.map((u) => `${u.label} ${(u.cv * 100).toFixed(0)}%`).join(', ')} ` +
+				`(per-entry \`cv\`; §Unstable Rows in the md)`
 		);
 	}
 } else {

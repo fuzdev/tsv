@@ -13,7 +13,7 @@ import {
 	type ParseGoal
 } from './types.ts';
 import type { OxcVersions } from './versions.ts';
-import { assert_format_config_landed, FORMAT_CONFIG_PROBE } from './format_config_probe.ts';
+import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 
 /**
  * One entry of an oxc `errors` array — the two fields this wrapper reads.
@@ -135,8 +135,10 @@ export function assert_oxc_rejects_invalid(
  * is what makes every format row do the same layout work. oxfmt's own printWidth
  * default is already 100 — pinned anyway so a future default change can't silently
  * skew the rows; singleQuote (default false), useTabs and trailingComma differ for
- * real. `init` proves all four LAND, because oxfmt ignores an unrecognized option
- * key silently (`lib/format_config_probe.ts`).
+ * real. `init` proves the three that differ LAND, because oxfmt ignores an
+ * unrecognized option key silently; a behavioral probe cannot falsify printWidth
+ * here precisely because 100 is already the default, which is also why it stays
+ * pinned — that assertion still sees a changed default (`lib/format_config_probe.ts`).
  *
  * Frozen, and `svelte` gets its own bag rather than a mutated copy: the shared
  * object outlives the call now, so the `options.svelte = {}` this replaced would
@@ -181,9 +183,26 @@ export class OxcImplementation extends BaseImplementation {
 		// Neither half of this impl reports a broken assumption on its own: oxc says
 		// nothing about its diagnostic vocabulary, and oxfmt accepts an unrecognized
 		// option key silently. Both are consumed through a cast, so prove them.
+		//
+		// ⚠️ One impl, two tools: either probe failing takes BOTH halves' rows down
+		// (the parse rows and the format rows), since the registry's unit of absence
+		// is the impl, not the row. Over-broad, and deliberately so — the alternative
+		// is a second registry entry per binding — and disclosed rather than silent:
+		// `unavailable[].rows` names every row the failure removed.
 		assert_oxc_rejects_invalid(this._parser, 'oxc-parser');
-		const probe = await this._formatter.format('file.ts', FORMAT_CONFIG_PROBE, OXFMT_OPTIONS);
-		assert_format_config_landed('oxfmt', probe.code);
+		// Per LANGUAGE, and through `format_async` rather than the raw module call:
+		// one options bag drives all three here (unlike biome's per-language sections),
+		// so the extra two are corroboration — but they run the exact call the timed
+		// row makes, which grades oxfmt's own diagnostics through `oxc_fatal_errors`,
+		// and the svelte pass is the standing proof that the pins reach oxfmt's
+		// bundled-prettier fallback (docs/benchmarks.md §Fairness caveats asserts it).
+		for (const language of this.format_languages) {
+			assert_format_config_landed(
+				'oxfmt',
+				language,
+				await this.format_async(FORMAT_CONFIG_PROBES[language], language)
+			);
+		}
 	}
 
 	readonly parse_languages: ReadonlyArray<Language> = ['typescript'];

@@ -282,8 +282,11 @@ export function generate_summary_report(
 		// - The Svelte pair: rsvelte's parser is the only third-party engine there,
 		//   and it matches `tsv-json` on BOTH axes — mechanism (each returns a compact
 		//   JSON string the caller parses, so both pay the identical serialize +
-		//   boundary + JSON.parse cost) and payload (within ~1.5% of tsv's bytes on a
-		//   real component). Deliberately NOT paired with the no-locations rows:
+		//   boundary + JSON.parse cost) and payload (-1.1% of tsv's bytes ACROSS THE
+		//   CORPUS — the axis a throughput ratio integrates over; per component the
+		//   spread is wider, p90 3% and up to 12%, so the aggregate is the claim.
+		//   Measured over 120 real components; re-measure on an rsvelte pin bump).
+		//   Deliberately NOT paired with the no-locations rows:
 		//   `skipExpressionLoc` is a different reduction from tsv's span-only wire
 		//   (see lib/rsvelte_parse.ts), which is also why that row is named for its
 		//   option rather than for tsv's.
@@ -661,10 +664,10 @@ const SWC_NOTE: FairnessNote = {
 const RSVELTE_PARSE_NOTE: FairnessNote = {
 	terminal: [
 		'  (rsvelte-parse returns a JSON string the caller parses — the identical mechanism',
-		'   tsv-json measures, and within ~1.5% of its payload, so this pair matches on both axes)'
+		'   tsv-json measures, and within ~1.5% of its payload corpus-wide, so this pair matches on both axes)'
 	],
 	markdown:
-		'rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload on a real component, so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire'
+		'rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload measured across the corpus (the axis a throughput ratio integrates; per component the spread is wider), so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire'
 };
 
 const POSTCSS_NOTE: FairnessNote = {

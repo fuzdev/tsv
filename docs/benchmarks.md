@@ -36,26 +36,44 @@ Things the published numbers measure that aren't quite what they look like.
   (`dprint.ts` `setConfig`; `quoteStyle: preferSingle` is the faithful analogue
   of prettier's `singleQuote: true`, which likewise switches quotes to avoid
   escaping, and `trailingCommas: never` fans out to dprint's 12 per-construct
-  keys), malva (`malva.ts`), and rsvelte-fmt (`rsvelte.ts`). Unmatched defaults (biome's width is 80; oxfmt and biome default to
-  double quotes) would make rows wrap/rewrite different amounts of code,
-  conflating config with engine speed. **Each of the four TIMED alternatives —
-  oxfmt, biome, dprint, malva — proves its pins actually LANDED** (rsvelte-fmt is
-  coverage-only, so its config can't move a ratio), because a silently-ignored key
-  produces
-  exactly that conflation with nothing in the report to show it: dprint and malva
-  fail init on a non-empty `getConfigDiagnostics()`, while biome's
-  `applyConfiguration` and oxfmt's per-call options bag accept an unknown key with
-  no throw and no diagnostic (verified — biome then falls back to width 80 + double
-  quotes + trailing commas, oxfmt to spaces + double quotes + trailing commas), so
-  those two are checked behaviorally: `init` formats one probe source whose output
-  differs under each pinned option and reads the answer back
-  (`lib/format_config_probe.ts` — one probe and one grader for both tools, so they
-  can't drift on what "landed" means). A tool whose pins stop landing goes ABSENT,
-  with the option named in the report's `unavailable`, rather than staying present
-  and publishing a number produced at some other tool's defaults. oxfmt's own width
-  default is already 100 —
-  pinned anyway so a default change can't silently skew the rows; the options
-  provably reach its bundled-prettier Svelte fallback too. `prettier` is the
+  keys), malva (`malva.ts`), and rsvelte-fmt (`rsvelte.ts`). Unmatched defaults
+  (biome's width is 80; oxfmt and biome default to double quotes) would make rows
+  wrap/rewrite different amounts of code, conflating config with engine speed.
+  **Every formatter whose config can move a ratio proves its pins actually
+  LANDED** — the four timed alternatives (oxfmt, biome, dprint, malva) *and*
+  `prettier` itself, which matters most: it is not one row among many but the
+  DENOMINATOR of every published `Nx`, and the oracle `corpus:compare:format`
+  grades tsv against, so a silent drop there moves every ratio in the report and
+  manufactures thousands of false divergences (verified: renaming prettier's four
+  options drops its output to 2-space indent, double quotes, width 80, with no
+  throw and no warning through the API). rsvelte-fmt is exempt as the one
+  coverage-only row — its config can't move a ratio. The check exists because a
+  silently-ignored key produces exactly that conflation with nothing in the report
+  to show it: dprint and malva fail init on a non-empty
+  `getConfigDiagnostics()`, while biome's `applyConfiguration` and oxfmt's per-call
+  options bag accept an unknown key with no throw and no diagnostic (verified —
+  biome then falls back to width 80 + double quotes + trailing commas, oxfmt to
+  spaces + double quotes + trailing commas), so those two are checked behaviorally:
+  `init` formats a probe source whose output differs under each pinned option and
+  reads the answer back (`lib/format_config_probe.ts` — one probe set and one grader
+  for both tools, so they can't drift on what "landed" means). **Per LANGUAGE**, not
+  per tool: biome's config is a stack of per-language sections
+  (`javascript`/`css`/`html`), each feeding a different row, so a TypeScript-only
+  probe would prove one section and leave the CSS and svelte rows free to un-pin
+  silently. The svelte probe doubles as the only guard on biome's
+  `html.experimentalFullSupportEnabled` — without it biome returns an EMPTY string
+  for `.svelte`, which the timed row would otherwise score as a successful format.
+  A tool whose pins stop landing goes ABSENT, with the option and the language named
+  in the report's `unavailable`, rather than staying present and publishing a number
+  produced at some other tool's defaults. `prettier`'s failure STOPS THE RUN instead,
+  and that is the same rule rather than a different one: a failed self-check
+  withdraws whatever the bad config contaminates, and the baseline has no row to
+  withdraw — every other row is a ratio against it. An option matching the tool's own default
+  is unfalsifiable this way and is pinned for the other reason — it still catches an
+  upstream DEFAULT change: biome already indents with tabs, and oxfmt's own width
+  default is already 100 (its probes do prove tabs, quotes and the trailing comma,
+  and the svelte one proves the options reach its bundled-prettier fallback).
+  `prettier` is the
   reference and `oxfmt` also targets prettier conformance, so `prettier` vs
   `oxfmt` is the closest to a same-output race; `tsv` tracks prettier closely but
   _intentionally diverges_ in documented cases (the `_prettier_divergence` fixtures
@@ -226,6 +244,20 @@ Things the published numbers measure that aren't quite what they look like.
   publishing numbers with the control quietly gone. Nothing here randomizes or
   interleaves task order — the settle bounds the carryover rather than eliminating
   order as a variable.
+- **Measurement stability is disclosed, not assumed.** Every published `Nx` divides
+  two means, so it inherits both means' noise — and nothing in the report used to
+  say how noisy either was. A per-runtime report now carries a **§Unstable Rows**
+  section for any row whose cv (`std_dev / mean`, post-outlier-removal) reaches 10%,
+  and the cross-runtime report names the **within-noise** deltas whose difference is
+  smaller than the combined cv of the two rows they divide. Both are reading aids,
+  not significance tests — the Welch test lives in `benchmark_baseline_compare` and
+  needs `--compare-baseline`, which a plain `deno task bench` never runs, so before
+  this a full bench reached no stability check at all. Calibration: across the three
+  committed reports (128 timed rows) cv runs median 1.0% / p90 3.1%, so 10% is ~3× the
+  p90 rather than a round number; the live outlier is `format/css/biome-wasm`, at 24%
+  under Node against 3% on its Deno sibling. Six of 44 node/deno deltas currently land
+  inside their noise, all of them at ~1.00x — i.e. today this confirms "no difference"
+  rather than overturning a reading.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the
@@ -414,7 +446,8 @@ prettier. Load-bearing on two axes:
   prettier-pipeline number in oxfmt packaging — read that one ratio accordingly.
   The report corroborates: oxfmt ≈ prettier on svelte (~1x), but ~28x prettier on
   css and ~14x on TS. Its pinned options are hoisted out of the per-call path and
-  proven to land at `init` (see the pinning bullet in
+  proven to land at `init` — once per language it formats, so the Svelte fallback's
+  own layout is proven too (see the pinning bullet in
   [Fairness caveats](#fairness-caveats)).
 - **biome (WASM)** — formatter/linter; TypeScript, JS, CSS, and Svelte (via
   biome's experimental HTML-superset support, `html.experimentalFullSupportEnabled`;
@@ -423,8 +456,11 @@ prettier. Load-bearing on two axes:
   Its per-language `formatter` sections inherit the top-level one and override it
   where they set a key (measured in both directions); each repeats the shared
   values anyway, so a rename reaching only the top-level block can't un-pin every
-  language at once. The pins are proven to land at `init` (see the pinning bullet
-  in [Fairness caveats](#fairness-caveats)).
+  language at once. The pins are proven to land at `init`, **per language** — the
+  sections are separate, so proving one proves only its own row, and the svelte
+  probe is also what catches a lost `experimentalFullSupportEnabled` (biome then
+  returns empty output, which a timed row reads as success). See the pinning bullet
+  in [Fairness caveats](#fairness-caveats).
 - **dprint (WASM)** — formatter; **TypeScript, JS only**. This is the engine
   **`deno fmt` runs** for TS/JS (`dprint-plugin-typescript`), loaded in-process as
   its Wasm plugin. Deliberately NOT a `deno fmt` subprocess row: that would exist
@@ -466,7 +502,9 @@ prettier. Load-bearing on two axes:
   measured against its own reference and nothing else. Two rows. `rsvelte-parse` is matched
   to `tsv-json` on **both** axes — mechanism (each returns a compact JSON string
   the caller `JSON.parse`s, so both pay the identical serialize + boundary + parse
-  cost) and payload (within ~1.5% of `tsv-json`'s bytes on a real component) —
+  cost) and payload (within ~1.5% of `tsv-json`'s bytes across the corpus — the
+  axis a throughput ratio integrates over; per component the spread is wider, p90
+  3% and up to 12%, so the aggregate is the claim) —
   which earns it a curated comparison line, the only one the Svelte surface has.
   Because rsvelte claims the same drop-in contract tsv does, the row is a
   conformance datum too: on that same component its AST differs from

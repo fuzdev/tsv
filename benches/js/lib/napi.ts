@@ -27,6 +27,7 @@ import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { native_library_filename } from './runtime.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { assert_binding_reports_rejection } from './reject_probe.ts';
 
 /** The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI). */
 export interface NapiAddon {
@@ -132,6 +133,10 @@ export class NapiImplementation extends BaseImplementation {
 				css: addon.format_css
 			}
 		};
+
+		// The addon throws natively today; probed anyway so the three bindings can't
+		// come to disagree about what surfacing a refusal MEANS — see `lib/reject_probe.ts`.
+		assert_binding_reports_rejection('tsv (N-API)', this);
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {

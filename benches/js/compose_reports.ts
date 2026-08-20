@@ -58,6 +58,15 @@ interface Entry {
 	ops_per_second: number | null;
 	files_iterated: number | null;
 	runtime: Runtime;
+	/**
+	 * Coefficient of variation (`std_dev_ns / mean_ns`, post-outlier-removal), or
+	 * null on a coverage-only row. Optional because siblings written before it was
+	 * folded here carry it in `entries[]` but this composer never read it.
+	 *
+	 * The one field this report needs that is not a number it prints: every cell
+	 * here is a RATIO of two sibling means, and a ratio inherits the noise of both.
+	 */
+	cv?: number | null;
 }
 
 /**
@@ -98,9 +107,29 @@ interface Report {
 const results_dir = fileURLToPath(new URL('./results/', import.meta.url));
 
 async function read_report(runtime: Runtime): Promise<Report | null> {
+	const path = `${results_dir}report.${runtime}.json`;
+	let text: string;
 	try {
-		return JSON.parse(await readFile(`${results_dir}report.${runtime}.json`, 'utf8')) as Report;
+		text = await readFile(path, 'utf8');
 	} catch {
+		// Absent is ordinary — the composer folds whatever exists, and a runtime
+		// nobody has run yet simply has no column.
+		return null;
+	}
+	try {
+		return JSON.parse(text) as Report;
+	} catch (e) {
+		// UNREADABLE is not the same claim as absent, and a catch-all made them one:
+		// an interrupted run leaves a truncated `report.<runtime>.json`, and folding
+		// it as "absent" drops that runtime from the table with nothing saying why —
+		// a report that silently measures two runtimes while its header still says
+		// the run covered three.
+		console.error(
+			`⚠ compose: ${path} exists but is not valid JSON (${
+				e instanceof Error ? e.message : String(e)
+			}) — treating ${runtime} as absent. Usually an interrupted run; re-run ` +
+				`\`deno task bench:${runtime}\` to rewrite it.`
+		);
 		return null;
 	}
 }
@@ -131,6 +160,8 @@ interface Row {
 	ops: Partial<Record<Runtime, number>>;
 	mean_ns: Partial<Record<Runtime, number>>;
 	files_iterated: Partial<Record<Runtime, number | null>>;
+	/** Per-runtime measurement noise, for `within_noise` below. */
+	cv: Partial<Record<Runtime, number>>;
 }
 
 const rows = new Map<string, Row>();
@@ -146,13 +177,14 @@ for (const r of present) {
 		const key = `${e.group}/${e.name}`;
 		let row = rows.get(key);
 		if (!row) {
-			row = { group: e.group, name: e.name, ops: {}, mean_ns: {}, files_iterated: {} };
+			row = { group: e.group, name: e.name, ops: {}, mean_ns: {}, files_iterated: {}, cv: {} };
 			rows.set(key, row);
 			order.push(key);
 		}
 		row.ops[r] = e.ops_per_second;
 		row.mean_ns[r] = e.mean_ns;
 		row.files_iterated[r] = e.files_iterated;
+		if (e.cv != null) row.cv[r] = e.cv;
 	}
 }
 
@@ -174,6 +206,25 @@ const sources = present.map((r) => ({
 	// "nothing missing" are different claims, and only one of them is safe to make.
 	unavailable: reports.get(r)!.unavailable ?? null
 }));
+
+/**
+ * Row names each sibling recorded as unavailable, or `null` when the sibling
+ * predates the field — "not recorded" and "nothing was missing" are different
+ * claims, and only one of them is safe to make.
+ *
+ * The ONE derivation of that fact. Both readers below take it from here rather
+ * than walking `sources` again: the folded disclosure (`unavailable_by_runtime`)
+ * and the staleness detector (`partial_rows`) ask the same question at different
+ * fidelities — the first collapses "not recorded" into "nothing missing", the
+ * second must not — and two walks would be free to drift on which one they meant.
+ * Insertion order is `sources` order, so the array below stays in runtime order.
+ */
+const unavailable_rows_by_runtime = new Map<Runtime, ReadonlySet<string> | null>(
+	sources.map((s) => [
+		s.runtime,
+		s.unavailable === null ? null : new Set(s.unavailable.flatMap((u) => u.rows ?? []))
+	])
+);
 
 /**
  * Every ROW a sibling recorded as unavailable, listed under the runtime that
@@ -198,23 +249,11 @@ const sources = present.map((r) => ({
  * still a shortfall of the machine that produced these reports, and the fold has no
  * row for it either way. The md line below is worded to cover both.
  */
-const unavailable_by_runtime = sources
-	.map((s) => ({ runtime: s.runtime, rows: (s.unavailable ?? []).flatMap((u) => u.rows ?? []) }))
-	.filter((entry) => entry.rows.length > 0);
+const unavailable_by_runtime = [...unavailable_rows_by_runtime].flatMap(([runtime, rows]) =>
+	rows === null || rows.size === 0 ? [] : [{ runtime, rows: [...rows] }]
+);
 const mixed_vintage =
 	new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}`)).size > 1;
-
-/**
- * Row names each sibling recorded as unavailable, or `null` when the sibling
- * predates the field — "not recorded" and "nothing was missing" are different
- * claims, and only one of them is safe to make.
- */
-const unavailable_rows_by_runtime = new Map<Runtime, ReadonlySet<string> | null>(
-	sources.map((s) => [
-		s.runtime,
-		s.unavailable === null ? null : new Set(s.unavailable.flatMap((u) => u.rows ?? []))
-	])
-);
 
 /**
  * Rows one sibling MEASURED that another doesn't carry at all, with no load failure
@@ -268,13 +307,59 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * names changed, and say what the new number means in one line below, so a consumer
  * can tell "this composer didn't record it" from "there was nothing to record".
  *
- * 10: `partial_rows[]` — rows one sibling measured that another doesn't carry, with
- * no recorded load failure to explain the gap (i.e. a stale sibling, not a machine
- * shortfall).
+ * 11: `within_noise[]` — per-runtime deltas smaller than the combined cv of the two
+ * measurements they divide, i.e. the cells that are not runtime effects. The first
+ * field here that qualifies a number this report prints rather than adding one.
  */
-const COMBINED_SCHEMA_VERSION = 10;
+const COMBINED_SCHEMA_VERSION = 11;
 
 // JSON: metadata + provenance per source + the comparison rows.
+/**
+ * Per-runtime deltas that are smaller than the noise of the two measurements they
+ * divide — i.e. the cells a reader must NOT read as a runtime effect.
+ *
+ * This report's stated subject is exactly those deltas ("A per-runtime delta on the
+ * same row is the signal"), and every cell is a ratio of two sibling means, so it
+ * inherits both means' noise while printing neither. A `1.15x` between two rows that
+ * each wobble 10% is not a runtime difference; a `1.15x` between two 1% rows is.
+ * Nothing here could tell them apart.
+ *
+ * The bar is the quadrature sum of the two rows' cv — the standard combination for
+ * independent relative errors, and deliberately a rough one: it is a READING AID,
+ * not a significance test (that is `benchmark_baseline_compare`'s Welch job, on a
+ * run this composer never sees). Rows missing a cv on either side are skipped
+ * rather than assumed quiet — a sibling predating the field would otherwise read as
+ * noiseless.
+ *
+ * Measured when this was written: across the three committed reports, 6 of 44
+ * node/deno deltas land inside their combined cv, and all six sit at ~1.00x — so
+ * this currently confirms "no difference" rather than overturning anything. It is
+ * here for the case it does overturn.
+ */
+const within_noise = order.flatMap((key) => {
+	const row = rows.get(key)!;
+	const cells: Array<{
+		group: string;
+		name: string;
+		runtime: Runtime;
+		delta: number;
+		noise: number;
+	}> = [];
+	const base_ops = row.ops[base_runtime];
+	const base_cv = row.cv[base_runtime];
+	if (base_ops === undefined || base_cv === undefined) return cells;
+	for (const r of present) {
+		if (r === base_runtime) continue;
+		const ops = row.ops[r];
+		const cv = row.cv[r];
+		if (ops === undefined || cv === undefined) continue;
+		const delta = Math.abs(ops / base_ops - 1);
+		const noise = Math.sqrt(base_cv ** 2 + cv ** 2);
+		if (delta < noise) cells.push({ group: row.group, name: row.name, runtime: r, delta, noise });
+	}
+	return cells;
+});
+
 const combined = {
 	version: COMBINED_SCHEMA_VERSION,
 	kind: 'combined' as const,
@@ -284,6 +369,7 @@ const combined = {
 	mixed_machine,
 	unavailable_by_runtime,
 	partial_rows,
+	within_noise,
 	sources,
 	rows: order.map((key) => {
 		const row = rows.get(key)!;
@@ -360,6 +446,21 @@ if (partial_rows.length > 0) {
 			'. Those runtimes recorded no load failure for the row, so its absence is unexplained — ' +
 			'usually a sibling report predating the row. Re-run the stale runtimes ' +
 			'(`deno task bench:perf`) before reading the ratios in its group.\n'
+	);
+}
+if (within_noise.length > 0) {
+	md.push(
+		`**Within noise:** ${within_noise.length} per-runtime delta(s) are smaller than the two ` +
+			"measurements' combined variation, so they are not runtime effects — " +
+			within_noise
+				.map(
+					(c) =>
+						`\`${c.group}/${c.name}\` ${c.runtime} (${(c.delta * 100).toFixed(1)}% vs ` +
+						`${(c.noise * 100).toFixed(1)}% noise)`
+				)
+				.join('; ') +
+			'. Read those cells as "no difference", and see each per-runtime report\'s §Unstable Rows ' +
+			'for the noisy row itself.\n'
 	);
 }
 md.push(

@@ -16,6 +16,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { wasm_target } from './runtime.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { assert_binding_reports_rejection } from './reject_probe.ts';
 
 /** The `{locations?, goal?}` options bag the parse exports take (`goal` is
  * TypeScript-only — the other languages reject the key). */
@@ -152,10 +153,19 @@ export class WasmImplementation extends BaseImplementation {
 				`tsv_wasm parse returned a ${typeof probe} — expected a materialized AST object`
 			);
 		}
+
+		// The bindings throw natively today; probed anyway so the three can't come to
+		// disagree about what surfacing a refusal MEANS — see `lib/reject_probe.ts`.
+		// The guard above asks what a SUCCESS returns; this asks what a REFUSAL does.
+		assert_binding_reports_rejection('tsv (WASM)', this);
 	}
 
-	// The `goal` option is TypeScript-only (the other languages reject the key),
-	// so it's withheld unless the language is typescript.
+	// `goal` is TypeScript's alone — the other languages reject a SET goal, not
+	// the key itself: `crates/tsv_wasm/src/lib.rs` declares `goal?: undefined` on
+	// `ParseOptions` precisely so one options bag can be forwarded to whichever
+	// export (the documented forwarding idiom `npm/cli.js` uses). So `parse` withholds
+	// the bag for tidiness, and `parse_no_locations` below spells the inapplicable
+	// goal `undefined` — both legal, neither one relying on the other's rule.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		return this.tables.parse[language](
 			source,

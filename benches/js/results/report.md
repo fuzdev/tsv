@@ -1,6 +1,6 @@
 # tsv benchmark results — cross-runtime
 
-**Generated:** 2026-08-20T02:58:53.429Z
+**Generated:** 2026-08-20T12:30:46.813Z
 
 **Runtimes:** deno, node, bun — each runtime’s full report is its `report.<runtime>.{json,md}` sibling.
 
@@ -11,6 +11,8 @@
 **Machine:** AMD Ryzen 5 PRO 7530U with Radeon Graphics · linux/x86_64
 
 **Not measured everywhere:** bun — oxc-parser-wasm, biome-wasm. The implementation behind each row failed to load on the runtime(s) named, so it contributes no measurement there — a row thinner than its neighbours, or missing outright, is a load failure rather than a speed result. The per-runtime report’s `unavailable` carries the impl and the cause.
+
+**Within noise:** 6 per-runtime delta(s) are smaller than the two measurements' combined variation, so they are not runtime effects — `parse/svelte/svelte/compiler` node (0.8% vs 4.4% noise); `format/svelte/prettier` node (2.3% vs 3.7% noise); `format/svelte/tsv` node (0.8% vs 1.5% noise); `parse/css/svelte/compiler` node (3.5% vs 5.5% noise); `parse/css/postcss` node (1.2% vs 4.3% noise); `format/css/oxfmt` node (0.1% vs 4.9% noise). Read those cells as "no difference", and see each per-runtime report's §Unstable Rows for the noisy row itself.
 
 A per-runtime delta on the same row is the signal: same engine, different runtime + binding boundary (Deno → FFI, Node/Bun → N-API). Ratios are vs `deno` (> 1 = faster than deno). A group (or row) flagged `⚠ files …` iterated *different per-runtime intersections* (each runtime times the files all its impls passed preflight on), so a sliver of the ratio can be file-set difference rather than runtime effect.
 

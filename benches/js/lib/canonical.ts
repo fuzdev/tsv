@@ -15,6 +15,7 @@ import {
 	type ParseGoal
 } from './types.ts';
 import type { CanonicalVersions } from './versions.ts';
+import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 
 /** Prettier module */
 interface PrettierModule {
@@ -24,16 +25,26 @@ interface PrettierModule {
 /** Parser function type */
 type ParserFn = (source: string) => unknown;
 
+/** Shared empty plugins array — hoisted so the timed loop doesn't allocate one per call. */
+const NO_PLUGINS: unknown[] = [];
+
 /**
  * Prettier formatting options, fixed to tsv's settings and passed explicitly on
  * every call. Mirrors the inline options in the fixture oracle
  * (`crates/tsv_debug/src/deno/sidecar.ts`), the source of truth for fixture
  * correctness — tsv ships no prettier config file, so the corpus oracle reads
- * none either. Keep these two option sets identical.
+ * none either. Keep these two option sets identical — `deno task pins:audit` gates
+ * it (a differing value OR a one-sided addition fails), so the invariant is checked
+ * rather than merely stated.
+ *
+ * `init` proves they LAND (`lib/format_config_probe.ts`). Prettier accepts an
+ * unrecognized option key SILENTLY — no throw, no warning through the API
+ * (verified: renaming all four drops the output to 2-space indent, double quotes,
+ * width 80) — and this bag is the one whose loss is worst, because it is not one
+ * row among many: it is the DENOMINATOR of every published `Nx`, and the divergence
+ * ORACLE `corpus:compare:format` grades tsv against. A silent drop here would move
+ * every ratio in the report and manufacture thousands of false divergences.
  */
-/** Shared empty plugins array — hoisted so the timed loop doesn't allocate one per call. */
-const NO_PLUGINS: unknown[] = [];
-
 const PRETTIER_OPTIONS = {
 	useTabs: true,
 	printWidth: 100,
@@ -119,6 +130,28 @@ export class CanonicalImplementation extends BaseImplementation {
 				return this.#svelte_compiler.parseCss(source);
 			}
 		};
+
+		// Assert the pins actually LANDED, per language — see `PRETTIER_OPTIONS`, and
+		// `lib/format_config_probe.ts` for why the check is behavioral. Prettier is the
+		// only impl here whose probe runs on all three languages for coverage rather
+		// than corroboration: each routes through a different printer (typescript,
+		// postcss, prettier-plugin-svelte), and the plugin is loaded separately, so the
+		// svelte pass is also the standing proof that the options reach it.
+		//
+		// This is `init_required`, so a failure STOPS THE RUN rather than dropping a
+		// row, and that is the same rule the optional impls follow, not a different one:
+		// a probe failure withdraws whatever the bad config contaminates. For an
+		// alternative that is its own row. For the baseline there is no row to withdraw
+		// — it is what every other row is a ratio against, and the oracle
+		// `corpus:compare:format` and the conformance driver grade tsv against — so the
+		// contaminated unit is the whole run.
+		for (const language of LANGUAGES) {
+			assert_format_config_landed(
+				'prettier',
+				language,
+				await this.format_async(FORMAT_CONFIG_PROBES[language], language)
+			);
+		}
 	}
 
 	/**
