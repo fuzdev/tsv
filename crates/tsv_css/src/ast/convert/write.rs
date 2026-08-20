@@ -34,7 +34,7 @@
 
 use super::super::internal;
 use super::{
-    WireComment, convert_prelude_to_string, pseudo_name_end, raw_selector_name, scan_to_terminator,
+    WireComment, convert_prelude_to_string, raw_selector_name, scan_to_terminator,
     selector_contains_invalid, split_declaration_svelte_compat, strip_css_comments_collecting,
 };
 use std::borrow::Cow;
@@ -509,21 +509,35 @@ fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ct
 /// Emit a simple selector (type/universal/class/id/nesting/attribute/pseudo/percentage).
 fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'_>, ctx: &Ctx<'_>) {
     match simple {
-        internal::SimpleSelector::Type { namespace, span } => {
-            let name = if namespace.is_none() {
-                raw_selector_name(ctx.source, *span, 0)
-            } else {
-                let raw = &ctx.source[span.start as usize..span.end as usize];
-                let prefix = raw.find('|').map_or(0, |i| i + 1);
-                raw_selector_name(ctx.source, *span, prefix)
+        internal::SimpleSelector::Type {
+            namespace_span,
+            span,
+        } => {
+            let name = match namespace_span {
+                None => raw_selector_name(ctx.source, *span, 0),
+                // Step forward from the prefix token rather than scanning for a `|`: the
+                // separator is the next non-trivia byte after the prefix, and the element
+                // name the next one after that. Both junctures may hold a comment
+                // (`svg/* c */|rect`, `svg|/* c */rect`), and the prefix itself may hold an
+                // escaped `|` (`a\|b|rect`) — a scan for the first `|` reads one as the
+                // separator and the rest as the name.
+                Some(prefix) => {
+                    let name_start = wq_name_start(ctx.source, *prefix, span.end);
+                    raw_selector_name(ctx.source, *span, name_start - span.start as usize)
+                }
             };
             write_named_selector(w, "TypeSelector", &name, *span, ctx);
         }
-        internal::SimpleSelector::Universal { namespace: _, span } => {
+        internal::SimpleSelector::Universal {
+            namespace_span: _,
+            span,
+        } => {
             write_named_selector(w, "TypeSelector", "*", *span, ctx);
         }
         internal::SimpleSelector::Class { span } => {
-            let name = raw_selector_name(ctx.source, *span, 1);
+            // Past the `.` AND any comment glued to it (`./* c */cls`) — never a bare `1`.
+            let name_start = crate::comments::class_name_start(ctx.source.as_bytes(), span.start);
+            let name = raw_selector_name(ctx.source, *span, (name_start - span.start) as usize);
             write_named_selector(w, "ClassSelector", &name, *span, ctx);
         }
         internal::SimpleSelector::Id { span } => {
@@ -534,7 +548,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             write_named_selector(w, "NestingSelector", "&", *span, ctx);
         }
         internal::SimpleSelector::Attribute {
-            namespace,
+            namespace_span,
             name_span,
             matcher,
             value_span,
@@ -547,7 +561,9 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // escapes stay encoded (`[a=x\27]` → `x\27`), so no decode here.
             let value = value_span.map(|s| internal::attribute_value_text(ctx.source, s));
             let flags = *flags;
-            let namespace = *namespace;
+            // Half-decoded from the prefix's own span, like every other selector name —
+            // `*` and the empty prefix fall out of the same slice.
+            let namespace = namespace_span.map(|ns| raw_selector_name(ctx.source, ns, 0));
             w.raw("{\"type\":\"AttributeSelector\",\"start\":");
             w.u32(ctx.pos(span.start));
             w.raw(",\"end\":");
@@ -562,18 +578,22 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             write_or_null(w, value.as_ref(), |w, v| w.string(v));
             w.raw(",\"flags\":");
             write_or_null(w, flags.as_ref(), |w, f| w.string(f));
-            if let Some(ns) = namespace {
+            if let Some(ns) = &namespace {
                 w.raw(",\"namespace\":");
                 w.string(ns);
             }
             w.raw("}");
         }
-        internal::SimpleSelector::PseudoClass { args, span } => {
+        internal::SimpleSelector::PseudoClass {
+            args,
+            name_end,
+            span,
+        } => {
             let name_span = Span {
-                start: span.start,
-                end: pseudo_name_end(ctx.source, *span, args.is_some()),
+                start: crate::comments::pseudo_name_start(ctx.source.as_bytes(), span.start),
+                end: *name_end,
             };
-            let name = raw_selector_name(ctx.source, name_span, 1);
+            let name = raw_selector_name(ctx.source, name_span, 0);
             w.raw("{\"type\":\"PseudoClassSelector\",\"name\":");
             w.string(&name);
             w.raw(",\"args\":");
@@ -584,15 +604,21 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.u32(ctx.pos(span.end));
             w.raw("}");
         }
-        internal::SimpleSelector::PseudoElement { args, span } => {
-            let name_end = pseudo_name_end(ctx.source, *span, args.is_some());
+        internal::SimpleSelector::PseudoElement {
+            args,
+            name_end,
+            span,
+        } => {
+            let name_end = *name_end;
+            // Past BOTH colons and any comment glued to either (`:/* c */:before`) —
+            // never a bare `2`.
             let name = raw_selector_name(
                 ctx.source,
                 Span {
-                    start: span.start,
+                    start: crate::comments::pseudo_name_start(ctx.source.as_bytes(), span.start),
                     end: name_end,
                 },
-                2,
+                0,
             );
             w.raw("{\"type\":\"PseudoElementSelector\",\"name\":");
             w.string(&name);
@@ -648,6 +674,20 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             unreachable!("Invalid selectors should be filtered in write_selector_list_filtered")
         }
     }
+}
+
+/// Where a `<wq-name>`'s element name begins, given its `<ns-prefix>`'s leading-token
+/// span: past the `|` that follows the prefix, and past any comment run on either side of
+/// it. Bounded by `limit` (the selector's own end).
+///
+/// Two [`crate::comments::skip_trivia_forward`] steps rather than a scan for `|`, because
+/// only the *first* `|` outside the prefix is the separator — an escaped one inside it
+/// (`a\|b|rect`) is part of the prefix's name.
+fn wq_name_start(source: &str, prefix: Span, limit: u32) -> usize {
+    let bytes = source.as_bytes();
+    let limit = limit as usize;
+    let pipe = crate::comments::skip_trivia_forward(bytes, prefix.end as usize, limit);
+    crate::comments::skip_trivia_forward(bytes, (pipe + 1).min(limit), limit)
 }
 
 /// The shared `{type, name, start, end}` shape (Type/Universal/Class/Id/Nesting).

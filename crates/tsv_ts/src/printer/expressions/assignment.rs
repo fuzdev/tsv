@@ -93,6 +93,39 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn jsdoc_cast_in_value_gap(&self, cast: &JsdocCast<'_>) -> bool {
         self.jsdoc_cast_value_gap_target.get() == Some(cast.span)
     }
+
+    /// Record that `left` is about to be built as an assignment **target**, so a member
+    /// chain there prints its `.prop` lookups with no break point
+    /// ([`Printer::inline_member_target`]).
+    ///
+    /// A plain identifier target clears the mark rather than leaving a stale one — the
+    /// same unconditional-set discipline as [`Self::mark_jsdoc_cast_value_gap`]. It is
+    /// also prettier's own condition: `shouldInline`'s assignment clause reads
+    /// `left.type !== "Identifier"`, so `a = <chain>` keeps the chain breakable while
+    /// `a.b = …` does not.
+    ///
+    /// The assignment **expression** is the only caller, because it is the only shape
+    /// prettier's clause names. A `for (a.b.c of …)` head is an assignment target in the
+    /// grammar's sense but not in `shouldInline`'s: its `firstNonMemberParent` is the
+    /// `ForOfStatement`, so prettier keeps those lookups breakable, and so does tsv.
+    ///
+    /// A destructuring target (`[a.b.c] = v`) declines through the span key rather than
+    /// this match: the mark records the *pattern's* span, which no chain inside it shares.
+    /// Prettier declines it too, one step earlier — the member's `firstNonMemberParent` is
+    /// the pattern, not the assignment.
+    pub(in crate::printer) fn mark_inline_member_target(&self, left: &Expression<'_>) {
+        self.inline_member_target.set(match left {
+            Expression::Identifier(_) => None,
+            _ => Some(left.span()),
+        });
+    }
+
+    /// Whether this chain is the assignment target [`Self::mark_inline_member_target`]
+    /// recorded — asked once at the chain root, before any node doc is built, so a nested
+    /// assignment inside the target (a computed index) cannot clear the mark first.
+    pub(in crate::printer) fn member_target_inlines_lookups(&self, chain_span: Span) -> bool {
+        self.inline_member_target.get() == Some(chain_span)
+    }
 }
 
 /// Whether the author gave a JSDoc cast's comment a line of its own — a newline on

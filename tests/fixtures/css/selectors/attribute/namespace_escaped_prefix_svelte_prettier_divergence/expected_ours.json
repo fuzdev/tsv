@@ -1,0 +1,199 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 338,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 98,
+					"end": 109,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 98,
+							"end": 109,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 98,
+											"end": 109,
+											"name": "attr",
+											"matcher": null,
+											"value": null,
+											"flags": null,
+											"namespace": "a\\|b"
+										}
+									],
+									"start": 98,
+									"end": 109
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 110,
+					"end": 128,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 114,
+							"end": 124,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 98,
+				"end": 128
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 174,
+					"end": 187,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 174,
+							"end": 187,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 174,
+											"end": 187,
+											"name": "attr",
+											"matcher": null,
+											"value": null,
+											"flags": null,
+											"namespace": "a|b"
+										}
+									],
+									"start": 174,
+									"end": 187
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 188,
+					"end": 207,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 192,
+							"end": 203,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 174,
+				"end": 207
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 295,
+					"end": 308,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 295,
+							"end": 308,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 295,
+											"end": 308,
+											"name": "attr",
+											"matcher": null,
+											"value": null,
+											"flags": null,
+											"namespace": "aAb"
+										}
+									],
+									"start": 295,
+									"end": 308
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 309,
+					"end": 329,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 313,
+							"end": 325,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 295,
+				"end": 329
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an identity-escaped `|` belongs to the prefix's NAME, not the <wq-name> separator ",
+				"start": 9,
+				"end": 96
+			},
+			{
+				"type": "CSSComment",
+				"value": " the hex spelling of the same prefix ",
+				"start": 131,
+				"end": 172
+			},
+			{
+				"type": "CSSComment",
+				"value": " an ordinary escape in the prefix survives verbatim, like the attribute name's ",
+				"start": 210,
+				"end": 293
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 330,
+			"styles": "\n\t/* an identity-escaped `|` belongs to the prefix's NAME, not the <wq-name> separator */\n\t[a\\|b|attr] {\n\t\tcolor: red;\n\t}\n\n\t/* the hex spelling of the same prefix */\n\t[a\\7c b|attr] {\n\t\tcolor: blue;\n\t}\n\n\t/* an ordinary escape in the prefix survives verbatim, like the attribute name's */\n\t[a\\41 b|attr] {\n\t\tcolor: green;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 339,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -695,6 +695,29 @@ impl<'a> Printer<'a> {
     /// column 0 with no post-hoc re-indent.
     pub(crate) fn comment_blocks_in_range(&self, start: u32, end: u32) -> String {
         let mut out = String::new();
+        self.push_comment_blocks_in_range(&mut out, start, end, " ");
+        out
+    }
+
+    /// [`Self::comment_blocks_in_range`] appended in place, with the run's own separator
+    /// named.
+    ///
+    /// Every ordinary gap joins single-spaced; the empty separator is for the
+    /// **whitespace-forbidden** selector gaps — the components of a `<wq-name>` or an
+    /// `<attr-matcher>` — where the space would be a `<whitespace-token>` the grammar
+    /// rejects, so a glued run must stay glued (the same rule that keeps
+    /// `.a/* c *//* d */.b` a compound).
+    ///
+    /// Appends rather than returning a `String` because the attribute selector's rebuild
+    /// asks this once per interior gap, into one buffer it is already building.
+    pub(crate) fn push_comment_blocks_in_range(
+        &self,
+        out: &mut String,
+        start: u32,
+        end: u32,
+        sep: &str,
+    ) {
+        let mut first = true;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             // The crate's other comment-emission seam (see `print_css_comment`). Sound to
             // record at build time: the CSS printer builds each doc once and renders it
@@ -702,14 +725,15 @@ impl<'a> Printer<'a> {
             #[cfg(feature = "comment_check")]
             tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
 
-            if !out.is_empty() {
-                out.push(' ');
+            if first {
+                first = false;
+            } else {
+                out.push_str(sep);
             }
             out.push_str("/*");
             out.push_str(comment.content(self.source));
             out.push_str("*/");
         }
-        out
     }
 
     /// Split the comments in `[start, end)` around `split_pos` (a delimiter byte

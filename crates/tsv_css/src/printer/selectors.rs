@@ -493,47 +493,45 @@ impl<'a> Printer<'a> {
     }
 
     /// Reconstruct an attribute selector (`[ns|name op 'value' flags]`) from source.
-    /// The name is emitted raw (escapes preserved — `[f\oo]` stays `[f\oo]`); the value
-    /// is re-quoted from its raw token like a declaration string (the delimiter that
-    /// needs fewer escapes wins, ties prefer single — matches prettier), except that a
-    /// bare value stays bare when quoting it would force a re-escape.
+    /// The namespace prefix and the name are emitted raw (escapes preserved — `[f\oo]`
+    /// stays `[f\oo]`, `[a\|b|attr]` keeps the escape that would otherwise read as the
+    /// `<wq-name>` separator); the value is re-quoted from its raw token like a
+    /// declaration string (the delimiter that needs fewer escapes wins, ties prefer
+    /// single — matches prettier), except that a bare value stays bare when quoting it
+    /// would force a re-escape.
+    ///
+    /// One probe splits the two builds: with no comment anywhere inside the selector
+    /// there is no gap to interleave and no part to locate, so
+    /// [`Self::build_commented_attribute_selector_text`] — and every scan it runs — is
+    /// skipped outright.
     fn build_attribute_selector_text(
         &self,
-        namespace: Option<&str>,
+        namespace_span: Option<Span>,
         name_span: Span,
         matcher: Option<internal::AttributeMatcher>,
         value_span: Option<Span>,
         flags: Option<&str>,
+        span: Span,
     ) -> String {
+        if has_comments_to_emit_in_range(self.comments, span.start, span.end) {
+            return self.build_commented_attribute_selector_text(
+                namespace_span,
+                name_span,
+                matcher,
+                value_span,
+                flags,
+                span,
+            );
+        }
         let mut result = String::from("[");
-        if let Some(ns) = namespace {
-            result.push_str(ns);
+        if let Some(ns) = namespace_span {
+            result.push_str(ns.extract(self.source));
             result.push('|');
         }
         result.push_str(name_span.extract(self.source));
         if let Some(m) = matcher {
             result.push_str(m.as_str());
-            if let Some(vs) = value_span {
-                match internal::attribute_value_quote_and_text(self.source, vs) {
-                    (Some(quote), interior) => {
-                        // Quoted value: optimal-quote re-quoting over the raw interior,
-                        // swapping only the quote escapes (`[a="it's"]` keeps its double
-                        // quotes, `[a='it\'s']` becomes `[a="it's"]`).
-                        result.push_str(&format_string_literal(interior, quote));
-                    }
-                    (None, raw) if raw.bytes().any(|b| b == b'\'' || b == b'"') => {
-                        // A quote character reaches a bare value only via an escape
-                        // (`[a=x\']`); wrapping it in quotes would need re-escaping, so
-                        // it stays bare (matches prettier).
-                        result.push_str(raw);
-                    }
-                    (None, raw) => {
-                        result.push('\'');
-                        result.push_str(raw);
-                        result.push('\'');
-                    }
-                }
-            }
+            self.push_attribute_value(&mut result, value_span);
         }
         if let Some(f) = flags {
             result.push(' ');
@@ -541,6 +539,200 @@ impl<'a> Printer<'a> {
         }
         result.push(']');
         result
+    }
+
+    /// [`Self::build_attribute_selector_text`] for a selector that holds a comment: the
+    /// same parts, with each interior gap's comments interleaved at their authored
+    /// position (the selector is REBUILT here, so nothing else can carry them).
+    ///
+    /// Two spacings apply, split by [`AttributeGap`]: the spacing-safe gaps pad, the
+    /// whitespace-forbidden ones glue. Only the gap holding the comment changes — every
+    /// other gap keeps its canonical (empty) spelling, which is what makes the output a
+    /// fixed point.
+    fn build_commented_attribute_selector_text(
+        &self,
+        namespace_span: Option<Span>,
+        name_span: Span,
+        matcher: Option<internal::AttributeMatcher>,
+        value_span: Option<Span>,
+        flags: Option<&str>,
+        span: Span,
+    ) -> String {
+        // The `]`, and so the far bound of every interior gap.
+        let close = span.end - 1;
+        let open = span.start + 1;
+
+        let mut result = String::from("[");
+        match namespace_span {
+            Some(ns) => {
+                // `<wq-name>` = `[<ident-token> | '*']? '|' <ident-token>`. The gaps around
+                // the `|` are whitespace-forbidden, so their comments glue; the gap between
+                // `[` and the prefix is spacing-safe like the rest of the interior.
+                self.push_attribute_gap_comments(
+                    &mut result,
+                    open,
+                    ns.start,
+                    AttributeGap::AFTER_OPEN,
+                );
+                // Verbatim, and the separator is then the next non-trivia byte past it —
+                // never a scan for `|`, which an escaped one inside the prefix
+                // (`[a\|b|attr]`) or one in a comment's content (`[svg/* | */|attr]`)
+                // would both answer wrong.
+                result.push_str(ns.extract(self.source));
+                let pipe = skip_gap_trivia(self.source, ns.end, name_span.start);
+                self.push_attribute_gap_comments(&mut result, ns.end, pipe, AttributeGap::Glued);
+                result.push('|');
+                self.push_attribute_gap_comments(
+                    &mut result,
+                    pipe + 1,
+                    name_span.start,
+                    AttributeGap::Glued,
+                );
+            }
+            None => {
+                self.push_attribute_gap_comments(
+                    &mut result,
+                    open,
+                    name_span.start,
+                    AttributeGap::AFTER_OPEN,
+                );
+            }
+        }
+        result.push_str(name_span.extract(self.source));
+
+        let value_end = value_span.map_or(name_span.end, |v| v.end);
+        match matcher {
+            Some(m) => {
+                let value_start = value_span.map_or(close, |v| v.start);
+                let m_start = skip_gap_trivia(self.source, name_span.end, value_start);
+                self.push_attribute_gap_comments(
+                    &mut result,
+                    name_span.end,
+                    m_start,
+                    AttributeGap::INTERIOR,
+                );
+                let text = m.as_str();
+                // A two-character matcher is two `<delim-token>`s, not one token: a comment
+                // may split it (glued), a `<whitespace-token>` may not — the parser rejects
+                // that, so the gap holds only comments.
+                let after_matcher = match text.strip_suffix('=').filter(|head| !head.is_empty()) {
+                    Some(head) => {
+                        let eq = skip_gap_trivia(self.source, m_start + 1, value_start);
+                        result.push_str(head);
+                        self.push_attribute_gap_comments(
+                            &mut result,
+                            m_start + 1,
+                            eq,
+                            AttributeGap::Glued,
+                        );
+                        result.push('=');
+                        eq + 1
+                    }
+                    None => {
+                        result.push_str(text);
+                        m_start + text.len() as u32
+                    }
+                };
+                self.push_attribute_gap_comments(
+                    &mut result,
+                    after_matcher,
+                    value_start,
+                    AttributeGap::INTERIOR,
+                );
+                self.push_attribute_value(&mut result, value_span);
+            }
+            // A bare presence selector has one interior gap left: name → `]`.
+            None => {
+                self.push_attribute_gap_comments(
+                    &mut result,
+                    name_span.end,
+                    close,
+                    AttributeGap::BEFORE_CLOSE,
+                );
+            }
+        }
+
+        if let Some(f) = flags {
+            // The flag token can hold no comment, so its start alone splits the tail
+            // into the comments that precede it and those that follow. A padded run
+            // supplies the flag's separator, so the plain space goes in only when the
+            // gap emitted nothing.
+            let flag_start = skip_gap_trivia(self.source, value_end, close);
+            if !self.push_attribute_gap_comments(
+                &mut result,
+                value_end,
+                flag_start,
+                AttributeGap::INTERIOR,
+            ) {
+                result.push(' ');
+            }
+            result.push_str(f);
+            self.push_attribute_gap_comments(
+                &mut result,
+                flag_start,
+                close,
+                AttributeGap::BEFORE_CLOSE,
+            );
+        } else if matcher.is_some() {
+            self.push_attribute_gap_comments(
+                &mut result,
+                value_end,
+                close,
+                AttributeGap::BEFORE_CLOSE,
+            );
+        }
+        result.push(']');
+        result
+    }
+
+    /// Append an attribute selector's value, re-quoted from its raw token.
+    fn push_attribute_value(&self, result: &mut String, value_span: Option<Span>) {
+        let Some(vs) = value_span else {
+            return;
+        };
+        match internal::attribute_value_quote_and_text(self.source, vs) {
+            (Some(quote), interior) => {
+                // Quoted value: optimal-quote re-quoting over the raw interior,
+                // swapping only the quote escapes (`[a="it's"]` keeps its double
+                // quotes, `[a='it\'s']` becomes `[a="it's"]`).
+                result.push_str(&format_string_literal(interior, quote));
+            }
+            (None, raw) if raw.bytes().any(|b| b == b'\'' || b == b'"') => {
+                // A quote character reaches a bare value only via an escape
+                // (`[a=x\']`); wrapping it in quotes would need re-escaping, so
+                // it stays bare (matches prettier).
+                result.push_str(raw);
+            }
+            (None, raw) => {
+                result.push('\'');
+                result.push_str(raw);
+                result.push('\'');
+            }
+        }
+    }
+
+    /// Append the comments in `[from, to)` to an attribute selector being rebuilt,
+    /// spaced per `gap`. Returns whether anything was emitted — a caller that owns its
+    /// own separator (the case flag's leading space) must not add one on top of a
+    /// padded run.
+    fn push_attribute_gap_comments(
+        &self,
+        result: &mut String,
+        from: u32,
+        to: u32,
+        gap: AttributeGap,
+    ) -> bool {
+        if from >= to || !has_comments_to_emit_in_range(self.comments, from, to) {
+            return false;
+        }
+        if gap.pad_before() {
+            result.push(' ');
+        }
+        self.push_comment_blocks_in_range(result, from, to, gap.separator());
+        if gap.pad_after() {
+            result.push(' ');
+        }
+        true
     }
 
     /// Fold a pseudo selector's `:name` / `::name` prefix to its canonical case,
@@ -551,36 +743,46 @@ impl<'a> Printer<'a> {
     /// case-insensitive pseudo keywords (`:HOVER` → `:hover`, `::-WEBKIT-` →
     /// `::-webkit-`) but preserves custom `:--Name` pseudos and, for an escaped
     /// name, folds only up to the escape's terminator whitespace (`:\4A b` →
-    /// `:\4a b`, keeping the literal `B` in `::\41 B`). With `has_args`, only the
-    /// part before `(` is the name.
-    fn pseudo_name_text(&self, span: Span, has_args: bool) -> Cow<'a, str> {
-        let raw = span.extract(self.source);
-        let name = if has_args {
-            raw.split_once('(').map_or(raw, |(before, _)| before)
-        } else {
-            raw
-        };
+    /// `:\4a b`, keeping the literal `B` in `::\41 B`).
+    ///
+    /// `name_end` comes from the parser (it equals `span.end` when there are no args),
+    /// never from a scan for `(`: an identity escape can put one inside the name
+    /// (`:foo\(bar(.x)`), where splitting at the first `(` truncates the name and drops
+    /// the rest of it from the output.
+    fn pseudo_name_text(&self, span: Span, name_end: u32) -> Cow<'a, str> {
+        let text = Span {
+            start: span.start,
+            end: name_end,
+        }
+        .extract(self.source);
+        // The sigil (`:` / `::`) and any comment glued to it are emitted verbatim; only
+        // what follows is a name that can fold. Splitting here rather than trimming `:`
+        // is what keeps a comment's CONTENT out of the fold (`:/* C */HOVER` must lower
+        // the name, never the comment).
+        let prefix_len = (crate::comments::pseudo_name_start(self.source.as_bytes(), span.start)
+            - span.start) as usize;
+        let (prefix, name) = text.split_at(prefix_len.min(text.len()));
         // A custom pseudo (`::--foo`) is emitted verbatim. Otherwise only the head
         // (up to the first whitespace) case-folds; a name whose head carries no
         // ASCII uppercase already IS its canonical form, so borrow the source slice
         // and skip the allocation — the overwhelmingly common case (`:where`,
         // `:hover`, `:root`, `:is`, `:not`). Every pseudo hits this path, so the
         // owned-String-then-pool-copy was the top CSS format-churn site.
-        let after_colons = name.trim_start_matches(':');
-        if after_colons.starts_with("--") {
-            return Cow::Borrowed(name);
+        if name.starts_with("--") {
+            return Cow::Borrowed(text);
         }
         let head_end = name
             .find(|c: char| c.is_ascii_whitespace())
             .unwrap_or(name.len());
         if name[..head_end].bytes().any(|b| b.is_ascii_uppercase()) {
             // Fold only the head; the tail (from the first whitespace on) is verbatim.
-            let mut out = String::with_capacity(name.len());
+            let mut out = String::with_capacity(text.len());
+            out.push_str(prefix);
             out.push_str(&name[..head_end].to_ascii_lowercase());
             out.push_str(&name[head_end..]);
             Cow::Owned(out)
         } else {
-            Cow::Borrowed(name)
+            Cow::Borrowed(text)
         }
     }
 
@@ -608,41 +810,70 @@ impl<'a> Printer<'a> {
                         return d.text_pooled(&text.to_ascii_lowercase());
                     }
                 }
+                // Only the NAMESPACED form's span can hold a comment — a `<wq-name>`
+                // separator one (`svg/* c */|rect`) — and it rides out inside the raw
+                // slice, so the range is declared to `tsv_lang::comment_ledger`. The gap
+                // emitters never see it: it sits INSIDE a simple selector's span, not in
+                // a boundary gap. The bare form's span is just its name (it ends at the
+                // NEXT token's start, and a glued comment IS that token), so the
+                // unconditional range stays tight.
+                #[cfg(feature = "comment_check")]
+                tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 self.span_leaf_doc(*span, is_last_in_compound)
             }
-            internal::SimpleSelector::Universal { namespace, .. } => match namespace {
-                Some(ns) => {
-                    let mut w = d.pool_writer();
-                    w.push_str(ns);
-                    w.push_str("|*");
-                    w.finish_text()
+            internal::SimpleSelector::Universal {
+                namespace_span,
+                span,
+            } => match namespace_span {
+                // The namespaced form is emitted from its own span rather than rebuilt
+                // from the prefix, so a `<wq-name>` separator comment (`|/* c */*`)
+                // survives glued. The span is exactly the prefix through the `*`; the
+                // bare `*` takes the constant instead, its span reaching to the NEXT
+                // token's start.
+                Some(_) => {
+                    #[cfg(feature = "comment_check")]
+                    tsv_lang::comment_ledger::record_verbatim_range(
+                        self.source,
+                        span.start,
+                        span.end,
+                    );
+                    self.span_leaf_doc(*span, is_last_in_compound)
                 }
                 None => d.text("*"),
             },
             internal::SimpleSelector::Class { span } => {
+                // A `.`-glued comment (`./* c */cls`) rides out inside the verbatim
+                // slice, like the `<wq-name>` separator's — see the `Type` arm.
+                #[cfg(feature = "comment_check")]
+                tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 self.span_leaf_doc(*span, is_last_in_compound)
             }
             internal::SimpleSelector::Id { span } => self.span_leaf_doc(*span, is_last_in_compound),
             internal::SimpleSelector::Attribute {
-                namespace,
+                namespace_span,
                 name_span,
                 matcher,
                 value_span,
                 flags,
-                ..
+                span,
             } => d.text_pooled(&self.build_attribute_selector_text(
-                *namespace,
+                *namespace_span,
                 *name_span,
                 *matcher,
                 *value_span,
                 *flags,
+                *span,
             )),
-            internal::SimpleSelector::PseudoClass { args, span } => {
-                self.build_pseudo_doc(*span, args.as_ref(), is_last_in_compound)
-            }
-            internal::SimpleSelector::PseudoElement { args, span } => {
-                self.build_pseudo_doc(*span, args.as_ref(), is_last_in_compound)
-            }
+            internal::SimpleSelector::PseudoClass {
+                args,
+                name_end,
+                span,
+            } => self.build_pseudo_doc(*span, *name_end, args.as_ref(), is_last_in_compound),
+            internal::SimpleSelector::PseudoElement {
+                args,
+                name_end,
+                span,
+            } => self.build_pseudo_doc(*span, *name_end, args.as_ref(), is_last_in_compound),
             internal::SimpleSelector::Nesting { .. } => d.text("&"),
             internal::SimpleSelector::Percentage { value, .. } => {
                 let mut w = d.pool_writer();
@@ -700,13 +931,23 @@ impl<'a> Printer<'a> {
     fn build_pseudo_doc(
         &self,
         span: Span,
+        name_end: u32,
         args: Option<&internal::PseudoClassArgs<'_>>,
         is_last_in_compound: bool,
     ) -> DocId {
         let d = self.d();
         match args {
             Some(args) => {
-                let name = self.pseudo_name_text(span, true);
+                // Unlike the no-args branch below, this one emits name + args rather than
+                // the whole span, so the sigil-glued comment inside `name` is declared on
+                // its own (`:/* c */not(.a)`).
+                #[cfg(feature = "comment_check")]
+                tsv_lang::comment_ledger::record_verbatim_range(
+                    self.source,
+                    span.start,
+                    crate::comments::pseudo_name_start(self.source.as_bytes(), span.start),
+                );
+                let name = self.pseudo_name_text(span, name_end);
                 d.concat(&[d.text_pooled(&name), self.build_pseudo_args_doc(args)])
             }
             None => {
@@ -723,7 +964,7 @@ impl<'a> Printer<'a> {
                 // `tsv_lang::comment_ledger`.
                 #[cfg(feature = "comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
-                let name = self.pseudo_name_text(span, false);
+                let name = self.pseudo_name_text(span, name_end);
                 let text = if is_last_in_compound {
                     crate::escapes::trim_end_preserving_escape(&name)
                 } else {
@@ -1047,6 +1288,71 @@ fn lowercase_an_plus_b_n(s: &str) -> Cow<'_, str> {
         rest = &rest[ch.len_utf8()..];
     }
     Cow::Owned(out)
+}
+
+/// How an attribute selector's interior gap spaces the comments it holds.
+///
+/// Two answers, and which one a gap takes is a grammar fact rather than a taste call.
+/// selectors-4 forbids white space "between **any** of the components of a `<wq-name>`"
+/// and "between the components of an `<attr-matcher>`" — a space there would be a
+/// `<whitespace-token>` the grammar rejects, while a comment is no token at all
+/// (css-syntax-3 §4), so those gaps stay [`Glued`](AttributeGap::Glued). Every other
+/// juncture is bounded by the brackets and takes a space safely, so the comment is padded
+/// off its neighbours — glued only to `[` and `]` themselves, the answer `:is()` and
+/// `::part()` already give inside their parens.
+#[derive(Clone, Copy)]
+enum AttributeGap {
+    /// A `<wq-name>` or `<attr-matcher>` juncture: no space added anywhere, a run
+    /// included (the same rule that keeps `.a/* c *//* d */.b` a compound).
+    Glued,
+    /// A spacing-safe juncture; the flags say which sides get their single space.
+    Spaced { before: bool, after: bool },
+}
+
+impl AttributeGap {
+    /// The gap just inside `[`: glued to the bracket, padded off the name.
+    const AFTER_OPEN: Self = Self::Spaced {
+        before: false,
+        after: true,
+    };
+    /// A gap between two interior tokens: padded on both sides.
+    const INTERIOR: Self = Self::Spaced {
+        before: true,
+        after: true,
+    };
+    /// The gap just inside `]`: padded off the content, glued to the bracket.
+    const BEFORE_CLOSE: Self = Self::Spaced {
+        before: true,
+        after: false,
+    };
+
+    fn separator(self) -> &'static str {
+        match self {
+            Self::Glued => "",
+            Self::Spaced { .. } => " ",
+        }
+    }
+
+    fn pad_before(self) -> bool {
+        matches!(self, Self::Spaced { before: true, .. })
+    }
+
+    fn pad_after(self) -> bool {
+        matches!(self, Self::Spaced { after: true, .. })
+    }
+}
+
+/// The first position in `[from, to)` that begins the region's next real token — the
+/// [`crate::comments::skip_trivia_forward`] scan in the printer's `u32` span
+/// coordinates.
+///
+/// The attribute selector is rebuilt from its parts, so the printer locates the parts it
+/// has no span for (the `|`, the matcher, the case flag) by stepping over the trivia ahead
+/// of them. Comment-aware by construction, so no scan can read a comment's content as
+/// structure.
+fn skip_gap_trivia(source: &str, from: u32, to: u32) -> u32 {
+    debug_assert!(from <= to, "attribute-gap scan bounds inverted");
+    crate::comments::skip_trivia_forward(source.as_bytes(), from as usize, to as usize) as u32
 }
 
 #[cfg(test)]

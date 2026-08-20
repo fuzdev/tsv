@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 352,
+		"end": 571,
 		"attributes": [],
 		"children": [
 			{
@@ -299,6 +299,100 @@
 				},
 				"start": 294,
 				"end": 343
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 499,
+					"end": 506,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 499,
+							"end": 506,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "rect",
+											"start": 499,
+											"end": 506
+										}
+									],
+									"start": 499,
+									"end": 506
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 507,
+					"end": 527,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 511,
+							"end": 523,
+							"property": "fill",
+							"value": "purple"
+						}
+					]
+				},
+				"start": 499,
+				"end": 527
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 530,
+					"end": 543,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 530,
+							"end": 543,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "circle",
+											"start": 530,
+											"end": 543
+										}
+									],
+									"start": 530,
+									"end": 543
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 544,
+					"end": 562,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 548,
+							"end": 558,
+							"property": "fill",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 530,
+				"end": 562
 			}
 		],
 		"comments": [
@@ -319,18 +413,24 @@
 				"value": " Combined patterns ",
 				"start": 221,
 				"end": 244
+			},
+			{
+				"type": "CSSComment",
+				"value": " An escaped `|` is part of the prefix's NAME, never the <wq-name> separator:\n\t   the separator is the first `|` the escape rules leave as a delim. ",
+				"start": 346,
+				"end": 497
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 344,
-			"styles": "\n\t/* Type selectors with namespace */\n\tsvg|rect {\n\t\tfill: red;\n\t}\n\n\tsvg|circle {\n\t\tstroke: blue;\n\t}\n\n\tmath|mi {\n\t\tfont-style: italic;\n\t}\n\n\t/* Universal namespace with type selector */\n\t*|div {\n\t\tcolor: green;\n\t}\n\n\t/* Combined patterns */\n\tsvg|rect.class1 {\n\t\tborder: 1px solid red;\n\t}\n\n\tsvg|text:hover {\n\t\ttext-decoration: underline;\n\t}\n",
+			"end": 563,
+			"styles": "\n\t/* Type selectors with namespace */\n\tsvg|rect {\n\t\tfill: red;\n\t}\n\n\tsvg|circle {\n\t\tstroke: blue;\n\t}\n\n\tmath|mi {\n\t\tfont-style: italic;\n\t}\n\n\t/* Universal namespace with type selector */\n\t*|div {\n\t\tcolor: green;\n\t}\n\n\t/* Combined patterns */\n\tsvg|rect.class1 {\n\t\tborder: 1px solid red;\n\t}\n\n\tsvg|text:hover {\n\t\ttext-decoration: underline;\n\t}\n\n\t/* An escaped `|` is part of the prefix's NAME, never the <wq-name> separator:\n\t   the separator is the first `|` the escape rules leave as a delim. */\n\t\\||rect {\n\t\tfill: purple;\n\t}\n\n\ta\\7c b|circle {\n\t\tfill: teal;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 353,
+	"end": 572,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
