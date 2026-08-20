@@ -133,10 +133,12 @@ pub(super) fn try_expand_last_arg(
         _ => true,
     };
     // …with one exception, which is why prettier can ask `couldExpandArg` late: a broken
-    // `=>`→body gap selects its own state ([`last_arg_arrow_gap_break`])
-    // ahead of any body-kind question, for a non-eligible body too. That state needs the
-    // argument docs, so it keeps the block below — and returns from inside it, so no second
-    // build follows.
+    // `=>`→body gap selects its own state ([`last_arg_arrow_gap_break`]) ahead of the
+    // body-kind question the arms below ask. It is not ahead of `couldExpandArg` itself —
+    // that gate is the first thing the helper applies, since a body prettier would not
+    // expand never reaches the arrow printing whose softline this state exists to carry.
+    // The state needs the argument docs, so it keeps the block below — and returns from
+    // inside it, so no second build follows.
     let arrow_gap_break = if has_comments {
         last_arg.and_then(|last| last_arg_arrow_gap_break(printer, last))
     } else {

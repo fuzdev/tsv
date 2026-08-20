@@ -440,7 +440,20 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// mover in any bucket (`match` 4416 → 4417, the unknown lists otherwise identical
 	// file-for-file, nothing arrived), and `partial` / `safety` / `errors` /
 	// `expected_errors` are byte-identical.
-	typescript: 105,
+	//
+	// 105 → 104 (`bug469`, the post-arrow glued line comment): `js/arrows/issue-17421.js`
+	// leaves for **`partial`**, not for `match` — a reclassification, and the file is
+	// prettier's own regression test for this gap. A `//` the author glued to `=>` now keeps
+	// that line (§Uniform Forced-Continuation Indent), so the file's arrow hunks become
+	// `comment_position` and the detector recognizes them; what keeps it out of `known` is a
+	// *different*, still-uncataloged divergence the same file carries — a **block** body
+	// behind a parameter list (`(id) => // c⏎{}`), where prettier hugs `=> {` and relocates
+	// the comment INSIDE the block. That residue is deliberately left unexplained rather
+	// than given a detector pattern: classifying it would assert a sanction nothing has
+	// decided. A/B'd against a worktree holding this branch's code minus the arrow change,
+	// over the whole corpus: this file is the ONLY mover in any bucket, and `safety` /
+	// `errors` / `expected_errors` are byte-identical file-for-file.
+	typescript: 104,
 	css: 23
 };
 
@@ -492,7 +505,13 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// off different bases. It agrees with the sum only because the movers are disjoint, which
 	// was checked per file (`js/function/iife.js` is in `partial`, `issue-12967.js` in
 	// neither bucket) rather than inferred from the arithmetic.
-	typescript: 24,
+	//
+	// 24 → 25 (`bug469`, the post-arrow glued line comment): `js/arrows/issue-17421.js`
+	// ARRIVES from `unknown` — the same single mover, counted here on the other side.
+	// Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step;
+	// the arrival is a gain (the file's arrow hunks are now explained) held short of `known`
+	// by an uncataloged block-body residue in the same file.
+	typescript: 25,
 	css: 9
 };
 

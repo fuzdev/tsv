@@ -737,7 +737,8 @@ fn try_single_arg_hug(
 
     // A broken `=>`→body gap keeps the arrow start on the `callee(` line and breaks the
     // closing paren onto its own. **Above the match**, because the rule is the gap's and not
-    // the body's ([`last_arg_arrow_gap_break`]) — asking it
+    // the arms' body-kind split — the one body question it does owe, prettier's
+    // `couldExpandArg`, the helper applies itself ([`last_arg_arrow_gap_break`]) — asking it
     // inside the block-arrow arm left every other body kind to the arms below, which are
     // body-keyed and answer this gap not at all: a call or ternary body took its own
     // reassembling layout and printed the signature past the print width with no state to
