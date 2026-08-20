@@ -1860,6 +1860,19 @@ impl<'a> Printer<'a> {
                         // freeze is stated once. The predicate opens on the document-level
                         // flag, so a directive-free document pays one predicted branch.
                         let init_frozen = self.value_head_frozen_span(eq_pos + 1, init.span());
+                        // A header declarator is a declarator here too: prettier's
+                        // call-object clause keys on the `VariableDeclarator` parent and
+                        // never asks where the declaration sits, so this marks exactly
+                        // what the statement-level twin marks
+                        // (`build_init_value_doc` → [`Printer::mark_member_call_tail_operand`]).
+                        //
+                        // Gated by `tests/for_header_declarator_call_tail.rs`, not by a
+                        // fixture — the `=` below is a flat concat with no assignment
+                        // layout, so prettier breaks after it and tsv never does, and NO
+                        // over-width initializer in this position can be a fixture input.
+                        // The test asserts the clause's own effect, which is the inner
+                        // shape both formatters do agree on.
+                        self.mark_member_call_tail_operand(init);
                         let build_value = || {
                             let inner = self.build_for_init_value_doc(
                                 init,

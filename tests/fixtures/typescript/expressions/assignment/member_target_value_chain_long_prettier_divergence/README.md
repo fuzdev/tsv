@@ -27,9 +27,16 @@ tsv adopts the rule and not the walk. Not breaking the thing being assigned *to*
 argument; not breaking the thing being assigned is the same expression prettier breaks one
 character of target-shape away, so the overflow buys nothing and costs the print-width limit.
 
+What is declined is this clause's walk, not the value position: `shouldInline`'s **call-object**
+clause names an assignment's value (and a declarator's initializer) outright and identity-checks
+the parent, and tsv implements it — so a value chain whose last lookup hangs off a call *with
+arguments* does lose that break point. The chains here are call-free, which is why they stay
+breakable.
+
 ## Related
 
 - `assignment/member_target_long/` — the target half of the same `shouldInline` clause, where tsv matches prettier.
 - `assignment/breakable_lhs_template_rhs/` — the `chooseLayout` gate the target rule feeds (`canBreakLeftDoc`).
+- `member/call_base_lone_tail_long/` — the `shouldInline` clause that DOES reach a value chain, where tsv matches prettier.
 
 See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript (Assignment target member chains) and [§Print Width Philosophy](../../../../../../docs/conformance_prettier.md#print-width-philosophy).

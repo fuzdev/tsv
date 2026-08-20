@@ -33,6 +33,7 @@ use super::printing::{
     print_group_expanded, print_group_standard_expanded, print_node_inner,
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
+use super::{InlineLookups, resolve_inline_lookups};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression};
 use crate::printer::Printer;
 use smallvec::SmallVec;
@@ -105,12 +106,12 @@ pub fn build_chain_doc<'a>(
     let prev_has_comments = printer.set_chain_has_comments(
         printer.has_comments_on_page_between(chain_span.start, chain_span.end),
     );
-    // Read the assignment-target mark HERE, at the chain root and before any node doc is
-    // built: a nested assignment inside the chain (a computed index, `a[x = 1].b`) marks
-    // its own target and would clear this one first. See
-    // [`Printer::mark_inline_member_target`].
-    let inline_lookups = printer.member_target_inlines_lookups(chain_span);
-    let result = build_chain_doc_impl(groups, chain_span.end, inline_lookups, printer);
+    // Read the parent's `shouldInline` marks HERE, at the chain root and before any node
+    // doc is built: a nested assignment inside the chain (a computed index, `a[x = 1].b`)
+    // marks its own operands and would clear these first. See
+    // [`super::inline_lookups`].
+    let inline = resolve_inline_lookups(chain_span, groups, printer);
+    let result = build_chain_doc_impl(groups, chain_span.end, inline, printer);
     printer.restore_chain_has_comments(prev_has_comments);
     printer.exit_chain_arg_share(was_active);
     result
@@ -119,17 +120,18 @@ pub fn build_chain_doc<'a>(
 /// `chain_end` is the chain's source end — the anchor for the trailing member's
 /// trailer read ([`has_comments_forcing_expansion`]).
 ///
-/// `inline_lookups` reports that this chain is an assignment target, whose `.prop`
-/// lookups therefore carry no break point ([`Printer::mark_inline_member_target`]). It
-/// reaches every site that decides a lookup's break point — the member-only fold, the
-/// short chain's paren-base lookup, and the peeled member tail — because they answer one
-/// question in three shapes, and a subset would leave the target breakable through
-/// whichever spelling was missed. It applies only to the WHOLE chain: the recursive calls
-/// below pass `false`, since a peeled sub-chain is not the target span the mark named.
+/// `inline` carries the `shouldInline` answers this chain's PARENT supplied
+/// ([`super::inline_lookups`]). Its `every` arm reaches every site that decides a
+/// lookup's break point — the member-only fold, the short chain's paren-base lookup, and
+/// the peeled member tail — because they answer one question in three shapes, and a
+/// subset would leave the chain breakable through whichever spelling was missed; its
+/// `call_tail` arm reaches the peel alone, the only site that gives a bare-base call's
+/// tail a break point. Both apply only to the WHOLE chain: the recursive calls below pass
+/// [`InlineLookups::NONE`], since a peeled sub-chain is not the span either mark named.
 fn build_chain_doc_impl<'a>(
     groups: &[ChainGroup<'a>],
     chain_end: u32,
-    inline_lookups: bool,
+    inline: InlineLookups,
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
@@ -169,8 +171,8 @@ fn build_chain_doc_impl<'a>(
     // (`any_non_last_breaks`, the call-count rules) never sees it, which is what
     // keeps `obj.aa(x).bb(cb)` flat with the arrow hugged and `.prop` trailing.
     // Folding the tail into the chain made `.bb` non-last and force-expanded it.
-    if has_calls && let Some(peeled) = peel_trailing_member_tail(groups, printer) {
-        return build_peeled_tail_doc(groups, chain_end, &peeled, inline_lookups, printer);
+    if has_calls && let Some(peeled) = peel_trailing_member_tail(groups, inline, printer) {
+        return build_peeled_tail_doc(groups, chain_end, &peeled, inline, printer);
     }
 
     // Prettier's logic (member-chain.js:351-359):
@@ -240,7 +242,7 @@ fn build_chain_doc_impl<'a>(
 
     if !has_calls && !first_has_parens && !has_bracket_comments {
         // Member-only chain: use fill for greedy packing
-        return build_member_only_chain_doc(groups, inline_lookups, printer);
+        return build_member_only_chain_doc(groups, inline.every, printer);
     }
 
     // Split groups into first (merged) and rest based on should_merge
@@ -267,7 +269,7 @@ fn build_chain_doc_impl<'a>(
             first_doc,
             first_has_parens,
             has_calls,
-            inline_lookups,
+            inline.every,
             printer,
         );
     }
@@ -338,7 +340,7 @@ fn build_short_chain_doc<'a>(
     first_doc: DocId,
     first_has_parens: bool,
     has_calls: bool,
-    inline_lookups: bool,
+    inline_every_lookup: bool,
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
@@ -397,18 +399,18 @@ fn build_short_chain_doc<'a>(
             // that ever stop holding.)
             let lookup = d.concat(&rest_docs);
 
-            // No break point before the lookup — the same two `shouldInline` clauses
+            // No break point before the lookup — the same `shouldInline` clauses
             // (member.js) the member-only builder's flat arm answers:
             //
-            // - the assignment **target** clause: every lookup under an assignment whose
-            //   `left` is not a plain identifier, so the base's own parens become the only
-            //   break point left and hang instead (`(⏎\taaa as Tttt⏎).bbb… = v`). See
-            //   [`Printer::mark_inline_member_target`].
+            // - the parent-supplied `every` clauses — an assignment **target**, a `new`
+            //   **callee** — so the base's own parens become the only break point left and
+            //   hang instead (`(⏎\taaa as Tttt⏎).bbb… = v`, `new (⏎\taaa as Tttt⏎).bbb…()`).
+            //   See [`super::inline_lookups`].
             // - `node.computed`: a computed lookup takes no break point before it, ever, so
             //   `(x as T)![i]` and `(x as T)[i][j]` stay glued to the base and shed width
             //   by breaking their own brackets (`computed_lookup_doc`). Same rule as
             //   `starts_segment` in the member-only path.
-            if inline_lookups
+            if inline_every_lookup
                 || rest_groups
                     .first()
                     .and_then(|g| g.nodes.first())
@@ -452,7 +454,8 @@ struct PeeledTail<'a, 'p> {
     /// window holds no comments or the tail's first node has no gap.
     gap_comments: Option<ClassifiedComments<'p>>,
     /// Bare base call (`fn(args).a.b` — one call, nothing else before the tail):
-    /// the tail keeps member.js's per-member break points.
+    /// the tail keeps member.js's per-member break points. Cleared for the one shape
+    /// prettier's call-object clause takes them back for — see the peel.
     per_member_breaks: bool,
 }
 
@@ -461,13 +464,25 @@ struct PeeledTail<'a, 'p> {
 /// member in the call's own group: `read(...).a.b` groups as
 /// `[[base, call, .a], [.b]]`). Returns `Some` only when the tail is ALL plain
 /// `.prop` members and its gaps are quiet: a computed / private / non-null node
-/// keeps its own break structure on the existing paths, a break-forcing comment
-/// (trailing line, or any leading) needs the comment-aware chain paths, and a
-/// blank line before the tail is expansion signal the chain-level scan must keep
-/// seeing. A trailing same-line block comment is fine — the append emits it
-/// inline, as `add_group_no_break` does.
+/// keeps its own break structure on the existing paths, and a break-forcing comment
+/// (trailing line, or any leading) needs the comment-aware chain paths. A trailing
+/// same-line block comment is fine — the append emits it inline, as
+/// `add_group_no_break` does.
+///
+/// ⚠️ A **blank line** in the prefix→tail gap is NOT a refusal, though it reads like the
+/// blank-between-methods signal `should_force_chain_expand` acts on. That signal is about
+/// blanks the member CHAIN contains, and this one is outside it: prettier roots the chain
+/// at the outermost call, so a blank before a trailing `.prop` sits between the chain and
+/// a `printMemberExpression` above it, which has no blank handling at all — prettier
+/// collapses it and lays the lookup out on width alone. Refusing here read it as chain
+/// signal instead, and cost three things at once: a chain that FITS expanded
+/// (`aa.b().c().d()⏎⏎.e` → three lines), the blank itself survived where prettier collapses
+/// it, and the refused path has no break point for a trailing member at all — so an
+/// over-width lookup printed flat on pass 1 and broke on pass 2, a non-idempotency the
+/// blank-injection audit reaches. See `expressions/member/call_base_tail_blank`.
 fn peel_trailing_member_tail<'a, 'p>(
     groups: &[ChainGroup<'a>],
+    inline: InlineLookups,
     printer: &'p Printer<'_>,
 ) -> Option<PeeledTail<'a, 'p>> {
     let last_call_group = groups
@@ -488,20 +503,18 @@ fn peel_trailing_member_tail<'a, 'p>(
     if tail.is_empty() || !tail.iter().all(|n| matches!(n, ChainNode::Member { .. })) {
         return None;
     }
-    // The prefix→tail gap: refuse a break-forcing comment or a blank line.
+    // The prefix→tail gap: refuse a break-forcing comment. A blank here is not one —
+    // see the ⚠️ above.
     let mut gap_comments = None;
-    if let Some((object_end, property_start)) = node_comment_gap(&tail[0], printer) {
-        if printer.chain_has_comments() {
-            let classified =
-                printer.classify_chain_gap(object_end, property_start, tail[0].paren_gap_skip());
-            if gap_has_break_forcing_comments(&classified) {
-                return None;
-            }
-            gap_comments = Some(classified);
-        }
-        if printer.is_next_line_empty(object_end, property_start) {
+    if printer.chain_has_comments()
+        && let Some((object_end, property_start)) = node_comment_gap(&tail[0], printer)
+    {
+        let classified =
+            printer.classify_chain_gap(object_end, property_start, tail[0].paren_gap_skip());
+        if gap_has_break_forcing_comments(&classified) {
             return None;
         }
+        gap_comments = Some(classified);
     }
     // The tail's interior gaps must be comment-free — an interior comment needs the
     // comment-aware chain paths.
@@ -517,7 +530,7 @@ fn peel_trailing_member_tail<'a, 'p>(
         return None;
     }
 
-    let per_member_breaks = last_call_group == 0
+    let bare_base_call = last_call_group == 0
         && last_call_idx == 1
         && matches!(
             groups[0].nodes[0],
@@ -526,6 +539,24 @@ fn peel_trailing_member_tail<'a, 'p>(
                 ..
             }
         );
+    // Prettier's call-object clause takes that break point back for ONE shape: a chain
+    // sitting directly under an assignment or declarator whose lone `.prop` tail hangs off
+    // a call WITH ARGUMENTS (`const x = fn(a).prop`). Both halves are read here — the
+    // POSITION from the parent's mark, the OBJECT and the tail from the chain — so
+    // `const x = fn().prop` (no arguments) and `const x = fn(a).b.c` (two lookups) keep
+    // their break points, exactly as prettier does. See [`super::inline_lookups`].
+    //
+    // `bare_base_call` is what makes `nodes[1]` the tail's object: it says the last call
+    // sits at index 1 of the first group, so this reads the very call the clause asks
+    // about rather than whatever else a longer prefix would put there.
+    let call_object_clause = bare_base_call
+        && inline.call_tail
+        && tail.len() == 1
+        && matches!(
+            groups[0].nodes.get(1),
+            Some(ChainNode::Call { call, .. }) if !call.arguments.is_empty()
+        );
+    let per_member_breaks = bare_base_call && !call_object_clause;
     Some(PeeledTail {
         last_call_group,
         last_call_idx,
@@ -544,20 +575,20 @@ fn build_peeled_tail_doc<'a>(
     groups: &[ChainGroup<'a>],
     chain_end: u32,
     peeled: &PeeledTail<'a, '_>,
-    inline_lookups: bool,
+    inline: InlineLookups,
     printer: &Printer<'_>,
 ) -> DocId {
     let call_group = &groups[peeled.last_call_group];
     // The prefix ends with the call, so its build never reaches the trailing-MEMBER
-    // trailer read that `chain_end` anchors; it is passed through unchanged. The
-    // assignment-target mark is NOT: a peeled prefix is a sub-chain, not the target span
-    // the mark named, so it takes `false` (and, ending in a call, never reaches the
-    // member-only builder that would read it anyway).
+    // trailer read that `chain_end` anchors; it is passed through unchanged. The parent's
+    // marks are NOT: a peeled prefix is a sub-chain, not the span either mark named, so it
+    // takes [`InlineLookups::NONE`] (and, ending in a call, never reaches the member-only
+    // builder that would read `every` anyway).
     let chain_doc = if peeled.last_call_idx + 1 == call_group.nodes.len() {
         build_chain_doc_impl(
             &groups[..=peeled.last_call_group],
             chain_end,
-            false,
+            InlineLookups::NONE,
             printer,
         )
     } else {
@@ -566,9 +597,9 @@ fn build_peeled_tail_doc<'a>(
         let mut cut = call_group.clone();
         cut.nodes.truncate(peeled.last_call_idx + 1);
         prefix.push(cut);
-        build_chain_doc_impl(&prefix, chain_end, false, printer)
+        build_chain_doc_impl(&prefix, chain_end, InlineLookups::NONE, printer)
     };
-    append_member_tail(chain_doc, peeled, inline_lookups, printer)
+    append_member_tail(chain_doc, peeled, inline.every, printer)
 }
 
 /// Append a peeled member tail to the chain's doc. The gap's same-line block
@@ -586,13 +617,16 @@ fn build_peeled_tail_doc<'a>(
 ///   `trailing_member_expand_args_long_prettier_divergence`). The same glue
 ///   `add_group_no_break` applies when the chain prints a tail itself.
 ///
-/// `inline_lookups` forces the glue at every prefix: an assignment TARGET's lookups
-/// carry no break point, so the width falls to the call's arguments or to the operator
-/// ([`Printer::mark_inline_member_target`]).
+/// `inline_every_lookup` forces the glue at every prefix: a chain the parent marked —
+/// an assignment TARGET, a `new` CALLEE — carries no break point at any lookup, so the
+/// width falls to the call's arguments or to the operator ([`super::inline_lookups`]).
+/// The narrower `call_tail` clause is not read here: it acts by clearing
+/// [`PeeledTail::per_member_breaks`] at the peel, where the shape it is gated on is
+/// visible.
 fn append_member_tail(
     chain_doc: DocId,
     peeled: &PeeledTail<'_, '_>,
-    inline_lookups: bool,
+    inline_every_lookup: bool,
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
@@ -604,7 +638,7 @@ fn append_member_tail(
         // The first member's gap comments were just emitted above — skip them in the
         // node print so they can't double-print (the add_group_no_break seam).
         let member = print_node_inner(node, printer, false, i == 0);
-        parts.push(if peeled.per_member_breaks && !inline_lookups {
+        parts.push(if peeled.per_member_breaks && !inline_every_lookup {
             member_lookup_group(d, member)
         } else {
             member

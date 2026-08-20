@@ -376,6 +376,24 @@ impl<'a> ChainNode<'a> {
         matches!(self, Self::NonNull { .. })
     }
 
+    /// Whether this link is written with `?.`, which makes the whole chain a
+    /// `ChainExpression` in the public AST.
+    ///
+    /// The linearizer keeps a **sealed** optional chain (`(a?.b).c`) as a
+    /// [`Self::Base`], so a chain answering `true` here is one whose own top level is
+    /// optional — exactly the nesting the public AST wraps. Read by
+    /// [`super::resolve_inline_lookups`], where that wrapper stops two of prettier's
+    /// `shouldInline` ancestor walks.
+    pub const fn is_optional_link(&self) -> bool {
+        match self {
+            Self::Member { optional, .. }
+            | Self::PrivateMember { optional, .. }
+            | Self::ComputedMember { optional, .. } => *optional,
+            Self::Call { call, .. } => call.optional,
+            Self::Base { .. } | Self::NonNull { .. } => false,
+        }
+    }
+
     /// Check if this is a numeric computed accessor like `[0]`, `[1]`
     pub fn is_numeric_accessor(&self) -> bool {
         matches!(self, Self::ComputedMember { expr, .. } if is_numeric_index(expr))

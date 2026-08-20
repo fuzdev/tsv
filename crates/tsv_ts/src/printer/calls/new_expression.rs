@@ -96,6 +96,14 @@ impl<'a> Printer<'a> {
         // pair the `NewCallee` position supplies rides outside it
         // ([`Printer::build_frozen_value_doc`]), so the arms below — each of which exists to
         // lay out the callee's *contents* — have nothing left to decide.
+        //
+        // A member chain in callee position prints its `.prop` lookups with no break
+        // point, so the constructor name stays one unit and the width falls to the
+        // argument list ([`Printer::mark_new_callee_member_lookups`]). Marked ahead of
+        // the whole cascade rather than in one arm: the chain reaches this position
+        // through three of them — bare (`new a.b.C()`), parenthesized where the callee
+        // holds a call (`new (fn(k).a.B)()`), and frozen, where the mark is simply inert.
+        self.mark_new_callee_member_lookups(new_expr.callee);
         let callee = if let Some(frozen) = frozen {
             self.build_frozen_value_doc(new_expr.callee, frozen, ParenContext::NewCallee)
         } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
