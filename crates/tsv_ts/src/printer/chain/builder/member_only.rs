@@ -134,6 +134,32 @@ fn starts_segment(node: &ChainNode<'_>) -> bool {
     node.is_member() && !node.is_computed()
 }
 
+/// Prettier's `shouldInline` clause for a lone `a.prop`: object and property are both
+/// identifiers, and the chain is not itself inside a member (member.js). Read here as
+/// "exactly one segment off a bare base", which is the same fact after linearization —
+/// a second segment means the outer lookup's object IS a member, and any base that is
+/// not bare (a call, a paren shell, a computed head) never reaches this builder's flat
+/// arm with one segment.
+///
+/// `this` / `super` join `Identifier` although prettier's clause names only the latter.
+/// The widening is tsv's and predates the target clause; it is inert in practice, since
+/// a lone lookup off `this` only reaches the width where an enclosing group breaks first
+/// (probed against prettier in argument, statement and assignment position — no
+/// divergence). Keep it separable from `inline_lookups` above rather than folding the
+/// two: they answer to different prettier clauses and only agree on the output.
+fn lone_lookup_off_bare_base(nodes: &[&ChainNode<'_>], segment_count: usize) -> bool {
+    segment_count == 1
+        && matches!(
+            nodes.first(),
+            Some(ChainNode::Base {
+                expr: Expression::Identifier(_)
+                    | Expression::ThisExpression(_)
+                    | Expression::Super(_),
+                ..
+            })
+        )
+}
+
 /// Build doc for member-only chains: one group per lookup, mirroring prettier's
 /// `printMemberExpression`.
 ///
@@ -152,8 +178,12 @@ fn starts_segment(node: &ChainNode<'_>) -> bool {
 ///     .b!
 ///     .c!
 /// ```
+///
+/// `inline_lookups` suppresses every one of those break points: an assignment TARGET
+/// prints as one unbreakable unit ([`Printer::mark_inline_member_target`]).
 pub(super) fn build_member_only_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
+    inline_lookups: bool,
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
@@ -181,14 +211,11 @@ pub(super) fn build_member_only_chain_doc<'a>(
     //
     // The grouping logic puts almost all members in the first group (for the
     // "short chain fits on one line" case), so the segments are re-derived here.
-    let mut first_doc_end = 0;
-    for (i, node) in all_nodes.iter().enumerate() {
-        if starts_segment(node) {
-            // Stop at first member - that starts the segments
-            break;
-        }
-        first_doc_end = i + 1;
-    }
+    //
+    // The base run is everything before the first segment-starter. Same `take_while`
+    // idiom as the comment-aware twin above, over a different predicate: that one counts
+    // `is_member`, so a computed head opens a segment there and is glued here.
+    let first_doc_end = all_nodes.iter().take_while(|n| !starts_segment(n)).count();
 
     // Build first_doc from base + any trailing non-null assertions
     let first_doc_nodes: DocBuf = all_nodes
@@ -204,43 +231,39 @@ pub(super) fn build_member_only_chain_doc<'a>(
         return first_doc;
     }
 
-    // Build segments where each segment STARTS with a member access and carries the
-    // nodes glued to it (a trailing `!`, a computed `[i]`). Each gets its own break
-    // point, placed BEFORE the member access.
+    // Build segments by collecting nodes until the NEXT segment-starter. Each segment
+    // STARTS with a member access and carries the nodes glued to it (a trailing `!`, a
+    // computed `[i]`), so each gets one break point, placed BEFORE the member access.
     //
     // Example: `a!.b!.c!` with nodes [Base(a), NonNull, Member(.b), NonNull, Member(.c), NonNull]
     //   first_doc = "a!"
     //   remaining nodes: [Member(.b), NonNull, Member(.c), NonNull]
     //   segments = [".b!", ".c!"]
     //   result = a! + group(indent(softline + .b!)) + group(indent(softline + .c!))
-
-    // Build segments by collecting nodes until we see the NEXT member
-    // Each segment includes everything up to and including a member (+ trailing non-null)
-    // Note: Block comments are handled by print_node for member nodes
+    //
+    // `print_node` handles each member node's own block comments.
     let remaining_nodes = &all_nodes[first_doc_end..];
     let mut segments: DocBuf = DocBuf::new();
     let mut current_segment: DocBuf = DocBuf::new();
     let mut seen_member = false;
 
-    for (i, node) in remaining_nodes.iter().enumerate() {
-        // Check if this is a member and we already have content that includes a member
-        // If so, flush before adding this member
-        if starts_segment(node) && seen_member {
+    for node in remaining_nodes {
+        let starts = starts_segment(node);
+        // A segment must CONTAIN a member, so the flush is gated on `seen_member` rather
+        // than on the buffer being non-empty: a leading glued node would otherwise be
+        // flushed as a segment of its own, and a segment with no member has no break
+        // point to own.
+        if starts && seen_member {
             segments.push(d.concat(&std::mem::take(&mut current_segment)));
             seen_member = false;
         }
-
-        // print_node handles block comments for member nodes
         current_segment.push(print_node(node, printer));
-
-        if starts_segment(node) {
+        if starts {
             seen_member = true;
         }
-
-        // If this is the last node, flush
-        if i == remaining_nodes.len() - 1 && !current_segment.is_empty() {
-            segments.push(d.concat(&std::mem::take(&mut current_segment)));
-        }
+    }
+    if !current_segment.is_empty() {
+        segments.push(d.concat(&current_segment));
     }
 
     // If no segments, just return the first doc
@@ -248,22 +271,29 @@ pub(super) fn build_member_only_chain_doc<'a>(
         return first_doc;
     }
 
-    // A lone `a.prop` off an identifier base gets no break point at all — prettier's
-    // `shouldInline` inlines the lookup when object and property are both identifiers
-    // and the whole thing isn't itself inside a member (member.js). Everything else
-    // falls through to the per-lookup groups below.
-    if segments.len() == 1
-        && matches!(
-            all_nodes.first(),
-            Some(ChainNode::Base {
-                expr: Expression::Identifier(_)
-                    | Expression::ThisExpression(_)
-                    | Expression::Super(_),
-                ..
-            })
-        )
-    {
-        return d.concat(&[first_doc, segments[0]]);
+    // The chain takes NO break point at all — one flat concat. Two of prettier's
+    // `shouldInline` clauses (member.js) reach a member-only chain, and both make the
+    // whole chain flat, so they meet here as one decision rather than as two adjacent
+    // spellings of the same answer:
+    //
+    // - the assignment **target** clause (`inline_lookups`, marked by the assignment
+    //   before it builds its left) — the target prints as one unbreakable unit, so the
+    //   assignment sheds width after the operator instead of splitting the thing being
+    //   assigned to, and holds its line outright when the value is unbreakable too;
+    // - a lone `a.prop` off a bare base ([`lone_lookup_off_bare_base`]).
+    //
+    // The third clause, `node.computed`, is answered earlier by `starts_segment`: a
+    // computed lookup is glued into its preceding segment either way, so its own bracket
+    // group survives here untouched — which is what keeps `chooseLayout`'s
+    // `canBreakLeftDoc` true for `params['key'] = …`.
+    //
+    // Asked AFTER the segment walk rather than before it, so both shapes share one
+    // segmentation.
+    if inline_lookups || lone_lookup_off_bare_base(&all_nodes, segments.len()) {
+        let mut parts: DocBuf = DocBuf::with_capacity(segments.len() + 1);
+        parts.push(first_doc);
+        parts.extend(segments.iter().copied());
+        return d.concat(&parts);
     }
 
     // Mirror prettier's `printMemberExpression`, which gives EACH lookup
