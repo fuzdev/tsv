@@ -155,13 +155,19 @@ impl<'a> Printer<'a> {
         // A member chain in target position prints its `.prop` lookups with no break
         // point (prettier's `printMemberExpression` `shouldInline`), so the mark goes up
         // before the target is built and the chain root reads it — see
-        // [`Printer::mark_inline_member_target`].
-        self.mark_inline_member_target(assign.left);
+        // [`Printer::mark_assignment_target_member_lookups`].
+        self.mark_assignment_target_member_lookups(assign.left);
         let left_doc = self.build_shell_operand_doc(
             assign.span.start,
             assign.left,
             ParenContext::AssignmentTarget,
         );
+
+        // The VALUE is an assignment operand too, and prettier's call-object clause is
+        // gated on exactly that position ([`Printer::mark_member_call_tail_operand`]).
+        // Marked AFTER the target is built, since a nested assignment inside the target
+        // marks its own operands; every branch below builds the value after this point.
+        self.mark_member_call_tail_operand(assign.right);
 
         // Extract inline comments between operator and RHS
         // Uses line-comment-safe spacing: block comments get trailing space,
