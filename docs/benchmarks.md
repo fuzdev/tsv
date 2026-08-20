@@ -203,9 +203,9 @@ Things the published numbers measure that aren't quite what they look like.
   (c) Task return values are discarded uniformly for all impls; the FFI/WASM/async
   boundaries block dead-code elimination, so no impl's work is optimized away.
 - **`tsv_wasm` is measured on the full build.** The WASM bench loads
-  `pkg/all/deno` (the default both-features artifact, ~2.4 MB — what
+  `pkg/all/deno` (the default both-features artifact, ~2.5 MB — what
   `@fuzdev/tsv_wasm` ships) for _both_ parse and format, while subset consumers
-  ship the smaller `@fuzdev/tsv_format_wasm` (~2.1 MB, no convert layer) or
+  ship the smaller `@fuzdev/tsv_format_wasm` (~2.2 MB, no convert layer) or
   `@fuzdev/tsv_parse_wasm` (~0.9 MB, no printers). Same story natively: the perf
   row loads the full `libtsv_ffi`, while the Binary Sizes table also lists the
   `tsv format (ffi)` / `tsv parse (ffi)` subset builds (no perf rows of their own
@@ -676,6 +676,18 @@ Benchmark output includes a binary/WASM size comparison. Each row reports **raw
 on-disk size** plus **gzipped size** (≈ npm-tarball wire size), grouped by kind
 (WASM vs native) with ratios relative to `tsv` for both. Implementation:
 `lib/binary_sizes.ts`; JSON output carries a per-entry `gzip_bytes: number | null`.
+
+Sizes are **decimal** (`MB` = 1,000,000 B) — the convention shared by every byte
+figure the harness prints (this table, the report's `**Corpus:**` line, the terminal
+corpus block) and by the publish scripts' `format_size`, so an artifact sized in a
+publish log and the same artifact in this table can be compared without asking which
+`MB` each meant. The same label over two conventions is a disagreement no output can
+resolve; the JSON carries raw byte counts for anyone who wants binary units.
+
+The deliberate holdout is `tsv_debug profile`, whose sizes are binary and whose
+headline metric is µs per binary KB — a rate whose divisor defines it, with recorded
+baselines in [performance.md](performance.md) that redefining it would silently
+invalidate. It never sits beside these numbers.
 
 **A row exists only for an artifact on disk**, which makes this the one report
 section whose *composition* varies by machine — and the ratios read the same either
