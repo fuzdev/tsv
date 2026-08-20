@@ -50,8 +50,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.finish_variable_declaration(kind, start)
     }
 
-    pub(super) fn parse_variable_declarator(
+    /// Parse one declarator of a variable **statement**, where the definite
+    /// assignment `!` is part of the declarator production.
+    fn parse_variable_declarator(&mut self) -> Result<VariableDeclarator<'arena>, ParseError> {
+        self.parse_declarator(true)
+    }
+
+    /// Parse one declarator of a `for` **head** — the C-style init and the
+    /// `in`/`of` left alike, in every keyword spelling — where the definite
+    /// assignment `!` is *not* part of the production.
+    ///
+    /// tsc reads the marker under three conjuncts (`parseVariableDeclaration`:
+    /// `allowExclamation && name.kind === Identifier &&
+    /// !scanner.hasPrecedingLineBreak()`), and
+    /// `parseVariableDeclarationList(/*inForStatementInitializer*/ true)` selects
+    /// the `allowExclamation: false` spelling for the whole head — a grammar
+    /// parameter barring a production, so the rejection is the parser's rather
+    /// than a deferred early error. acorn-typescript has no such parameter and
+    /// accepts, but it is the AST-*shape* oracle, not the validity one.
+    ///
+    /// The rule is stated here rather than at each caller so the keyword
+    /// spellings cannot drift apart: `let`/`const`/`var` reach it through
+    /// [`Self::parse_for_variable_declaration`], `using` and `await using`
+    /// through [`Self::parse_for_using_declaration`].
+    fn parse_for_header_declarator(&mut self) -> Result<VariableDeclarator<'arena>, ParseError> {
+        self.parse_declarator(false)
+    }
+
+    /// Shared declarator body. `allow_definite` is tsc's `allowExclamation`.
+    fn parse_declarator(
         &mut self,
+        allow_definite: bool,
     ) -> Result<VariableDeclarator<'arena>, ParseError> {
         let id_start = self.current_pos().0;
 
@@ -59,7 +88,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Note: Some keywords can be used as identifiers in variable declarations (e.g., `async`)
         // For simple identifiers, also handles definite assignment assertion (`!`)
         let (id, definite) = if let Some(name) = self.try_binding_name() {
-            self.parse_simple_binding(name)?
+            self.parse_simple_binding(name, allow_definite)?
         } else if matches!(
             self.current_kind(),
             TokenKind::BracketOpen | TokenKind::BraceOpen
@@ -111,14 +140,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Parse first declarator
-        let first = self.parse_variable_declarator()?;
+        let first = self.parse_for_header_declarator()?;
         let mut decl_end = first.span.end;
 
         // Parse additional declarators (comma-separated)
         let mut declarations = self.bvec();
         declarations.push(first);
         while self.eat(TokenKind::Comma) {
-            let decl = self.parse_variable_declarator()?;
+            let decl = self.parse_for_header_declarator()?;
             decl_end = decl.span.end;
             declarations.push(decl);
         }
@@ -173,7 +202,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Parse single declarator (for-of only allows one)
-        let declarator = self.parse_variable_declarator()?;
+        let declarator = self.parse_for_header_declarator()?;
         let decl_end = declarator.span.end;
 
         let mut declarations = self.bvec();
@@ -209,9 +238,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Handles both regular identifiers and contextual keywords used as identifiers (e.g., `async`).
     ///
     /// Returns `(expression, definite)` where `definite` is true if `!` was present.
+    ///
+    /// `allow_definite` is tsc's `allowExclamation` — false in a `for` head, where
+    /// the marker is barred by position (see [`Self::parse_for_header_declarator`]).
     fn parse_simple_binding(
         &mut self,
         name: IdentName<'arena>,
+        allow_definite: bool,
     ) -> Result<(Expression<'arena>, bool), ParseError> {
         let (start, end) = self.current_pos();
         self.advance()?;
@@ -221,7 +254,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // here] !`): a newline before it makes it not a definite-assignment assertion,
         // leaving `!` a stray token (acorn-typescript's `hasPrecedingLineBreak` guard).
         // Same rule as the arrow `=>` / conditional `extends` / predicate `is`.
+        let marker_start = self.current_pos().0;
         let definite = !self.had_line_terminator && self.eat(TokenKind::Bang);
+
+        // The position conjunct of the same guard. Rejecting rather than dropping the
+        // token: the printer prints a binding through the plain expression path, which
+        // cannot see `definite`, so accepting here deleted authored source and emitted
+        // a program that re-parsed differently.
+        if definite && !allow_definite {
+            return Err(self.error_msg_at(
+                "a definite assignment assertion is not permitted in a for header",
+                marker_start,
+            ));
+        }
 
         let type_annotation = self.parse_optional_type_annotation()?;
 
