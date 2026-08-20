@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 425,
+	"end": 813,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -108,9 +108,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " a retained paren shell's trailing gap behaves the same way",
+			"value": " a retained paren shell's trailing gap behaves the same way - and an extra redundant",
 			"start": 286,
-			"end": 347,
+			"end": 372,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -118,22 +118,54 @@
 				},
 				"end": {
 					"line": 14,
-					"column": 62
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " LAYER changes nothing, the layers stripping as a unit so the retain question is the",
+			"start": 374,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " whole nest's (unformatted_ours_paren_layer carries that authoring)",
+			"start": 462,
+			"end": 531,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 70
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c4",
-			"start": 365,
-			"end": 370,
+			"start": 549,
+			"end": 554,
 			"loc": {
 				"start": {
-					"line": 16,
+					"line": 18,
 					"column": 4
 				},
 				"end": {
-					"line": 16,
+					"line": 18,
 					"column": 9
 				}
 			}
@@ -141,15 +173,15 @@
 		{
 			"type": "Line",
 			"value": " c5",
-			"start": 373,
-			"end": 378,
+			"start": 557,
+			"end": 562,
 			"loc": {
 				"start": {
-					"line": 17,
+					"line": 19,
 					"column": 2
 				},
 				"end": {
-					"line": 17,
+					"line": 19,
 					"column": 7
 				}
 			}
@@ -157,15 +189,79 @@
 		{
 			"type": "Line",
 			"value": " c6",
-			"start": 403,
-			"end": 408,
+			"start": 587,
+			"end": 592,
 			"loc": {
 				"start": {
-					"line": 21,
+					"line": 23,
 					"column": 4
 				},
 				"end": {
-					"line": 21,
+					"line": 23,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a LEADING run in the same nest: the retain rule is asked of the whole nest, so the",
+			"start": 601,
+			"end": 686,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " pair survives and the enclosing gap must not claim the leading run out of it",
+			"start": 688,
+			"end": 767,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 781,
+			"end": 786,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 13
+				},
+				"end": {
+					"line": 28,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 791,
+			"end": 796,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 4
+				},
+				"end": {
+					"line": 29,
 					"column": 9
 				}
 			}
@@ -174,19 +270,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 424,
+		"end": 812,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 415,
+			"end": 803,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 23,
+					"line": 31,
 					"column": 9
 				}
 			},
@@ -453,29 +549,29 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 349,
-					"end": 384,
+					"start": 533,
+					"end": 568,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 17,
 							"column": 1
 						},
 						"end": {
-							"line": 18,
+							"line": 20,
 							"column": 5
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 354,
-						"end": 356,
+						"start": 538,
+						"end": 540,
 						"loc": {
 							"start": {
-								"line": 15,
+								"line": 17,
 								"column": 6
 							},
 							"end": {
-								"line": 15,
+								"line": 17,
 								"column": 8
 							}
 						},
@@ -483,57 +579,57 @@
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
-						"start": 359,
-						"end": 383,
+						"start": 543,
+						"end": 567,
 						"loc": {
 							"start": {
-								"line": 15,
+								"line": 17,
 								"column": 11
 							},
 							"end": {
-								"line": 18,
+								"line": 20,
 								"column": 4
 							}
 						},
 						"elementType": {
 							"type": "TSParenthesizedType",
-							"start": 359,
-							"end": 381,
+							"start": 543,
+							"end": 565,
 							"loc": {
 								"start": {
-									"line": 15,
+									"line": 17,
 									"column": 11
 								},
 								"end": {
-									"line": 18,
+									"line": 20,
 									"column": 2
 								}
 							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
-								"start": 363,
-								"end": 364,
+								"start": 547,
+								"end": 548,
 								"loc": {
 									"start": {
-										"line": 16,
+										"line": 18,
 										"column": 2
 									},
 									"end": {
-										"line": 16,
+										"line": 18,
 										"column": 3
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 363,
-									"end": 364,
+									"start": 547,
+									"end": 548,
 									"loc": {
 										"start": {
-											"line": 16,
+											"line": 18,
 											"column": 2
 										},
 										"end": {
-											"line": 16,
+											"line": 18,
 											"column": 3
 										}
 									},
@@ -543,8 +639,8 @@
 									{
 										"type": "Line",
 										"value": " c4",
-										"start": 365,
-										"end": 370
+										"start": 549,
+										"end": 554
 									}
 								]
 							}
@@ -553,37 +649,49 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a retained paren shell's trailing gap behaves the same way",
+							"value": " a retained paren shell's trailing gap behaves the same way - and an extra redundant",
 							"start": 286,
-							"end": 347
+							"end": 372
+						},
+						{
+							"type": "Line",
+							"value": " LAYER changes nothing, the layers stripping as a unit so the retain question is the",
+							"start": 374,
+							"end": 460
+						},
+						{
+							"type": "Line",
+							"value": " whole nest's (unformatted_ours_paren_layer carries that authoring)",
+							"start": 462,
+							"end": 531
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 387,
-					"end": 414,
+					"start": 571,
+					"end": 598,
 					"loc": {
 						"start": {
-							"line": 20,
+							"line": 22,
 							"column": 1
 						},
 						"end": {
-							"line": 22,
+							"line": 24,
 							"column": 5
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 392,
-						"end": 394,
+						"start": 576,
+						"end": 578,
 						"loc": {
 							"start": {
-								"line": 20,
+								"line": 22,
 								"column": 6
 							},
 							"end": {
-								"line": 20,
+								"line": 22,
 								"column": 8
 							}
 						},
@@ -591,57 +699,57 @@
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
-						"start": 397,
-						"end": 413,
+						"start": 581,
+						"end": 597,
 						"loc": {
 							"start": {
-								"line": 20,
+								"line": 22,
 								"column": 11
 							},
 							"end": {
-								"line": 22,
+								"line": 24,
 								"column": 4
 							}
 						},
 						"elementType": {
 							"type": "TSParenthesizedType",
-							"start": 397,
-							"end": 411,
+							"start": 581,
+							"end": 595,
 							"loc": {
 								"start": {
-									"line": 20,
+									"line": 22,
 									"column": 11
 								},
 								"end": {
-									"line": 22,
+									"line": 24,
 									"column": 2
 								}
 							},
 							"typeAnnotation": {
 								"type": "TSTypeReference",
-								"start": 401,
-								"end": 402,
+								"start": 585,
+								"end": 586,
 								"loc": {
 									"start": {
-										"line": 21,
+										"line": 23,
 										"column": 2
 									},
 									"end": {
-										"line": 21,
+										"line": 23,
 										"column": 3
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 401,
-									"end": 402,
+									"start": 585,
+									"end": 586,
 									"loc": {
 										"start": {
-											"line": 21,
+											"line": 23,
 											"column": 2
 										},
 										"end": {
-											"line": 21,
+											"line": 23,
 											"column": 3
 										}
 									},
@@ -651,8 +759,8 @@
 									{
 										"type": "Line",
 										"value": " c6",
-										"start": 403,
-										"end": 408
+										"start": 587,
+										"end": 592
 									}
 								]
 							}
@@ -662,8 +770,130 @@
 						{
 							"type": "Line",
 							"value": " c5",
-							"start": 373,
-							"end": 378
+							"start": 557,
+							"end": 562
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 769,
+					"end": 802,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 774,
+						"end": 776,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 6
+							},
+							"end": {
+								"line": 28,
+								"column": 8
+							}
+						},
+						"name": "B3"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 779,
+						"end": 801,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 11
+							},
+							"end": {
+								"line": 30,
+								"column": 4
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 779,
+							"end": 799,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 11
+								},
+								"end": {
+									"line": 30,
+									"column": 2
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 789,
+								"end": 790,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 789,
+									"end": 790,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 3
+										}
+									},
+									"name": "U"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c7",
+										"start": 781,
+										"end": 786
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c8",
+										"start": 791,
+										"end": 796
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a LEADING run in the same nest: the retain rule is asked of the whole nest, so the",
+							"start": 601,
+							"end": 686
+						},
+						{
+							"type": "Line",
+							"value": " pair survives and the enclosing gap must not claim the leading run out of it",
+							"start": 688,
+							"end": 767
 						}
 					]
 				}
