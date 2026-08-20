@@ -24,4 +24,15 @@
 	type H = & // c6
 	 (// d6
 	h);
+
+	// the shell one link DEEPER, under an array suffix on a 2-member intersection: the
+	// leading gap is the intersection's own, and the member's leading-EDGE shell rides it
+	type I = & /* c7 */ (// d7
+	i)[] & j;
+
+	// and the same deeper shell reached through the LINE-comment route, which owns the gap
+	// through its own emitter - one shape, both routes
+	type J = & // c8
+	 (// d8
+	k)[] & l;
 </script>

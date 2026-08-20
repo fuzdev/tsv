@@ -8,6 +8,7 @@ use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_indexed_access_object,
+    unwrap_parenthesized,
 };
 use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
 use crate::printer::{
@@ -533,13 +534,27 @@ impl<'a> Printer<'a> {
                     // expansion, so keep `= {` together like other internally-breaking types
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
-                } else if u.types.len() == 1 && self.value_owns_its_comment_break(&u.types[0]) {
+                } else if u.types.len() == 1
+                    && (self.value_owns_its_comment_break(&u.types[0])
+                        || (matches!(unwrap_parenthesized(&u.types[0]), TSType::Intersection(_))
+                            && d.will_break(type_doc)))
+                {
                     // A single-member union prints transparently as its member (prettier
                     // drops the node in postprocess), so a member that owns its comment
                     // break hugs the `=` exactly as it would bare — `= | (A // c)`
                     // collapses to the retained shell, whose parens own the break. The
                     // hang below would split the `=` for a break the reparse (seeing the
                     // bare shell) reproduces at the shell, not the `=` (F1).
+                    //
+                    // A member that collapses to an INTERSECTION takes that arm's rule for
+                    // the same reason, read off the doc the collapse just built: the
+                    // intersection arm below hugs a `will_break` value and the bare
+                    // authoring goes straight there, so hanging here split the `=` for a
+                    // break the reparse — which no longer sees a union at all — reproduces
+                    // inside the intersection (`= | ((// c⏎A | B) & C)`). The kind is asked
+                    // because the break must be the MEMBER's: a member collapsing to a
+                    // union breaks from the union's own leading-`|` layout, which is what
+                    // the hang indents.
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
                 } else if lead_space {

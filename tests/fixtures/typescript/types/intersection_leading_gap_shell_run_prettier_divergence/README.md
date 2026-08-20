@@ -28,15 +28,31 @@ spelling is the one place they don't, and three things went wrong there at once:
   enclosing seam whose leading-edge claim had widened over the shell, and once from the
   intersection itself. The claim names the shell's region while the enclosing gap's *window*
   opens at its own start, so it swallowed bytes nobody had handed it — an anchor shift, not
-  a partition. The seam now declines the descent for a leading-operator intersection whose
-  gap actually holds a comment (empty, the two windows coincide and the claim is exactly the
-  shell's, which the array / indexed-access / conditional positions still need);
+  a partition. The seam now declines the descent for a **multi-member** leading-operator
+  intersection whose gap actually holds a comment (empty, the two windows coincide and the
+  claim is exactly the shell's, which the array / indexed-access / conditional positions still
+  need; with ONE member the `&` is dropped outright and the gap is the enclosing one's, which
+  [single_member_intersection_leading_gap_shell_run](../single_member_intersection_leading_gap_shell_run_prettier_divergence/)
+  pins);
 - emitted by the body *after* the hoisted run, the pair came back **REVERSED** — `// d1`
   ahead of `/* c1 */`, which the author wrote first.
 
 `H` is the same run reached with a **line** comment in the gap, which routes through
 `build_intersection_leading_gap_line_comment_doc` — the sibling that already composed the
 two windows this way, and the reason the hoist route now spells it identically.
+
+`I` puts the shell one link DEEPER, at the first member's leading printed **edge** under an
+array suffix. There is nothing to strip there, so the hoist's own window finds nothing and
+the shell printed its run at whatever indent it was built at, welded onto the block the gap
+had already emitted. The gap claims that edge shell too — the same
+`Printer::leading_edge_shell_line_comment_claim` an enclosing gap would use — and builds the
+member with the shell's copy suppressed, so the run stays one run.
+
+`J` is `I` reached through the **line**-comment route (`H`'s), which is the same gap answered
+by a different emitter — and it failed the same way while only the hoist route knew about the
+edge shell. Both now resolve the first member's head run and build the claimed body through
+one pair (`IntersectionHeadRun`, `Printer::build_intersection_claimed_body_doc`), so the two
+routes cannot answer the shape question differently.
 
 ## Prettier
 
