@@ -23,7 +23,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 **Embedding** (used by `tsv_svelte` for `<style>` blocks):
 
 - `parse_embedded(source, base_offset, arena: &'arena Bump) -> Result<CssStyleSheet<'arena>>` — same parser, but span positions are shifted by `base_offset` so they index into the parent Svelte file; `arena` is the host document's `Bump`, so the embedded CSS AST shares it
-- `format_embedded(&stylesheet, source, EmbedContext)` — formats with `EmbedContext::base_indent_offset` so wrapped lines respect outer Svelte indentation. `format_embedded_in(..., &DocArena)` is the arena-sharing form the Svelte host uses (builds the CSS doc nodes into the host's doc arena rather than a fresh per-block one; still renders to an owned `String`, and the arena is not reset so the host's in-flight nodes stay valid)
+- `format_embedded_in(&stylesheet, source, line_breaks, EmbedContext, &DocArena)` — formats with `EmbedContext::base_indent_offset` so wrapped lines respect outer Svelte indentation, building the CSS doc nodes into the host's doc arena rather than a fresh per-block one (it still renders to an owned `String`, and the arena is not reset so the host's in-flight nodes stay valid). The Svelte host is its only caller, so there is no fresh-arena twin — an embedded stylesheet always has a host arena to lend
 - `ast::convert::write_css_children` / `write_css_comments` — emit an embedded-`<style>` stylesheet's `children` and `comments` arrays (no `metadata`), the two adjacent keys `tsv_svelte`'s writer composes for the `<style>` element. The first returns the opaque `CssComments` run its walk gathered; the second spends it
 
 ## Distinctives

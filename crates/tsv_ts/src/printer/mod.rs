@@ -668,11 +668,6 @@ impl<'a> Printer<'a> {
         self.buffer.into_string()
     }
 
-    /// Set the indent level (for formatting expressions in nested contexts)
-    pub(crate) fn set_indent_level(&mut self, level: usize) {
-        self.indent_level = level;
-    }
-
     /// Get the current column position (for doc-builder width calculations)
     pub(crate) fn current_column(&self) -> usize {
         self.buffer.current_column(TAB_WIDTH)

@@ -10,6 +10,9 @@
 # Any future fixture carrying deliberate CR bytes needs an entry here.
 unformatted_cr.svelte -text
 unformatted_crlf.svelte -text
+input_invalid_raw_cr.svelte -text
+unformatted_cr_reindent.svelte -text
+unformatted_crlf_reindent.svelte -text
 
 # Recorded oracle outputs — committed on purpose, but generated:
 # collapse in GitHub diffs and exclude from language stats.

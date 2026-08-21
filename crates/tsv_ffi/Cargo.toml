@@ -18,6 +18,11 @@ tsv_css = { workspace = true }
 # doesn't pull tsv_lang (the doc-arena helper's dep); the `format` feature below
 # re-enables it.
 tsv_arena = { workspace = true }
+# The format path's line-terminator fold (`printing::normalize_carriage_returns`), applied
+# ahead of the parse. The DIRECT edge is format-only, matching this crate's feature
+# discipline; the crate is in the graph either way (every language crate depends on it), so
+# the parse-only build is unchanged.
+tsv_lang = { workspace = true, optional = true }
 serde_json.workspace = true
 
 [features]
@@ -27,7 +32,7 @@ serde_json.workspace = true
 # native mirror of @fuzdev/tsv_format_wasm — it drops the convert/JSON layer.
 default = ["format", "parse"]
 # tsv_format_<lang> exports. Pulls the reusable `DocArena` (tsv_arena/format → tsv_lang).
-format = ["tsv_arena/format"]
+format = ["tsv_arena/format", "dep:tsv_lang"]
 # tsv_parse_<lang> + tsv_parse_internal_<lang> exports plus the wire-JSON
 # convert layer they emit through.
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]

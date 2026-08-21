@@ -3,8 +3,9 @@
 // This module provides common printing logic used across language printers
 // (TypeScript, CSS, Svelte) to eliminate code duplication.
 
-use crate::Span;
 use crate::escapes::swap_quote_escaping;
+use crate::swar::{splat, zero_lanes};
+use std::borrow::Cow;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthChar;
 
@@ -224,6 +225,117 @@ pub fn ecmascript_lines(text: &str) -> impl Iterator<Item = &str> {
     })
 }
 
+/// Fold every **carriage return** in `source` to LF, so everything downstream sees the
+/// LF-only text each of tsv's languages is defined over. Borrowed unchanged when there is
+/// none — the overwhelming majority of documents — for one `memchr` and the caller's
+/// `&str` back.
+///
+/// Call this on a source string **before parsing it to FORMAT**, and never before parsing it
+/// for the wire AST: the fold shifts byte offsets, and `parse`'s offsets are a drop-in
+/// contract with acorn / Svelte / `parseCss` over the author's own bytes. Every
+/// parse-then-format entry point does it — `tsv_ts` / `tsv_svelte`'s `format_str`, the CLI's
+/// `format_source` (CSS's only one, having no `format_str` of its own), each binding's format
+/// export, and `canonicalize_js` — so no printer ever sees a `<CR>`.
+/// It is also where prettier answers the same question (`normalizeEndOfLine`, in
+/// `normalizeInputAndOptions`, ahead of the parse).
+///
+/// **Every language tsv formats folds the CR itself, before it tokenizes.** HTML
+/// preprocesses its input stream so that "there are never any U+000D CR characters in the
+/// input to the tokenization stage"; CSS Syntax §3.3 filters `<CR>`, `<FF>` and `<CR><LF>`
+/// to a single `<LF>` on the way in. ECMAScript has no input-stream pass — `<CR>` is a real
+/// `LineTerminator` in its grammar — but it folds at the only place a `<CR>` can reach a
+/// *value*: "`<CR><LF>` and `<CR>` |LineTerminatorSequence|s are normalized to `<LF>` for
+/// both TV and TRV" (a raw `<CR>` cannot appear in a `StringLiteral` or a
+/// `RegularExpressionLiteral` at all). So this changes bytes without changing meaning at
+/// every position it reaches.
+///
+/// **Why the input rather than the finished output.** The printer asks *where are the
+/// lines?* in several places that split on `'\n'` alone: [`crate::Comment::multiline`] at
+/// parse, [`is_indentable_block_comment`] / [`strip_comment_indentation`] at doc-build, and the
+/// per-line emitters under them. A fold applied to the finished string leaves every one of
+/// those disagreeing with the output about where the lines *are* — a lone-`<CR>` document's
+/// block comment reads as a single line, rides out verbatim, and the fold then splits it, so
+/// a second pass re-indents what the first left alone and idempotence fails. Folding first
+/// makes all of them right by construction, and is one answer rather than one per reader.
+///
+/// **CR only** — not the whole [`line_terminator_len`] class. U+2028 / U+2029 are
+/// terminators to ECMAScript but ordinary characters to HTML and CSS text, both formatters
+/// keep them where the author put them, and ECMAScript's own TRV keeps each as itself
+/// (`<LS>` → U+2028), so folding one would change what a template renders.
+///
+/// Idempotent: its own output holds no `<CR>` to fold.
+#[must_use]
+pub fn normalize_carriage_returns(source: &str) -> Cow<'_, str> {
+    let Some(first) = source.find('\r') else {
+        return Cow::Borrowed(source);
+    };
+    let mut out = String::with_capacity(source.len());
+    out.push_str(&source[..first]);
+    let mut rest = &source[first..];
+    while let Some(i) = rest.find('\r') {
+        out.push_str(&rest[..i]);
+        out.push('\n');
+        let after = &rest[i + 1..];
+        // A CRLF pair is ONE LineTerminatorSequence: consume the `\n` so it does not
+        // become a second.
+        rest = after.strip_prefix('\n').unwrap_or(after);
+    }
+    out.push_str(rest);
+    Cow::Owned(out)
+}
+
+/// The line `position` sits on, as `(line_start, line_end, line_number)` — bounds in bytes,
+/// number 1-indexed — over the ECMAScript terminator class ([`line_terminator_len`]).
+///
+/// The answer for a lone byte offset with no line table to hand: the diagnostic snippet in
+/// [`crate::error`]. The printer's hot path asks the same question against a prebuilt table
+/// instead ([`is_same_line_fast`] and its siblings, over [`build_line_breaks_into`]), which
+/// is why this one walks rather than bisects — it runs once, on a source that failed to
+/// parse.
+///
+/// Splitting on `'\n'` alone is what this exists to prevent: it makes a lone-`<CR>` or
+/// `<LS>`-separated source ONE line, so the number is 1 whatever the position, and the
+/// excerpt carries raw `<CR>`s that a terminal renders by overwriting the line it just
+/// printed — hiding the very text a caret points into.
+pub(crate) fn line_bounds_at(source: &str, position: usize) -> (usize, usize, usize) {
+    let bytes = source.as_bytes();
+    let mut line_start = 0;
+    let mut line_number = 1;
+    let mut i = 0;
+    while i < position {
+        let candidate = next_line_terminator_candidate(bytes, i);
+        if candidate >= position {
+            break;
+        }
+        i = candidate;
+        match line_terminator_len(bytes, i) {
+            // A sequence that ENDS at or before `position` opens the line we want.
+            Some(len) => {
+                if i + len > position {
+                    // `position` sits INSIDE the sequence — a byte offset between a `<CR>`
+                    // and its `<LF>`. The line it belongs to is the one this sequence ends.
+                    return (line_start, i, line_number);
+                }
+                line_number += 1;
+                line_start = i + len;
+                i += len;
+            }
+            // A `0xE2` lead that is not `<LS>` / `<PS>`.
+            None => i += 1,
+        }
+    }
+
+    let mut line_end = position.max(line_start);
+    while line_end < bytes.len() {
+        line_end = next_line_terminator_candidate(bytes, line_end);
+        if line_end >= bytes.len() || line_terminator_len(bytes, line_end).is_some() {
+            break;
+        }
+        line_end += 1;
+    }
+    (line_start, line_end.min(bytes.len()), line_number)
+}
+
 /// Whether `text` holds any ECMAScript line terminator ([`line_terminator_len`]).
 #[inline]
 fn contains_line_terminator(text: &str) -> bool {
@@ -262,57 +374,6 @@ fn count_line_terminators(text: &str) -> usize {
         }
     }
     count
-}
-
-/// Check if two spans are on the same line
-///
-/// This is a span-aware version of [`is_same_line`] that handles span ordering
-/// and overlap detection. Spans can be provided in any order.
-///
-/// Returns `true` if:
-/// - The spans overlap or touch (share a boundary)
-/// - There is no newline between the end of the first span and start of the second
-///
-/// # Arguments
-///
-/// * `source` - The source text
-/// * `span1` - First span
-/// * `span2` - Second span
-///
-/// # Returns
-///
-/// `true` if the spans are on the same line, `false` otherwise.
-/// Returns `false` if span positions are out of bounds.
-///
-/// # Examples
-///
-/// ```
-/// use tsv_lang::{Span, printing::spans_on_same_line};
-///
-/// let source = "foo bar\nbaz";
-/// let span1 = Span::new(0, 3);  // "foo"
-/// let span2 = Span::new(4, 7);  // "bar"
-/// let span3 = Span::new(8, 11); // "baz"
-///
-/// assert_eq!(spans_on_same_line(source, span1, span2), true);  // foo and bar
-/// assert_eq!(spans_on_same_line(source, span1, span3), false); // crosses newline
-/// assert_eq!(spans_on_same_line(source, span2, span1), true);  // order doesn't matter
-/// ```
-pub fn spans_on_same_line(source: &str, span1: Span, span2: Span) -> bool {
-    // Determine which span comes first
-    let (first, second) = if span1.start <= span2.start {
-        (span1, span2)
-    } else {
-        (span2, span1)
-    };
-
-    // If spans overlap or touch, they're on the same line
-    if first.end >= second.start {
-        return true;
-    }
-
-    // Check if there's a newline between the spans
-    is_same_line(source, first.end, second.start)
 }
 
 /// Check if there's a blank line (2+ newlines) between two positions
@@ -638,9 +699,18 @@ pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
     // chain (a no-op once the parked table is warm). Capacity-only — never
     // affects the recorded values.
     breaks.reserve(source.len() / 32);
-    let bytes = source.as_bytes();
+    build_line_breaks_bytes(source.as_bytes(), breaks);
+}
+
+/// [`build_line_breaks_into`]'s walk, over bytes and without the capacity reserve — the
+/// shape the exhaustive equivalence test grades against its byte-at-a-time reference.
+fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) {
     let mut i = 0;
     while i < bytes.len() {
+        i = next_line_terminator_candidate(bytes, i);
+        if i >= bytes.len() {
+            break;
+        }
         match line_terminator_len(bytes, i) {
             // The recorded offset is the sequence's LAST byte, which is what the
             // LF-only builder recorded for both `\n` and `\r\n`. Every consumer
@@ -651,10 +721,51 @@ pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
                 breaks.push((i + len - 1) as u32);
                 i += len;
             }
+            // A `0xE2` lead that is not `<LS>` / `<PS>` — the candidate scan's only
+            // false positive, and the reason it is a CANDIDATE scan.
             None => i += 1,
         }
     }
 }
+
+/// Index of the first byte at or after `from` that could BEGIN a line terminator
+/// sequence — `\n`, `\r`, or the `0xE2` lead of `<LS>` / `<PS>` — or `bytes.len()`.
+///
+/// The same word-at-a-time shape, and the same reason, as `location`'s
+/// `next_ecmascript_terminator`: terminators are sparse (~1 per 30–40 source bytes), so a
+/// per-byte compare spends nearly all of its work confirming misses, and this table is
+/// built once over the whole source in every `format_in`. The third needle is what
+/// `location`'s does not need — that one runs inside a run already proven ASCII, where no
+/// `<LS>` / `<PS>` can occur; this one runs over the raw source, so it must not skip the
+/// `0xE2` lead. `line_terminator_len` then classifies the hit, since most `0xE2` bytes
+/// begin some other character.
+///
+/// `from_le_bytes` puts byte 0 in the low lane, so the lowest set bit is the earliest
+/// match, and OR-ing the three masks preserves [`crate::swar::zero_lanes`]'s lowest-lane
+/// guarantee: a spurious lane in any one mask is preceded by a genuine one in that same
+/// mask.
+#[inline]
+fn next_line_terminator_candidate(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        let hits = zero_lanes(w ^ splat(b'\n'))
+            | zero_lanes(w ^ splat(b'\r'))
+            | zero_lanes(w ^ splat(LINE_SEPARATOR_LEAD));
+        if hits != 0 {
+            return i + (hits.trailing_zeros() / 8) as usize;
+        }
+        i += 8;
+    }
+    while i < bytes.len() && !matches!(bytes[i], b'\n' | b'\r' | LINE_SEPARATOR_LEAD) {
+        i += 1;
+    }
+    i
+}
+
+/// The UTF-8 lead byte of `<LS>` (U+2028) and `<PS>` (U+2029) — `E2 80 A8/A9`, the only
+/// multi-byte line terminators, spelled once for the scan and its scalar tail.
+const LINE_SEPARATOR_LEAD: u8 = 0xE2;
 
 /// Strip common indentation from comment content based on its position in source
 ///
@@ -1261,6 +1372,164 @@ mod tests {
         }
     }
 
+    /// The byte-at-a-time shape [`build_line_breaks_bytes`]'s word-at-a-time scan replaced,
+    /// kept as its arithmetic oracle.
+    ///
+    /// **No corpus can grade the replacement.** A word-at-a-time rewrite fails on *where
+    /// the pattern lands relative to the stride*, which a corpus samples arbitrarily — and
+    /// real source contains no `\r` at all, so its whole CRLF arm is corpus-dead. See
+    /// `docs/performance.md` §"The same rule covers scans".
+    fn reference_line_breaks(bytes: &[u8]) -> Vec<u32> {
+        let mut breaks = Vec::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            match line_terminator_len(bytes, i) {
+                Some(len) => {
+                    breaks.push((i + len - 1) as u32);
+                    i += len;
+                }
+                None => i += 1,
+            }
+        }
+        breaks
+    }
+
+    /// [`next_line_terminator_candidate`] graded DIRECTLY, at every length and alignment.
+    ///
+    /// Its caller cannot grade it: `build_line_breaks_bytes` steps a byte on a
+    /// non-terminator, so a scan that gave up at the last short chunk would degrade into
+    /// the caller's own per-byte walk and produce the same table. Deleting the scalar tail
+    /// therefore passes the table-level test — which is what "an oracle you have never seen
+    /// fail proves nothing" means in practice, one level up from the usual reading.
+    #[test]
+    fn swar_candidate_scan_matches_the_scalar_reference_exhaustive() {
+        const ALPHABET: [u8; 8] = [b'\n', b'\r', 0xE2, 0x80, 0xA8, 0xA9, b'a', 0x7f];
+        fn reference(bytes: &[u8], from: usize) -> usize {
+            let mut i = from;
+            while i < bytes.len() && !matches!(bytes[i], b'\n' | b'\r' | 0xE2) {
+                i += 1;
+            }
+            i
+        }
+        let mut buf = Vec::new();
+        for align in 0..=16usize {
+            for len in 0..=4usize {
+                for mut code in 0..8usize.pow(len as u32) {
+                    buf.clear();
+                    buf.resize(align, b'x');
+                    for _ in 0..len {
+                        buf.push(ALPHABET[code % 8]);
+                        code /= 8;
+                    }
+                    for from in 0..=buf.len() {
+                        assert_eq!(
+                            next_line_terminator_candidate(&buf, from),
+                            reference(&buf, from),
+                            "align {align}, from {from}, bytes {buf:02x?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Every string of length 0–4 over an alphabet covering each arm, at every alignment
+    /// across the word stride. The alphabet holds both `<LS>`/`<PS>` continuation bytes and
+    /// a bare `0xE2` lead, so the candidate scan's one false positive is exercised in every
+    /// position; the inputs are raw bytes (the scan reads bytes, never chars), which lets a
+    /// truncated sequence sit at the very end of the slice.
+    #[test]
+    fn swar_line_break_scan_matches_the_scalar_reference_exhaustive() {
+        const ALPHABET: [u8; 8] = [b'\n', b'\r', 0xE2, 0x80, 0xA8, 0xA9, b'a', 0x7f];
+        let mut buf = Vec::new();
+        let mut actual = Vec::new();
+        for align in 0..=16usize {
+            for len in 0..=4usize {
+                for mut code in 0..8usize.pow(len as u32) {
+                    buf.clear();
+                    buf.resize(align, b'x');
+                    for _ in 0..len {
+                        buf.push(ALPHABET[code % 8]);
+                        code /= 8;
+                    }
+                    actual.clear();
+                    build_line_breaks_bytes(&buf, &mut actual);
+                    assert_eq!(
+                        actual,
+                        reference_line_breaks(&buf),
+                        "align {align}, bytes {buf:02x?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The same equivalence on inputs long enough to run the word loop many times over,
+    /// with the terminators sparse the way real source has them.
+    #[test]
+    fn swar_line_break_scan_matches_the_scalar_reference_on_long_sources() {
+        for period in [7usize, 8, 9, 16, 31, 33] {
+            for terminator in ["\n", "\r\n", "\r", "\u{2028}", "\u{2029}"] {
+                let mut src = String::new();
+                for line in 0..40 {
+                    src.push_str(&"x".repeat(period + line % 3));
+                    src.push_str(terminator);
+                }
+                // A bare `0xE2` lead that is NOT a terminator, mid-source.
+                src.push('\u{2603}');
+                src.push('\n');
+                let mut actual = Vec::new();
+                build_line_breaks_bytes(src.as_bytes(), &mut actual);
+                assert_eq!(
+                    actual,
+                    reference_line_breaks(src.as_bytes()),
+                    "period {period}, terminator {terminator:?}"
+                );
+            }
+        }
+    }
+
+    /// Every spelling of a carriage return folds to LF, and a CRLF pair stays ONE terminator.
+    #[test]
+    fn carriage_returns_normalize_to_lf() {
+        assert_eq!(normalize_carriage_returns("a\r\nb"), "a\nb");
+        assert_eq!(normalize_carriage_returns("a\rb"), "a\nb");
+        assert_eq!(normalize_carriage_returns("a\r\n\r\nb"), "a\n\nb");
+        assert_eq!(normalize_carriage_returns("a\r\rb"), "a\n\nb");
+        // `\n\r` is two terminators, not a pair — only `\r\n` is one.
+        assert_eq!(normalize_carriage_returns("a\n\rb"), "a\n\nb");
+        assert_eq!(normalize_carriage_returns("\r"), "\n");
+        assert_eq!(normalize_carriage_returns("\r\n"), "\n");
+    }
+
+    /// A CR-free string comes back BORROWED — the fold runs ahead of every format, so the
+    /// common document must not pay an allocation for it — and folding is idempotent.
+    #[test]
+    fn carriage_return_normalization_borrows_without_one_and_is_idempotent() {
+        assert!(matches!(
+            normalize_carriage_returns("a\nb\n"),
+            Cow::Borrowed("a\nb\n")
+        ));
+        assert!(matches!(normalize_carriage_returns(""), Cow::Borrowed("")));
+        let once = normalize_carriage_returns("a\r\nb\rc").into_owned();
+        assert!(matches!(
+            normalize_carriage_returns(&once),
+            Cow::Borrowed(_)
+        ));
+        assert_eq!(once, "a\nb\nc");
+    }
+
+    /// U+2028 / U+2029 are terminators to ECMAScript and ordinary characters to HTML and CSS
+    /// text. Both formatters keep them where the author put them, and ECMAScript's own TRV
+    /// keeps each as itself, so this fold must not reach them even though
+    /// `line_terminator_len` counts them.
+    #[test]
+    fn carriage_return_normalization_leaves_line_and_paragraph_separators_alone() {
+        assert_eq!(normalize_carriage_returns("a\u{2028}b"), "a\u{2028}b");
+        assert_eq!(normalize_carriage_returns("a\u{2029}b"), "a\u{2029}b");
+        assert_eq!(normalize_carriage_returns("a\u{2028}\r\nb"), "a\u{2028}\nb");
+    }
+
     #[test]
     fn test_a_bare_0xe2_lead_is_not_a_terminator() {
         // `<LS>`/`<PS>` are the only 0xE2 leads that terminate a line; every other
@@ -1301,16 +1570,6 @@ mod tests {
     fn test_has_newline_between_invalid_positions() {
         assert!(!has_newline_between("{\nx", 5, 1));
         assert!(!has_newline_between("{\nx", 0, 99));
-    }
-
-    #[test]
-    fn test_spans_on_same_line_overlap_and_reversed() {
-        let source = "abcdefgh";
-        let a = Span::new(0, 5);
-        let b = Span::new(3, 8); // overlaps `a`
-        assert!(spans_on_same_line(source, a, b));
-        // Argument order must not matter.
-        assert!(spans_on_same_line(source, b, a));
     }
 
     #[test]

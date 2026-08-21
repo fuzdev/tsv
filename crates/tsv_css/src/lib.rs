@@ -104,48 +104,20 @@ pub fn format_in(
     printer::format_css_in(stylesheet, source, arena)
 }
 
-/// Format a CSS stylesheet embedded in another language (e.g., Svelte).
-///
-/// Pass an [`EmbedContext`](tsv_lang::EmbedContext) with `base_indent_offset`
-/// so wrapped lines respect the host's indentation.
-///
-/// # Arguments
-/// * `stylesheet` - CSS stylesheet (nodes + value comments)
-/// * `source` - The whole host document (spans are absolute)
-/// * `line_breaks` - The host's whole-source line-break table
-///   (`tsv_lang::printing::build_line_breaks(source)`) — the host printer
-///   already holds one, so embedding doesn't rebuild it per `<style>` block
-/// * `embed` - Embedding context (e.g., `base_indent_offset`)
-///
-/// # Example
-/// ```
-/// use tsv_css::{parse, format_embedded};
-/// use tsv_lang::EmbedContext;
-///
-/// let css = "div{color:red;}";
-/// let arena = bumpalo::Bump::new();
-/// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
-/// let line_breaks = tsv_lang::printing::build_line_breaks(css);
-/// let embed = EmbedContext { base_indent_offset: 1, ..EmbedContext::default() };
-/// let formatted = format_embedded(&stylesheet, css, &line_breaks, embed);
-/// ```
-pub fn format_embedded(
-    stylesheet: &CssStyleSheet<'_>,
-    source: &str,
-    line_breaks: &[u32],
-    embed: tsv_lang::EmbedContext,
-) -> String {
-    printer::format_css_embedded(stylesheet, source, line_breaks, embed)
-}
-
 /// Format an embedded CSS stylesheet into a caller-provided doc arena.
 ///
-/// Identical output to [`format_embedded`], but the doc IR is built into `arena`
-/// rather than a freshly allocated one — so a Svelte host formatting a `<style>`
-/// block can share its own document arena instead of allocating a second
-/// whole-host-sized `DocArena` per block. Nothing borrowed from `arena` escapes
-/// (the embedded CSS renders to an owned `String`), and the arena is **not**
-/// reset, so the host's in-flight doc nodes stay valid across the call.
+/// `embed.base_indent_offset` seeds the indent so wrapped lines respect the host's
+/// indentation, and `source` is the whole host document (spans are absolute), so
+/// `line_breaks` is the host's whole-source table — never island-local.
+///
+/// The doc IR is built into `arena` rather than a freshly allocated one, so a Svelte host
+/// formatting a `<style>` block shares its own document arena instead of allocating a
+/// second whole-host-sized `DocArena` per block. Nothing borrowed from `arena` escapes (the
+/// embedded CSS renders to an owned `String`), and the arena is **not** reset, so the
+/// host's in-flight doc nodes stay valid across the call.
+///
+/// There is no fresh-arena twin: an embedded stylesheet always has a host arena to lend,
+/// and the Svelte host is the only caller.
 pub fn format_embedded_in(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,

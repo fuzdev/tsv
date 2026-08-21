@@ -71,19 +71,16 @@ fn comment_from_token(
 ) -> (Comment, bool) {
     let content_end = if is_block { token_end - 2 } else { token_end };
     let content = &source[content_start..content_end];
-    // Line comments end at the first line terminator, so their content never
-    // contains one — gate both scans below on `is_block` (value unchanged, scan
-    // skipped for every `//` comment).
-    //
-    // Ask the `\n` question first: it is a single-`char` pattern, so it lowers to
-    // a `memchr`, whereas the full `LineTerminator` predicate is a char-at-a-time
-    // searcher over the whole comment body (a long JSDoc block pays that in full).
-    // And a `\n` *is* a line terminator, so on the common multi-line block comment
-    // it answers the wider question for free; only a block comment with no `\n` at
-    // all — a one-liner like `/* x */` — reaches the rare-terminator scan, which is
-    // spelled as the shared production minus the character already ruled out rather
-    // than as its own list, so widening the class cannot leave this behind.
-    let multiline = is_block && content.contains('\n');
+    // Ask the `\n` question first — `Comment::content_is_multiline`, which is also the
+    // `is_block` gate (a `//` comment's content can hold no terminator at all). It is a
+    // single-`char` pattern, so it lowers to a `memchr`, whereas the full `LineTerminator`
+    // predicate is a char-at-a-time searcher over the whole comment body (a long JSDoc block
+    // pays that in full). And a `\n` *is* a line terminator, so on the common multi-line block
+    // comment it answers the wider question for free; only a block comment with no `\n` at all
+    // — a one-liner like `/* x */` — reaches the rare-terminator scan, which is spelled as the
+    // shared production minus the character already ruled out rather than as its own list, so
+    // widening the class cannot leave this behind.
+    let multiline = Comment::content_is_multiline(is_block, content);
     let has_line_terminator =
         is_block && (multiline || content.contains(|c| is_es_line_terminator(c) && c != '\n'));
     let comment = Comment {

@@ -144,7 +144,10 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         debug_assert!(matches!(self.current_kind, TokenKind::Comment));
         // Content excludes the `/* */` delimiters; recovered on demand as a
         // source slice rather than copied.
-        let multiline = self.source[self.current_start + 2..self.current_end - 2].contains('\n');
+        let multiline = Comment::content_is_multiline(
+            true,
+            &self.source[self.current_start + 2..self.current_end - 2],
+        );
         Comment {
             content_span: Span {
                 start: self.span_pos(self.current_start + 2),

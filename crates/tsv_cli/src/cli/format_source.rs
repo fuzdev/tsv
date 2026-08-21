@@ -63,6 +63,14 @@ pub fn format_source_in_with_goal(
     arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
 ) -> Result<String, String> {
+    // The format path's line-terminator fold, ahead of the parse — the seam every consumer
+    // of this module inherits (the `format` command and every `tsv_debug` audit), so a
+    // printer never sees a `<CR>` and the doc-build's line splits agree with the output
+    // about where the lines are. See `tsv_lang::printing::normalize_carriage_returns`; the
+    // `parse` command deliberately skips it, its offsets being a drop-in contract over the
+    // author's own bytes. Borrowed unchanged on a source with no `<CR>`.
+    let source = tsv_lang::printing::normalize_carriage_returns(source);
+    let source = source.as_ref();
     match parser_type {
         ParserType::Svelte => tsv_svelte::parse(source, arena)
             .map(|ast| tsv_svelte::format_in(&ast, source, doc_arena))
