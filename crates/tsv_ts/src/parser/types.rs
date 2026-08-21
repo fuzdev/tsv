@@ -12,7 +12,7 @@ use tsv_lang::{ParseError, Span};
 use super::Parser;
 use super::expression_lookahead::{paren_pattern_then_type_operator, scan_parens_then_arrow};
 use super::scan::{
-    identifier_continues_at, identifier_starts_at, skip_identifier, skip_whitespace_and_comments,
+    identifier_starts_at, is_word_at, skip_identifier, skip_whitespace_and_comments,
 };
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -601,9 +601,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Then the `in` keyword, at a word boundary so `[index]` and `[inK in K]`
         // don't false-match on a leading `in`.
-        pos + 2 <= bytes.len()
-            && &bytes[pos..pos + 2] == b"in"
-            && !identifier_continues_at(bytes, pos + 2)
+        is_word_at(bytes, pos, b"in")
     }
 
     /// Parse type reference: `Foo` or `Foo.Bar` or `Foo<T>`

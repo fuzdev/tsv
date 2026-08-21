@@ -50,6 +50,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // A keyword can also be a value (`null`, `true`, `undefined`, or a variable
                 // named `string`, etc.), so `x < null` is a comparison. Confirm a closing
                 // `>` follows before committing to type arguments.
+                //
+                // TODO: this arm confirms only that a `>` closes and what follows it —
+                // unlike the identifier arm below, it never checks that what sits BETWEEN
+                // the angles could be a type. So a keyword used as an ordinary name with
+                // non-type content after it is over-rejected whenever the follow token
+                // does not start an expression: ``p < string ? q : r > `t` `` and
+                // ``p < string - 1 > `t` `` are plain conditionals to acorn and parse
+                // errors here. 18 of the 20 keywords reach it (all but `typeof`, `void`,
+                // `import` and `new`, which acorn also rejects). The fix is the
+                // identifier arm's what-follows-the-name filter, applied here too.
                 scan_for_closing_angle_bracket(bytes, pos)
             }
 
@@ -264,9 +274,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// asks. This used to hand-roll its own boundary and got two character classes wrong
     /// in the same direction: `$` was read as *ending* the word (so `string$` matched
     /// `string`), and so was every byte `>= 0x80` (so `stringµ` did too). Either way an
-    /// ordinary identifier went down the keyword arm, whose closing-`>` scan lacks the
-    /// follow-token filter [`Parser::check_identifier_type_arg_pattern`] applies — which
-    /// is what turned `a < string$ ? b : c > d` into a parse error.
+    /// ordinary identifier went down the keyword arm, which runs the closing-`>` scan
+    /// directly and so never applies the inside-the-angles filter
+    /// [`Parser::check_identifier_type_arg_pattern`] carries.
+    ///
+    /// ⚠️ That only bites where the token past the would-be closing `>` does **not**
+    /// start an expression, because an expression-starting one disqualifies the
+    /// type-argument reading in *both* arms. So `a < string$ ? b : c > d` parsed fine
+    /// even with the bad boundary, while ``a < string$ ? b : c > `t` `` and
+    /// `a < string$ ? b : c > (d, e)` were parse errors — a case that reaches only one
+    /// arm is the only case a mis-dispatch can be observed through, and the fixture pins
+    /// those rather than the inert form:
+    /// [less_than_keyword_boundary](../../../../tests/fixtures/typescript/syntax/disambiguation/less_than_keyword_boundary/).
     fn is_type_keyword_at(&self, bytes: &[u8], pos: usize) -> bool {
         // Full keyword match at `pos`, not part of a longer identifier.
         let kw = |k: &[u8]| is_word_at(bytes, pos, k);

@@ -9,6 +9,16 @@
 	const a4 = p < nullµ ? q : r > s;
 	const a5 = p < true$ ? q : r > s;
 
+	// The same claim where it BITES. Past the would-be closing `>`, a template tag
+	// or a parenthesized operand does not start an expression — the one follow
+	// token the closing-`>` scan accepts — so a false keyword match commits to type
+	// arguments here and then fails on the `?`. The lines above stay comparisons
+	// under a byte-level word boundary too; only these do not.
+	const a6 = p < string$ ? q : r > `t`;
+	const a7 = p < stringµ ? q : r > `t`;
+	const a8 = p < string$ ? q : r > (t, u);
+	const a9 = p < null$ - 1 > `t`;
+
 	// The bare keyword still opens them.
 	const b1 = fn<string>();
 	const b2 = fn<string | number>();

@@ -7,16 +7,29 @@ use std::borrow::Cow;
 
 use crate::lexer::{is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace};
 
-/// 256-entry lookup table for the ASCII half of the lookahead whitespace class —
+/// 256-entry lookup table for the lookahead whitespace class. `In` is its ASCII half —
 /// `<SP>`, `<TAB>`, `<VT>`, `<FF>` from `WhiteSpace` plus `<LF>`, `<CR>` from
-/// `LineTerminator`. Const-derived from the same `matches!` the test below
-/// re-spells, so the table and its documented membership can't drift.
-const LOOKAHEAD_WS_LUT: [bool; 256] = {
-    let mut t = [false; 256];
+/// `LineTerminator`; `Maybe` is the five [`is_es_whitespace_lead`] bytes, which only a
+/// decode can settle. Const-derived from the same `matches!` the test below re-spells,
+/// so the table and its documented membership can't drift.
+///
+/// One table rather than a `bool` half plus a separate lead test, so
+/// [`skip_whitespace`] and [`skip_identifier`] ask their byte the same way: one load,
+/// one three-way verdict. The two scans classify the same bytes for opposite purposes —
+/// what ends a name is what a gap is made of — so a byte that is `Maybe` here is `Maybe`
+/// there, by construction.
+const LOOKAHEAD_WS_LUT: [ScanByte; 256] = {
+    let mut t = [ScanByte::Out; 256];
     let mut i = 0;
     while i < 256 {
         let b = i as u8;
-        t[i] = matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C);
+        t[i] = if matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C) {
+            ScanByte::In
+        } else if is_es_whitespace_lead(b) {
+            ScanByte::Maybe
+        } else {
+            ScanByte::Out
+        };
         i += 1;
     }
     t
@@ -43,28 +56,24 @@ const LOOKAHEAD_WS_LUT: [bool; 256] = {
 /// Narrowing the class to make some construct reject "works" only by accident and
 /// takes every legal whitespace character down with it.
 ///
-/// The ASCII path is a table lookup (the idiom the identifier classes below use); a
-/// decode is reached only at the five [`is_es_whitespace_lead`] bytes, and every one of
-/// those ends the run under any classification, so the branch is off the hot path.
+/// The scan is a table lookup (the same idiom, and now the same table shape, as the
+/// identifier classes below); a decode is reached only at the five
+/// [`is_es_whitespace_lead`] bytes, and every other byte `>= 0x80` ends the run without
+/// one, so the branch is off the hot path.
 #[inline]
 pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
     while pos < bytes.len() {
-        let b = bytes[pos];
-        if LOOKAHEAD_WS_LUT[b as usize] {
-            pos += 1;
-        } else if is_es_whitespace_lead(b) {
+        match LOOKAHEAD_WS_LUT[bytes[pos] as usize] {
+            ScanByte::In => pos += 1,
             // One of the five leads that can begin NBSP/ZWNBSP/a `Zs`/LS/PS — but each
             // also leads ordinary non-ASCII token characters, so only a decode tells
             // them apart, and a partial decode must not advance: step by the character's
-            // own width, which is what the shared helper returns. Every other byte
-            // `>= 0x80` ends the run without decoding, by the same filter the identifier
-            // tables gate their `MAYBE` entries on.
-            match non_ascii_es_whitespace_len_at(bytes, pos) {
+            // own width, which is what the shared helper returns.
+            ScanByte::Maybe => match non_ascii_es_whitespace_len_at(bytes, pos) {
                 0 => break,
                 len => pos += len,
-            }
-        } else {
-            break;
+            },
+            ScanByte::Out => break,
         }
     }
     pos
@@ -77,7 +86,7 @@ pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
 /// width to advance, and [`id_class_holds`], which needs only the verdict — so the class
 /// keeps exactly one spelling ([`is_es_whitespace`] / [`is_es_line_terminator`], the
 /// lexer's own). The ASCII members are answered by table lookup instead
-/// ([`LOOKAHEAD_WS_LUT`], and by their `IdByte::OUT` entries in the identifier tables),
+/// ([`LOOKAHEAD_WS_LUT`], and by their `ScanByte::Out` entries in the identifier tables),
 /// which is why this never sees an ASCII byte: [`decode_char`] returns `None` for one.
 #[inline]
 fn non_ascii_es_whitespace_len_at(bytes: &[u8], pos: usize) -> usize {
@@ -177,35 +186,35 @@ pub(super) fn skip_whitespace_and_comments(bytes: &[u8], mut pos: usize) -> usiz
 /// *last*, behind the `> 127`, `$`, `_` and digit tests.
 ///
 /// ⚠️ **"Almost" every byte `> 127`, and the exception is the whole reason these are
-/// tables of [`IdByte`] rather than of `bool`.** A lookahead asks the identifier classes
+/// tables of [`ScanByte`] rather than of `bool`.** A lookahead asks the identifier classes
 /// two different questions — *step over this name* and *does the word end here?* — and
 /// the second is a WORD BOUNDARY, where reading a non-ASCII whitespace character as
 /// "the identifier continues" merges a keyword into its neighbour. A byte test cannot
 /// settle it: `0xC2` leads both `<NBSP>` (`c2 a0`) and ordinary identifier characters
 /// (`µ` is `c2 b5`), so the five lead bytes that can begin ECMAScript whitespace are
-/// entered as [`IdByte::MAYBE`] and resolved by [`non_ascii_es_whitespace_len_at`]
+/// entered as [`ScanByte::Maybe`] and resolved by [`non_ascii_es_whitespace_len_at`]
 /// against the same productions [`skip_whitespace`] crosses.
-const LOOKAHEAD_ID_START_LUT: [u8; 256] = build_id_lut(false);
-const LOOKAHEAD_ID_CONTINUE_LUT: [u8; 256] = build_id_lut(true);
+const LOOKAHEAD_ID_START_LUT: [ScanByte; 256] = build_id_lut(false);
+const LOOKAHEAD_ID_CONTINUE_LUT: [ScanByte; 256] = build_id_lut(true);
 
-/// What a byte contributes to a lookahead identifier scan. Stored as a `u8` because the
-/// tables are built in a `const` block; the three values are named rather than matched
-/// as bare integers so a table entry and its meaning can't drift.
-struct IdByte;
-impl IdByte {
-    /// The identifier ends at this byte.
-    const OUT: u8 = 0;
-    /// This byte is part of the identifier, unconditionally.
-    const IN: u8 = 1;
+/// What a byte contributes to a lookahead scan — of an identifier, or of a whitespace
+/// run. An enum rather than a `u8` sentinel so the verdict arms are exhaustive: a fourth
+/// state could not be added and silently fall into someone's `_`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ScanByte {
+    /// The run ends at this byte.
+    Out,
+    /// This byte is part of the run, unconditionally.
+    In,
     /// A UTF-8 lead byte that begins EITHER an ECMAScript whitespace character or an
     /// ordinary non-ASCII identifier character — only the bytes after it can say which.
-    const MAYBE: u8 = 2;
+    Maybe,
 }
 
 /// Build one of the two tables above. `continuing` picks the `ID_Continue` membership
 /// (digits admitted) over the `ID_Start` one.
-const fn build_id_lut(continuing: bool) -> [u8; 256] {
-    let mut t = [IdByte::OUT; 256];
+const fn build_id_lut(continuing: bool) -> [ScanByte; 256] {
+    let mut t = [ScanByte::Out; 256];
     let mut i = 0;
     while i < 256 {
         let b = i as u8;
@@ -217,11 +226,11 @@ const fn build_id_lut(continuing: bool) -> [u8; 256] {
                 b.is_ascii_alphabetic()
             };
         t[i] = if is_es_whitespace_lead(b) {
-            IdByte::MAYBE
+            ScanByte::Maybe
         } else if b > 127 || ascii_member {
-            IdByte::IN
+            ScanByte::In
         } else {
-            IdByte::OUT
+            ScanByte::Out
         };
         i += 1;
     }
@@ -234,8 +243,8 @@ const fn build_id_lut(continuing: bool) -> [u8; 256] {
 /// `ef` (U+FEFF `<ZWNBSP>`).
 ///
 /// A conservative *filter*, never the answer: every one of them also leads ordinary
-/// identifier characters, which is why an [`IdByte::MAYBE`] entry is resolved by a decode rather
-/// than by this. Kept exact by `es_whitespace_leads_cover_the_class` below, which walks
+/// identifier characters, which is why a [`ScanByte::Maybe`] entry is resolved by a decode
+/// rather than by this. Kept exact by `es_whitespace_leads_cover_the_class` below, which walks
 /// the whole code-point space so a widened whitespace class cannot leave a lead behind.
 const fn is_es_whitespace_lead(b: u8) -> bool {
     matches!(b, 0xC2 | 0xE1 | 0xE2 | 0xE3 | 0xEF)
@@ -257,20 +266,24 @@ pub(super) fn identifier_starts_at(bytes: &[u8], pos: usize) -> bool {
 /// signature exists to prevent: at a **word boundary** (`is_word_at`, the `in` of a
 /// mapped type) a non-ASCII whitespace character must END the word, while the `0xC2`
 /// that leads `<NBSP>` also leads `µ`. `false` past the end of `bytes`.
+///
+/// Private on purpose: the word-boundary question has exactly one caller-facing
+/// spelling, [`is_word_at`]. A lookahead that reaches for the raw class instead is
+/// re-deriving that boundary, which is what let this one go wrong.
 #[inline]
-pub(super) fn identifier_continues_at(bytes: &[u8], pos: usize) -> bool {
+fn identifier_continues_at(bytes: &[u8], pos: usize) -> bool {
     id_class_holds(&LOOKAHEAD_ID_CONTINUE_LUT, bytes, pos)
 }
 
 /// The shared body of the two predicates above: one table load, and a decode only at the
-/// [`IdByte::MAYBE`] leads.
+/// [`ScanByte::Maybe`] leads.
 #[inline]
-fn id_class_holds(lut: &[u8; 256], bytes: &[u8], pos: usize) -> bool {
+fn id_class_holds(lut: &[ScanByte; 256], bytes: &[u8], pos: usize) -> bool {
     match bytes.get(pos) {
         Some(&b) => match lut[b as usize] {
-            IdByte::IN => true,
-            IdByte::MAYBE => non_ascii_es_whitespace_len_at(bytes, pos) == 0,
-            _ => false,
+            ScanByte::In => true,
+            ScanByte::Maybe => non_ascii_es_whitespace_len_at(bytes, pos) == 0,
+            ScanByte::Out => false,
         },
         None => false,
     }
@@ -331,14 +344,14 @@ pub(super) fn skip_numeric_literal(bytes: &[u8], pos: usize) -> usize {
 ///
 /// The loop is the lookahead's hot path, so it reads the table directly rather than
 /// calling [`identifier_continues_at`]: the fast arm stays one L1 load and one compare
-/// per byte, and the decode is reached only at the [`IdByte::MAYBE`] leads — in practice
+/// per byte, and the decode is reached only at the [`ScanByte::Maybe`] leads — in practice
 /// once per call, on the byte that ends the run.
 #[inline]
 pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
     while pos < bytes.len() {
         match LOOKAHEAD_ID_CONTINUE_LUT[bytes[pos] as usize] {
-            IdByte::IN => pos += 1,
-            IdByte::MAYBE if non_ascii_es_whitespace_len_at(bytes, pos) == 0 => pos += 1,
+            ScanByte::In => pos += 1,
+            ScanByte::Maybe if non_ascii_es_whitespace_len_at(bytes, pos) == 0 => pos += 1,
             _ => break,
         }
     }
@@ -435,17 +448,17 @@ mod tests {
     fn lookahead_id_luts_match_the_predicates_they_replace() {
         for b in 0..=u8::MAX {
             if is_es_whitespace_lead(b) {
-                assert_eq!(LOOKAHEAD_ID_START_LUT[b as usize], IdByte::MAYBE);
-                assert_eq!(LOOKAHEAD_ID_CONTINUE_LUT[b as usize], IdByte::MAYBE);
+                assert_eq!(LOOKAHEAD_ID_START_LUT[b as usize], ScanByte::Maybe);
+                assert_eq!(LOOKAHEAD_ID_CONTINUE_LUT[b as usize], ScanByte::Maybe);
                 continue;
             }
             assert_eq!(
-                LOOKAHEAD_ID_START_LUT[b as usize] == IdByte::IN,
+                LOOKAHEAD_ID_START_LUT[b as usize] == ScanByte::In,
                 b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127,
                 "id_start mismatch at byte {b:#x}"
             );
             assert_eq!(
-                LOOKAHEAD_ID_CONTINUE_LUT[b as usize] == IdByte::IN,
+                LOOKAHEAD_ID_CONTINUE_LUT[b as usize] == ScanByte::In,
                 b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127,
                 "id_continue mismatch at byte {b:#x}"
             );
@@ -590,14 +603,23 @@ mod tests {
         }
     }
 
-    /// The ASCII half of the whitespace class, graded the same way: the table
-    /// against a plain re-spelling of the membership its doc claims.
+    /// The whitespace table, graded the same way as the identifier ones: each entry
+    /// against a plain re-spelling of the membership its doc claims. The `Maybe` leads
+    /// are the same five bytes the identifier tables carry — a byte test cannot answer
+    /// for them, which `identifier_scan_hands_off_to_the_whitespace_scan` grades per
+    /// code point.
     #[test]
     fn lookahead_ws_lut_matches_the_predicate_it_replaces() {
         for b in 0..=u8::MAX {
+            let expected = if matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C) {
+                ScanByte::In
+            } else if is_es_whitespace_lead(b) {
+                ScanByte::Maybe
+            } else {
+                ScanByte::Out
+            };
             assert_eq!(
-                LOOKAHEAD_WS_LUT[b as usize],
-                matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C),
+                LOOKAHEAD_WS_LUT[b as usize], expected,
                 "ws lut mismatch at byte {b:#x}"
             );
         }
