@@ -359,12 +359,18 @@ the short version:
   comments, so the `line` payload is inert in a `.css` file.
 - **`code_regions`' reach.** A gap the region walk doesn't name is a gap never probed. Today
   a `.svelte` file's `<style>` content is unprobed — so a Svelte fixture containing only a
-  `<style>` block yields **zero sites**. That one is held back by **yield, not difficulty**:
+  `<style>` block yields **zero sites**. That gap is held back by **yield, not difficulty**:
   `Style::content_span` names it in a line, but measured over `tests/fixtures` — before the
   CSS in-block ledger extension, so re-measure before pricing it — it was +154k
   sites (+20% runtime) for 3 shapes, all `@import`-prelude double-prints. The thinness is
   structural — CSS's remaining unguarded comment surface is the declaration-value one the
   ledger cannot see at all — so the census, not the ledger, is what covers it.
+  A **foreign-language `<script>` body** (a `lang`/`type` outside the JS/TS family) is a
+  different case: it is excluded on purpose rather than deferred, because the printer
+  freezes it verbatim
+  ([conformance_prettier_svelte.md §Foreign-language embedded bodies](conformance_prettier_svelte.md#svelte-foreign-language-embedded-bodies)),
+  so a probe there proves only that verbatim is verbatim while its preserved blank runs read
+  as violations of the formatted-output model they are exempt from by design.
 
 Related: [Comment Ledger Audit](audits.md#comment-ledger-audit-commentsaudit) (the detector this drives),
 [conformance_prettier.md §Comment Position Philosophy](conformance_prettier.md#comment-position-philosophy).

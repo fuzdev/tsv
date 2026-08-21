@@ -262,8 +262,9 @@ pub(super) fn build_script_writer_comments(
 /// here is Svelte's own `this.ts`, which never builds an AST for the question: it runs a regex
 /// over the template text (`1-parse/index.js`, `lang=(["'])?([^"' >]+)`) and compares the
 /// captured bytes against `ts`. So `<script lang="&#116;s">` is NOT TypeScript to the wire,
-/// where the *formatting* question — [`internal::lang_attribute`], which asks what language the
-/// body is in — decodes and calls the same spelling `ts`. Two questions, two readers, on
+/// where the *formatting* question — `internal::lang_attribute`, the reader behind
+/// [`internal::EmbeddedLang::is_frozen`], which asks what language the body is in — decodes
+/// and calls the same spelling `ts`. Two questions, two readers, on
 /// purpose; `tests/fixtures/svelte/attributes/lang_entity` holds both answers.
 fn script_lang<'s>(script: &internal::Script<'_>, source: &'s str) -> Option<&'s str> {
     for attr_node in script.attributes {

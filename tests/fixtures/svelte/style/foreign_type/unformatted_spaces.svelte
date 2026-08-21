@@ -1,10 +1,10 @@
 <div>text</div>
 
 <!-- type="text/less" - content preserved raw -->
-<style type="text/less">
-    @color: red;
+<style  type="text/less" >
+	@color: red;
 
-    div {
-        color: @color;
-    }
+	div {
+		color: @color;
+	}	
 </style>

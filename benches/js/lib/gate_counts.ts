@@ -222,7 +222,24 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// already diverged on the trailing comments prettier strips there. The
 	// `forced_continuation_indent` detector was widened with the clause in the same change, so
 	// it lands in `known` — the `unknown` count is unmoved.
-	svelte: 498,
+	//
+	// 502 → 499: the embedded-body freeze
+	// (conformance_prettier_svelte.md §Svelte: Foreign-language embedded bodies) takes three
+	// reproducible files out of `match`, each of them an ACCIDENT of the heuristic it replaced
+	// rather than a regression. `prettier-plugin-svelte/.../style-lang-less.html` and
+	// `style-type-less.html`: the old `<style>` path re-indented a foreign body by inferring
+	// its indent unit, which on an already-well-formed less body reproduced prettier's less
+	// printer exactly — tsv now emits the author's bytes, so a 4-space body stays 4-space.
+	// `prettier/tests/format/html/multiparser/unknown/unknown-lang.html`: `lang="unknown"` on
+	// both tags, which tsv used to format with its TS and CSS printers on the strength of
+	// nothing. Sanctioned by `svelte/style/foreign_lang_frozen_prettier_divergence` and
+	// `svelte/script/foreign_lang_frozen_prettier_divergence`; all three land in `known` via
+	// the `foreign_body_freeze` detector, so `unknown` and `partial` are unmoved. Those three
+	// plus `no-tag-snippings.html` (divergent before and after) are the ONLY reproducible
+	// svelte files whose tsv output changes at all — an A/B of every file under the framework
+	// roots and both `.html` suites against a pre-change binary. The floor it replaces was
+	// four below the tree's real 502, which is why a three-file drop cleared it; 499 is tight.
+	svelte: 499,
 	// 2332 → 2334: two reproducible files, `prettier/tests/format/js/comments/11273.js` and
 	// `.../trailing-jsdocs.js`, whose divergence was a container-end trailing comment RUN the
 	// author glued onto one line and tsv split onto two. That run's separator now asks the

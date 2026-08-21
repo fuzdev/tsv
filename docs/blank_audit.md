@@ -239,6 +239,11 @@ If a shape is genuinely pre-existing and merely newly *reached* by a fixture you
 - **CSS is deferred.** A `.css` seed is skipped outright, and a `.svelte` file's `<style>` is
   unprobed (`code_regions` doesn't name it) — CSS's whole-file region is the most exposed to the
   string-interior class below, and its blank-line behavior is a separate follow-up.
+- **Foreign-language `<script>` bodies are excluded by design.** A `lang`/`type` outside the
+  JS/TS family freezes the body verbatim
+  ([conformance_prettier_svelte.md §Foreign-language embedded bodies](conformance_prettier_svelte.md#svelte-foreign-language-embedded-bodies)),
+  which preserves author blank runs — sanctioned output the blank-run invariant would
+  misread as violations, so `code_regions` doesn't name those spans.
 - **String / template interiors are excluded.** tsv's lexer accepts a raw newline inside a quoted
   string as content, so a blank injected there would not be *rejected* — it would silently become
   string content and read as a false finding. `string_and_template_spans` excludes string-literal

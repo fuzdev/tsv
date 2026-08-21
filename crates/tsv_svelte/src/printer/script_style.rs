@@ -25,6 +25,17 @@ impl<'a> Printer<'a> {
         // Opening tag with doc-based attribute wrapping
         self.write_section_opening_tag("script", script.attributes, had_content);
 
+        // A frozen-language body (`lang="coffee"`, `type="application/json"`, …) freezes:
+        // the author's bytes ride out verbatim between the two delimiter newlines —
+        // prettier's `preformattedBody` shape exactly, which is what it emits for its own
+        // frozen scripts. The AST is ignored, but the body still PARSED (canonical Svelte
+        // runs acorn on every script body regardless of `lang`, and so does tsv), so its JS
+        // comments are registered on the print-once ledger and the slice must declare
+        // them. See `internal::EmbeddedLang` for the allowlist.
+        if internal::EmbeddedLang::Script.is_frozen(script.attributes, self.source) {
+            return self.write_frozen_section("script", script.content.span);
+        }
+
         if had_content {
             self.write("\n");
         }
@@ -94,70 +105,12 @@ impl<'a> Printer<'a> {
         // Opening tag with doc-based attribute wrapping
         self.write_section_opening_tag("style", style.attributes, had_content);
 
-        // Foreign languages (less, scss, etc.) — preserve content raw but normalize indentation.
-        // The value is the DECODED one (`lang="&#99;ss"` is css) — see `internal::lang_attribute`.
-        if internal::lang_attribute(style.attributes, self.source).is_some_and(|l| l != "css") {
-            if had_content {
-                // The `&'a str` field, not `self.source()` — that accessor's return borrows
-                // `&self`, which the `write` calls below would conflict with, and copying the
-                // whole stylesheet into a `String` to dodge it is a per-`<style>` allocation
-                // the field read does not need.
-                let content = style.content_span.extract(self.source);
-                // Collect non-empty lines (skip leading/trailing blank lines)
-                let all_lines: Vec<&str> = content.lines().collect();
-                let start = all_lines.iter().position(|l| !l.trim().is_empty());
-                let end = all_lines.iter().rposition(|l| !l.trim().is_empty());
-                match (start, end) {
-                    (Some(start), Some(end)) => {
-                        let lines = &all_lines[start..=end];
-
-                        let leading_ws =
-                            |line: &&str| -> usize { line.len() - line.trim_start().len() };
-
-                        // Indentation levels from non-empty lines
-                        let indents: Vec<usize> = lines
-                            .iter()
-                            .filter(|line| !line.trim().is_empty())
-                            .map(leading_ws)
-                            .collect();
-
-                        let min_indent = indents.iter().copied().min().unwrap_or(0);
-
-                        // Detect indent unit: smallest indent level above the base
-                        let indent_unit = indents
-                            .iter()
-                            .copied()
-                            .filter(|&i| i > min_indent)
-                            .map(|i| i - min_indent)
-                            .min()
-                            .unwrap_or_else(|| 1.max(min_indent));
-
-                        self.write("\n");
-                        self.indent_level += 1;
-                        for line in lines {
-                            if line.trim().is_empty() {
-                                self.write("\n");
-                            } else {
-                                let extra_levels =
-                                    (leading_ws(line).saturating_sub(min_indent)) / indent_unit;
-                                self.write_indent();
-                                for _ in 0..extra_levels {
-                                    self.write("\t");
-                                }
-                                self.write(line.trim_start());
-                                self.write("\n");
-                            }
-                        }
-                        self.indent_level -= 1;
-                    }
-                    _ => {
-                        // Whitespace-only content — preserve block structure
-                        self.write("\n");
-                    }
-                }
-            }
-            self.write("</style>\n");
-            return;
+        // A frozen-language body freezes: the author's bytes ride out verbatim between the
+        // two delimiter lines — the same shape the `<script>` and `<template>` freezes give
+        // their bodies, and prettier's `preformattedBody`. The shared gate reads the DECODED
+        // value (`lang="&#99;ss"` is css) — see `internal::EmbeddedLang`.
+        if internal::EmbeddedLang::Style.is_frozen(style.attributes, self.source) {
+            return self.write_frozen_section("style", style.content_span);
         }
 
         // Format CSS content if present (nodes or comments)
