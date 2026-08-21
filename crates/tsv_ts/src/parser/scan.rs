@@ -5,13 +5,87 @@
 
 use std::borrow::Cow;
 
-/// Skip ASCII whitespace characters in a byte slice, returning new position
+use crate::lexer::{is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace};
+
+/// 256-entry lookup table for the ASCII half of the lookahead whitespace class —
+/// `<SP>`, `<TAB>`, `<VT>`, `<FF>` from `WhiteSpace` plus `<LF>`, `<CR>` from
+/// `LineTerminator`. Const-derived from the same `matches!` the test below
+/// re-spells, so the table and its documented membership can't drift.
+const LOOKAHEAD_WS_LUT: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0;
+    while i < 256 {
+        let b = i as u8;
+        t[i] = matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C);
+        i += 1;
+    }
+    t
+};
+
+/// Skip the whitespace run at `pos`, returning the position of the next
+/// significant byte.
+///
+/// The class is ECMAScript `WhiteSpace` ∪ `LineTerminator` — equivalently what
+/// JS's `\s` matches, the spec being explicit that "line terminators are included
+/// in the set of white space code points that are matched by the `\s` class in
+/// regular expressions". That is the same question the lexer's own
+/// [`Lexer::skip_whitespace`](crate::lexer::Lexer) answers, and this scan must
+/// agree with it by construction: a lookahead that stops **earlier** than the
+/// lexer mis-reads the shape it is classifying and rejects input the canonical
+/// parser accepts. So the two share one spelling of the productions —
+/// [`is_es_whitespace`] and [`is_es_line_terminator`] — rather than restating them.
+///
+/// ⚠️ Crossing a line terminator here is correct and is **not** how a
+/// `[no LineTerminator here]` restriction is enforced. These predicates only
+/// locate the next token; the restriction is enforced downstream off the lexer's
+/// `had_line_terminator` (see `Parser::expect_arrow`), which is why `(a)\n=> a`
+/// has always been rejected even though `\n` was in the old, narrower class.
+/// Narrowing the class to make some construct reject "works" only by accident and
+/// takes every legal whitespace character down with it.
+///
+/// The ASCII path is a table lookup (the idiom the identifier classes below use);
+/// only a byte ≥ `0x80` — which ends the run under any classification, so the
+/// branch is off the hot path — decodes a `char` to test the non-ASCII members.
 #[inline]
 pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
-    while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
-        pos += 1;
+    while pos < bytes.len() {
+        let b = bytes[pos];
+        if LOOKAHEAD_WS_LUT[b as usize] {
+            pos += 1;
+        } else if b >= 0x80 {
+            // A lead byte here may begin NBSP/ZWNBSP/a `Zs`/LS/PS, or an ordinary
+            // non-ASCII token character. Only a decode can tell them apart, and a
+            // partial decode must not advance — hence stepping by `len_utf8`.
+            match decode_char(bytes, pos) {
+                Some(c) if is_es_whitespace(c) || is_es_line_terminator(c) => pos += c.len_utf8(),
+                _ => break,
+            }
+        } else {
+            break;
+        }
     }
     pos
+}
+
+/// The `char` starting at `pos`, or `None` when the bytes there are not a
+/// complete UTF-8 sequence.
+///
+/// The scans work on `&[u8]` taken from a `&str`, so a lead byte is always
+/// followed by its continuation bytes; the fallible form exists so a malformed
+/// slice ends the run instead of panicking or advancing onto a continuation byte.
+#[inline]
+fn decode_char(bytes: &[u8], pos: usize) -> Option<char> {
+    let width = match bytes[pos] {
+        0xC0..=0xDF => 2,
+        0xE0..=0xEF => 3,
+        0xF0..=0xF7 => 4,
+        _ => return None,
+    };
+    let end = pos.checked_add(width)?;
+    std::str::from_utf8(bytes.get(pos..end)?)
+        .ok()?
+        .chars()
+        .next()
 }
 
 /// Skip a line comment (// ...), returning position after the newline
@@ -20,16 +94,9 @@ pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
 pub(super) fn skip_line_comment(bytes: &[u8], mut pos: usize) -> usize {
     // Skip //
     pos += 2;
-    // Read until line terminator or EOF — U+2028/U+2029 (UTF-8 e2 80 a8/a9)
-    // terminate line comments like LF/CR per the spec
-    while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
-        if bytes[pos] == 0xe2
-            && pos + 2 < bytes.len()
-            && bytes[pos + 1] == 0x80
-            && (bytes[pos + 2] == 0xa8 || bytes[pos + 2] == 0xa9)
-        {
-            break;
-        }
+    // Read until a LineTerminator or EOF — U+2028/U+2029 end a line comment just
+    // as LF/CR do, per the spec. The terminator is not consumed.
+    while pos < bytes.len() && !is_es_line_terminator_at(bytes, pos) {
         pos += 1;
     }
     pos
@@ -263,6 +330,96 @@ mod tests {
                 is_identifier_continue(b),
                 b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127,
                 "id_continue mismatch at byte {b:#x}"
+            );
+        }
+    }
+
+    /// The ASCII half of the whitespace class, graded the same way: the table
+    /// against a plain re-spelling of the membership its doc claims.
+    #[test]
+    fn lookahead_ws_lut_matches_the_predicate_it_replaces() {
+        for b in 0..=u8::MAX {
+            assert_eq!(
+                LOOKAHEAD_WS_LUT[b as usize],
+                matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C),
+                "ws lut mismatch at byte {b:#x}"
+            );
+        }
+    }
+
+    /// `skip_whitespace` must cross exactly ECMAScript `WhiteSpace` ∪
+    /// `LineTerminator` — JS's `\s` — at **every** code point, not just the ones
+    /// some fixture happens to contain. The reference set is spelled out from the
+    /// spec's two tables rather than reusing the predicates under test, so this
+    /// grades the class instead of restating it.
+    ///
+    /// The exact membership is the whole point of the test: the class was once
+    /// `[ \t\n\r]`, which rejected `(a)<NBSP>=> a` — legal ECMAScript the
+    /// canonical parser accepts. Both over- and under-matching are caught, so
+    /// reaching for Rust's `char::is_whitespace` (which drops U+FEFF and adds
+    /// U+0085) fails here rather than in a corpus months later.
+    #[test]
+    fn skip_whitespace_crosses_exactly_the_js_s_class() {
+        for cp in 0..=0x10ffff_u32 {
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            // ES `WhiteSpace` (table-white-space-code-points) ∪ `LineTerminator`
+            // (table-line-terminator-code-points), spelled from the spec.
+            let expected = matches!(
+                cp,
+                0x0009 // <TAB>
+                | 0x000B // <VT>
+                | 0x000C // <FF>
+                | 0xFEFF // <ZWNBSP>
+                | 0x0020 | 0x00A0 | 0x1680 | 0x2000
+                    ..=0x200A | 0x202F | 0x205F | 0x3000 // <USP>: Zs
+                | 0x000A | 0x000D | 0x2028 | 0x2029 // LineTerminator
+            );
+            let mut buf = [0u8; 4];
+            let encoded = c.encode_utf8(&mut buf).len();
+            let bytes = &buf[..encoded];
+            let crossed = skip_whitespace(bytes, 0) == encoded;
+            assert_eq!(
+                crossed, expected,
+                "U+{cp:04X} is on the wrong side of `\\s`"
+            );
+        }
+    }
+
+    /// A whitespace character glued to a following token must leave the cursor on
+    /// that token, never inside it — the failure a byte-wise `pos += 1` over a
+    /// multi-byte character would produce, landing on a continuation byte.
+    #[test]
+    fn skip_whitespace_lands_on_a_character_boundary() {
+        for s in [
+            "\u{a0}=>",
+            "\u{feff}=>",
+            "\u{3000}=>",
+            "\u{2028}=>",
+            "\u{b}=>",
+            " \u{a0}\t=>",
+        ] {
+            let bytes = s.as_bytes();
+            let pos = skip_whitespace(bytes, 0);
+            assert!(
+                s.is_char_boundary(pos),
+                "{s:?} stopped mid-character at {pos}"
+            );
+            assert_eq!(&s[pos..], "=>", "{s:?} did not stop at the token");
+        }
+    }
+
+    /// A non-ASCII character that is *not* whitespace ends the run — including
+    /// U+0085 (`<NEL>`), which Rust calls whitespace and ECMAScript does not, and
+    /// an ordinary identifier character sharing NBSP's `0xC2` lead byte.
+    #[test]
+    fn skip_whitespace_stops_at_non_es_whitespace() {
+        for s in ["\u{85}x", "\u{b5}x", "\u{180e}x", "x"] {
+            assert_eq!(
+                skip_whitespace(s.as_bytes(), 0),
+                0,
+                "{s:?} should not be crossed"
             );
         }
     }

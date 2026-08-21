@@ -170,16 +170,23 @@ pub struct Lexer<'a> {
 }
 
 /// Returns true if `c` is an ECMAScript **WhiteSpace** code point (ES spec
-/// `sec-white-space`): `<TAB>`, `<VT>`, `<FF>`, `<ZWNBSP>` (U+FEFF), and every
-/// `Space_Separator` (Unicode category `Zs`, which includes `<SP>` and `<NBSP>`).
+/// `sec-white-space`, `table-white-space-code-points`): `<TAB>`, `<VT>`, `<FF>`,
+/// `<ZWNBSP>` (U+FEFF), and every `Space_Separator` (Unicode category `Zs`,
+/// which includes `<SP>` and `<NBSP>`).
 ///
 /// This is deliberately **not** Rust's `char::is_whitespace()` (the Unicode
 /// `White_Space` property), which differs in both directions: it omits U+FEFF
 /// and includes U+0085 (`<NEL>`), neither of which ECMAScript treats as
-/// WhiteSpace. LineTerminators (`<LF>`/`<CR>`/`<LS>`/`<PS>`) are a separate
-/// production and are matched ahead of this in `skip_whitespace`, so they are
-/// intentionally absent here.
-const fn is_es_whitespace(c: char) -> bool {
+/// WhiteSpace. The spec says so explicitly — WhiteSpace "intentionally excludes
+/// all code points that have the Unicode 'White_Space' property but which are
+/// not classified in general category 'Space_Separator'".
+///
+/// LineTerminators are the separate [`is_es_line_terminator`] production,
+/// matched ahead of this in [`Lexer::skip_whitespace`] because a newline drives
+/// ASI — so they are intentionally absent here. A scan that wants "the next
+/// token starts where?" wants the **union** of the two, which is what JS's `\s`
+/// means; the parser's lookahead (`parser::scan::skip_whitespace`) asks for both.
+pub(crate) const fn is_es_whitespace(c: char) -> bool {
     matches!(
         c,
         '\u{0009}'              // <TAB>
@@ -192,6 +199,49 @@ const fn is_es_whitespace(c: char) -> bool {
         | '\u{1680}'
         | '\u{2000}'..='\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}'
     )
+}
+
+/// Returns true if `c` is an ECMAScript **LineTerminator** (ES spec
+/// `sec-line-terminators`, `table-line-terminator-code-points`): `<LF>`, `<CR>`,
+/// `<LS>` (U+2028) and `<PS>` (U+2029) — and nothing else. The spec is explicit
+/// that "other new line or line breaking Unicode code points are not treated as
+/// line terminators", so U+0085 (`<NEL>`) is not one (nor is it WhiteSpace).
+///
+/// The sibling of [`is_es_whitespace`], and the reason the two are separate: a
+/// line terminator ends a `SingleLineComment`, drives ASI, and is forbidden
+/// outright at a `[no LineTerminator here]` restriction (`ArrowParameters [no
+/// LineTerminator here] '=>'`), so the lexer must record that it crossed one
+/// rather than merely skip it. Callers that only need "where does the next token
+/// start" take the union of both productions.
+pub(crate) const fn is_es_line_terminator(c: char) -> bool {
+    matches!(c, '\u{000A}' | '\u{000D}' | '\u{2028}' | '\u{2029}')
+}
+
+/// [`is_es_line_terminator`] over a **byte cursor**: whether a LineTerminator
+/// starts at `bytes[pos]`, without decoding a `char`.
+///
+/// The byte-level form of the same production, living beside the char-level one
+/// so the two cannot drift — three scanners had hand-rolled the `e2 80 a8`/`a9`
+/// peek separately, which is the duplication that let the sibling whitespace
+/// class go narrow unnoticed.
+///
+/// Byte-at-a-time is sound: neither LF, CR nor `0xe2` ever appears as a UTF-8
+/// continuation byte (those are `0x80..=0xbf`), and in valid UTF-8 `0xe2` is
+/// always a 3-byte lead — so a scan that steps one byte at a time still lands
+/// this peek on a character boundary, and callers need no decode.
+///
+/// `pos` must be in bounds; the LS/PS peek does its own bounds check.
+#[inline]
+pub(crate) fn is_es_line_terminator_at(bytes: &[u8], pos: usize) -> bool {
+    match bytes[pos] {
+        b'\n' | b'\r' => true,
+        // <LS> U+2028 / <PS> U+2029 — the only non-ASCII LineTerminators, and
+        // the only `e2 80 a8`/`a9` sequences.
+        0xE2 => {
+            pos + 2 < bytes.len() && bytes[pos + 1] == 0x80 && matches!(bytes[pos + 2], 0xA8 | 0xA9)
+        }
+        _ => false,
+    }
 }
 
 impl<'a> Lexer<'a> {
@@ -778,8 +828,9 @@ impl<'a> Lexer<'a> {
                 // Non-ASCII lead byte: decode to classify against the Unicode rules
                 // (LS/PS line terminators, plus NBSP/ZWNBSP/Zs whitespace).
                 Some(_) => match self.cur_char() {
-                    // LS (Line Separator) / PS (Paragraph Separator)
-                    Some('\u{2028}' | '\u{2029}') => {
+                    // LS (Line Separator) / PS (Paragraph Separator) — the
+                    // non-ASCII half of the production; LF/CR took the fast path.
+                    Some(c) if is_es_line_terminator(c) => {
                         self.had_line_terminator = true;
                         self.advance();
                     }
