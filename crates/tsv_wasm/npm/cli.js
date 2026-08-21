@@ -11,7 +11,11 @@
  * spawning this same file as its own worker (`isMainThread` splits the two
  * roles). A pool only pays for itself once the job is big enough to amortize
  * its startup, so the *default* waits for `WORKER_FILE_THRESHOLD` files; an
- * explicit `--jobs N` is obeyed at any size, as it is natively. `--jobs 1`,
+ * explicit `--jobs N` is obeyed at any size — one place this mirror is *looser*
+ * than the native CLI, which holds an explicit count to 4x the logical CPUs.
+ * Nothing here needs that bound: the count is clamped to the file count, and a
+ * worker the host refuses narrows the pool (see `format_files_parallel`) rather
+ * than failing the run. `--jobs 1`,
  * `--content`/`--stdin`, and `--list` stay on one thread either way.
  * Which engine a worker binds is decided by whether the main thread's
  * `./index.js` exposes a `wasm_module`: the WASM package hands the compiled
@@ -607,10 +611,13 @@ function cpu_list_len(list) {
  * How many workers to actually spawn: 1 means "stay on this thread".
  *
  * `WORKER_FILE_THRESHOLD` governs the **default** only. An explicit `--jobs N`
- * is obeyed at any file count — the user asked, the native CLI obeys it, and
- * second-guessing a flag is the kind of surprise a drop-in mirror can't afford.
- * It is also the only way to compare the two paths at a fixed size, which is
- * what calibrating the threshold and `default_jobs` took.
+ * is obeyed at any file count — the user asked, and second-guessing a flag is
+ * the kind of surprise a drop-in mirror can't afford. It is also the only way to
+ * compare the two paths at a fixed size, which is what calibrating the threshold
+ * and `default_jobs` took. The native CLI additionally holds an explicit count to
+ * 4x the logical CPUs, a blast-radius bound on how many OS threads a mistyped
+ * number can ask for; here the file-count clamp below and the graceful narrowing
+ * in `format_files_parallel` already bound it, so this stays as it is.
  *
  * Both forms clamp to the file count (a worker with no file to claim is pure
  * startup cost) and to a floor of 1, so `--jobs 0` means the same as `--jobs 1`

@@ -1,12 +1,14 @@
-//! The stride-chunked worker-pool driver both injection audits run their per-file loop under.
+//! The stride-chunked worker-pool driver the injection audits run their per-file loop under.
 //!
-//! `gap_audit` and `blank_audit` each walk the fixture corpus on a small thread pool, folding a
-//! per-worker tally into one after the join. The loop was byte-identical between them (job-count
-//! resolution, stride chunking, join-and-merge) — extracted here so there is one copy, and one
-//! home for the panic-safety contract below.
+//! `gap_audit`, `blank_audit` and `ignore_audit` each walk the fixture corpus on a small thread
+//! pool, folding a per-worker tally into one after the join. The loop was byte-identical between
+//! them (job-count resolution, stride chunking, join-and-merge) — extracted here so there is one
+//! copy, and one home for the panic-safety and thread-sizing contracts below.
 
 use std::num::NonZero;
 use std::path::{Path, PathBuf};
+
+use tsv_cli::cli::stack::{clamp_worker_count, sized_thread};
 
 use crate::audit::panic_hook::SuppressedPanicHook;
 use crate::cli::CliError;
@@ -56,8 +58,13 @@ impl Drop for ArmedRun {
 
 /// Run `per_file` over `files` on a stride-chunked worker pool and return the merged tally.
 ///
-/// `jobs_hint` is the `--jobs N` flag (`None` / `Some(0)` → `available_parallelism`, capped at the
-/// file count). Chunking is by **stride**, not contiguous block: fixture sizes cluster by
+/// `jobs_hint` is the `--jobs N` flag (`None` / `Some(0)` → `available_parallelism`, held to
+/// `tsv_cli::cli::stack::clamp_worker_count` — the same ceiling `tsv format --jobs` takes, shared
+/// so the two flags cannot drift — and capped at the file count). Every worker runs on the stated
+/// [`tsv_cli::cli::stack::STACK_SIZE`] reservation rather than Rust's 2 MiB default: these sweeps
+/// drive the same recursive descent the CLI does, and a stack overflow is uncatchable, so a
+/// narrower pool thread would abort the whole audit on input `tsv format` handles. Chunking is by
+/// **stride**, not contiguous block: fixture sizes cluster by
 /// directory and the per-file work is quadratic in file size, so blocks would strand every large
 /// file on one worker. Each file is visited by exactly one worker and `merge` must be
 /// order-independent (workers finish in arbitrary order), so the merged result is
@@ -76,27 +83,53 @@ pub(crate) fn run_pool<T: Default + Send>(
     per_file: impl Fn(&Path, &mut T) + Sync,
     merge: impl Fn(&mut T, T),
 ) -> Result<T, CliError> {
-    let jobs = jobs_hint
-        .filter(|j| *j > 0)
-        .or_else(|| std::thread::available_parallelism().ok().map(NonZero::get))
-        .unwrap_or(1)
-        .min(files.len());
+    let jobs = clamp_worker_count(
+        jobs_hint
+            .filter(|j| *j > 0)
+            .or_else(|| std::thread::available_parallelism().ok().map(NonZero::get))
+            .unwrap_or(1),
+    )
+    .min(files.len());
 
     let per_file = &per_file;
     let mut total = T::default();
     let mut panicked = false;
     std::thread::scope(|scope| {
-        let handles: Vec<_> = (0..jobs)
-            .map(|worker| {
-                scope.spawn(move || {
-                    let mut tally = T::default();
-                    for path in files.iter().skip(worker).step_by(jobs) {
-                        per_file(path, &mut tally);
-                    }
-                    tally
-                })
-            })
-            .collect();
+        // The stride is keyed on `jobs`, so every index in `0..jobs` must be walked by
+        // exactly one runner. That is why a refused thread cannot narrow the pool the
+        // way `tsv format`'s does: its files are covered by nobody, and a silently
+        // dropped stride is the lost tally this function already refuses to tolerate.
+        // This thread takes the refused strides instead — slower, still complete.
+        let run_stride = |worker: usize| {
+            let mut tally = T::default();
+            for path in files.iter().skip(worker).step_by(jobs) {
+                per_file(path, &mut tally);
+            }
+            tally
+        };
+        let mut handles = Vec::with_capacity(jobs);
+        let mut refused = Vec::new();
+        for worker in 0..jobs {
+            // `sized_thread`, not `scope.spawn`: the audits drive the same recursive
+            // descent over whole corpora that the CLI does, and an overflow is
+            // uncatchable — on Rust's default 2 MiB it would kill the sweep on input
+            // `tsv format` handles. `Scope::spawn` also *panics* when the OS refuses a
+            // thread, which is what makes this the `Builder` form.
+            match sized_thread("tsv-audit").spawn_scoped(scope, move || run_stride(worker)) {
+                Ok(handle) => handles.push(handle),
+                Err(_) => refused.push(worker),
+            }
+        }
+        if !refused.is_empty() {
+            eprintln!(
+                "warning: only {} of {jobs} audit workers started; {} stride(s) run on this thread",
+                handles.len(),
+                refused.len()
+            );
+            for worker in refused {
+                merge(&mut total, run_stride(worker));
+            }
+        }
         for h in handles {
             match h.join() {
                 Ok(t) => merge(&mut total, t),
