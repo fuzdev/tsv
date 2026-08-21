@@ -1018,7 +1018,7 @@ pub(crate) fn format_css_in(
     printing::build_line_breaks_into(source, &mut line_breaks);
     let mut printer = Printer::new(arena, source, &stylesheet.comments, &line_breaks);
     printer.print_css_nodes(stylesheet.nodes);
-    let output = printer.into_string();
+    let output = printing::normalize_carriage_returns(printer.into_string());
     arena.park_line_breaks_scratch(line_breaks);
     output
 }

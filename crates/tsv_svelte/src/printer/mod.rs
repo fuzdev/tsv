@@ -816,7 +816,7 @@ pub(crate) fn format_svelte_in(
 
     let mut printer = Printer::new(arena, source, &root.comments);
     printer.print_root(root);
-    printer.into_string()
+    tsv_lang::printing::normalize_carriage_returns(printer.into_string())
 }
 
 /// Collect the spans of every `<!-- -->` (`FragmentNode::Comment`) in a fragment, recursing

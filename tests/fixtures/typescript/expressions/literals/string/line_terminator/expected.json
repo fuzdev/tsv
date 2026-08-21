@@ -1,0 +1,333 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 277,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A raw <LF> or <CR> may not appear in a string literal — the character reaches one",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " only as an escape. (<LS> / <PS> may, and are covered by",
+			"start": 106,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " typescript/syntax/unicode_line_terminators.)",
+			"start": 166,
+			"end": 213,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 48
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 276,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 215,
+					"end": 230,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 221,
+							"end": 229,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 221,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 225,
+								"end": 229,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 15
+									}
+								},
+								"value": "\r",
+								"raw": "'\\r'"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A raw <LF> or <CR> may not appear in a string literal — the character reaches one",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " only as an escape. (<LS> / <PS> may, and are covered by",
+							"start": 106,
+							"end": 164
+						},
+						{
+							"type": "Line",
+							"value": " typescript/syntax/unicode_line_terminators.)",
+							"start": 166,
+							"end": 213
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 232,
+					"end": 247,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 238,
+							"end": 246,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 238,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 242,
+								"end": 246,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 15
+									}
+								},
+								"value": "\n",
+								"raw": "'\\n'"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 249,
+					"end": 266,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 255,
+							"end": 265,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 255,
+								"end": 256,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 259,
+								"end": 265,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 17
+									}
+								},
+								"value": "\r\n",
+								"raw": "'\\r\\n'"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

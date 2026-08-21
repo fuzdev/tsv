@@ -224,6 +224,46 @@ pub fn ecmascript_lines(text: &str) -> impl Iterator<Item = &str> {
     })
 }
 
+/// Normalize every **carriage return** in tsv's own output to LF, so the "tsv's output is
+/// always LF" invariant [`ecmascript_lines`] states above is true rather than assumed.
+///
+/// tsv normalizes line terminators wherever it *rebuilds* a line — a `hardline` renders as
+/// `\n` whatever the author wrote. It cannot where it *copies source bytes*: a frozen
+/// embedded body, a `format-ignore` region, a multi-line `<!-- -->` or `/* */`, a template
+/// literal. Those all ride out verbatim, so an author's `\r` rode out with them and a CRLF
+/// file came back with LF everywhere except inside them — output no author wrote and no
+/// second pass changes, since the mixed form is its own fixed point. One pass over the
+/// finished string is the one place that question has to be answered once; answering it at
+/// each verbatim emitter instead is the same rule spelled five times, and the sixth emitter
+/// is written without it.
+///
+/// **CR only** — not the whole [`line_terminator_len`] class. U+2028 / U+2029 are
+/// terminators to ECMAScript but ordinary characters to HTML and CSS text, both formatters
+/// keep them where the author put them, and rewriting one would change what a template
+/// renders. `\r` has no such reading: HTML, CSS and ECMAScript all normalize it away
+/// themselves (a template literal's TV folds `\r\n` and `\r` to `\n` before any program
+/// sees it), so this changes bytes without changing meaning at every position it reaches.
+///
+/// Idempotent, and free on the overwhelming majority of documents — a source with no `\r`
+/// costs one `memchr` and returns the string it was handed.
+#[must_use]
+pub fn normalize_carriage_returns(output: String) -> String {
+    if !output.contains('\r') {
+        return output;
+    }
+    let mut out = String::with_capacity(output.len());
+    let mut rest = output.as_str();
+    while let Some(i) = rest.find('\r') {
+        out.push_str(&rest[..i]);
+        out.push('\n');
+        let after = &rest[i + 1..];
+        // A CRLF pair is ONE terminator: consume the `\n` so it does not become a second.
+        rest = after.strip_prefix('\n').unwrap_or(after);
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Whether `text` holds any ECMAScript line terminator ([`line_terminator_len`]).
 #[inline]
 fn contains_line_terminator(text: &str) -> bool {
@@ -1259,6 +1299,51 @@ mod tests {
                 "blank run spelled with {term:?}"
             );
         }
+    }
+
+    /// Every spelling of a carriage return folds to LF, and a CRLF pair stays ONE terminator.
+    #[test]
+    fn carriage_returns_normalize_to_lf() {
+        assert_eq!(normalize_carriage_returns("a\r\nb".to_owned()), "a\nb");
+        assert_eq!(normalize_carriage_returns("a\rb".to_owned()), "a\nb");
+        assert_eq!(
+            normalize_carriage_returns("a\r\n\r\nb".to_owned()),
+            "a\n\nb"
+        );
+        assert_eq!(normalize_carriage_returns("a\r\rb".to_owned()), "a\n\nb");
+        // `\n\r` is two terminators, not a pair — only `\r\n` is one.
+        assert_eq!(normalize_carriage_returns("a\n\rb".to_owned()), "a\n\nb");
+        assert_eq!(normalize_carriage_returns("\r".to_owned()), "\n");
+        assert_eq!(normalize_carriage_returns("\r\n".to_owned()), "\n");
+    }
+
+    /// A CR-free string is returned untouched, and the fold is idempotent — it runs at the
+    /// end of every format, so a second pass over its own output must be a no-op.
+    #[test]
+    fn carriage_return_normalization_is_a_noop_without_one_and_idempotent() {
+        assert_eq!(normalize_carriage_returns("a\nb\n".to_owned()), "a\nb\n");
+        assert_eq!(normalize_carriage_returns(String::new()), "");
+        let once = normalize_carriage_returns("a\r\nb\rc".to_owned());
+        assert_eq!(normalize_carriage_returns(once.clone()), once);
+    }
+
+    /// U+2028 / U+2029 are terminators to ECMAScript and ordinary characters to HTML and CSS
+    /// text. Both formatters keep them where the author put them, so this fold must not
+    /// reach them even though `line_terminator_len` counts them.
+    #[test]
+    fn carriage_return_normalization_leaves_line_and_paragraph_separators_alone() {
+        assert_eq!(
+            normalize_carriage_returns("a\u{2028}b".to_owned()),
+            "a\u{2028}b"
+        );
+        assert_eq!(
+            normalize_carriage_returns("a\u{2029}b".to_owned()),
+            "a\u{2029}b"
+        );
+        assert_eq!(
+            normalize_carriage_returns("a\u{2028}\r\nb".to_owned()),
+            "a\u{2028}\nb"
+        );
     }
 
     #[test]

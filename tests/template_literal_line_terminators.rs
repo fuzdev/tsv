@@ -9,12 +9,15 @@
 //! source slice whenever the source carries a `<CR>` — `` `x<CR><LF>y` `` has a
 //! 4-byte source span and a 3-character `raw`.
 //!
-//! These can't be fixtures: prettier rewrites every `<CR>` in its output (an
-//! `input.*` carrying one is not a prettier fixed point, so F1 fails), and the
+//! These stay unit tests rather than fixtures because the claim is an AST one:
+//! an `input.*` carrying a `<CR>` is not a prettier fixed point, and the
 //! `unformatted_*` variant that could hold the bytes makes a FORMATTING claim,
-//! never an AST one. Each test therefore also asserts the premise — tsv formats
-//! the `<CR>` source to itself — so if tsv ever adopts prettier's output-side
-//! normalization these cases flag for promotion into a real fixture.
+//! never a wire one. The formatting side moved out — tsv folds every `<CR>` in
+//! its output to `<LF>` (`tsv_lang::printing::normalize_carriage_returns`), and
+//! `tests/fixtures/svelte/syntax/whitespace/line_terminators` pins that. Each
+//! test still asserts the output shape, so the two stay in step: the fold is an
+//! OUTPUT rule and leaves the wire values below untouched, since a template's
+//! TRV/TV already folded them at parse.
 //!
 //! Two sets of null controls, varying the same dimension in opposite ways:
 //! `<LF>`/`<LS>`/`<PS>` are line terminators the TRV deliberately does not
@@ -27,9 +30,9 @@
 use serde_json::Value;
 
 /// Parses `source`, asserts the template element at `quasi_pointer` carries
-/// `expected_raw` / `expected_cooked` (`None` = the wire's `null`), then
-/// asserts tsv formats `source` to itself — the premise that keeps this out of
-/// the fixture pipeline.
+/// `expected_raw` / `expected_cooked` (`None` = the wire's `null`), then asserts
+/// tsv formats `source` to its LF form — the output rule, restated here rather
+/// than called, so these specify it instead of agreeing with its implementation.
 fn assert_quasi(
     source: &str,
     quasi_pointer: &str,
@@ -52,12 +55,13 @@ fn assert_quasi(
         "TV of the element's LineTerminatorSequences: {quasi}"
     );
 
+    let lf_form = source.replace("\r\n", "\n").replace('\r', "\n");
     assert_eq!(
         tsv_ts::format(&program, source),
-        source,
-        "premise: tsv keeps the source's line terminators, so prettier — which \
-         rewrites them — is what blocks a fixture. If this fails, promote these \
-         cases to a fixture."
+        lf_form,
+        "tsv's output is LF-only, so a `<CR>` source formats to its LF form rather than to \
+         itself. This is an OUTPUT rule and does not touch the raw/cooked values above — a \
+         template's TRV/TV folded those at parse, whatever the formatter does."
     );
 }
 

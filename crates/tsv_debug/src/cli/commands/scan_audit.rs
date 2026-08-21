@@ -139,6 +139,11 @@ const ALLOW: &[Allow] = &[
         "newline",
     ),
     ("tsv_lang/src/error.rs", ".find('\\n')", "newline"),
+    (
+        "tsv_lang/src/printing.rs",
+        "while let Some(i) = rest.find('\\r') {",
+        "non-source",
+    ),
     // ── tsv_svelte ───────────────────────────────────────────────────────────
     (
         "tsv_svelte/src/parser/attribute.rs",

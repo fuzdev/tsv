@@ -230,7 +230,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     };
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.print_program(program);
-    let output = printer.into_string();
+    let output = tsv_lang::printing::normalize_carriage_returns(printer.into_string());
     arena.park_line_breaks_scratch(line_breaks);
     output
 }
@@ -293,7 +293,7 @@ pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.set_canonical();
     printer.print_program(program);
-    let output = printer.into_string();
+    let output = tsv_lang::printing::normalize_carriage_returns(printer.into_string());
     arena.park_line_breaks_scratch(line_breaks);
     output
 }

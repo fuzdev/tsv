@@ -243,7 +243,12 @@ and the doc emitters:
   (`tsv_lang::doc`'s renderer trims space and tab ahead of every non-literal newline, which
   is prettier's `trimIndentation` exactly, and the freeze's closing `hardline` is such a
   newline); the top-level writer builds its own lines, so it spells the same trim on the
-  slice it emits.
+  slice it emits. Both halves are pinned by
+  [foreign_lang_body_whitespace](../tests/fixtures/svelte/elements/foreign_lang_body_whitespace/),
+  which carries a trailing space run, a trailing tab, a blank line, a whitespace-only line and
+  authored indentation through every one of the four freeze call sites — the *interior* runs in
+  `input`, the *last line's* in its `unformatted_spaces` variant, since prettier trims that one
+  too and an input carrying it is no fixed point.
 
 Two reader rules the family shares, both agreements with prettier and pinned by plain
 fixtures: `lang` outranks `type` whatever their source order (prettier's
