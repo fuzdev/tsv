@@ -257,6 +257,14 @@ pub(super) fn build_script_writer_comments(
 /// `importKind`/`exportKind = "value"` and omits `attributes`; the Svelte context (anything else)
 /// omits `importKind`/`exportKind` and always includes `attributes`. But the *choice* is
 /// component-global, not per-script — this only feeds [`component_is_typescript`].
+///
+/// ⚠️ Reads the attribute's **raw** bytes, and is the one `lang` reader that does. The oracle
+/// here is Svelte's own `this.ts`, which never builds an AST for the question: it runs a regex
+/// over the template text (`1-parse/index.js`, `lang=(["'])?([^"' >]+)`) and compares the
+/// captured bytes against `ts`. So `<script lang="&#116;s">` is NOT TypeScript to the wire,
+/// where the *formatting* question — [`internal::lang_attribute`], which asks what language the
+/// body is in — decodes and calls the same spelling `ts`. Two questions, two readers, on
+/// purpose; `tests/fixtures/svelte/attributes/lang_entity` holds both answers.
 fn script_lang<'s>(script: &internal::Script<'_>, source: &'s str) -> Option<&'s str> {
     for attr_node in script.attributes {
         let internal::AttributeNode::Attribute(attr) = attr_node else {
@@ -267,12 +275,7 @@ fn script_lang<'s>(script: &internal::Script<'_>, source: &'s str) -> Option<&'s
             && let Some(values) = &attr.value
             && let Some(internal::AttributeValue::Text(text)) = values.first()
         {
-            // `data()` borrows `source` when the value has no entities (the common case); a
-            // decoded value would not outlive this call, but a `lang` value never carries one.
-            return match text.data(source) {
-                Cow::Borrowed(s) => Some(s),
-                Cow::Owned(_) => Some(""),
-            };
+            return Some(text.raw(source));
         }
     }
     None

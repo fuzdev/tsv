@@ -1,0 +1,762 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 904,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 152,
+				"data": " A foreign `<template lang=\"…\">` body is the author's own bytes: every child rides out\n\tverbatim, and only the boundary newlines are normalized. "
+			},
+			{
+				"type": "Text",
+				"start": 152,
+				"end": 154,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 154,
+				"end": 204,
+				"data": " An element child, kept exactly as written "
+			},
+			{
+				"type": "Text",
+				"start": 204,
+				"end": 205,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 205,
+				"end": 257,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 206
+					},
+					"end": {
+						"line": 5,
+						"column": 9,
+						"character": 214
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 215,
+						"end": 225,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 10,
+								"character": 215
+							},
+							"end": {
+								"line": 5,
+								"column": 14,
+								"character": 219
+							}
+						},
+						"value": [
+							{
+								"start": 221,
+								"end": 224,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 226,
+							"end": 227,
+							"raw": "\n",
+							"data": "\n"
+						},
+						{
+							"type": "RegularElement",
+							"start": 227,
+							"end": 245,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 1,
+									"character": 228
+								},
+								"end": {
+									"line": 6,
+									"column": 4,
+									"character": 231
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 235,
+										"end": 239,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 245,
+							"end": 246,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 257,
+				"end": 259,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 259,
+				"end": 299,
+				"data": " Text and an element in one body "
+			},
+			{
+				"type": "Text",
+				"start": 299,
+				"end": 300,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 300,
+				"end": 356,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 301
+					},
+					"end": {
+						"line": 10,
+						"column": 9,
+						"character": 309
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 310,
+						"end": 320,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 10,
+								"character": 310
+							},
+							"end": {
+								"line": 10,
+								"column": 14,
+								"character": 314
+							}
+						},
+						"value": [
+							{
+								"start": 316,
+								"end": 319,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 321,
+							"end": 327,
+							"raw": "\ntext1",
+							"data": "\ntext1"
+						},
+						{
+							"type": "RegularElement",
+							"start": 327,
+							"end": 339,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 6,
+									"character": 328
+								},
+								"end": {
+									"line": 11,
+									"column": 7,
+									"character": 329
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 330,
+										"end": 335,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 339,
+							"end": 345,
+							"raw": "text3\n",
+							"data": "text3\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 356,
+				"end": 358,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 358,
+				"end": 428,
+				"data": " A comment and an expression tag are body bytes like any other "
+			},
+			{
+				"type": "Text",
+				"start": 428,
+				"end": 429,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 429,
+				"end": 483,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 430
+					},
+					"end": {
+						"line": 15,
+						"column": 9,
+						"character": 438
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 439,
+						"end": 449,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 15,
+								"column": 10,
+								"character": 439
+							},
+							"end": {
+								"line": 15,
+								"column": 14,
+								"character": 443
+							}
+						},
+						"value": [
+							{
+								"start": 445,
+								"end": 448,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 450,
+							"end": 451,
+							"raw": "\n",
+							"data": "\n"
+						},
+						{
+							"type": "Comment",
+							"start": 451,
+							"end": 464,
+							"data": " text "
+						},
+						{
+							"type": "Text",
+							"start": 464,
+							"end": 465,
+							"raw": "\n",
+							"data": "\n"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 465,
+							"end": 471,
+							"expression": {
+								"type": "Identifier",
+								"start": 466,
+								"end": 470,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 1
+									},
+									"end": {
+										"line": 17,
+										"column": 5
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 471,
+							"end": 472,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 483,
+				"end": 485,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 485,
+				"end": 507,
+				"data": " A block child "
+			},
+			{
+				"type": "Text",
+				"start": 507,
+				"end": 508,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 508,
+				"end": 563,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 1,
+						"character": 509
+					},
+					"end": {
+						"line": 21,
+						"column": 9,
+						"character": 517
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 518,
+						"end": 528,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 21,
+								"column": 10,
+								"character": 518
+							},
+							"end": {
+								"line": 21,
+								"column": 14,
+								"character": 522
+							}
+						},
+						"value": [
+							{
+								"start": 524,
+								"end": 527,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 529,
+							"end": 530,
+							"raw": "\n",
+							"data": "\n"
+						},
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 530,
+							"end": 551,
+							"test": {
+								"type": "Identifier",
+								"start": 535,
+								"end": 539,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 5
+									},
+									"end": {
+										"line": 22,
+										"column": 9
+									}
+								},
+								"name": "cond"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 540,
+										"end": 546,
+										"raw": "\ntext\n",
+										"data": "\ntext\n"
+									}
+								]
+							},
+							"alternate": null
+						},
+						{
+							"type": "Text",
+							"start": 551,
+							"end": 552,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 563,
+				"end": 565,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 565,
+				"end": 653,
+				"data": " Nested: the body starts at column 0, the closing tag takes the element's indent "
+			},
+			{
+				"type": "Text",
+				"start": 653,
+				"end": 654,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 654,
+				"end": 710,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 28,
+						"column": 1,
+						"character": 655
+					},
+					"end": {
+						"line": 28,
+						"column": 4,
+						"character": 658
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 659,
+							"end": 661,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 661,
+							"end": 703,
+							"name": "template",
+							"name_loc": {
+								"start": {
+									"line": 29,
+									"column": 2,
+									"character": 662
+								},
+								"end": {
+									"line": 29,
+									"column": 10,
+									"character": 670
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 671,
+									"end": 681,
+									"name": "lang",
+									"name_loc": {
+										"start": {
+											"line": 29,
+											"column": 11,
+											"character": 671
+										},
+										"end": {
+											"line": 29,
+											"column": 15,
+											"character": 675
+										}
+									},
+									"value": [
+										{
+											"start": 677,
+											"end": 680,
+											"type": "Text",
+											"raw": "pug",
+											"data": "pug"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 682,
+										"end": 692,
+										"raw": "\nh1 text\n\t",
+										"data": "\nh1 text\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 703,
+							"end": 704,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 710,
+				"end": 712,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 712,
+				"end": 759,
+				"data": " An empty body takes no newlines at all "
+			},
+			{
+				"type": "Text",
+				"start": 759,
+				"end": 760,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 760,
+				"end": 792,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 35,
+						"column": 1,
+						"character": 761
+					},
+					"end": {
+						"line": 35,
+						"column": 9,
+						"character": 769
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 770,
+						"end": 780,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 35,
+								"column": 10,
+								"character": 770
+							},
+							"end": {
+								"line": 35,
+								"column": 14,
+								"character": 774
+							}
+						},
+						"value": [
+							{
+								"start": 776,
+								"end": 779,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 792,
+				"end": 794,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 794,
+				"end": 868,
+				"data": " A blank body is the two delimiter lines with nothing between them "
+			},
+			{
+				"type": "Text",
+				"start": 868,
+				"end": 869,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 869,
+				"end": 903,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 38,
+						"column": 1,
+						"character": 870
+					},
+					"end": {
+						"line": 38,
+						"column": 9,
+						"character": 878
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 879,
+						"end": 889,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 38,
+								"column": 10,
+								"character": 879
+							},
+							"end": {
+								"line": 38,
+								"column": 14,
+								"character": 883
+							}
+						},
+						"value": [
+							{
+								"start": 885,
+								"end": 888,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 890,
+							"end": 892,
+							"raw": "\n\n",
+							"data": "\n\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
