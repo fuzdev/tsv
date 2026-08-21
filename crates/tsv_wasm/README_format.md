@@ -22,7 +22,7 @@ Each also takes an optional trailing options object. Formatting itself is non-co
 
 A second argument that isn't an object throws too, arrays included. That makes `sources.map(format_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => format_typescript(s))`.
 
-Deeply nested input has a ceiling: the WASM stack is 1 MiB, which is roughly 300 levels of nesting (for comparison, acorn gives up around 500). Past it the call traps with `memory access out of bounds`, and unlike a parse error that **poisons the instance** — every later call throws the same thing, so a tool looping over files needs a fresh instance to carry on. Real code is nowhere near this; generated and minified code can be.
+Deeply nested input has a ceiling: the WASM stack is 1 MiB, which is roughly 1,600 levels of nesting (for comparison, acorn gives up around 500 and prettier around 800). Past it the call traps with `memory access out of bounds`, and unlike a parse error that **poisons the instance** — every later call throws the same thing, so a tool looping over files needs a fresh instance to carry on. Real code is nowhere near this; generated and minified code can be.
 
 ### Node.js, Bun, Deno
 

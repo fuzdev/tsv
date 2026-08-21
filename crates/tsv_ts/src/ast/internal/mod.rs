@@ -94,6 +94,20 @@ pub use expressions::{
     UpdateExpression, UpdateOperator, YieldExpression,
 };
 
+// The two node enums are wide enough that holding one BY VALUE across a recursive
+// call is a stack-depth decision, not a style one: a frame is sized once for its
+// widest arm, so a dispatcher with N arms that each hold one reserves N times these
+// bytes at every recursion level. `docs/cli.md` §Recursion Depth states the byte
+// counts and the per-construct depths they produce, and `ParsedExpr` (the parser's
+// expression return) exists to keep `Expression` out of those frames. Pinned so a
+// variant that widens either enum shows up as a failed build rather than as a
+// silently lower nesting ceiling. 64-bit only: the counts are pointer-width-relative
+// and the doc's measurements are x86-64.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Expression<'static>>() == 176);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Statement<'static>>() == 544);
+
 //
 // Foundational Types (defined here, used everywhere)
 //

@@ -24,14 +24,16 @@
 //! `Builder`.
 //!
 //! The value is chosen so that even the **debug** profile out-reaches the parsers tsv
-//! stands in for. Measured on `const x = ((((…1…))));`, the cost is ~5.5 KiB of stack
-//! per nesting level in a release build and ~35 KiB in a debug build, where frames are
+//! stands in for. Measured on `const x = ((((…1…))));`, the cost is ~1.2 KiB of stack
+//! per nesting level in a release build and ~21 KiB in a debug build, where frames are
 //! far larger; acorn + `@sveltejs/acorn-typescript` give up at 497 levels and prettier
-//! at 805, both through V8's own checked stack limit. 32 MiB clears ~5,900 levels in
-//! release and ~950 in debug, so no profile of tsv dies before the tools it replaces
-//! do. Nesting is not the only recursion that costs stack, but it is the cheapest to
-//! state and the deepest real code reaches: the deepest file in the tsc corpus nests
-//! 69 levels, and the exposure is generated and minified code.
+//! at 805, both through V8's own checked stack limit. 32 MiB clears ~26,900 levels in
+//! release and ~1,570 in debug, so no profile of tsv dies before the tools it replaces
+//! do. Parens are the cheapest shape to state, not the tightest — statement nesting
+//! costs ~5.3 KiB a level, so ~6,200 is the depth every shape clears (the per-construct
+//! table is in `docs/cli.md` §Recursion Depth). Nesting is not the only recursion that
+//! costs stack, but it is the deepest real code reaches: the deepest file in the tsc
+//! corpus nests 69 levels, and the exposure is generated and minified code.
 //!
 //! The size is a *reservation*, not a commitment: pages are committed lazily on first
 //! touch, so it costs address space and ~0 RSS, and nothing the benchmarks measure

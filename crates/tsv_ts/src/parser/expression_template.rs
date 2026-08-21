@@ -2,7 +2,7 @@
 // the single `TemplateElement` constructor every template site builds through —
 // expression AND type templates, head/middle/tail/no-substitution alike.
 
-use crate::ast::internal::{Expression, TemplateCooked, TemplateElement, TemplateLiteral};
+use crate::ast::internal::{TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
@@ -178,7 +178,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_template_literal(
         &mut self,
         tagged: bool,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<TemplateLiteral<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         let mut quasis = self.bvec();
         let mut expressions = self.bvec();
@@ -194,11 +194,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 quasis.push(element);
 
-                Ok(Expression::TemplateLiteral(TemplateLiteral {
+                Ok(TemplateLiteral {
                     quasis: quasis.into_bump_slice(),
                     expressions: expressions.into_bump_slice(),
                     span: Span::new(start as u32, elem_end as u32),
-                }))
+                })
             }
             TokenKind::TemplateHead => {
                 // Template with interpolation: `hello ${name}...`
@@ -271,11 +271,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 let end = quasis.last().map_or(start as u32, |q| q.span.end);
 
-                Ok(Expression::TemplateLiteral(TemplateLiteral {
+                Ok(TemplateLiteral {
                     quasis: quasis.into_bump_slice(),
                     expressions: expressions.into_bump_slice(),
                     span: Span::new(start as u32, end),
-                }))
+                })
             }
             _ => Err(self.error_expected_found_at("template literal", start)),
         }

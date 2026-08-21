@@ -830,16 +830,21 @@ and the extra pointer-chases that size-minimization adds on hot traversal paths
 cost more than the cache-density they buy. (The arena allocation itself is the
 win; the node *layout* favors traversal locality over byte size.)
 
-The fat inline nodes carry no by-value-return penalty in the parser, either: each
-node is built in the arena and threaded up the recursive descent **by reference**
-(the expression parser's transient `ParsedExpr` wrapper holds an `&'arena
-Expression`, not the node), so the recursion moves pointers regardless of node
-size. The wrapper is kept register-returnable end to end — an 8-byte reference plus
-two `u32` paren-bound positions (16 bytes), with the error boxed so the fallible
-`Result<ParsedExpr, Box<ParseError>>` stays 16 bytes and returns in registers rather
-than through an sret stack slot. The two concerns are decoupled — node *layout* is
-tuned for the format traversal, while the parse-time recursion cost is paid in
-pointer moves — so a fat inline variant is not a reason to box it.
+The fat inline nodes carry no by-value-return penalty in the **expression**
+recursion, either: each node is built in the arena and threaded up the recursive
+descent **by reference** (the expression parser's transient `ParsedExpr` wrapper
+holds an `&'arena Expression`, not the node), so the recursion moves pointers
+regardless of node size. The wrapper is kept register-returnable end to end — an
+8-byte reference plus two `u32` paren-bound positions (16 bytes), with `ParseError`
+boxing its own payload so the fallible `Result<ParsedExpr, ParseError>` is the same
+16 bytes and returns in registers rather than through an sret stack slot. What that
+buys is the *caller's frame* as much as the return: an arm that holds a node by
+value reserves its bytes at every recursion level, whichever arm the dispatcher
+takes, so the choice sets nesting depth rather than throughput — the per-construct
+ceilings are in [cli.md §Recursion Depth](./cli.md#recursion-depth). The two
+concerns are decoupled — node *layout* is tuned for the format traversal, while the
+parse-time recursion cost is paid in pointer moves — so a fat inline variant is not
+a reason to box it.
 
 **Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
 `MultiArrayList`) were benchmarked early in development and were slower —

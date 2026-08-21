@@ -138,34 +138,47 @@ host and the platform:
   is above the pool's own reservation, where the pool becomes the shallower route.
   `tsv parse` has no pool at all, so it took the inherited stack on every platform.
 - which recursion binds is the **parser**, on all three languages: at a fixed stack,
-  `parse` reaches within ~0.3% of `format` on the same input (1,494 vs 1,490 parens at
-  8 MiB), so neither the printer nor the wire-JSON writer adds a second depth's worth on
+  `parse` reaches within ~0.1% of `format` on the same input (26,877 vs 26,857 parens at
+  32 MiB), so neither the printer nor the wire-JSON writer adds a second depth's worth on
   top of it.
 
-Measured on `const x = ((((…1…))));`, one nesting level costs ~5.5 KiB of stack in a
-release build (~35 KiB in a debug build, where frames are much larger), so the shipped
-CLI reaches ~5,900 levels on every route and every platform. For scale: the parsers tsv
+Measured on `const x = ((((…1…))));`, one nesting level costs ~1.2 KiB of stack in a
+release build (~21 KiB in a debug build, where frames are much larger), so the shipped
+CLI reaches ~26,900 levels on every route and every platform. For scale: the parsers tsv
 stands in for stop earlier and on the same input — acorn + `@sveltejs/acorn-typescript`
 at 497 levels and prettier at 805, both through V8's own checked stack limit, which is
 why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the tsc
 corpus nests 69 levels; the exposure is generated and minified code.
 
 Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
-release build: **TS object literals ~7.5 KiB** (the worst measured), binary chains
-~6.1, calls ~5.5, parens and member chains ~5.5, statement nesting ~5.3, TS *types*
-~3.2, Svelte elements ~3.2, CSS rules ~0.4. The spread inside TypeScript is narrow
-while the gap to CSS is ~13x, so the cost is a property of the parser's recursion
-cycle rather than of any one construct.
+release build: **statement nesting ~5.3 KiB** (the worst measured — ~6,200 levels, which
+is the depth every shape clears), TS object literals ~3.3, TS *types* ~3.2, Svelte
+elements ~3.2, nested binary chains ~2.0, calls ~1.9, array literals ~1.7, computed
+member subscripts ~1.5, parens ~1.2, unary / ternary / assignment chains ~0.75, CSS rules
+~0.4.
+
+What sets a shape's cost is the stack slots its cycle's functions **reserve**, not the
+work they do: a frame is sized once for the widest arm, and every level pays all of it
+whichever arm it takes — so a dispatcher that holds one by-value AST node per arm
+multiplies that node's size by its arm count, at every level, forever. This is why no
+`parse_*` on the expression cycle hands its caller a bare 176-byte `Expression`: a node
+builder either boxes into the arena at its own tail (`ParsedExpr::from_expr`, leaving the
+caller an 8-byte reference) or returns its own concrete node struct — an
+`ObjectExpression` is 32 B, and the dispatcher arm that wraps one back into an
+`Expression` builds a temporary the compiler merges with its sibling arms' rather than a
+return slot it cannot. Statement nesting is the binding shape because that layer still
+threads statements by value — a `Statement` is 544 B (its `ForStatement` variant sets the
+size) and the statement dispatchers hold several at once.
 
 **The other surfaces have their own ceilings, set by their hosts, and the CLI's
 reservation does not reach them:**
 
 | surface | stack | depth |
 | --- | --- | --- |
-| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~5,900 |
-| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~1,400 at 8 MiB |
-| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~710 |
-| WASM, any host | the wasm shadow stack, 1 MiB by link default | ~300 |
+| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~26,900 |
+| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~6,300 at 8 MiB |
+| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~3,130 |
+| WASM, any host | the wasm shadow stack, 1 MiB by link default | ~1,630 |
 
 The two binding rows are the host's thread, so the addon cannot size them; a host that
 needs the depth raises it itself (`new Worker(…, {resourceLimits: {stackSizeMb}})`), which

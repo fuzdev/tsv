@@ -72,11 +72,11 @@ restore. So the pointer stays where the deep call left it and **every later call
 that instance throws the same error, in every language and on every entry point** —
 verified across `format_typescript` / `format_css` / `format_svelte` /
 `parse_typescript_json` after one deep `format_typescript`. Only a fresh instance
-recovers. The depth is ~300 nested parens at ~3.5 KiB of shadow stack per level, the
-lowest of any tsv surface — below acorn's 497 — and unlike the native builds it does
-not move with the host, since the shadow stack is inside the module. Consumers that
-loop over files on one instance therefore need to re-instantiate after a trap, or one
-outsized file turns every file after it into a spurious error.
+recovers. The depth is ~1,630 nested parens at ~0.65 KiB of shadow stack per level, the
+lowest of any tsv surface — though above acorn's 497 and prettier's 805 — and unlike the
+native builds it does not move with the host, since the shadow stack is inside the
+module. Consumers that loop over files on one instance therefore need to re-instantiate
+after a trap, or one outsized file turns every file after it into a spurious error.
 
 ## JSON-String Transport
 
