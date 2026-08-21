@@ -793,8 +793,9 @@ This is one instance of a broader stance: **the parser is deliberately permissiv
 **`parse` never rewrites its input** — its byte offsets are a drop-in contract with
 acorn / Svelte / `parseCss` over the author's own bytes. **Every parse-then-format entry
 point folds `<CR>` / `<CR><LF>` to `<LF>` before it parses**
-(`tsv_lang::printing::normalize_carriage_returns`, from each crate's `format_str`, the
-CLI's `format_source`, and each binding's `parse_format!`), so tsv's output is LF-only
+(`tsv_lang::printing::normalize_carriage_returns`, from `tsv_ts` / `tsv_svelte`'s
+`format_str`, the CLI's `format_source` — CSS's only parse-then-format entry point — each
+binding's format export, and `canonicalize_js`), so tsv's output is LF-only
 even inside the regions it copies verbatim. Ahead of the parse is the only place that
 answers it once: the printers ask "where are the lines?" in several places that split on
 `'\n'` alone (`Comment::multiline`, `is_indentable_block_comment`,

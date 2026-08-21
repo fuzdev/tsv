@@ -1,3 +1,4 @@
+use super::is_es_line_terminator_at;
 use super::lex_err;
 use super::token::{Token, TokenKind};
 use tsv_lang::ParseError;
@@ -17,31 +18,25 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
     // Scan to the end of the comment over raw bytes — the content is recovered on
     // demand as a source slice (`[start + 2, end)`), never copied here.
     //
-    // A line comment ends at the first LineTerminator — LF, CR, or the UTF-8
-    // line/paragraph separators U+2028/U+2029 (`e2 80 a8`/`a9`) — or EOF. The
-    // terminator is NOT consumed; it's whitespace for the next token.
+    // A line comment ends at the first `LineTerminator` — or EOF; the terminator is NOT
+    // consumed, it's whitespace for the next token. The class is
+    // [`is_es_line_terminator_at`], the one byte-level spelling of the production, shared
+    // with the parser's scans so the three scanners that each hand-rolled the LS/PS peek
+    // cannot drift apart again. Byte-at-a-time is sound: none of its bytes ever appears
+    // as a UTF-8 continuation byte, so the peek always lands on a char boundary.
     //
-    // Byte-at-a-time is sound: none of LF/CR/`0xe2` ever appears as a UTF-8
-    // continuation byte (those are `0x80..=0xbf`), and in valid UTF-8 `0xe2` is
-    // always a 3-byte lead, so the LS/PS peek lands on a char boundary. This
-    // tight loop auto-vectorizes (vs the former per-char `chars().next()` decode).
-    //
-    // ⚠️ This match is the ONE site that does NOT share `is_es_line_terminator_at`
-    // (the byte-level LineTerminator production the parser's scans use). Routing it
-    // through the helper is behaviour-neutral and was tried; it is held back only
-    // because this loop carries the vectorization claim above and no TRUSTWORTHY
-    // measurement was obtained — two A/B attempts disagreed and both ran on a
-    // contended machine, so neither grades it. Keep the two spellings in step BY
-    // HAND until a quiesced rig says the call is free.
+    // The hand-rolled predecessor was held back on a *suspected* vectorization advantage
+    // that no measurement had ever graded. Settled by codegen, not wall clock: under the
+    // `corpus` profile this function is 139 bytes where the hand-rolled loop was 152, the
+    // per-byte hot path is the same nine instructions either way, and **neither**
+    // spelling vectorizes. The saving is in the rare `0xE2` arm — the old form tested
+    // `p + 2 < len` against a hoisted local, so LLVM could not fold the `bytes[p + 1]`
+    // bounds check and kept a panic landing pad; the helper compares against
+    // `bytes.len()` directly and both checks fold away. Sharing the production is the
+    // cheaper spelling, not a concession.
     let mut p = start + 2; // skip //
-    while p < len {
-        match bytes[p] {
-            b'\n' | b'\r' => break,
-            0xe2 if p + 2 < len && bytes[p + 1] == 0x80 && matches!(bytes[p + 2], 0xa8 | 0xa9) => {
-                break;
-            }
-            _ => p += 1,
-        }
+    while p < len && !is_es_line_terminator_at(bytes, p) {
+        p += 1;
     }
     *pos = p;
 

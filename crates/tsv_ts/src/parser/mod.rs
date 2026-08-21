@@ -2,7 +2,7 @@
 
 use crate::Goal;
 use crate::ast::internal::*;
-use crate::lexer::{KeywordKind, Lexer, Token, TokenKind};
+use crate::lexer::{KeywordKind, Lexer, Token, TokenKind, is_es_line_terminator};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{ParseError, Span};
@@ -73,15 +73,16 @@ fn comment_from_token(
     let content = &source[content_start..content_end];
     // Ask the `\n` question first — `Comment::content_is_multiline`, which is also the
     // `is_block` gate (a `//` comment's content can hold no terminator at all). It is a
-    // single-`char` pattern, so it lowers to a `memchr`, whereas the four-way
-    // `['\n', '\r', '\u{2028}', '\u{2029}']` pattern is a `MultiCharEq` searcher that
-    // decodes a char per step of the whole comment body (a long JSDoc block pays that in
-    // full). And a `\n` *is* a line terminator, so on the common multi-line block comment it
-    // answers the wider question for free; only a block comment with no `\n` at all — a
-    // one-liner like `/* x */` — reaches the rare-terminator scan.
+    // single-`char` pattern, so it lowers to a `memchr`, whereas the full `LineTerminator`
+    // predicate is a char-at-a-time searcher over the whole comment body (a long JSDoc block
+    // pays that in full). And a `\n` *is* a line terminator, so on the common multi-line block
+    // comment it answers the wider question for free; only a block comment with no `\n` at all
+    // — a one-liner like `/* x */` — reaches the rare-terminator scan, which is spelled as the
+    // shared production minus the character already ruled out rather than as its own list, so
+    // widening the class cannot leave this behind.
     let multiline = Comment::content_is_multiline(is_block, content);
     let has_line_terminator =
-        is_block && (multiline || content.contains(['\r', '\u{2028}', '\u{2029}']));
+        is_block && (multiline || content.contains(|c| is_es_line_terminator(c) && c != '\n'));
     let comment = Comment {
         content_span: Span::new(
             (content_start + base_offset) as u32,
@@ -1307,7 +1308,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.peek_kind(); // populate the cache
         let to = self.peek_start();
         let from = (self.current.end as usize).min(to);
-        self.source[from..to].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
+        self.source[from..to].contains(is_es_line_terminator)
     }
 
     /// Whether the peeked token is an identifier on the same line as the current
@@ -1480,9 +1481,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let after_peek = self.peek.as_ref().map_or(0, |t| t.end as usize);
         let bytes = self.source.as_bytes();
         let pos = scan::skip_whitespace_and_comments(bytes, after_peek);
-        pos < bytes.len()
-            && scan::is_identifier_start(bytes[pos])
-            && !self.source[after_peek..pos].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
+        scan::identifier_starts_at(bytes, pos)
+            && !self.source[after_peek..pos].contains(is_es_line_terminator)
             && {
                 // A word continuing the *expression* reading instead of binding:
                 // `await using in b` / `await using instanceof C` are await
@@ -1518,7 +1518,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let bytes = self.source.as_bytes();
         let pos = scan::skip_whitespace_and_comments(bytes, after_peek);
         pos < bytes.len()
-            && !self.source[after_peek..pos].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
+            && !self.source[after_peek..pos].contains(is_es_line_terminator)
             && &bytes[pos..scan::skip_identifier(bytes, pos)] == b"function"
     }
 
