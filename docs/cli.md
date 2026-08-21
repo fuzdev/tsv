@@ -49,12 +49,19 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
     N-API mirror has no compiler thread to compete with and peaks at the
     physical core count.
 
-  An explicit `--jobs N` is obeyed at any size here — the one place this CLI is
-  *looser* than the native one, which holds an explicit count to `4 × logical`
-  (see [§Multi-File Formatting](#multi-file-formatting)'s parallelism note). An
-  explicit width is the only way to compare the two paths at a given size, which
-  calibrating those defaults needed, and every size that calibration uses is far
-  under that ceiling on both.
+  An explicit `--jobs N` is held to the same `4 × logical` ceiling as the
+  native CLI, warned about on stderr when it bites (see
+  [§Multi-File Formatting](#multi-file-formatting)'s parallelism note; `cli.js`
+  restates the native `clamp_worker_count` by hand — same constant, same
+  message, so both surfaces refuse the same numbers). The bound does a
+  different job here than natively: a JS worker is a whole V8 isolate (~13 MB
+  resident on either engine, where the native thread's reservation is lazily
+  committed and costs ~none), so an unbounded width on a large tree hits the
+  machine's *memory* — ending in an uncatchable OOM SIGKILL — long before the
+  OS refuses a thread, and the file-count clamp bounds nothing on exactly the
+  trees large enough to matter. An explicit width remains the only way to
+  compare the two paths at a given size, which calibrating those defaults
+  needed; every size that calibration uses is far under the ceiling on both.
   `--jobs 1`, `--content`, `--stdin`, and `--list` are single-threaded on both
   CLIs. The parallel and single-threaded paths report identically (same sorted
   stdout, same summary, same exit code), so the split is a cost decision and
