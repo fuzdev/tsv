@@ -438,7 +438,7 @@ The `parse_expression_bp(min_bp)` loop handles multiple phases in precedence ord
 - **Generics vs comparison**: Check for type parameter markers after `<`, scan to closing `>`
 - **Type assertions**: `<T>expr` vs `a < b` — lookahead for type-like content between angles
 
-Parser state flags manage context sensitivity: `allow_in` (disables `in` operator in for-loop headers), `allow_ts_type_assertions` (Svelte `#each` binding context), `grouping_depth` (parenthesis nesting), `in_ambient_context` (`declare` blocks).
+Parser state flags manage context sensitivity: `allow_in` (disables `in` operator in for-loop headers), `top_level_as_is_assertion` (Svelte `#each` binding context, where a top-level `as` is the block's separator rather than TypeScript's operator), `grouping_depth` (parenthesis nesting), `in_ambient_context` (`declare` blocks).
 
 ### CSS (`tsv_css/src/parser/`)
 

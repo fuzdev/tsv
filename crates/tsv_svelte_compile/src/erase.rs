@@ -44,7 +44,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
-use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
+use tsv_lang::source_scan::{TriviaProfile, skip_trivia, skip_trivia_run};
 use tsv_ts::ast::internal::{
     ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentPattern, BlockStatement,
     CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassMember, EmptyStatement,
@@ -57,7 +57,7 @@ use tsv_ts::ast::internal::{
 
 use crate::CompileError;
 use crate::refusal::Refusal;
-use crate::text_class::js_char_at;
+use crate::text_class::{is_js_whitespace, js_char_at};
 
 /// The product of erasing a statement list.
 pub(crate) struct Erased<'arena> {
@@ -139,24 +139,19 @@ pub(crate) fn erase_expression<'arena>(
 /// oracle re-anchors onto the initializer) sits inside it. Public so the
 /// `erase_comment_census` diagnostic measures the same rule the compiler
 /// enforces.
+///
+/// The class is [`is_js_whitespace`], never `u8::is_ascii_whitespace`; the shared
+/// run-skipper owns the rest — the alternating whitespace/comment loop, the whole-char
+/// step, and the end guard [`skip_trivia`] needs (a run reaching the end of the source is
+/// the ordinary case here, and calling it at `end` would index out of bounds).
 #[must_use]
 pub fn next_token_pos(source: &str, from: u32) -> u32 {
-    let bytes = source.as_bytes();
-    let end = bytes.len();
-    let mut pos = (from as usize).min(end);
-    loop {
-        // JS whitespace, not `u8::is_ascii_whitespace` — see `js_char_at`.
-        while pos < end
-            && let Some(c) = js_char_at(source, pos)
-            && c.is_whitespace
-        {
-            pos += c.len;
-        }
-        match skip_trivia(bytes, pos, end, TriviaProfile::COMMENTS) {
-            Some(next) if next > pos => pos = next,
-            _ => return pos as u32,
-        }
-    }
+    skip_trivia_run(
+        source,
+        from as usize,
+        TriviaProfile::COMMENTS,
+        is_js_whitespace,
+    ) as u32
 }
 
 /// End of the last surviving token strictly before `to`, scanning forward from

@@ -32,6 +32,7 @@ use tsv_lang::printing::build_line_breaks_into;
 pub use tsv_lang::{ParseError, Result};
 
 pub use goal::Goal;
+pub use parser::TopLevelAs;
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, and the precomputed
@@ -671,15 +672,40 @@ pub fn parse_type_annotation_partial<'arena>(
 /// pattern from the index variable. Uses assignment-expression parsing which
 /// stops at top-level commas (but handles commas inside objects/arrays/calls
 /// correctly).
+///
+/// `top_level_as` says whether a top-level `as` is this parse's or the host grammar's —
+/// see [`TopLevelAs`]. It is not a formality: a head that gives the keyword away owes the
+/// assertion run its own reader, and one that passes the wrong policy either swallows its
+/// binding or rejects every assertion in the head. `satisfies` is never in question.
 pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
+    top_level_as: TopLevelAs,
 ) -> Result<(Expression<'arena>, usize, &'arena [ast::Comment])> {
     with_embedding_parser(source, base_offset, arena, |parser| {
-        let (expr, end_pos) = parser.parse_assignment_expression_partial()?;
+        let (expr, end_pos) = parser.parse_assignment_expression_partial(top_level_as)?;
         Ok((expr, end_pos, parser.take_comments()))
     })
+}
+
+/// How far a **bare** type (no leading `:`) reaches from the start of `source`, as an
+/// absolute offset — or an error if no type parses there.
+///
+/// The probe behind Svelte's `{#each}` head split, where `as` is both TypeScript's
+/// assertion operator and the block's binding separator: walking the run one type at a
+/// time is what tells the two apart, and a failure here is the answer "the `as` before
+/// this is Svelte's" (`{#each xs as A[] as { a = 1 }}` — a default value is a pattern,
+/// never a type).
+///
+/// Deliberately hands back a position and nothing else. The node is dropped, and so are
+/// the comments the probe collected: the region is re-read by the real iterable and
+/// binding parses, so returning either would register every comment in the head twice.
+// The method-path form clippy suggests fails the higher-ranked lifetime check on
+// `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
+#[allow(clippy::redundant_closure_for_method_calls)]
+pub fn parse_type_extent(source: &str, base_offset: usize, arena: &bumpalo::Bump) -> Result<usize> {
+    with_embedding_parser(source, base_offset, arena, |parser| parser.type_extent())
 }
 
 /// Parse a single statement and return it with any collected comments.

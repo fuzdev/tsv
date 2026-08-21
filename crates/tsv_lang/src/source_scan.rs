@@ -152,6 +152,54 @@ fn skip_trivia_scan(
     None
 }
 
+/// Skip the whole RUN of whitespace and trivia starting at `from`, returning the byte
+/// position of the first significant character — or `source.len()` if the run reaches the
+/// end.
+///
+/// [`skip_trivia`] answers "does trivia START here"; this answers "where does the trivia
+/// END", which is what a caller sitting *between two tokens* actually asks. One
+/// `skip_trivia` call sees only the first span, and between two tokens there can be
+/// whitespace, a comment, more whitespace and another comment — so every such caller hand
+/// -rolled the same alternating loop, each with its own copy of two easy-to-miss
+/// obligations: that `skip_trivia` must not be called at `end` (it indexes `bytes[i]`, and
+/// running out of source mid-run is the ordinary case, not a caller error), and that the
+/// whitespace step must move by whole **characters** — a byte cursor that advances by one
+/// past a non-ASCII member lands on a continuation byte, which both misreads the text and
+/// panics as a `&str` index.
+///
+/// `is_whitespace` is the caller's own language class rather than `char::is_whitespace`:
+/// JS `\s` and Rust's `White_Space` disagree at `U+0085` and `U+FEFF`, and a scan using
+/// the wrong one stops early — under-reporting, the direction these scans exist to avoid.
+///
+/// Total: a `from` past the end, or off a character boundary, returns it unchanged rather
+/// than panicking.
+#[inline]
+pub fn skip_trivia_run(
+    source: &str,
+    from: usize,
+    profile: TriviaProfile,
+    is_whitespace: impl Fn(char) -> bool,
+) -> usize {
+    let end = source.len();
+    let mut pos = from.min(end);
+    loop {
+        let Some(rest) = source.get(pos..) else {
+            return pos;
+        };
+        pos = end - rest.trim_start_matches(&is_whitespace).len();
+        if pos == end {
+            return end;
+        }
+        let Some(past) = skip_trivia(source.as_bytes(), pos, end, profile) else {
+            return pos;
+        };
+        // `skip_trivia` never reports a position at or before its own — every arm returns
+        // at least `i + 2`, or `end`, which is `> i` because `i < end` — so the run always
+        // advances and the loop always terminates.
+        pos = past;
+    }
+}
+
 /// Find the first occurrence of `target` in `bytes[start..end]`, skipping trivia
 /// per `profile`. Returns the byte's position, or `None` if not found.
 ///
@@ -760,6 +808,54 @@ mod tests {
     fn find_char_plain() {
         assert_eq!(find("a, b", b',', TriviaProfile::JS), Some(1));
         assert_eq!(find("abc", b',', TriviaProfile::JS), None);
+    }
+
+    /// The whole ALTERNATING run, not one trivia span: between two tokens there can be
+    /// whitespace, a comment, more whitespace and another comment, and a single
+    /// [`skip_trivia`] call stops after the first.
+    ///
+    /// Two obligations each hand-rolled copy of this loop had to remember, both graded
+    /// here. A run reaching the END of the source is ordinary, not a caller error — every
+    /// case below whose trivia runs to EOF would have called `skip_trivia` at `end`, where
+    /// it indexes out of bounds. And the whitespace step must move by whole CHARACTERS: a
+    /// non-ASCII member (JS `\s` has several) leaves a byte cursor on a continuation byte,
+    /// which misreads the text and panics as a `&str` index.
+    #[test]
+    fn skip_trivia_run_crosses_the_whole_alternating_run() {
+        // JS `\s`, narrowed to the members this test needs — deliberately not
+        // `char::is_whitespace`, which disagrees with it at `U+0085` and `U+FEFF`.
+        let ws = |c: char| matches!(c, ' ' | '\t' | '\n' | '\r' | '\u{a0}' | '\u{feff}');
+        let run = |src: &str| skip_trivia_run(src, 0, TriviaProfile::COMMENTS, ws);
+
+        for (src, first_significant) in [
+            ("x", "x"),
+            ("  x", "x"),
+            ("/* c */x", "x"),
+            ("  /* c1 */ /* c2 */  x", "x"),
+            ("// c\nx", "x"),
+            ("/* c1 */\n// c2\n\t/* c3 */x", "x"),
+            // A non-ASCII whitespace member: the run must step over the whole character.
+            ("\u{a0}\u{feff}/* c */\u{a0}x", "x"),
+            // Trivia all the way to the end — the case that calls for the end guard.
+            ("", ""),
+            ("   ", ""),
+            ("/* c */", ""),
+            ("// c", ""),
+            ("  /* c */  ", ""),
+            // An unterminated comment ends at the source end rather than running past it.
+            ("/* c", ""),
+        ] {
+            let pos = run(src);
+            assert_eq!(&src[pos..], first_significant, "{src:?}");
+        }
+
+        // Strings are not trivia under `COMMENTS`, and a lone `/` is no comment at all.
+        assert_eq!(&"  'a b' x"[run("  'a b' x")..], "'a b' x");
+        assert_eq!(&" / x"[run(" / x")..], "/ x");
+
+        // Total: a `from` past the end, or off a character boundary, comes back unchanged.
+        assert_eq!(skip_trivia_run("ab", 9, TriviaProfile::COMMENTS, ws), 2);
+        assert_eq!(skip_trivia_run("é x", 1, TriviaProfile::COMMENTS, ws), 1);
     }
 
     #[test]
