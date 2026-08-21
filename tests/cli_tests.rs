@@ -1705,12 +1705,14 @@ fn test_format_target_scope_is_cwd_independent() {
 ///
 /// Chosen against the two profiles that bound it. The floor: a 1 MiB main-thread stack
 /// — what Windows gives every process, the linker writing it into the executable
-/// header — reaches **27** levels in a **debug** build, the profile `cargo test` runs
-/// (measured on Linux under `ulimit -s 1024`; Windows frames differ somewhat, so read
-/// it as the order of magnitude, not the exact number). Anything past that fails on a
-/// route that inherits the platform default. The ceiling: the reservation in
-/// `cli::stack` clears ~950 levels in that same debug build, so 200 leaves room for
-/// per-target frame differences while staying far out of reach of an unsized thread.
+/// header — is worth roughly **50** levels in a **debug** build, the profile `cargo test`
+/// runs. That one is derived rather than measured (1 MiB over the ~21 KiB a nesting
+/// level measures at in debug), since every route reserves its own stack and none is
+/// left to read an inherited one off; Windows frames differ somewhat, so read it as the
+/// order of magnitude either way. Anything past that fails on a route that inherits the
+/// platform default. The ceiling: the reservation in `cli::stack` clears ~1,570 levels in
+/// that same debug build, so 200 leaves room for per-target frame differences while
+/// staying far out of reach of an unsized thread.
 const NESTED_DEPTH: usize = 200;
 
 /// `const x = ((((…1…))));` nested [`NESTED_DEPTH`] deep — the cheapest input whose

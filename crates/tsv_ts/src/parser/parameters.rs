@@ -112,9 +112,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the enclosing `RestElement` (`...[a, b]: T`), matching acorn.
     pub(super) fn parse_binding_pattern(&mut self) -> Result<Expression<'arena>, ParseError> {
         let expr = if self.check(&TokenKind::BracketOpen) {
-            self.parse_array_expression()?
+            Expression::ArrayExpression(self.parse_array_expression()?)
         } else {
-            self.parse_object_expression()?
+            Expression::ObjectExpression(self.parse_object_expression()?)
         };
         // Binding context: a type assertion is not a valid binding target
         // (`let [x as T] = …` / `function f([x as T])` reject, matching acorn).

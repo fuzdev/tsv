@@ -5,6 +5,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
+use super::super::expression::ParsedExpr;
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_return_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
@@ -253,7 +254,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Function expressions are similar to function declarations but:
     /// - The name is always optional
     /// - They appear in expression position
-    pub fn parse_function_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(in crate::parser) fn parse_function_expression(
+        &mut self,
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.parse_function_expression_inner(start, false)
     }
@@ -261,10 +264,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse an async function expression: `async function() {}` or `async function*() {}`
     ///
     /// Called when we've already seen `async` and are at `function`.
-    pub fn parse_async_function_expression(
+    pub(in crate::parser) fn parse_async_function_expression(
         &mut self,
         start: usize,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         self.parse_function_expression_inner(start, true)
     }
 
@@ -273,7 +276,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         is_async: bool,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         // Consume 'function' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -335,16 +338,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })?;
         let end = body.span.end;
 
-        Ok(Expression::FunctionExpression(FunctionExpression {
-            id,
-            type_parameters,
-            params,
-            return_type,
-            body,
-            generator: is_generator,
-            r#async: is_async,
-            params_start: params_start as u32,
-            span: Span::new(start as u32, end),
-        }))
+        Ok(ParsedExpr::from_expr(
+            self.arena,
+            Expression::FunctionExpression(FunctionExpression {
+                id,
+                type_parameters,
+                params,
+                return_type,
+                body,
+                generator: is_generator,
+                r#async: is_async,
+                params_start: params_start as u32,
+                span: Span::new(start as u32, end),
+            }),
+        ))
     }
 }
