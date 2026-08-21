@@ -45,6 +45,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
+    /// How far a **bare** type (no leading `:`) reaches from the current position —
+    /// the extent, not the node.
+    ///
+    /// The measurement behind Svelte's `{#each}` head split. `{#each xs as A[] as item}`
+    /// holds two `as` tokens and only one is Svelte's binding separator; which one is a
+    /// question about the *type* grammar, so it is answered by parsing a type rather than
+    /// by scanning bytes for brackets. A scan cannot answer it: `<` / `>` are not a
+    /// bracket pair (`=>` closes one that was never opened), and a mapped type puts an
+    /// `as` *inside* one (`{ [K in T as U]: V }`).
+    ///
+    /// The extent is the type node's own `span.end`, never the parser's stop position —
+    /// the lexer's one-token lookahead has already skipped the trailing trivia by then,
+    /// so that position is *past* a trailing comment. Same hazard, same answer, as
+    /// [`Parser::parse_type_annotation`]'s embedding wrapper documents.
+    pub(crate) fn type_extent(&mut self) -> Result<usize, ParseError> {
+        Ok(self.parse_type()?.span().end as usize)
+    }
+
     /// Parse a complete type expression (handles unions and conditional types at
     /// top level). This is the full-type entry, where function/constructor types
     /// are grammatically allowed — clear both type-context restrictions

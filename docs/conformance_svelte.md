@@ -894,7 +894,8 @@ Svelte parser does not carry the document flag (`component_is_typescript` lives 
 wire-JSON convert layer, where it shapes the acorn-vs-acorn-typescript emission but
 cannot gate the parse), so it accepts TypeScript in **every** island of a no-`ts`
 document — the script itself, `{#snippet}` heads (generics and typed params),
-`{#each}` / `{#await}` typed bindings, `{@const}` annotations, casts in expression
+`{#each}` / `{#await}` typed bindings, an assertion in an `{#each}` or `{#await}` head,
+`{@const}` annotations, casts in expression
 tags, attribute values and directives. Svelte rejects each of them, and prettier
 (prettier-plugin-svelte) inherits that verdict, so the fixture pins both oracles'
 failures at once — [script/no_lang_typescript](../tests/fixtures/svelte/script/no_lang_typescript_svelte_prettier_divergence/).
