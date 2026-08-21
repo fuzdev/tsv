@@ -24,3 +24,8 @@
 {#each (fns as unknown as A<() => string>) as item, i}
 	<div>{i}: {item}</div>
 {/each}
+
+<!-- mapped type spelling its own `as`, with a function type in the value -->
+{#each (fns as { [K in keyof A<string> as string]: () => string }) as item}
+	<div>{item}</div>
+{/each}

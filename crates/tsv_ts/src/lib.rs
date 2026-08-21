@@ -32,7 +32,7 @@ use tsv_lang::printing::build_line_breaks_into;
 pub use tsv_lang::{ParseError, Result};
 
 pub use goal::Goal;
-pub use parser::TypeAssertions;
+pub use parser::TopLevelAs;
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, and the precomputed
@@ -673,18 +673,18 @@ pub fn parse_type_annotation_partial<'arena>(
 /// stops at top-level commas (but handles commas inside objects/arrays/calls
 /// correctly).
 ///
-/// `assertions` says whether a top-level `as` / `satisfies` is this parse's or the host
-/// grammar's — see [`TypeAssertions`]. It is not a formality: a head that denies them
-/// owes the assertion run its own reader, and one that passes the wrong policy either
-/// swallows its binding or rejects every assertion in the head.
+/// `top_level_as` says whether a top-level `as` is this parse's or the host grammar's —
+/// see [`TopLevelAs`]. It is not a formality: a head that gives the keyword away owes the
+/// assertion run its own reader, and one that passes the wrong policy either swallows its
+/// binding or rejects every assertion in the head. `satisfies` is never in question.
 pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
-    assertions: TypeAssertions,
+    top_level_as: TopLevelAs,
 ) -> Result<(Expression<'arena>, usize, &'arena [ast::Comment])> {
     with_embedding_parser(source, base_offset, arena, |parser| {
-        let (expr, end_pos) = parser.parse_assignment_expression_partial(assertions)?;
+        let (expr, end_pos) = parser.parse_assignment_expression_partial(top_level_as)?;
         Ok((expr, end_pos, parser.take_comments()))
     })
 }

@@ -13,8 +13,8 @@ typed snippet head (`{#snippet fn<T>(a: T)}`), a typed `{#each}` binding
   acorn (which rejects `x: number`), the snippet reader matches `<` only when `parser.ts`,
   the block readers hand a typed binding — and an `{#await}` head — to plain acorn, and the
   expression readers reject `as` / `satisfies`. So Svelte **rejects** this input at the
-  first island it reaches
-  (`Unexpected token` on the script). `expected_svelte.json` holds the parse-failure marker.
+  first island it reaches (`Unexpected token` on the script). `expected_svelte.json` holds
+  the parse-failure marker.
 - **prettier** (via prettier-plugin-svelte) inherits that verdict and throws — no format
   oracle exists, which is what `prettier_rejects.txt` pins (`Expected token (`, the plugin
   reaching the snippet head first).

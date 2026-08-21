@@ -23,27 +23,33 @@ mod types; // TypeScript type-syntax parsing (annotations, type expressions, typ
 
 pub(crate) use expression::is_jsdoc_type_cast_comment;
 
-/// Whether a partial expression parse may consume a TypeScript `as` / `satisfies`
-/// operator at the top level.
+/// Who owns a top-level `as` in a partial expression parse — TypeScript, or the host
+/// grammar the expression is embedded in.
 ///
 /// Svelte's block heads are the only callers, and they split on whether the head's own
-/// binding separator collides with the assertion keyword:
+/// binding separator is spelled `as`:
 ///
-/// - [`TypeAssertions::Allow`] — `{#await p as T then v}`. `then` / `catch` are not type
+/// - [`TopLevelAs::Assertion`] — `{#await p as T then v}`. `then` / `catch` are not type
 ///   syntax, so an `as` in an await head is always TypeScript's; the parse ends on its
 ///   own at the clause keyword.
-/// - [`TypeAssertions::Deny`] — `{#each xs as item}`, where the separator *is* `as`. The
-///   parse must leave the keyword for the block reader, which then walks the assertion
-///   run itself (`tsv_svelte`'s `each_binding_separator`).
+/// - [`TopLevelAs::HostSeparator`] — `{#each xs as item}`, where the separator *is* `as`.
+///   The parse must leave the keyword for the block reader, which then walks the
+///   assertion run itself (`tsv_svelte`'s `each_binding_separator`).
+///
+/// ⚠️ The axis is `as` **alone**, which is why the name says so. `satisfies` is a type
+/// assertion too, but no host separator is spelled `satisfies`, so it is never in
+/// question and stays consumable under both variants — the wider "type assertions"
+/// framing this replaced denied it in `{#each}` for no reason, rejecting
+/// `{#each xs satisfies T as item}`, which canonical Svelte accepts.
 ///
 /// The policy applies only at [`Parser::grouping_depth`] `0` — inside grouping,
 /// `(x as T)` is unambiguously an assertion under both.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TypeAssertions {
-    /// Consume `as` / `satisfies` wherever they are grammatical.
-    Allow,
-    /// Stop at a top-level `as` / `satisfies`, leaving the keyword to the host grammar.
-    Deny,
+pub enum TopLevelAs {
+    /// Consume `as` wherever it is grammatical.
+    Assertion,
+    /// Stop at a top-level `as`, leaving the keyword to the host grammar.
+    HostSeparator,
 }
 
 /// Build a detached [`Comment`] from a lexed comment token's positions.
@@ -139,16 +145,19 @@ pub struct Parser<'a, 'arena> {
     /// End position of the previous token (before current). Used for span calculation
     /// when ASI inserts a semicolon.
     prev_end: usize,
-    /// Whether to parse TypeScript `as`/`satisfies` operators. Set per partial parse
-    /// from a [`TypeAssertions`] policy — denied only where the host grammar spells its
+    /// Whether a top-level `as` is TypeScript's assertion operator. Set per partial
+    /// parse from a [`TopLevelAs`] policy — false only where the host grammar spells its
     /// own separator `as` (`{#each items as pattern}`), never as a blanket
-    /// "Svelte template" rule (`{#await p as T then v}` allows them).
-    allow_ts_type_assertions: bool,
+    /// "Svelte template" rule (`{#await p as T then v}` keeps it).
+    ///
+    /// `satisfies` is deliberately NOT gated by this: no host separator collides with it,
+    /// so it is an assertion in every context.
+    top_level_as_is_assertion: bool,
     /// Nesting depth inside grouping delimiters (`(...)`, `[...]`, `{...}`, `${...}`),
     /// maintained by [`Parser::enter_grouping`] / [`Parser::exit_grouping`].
     /// Used to disambiguate context-sensitive keywords inside nested expressions:
-    /// - `as`/`satisfies`: always type assertions when depth > 0, even when
-    ///   `allow_ts_type_assertions` is false (Svelte `#each` partial parsing)
+    /// - `as`: always a type assertion when depth > 0, even when
+    ///   `top_level_as_is_assertion` is false (Svelte `#each` partial parsing)
     /// - `in`: a binary operator once the depth rises above [`Parser::no_in_depth`],
     ///   even when `allow_in` is false (for-loop header parsing)
     ///
@@ -376,14 +385,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             comments,
             had_line_terminator: false, // No line terminator before first token
             prev_end: 0,
-            allow_ts_type_assertions: true, // Enable by default (TypeScript context)
-            grouping_depth: 0,              // Not inside any grouping delimiters
-            preserve_parens: false,         // Discard grouping parens (paren-free public AST)
-            in_ambient_context: false,      // Not in declare namespace/module
-            lexer_error: None,              // No stored lexer error
+            top_level_as_is_assertion: true, // Enable by default (TypeScript context)
+            grouping_depth: 0,               // Not inside any grouping delimiters
+            preserve_parens: false,          // Discard grouping parens (paren-free public AST)
+            in_ambient_context: false,       // Not in declare namespace/module
+            lexer_error: None,               // No stored lexer error
             peek_had_line_terminator: false, // No peek cached yet
-            allow_in: true,                 // Allow `in` binary operator by default
-            no_in_depth: 0,                 // Only read while `allow_in` is false
+            allow_in: true,                  // Allow `in` binary operator by default
+            no_in_depth: 0,                  // Only read while `allow_in` is false
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
@@ -2070,22 +2079,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// This is useful for parsing expressions embedded in contexts where commas
     /// have other meanings (like `{#each items as pattern, index}`).
     ///
-    /// `assertions` decides whether a top-level `as` / `satisfies` belongs to this parse
-    /// or to the host's own grammar — see [`TypeAssertions`], which states the rule and
-    /// names both callers.
+    /// `top_level_as` decides whether a top-level `as` belongs to this parse or to the
+    /// host's own grammar — see [`TopLevelAs`], which states the rule and names both
+    /// callers. `satisfies` is unaffected either way.
     ///
     /// Returns (expression, end_position) where end_position is where the next
     /// unparsed content begins (in absolute source coordinates with base_offset).
     pub fn parse_assignment_expression_partial(
         &mut self,
-        assertions: TypeAssertions,
+        top_level_as: TopLevelAs,
     ) -> Result<(Expression<'arena>, usize), ParseError> {
         let saved = std::mem::replace(
-            &mut self.allow_ts_type_assertions,
-            assertions == TypeAssertions::Allow,
+            &mut self.top_level_as_is_assertion,
+            top_level_as == TopLevelAs::Assertion,
         );
         let result = self.parse_assignment_expression();
-        self.allow_ts_type_assertions = saved;
+        self.top_level_as_is_assertion = saved;
 
         let expr = result?;
         // Return the start of the current (unconsumed) token

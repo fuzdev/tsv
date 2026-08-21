@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 598,
+	"end": 778,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -1039,6 +1039,315 @@
 					}
 				},
 				"index": "i"
+			},
+			{
+				"type": "Text",
+				"start": 597,
+				"end": 599,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 599,
+				"end": 676,
+				"data": " mapped type spelling its own `as`, with a function type in the value "
+			},
+			{
+				"type": "Text",
+				"start": 676,
+				"end": 677,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 677,
+				"end": 777,
+				"expression": {
+					"type": "TSAsExpression",
+					"start": 684,
+					"end": 741,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 7
+						},
+						"end": {
+							"line": 29,
+							"column": 64
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 684,
+						"end": 687,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 7
+							},
+							"end": {
+								"line": 29,
+								"column": 10
+							}
+						},
+						"name": "fns"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 691,
+						"end": 741,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 14
+							},
+							"end": {
+								"line": 29,
+								"column": 64
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 694,
+							"end": 714,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 17
+								},
+								"end": {
+									"line": 29,
+									"column": 37
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSTypeOperator",
+								"start": 699,
+								"end": 714,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 22
+									},
+									"end": {
+										"line": 29,
+										"column": 37
+									}
+								},
+								"operator": "keyof",
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 705,
+									"end": 714,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 28
+										},
+										"end": {
+											"line": 29,
+											"column": 37
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 705,
+										"end": 706,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 28
+											},
+											"end": {
+												"line": 29,
+												"column": 29
+											}
+										},
+										"name": "A"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 706,
+										"end": 714,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 29
+											},
+											"end": {
+												"line": 29,
+												"column": 37
+											}
+										},
+										"params": [
+											{
+												"type": "TSStringKeyword",
+												"start": 707,
+												"end": 713,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 30
+													},
+													"end": {
+														"line": 29,
+														"column": 36
+													}
+												}
+											}
+										]
+									}
+								}
+							}
+						},
+						"nameType": {
+							"type": "TSStringKeyword",
+							"start": 718,
+							"end": 724,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 41
+								},
+								"end": {
+									"line": 29,
+									"column": 47
+								}
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSFunctionType",
+							"start": 727,
+							"end": 739,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 50
+								},
+								"end": {
+									"line": 29,
+									"column": 62
+								}
+							},
+							"parameters": [],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 730,
+								"end": 739,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 53
+									},
+									"end": {
+										"line": 29,
+										"column": 62
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 733,
+									"end": 739,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 56
+										},
+										"end": {
+											"line": 29,
+											"column": 62
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 750,
+							"end": 752,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 752,
+							"end": 769,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 30,
+									"column": 2,
+									"character": 753
+								},
+								"end": {
+									"line": 30,
+									"column": 5,
+									"character": 756
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 757,
+										"end": 763,
+										"expression": {
+											"type": "Identifier",
+											"start": 758,
+											"end": 762,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 7
+												},
+												"end": {
+													"line": 30,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 769,
+							"end": 770,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 745,
+					"end": 749,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 68,
+							"character": 745
+						},
+						"end": {
+							"line": 29,
+							"column": 72,
+							"character": 749
+						}
+					}
+				}
 			}
 		]
 	},

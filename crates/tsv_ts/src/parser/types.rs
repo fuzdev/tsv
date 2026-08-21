@@ -51,9 +51,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The measurement behind Svelte's `{#each}` head split. `{#each xs as A[] as item}`
     /// holds two `as` tokens and only one is Svelte's binding separator; which one is a
     /// question about the *type* grammar, so it is answered by parsing a type rather than
-    /// by scanning bytes for brackets. A scan cannot answer it: `<` / `>` are not a
-    /// bracket pair (`=>` closes one that was never opened), and a mapped type puts an
-    /// `as` *inside* one (`{ [K in T as U]: V }`).
+    /// by scanning bytes for brackets — `<` / `>` are not a bracket pair, so an arrow's
+    /// `>` closes a depth nothing opened. The reasoning lives with the caller that owns
+    /// the decision (`tsv_svelte`'s `each_binding_separator`); this side only measures.
     ///
     /// The extent is the type node's own `span.end`, never the parser's stop position —
     /// the lexer's one-token lookahead has already skipped the trailing trivia by then,
