@@ -1,0 +1,563 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 806,
+		"end": 861,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 813,
+				"end": 827,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 7,
+						"character": 813
+					},
+					"end": {
+						"line": 22,
+						"column": 11,
+						"character": 817
+					}
+				},
+				"value": [
+					{
+						"start": 819,
+						"end": 826,
+						"type": "Text",
+						"raw": "&#99;ss",
+						"data": "css"
+					}
+				]
+			}
+		],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 830,
+					"end": 833,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 830,
+							"end": 833,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 830,
+											"end": 833
+										}
+									],
+									"start": 830,
+									"end": 833
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 834,
+					"end": 852,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 838,
+							"end": 848,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 830,
+				"end": 852
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 828,
+			"end": 853,
+			"styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+			"comment": {
+				"type": "Comment",
+				"start": 729,
+				"end": 805,
+				"data": " `lang=\"&#99;ss\"` decodes to `css`, so the stylesheet formats as CSS "
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 862,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 298,
+				"end": 300,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 300,
+				"end": 436,
+				"data": " The `lang` / `type` gate reads the attribute's DECODED value, so an entity-spelled one\n\troutes exactly like its plain spelling. "
+			},
+			{
+				"type": "Text",
+				"start": 436,
+				"end": 438,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 438,
+				"end": 514,
+				"data": " `lang=\"&#104;tml\"` decodes to `html`, so the body formats as markup "
+			},
+			{
+				"type": "Text",
+				"start": 514,
+				"end": 515,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 515,
+				"end": 571,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 516
+					},
+					"end": {
+						"line": 12,
+						"column": 9,
+						"character": 524
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 525,
+						"end": 541,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 12,
+								"column": 10,
+								"character": 525
+							},
+							"end": {
+								"line": 12,
+								"column": 14,
+								"character": 529
+							}
+						},
+						"value": [
+							{
+								"start": 531,
+								"end": 540,
+								"type": "Text",
+								"raw": "&#104;tml",
+								"data": "html"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 542,
+							"end": 544,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 544,
+							"end": 559,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 13,
+									"column": 2,
+									"character": 545
+								},
+								"end": {
+									"line": 13,
+									"column": 5,
+									"character": 548
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 549,
+										"end": 553,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 559,
+							"end": 560,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 571,
+				"end": 573,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 573,
+				"end": 666,
+				"data": " `type=\"text&#47;html\"` decodes to `text/html`, whose `text/` prefix strips to `html` "
+			},
+			{
+				"type": "Text",
+				"start": 666,
+				"end": 667,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 667,
+				"end": 727,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 668
+					},
+					"end": {
+						"line": 17,
+						"column": 9,
+						"character": 676
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 677,
+						"end": 697,
+						"name": "type",
+						"name_loc": {
+							"start": {
+								"line": 17,
+								"column": 10,
+								"character": 677
+							},
+							"end": {
+								"line": 17,
+								"column": 14,
+								"character": 681
+							}
+						},
+						"value": [
+							{
+								"start": 683,
+								"end": 696,
+								"type": "Text",
+								"raw": "text&#47;html",
+								"data": "text/html"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 698,
+							"end": 700,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 700,
+							"end": 715,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 2,
+									"character": 701
+								},
+								"end": {
+									"line": 18,
+									"column": 5,
+									"character": 704
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 705,
+										"end": 709,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 715,
+							"end": 716,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 727,
+				"end": 729,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 729,
+				"end": 805,
+				"data": " `lang=\"&#99;ss\"` decodes to `css`, so the stylesheet formats as CSS "
+			},
+			{
+				"type": "Text",
+				"start": 805,
+				"end": 806,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The one reader that must NOT decode: the wire schema follows Svelte's own raw-bytes",
+			"start": 25,
+			"end": 111,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `lang` regex, so this script is not TypeScript. The Svelte import shape in",
+			"start": 113,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " expected.json — `attributes` present, no `importKind` — is the assertion.",
+			"start": 192,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 77
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 298,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 23,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 270,
+					"end": 288,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 19
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 277,
+							"end": 278,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 8
+								},
+								"end": {
+									"line": 5,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 277,
+								"end": 278,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 8
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 284,
+						"end": 287,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 15
+							},
+							"end": {
+								"line": 5,
+								"column": 18
+							}
+						},
+						"value": "b",
+						"raw": "'b'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The one reader that must NOT decode: the wire schema follows Svelte's own raw-bytes",
+							"start": 25,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " `lang` regex, so this script is not TypeScript. The Svelte import shape in",
+							"start": 113,
+							"end": 190
+						},
+						{
+							"type": "Line",
+							"value": " expected.json — `attributes` present, no `importKind` — is the assertion.",
+							"start": 192,
+							"end": 268
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 22,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 21,
+						"type": "Text",
+						"raw": "&#116;s",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
