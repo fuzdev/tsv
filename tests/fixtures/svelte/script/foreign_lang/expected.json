@@ -1,0 +1,155 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 47,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " note",
+			"start": 29,
+			"end": 36,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 6
+				},
+				"end": {
+					"line": 2,
+					"column": 13
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 46,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 22,
+			"end": 37,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 23,
+					"end": 28,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 0
+						},
+						"end": {
+							"line": 2,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 23,
+						"end": 28,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 0
+							},
+							"end": {
+								"line": 2,
+								"column": 5
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 23,
+							"end": 24,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 0
+								},
+								"end": {
+									"line": 2,
+									"column": 1
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "Literal",
+							"start": 27,
+							"end": 28,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 4
+								},
+								"end": {
+									"line": 2,
+									"column": 5
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						}
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " note",
+							"start": 29,
+							"end": 36
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 21,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 20,
+						"type": "Text",
+						"raw": "coffee",
+						"data": "coffee"
+					}
+				]
+			}
+		]
+	}
+}

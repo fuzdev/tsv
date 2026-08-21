@@ -106,9 +106,156 @@ The visible effect is on the following sibling: as an inline element the space b
 
 **Space after block element**: When a block element (`<div>`, `<p>`, …) is directly followed by content text with a same-line (space, no linebreak) boundary, prettier-plugin-svelte trims the text's leading whitespace (`trimTextNodeLeft`) but still emits the block-child break, stranding a **leading space** on the text line (`<div>block</div> text` → `>⏎ text`). It is **non-idempotent** — a second pass trims the space, converging to the same form tsv produces. tsv takes the same trim but emits no fold/group after the block (the block's own break already supplies the separating line), so no stray space survives and the result is identical in one pass from either authoring. The `unformatted_ours_compact` variant pins tsv's one-pass normalization; `prettier_intermediate_compact` captures prettier's stray-space first pass (which converges to `input` on the next pass).
 
-**Nested foreign `<template>` body columns**: a `<template lang="…">` in a language tsv does not format has a body that is the author's own bytes, and tsv emits the whole child run's source span between a column-0 line break and the closing tag's own indent — so the body keeps its authored columns at every nesting depth. Prettier prints such a template through **two** paths and only one of them agrees. `lang="pug"` reaches `embedTag` → `preformattedBody`, whose `literalline` is tsv's rule exactly (that path is the plain [template_foreign_lang_body](../tests/fixtures/svelte/elements/template_foreign_lang_body/), where the two match on every child kind — element, comment, expression tag, block — and on the empty and blank-body arms). The five names in the plugin's hand-maintained `unsupportedLanguages` list (`coffee`, `coffeescript`, `styl`, `stylus`, `sass`) fall through to the element printer's raw arm instead, whose leading `hardline` indents the body's **first line** and leaves every other line where it was. At indent 0 the two paths coincide, so only a *nested* template can tell them apart.
+**Nested foreign `<template>` body columns**: tsv gives a frozen `<template>` body the one freeze shape ([§Foreign-language embedded bodies](#svelte-foreign-language-embedded-bodies)) — the whole child run's source span between a column-0 line break and the closing tag's own indent — so the body keeps its authored columns at every nesting depth. Prettier prints such a template through **two** paths and only one of them agrees. `lang="pug"` reaches `embedTag` → `preformattedBody`, whose `literalline` is tsv's rule exactly (that path is the plain [template_foreign_lang_body](../tests/fixtures/svelte/elements/template_foreign_lang_body/), where the two match on every child kind — element, comment, expression tag, block — and on the empty and blank-body arms). The five names in the plugin's hand-maintained `unsupportedLanguages` list (`coffee`, `coffeescript`, `styl`, `stylus`, `sass`) fall through to the element printer's raw arm instead, whose leading `hardline` indents the body's **first line** and leaves every other line where it was. At indent 0 the two paths coincide, so only a *nested* template can tell them apart.
 
 That arm is **non-convergent**: the indent it inserts becomes part of the body prettier re-reads next pass, while its leading strip (`/^[\t\f\r ]*\n/`) only removes blanks *before* the delimiter's newline and never after it, so the first line gains one more level on every run without end. There is no fixed point to pin, hence the `prettier_nonconvergent.txt` marker. tsv is stable, and stability is the same argument as correctness here: the body is whitespace-significant by assumption — that is why it is not being formatted — so indenting one of its lines and not the rest changes what it says.
+
+## Svelte: Foreign-language embedded bodies
+
+**◆design_choice.** One rule at every position that reads a `lang`/`type` attribute: **a body
+declared as a language tsv does not format at that position is the author's own bytes** — the
+printer freezes it, emitting the source run verbatim instead of reprinting from the AST. One
+reader answers it everywhere (`internal::EmbeddedLang::is_frozen` over
+`internal::lang_attribute`), with a per-tag set of formattable names as its only variable:
+`<style>` formats exactly `css`, `<template>` exactly `html`, `<script>` the JS/TS family
+(`ts`, `typescript`, `js`, `javascript`, `ecmascript`, `application/javascript`,
+`application/ecmascript`, and `module` — see below); an absent attribute is always
+formattable. The code spells the rule **frozen** rather than *foreign*, since `foreign` is
+already the HTML spec's word for an SVG/MathML element and `TagClass::is_foreign` means
+exactly that.
+
+**The `<script>` set is drawn where tsv's *printer* stops, not where Svelte's *parser*
+switches grammars.** Those are different lines and must not be conflated: Svelte's `this.ts`
+(`1-parse/index.js`) recognizes the single raw value `ts` and answers "should acorn accept
+TypeScript syntax here?", while this rule asks "can tsv print this body?" — and tsv's printer
+takes the whole family, since it parses every body under the TS grammar regardless of the name
+on the tag. `module` is in the set because `type="module"` names JavaScript: on a `<script>`,
+`type` is a loading and MIME attribute, so the value it carries need not be a language at all
+— and for the same reason the set takes the **living JavaScript MIME essences** beside the
+bare names, since `text/javascript` and `application/javascript` name one language and the
+reader's `text/` strip alone would have let only the first through.
+
+What stays out is what tsv genuinely cannot print — `coffee`, `application/json` /
+`application/ld+json` / `importmap`, every unknown name, and the **dead** MIME essences
+mimesniff still lists (`text/jscript`, `text/livescript`, the `x-` spellings,
+`text/javascript1.<n>`). That last group freezes deliberately rather than by omission: a body
+under one of those names is a museum piece rather than JS an author wants reflowed, and a
+freeze is lossless either way, which is the direction this whole rule leans.
+
+Prettier's default points the other way: it formats every *unknown* name (its CSS parser for
+styles, `babel-ts` for scripts, the markup printer for templates) and freezes only a
+hand-maintained five-name denylist (`coffee`, `coffeescript`, `styl`, `stylus`, `sass`) — a
+defensible split for a formatter that really has scss/less parsers behind the fallthrough, and
+an unsound one for tsv, which has exactly one parser per position: guessing with it corrupts
+what it half-understands (less `@color: red;` reprinted as the at-rule `@color : red;` by the
+CSS printer).
+
+The freeze changes nothing about *parsing*: canonical Svelte runs acorn and `parseCss` over
+every top-level body regardless of `lang`, and so does tsv, so a non-parseable foreign body
+still rejects the whole file on both sides and every body that reaches a **top-level** freeze
+is by construction parseable. A **nested** body carries no such guarantee — it is raw text to
+both parsers, so nothing has established anything about it.
+
+⚠️ **That premise is also the top-level freeze's whole reach, which is narrower than it
+looks**: a top-level body freezes only if it is *simultaneously* valid TypeScript (or valid
+CSS), because anything else was rejected before the printer saw it. `<script
+type="application/json">{ "a": 1 }</script>` and a less body using `.mixin()` are both
+rejected by tsv **and by Svelte** — parity, not an over-rejection, and the reason the JSON and
+importmap cases below are fixtured **nested** while the top-level ones are a `lang="foo"` body
+that happens to be valid JS and a `lang="scss"` body that happens to be valid CSS. Don't reach
+for a top-level fixture of a genuinely foreign body; there is no such file. The tag this
+actually pays off at is `<style>`, where most `lang="scss"` bodies are syntactically plain CSS
+and so do reach the freeze.
+
+**The freeze shape is verbatim, at every tag and both positions.** The body's bytes ride out
+between two delimiter lines (prettier's `preformattedBody`: one leading
+`/^[\t\f\r ]*\n/` and one trailing `/\n[\t\f\r ]*$/` stripped, authored columns kept),
+and nothing else is touched — indentation, blank lines and interior trailing whitespace all
+survive byte for byte. In particular the freeze does **not** re-indent, and the reason is the
+rule's own premise: rewriting indentation is formatting, and indentation is exactly what
+`lang="sass"` and `lang="stylus"` are made of. Shifting such a body off column 0, or
+respelling its unit, changes what it says — the same corruption as the `@color : red;` case
+above, one dimension down — and no position is in a state to rule that out, the nested one
+because nothing read the body and the top-level one because "it parsed as CSS" licenses the
+rewrite as *safe*, never as *right*. Where prettier also freezes, the two agree byte-for-byte:
+[style/foreign_lang_verbatim](../tests/fixtures/svelte/style/foreign_lang_verbatim/) (sass and
+stylus, at both positions), [script/foreign_lang](../tests/fixtures/svelte/script/foreign_lang/)
+(coffee, with a `//` comment riding out verbatim),
+[script/foreign_type](../tests/fixtures/svelte/script/foreign_type/)
+(`type="text/coffeescript"`), and
+[script_foreign_lang_nested](../tests/fixtures/svelte/elements/script_foreign_lang_nested/).
+
+The divergences are where prettier formats what tsv freezes — one per tag, plus the routing
+rule that decides which side a value lands on:
+
+- **Frozen `<script>` body** (both positions) — prettier sends every name outside its
+  five-name denylist to `babel-ts`, and every name ending in `json`/`importmap` to its JSON
+  parser, so an unknown name and the JSON family both diverge —
+  [foreign_lang_frozen](../tests/fixtures/svelte/script/foreign_lang_frozen_prettier_divergence/)
+  (`lang="foo"` at the top level, `application/json` and `importmap` nested). The unknown
+  name is the case where prettier's fallthrough is least defensible — it hands a body it
+  knows nothing about to a JavaScript printer on the strength of having no entry in a
+  hand-maintained list — and the JSON one is where prettier's own answer is a hard
+  **error** on a body that is not JSON, landing on its degraded error-swallow path. A body
+  prettier freezes too agrees and is the plain
+  [script/foreign_lang](../tests/fixtures/svelte/script/foreign_lang/).
+- **Frozen `<style>` body** (both positions) — prettier formats scss/less with real parsers
+  and unknown names with its CSS parser, so any body prettier would restyle diverges —
+  [foreign_lang_frozen](../tests/fixtures/svelte/style/foreign_lang_frozen_prettier_divergence/)
+  (top level) and
+  [style_foreign_lang_nested](../tests/fixtures/svelte/elements/style_foreign_lang_nested_prettier_divergence/)
+  (nested, which also holds the whitespace-only body: tsv gives it the freeze shape, prettier
+  the formattable one). An already-prettier-shaped body agrees and is the plain
+  [style/foreign_lang](../tests/fixtures/svelte/style/foreign_lang/) /
+  [style/foreign_type](../tests/fixtures/svelte/style/foreign_type/).
+- **Unknown-lang `<template>`** — tsv freezes any non-`html` name; prettier's element
+  printer formats a name outside its denylist as ordinary markup (`lang="jade"` — pug's
+  older name, absent from its list — would have its indentation-significant body reflowed) —
+  [template_foreign_lang_unknown](../tests/fixtures/svelte/elements/template_foreign_lang_unknown_prettier_divergence/).
+- **Untrimmed `lang` routing** — tsv trims the decoded value, so `lang=" pug "` names pug
+  and freezes; prettier compares untrimmed and formats the body as markup —
+  [template_lang_trim](../tests/fixtures/svelte/elements/template_lang_trim_prettier_divergence/).
+  The trim only ever routes *toward* the freeze, and Svelte's own `lang` regex cannot match
+  a spaced value either.
+
+The JS/TS family agrees instead, and is the plain
+[script/lang_js_family](../tests/fixtures/svelte/script/lang_js_family/) (`lang="js"` at the
+top level, `type="module"` in `<svelte:head>`, and `lang="typescript"` plus the three MIME
+essences nested — each with an unformatted variant, since an already-formatted body cannot
+tell a freeze from a format).
+
+Two **shape** rules the freeze shares with prettier, at every position and in both the writer
+and the doc emitters:
+
+- **An empty body collapses; a whitespace-only one keeps its delimiter break.** `<script
+  lang="coffee"></script>` stays on one line, while a body of spaces gets the two delimiter
+  lines a frozen body always gets, and a *formattable* body with nothing in it gets the one
+  break its formatted content would have sat on. Prettier draws the same line twice —
+  `preformattedBody('')` returns the empty doc where `preformattedBody('   ')` returns the
+  literal-line pair, and its formattable arm is `content === '' ? '' : hardline`. The two
+  arms are one character apart in the source and three different shapes in the output, so
+  every position asks the question of the **raw bytes** rather than of a trimmed reading —
+  [nested_script_style_whitespace_only](../tests/fixtures/svelte/elements/nested_script_style_whitespace_only/)
+  holds the agreeing cells against an empty control.
+- **A frozen body's last line still owes the trailing-whitespace trim**, and only its last
+  line: the run being trimmed is the one the closing break is about to end, so interior
+  lines keep theirs on both sides. This is free wherever the freeze is emitted as a doc
+  (`tsv_lang::doc`'s renderer trims space and tab ahead of every non-literal newline, which
+  is prettier's `trimIndentation` exactly, and the freeze's closing `hardline` is such a
+  newline); the top-level writer builds its own lines, so it spells the same trim on the
+  slice it emits.
+
+Two reader rules the family shares, both agreements with prettier and pinned by plain
+fixtures: `lang` outranks `type` whatever their source order (prettier's
+`getLangAttribute` is `lang || type`), and an empty value names no language and reads as
+absent — [lang_priority](../tests/fixtures/svelte/attributes/lang_priority/); the value is
+the *decoded* text — [lang_entity](../tests/fixtures/svelte/attributes/lang_entity/).
+
+One rough edge stays open by choice: a nested body in a *formattable* language whose
+content fails its parse (`<div><style>$c: red;</style></div>`) keeps the old glued raw
+fallback rather than a freeze shape. Prettier's own behavior there is its degraded
+error-swallow path (the plugin logs the embedded parse error and resolves with the body
+verbatim), which is no oracle to pin against; no real corpus file reaches it.
 
 ## Svelte: Inline content block-style
 

@@ -20,6 +20,7 @@
 
 mod attributes;
 mod classification;
+mod frozen_body;
 mod helpers;
 mod nodes;
 mod script_style;

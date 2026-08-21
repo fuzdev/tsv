@@ -43,9 +43,10 @@ only the form whose *raw bytes* contain a `|` before the real separator is corru
 The other spellings prettier prints verbatim, agreeing with tsv.
 
 ⚠️ Prettier's output for this rule is **not** a form tsv can reach or a claim that can be
-widened: `[a\|b]` does not survive its own next pass (`Invalid character`), and the
-related `[svg|a\|b]` becomes `[svg|a\]`, an unclosed bracket. Only the pass-1 output is
-recorded, and only for this input.
+widened. `[a\|b]` is a prettier **fixed point**, so the truncation is silent — no later
+pass raises anything, and what the file keeps is simply a different selector. The related
+`[svg|a\|b]` degrades further, to the unclosed `[svg|a\]`, which prettier's own next pass
+rejects (`Unclosed bracket`). Only the pass-1 output is recorded, and only for this input.
 
 See [conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).
 

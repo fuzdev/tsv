@@ -647,8 +647,12 @@ The constructs tsv rejects outright:
   side effect: the column combinator lives in selectors-5, whose grammar
   (`<combinator> = '>' | '+' | '~' | [ '|' '|' ] | [ / <wq-name> / ]`) adds its own *white
   space is forbidden* rule — "Between the components of a `<combinator>`" — so only the
-  comment form is a gap. Prettier has no usable oracle for either (it rewrites
-  `col | | td` to `col|td`). The **last** spec-valid selector position tsv rejects a
+  comment form is a gap. Prettier is a usable oracle for the comment form only: its
+  selector parser gives up on **any** comment and freezes the selector verbatim, so
+  `col |/* c */| td` comes back byte-identical and stays so on a second pass. For the
+  whitespace form it has none — it rewrites `col | | td` to `col|td`. Svelte's `parseCss`
+  rejects both spellings, so closing the gap is a *shared* over-rejection with no fixture
+  shape today. The **last** spec-valid selector position tsv rejects a
   comment in; every other one is listed under [Comments](#comments). An ident glued to `(`
   (`:not/* c */(`) is a single `<function-token>` and is correctly rejected, not a gap —
   and `#id` is a single `<hash-token>`, so it has no juncture to split either

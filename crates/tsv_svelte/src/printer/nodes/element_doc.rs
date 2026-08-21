@@ -124,8 +124,10 @@ pub(super) struct TagClass {
     pub(super) is_foreign: bool,
     /// `<foo:bar>` — a namespaced regular element; inline-kinded, but may print self-closing
     pub(super) is_namespaced: bool,
-    pub(super) is_style: bool,
-    pub(super) is_script: bool,
+    /// `<style>` / `<script>` — a raw-text element, and which one. `None` for every other
+    /// tag. One field rather than two bools so "both" is unrepresentable and the tag's two
+    /// consumers (the builder's dispatch, the sibling-dangle's exclusion) cannot drift.
+    pub(super) raw_text: Option<RawTextKind>,
     /// `<pre>` / `<textarea>` — content whitespace is literal
     pub(super) is_ws_sensitive: bool,
     /// `<table>` / `<select>` / … — a whitespace-collapsing container: the compiler removes
@@ -336,42 +338,31 @@ pub(super) struct ElementContext {
     pub(super) has_multiline_attr: bool,
 }
 
-/// The horizontal filler a foreign body's own delimiter line may carry — prettier's
-/// `[\t\f\r ]` in [`foreign_body_bounds`], spelled once.
+/// Which raw-text element a `<script>` / `<style>` body belongs to.
 ///
-/// Deliberately **not** [`is_collapsible_ws_char`]: a form feed belongs here (it is filler on
-/// the delimiter's line) where the template's own text nodes treat it as content, and `\n` is
-/// excluded because it is the terminator these scans are looking for, never part of the run.
+/// The two differ in exactly two places — which language names their body may be written in
+/// and still be formatted, and which parser formats it — so they are one code path with a
+/// tag, not two, and the tag travels as a type rather than as a bool re-read at each of those
+/// decisions (where a flipped test is a silent mis-format rather than a compile error).
 ///
-/// So this is the crate's *other* `[\t\f\r ]`, and the two split on the form feed on purpose:
-/// `fragment_doc`'s `text_starts_with_linebreak` drops it, because there the run is template
-/// text the compiler renders. Here the run is a delimiter line tsv itself emits and no reader
-/// ever sees, so prettier's class is taken whole.
-const DELIMITER_LINE_FILLER: [char; 4] = ['\t', '\x0c', '\r', ' '];
+/// Two variants, not three: this drives the **parser** dispatch below, which genuinely has
+/// only two arms. The *language* question has a third position (`<template>`) and lives on
+/// [`internal::EmbeddedLang`], which this maps into rather than re-deriving.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum RawTextKind {
+    Style,
+    Script,
+}
 
-/// The byte range of `raw` a foreign `<template>`'s body contributes — the whole child run
-/// minus the two delimiter lines' own newlines, prettier's
-/// `.replace(/^[\t\f\r ]*\n/, '').replace(/\n[\t\f\r ]*$/, '')`. Empty (`start == end`) when
-/// the body is nothing but those two lines.
-///
-/// Only the FIRST newline goes at each end — a body that opens or closes with blank lines
-/// keeps every one of them but the delimiter's own. The strips are sequential in prettier, so
-/// they are here too: a lone `"\n"` body loses its newline to the leading strip and has
-/// nothing left for the trailing one.
-fn foreign_body_bounds(raw: &str) -> (usize, usize) {
-    let rest = raw.trim_start_matches(DELIMITER_LINE_FILLER);
-    let start = if rest.starts_with('\n') {
-        raw.len() - rest.len() + 1
-    } else {
-        0
-    };
-    let head = raw[start..].trim_end_matches(DELIMITER_LINE_FILLER);
-    let end = if head.ends_with('\n') {
-        start + head.len() - 1
-    } else {
-        raw.len()
-    };
-    (start, end)
+impl RawTextKind {
+    /// This tag's position in the freeze rule — the owner of its formattable-name set. See
+    /// docs/conformance_prettier_svelte.md §Foreign-language embedded bodies.
+    fn lang(self) -> internal::EmbeddedLang {
+        match self {
+            Self::Style => internal::EmbeddedLang::Style,
+            Self::Script => internal::EmbeddedLang::Script,
+        }
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -421,8 +412,13 @@ impl<'a> Printer<'a> {
             is_void: facts.is_void(),
             is_foreign: facts.is_foreign(),
             is_namespaced: facts.is_namespaced(),
-            is_style: facts.is_style(),
-            is_script: facts.is_script(),
+            raw_text: if facts.is_style() {
+                Some(RawTextKind::Style)
+            } else if facts.is_script() {
+                Some(RawTextKind::Script)
+            } else {
+                None
+            },
             is_ws_sensitive: facts.is_ws_sensitive(),
             collapses_child_ws: facts.collapses_child_whitespace(),
             is_declaration: facts.is_declaration(),
@@ -468,14 +464,14 @@ impl<'a> Printer<'a> {
         );
 
         // Special handling for <style> and <script> elements
-        if class.is_style || class.is_script {
-            return self.build_raw_content_element_doc(class.is_style, element, attrs.docs);
+        if let Some(kind) = class.raw_text {
+            return self.build_raw_content_element_doc(kind, element, attrs.docs);
         }
 
-        // Foreign language <template> elements (e.g., <template lang="pug">)
+        // Frozen-language <template> elements (e.g., <template lang="pug">)
         // preserve content raw — we can't format non-HTML template languages
-        if element.is_foreign_template(self.source) {
-            return self.build_foreign_template_doc(element);
+        if element.is_frozen_template(self.source) {
+            return self.build_frozen_template_doc(element);
         }
 
         // Whitespace-sensitive elements (pre, textarea, etc.) — these keep the mandatory
@@ -540,7 +536,7 @@ impl<'a> Printer<'a> {
     /// a dangled element renders its content identically to its undangled form (incl. trimming a
     /// render-free boundary space — `<span>text </span>{#each…}` must dangle like the glued form).
     ///
-    /// Special-content elements (raw `<script>`/`<style>`, foreign `<template>`, whitespace-sensitive
+    /// Special-content elements (raw `<script>`/`<style>`, frozen `<template>`, whitespace-sensitive
     /// `<pre>`/`<textarea>`) never participate — their closing tags aren't the simple hug-both shape.
     /// Soft alone qualifies (Hug's glued boundaries already collapse to it): a one-sided-newline or
     /// render-free boundary trims to the same glued form, so without the dangle `format(newline
@@ -552,10 +548,9 @@ impl<'a> Printer<'a> {
         element: &'e internal::Element<'e>,
     ) -> Option<(ElementParts<'e>, ElementContext, DocBuf, DocId)> {
         let class = self.classify_tag(element);
-        if class.is_style
-            || class.is_script
+        if class.raw_text.is_some()
             || class.is_ws_sensitive
-            || element.is_foreign_template(self.source)
+            || element.is_frozen_template(self.source)
         {
             return None;
         }
@@ -955,14 +950,14 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a doc for a `<template>` element with a foreign language (e.g., `lang="pug"`).
+    /// Build a doc for a `<template>` element in a frozen language (e.g., `lang="pug"`).
     /// Content is preserved raw — we can't format non-HTML template languages.
     /// Format: `<template lang="pug">\n{raw content}\n</template>`
-    fn build_foreign_template_doc(&self, element: &internal::Element<'_>) -> DocId {
+    fn build_frozen_template_doc(&self, element: &internal::Element<'_>) -> DocId {
         let d = self.d();
         let name_doc = d.source_span_ident(element.name_span);
 
-        // Opening tag: the ordinary one. What is foreign here is the element's CONTENT, which
+        // Opening tag: the ordinary one. What is frozen here is the element's CONTENT, which
         // tsv cannot format and so copies verbatim; the head above it is an attribute list like
         // any other and gets the shared layout — attributes wrapped one per line and the `>` at
         // base indent once it breaks. Answering that here instead cost both halves of the
@@ -983,7 +978,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![self.build_opening_tag(name_doc, &attr_docs, false)];
         parts.push(d.text(">"));
 
-        // The body is a foreign language, so it is the author's own bytes: the whole child
+        // The body is in a frozen language, so it is the author's own bytes: the whole child
         // run's source span rides out verbatim, boundary newlines aside. Reading the fragment
         // node by node instead cost every non-`Text` child — an element, a comment, an
         // expression tag, a block were all silently DELETED, and no self-oracle gate could see
@@ -997,19 +992,7 @@ impl<'a> Printer<'a> {
         // newlines at all: `<template lang="pug"></template>`.
         let nodes = element.fragment.nodes;
         if let (Some(first), Some(last)) = (nodes.first(), nodes.last()) {
-            let body = Span::new(first.span().start, last.span().end);
-            let (start, end) = foreign_body_bounds(body.extract(self.source));
-
-            parts.push(d.literalline());
-            if start < end {
-                // `source_span_covering_comments_doc`: a `{/* c */}` in the body reaches no
-                // comment emitter — it rides out inside this slice, so the ledger is told.
-                parts.push(self.source_span_covering_comments_doc(Span::new(
-                    body.start + start as u32,
-                    body.start + end as u32,
-                )));
-            }
-            parts.push(d.hardline());
+            parts.push(self.frozen_body_doc(Span::new(first.span().start, last.span().end)));
         }
 
         parts.push(self.end_tag(name_doc));
@@ -1023,7 +1006,7 @@ impl<'a> Printer<'a> {
     /// that need their content formatted as CSS/JS rather than as regular fragment nodes.
     pub(super) fn build_raw_content_element_doc(
         &self,
-        is_style: bool,
+        kind: RawTextKind,
         element: &internal::Element<'_>,
         attr_docs: DocBuf,
     ) -> DocId {
@@ -1038,17 +1021,54 @@ impl<'a> Printer<'a> {
             self.build_opening_tag(name_doc, &attr_docs, false),
             d.text(">"),
         ]));
+        // Every arm below ends with it, so it is built once rather than at each of the five.
+        let closing_tag = self.end_tag(name_doc);
 
         // Get raw content from the single Text child
-        let content = element.fragment.nodes.first().and_then(|node| match node {
-            FragmentNode::Text(text) => Some(text.data(self.source)),
+        let text = element.fragment.nodes.first().and_then(|node| match node {
+            FragmentNode::Text(text) => Some(text),
             _ => None,
         });
 
-        // Empty element or whitespace-only content
-        let Some(content) = content.filter(|c| !c.trim().is_empty()) else {
-            return d.concat(&[opening_tag, self.end_tag(name_doc)]);
+        // Nothing between the tags — the one arm that collapses. A body of *whitespace* is
+        // not this arm: it keeps a delimiter break at every other position and here too.
+        let Some(text) = text.filter(|t| !t.raw(self.source).is_empty()) else {
+            return d.concat(&[opening_tag, closing_tag]);
         };
+
+        // A frozen-language body freezes before any parse is attempted — the shared
+        // opacity gate, asked here at both nested positions exactly as at the two top-level
+        // ones (`print_style` / `print_script`), and answered with the one freeze shape:
+        // the author's bytes verbatim. Unlike the top-level positions, nested content is raw
+        // text to BOTH parsers (canonical Svelte never parses it), so nothing here has
+        // established anything about the body — not even that it is brace-structured. That
+        // is precisely why the freeze may not re-indent it: `lang="sass"` and `lang="stylus"`
+        // are indentation-significant, and shifting such a body off column 0 changes what it
+        // says, the same corruption in miniature as reprinting a less body with the CSS
+        // printer (`@color: red;` → `@color : red;`).
+        if kind.lang().is_frozen(element.attributes, self.source) {
+            // `raw_span`, not `span`: what rides out is the author's own bytes. The two
+            // coincide on a raw-text `Text` (no decode), and naming the raw one says so.
+            return d.concat(&[
+                opening_tag,
+                self.frozen_body_doc(text.raw_span),
+                closing_tag,
+            ]);
+        }
+
+        let content = text.data(self.source);
+
+        // A formattable body with nothing to format still holds its delimiter break — the two
+        // tags with one break between them, the closing tag back at the element's own indent.
+        // That is the shape `print_script` / `print_style` give it one level up, and
+        // prettier's `content === '' ? '' : hardline` arm. It is the shape a
+        // **whitespace-only** body takes, not an empty one, which collapsed above — the
+        // frozen twin keeps its own whitespace instead (`preformattedBody('')` returns the
+        // empty doc where `preformattedBody('   ')` returns the literal-line pair), which is
+        // why this question is asked below the freeze gate rather than above it.
+        if content.trim().is_empty() {
+            return d.concat(&[opening_tag, d.hardline(), closing_tag]);
+        }
 
         // Parse and format content based on tag type
         // Using base_indent_offset of 0 because we'll handle indentation in the doc structure.
@@ -1063,13 +1083,13 @@ impl<'a> Printer<'a> {
         // output-identical to `format`; the parsed content renders to an owned
         // `String` here, so nothing borrowed from the arena escapes and the arena
         // is not reset.
-        let formatted = if is_style {
-            tsv_css::parse(&content, &arena)
+        let formatted = match kind {
+            RawTextKind::Style => tsv_css::parse(&content, &arena)
                 .ok()
-                .map(|ast| tsv_css::format_in(&ast, &content, self.d()))
-        } else {
-            let parsed = tsv_ts::parse(&content, &arena).ok();
-            parsed.map(|ast| tsv_ts::format_in(&ast, &content, self.d()))
+                .map(|ast| tsv_css::format_in(&ast, &content, self.d())),
+            RawTextKind::Script => tsv_ts::parse(&content, &arena)
+                .ok()
+                .map(|ast| tsv_ts::format_in(&ast, &content, self.d())),
         };
 
         match formatted {
@@ -1087,11 +1107,17 @@ impl<'a> Printer<'a> {
 
                 let content_concat = d.concat(&content_lines);
                 let indented = d.indent(content_concat);
-                d.concat(&[opening_tag, indented, d.hardline(), self.end_tag(name_doc)])
+                d.concat(&[opening_tag, indented, d.hardline(), closing_tag])
             }
             _ => {
-                // Fallback: preserve raw content if parsing fails
-                d.concat(&[opening_tag, d.text_pooled(&content), self.end_tag(name_doc)])
+                // Fallback: preserve raw content if parsing fails. Reachable only for a
+                // FORMATTABLE-lang body (css/ts/absent) whose content doesn't parse — a
+                // frozen body froze before the parse above.
+                // TODO: route through the freeze emitter for a cleaner shape? Prettier's
+                // behavior here is its degraded error-swallow path (no clean oracle to pin
+                // a fixture against), so the glued raw shape stays for now — see
+                // docs/conformance_prettier_svelte.md §Foreign-language embedded bodies.
+                d.concat(&[opening_tag, d.text_pooled(&content), closing_tag])
             }
         }
     }
@@ -1347,52 +1373,5 @@ impl<'a> Printer<'a> {
     /// building). Shared by regular and special elements.
     pub(super) fn span_was_self_closing(&self, span: Span) -> bool {
         span.extract(self.source).trim_end().ends_with("/>")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::foreign_body_bounds;
-
-    /// The slice a body contributes, as `build_foreign_template_doc` takes it.
-    fn body(raw: &str) -> &str {
-        let (start, end) = foreign_body_bounds(raw);
-        &raw[start..end]
-    }
-
-    #[test]
-    fn body_bounds_drop_one_delimiter_newline_per_side() {
-        assert_eq!(body("\nh1 text\n"), "h1 text");
-        // Horizontal filler on either delimiter line goes with that line's newline.
-        assert_eq!(body("  \nh1 text\n\t"), "h1 text");
-        // Only the FIRST newline: the author's own blank lines are body.
-        assert_eq!(body("\n\nh1 text\n\n"), "\nh1 text\n");
-        // A body with no boundary newline at all keeps every byte.
-        assert_eq!(body("h1 text"), "h1 text");
-        // Trailing filler is only a delimiter line when a newline precedes it.
-        assert_eq!(body("\nh1 text  "), "h1 text  ");
-    }
-
-    #[test]
-    fn body_bounds_are_empty_when_the_two_delimiter_lines_are_all_there_is() {
-        // The strips are sequential, so a lone newline is spent on the leading one and the
-        // trailing strip finds nothing left.
-        assert_eq!(body("\n"), "");
-        assert_eq!(body("\n\n"), "");
-        // But the trailing strip needs a newline of its own: filler with none in front of it
-        // is body, exactly as prettier's `/\n[\t\f\r ]*$/` leaves it. The printed line is
-        // still empty — the `hardline` that follows the body trims the run — so this is a
-        // fact about the slice, not about the output.
-        assert_eq!(body("  \n  "), "  ");
-        // A form feed is filler on a delimiter line, unlike in rendered template text.
-        assert_eq!(body("\u{c}\nh1 text\u{c}\n\u{c}"), "h1 text\u{c}");
-    }
-
-    #[test]
-    fn body_bounds_keep_a_crlf_bodys_own_carriage_returns() {
-        // `\r` is filler, so the delimiter lines' CRLFs go whole — but an interior line's
-        // `\r` is the author's byte and rides out with it.
-        assert_eq!(body("\r\nh1 text\r\n"), "h1 text\r");
-        assert_eq!(body("\r\na\r\nb\r\n"), "a\r\nb\r");
     }
 }
