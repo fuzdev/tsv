@@ -134,18 +134,19 @@ pub(crate) fn comment_census(source: &str, parser: ParserType) -> CensusMultiset
 /// line edge is CONTENT, and trimming it would blind the census to exactly the
 /// kind of rewrite it exists to catch.
 ///
-/// The `<CR>` fold comes FIRST, and is the PRINTER's own
+/// The `<CR>` fold comes FIRST, and is the FORMAT PATH's own
 /// ([`tsv_lang::printing::normalize_carriage_returns`]) rather than a second copy, so the
-/// two cannot drift. tsv's output is LF-only, so a `<CR>` the author wrote inside a comment
-/// is a line break on the other side of this diff. Splitting on `\n` alone left the two
-/// sides disagreeing about where the LINES are — the input's lone `<CR>` stayed interior
+/// two cannot drift. The formatter applies it to its input ahead of the parse, so a `<CR>`
+/// the author wrote inside a comment is an `<LF>` on the other side of this diff — and this
+/// side has to make the same move to compare like with like. Splitting on `\n` alone left
+/// the two disagreeing about where the LINES are — the input's lone `<CR>` stayed interior
 /// content while the output's `<LF>` split and took the per-line trim — and the census
 /// reported a MISSING/EXTRA pair for a comment nothing had rewritten. `<LS>` / `<PS>` are
-/// deliberately NOT folded: the printer does not fold them either, so folding here would
+/// deliberately NOT folded: the formatter does not fold them either, so folding here would
 /// make `a<LS>b` and `a<LF>b` compare equal and blind the census to a real rewrite. `\r`
 /// left the trim class in the same step — after the fold there is none left to trim.
 fn normalize_interior(raw: &str) -> String {
-    let raw = tsv_lang::printing::normalize_carriage_returns(raw.to_owned());
+    let raw = tsv_lang::printing::normalize_carriage_returns(raw);
     let mut out = String::with_capacity(raw.len());
     for (i, line) in raw.split('\n').enumerate() {
         if i > 0 {

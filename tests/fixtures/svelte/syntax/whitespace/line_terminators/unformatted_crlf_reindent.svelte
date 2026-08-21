@@ -13,9 +13,9 @@ text2`;
 	const b = [ 1,
 		2 ];
 
-	/**
-	 * c
-	 */
+			/**
+			 * c
+			 */
 	const c = 1;
 </script>
 

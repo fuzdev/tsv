@@ -14,7 +14,8 @@ pub struct Comment {
     /// comment in the lexer and the parser's collect-clone.
     pub content_span: Span,
     pub is_block: bool, // true for /* */ or <!-- -->, false for //
-    /// Whether the content contains a `\n`. Precomputed at construction so the
+    /// Whether the content contains a `\n` ([`Comment::content_is_multiline`], the one
+    /// derivation every parser uses). Precomputed at construction so the
     /// multi-line-block-comment expansion checks (here and in the printers) stay
     /// O(1) and source-free. Line comments never contain a newline, so this is
     /// only ever `true` for block comments.
@@ -75,6 +76,25 @@ pub struct Comment {
 }
 
 impl Comment {
+    /// Whether a comment's `content` (its interior, delimiters excluded) spans more than
+    /// one line — the derivation behind [`Comment::multiline`], stated once for the three
+    /// parsers that build a `Comment`.
+    ///
+    /// **`\n` alone, deliberately, not the ECMAScript terminator class.** The field feeds
+    /// the WIRE as well as the printers — Svelte's comment `value` is dedented only for a
+    /// multi-line block comment — and Svelte's own gate is `/\n/.test(value)`
+    /// (`svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js`), so widening this
+    /// would dedent a comment Svelte leaves alone. Every format entry point folds `<CR>`
+    /// ahead of the parse anyway (`printing::normalize_carriage_returns`), so on that path
+    /// the two classes cannot disagree; `parse` is where the narrow class earns its keep.
+    #[must_use]
+    pub fn content_is_multiline(is_block: bool, content: &str) -> bool {
+        // Line comments end at the first line terminator, so their content never holds one
+        // — the gate makes that a fact of the API rather than of each caller, and skips the
+        // scan for every `//`.
+        is_block && content.contains('\n')
+    }
+
     /// The comment's content (delimiters excluded), sliced from `source`.
     ///
     /// `source` must be the same text the comment's spans were recorded
@@ -616,7 +636,7 @@ mod tests {
             // content_span mirrors the full span (no source to slice here).
             content_span: Span::new(start, end),
             is_block,
-            multiline: content.contains('\n'),
+            multiline: Comment::content_is_multiline(is_block, content),
             span: Span::new(start, end),
             emit_character_field: false,
             bump_pattern_columns: false,

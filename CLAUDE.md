@@ -788,6 +788,21 @@ This is one instance of a broader stance: **the parser is deliberately permissiv
 
 **Strict ≠ module-only — there is an orthogonal *goal* axis.** Both goals are strict (no sloppy mode, no `"use strict"` detection). A parse runs against `tsv_ts::Goal::{Module, Script}` (`parse_with_goal`, CLI `--goal script|module`), **defaulting to `Module`** (correct for Svelte `<script>` and ~all real TS; Svelte hard-wires it). The goal toggles only the four goal-specific constructs: at `Script` goal `await` is an ordinary identifier (`[~Await]` tracked via the parser's `in_await` flag, save/restored at every function-like scope), and `import`/`export` declarations + `import.meta` are syntax errors (dynamic `import(...)` stays valid, and so does a TypeScript **import-equals** — `import x = A.B` / `import x = require('y')` is not an `ImportDeclaration` and not a `ModuleItem`, which is why the gate fires on the shape rather than on the `import` keyword). `sourceType` follows the goal. See [docs/conformance_test262.md §Strict Mode Only, Explicit Goal Axis](docs/conformance_test262.md).
 
+### Line Terminators: parse preserves, format folds
+
+**`parse` never rewrites its input** — its byte offsets are a drop-in contract with
+acorn / Svelte / `parseCss` over the author's own bytes. **Every parse-then-format entry
+point folds `<CR>` / `<CR><LF>` to `<LF>` before it parses**
+(`tsv_lang::printing::normalize_carriage_returns`, from each crate's `format_str`, the
+CLI's `format_source`, and each binding's `parse_format!`), so tsv's output is LF-only
+even inside the regions it copies verbatim. Ahead of the parse is the only place that
+answers it once: the printers ask "where are the lines?" in several places that split on
+`'\n'` alone (`Comment::multiline`, `is_indentable_block_comment`,
+`strip_comment_indentation`), and folding the finished string instead leaves those
+disagreeing with the output — the same document then formats two ways on two passes.
+`<LS>` / `<PS>` are deliberately NOT folded. Full rationale + spec citations:
+./docs/architecture.md#line-terminators-parse-takes-the-authors-bytes-format-folds-first
+
 ### Language-Level concerns (classification)
 
 HTML element classification is split between the `tsv_html` crate — pure functions over tag names (`is_block_element()`, `is_void_element()`, `preserves_whitespace()`, and the other whitespace rules) — and thin printer adapters (`tsv_svelte/src/printer/classification/`) that resolve symbols, call tsv_html, and traverse the AST. Enables reuse across all planned tools (formatter, linter, compiler, LSP).

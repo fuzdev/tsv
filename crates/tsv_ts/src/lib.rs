@@ -76,7 +76,7 @@ pub struct PrinterInputs<'a> {
 
 /// Build an *output* printer — pre-sizes the output buffer to the source
 /// length for the rendering path. Used by the entry points that write the
-/// buffer and return a `String` (`format`, `format_expression`).
+/// buffer and return a `String` (`format`, `format_canonical`).
 fn make_printer<'a>(
     arena: &'a DocArena,
     inputs: &PrinterInputs<'a>,
@@ -195,9 +195,14 @@ pub fn format(program: &Program<'_>, source: &str) -> String {
 /// parse). Batch drivers that reuse arenas across files thread the primitives
 /// ([`parse`] + [`format_in`]) instead.
 pub fn format_str(source: &str) -> Result<String> {
+    // The format path's line-terminator fold, ahead of the parse — see
+    // `tsv_lang::printing::normalize_carriage_returns` for why it belongs here and not on
+    // the finished string. `parse` deliberately does NOT do this: its offsets are a
+    // drop-in contract over the author's own bytes.
+    let source = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = parse(source, &arena)?;
-    Ok(format(&program, source))
+    let program = parse(&source, &arena)?;
+    Ok(format(&program, &source))
 }
 
 /// Format into a caller-provided doc arena.
@@ -230,7 +235,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     };
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.print_program(program);
-    let output = tsv_lang::printing::normalize_carriage_returns(printer.into_string());
+    let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks);
     output
 }
@@ -293,7 +298,7 @@ pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.set_canonical();
     printer.print_program(program);
-    let output = tsv_lang::printing::normalize_carriage_returns(printer.into_string());
+    let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks);
     output
 }
@@ -475,25 +480,6 @@ pub fn parse_expression_with_comments<'arena>(
     with_embedding_parser(source, base_offset, arena, |parser| {
         parser.parse_expression_with_comments()
     })
-}
-
-/// Format a single TypeScript expression to a string.
-///
-/// `expression` was parsed as part of a larger document (e.g., a Svelte
-/// template); `inputs.source` is the full document the expression's spans index
-/// into. `embed.base_indent_offset` seeds the printer's indent level so wrapped
-/// lines (method chains, multiline arrays) indent relative to the surrounding
-/// context.
-pub fn format_expression(
-    expression: &Expression<'_>,
-    inputs: &PrinterInputs<'_>,
-    embed: EmbedContext,
-) -> String {
-    let arena = DocArena::for_source(inputs.source);
-    let mut printer = make_printer(&arena, inputs, embed);
-    printer.set_indent_level(embed.base_indent_offset);
-    printer.print_expression(expression);
-    printer.into_string()
 }
 
 /// Parse an expression and convert it to a binding pattern.

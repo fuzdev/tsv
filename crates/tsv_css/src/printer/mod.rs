@@ -1018,26 +1018,9 @@ pub(crate) fn format_css_in(
     printing::build_line_breaks_into(source, &mut line_breaks);
     let mut printer = Printer::new(arena, source, &stylesheet.comments, &line_breaks);
     printer.print_css_nodes(stylesheet.nodes);
-    let output = printing::normalize_carriage_returns(printer.into_string());
+    let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks);
     output
-}
-
-/// Format a CSS stylesheet embedded in another language (e.g., Svelte), using
-/// `embed.base_indent_offset` to account for the host's wrapper indentation.
-pub(crate) fn format_css_embedded(
-    stylesheet: &CssStyleSheet<'_>,
-    source: &str,
-    line_breaks: &[u32],
-    embed: EmbedContext,
-) -> String {
-    // Fresh-arena wrapper (top-level embedding tests / any caller without a host
-    // arena to lend). The Svelte host reuses its own document arena via
-    // `format_css_embedded_in`. `source` is the whole host document (spans are
-    // absolute), so the caller's `line_breaks` is the host's whole-source table —
-    // never island-local.
-    let arena = DocArena::for_source(source);
-    format_css_embedded_in(stylesheet, source, line_breaks, embed, &arena)
 }
 
 /// Embedded CSS formatting into a caller-provided doc arena — the arena-sharing

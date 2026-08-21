@@ -578,6 +578,29 @@ elements, mapped-type values) indent their continuations correctly.
 | Escape Handling  | Dedicated module (7 formats)   | Dedicated module (hex)  | Delegates to TS/CSS   |
 | Public API       | Core + broad embedding surface | Core + `parse_embedded` | Orchestrates TS + CSS |
 
+### Line terminators: `parse` takes the author's bytes, `format` folds first
+
+`parse` never rewrites its input — its offsets are a drop-in contract with acorn /
+Svelte / `parseCss` over the bytes on disk. Every **parse-then-format** entry point, by
+contrast, folds `<CR>` and `<CR><LF>` to `<LF>` *before* it parses
+(`tsv_lang::printing::normalize_carriage_returns`, called from each crate's `format_str`,
+the CLI's `format_source`, and each binding's `parse_format!`). tsv's output is therefore
+LF-only, including inside the regions it copies verbatim — a frozen embedded body, a
+`format-ignore` region, a multi-line comment, a template literal.
+
+Ahead of the parse is the only place the question can be answered once. The printers ask
+*where are the lines?* in several places that split on `'\n'` alone — `Comment::multiline`
+at parse, `is_indentable_block_comment` / `strip_comment_indentation` at doc-build, and the
+per-line emitters under them — and a fold applied to the finished string leaves all of them
+disagreeing with the output about where the lines are, so the same document formats two
+ways on two passes. It is also where prettier folds (`normalizeEndOfLine`, in
+`normalizeInputAndOptions`), and where the languages themselves do: HTML preprocesses its
+input stream so that "there are never any U+000D CR characters in the input to the
+tokenization stage", CSS Syntax §3.3 filters `<CR>` / `<FF>` / `<CR><LF>` to one `<LF>`,
+and ECMAScript normalizes `<CR>` and `<CR><LF>` to `<LF>` in both TV and TRV. `<LS>` /
+`<PS>` are deliberately untouched — ECMAScript keeps each as itself, and HTML and CSS read
+them as ordinary characters.
+
 ### Source-Based Printing
 
 All printers accept `source: &str` to preserve escape sequences:

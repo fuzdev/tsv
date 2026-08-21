@@ -77,6 +77,9 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 /// - `newline` — line/column tracking over source; a `\n` isn't hidden inside trivia
 ///   in a way that breaks line-start math.
 /// - `non-source` — over an output buffer or rendered doc text, not source.
+/// - `terminator-fold` — rewrites EVERY line terminator it finds, uniformly. There is no
+///   anchor to mis-place: a `<CR>` inside a comment or a string is exactly as much a target
+///   as one outside, which is the whole point of the fold.
 /// - `number-literal` — content of an isolated numeric literal (no comments inside).
 /// - `css-value` — `(`/`)` or function name of a `url()`/color/function value token
 ///   (url/color paren finds — not candidates).
@@ -134,15 +137,14 @@ const ALLOW: &[Allow] = &[
         "non-source",
     ),
     (
-        "tsv_lang/src/error.rs",
-        "let line_start = source[..position].rfind('\\n').map_or(0, |i| i + 1);",
-        "newline",
+        "tsv_lang/src/printing.rs",
+        "let Some(first) = source.find('\\r') else {",
+        "terminator-fold",
     ),
-    ("tsv_lang/src/error.rs", ".find('\\n')", "newline"),
     (
         "tsv_lang/src/printing.rs",
         "while let Some(i) = rest.find('\\r') {",
-        "non-source",
+        "terminator-fold",
     ),
     // ── tsv_svelte ───────────────────────────────────────────────────────────
     (

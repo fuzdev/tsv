@@ -12,6 +12,11 @@ text2`;
 	// prettier-ignore
 	const b = [ 1,
 		2 ];
+
+	/**
+	 * c
+	 */
+	const c = 1;
 </script>
 
 <div>

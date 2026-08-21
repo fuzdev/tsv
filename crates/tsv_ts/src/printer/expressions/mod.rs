@@ -56,16 +56,6 @@ enum BinaryChainLayout {
 }
 
 impl<'a> Printer<'a> {
-    /// Print an expression using doc-based formatting.
-    ///
-    /// The `format_expression` string entry — an expression ROOT under the caller's
-    /// embed, so it routes through the same root keying as the doc-building entry
-    /// (`build_expression_doc_with_comments`).
-    pub(crate) fn print_expression(&mut self, expression: &Expression<'_>) {
-        let doc = self.build_root_expression_doc(expression);
-        self.write_arena_doc(doc);
-    }
-
     /// Wrap `doc` in parens when `span` is the object/function/class node that
     /// starts the enclosing expression statement (set by `build_expression_statement_doc`
     /// via `leftmost_no_lookahead`). Consumes the target so it fires exactly once:

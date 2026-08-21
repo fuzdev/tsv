@@ -25,7 +25,7 @@ fn expression_comment(
     Comment {
         content_span,
         is_block,
-        multiline: content.contains('\n'),
+        multiline: Comment::content_is_multiline(is_block, content),
         span,
         emit_character_field,
         bump_pattern_columns: false,

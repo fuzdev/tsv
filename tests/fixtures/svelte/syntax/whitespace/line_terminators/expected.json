@@ -1,21 +1,21 @@
 {
 	"css": {
 		"type": "StyleSheet",
-		"start": 395,
-		"end": 448,
+		"start": 426,
+		"end": 479,
 		"attributes": [],
 		"children": [
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 417,
-					"end": 420,
+					"start": 448,
+					"end": 451,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 417,
-							"end": 420,
+							"start": 448,
+							"end": 451,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -24,12 +24,12 @@
 										{
 											"type": "TypeSelector",
 											"name": "div",
-											"start": 417,
-											"end": 420
+											"start": 448,
+											"end": 451
 										}
 									],
-									"start": 417,
-									"end": 420
+									"start": 448,
+									"end": 451
 								}
 							]
 						}
@@ -37,40 +37,40 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 421,
-					"end": 439,
+					"start": 452,
+					"end": 470,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 425,
-							"end": 435,
+							"start": 456,
+							"end": 466,
 							"property": "color",
 							"value": "red"
 						}
 					]
 				},
-				"start": 417,
-				"end": 439
+				"start": 448,
+				"end": 470
 			}
 		],
 		"comments": [
 			{
 				"type": "CSSComment",
 				"value": " a\n\t b ",
-				"start": 404,
-				"end": 415
+				"start": 435,
+				"end": 446
 			}
 		],
 		"content": {
-			"start": 402,
-			"end": 440,
+			"start": 433,
+			"end": 471,
 			"styles": "\n\t/* a\n\t b */\n\tdiv {\n\t\tcolor: red;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 449,
+	"end": 480,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -84,26 +84,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 164,
-				"end": 166,
+				"start": 195,
+				"end": 197,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 166,
-				"end": 393,
+				"start": 197,
+				"end": 424,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 17,
+						"line": 22,
 						"column": 1,
-						"character": 167
+						"character": 198
 					},
 					"end": {
-						"line": 17,
+						"line": 22,
 						"column": 4,
-						"character": 170
+						"character": 201
 					}
 				},
 				"attributes": [],
@@ -112,63 +112,63 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 171,
-							"end": 173,
+							"start": 202,
+							"end": 204,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 173,
-							"end": 339,
+							"start": 204,
+							"end": 370,
 							"data": " A line terminator normalizes to LF at every position, including the ones tsv emits\n\t\tby copying the author's source bytes rather than by rebuilding the line. "
 						},
 						{
 							"type": "Text",
-							"start": 339,
-							"end": 341,
+							"start": 370,
+							"end": 372,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 341,
-							"end": 386,
+							"start": 372,
+							"end": 417,
 							"name": "style",
 							"name_loc": {
 								"start": {
-									"line": 20,
+									"line": 25,
 									"column": 2,
-									"character": 342
+									"character": 373
 								},
 								"end": {
-									"line": 20,
+									"line": 25,
 									"column": 7,
-									"character": 347
+									"character": 378
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 348,
-									"end": 361,
+									"start": 379,
+									"end": 392,
 									"name": "lang",
 									"name_loc": {
 										"start": {
-											"line": 20,
+											"line": 25,
 											"column": 8,
-											"character": 348
+											"character": 379
 										},
 										"end": {
-											"line": 20,
+											"line": 25,
 											"column": 12,
-											"character": 352
+											"character": 383
 										}
 									},
 									"value": [
 										{
-											"start": 354,
-											"end": 360,
+											"start": 385,
+											"end": 391,
 											"type": "Text",
 											"raw": "stylus",
 											"data": "stylus"
@@ -180,8 +180,8 @@
 								"type": "Fragment",
 								"nodes": [
 									{
-										"start": 362,
-										"end": 378,
+										"start": 393,
+										"end": 409,
 										"type": "Text",
 										"data": "\na\n  color red\n\t",
 										"raw": "\na\n  color red\n\t"
@@ -191,8 +191,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 386,
-							"end": 387,
+							"start": 417,
+							"end": 418,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -201,8 +201,8 @@
 			},
 			{
 				"type": "Text",
-				"start": 393,
-				"end": 395,
+				"start": 424,
+				"end": 426,
 				"raw": "\n\n",
 				"data": "\n\n"
 			}
@@ -239,6 +239,22 @@
 				"end": {
 					"line": 12,
 					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 157,
+			"end": 171,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 4
 				}
 			}
 		}
@@ -446,19 +462,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 53,
-		"end": 164,
+		"end": 195,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 71,
-			"end": 155,
+			"end": 186,
 			"loc": {
 				"start": {
 					"line": 6,
 					"column": 0
 				},
 				"end": {
-					"line": 15,
+					"line": 20,
 					"column": 9
 				}
 			},
@@ -663,6 +679,80 @@
 							"value": " prettier-ignore",
 							"start": 113,
 							"end": 131
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 173,
+					"end": 185,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 179,
+							"end": 184,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 179,
+								"end": 180,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 183,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "*\n * c\n ",
+							"start": 157,
+							"end": 171
 						}
 					]
 				}

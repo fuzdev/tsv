@@ -673,6 +673,12 @@ macro_rules! lang_bindings {
         #[wasm_bindgen(skip_typescript)]
         pub fn $format_fn(source: &str, options: JsValue) -> Result<String, JsError> {
             let opts = read_options(&options, OptionsSpec::format(goal_allowed!($goalness)))?;
+            // The format path's line-terminator fold, ahead of the parse — see
+            // `tsv_lang::printing::normalize_carriage_returns`. The parse exports
+            // deliberately skip it: the wire's offsets are a drop-in contract over the
+            // author's own bytes.
+            let normalized = tsv_lang::printing::normalize_carriage_returns(source);
+            let source = normalized.as_ref();
             with_ast_arena(|arena| {
                 let ast = parse_ast!($goalness, $lang, source, opts.goal, arena).map_err(err)?;
                 Ok(with_doc_arena(|doc_arena| {

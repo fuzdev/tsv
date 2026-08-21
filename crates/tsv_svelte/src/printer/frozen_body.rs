@@ -28,15 +28,16 @@ use tsv_lang::doc::arena::DocId;
 /// text the compiler renders. Here the run is a delimiter line tsv itself emits and no reader
 /// ever sees, so the form feed stays filler.
 ///
-/// ⚠️ **`\r` is a terminator here, never filler** — the one place tsv's class must not
-/// mirror prettier's. Prettier normalizes its input to LF before this scan runs, so a `\r`
-/// reaching its `[\t\f\r ]` is stray filler by construction and the branch that treats it
-/// so is unreachable. tsv scans the author's un-normalized source, where a `\r` is
-/// overwhelmingly the delimiter's own line ending — so it is matched as a terminator by
-/// [`strip_one_terminator_front`] / [`strip_one_terminator_back`] instead. Leaving it in
-/// the class ate the terminator as filler, the `\n` the scan then looked for was never
-/// there, and a CR-terminated document kept its opening delimiter as a blank first body
-/// line.
+/// ⚠️ **`\r` is a terminator here, never filler.** Prettier normalizes its input to LF
+/// before this scan runs, so a `\r` reaching its `[\t\f\r ]` is stray filler by
+/// construction and the branch that treats it so is unreachable. tsv folds the same way at
+/// the same point ([`tsv_lang::printing::normalize_carriage_returns`], ahead of the parse),
+/// so no format entry point brings one here either — but the library primitive
+/// `format(&ast, source)` takes the caller's bytes as given, and there a `\r` is
+/// overwhelmingly the delimiter's own line ending. So it is matched as a terminator by
+/// [`strip_one_terminator_front`] / [`strip_one_terminator_back`] rather than eaten as
+/// filler: eaten, the `\n` the scan then looked for was never there, and a CR-terminated
+/// document kept its opening delimiter as a blank first body line.
 const DELIMITER_LINE_FILLER: [char; 3] = ['\t', '\x0c', ' '];
 
 /// The trailing run a rendered line never keeps — prettier's `trimIndentation`, which is
@@ -202,9 +203,10 @@ mod tests {
     }
 
     /// The delimiter's own terminator goes whole at each end — CRLF or lone CR — while an
-    /// INTERIOR line's terminator stays in the span. The span is the author's bytes;
-    /// `tsv_lang::printing::normalize_carriage_returns` folds the interior ones to LF on the
-    /// way out, so the two questions stay separate.
+    /// INTERIOR line's terminator stays in the span. The span is the caller's bytes, so the
+    /// two questions stay separate: every format entry point has already folded its input
+    /// (`tsv_lang::printing::normalize_carriage_returns`), and these bounds answer the
+    /// library primitive that has not.
     #[test]
     fn body_bounds_drop_the_delimiters_own_terminator_however_it_is_spelled() {
         assert_eq!(body("\r\nh1 text\r\n"), "h1 text");
@@ -219,8 +221,8 @@ mod tests {
     /// The trailing run every emitter owes the slice's last line, and only its last line —
     /// the run the closing break is about to end. `\r` and `\f` are not in the class
     /// (prettier's `trimIndentation` is space and tab), so this trim never touches a
-    /// terminator; the delimiter's own goes to the bounds above and an interior one to
-    /// `normalize_carriage_returns`.
+    /// terminator; the delimiter's own goes to the bounds above, and an interior one is
+    /// already `<LF>` on every path that folded its input.
     #[test]
     fn a_frozen_bodys_last_line_owes_the_rendered_line_trim() {
         fn trim(raw: &str) -> &str {

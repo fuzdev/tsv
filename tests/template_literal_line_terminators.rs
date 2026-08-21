@@ -12,12 +12,15 @@
 //! These stay unit tests rather than fixtures because the claim is an AST one:
 //! an `input.*` carrying a `<CR>` is not a prettier fixed point, and the
 //! `unformatted_*` variant that could hold the bytes makes a FORMATTING claim,
-//! never a wire one. The formatting side moved out — tsv folds every `<CR>` in
-//! its output to `<LF>` (`tsv_lang::printing::normalize_carriage_returns`), and
-//! `tests/fixtures/svelte/syntax/whitespace/line_terminators` pins that. Each
-//! test still asserts the output shape, so the two stay in step: the fold is an
-//! OUTPUT rule and leaves the wire values below untouched, since a template's
-//! TRV/TV already folded them at parse.
+//! never a wire one. The formatting side moved out —
+//! `tests/fixtures/svelte/syntax/whitespace/line_terminators` pins it — and the
+//! two sit on opposite sides of one seam: `parse` leaves the author's bytes
+//! alone (its offsets are a drop-in contract), while every parse-then-format
+//! entry point folds `<CR>` to `<LF>` first
+//! (`tsv_lang::printing::normalize_carriage_returns`). So each test asserts
+//! BOTH: the wire values off the raw source, and `format_str`'s LF output. The
+//! fold cannot disturb the wire values below in any case — a template's TRV/TV
+//! already folded them at parse.
 //!
 //! Two sets of null controls, varying the same dimension in opposite ways:
 //! `<LF>`/`<LS>`/`<PS>` are line terminators the TRV deliberately does not
@@ -31,8 +34,9 @@ use serde_json::Value;
 
 /// Parses `source`, asserts the template element at `quasi_pointer` carries
 /// `expected_raw` / `expected_cooked` (`None` = the wire's `null`), then asserts
-/// tsv formats `source` to its LF form — the output rule, restated here rather
-/// than called, so these specify it instead of agreeing with its implementation.
+/// `format_str` takes `source` to its LF form — the format path's rule, restated
+/// here rather than called, so these specify it instead of agreeing with its
+/// implementation.
 fn assert_quasi(
     source: &str,
     quasi_pointer: &str,
@@ -57,11 +61,12 @@ fn assert_quasi(
 
     let lf_form = source.replace("\r\n", "\n").replace('\r', "\n");
     assert_eq!(
-        tsv_ts::format(&program, source),
+        tsv_ts::format_str(source).expect("format failed"),
         lf_form,
-        "tsv's output is LF-only, so a `<CR>` source formats to its LF form rather than to \
-         itself. This is an OUTPUT rule and does not touch the raw/cooked values above — a \
-         template's TRV/TV folded those at parse, whatever the formatter does."
+        "the format path folds `<CR>` before it parses, so a `<CR>` source formats to its \
+         LF form rather than to itself. That fold is on the FORMAT side of the seam and \
+         does not touch the raw/cooked values above — a template's TRV/TV folded those at \
+         parse, off the author's own bytes."
     );
 }
 
