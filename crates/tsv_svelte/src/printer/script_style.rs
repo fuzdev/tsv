@@ -82,34 +82,6 @@ impl<'a> Printer<'a> {
         self.write("</script>\n");
     }
 
-    /// Get the `lang` or `type` attribute value from element attributes.
-    /// Strips `text/` prefix (e.g., `type="text/less"` → `"less"`).
-    /// Returns `None` if no `lang`/`type` attribute is present.
-    pub(crate) fn get_lang_attribute(
-        &self,
-        attributes: &[internal::AttributeNode<'_>],
-    ) -> Option<&'a str> {
-        for attr_node in attributes {
-            if let internal::AttributeNode::Attribute(attr) = attr_node {
-                let name = attr.name(self.source);
-                if (name == "lang" || name == "type")
-                    && let Some(value_parts) = attr.value
-                {
-                    for part in value_parts {
-                        if let internal::AttributeValue::Text(text) = part {
-                            // The value is a source slice (`&'a`), so callers compare
-                            // it without a per-call `String` allocation.
-                            let lang = text.raw(self.source).trim();
-                            let lang = lang.strip_prefix("text/").unwrap_or(lang);
-                            return Some(lang);
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
-
     /// Format a Style tag
     ///
     /// Formats the `<style>` tag with its CSS content.
@@ -122,13 +94,15 @@ impl<'a> Printer<'a> {
         // Opening tag with doc-based attribute wrapping
         self.write_section_opening_tag("style", style.attributes, had_content);
 
-        // Foreign languages (less, scss, etc.) — preserve content raw but normalize indentation
-        if self
-            .get_lang_attribute(style.attributes)
-            .is_some_and(|l| l != "css")
-        {
+        // Foreign languages (less, scss, etc.) — preserve content raw but normalize indentation.
+        // The value is the DECODED one (`lang="&#99;ss"` is css) — see `internal::lang_attribute`.
+        if internal::lang_attribute(style.attributes, self.source).is_some_and(|l| l != "css") {
             if had_content {
-                let content = style.content_span.extract(self.source()).to_string();
+                // The `&'a str` field, not `self.source()` — that accessor's return borrows
+                // `&self`, which the `write` calls below would conflict with, and copying the
+                // whole stylesheet into a `String` to dodge it is a per-`<style>` allocation
+                // the field read does not need.
+                let content = style.content_span.extract(self.source);
                 // Collect non-empty lines (skip leading/trailing blank lines)
                 let all_lines: Vec<&str> = content.lines().collect();
                 let start = all_lines.iter().position(|l| !l.trim().is_empty());

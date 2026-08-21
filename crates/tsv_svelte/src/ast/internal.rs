@@ -1115,6 +1115,74 @@ impl Element<'_> {
     pub fn name<'s>(&self, source: &'s str) -> &'s str {
         &source[self.name_span.range()]
     }
+
+    /// Whether this is a `<template>` whose `lang` / `type` names a language other than HTML
+    /// — the elements whose CONTENT the formatter copies out verbatim rather than formatting.
+    ///
+    /// The one definition of that composite. It has three callers across two crates (the
+    /// element builder, the sibling-`>` dangle's eligibility test, and `tsv_debug`'s razor
+    /// audit, which must agree with the printer about which bodies are the author's bytes),
+    /// and each of them used to spell it out itself — three copies of a predicate whose every
+    /// clause is a drift risk, down to which bytes the `lang` value is read off (see
+    /// [`lang_attribute`]: the decoded text, not the raw bytes). The template question stays on
+    /// the parse-time [`TagFacts`] bitfield, so the printer's hot paths keep the field load
+    /// rather than re-comparing the tag name.
+    pub fn is_foreign_template(&self, source: &str) -> bool {
+        self.facts.is_template()
+            && lang_attribute(self.attributes, source).is_some_and(|lang| lang != "html")
+    }
+}
+
+/// The `lang` or `type` attribute value from an attribute list, `text/` prefix stripped
+/// (`type="text/less"` → `"less"`). `None` when neither attribute is present.
+///
+/// Reads the **decoded** value ([`Text::data`]), never the raw bytes: the language a
+/// `lang`/`type` names is what the attribute *means*, and the parser already computed that —
+/// `lang="&#99;ss"` is `css`, and a raw read routes it to the preserve-verbatim path instead
+/// of the CSS printer. Prettier's `getLangAttribute` reads its `data` for the same reason.
+/// The decode borrows the source slice whenever the value carries no `&` (the overwhelming
+/// case), so the `Cow` costs nothing there; only an entity-bearing value allocates.
+///
+/// ⚠️ This is the **formatting** question, and it is the only one that decodes. The wire
+/// schema asks a different one — "is this component TypeScript?" — whose oracle is Svelte's
+/// own `this.ts`, a regex over the RAW template bytes (`1-parse/index.js`:
+/// `lang=(["'])?([^"' >]+)` compared against `ts`). So `<script lang="&#116;s">` is a
+/// TypeScript body to *this* reader and NOT TypeScript to the wire, and `convert`'s
+/// `script_lang` deliberately stays a separate raw-keyed reader rather than sharing this one.
+/// Pinned by `tests/fixtures/svelte/attributes/lang_entity`, which holds both answers.
+pub(crate) fn lang_attribute<'s>(
+    attributes: &[AttributeNode<'_>],
+    source: &'s str,
+) -> Option<Cow<'s, str>> {
+    for attr_node in attributes {
+        if let AttributeNode::Attribute(attr) = attr_node {
+            let name = attr.name(source);
+            if (name == "lang" || name == "type")
+                && let Some(value_parts) = attr.value
+            {
+                for part in value_parts {
+                    if let AttributeValue::Text(text) = part {
+                        return Some(narrow_lang_value(text.data(source)));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Trim a decoded `lang` / `type` value and strip its `text/` prefix, keeping the borrow when
+/// the decode kept one. Both narrowings are sub-slices, so the owned arm re-owns the remainder
+/// rather than the whole value — reached only by an entity-bearing attribute.
+fn narrow_lang_value(value: Cow<'_, str>) -> Cow<'_, str> {
+    fn narrow(raw: &str) -> &str {
+        let lang = raw.trim();
+        lang.strip_prefix("text/").unwrap_or(lang)
+    }
+    match value {
+        Cow::Borrowed(raw) => Cow::Borrowed(narrow(raw)),
+        Cow::Owned(raw) => Cow::Owned(narrow(&raw).to_owned()),
+    }
 }
 
 /// `facts` rides in the tail padding beside `kind`, so the parse-time classification costs no

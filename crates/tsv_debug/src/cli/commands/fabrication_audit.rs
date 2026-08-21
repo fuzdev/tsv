@@ -28,9 +28,10 @@ use super::profile::resolve_seed_files;
 ///
 /// Graded as a RATCHET over `fabrication_audit_known.txt`, keyed by the *shape* of the two
 /// lines bracketing the invented blank (so it is corpus-portable — no paths). Every line is a
-/// bug; the file shrinking is the goal. The two legitimate fabrications — the hoisted-section
-/// seam and an empty block body — are structural carve-outs ([`is_sanctioned`]) rather than
-/// snapshot lines, so the snapshot never mixes sanctioned rules with debt.
+/// bug; the file shrinking is the goal. The three legitimate fabrications — the hoisted-section
+/// seam, an empty block body, and an empty foreign-`<template>` body — are structural carve-outs
+/// ([`is_sanctioned`]) rather than snapshot lines, so the snapshot never mixes sanctioned rules
+/// with debt.
 ///
 /// Pure Rust — no Deno. Defaults to `tests/fixtures` when no paths are given.
 #[derive(FromArgs, Debug)]
@@ -57,9 +58,9 @@ const SNAPSHOT_HEADER: &str = "\
 # paths, so the snapshot is corpus-portable.
 #
 # A shape found but not pinned FAILS (a new fabrication). A pinned shape that no longer
-# fires FAILS (fix landed — re-pin). The two sanctioned layout rules — the hoisted-section
-# seam and an empty block body — are NOT here: they are carved out structurally in
-# `fabrication_audit.rs`.
+# fires FAILS (fix landed — re-pin). The three sanctioned layout rules — the hoisted-section
+# seam, an empty block body, and an empty foreign-`<template>` body — are NOT here: they are
+# carved out structurally in `fabrication_audit.rs`.
 #
 # Regenerate with `deno task fabrication:audit:update`.
 ";
@@ -288,7 +289,7 @@ fn count_blank_runs(s: &str) -> usize {
 /// Whether a blank run with this bracketing [`FabricationShape`] is one of tsv's SANCTIONED
 /// fabrications — a layout rule of the output rather than a claim about the input.
 ///
-/// Two rules, each stated on its own below. They are carve-outs in code rather than lines in
+/// Three rules, each stated on its own below. They are carve-outs in code rather than lines in
 /// the ratchet because the snapshot means "every line is a bug"; pinning a sanctioned rule
 /// there would make that false and invite someone to "fix" it.
 ///
@@ -297,7 +298,9 @@ fn count_blank_runs(s: &str) -> usize {
 /// name, so `<style-guide>` (a custom element) cannot slip through a `starts_with("<style")`
 /// and silently widen a carve-out past what it says.
 fn is_sanctioned(shape: &FabricationShape) -> bool {
-    is_section_seam(&shape.before, &shape.after) || is_empty_block_body(&shape.before, &shape.after)
+    is_section_seam(&shape.before, &shape.after)
+        || is_empty_block_body(&shape.before, &shape.after)
+        || is_empty_foreign_template_body(&shape.before, &shape.after)
 }
 
 /// Whether the run sits at a hoisted-section boundary.
@@ -341,6 +344,25 @@ fn is_empty_block_body(prev: &str, next: &str) -> bool {
     let opens_body = prev.starts_with("{#") || prev.starts_with("{:");
     let closes_body = next.starts_with("{:") || next.starts_with("{/");
     opens_body && closes_body
+}
+
+/// Whether the run IS an empty foreign-`<template>` body — [`is_empty_block_body`]'s rule one
+/// construct over, and sanctioned for the same reason.
+///
+/// A `<template lang="…">` in a language tsv does not format copies its body out verbatim
+/// between the two delimiter lines the geometry requires, so a body that holds only whitespace
+/// leaves those two lines with nothing between them: `<template lang="pug">⏎</template>` becomes
+/// `<template lang="pug">⏎⏎</template>`. That blank IS the body, not a separator the author
+/// wrote, and prettier's `preformattedBody` emits it identically.
+///
+/// As narrow as its sibling and for the same reason: the run must be adjacent to the opening
+/// tag on one side and the element's own closing tag on the other, which only an empty body can
+/// be — any real content puts a non-blank line between them. A plain (formatted) `<template>`
+/// cannot reach this shape either: an empty one prints as `<template></template>` with no
+/// newlines at all, so a blank between those two lines can only have been authored, and an
+/// authored one is already in the input count.
+fn is_empty_foreign_template_body(prev: &str, next: &str) -> bool {
+    prev == "<template" && next == "</template"
 }
 
 /// The syntactic shape of `line` — a stable token standing for what kind of construct opens it.
@@ -518,6 +540,25 @@ mod tests {
         // starts with a section name does not widen it.
         assert!(!sanctioned("text", "<style-guide>"));
         assert!(!sanctioned("</script-host>", "text"));
+    }
+
+    #[test]
+    fn empty_bodies_are_their_own_blank() {
+        // A block section's empty body: the opener and the terminator each keep their line.
+        assert!(sanctioned("{:catch error}", "{/await}"));
+        assert!(sanctioned("{#if cond}", "{:else if b}"));
+        // A foreign template's empty body, the same rule one construct over.
+        assert!(sanctioned("<template lang=\"pug\">", "</template>"));
+        assert!(sanctioned(
+            "\t<template lang=\"coffee\">  ",
+            "\t</template>"
+        ));
+        // Both sides must bracket the run: real content puts a non-blank line between them.
+        assert!(!sanctioned("<template lang=\"pug\">", "text"));
+        assert!(!sanctioned("text", "</template>"));
+        assert!(!sanctioned("{#if cond}", "text"));
+        // Keyed on the exact tag name, like the section seam.
+        assert!(!sanctioned("<template-host>", "</template>"));
     }
 
     #[test]

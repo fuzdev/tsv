@@ -1,0 +1,6 @@
+Prettier never reaches a fixed point on this input: it indents the body's FIRST line
+one level on every pass (`if cond` → `\tif cond` → `\t\tif cond` → …) while every other
+line keeps its authored column, so no prettier-anchored claim file
+(output_prettier.svelte, audit_signature.txt, variants) is expressible. The validator
+live-verifies this claim (rule F5). See README.md and
+docs/conformance_prettier_svelte.md §Svelte: Elements.

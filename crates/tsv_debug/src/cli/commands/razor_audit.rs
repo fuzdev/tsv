@@ -8,9 +8,7 @@ use tsv_cli::cli::input::ParserType;
 use tsv_lang::{
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
 };
-use tsv_svelte::ast::internal::{
-    AttributeNode, AttributeValue, Element, Fragment, FragmentNode, TextDecoding,
-};
+use tsv_svelte::ast::internal::{Element, Fragment, FragmentNode, TextDecoding};
 
 use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
@@ -367,7 +365,7 @@ fn line_head_boundary_spaces(source: &str) -> Vec<(usize, String)> {
 ///   content, and those elements are dispatched to the verbatim builders before any of the
 ///   layout this audit grades ever runs.
 /// - **raw content** — `<script>`/`<style>`, and a `<template>` in a foreign language
-///   ([`foreign_template_lang`]), whose bodies the printer emits verbatim.
+///   ([`Element::is_foreign_template`]), whose bodies the printer emits verbatim.
 /// - **decoding** — a `Text` that is not [`TextDecoding::Fragment`] is raw-content element text
 ///   or an attribute value.
 /// - **format-ignore** — both the *node* form (`<!-- prettier-ignore -->` freezes the next
@@ -471,34 +469,11 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
 /// formatter's to answer for.
 fn emits_verbatim_body(element: &Element<'_>, source: &str) -> bool {
     let name = element.name(source);
-    name == "script" || name == "style" || foreign_template_lang(element, source)
-}
-
-/// Whether this is a `<template>` in a language other than HTML — the printer's
-/// `build_foreign_template_doc` condition (`is_template && lang.is_some_and(|l| l != "html")`),
-/// reading `lang` / `type` the same way `Printer::get_lang_attribute` does.
-fn foreign_template_lang(element: &Element<'_>, source: &str) -> bool {
-    if element.name(source) != "template" {
-        return false;
-    }
-    element.attributes.iter().any(|node| {
-        let AttributeNode::Attribute(attr) = node else {
-            return false;
-        };
-        let name = attr.name(source);
-        if name != "lang" && name != "type" {
-            return false;
-        }
-        attr.value.is_some_and(|parts| {
-            parts.iter().any(|part| {
-                let AttributeValue::Text(text) = part else {
-                    return false;
-                };
-                let lang = text.raw(source).trim();
-                lang.strip_prefix("text/").unwrap_or(lang) != "html"
-            })
-        })
-    })
+    // The foreign-template arm asks the printer's own predicate rather than a copy of it. A
+    // copy here would have to track what the printer reads the `lang` value OFF — the decoded
+    // text, not the raw bytes — and the copy that stood here did not, so `lang="&#112;ug"`
+    // would have been a foreign body to the printer and a graded one to this audit.
+    name == "script" || name == "style" || element.is_foreign_template(source)
 }
 
 fn is_collapsible(c: char) -> bool {

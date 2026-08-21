@@ -126,7 +126,6 @@ pub(super) struct TagClass {
     pub(super) is_namespaced: bool,
     pub(super) is_style: bool,
     pub(super) is_script: bool,
-    pub(super) is_template: bool,
     /// `<pre>` / `<textarea>` — content whitespace is literal
     pub(super) is_ws_sensitive: bool,
     /// `<table>` / `<select>` / … — a whitespace-collapsing container: the compiler removes
@@ -337,6 +336,44 @@ pub(super) struct ElementContext {
     pub(super) has_multiline_attr: bool,
 }
 
+/// The horizontal filler a foreign body's own delimiter line may carry — prettier's
+/// `[\t\f\r ]` in [`foreign_body_bounds`], spelled once.
+///
+/// Deliberately **not** [`is_collapsible_ws_char`]: a form feed belongs here (it is filler on
+/// the delimiter's line) where the template's own text nodes treat it as content, and `\n` is
+/// excluded because it is the terminator these scans are looking for, never part of the run.
+///
+/// So this is the crate's *other* `[\t\f\r ]`, and the two split on the form feed on purpose:
+/// `fragment_doc`'s `text_starts_with_linebreak` drops it, because there the run is template
+/// text the compiler renders. Here the run is a delimiter line tsv itself emits and no reader
+/// ever sees, so prettier's class is taken whole.
+const DELIMITER_LINE_FILLER: [char; 4] = ['\t', '\x0c', '\r', ' '];
+
+/// The byte range of `raw` a foreign `<template>`'s body contributes — the whole child run
+/// minus the two delimiter lines' own newlines, prettier's
+/// `.replace(/^[\t\f\r ]*\n/, '').replace(/\n[\t\f\r ]*$/, '')`. Empty (`start == end`) when
+/// the body is nothing but those two lines.
+///
+/// Only the FIRST newline goes at each end — a body that opens or closes with blank lines
+/// keeps every one of them but the delimiter's own. The strips are sequential in prettier, so
+/// they are here too: a lone `"\n"` body loses its newline to the leading strip and has
+/// nothing left for the trailing one.
+fn foreign_body_bounds(raw: &str) -> (usize, usize) {
+    let rest = raw.trim_start_matches(DELIMITER_LINE_FILLER);
+    let start = if rest.starts_with('\n') {
+        raw.len() - rest.len() + 1
+    } else {
+        0
+    };
+    let head = raw[start..].trim_end_matches(DELIMITER_LINE_FILLER);
+    let end = if head.ends_with('\n') {
+        start + head.len() - 1
+    } else {
+        raw.len()
+    };
+    (start, end)
+}
+
 impl<'a> Printer<'a> {
     /// `<name>` — a whole start tag with no attributes (HTML spec "start tag").
     /// `name` is a pre-built name doc (span-identity `source_span`).
@@ -386,7 +423,6 @@ impl<'a> Printer<'a> {
             is_namespaced: facts.is_namespaced(),
             is_style: facts.is_style(),
             is_script: facts.is_script(),
-            is_template: facts.is_template(),
             is_ws_sensitive: facts.is_ws_sensitive(),
             collapses_child_ws: facts.collapses_child_whitespace(),
             is_declaration: facts.is_declaration(),
@@ -438,10 +474,7 @@ impl<'a> Printer<'a> {
 
         // Foreign language <template> elements (e.g., <template lang="pug">)
         // preserve content raw — we can't format non-HTML template languages
-        if class.is_template
-            && let Some(lang) = self.get_lang_attribute(element.attributes)
-            && lang != "html"
-        {
+        if element.is_foreign_template(self.source) {
             return self.build_foreign_template_doc(element);
         }
 
@@ -522,10 +555,7 @@ impl<'a> Printer<'a> {
         if class.is_style
             || class.is_script
             || class.is_ws_sensitive
-            || (class.is_template
-                && self
-                    .get_lang_attribute(element.attributes)
-                    .is_some_and(|lang| lang != "html"))
+            || element.is_foreign_template(self.source)
         {
             return None;
         }
@@ -927,7 +957,7 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for a `<template>` element with a foreign language (e.g., `lang="pug"`).
     /// Content is preserved raw — we can't format non-HTML template languages.
-    /// Format: `<template lang="pug">\n{raw content}</template>`
+    /// Format: `<template lang="pug">\n{raw content}\n</template>`
     fn build_foreign_template_doc(&self, element: &internal::Element<'_>) -> DocId {
         let d = self.d();
         let name_doc = d.source_span_ident(element.name_span);
@@ -944,7 +974,7 @@ impl<'a> Printer<'a> {
         let attr_docs = self
             .build_element_attrs_doc(
                 element.attributes,
-                self.d().line(),
+                d.line(),
                 element.name_span.end,
                 element.open_tag_end,
                 true,
@@ -953,17 +983,36 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![self.build_opening_tag(name_doc, &attr_docs, false)];
         parts.push(d.text(">"));
 
-        // Raw content from fragment text nodes
-        for node in element.fragment.nodes {
-            if let FragmentNode::Text(text) = node {
-                parts.push(d.source_span(text.raw_span, self.source));
+        // The body is a foreign language, so it is the author's own bytes: the whole child
+        // run's source span rides out verbatim, boundary newlines aside. Reading the fragment
+        // node by node instead cost every non-`Text` child — an element, a comment, an
+        // expression tag, a block were all silently DELETED, and no self-oracle gate could see
+        // it: the truncated output is its own fixed point, reparses, and drops no comment the
+        // ledger tracks. Prettier says the same thing structurally (`printRaw` +
+        // `preformattedBody`): the span runs first child start → last child end, one leading
+        // blank-through-newline and one trailing newline-through-blanks are stripped, and the
+        // body sits between a `literalline` (so the first line keeps column 0 — the author's
+        // indentation is part of a whitespace-significant language) and a `hardline` (so the
+        // closing tag takes the element's own indent). An empty fragment gets no body and no
+        // newlines at all: `<template lang="pug"></template>`.
+        let nodes = element.fragment.nodes;
+        if let (Some(first), Some(last)) = (nodes.first(), nodes.last()) {
+            let body = Span::new(first.span().start, last.span().end);
+            let (start, end) = foreign_body_bounds(body.extract(self.source));
+
+            parts.push(d.literalline());
+            if start < end {
+                // `source_span_covering_comments_doc`: a `{/* c */}` in the body reaches no
+                // comment emitter — it rides out inside this slice, so the ledger is told.
+                parts.push(self.source_span_covering_comments_doc(Span::new(
+                    body.start + start as u32,
+                    body.start + end as u32,
+                )));
             }
+            parts.push(d.hardline());
         }
 
-        // Closing tag
-        parts.push(d.text("</"));
-        parts.push(name_doc);
-        parts.push(d.text(">"));
+        parts.push(self.end_tag(name_doc));
 
         d.concat(&parts)
     }
@@ -1298,5 +1347,52 @@ impl<'a> Printer<'a> {
     /// building). Shared by regular and special elements.
     pub(super) fn span_was_self_closing(&self, span: Span) -> bool {
         span.extract(self.source).trim_end().ends_with("/>")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::foreign_body_bounds;
+
+    /// The slice a body contributes, as `build_foreign_template_doc` takes it.
+    fn body(raw: &str) -> &str {
+        let (start, end) = foreign_body_bounds(raw);
+        &raw[start..end]
+    }
+
+    #[test]
+    fn body_bounds_drop_one_delimiter_newline_per_side() {
+        assert_eq!(body("\nh1 text\n"), "h1 text");
+        // Horizontal filler on either delimiter line goes with that line's newline.
+        assert_eq!(body("  \nh1 text\n\t"), "h1 text");
+        // Only the FIRST newline: the author's own blank lines are body.
+        assert_eq!(body("\n\nh1 text\n\n"), "\nh1 text\n");
+        // A body with no boundary newline at all keeps every byte.
+        assert_eq!(body("h1 text"), "h1 text");
+        // Trailing filler is only a delimiter line when a newline precedes it.
+        assert_eq!(body("\nh1 text  "), "h1 text  ");
+    }
+
+    #[test]
+    fn body_bounds_are_empty_when_the_two_delimiter_lines_are_all_there_is() {
+        // The strips are sequential, so a lone newline is spent on the leading one and the
+        // trailing strip finds nothing left.
+        assert_eq!(body("\n"), "");
+        assert_eq!(body("\n\n"), "");
+        // But the trailing strip needs a newline of its own: filler with none in front of it
+        // is body, exactly as prettier's `/\n[\t\f\r ]*$/` leaves it. The printed line is
+        // still empty — the `hardline` that follows the body trims the run — so this is a
+        // fact about the slice, not about the output.
+        assert_eq!(body("  \n  "), "  ");
+        // A form feed is filler on a delimiter line, unlike in rendered template text.
+        assert_eq!(body("\u{c}\nh1 text\u{c}\n\u{c}"), "h1 text\u{c}");
+    }
+
+    #[test]
+    fn body_bounds_keep_a_crlf_bodys_own_carriage_returns() {
+        // `\r` is filler, so the delimiter lines' CRLFs go whole — but an interior line's
+        // `\r` is the author's byte and rides out with it.
+        assert_eq!(body("\r\nh1 text\r\n"), "h1 text\r");
+        assert_eq!(body("\r\na\r\nb\r\n"), "a\r\nb\r");
     }
 }
