@@ -16,12 +16,14 @@
 //! `tsv format --content` on the same input on the same Windows machine — a
 //! same-output-everywhere problem, not only a robustness one.
 //!
-//! Stating it once and applying it to **every** thread the CLI dispatches on — the
-//! wrapper [`run_on_sized_stack`] puts around the whole subcommand, and each format
-//! worker — is what makes the ceiling a property of tsv rather than of the route, the
-//! host and the platform. [`sized_thread`] is the single constructor both go through,
-//! so a future spawn cannot quietly miss the reservation by building its own
-//! `Builder`.
+//! Stating it once and applying it to **every** thread tsv dispatches language work on —
+//! the wrapper [`run_on_sized_stack`] puts around the whole subcommand, each format
+//! worker, and, in `tsv_debug`, each injection-audit worker and each thread of the tokio
+//! runtime its async commands format on — is what makes the ceiling a property of tsv
+//! rather than of the route, the host and the platform. [`sized_thread`] is the single
+//! constructor every `thread::Builder` spawn goes through, so one cannot quietly miss the
+//! reservation by building its own; the runtime, which builds its own threads by
+//! construction, takes [`STACK_SIZE`] directly.
 //!
 //! The value is chosen so that even the **debug** profile out-reaches the parsers tsv
 //! stands in for. Measured on `const x = ((((…1…))));`, the cost is ~1.2 KiB of stack

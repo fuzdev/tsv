@@ -70,9 +70,25 @@ use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 ///
 /// Debug tools need async for Deno sidecar communication. Runtime creation
 /// failure is unrecoverable, so panicking is appropriate.
+///
+/// `thread_stack_size` is what makes this a `Builder` rather than `Runtime::new()`
+/// (identical otherwise): these threads do not merely *await* the sidecar, they run
+/// tsv's own parser and printer. That is [`spawn_work_stream`]'s stated purpose — its
+/// `tokio::spawn` exists so "the CPU-bound Rust work (parse, format, serde, diff) runs
+/// across all runtime workers" — and `roundtrip_audit` formats inside its
+/// `buffer_unordered` body while sweeping the pinned prettier suites. Left at tokio's
+/// 2 MiB default, that is a route whose depth ceiling is ~16x lower than every other one
+/// tsv dispatches language work on, and a stack overflow is catchable under no profile:
+/// one pathological file in an arbitrary corpus aborts the sweep instead of reporting
+/// itself. The size is a reservation (lazy commit, ~0 RSS) and spawn cost is flat from
+/// 2 MiB to 32 MiB — measured, see `tsv_cli::cli::stack`, whose constant this is.
 #[allow(clippy::expect_used)]
 pub fn create_runtime() -> tokio::runtime::Runtime {
-    tokio::runtime::Runtime::new().expect("Failed to create tokio runtime")
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(tsv_cli::cli::stack::STACK_SIZE)
+        .build()
+        .expect("Failed to create tokio runtime")
 }
 
 /// Resolve a content-processing command's input — the `--content` / `--stdin` / `<file>`

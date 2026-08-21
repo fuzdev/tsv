@@ -1,9 +1,9 @@
-//! The stride-chunked worker-pool driver both injection audits run their per-file loop under.
+//! The stride-chunked worker-pool driver the injection audits run their per-file loop under.
 //!
-//! `gap_audit` and `blank_audit` each walk the fixture corpus on a small thread pool, folding a
-//! per-worker tally into one after the join. The loop was byte-identical between them (job-count
-//! resolution, stride chunking, join-and-merge) — extracted here so there is one copy, and one
-//! home for the panic-safety contract below.
+//! `gap_audit`, `blank_audit` and `ignore_audit` each walk the fixture corpus on a small thread
+//! pool, folding a per-worker tally into one after the join. The loop was byte-identical between
+//! them (job-count resolution, stride chunking, join-and-merge) — extracted here so there is one
+//! copy, and one home for the panic-safety and thread-sizing contracts below.
 
 use std::num::NonZero;
 use std::path::{Path, PathBuf};
