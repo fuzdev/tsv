@@ -11,11 +11,11 @@
  * spawning this same file as its own worker (`isMainThread` splits the two
  * roles). A pool only pays for itself once the job is big enough to amortize
  * its startup, so the *default* waits for `WORKER_FILE_THRESHOLD` files; an
- * explicit `--jobs N` is obeyed at any size — one place this mirror is *looser*
- * than the native CLI, which holds an explicit count to 4x the logical CPUs.
- * Nothing here needs that bound: the count is clamped to the file count, and a
- * worker the host refuses narrows the pool (see `format_files_parallel`) rather
- * than failing the run. `--jobs 1`,
+ * explicit `--jobs N` is honored up to the native CLI's ceiling of 4x the
+ * logical CPUs (`clamp_worker_count`, restated here so both surfaces refuse
+ * the same numbers), announced when it bites. Under it, the count is clamped
+ * to the file count, and a worker the host refuses narrows the pool (see
+ * `format_files_parallel`) rather than failing the run. `--jobs 1`,
  * `--content`/`--stdin`, and `--list` stay on one thread either way.
  * Which engine a worker binds is decided by whether the main thread's
  * `./index.js` exposes a `wasm_module`: the WASM package hands the compiled
@@ -140,6 +140,14 @@ const WORKER_FILE_THRESHOLD = IS_WASM_ENGINE
 	? WASM_WORKER_FILE_THRESHOLD
 	: NATIVE_WORKER_FILE_THRESHOLD;
 
+/** Workers per logical CPU an explicit `--jobs` is held to — the native CLI's
+ * ceiling (`MAX_WORKERS_PER_LOGICAL_CPU` in `tsv_cli`'s `cli/stack.rs`),
+ * restated here by hand like the pool's warning strings; the package test
+ * reads both spellings and fails on drift, so the two surfaces refuse the
+ * same numbers. Declared with the other pool constants, above the `main()`
+ * call — a `const` below it is dead-zoned for the whole run. */
+const MAX_WORKERS_PER_LOGICAL_CPU = 4;
+
 /** Valid `--parser` values (shared by `format` and `parse` — `FORMATTERS` and
  * `PARSERS` are keyed by the same names). */
 const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
@@ -178,7 +186,7 @@ Options:
   --goal <g>        TypeScript parse goal: script | module (default: module; --content/--stdin only)
   --check           check instead of writing/printing: exit 1 if any input would change
   --list            list the discovered in-scope files (one per line) without formatting; path mode only
-  --jobs <n>        worker thread count (default: scaled to this machine and engine)
+  --jobs <n>        worker thread count (default: scaled to this machine and engine; explicit values capped at 4x logical)
 
 Exit codes: 0 clean, 1 would change (--check), 2 errors.
 `;
@@ -611,13 +619,11 @@ function cpu_list_len(list) {
  * How many workers to actually spawn: 1 means "stay on this thread".
  *
  * `WORKER_FILE_THRESHOLD` governs the **default** only. An explicit `--jobs N`
- * is obeyed at any file count — the user asked, and second-guessing a flag is
- * the kind of surprise a drop-in mirror can't afford. It is also the only way to
- * compare the two paths at a fixed size, which is what calibrating the threshold
- * and `default_jobs` took. The native CLI additionally holds an explicit count to
- * 4x the logical CPUs, a blast-radius bound on how many OS threads a mistyped
- * number can ask for; here the file-count clamp below and the graceful narrowing
- * in `format_files_parallel` already bound it, so this stays as it is.
+ * bypasses it at any file count — the user asked, and an explicit width is also
+ * the only way to compare the parallel and sequential paths at a fixed size,
+ * which is what calibrating the threshold and `default_jobs` took (every size
+ * that calibration uses sits far under the ceiling `clamp_worker_count` holds
+ * the flag to).
  *
  * Both forms clamp to the file count (a worker with no file to claim is pure
  * startup cost) and to a floor of 1, so `--jobs 0` means the same as `--jobs 1`
@@ -628,12 +634,39 @@ function resolve_jobs(requested, file_count) {
 	if (requested === undefined) {
 		return file_count < WORKER_FILE_THRESHOLD ? 1 : clamp_jobs(default_jobs(), file_count);
 	}
-	return clamp_jobs(Number.parseInt(requested, 10), file_count);
+	return clamp_jobs(clamp_worker_count(Number.parseInt(requested, 10)), file_count);
 }
 
 /** A worker count clamped to what there is work for, floored at 1. */
 function clamp_jobs(jobs, file_count) {
 	return Math.max(1, Math.min(jobs, file_count));
+}
+
+/**
+ * Hold an explicit `--jobs` to `MAX_WORKERS_PER_LOGICAL_CPU` per logical CPU,
+ * mirroring the native `clamp_worker_count` — same ceiling, same message, said
+ * out loud when it bites and never silently.
+ *
+ * The native ceiling is about address space and task slots; neither is what
+ * bites here. A worker is a whole V8 isolate — ~13 MB resident on either
+ * engine, where the native worker's reservation is lazily committed and costs
+ * ~none — so an unbounded width walks up the machine's *memory* instead, and
+ * the file-count clamp is no bound on exactly the trees large enough to
+ * matter: measured on a 12-logical-CPU / 16 GB machine, a 1,300-file tree at
+ * full width peaked at 787 live threads and 5.2 GB for a run the default
+ * width finishes 29x sooner. Past the wall the end state is the kernel's OOM
+ * kill — a SIGKILL with zero output that no catch survives — where a thread
+ * the OS refuses (EAGAIN) throws and narrows the pool gracefully. That
+ * narrowing stays; this bound exists for the wall that refuses nothing until
+ * it kills.
+ */
+function clamp_worker_count(requested) {
+	const ceiling = cpu_topology().logical * MAX_WORKERS_PER_LOGICAL_CPU;
+	if (requested > ceiling) {
+		eprint(`warning: --jobs ${requested} exceeds this machine's ceiling; using ${ceiling}\n`);
+		return ceiling;
+	}
+	return requested;
 }
 
 /**

@@ -35,7 +35,7 @@ import {
 	rmSync,
 	writeFileSync
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
@@ -1159,9 +1159,9 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
-	// An explicit `--jobs` is obeyed at any size, so this drives the pool on a
-	// tree deliberately UNDER the threshold — the arm the default never reaches,
-	// and the one that makes calibrating the threshold possible.
+	// An explicit `--jobs` bypasses the threshold, so this drives the pool on a
+	// tree deliberately UNDER it — the arm the default never reaches, and the
+	// one that makes calibrating the threshold possible.
 	it('format --jobs forces the pool below the threshold, same output', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
@@ -1217,6 +1217,49 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		} finally {
 			rmSync(one_dir, { recursive: true, force: true });
 			rmSync(many_dir, { recursive: true, force: true });
+		}
+	});
+
+	// An explicit `--jobs` past the machine ceiling — the native CLI's
+	// `4 × logical`, restated in cli.js as MAX_WORKERS_PER_LOGICAL_CPU — is
+	// clamped with the native CLI's warning rather than obeyed, so the mirror
+	// refuses the same numbers the native CLI refuses.
+	it('format --jobs above the machine ceiling warns and clamps', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const  x=1');
+			const result = run_cli(['format', '--check', '--jobs', '100000', dir]);
+			const source = readFileSync(new URL(`../${pkg_dir}/cli.js`, import.meta.url), 'utf-8');
+			const match = /const MAX_WORKERS_PER_LOGICAL_CPU = (\d+);/.exec(source);
+			assert.ok(
+				match,
+				'could not read MAX_WORKERS_PER_LOGICAL_CPU out of cli.js — did it get renamed?'
+			);
+			// cli.js restates the native constant by hand (`cli/stack.rs`); this is
+			// the gate that keeps the two spellings from drifting.
+			const rust = readFileSync(
+				new URL('../crates/tsv_cli/src/cli/stack.rs', import.meta.url),
+				'utf-8'
+			);
+			const rust_match = /pub const MAX_WORKERS_PER_LOGICAL_CPU: usize = (\d+);/.exec(rust);
+			assert.ok(
+				rust_match,
+				'could not read MAX_WORKERS_PER_LOGICAL_CPU out of cli/stack.rs — did it get renamed?'
+			);
+			assert.equal(
+				Number(match[1]),
+				Number(rust_match[1]),
+				'cli.js and cli/stack.rs must state the same --jobs ceiling'
+			);
+			const ceiling = Number(match[1]) * availableParallelism();
+			assert.equal(result.status, 1, result.stderr);
+			assert.match(
+				result.stderr,
+				new RegExp(`^warning: --jobs 100000 exceeds this machine's ceiling; using ${ceiling}$`, 'm')
+			);
+			assert.match(result.stderr, /1 would change, 0 unchanged$/m);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
 		}
 	});
 
