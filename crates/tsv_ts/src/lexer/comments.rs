@@ -25,6 +25,14 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
     // continuation byte (those are `0x80..=0xbf`), and in valid UTF-8 `0xe2` is
     // always a 3-byte lead, so the LS/PS peek lands on a char boundary. This
     // tight loop auto-vectorizes (vs the former per-char `chars().next()` decode).
+    //
+    // ⚠️ This match is the ONE site that does NOT share `is_es_line_terminator_at`
+    // (the byte-level LineTerminator production the parser's scans use). Routing it
+    // through the helper is behaviour-neutral and was tried; it is held back only
+    // because this loop carries the vectorization claim above and no TRUSTWORTHY
+    // measurement was obtained — two A/B attempts disagreed and both ran on a
+    // contended machine, so neither grades it. Keep the two spellings in step BY
+    // HAND until a quiesced rig says the call is free.
     let mut p = start + 2; // skip //
     while p < len {
         match bytes[p] {

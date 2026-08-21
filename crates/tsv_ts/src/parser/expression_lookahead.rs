@@ -12,6 +12,7 @@ use super::scan::{
     is_identifier_start, is_word_at, skip_identifier, skip_numeric_literal,
     skip_whitespace_and_comments,
 };
+use crate::lexer::is_es_line_terminator_at;
 use tsv_lang::source_scan::{
     TriviaProfile, is_regex_start_after, operand_end_after, skip_regex_literal, skip_trivia,
     trivia_ends_operand,
@@ -775,15 +776,8 @@ fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
 fn has_line_terminator_between(bytes: &[u8], from: usize, to: usize) -> bool {
     let mut pos = from;
     while pos < to && pos < bytes.len() {
-        match bytes[pos] {
-            b'\n' | b'\r' => return true,
-            0xe2 if pos + 2 < bytes.len()
-                && bytes[pos + 1] == 0x80
-                && (bytes[pos + 2] == 0xa8 || bytes[pos + 2] == 0xa9) =>
-            {
-                return true;
-            }
-            _ => {}
+        if is_es_line_terminator_at(bytes, pos) {
+            return true;
         }
         pos += 1;
     }

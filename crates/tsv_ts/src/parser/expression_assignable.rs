@@ -235,10 +235,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // `(x as T) = …` / `(x.y! as U) = …` but rejects an assertion wrapping a
             // destructuring pattern (`([a, b] as T) = …`), and rejects it in a for-head
             // (`for ((x as T) of …)`) / binding position (acorn's `isBinding` split).
-            // Nested (a bare pattern child), the cast must additionally be
-            // *unparenthesized* — `({ a: b as T } = x)` is kept, but
-            // `({ a: (b as T) } = x)` is acorn's "Assigning to rvalue". The node is kept
-            // (the formatter reproduces prettier's `(x as T) = …`), and convert emits it.
+            // The node is kept (the formatter reproduces prettier's `(x as T) = …`),
+            // and convert emits it. Whether a *nested* cast (a bare pattern child) was
+            // reached through grouping parens does not matter: acorn reads those parens
+            // as grouping, so `({ a: b as T } = x)` and `({ a: (b as T) } = x)` are the
+            // same target, both accepted — pinned by `cast_target_destructure` and
+            // `cast_target_destructure_paren`.
             Expression::TSAsExpression(_)
             | Expression::TSSatisfiesExpression(_)
             | Expression::TSNonNullExpression(_)
@@ -247,8 +249,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     && matches!(
                         expr.skip_type_assertions(),
                         Expression::Identifier(_) | Expression::MemberExpression(_)
-                    )
-                    && !(nested && self.preceded_by_open_paren(expr.span().start_usize())) =>
+                    ) =>
             {
                 Ok(expr)
             }
@@ -270,37 +271,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Invalid assignment target (binding / for-head position)
             _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
         }
-    }
-
-    /// Whether the previous non-trivia byte before `start` (a full-file offset)
-    /// is `(` — i.e. the expression starting at `start` sits directly inside
-    /// grouping parens. Walks back over whitespace; a comment ending where the
-    /// walk stops is hopped via the lexer-recorded spans in `self.comments`
-    /// (byte-scanning backwards can't delimit comments reliably — same technique
-    /// as `paren_preceded_by_jsdoc_cast_comment`). Used by the nested
-    /// parenthesized-cast rejection in `to_assignable_impl`, so it only runs on
-    /// the rare cast-in-pattern path.
-    fn preceded_by_open_paren(&self, start: usize) -> bool {
-        let bytes = self.source.as_bytes();
-        let mut i = start - self.base_offset;
-        loop {
-            while i > 0 && bytes[i - 1].is_ascii_whitespace() {
-                i -= 1;
-            }
-            // If the walk stopped inside (or at the end of) a recorded comment,
-            // hop to the comment's start and keep walking.
-            let pos = (i + self.base_offset) as u32;
-            match self
-                .comments
-                .iter()
-                .rev()
-                .find(|c| c.span.start < pos && pos <= c.span.end)
-            {
-                Some(c) => i = c.span.start as usize - self.base_offset,
-                None => break,
-            }
-        }
-        i > 0 && bytes[i - 1] == b'('
     }
 
     /// Build the "trailing comma after a rest element" syntax error (`[...a,]` /
