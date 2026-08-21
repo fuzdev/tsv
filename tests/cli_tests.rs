@@ -754,6 +754,96 @@ fn test_format_jobs_zero_means_one() {
     assert_eq!(fs::read_to_string(dir.join("a.ts")).unwrap(), FORMATTED_TS);
 }
 
+/// A `--jobs` count the OS refuses must **narrow the pool**, not fail the run.
+///
+/// `--jobs` is a user-supplied number, and the pool's spawn used to `expect`, so this
+/// was the one `format` argument that answered with a panic where every other bad one
+/// exits 2 with a message. On the streamed path the panic was worse than a crash: it
+/// unwound past the queue's `finish`, leaving every already-spawned worker parked on
+/// the condvar while `thread::scope` waited to join them — the process hung holding
+/// the whole pool's stacks. Both discovery paths are covered here: one directory root
+/// streams, two spellings of it collect (the dedup is set-wide).
+///
+/// The refusal is provoked through **address space** (`ulimit -v`), which is the one
+/// limit a worker's stack reservation is not free against — `cli/stack.rs` names it as
+/// exactly that. `exec` hands the limit straight to tsv with no fork in between, and
+/// ~98 MiB is under the 128 MiB that even the *narrowest* machine's `--jobs` ceiling
+/// (4 workers × `STACK_SIZE`) reserves, so the refusal is reached whatever the core
+/// count, while leaving tsv itself room to run (measured: it still formats at 48 MiB).
+/// Both of the refusal's outcomes are a pass — the pool narrows to what it got, or it
+/// comes up empty and the calling thread formats — and the run must be **clean either
+/// way**.
+///
+/// The warning assertion is what keeps this test from passing vacuously: the first
+/// spelling of it reached for `ulimit -u`, which `/bin/sh` (dash) does not support, so
+/// the limit was never applied and the test passed against the *unfixed* code too.
+/// Requiring the warning means a constraint that fails to bite fails the test instead
+/// of quietly proving nothing.
+///
+/// Linux-only for the same reason: `RLIMIT_AS` is reliably enforced there, where macOS
+/// largely ignores it — a `#[cfg(unix)]` test would be back to proving nothing on half
+/// its platforms. `cargo test --workspace` gates on ubuntu.
+#[cfg(target_os = "linux")]
+#[test]
+fn test_format_jobs_beyond_the_thread_limit_narrows_the_pool() {
+    let dir = temp_dir("jobs_over_limit");
+    // More files than the cap, so the collected path's clamp (to the file count) still
+    // lands above it — both paths must ask for more threads than they can have.
+    let names: Vec<String> = (0..40).map(|i| format!("f{i}.ts")).collect();
+    let write_all = || {
+        for name in &names {
+            fs::write(dir.join(name), UNFORMATTED_TS).unwrap();
+        }
+    };
+    let assert_all_formatted = || {
+        for name in &names {
+            assert_eq!(
+                fs::read_to_string(dir.join(name)).unwrap(),
+                FORMATTED_TS,
+                "{name} was left unformatted"
+            );
+        }
+    };
+    let bin = built_tsv().display().to_string();
+    let run = |targets: &str| {
+        let script = format!("ulimit -v 100000; exec \"{bin}\" format --jobs 500 {targets}");
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(script)
+            .output()
+            .expect("Failed to execute sh");
+        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+        assert!(
+            !stderr.contains("panicked"),
+            "a refused thread must not panic: {stderr}"
+        );
+        // The limit must actually have bitten, or the run below proves nothing.
+        assert!(
+            stderr.contains("format workers started") || stderr.contains("could not start format"),
+            "the pool was never refused a thread, so this run tested nothing: {stderr}"
+        );
+        // Both warnings this run provokes — the ceiling's and the pool's — are
+        // diagnostics, so stdout stays the greppable list of changed paths.
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        assert!(
+            !stdout.contains("warning:"),
+            "a warning reached stdout, where only changed paths belong: {stdout}"
+        );
+        assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
+    };
+
+    let target = dir.to_str().unwrap();
+    write_all();
+    run(&format!("\"{target}\""));
+    assert_all_formatted();
+
+    // The same root twice is the collected path — overlapping roots need the
+    // canonical-path dedup, which needs the whole set in hand.
+    write_all();
+    run(&format!("\"{target}\" \"{target}\""));
+    assert_all_formatted();
+}
+
 #[test]
 fn test_format_nonexistent_path() {
     let output = tsv(&["format", "/nonexistent/tsv_cli_test_path"]);
