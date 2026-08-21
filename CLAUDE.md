@@ -798,9 +798,9 @@ point folds `<CR>` / `<CR><LF>` to `<LF>` before it parses**
 binding's format export, and `canonicalize_js`), so tsv's output is LF-only
 even inside the regions it copies verbatim. Ahead of the parse is the only place that
 answers it once: the printers ask "where are the lines?" in several places that split on
-`'\n'` alone (`Comment::multiline`, `is_indentable_block_comment`,
-`strip_comment_indentation`), and folding the finished string instead leaves those
-disagreeing with the output — the same document then formats two ways on two passes.
+`'\n'` alone (`Comment::multiline`, `is_indentable_block_comment`), and folding the
+finished string instead leaves those disagreeing with the output — the same document
+then formats two ways on two passes.
 `<LS>` / `<PS>` are deliberately NOT folded. Full rationale + spec citations:
 ./docs/architecture.md#line-terminators-parse-takes-the-authors-bytes-format-folds-first
 

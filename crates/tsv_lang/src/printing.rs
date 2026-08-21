@@ -251,7 +251,7 @@ pub fn ecmascript_lines(text: &str) -> impl Iterator<Item = &str> {
 ///
 /// **Why the input rather than the finished output.** The printer asks *where are the
 /// lines?* in several places that split on `'\n'` alone: [`crate::Comment::multiline`] at
-/// parse, [`is_indentable_block_comment`] / [`strip_comment_indentation`] at doc-build, and the
+/// parse, [`is_indentable_block_comment`] at doc-build, and the
 /// per-line emitters under them. A fold applied to the finished string leaves every one of
 /// those disagreeing with the output about where the lines *are* — a lone-`<CR>` document's
 /// block comment reads as a single line, rides out verbatim, and the fold then splits it, so
@@ -325,15 +325,10 @@ pub(crate) fn line_bounds_at(source: &str, position: usize) -> (usize, usize, us
         }
     }
 
-    let mut line_end = position.max(line_start);
-    while line_end < bytes.len() {
-        line_end = next_line_terminator_candidate(bytes, line_end);
-        if line_end >= bytes.len() || line_terminator_len(bytes, line_end).is_some() {
-            break;
-        }
-        line_end += 1;
-    }
-    (line_start, line_end.min(bytes.len()), line_number)
+    // The line ENDS at the terminator, so only its start is wanted here.
+    let line_end =
+        next_line_terminator(bytes, position.max(line_start)).map_or(bytes.len(), |(at, _)| at);
+    (line_start, line_end, line_number)
 }
 
 /// Whether `text` holds any ECMAScript line terminator ([`line_terminator_len`]).
@@ -344,19 +339,6 @@ fn contains_line_terminator(text: &str) -> bool {
     // `iter().position()` over them auto-vectorizes; the 0xE2 lead is checked in
     // the same pass since a separate scan would cost a second walk.
     (0..bytes.len()).any(|i| line_terminator_len(bytes, i).is_some())
-}
-
-/// Whether `bytes[i]` is the LAST byte of an ECMAScript line terminator — the
-/// backward-scan form of [`line_terminator_len`], for cursors walking towards a
-/// line start. `<LF>` answers for `<CR><LF>` too, since the pair ends on it.
-#[inline]
-fn ends_line_terminator(bytes: &[u8], i: usize) -> bool {
-    match bytes[i] {
-        b'\n' | b'\r' => true,
-        // The final byte of `<LS>` / `<PS>` (`e2 80 a8` / `e2 80 a9`).
-        0xA8 | 0xA9 => i >= 2 && bytes[i - 2] == 0xE2 && bytes[i - 1] == 0x80,
-        _ => false,
-    }
 }
 
 /// The number of ECMAScript line terminators in `text`, counting `<CR><LF>` once.
@@ -767,77 +749,126 @@ fn next_line_terminator_candidate(bytes: &[u8], from: usize) -> usize {
 /// multi-byte line terminators, spelled once for the scan and its scalar tail.
 const LINE_SEPARATOR_LEAD: u8 = 0xE2;
 
-/// Strip common indentation from comment content based on its position in source
+/// The first ECMAScript line terminator at or after `from`, as `(start, len)` — `None` if the
+/// rest of `bytes` holds none.
 ///
-/// Detects the indentation level at the comment's position and removes that
-/// same indentation from each line of the comment content. This is used when
-/// formatting multi-line comments to preserve their internal structure while
-/// removing the baseline indentation from the source code.
+/// [`next_line_terminator_candidate`] plus the confirmation step each of its callers owes it:
+/// the scan stops on any `0xE2` lead, only `<LS>` / `<PS>` are terminators, so a candidate
+/// [`line_terminator_len`] declines has to be stepped over and the scan resumed. Open-coding
+/// that retry is how a class question comes to be spelled *almost* right, so "where is the next
+/// line break" has one spelling.
 ///
-/// # Arguments
+/// [`build_line_breaks_bytes`] keeps its own walk deliberately: it wants *every* terminator
+/// rather than the next one, and its loop shape is what the exhaustive equivalence test grades.
+#[inline]
+fn next_line_terminator(bytes: &[u8], from: usize) -> Option<(usize, usize)> {
+    let mut i = from;
+    loop {
+        i = next_line_terminator_candidate(bytes, i);
+        if i >= bytes.len() {
+            return None;
+        }
+        if let Some(len) = line_terminator_len(bytes, i) {
+            return Some((i, len));
+        }
+        // A `0xE2` lead that is not `<LS>` / `<PS>`.
+        i += 1;
+    }
+}
+
+/// Dedent a multi-line block comment's content the way Svelte's acorn wrapper does.
 ///
-/// * `source` - The source text
-/// * `content` - The comment content to process
-/// * `comment_start` - The start position of the comment in the source
+/// Svelte's `onComment` (`svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js`) takes
+/// the indentation of the line the comment OPENS on and removes one copy of it from the front
+/// of every line of the comment's content, so the wire `value` reads the same however deeply
+/// the comment was nested. Mirroring it *is* the specification here: the parse product is a
+/// drop-in contract with Svelte, so a class read any wider or narrower than `onComment`'s is a
+/// wire divergence.
 ///
-/// # Returns
+/// ⚠️ **The two steps use DIFFERENT line-terminator classes, deliberately** — because
+/// `onComment` does:
 ///
-/// The comment content with common indentation stripped from each line.
+/// - **finding the comment's line start** is `while (a > 0 && source[a - 1] !== '\n') a -= 1`:
+///   `\n` and nothing else, so a `<CR>` / `<LS>` / `<PS>` between the real line start and the
+///   comment is ordinary text and the indentation is still the *line's* own;
+/// - **stripping it off each line** is `value.replace(new RegExp('^' + indentation, 'gm'), '')`,
+///   and an `m`-mode `^` matches at the start of input and after every ECMAScript terminator
+///   ([`line_terminator_len`]) — `\n`, `\r`, `<LS>` and `<PS>` alike.
+///
+/// So do not unify the two onto one predicate. Reading the walk-back with the full class finds
+/// a line start Svelte has not got — dedenting by whatever `[ \t]` trails the terminator rather
+/// than by the line's real indent — and splitting the content on `'\n'` alone misses line starts
+/// Svelte does have. Both were live wire divergences, in both directions.
+///
+/// `<CR><LF>` needs no special case in the strip: the `m`-mode `^` matches after the `<CR>` as
+/// well as after the `<LF>`, but the position after a `<CR>` begins with that `<LF>`, which a
+/// non-empty `[ \t]` indentation can never match — so one boundary or two is the same answer,
+/// and [`line_terminator_len`]'s pairing is free to take it as one.
+///
+/// The gate above this — a BLOCK comment whose content holds a `\n`, and only those
+/// ([`crate::Comment::content_is_multiline`]) — and the `[ \t]` indentation class are Svelte's
+/// too. All five spellings of both steps are pinned by
+/// `tests/comment_dedent_line_terminators.rs`, whose module doc says why a fixture cannot
+/// carry them.
 ///
 /// # Examples
 ///
 /// ```
 /// use tsv_lang::printing::strip_comment_indentation;
 ///
-/// let source = "    /* Line 1\n       Line 2 */";
-/// let content = " Line 1\n   Line 2 ";
-/// let result = strip_comment_indentation(source, content, 4);
-/// // Result: " Line 1\n   Line 2 " (4 spaces of indentation removed from each line)
+/// // The comment opens at byte 1, on a line indented by one tab, so one tab comes off the
+/// // front of each of its lines.
+/// let source = "\t/* a\n\tb */";
+/// assert_eq!(strip_comment_indentation(source, " a\n\tb ", 1), " a\nb ");
+///
+/// // A `<LS>` inside the content opens a line just as a `\n` does.
+/// assert_eq!(
+///     strip_comment_indentation(source, " a\u{2028}\tb ", 1),
+///     " a\u{2028}b "
+/// );
 /// ```
 pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32) -> String {
     let comment_start = comment_start as usize;
-
-    // Find start of line where comment begins. Walking back a byte at a time is
-    // safe for the multi-byte terminators too: their trailing bytes (0xA8/0xA9,
-    // 0x80) are UTF-8 continuations, so the scan only stops once it reaches the
-    // sequence's own last byte.
     let bytes = source.as_bytes();
+
+    // The line the comment opens on — `\n` and nothing else, per the walk-back above.
     let mut line_start = comment_start;
-    while line_start > 0 && !ends_line_terminator(bytes, line_start - 1) {
+    while line_start > 0 && bytes[line_start - 1] != b'\n' {
         line_start -= 1;
     }
 
-    // Find the indentation characters (spaces/tabs before the comment)
+    // The `[ \t]` run that opens that line.
     let mut indentation_end = line_start;
-    while indentation_end < source.len() {
-        let ch = source.as_bytes()[indentation_end];
-        if ch == b' ' || ch == b'\t' {
-            indentation_end += 1;
-        } else {
-            break;
-        }
+    while matches!(bytes.get(indentation_end), Some(b' ' | b'\t')) {
+        indentation_end += 1;
     }
-
     let indentation = &source[line_start..indentation_end];
-
-    // Strip this indentation from the start of each line in the comment
     if indentation.is_empty() {
         return content.to_string();
     }
 
-    // Process line by line, stripping indentation from the start of each line
+    // Drop one copy of it wherever an `m`-mode `^` matches: the content's start, and the
+    // position after every line terminator.
+    let content_bytes = content.as_bytes();
     let mut result = String::with_capacity(content.len());
-    let line_iter = content.split_inclusive('\n');
-
-    for line in line_iter {
-        if let Some(stripped) = line.strip_prefix(indentation) {
-            result.push_str(stripped);
+    let mut pos = 0;
+    loop {
+        let body_start = if content[pos..].starts_with(indentation) {
+            pos + indentation.len()
         } else {
-            result.push_str(line);
-        }
-    }
+            pos
+        };
 
-    result
+        // Copy the rest of the line, its terminator included; the next `^` sits at its end.
+        let line_end = next_line_terminator(content_bytes, body_start)
+            .map_or(content.len(), |(at, len)| at + len);
+        result.push_str(&content[body_start..line_end]);
+
+        if line_end == content.len() {
+            return result;
+        }
+        pos = line_end;
+    }
 }
 
 /// Returns `true` if a multi-line block comment is *indentable* in prettier's
@@ -1541,13 +1572,34 @@ mod tests {
     }
 
     #[test]
-    fn test_strip_comment_indentation_finds_line_start_after_any_terminator() {
+    fn test_strip_comment_indentation_line_start_is_newline_only() {
+        // The comment's own line is found by `onComment`'s `\n`-only walk-back, so a `<CR>` /
+        // `<LS>` / `<PS>` ahead of it is ordinary text and the indentation is still the line's.
+        // Reading the whole class here instead takes the `\t\t` AFTER the terminator for the
+        // indent — a wider one than the line's, which over-dedents on the wire.
         for (term, _) in TERMINATORS {
-            let source = format!("x{term}\t/* a\n\t   b */");
-            let comment_start = (1 + term.len() + 1) as u32;
+            let source = format!("x{term}\t\t/* a\n\t\tb */");
+            let comment_start = (1 + term.len() + 2) as u32;
+            let stripped = strip_comment_indentation(&source, " a\n\t\tb ", comment_start);
+            if term == "\n" || term == "\r\n" {
+                // A line really does start after these two, and it opens with the `\t\t`.
+                assert_eq!(stripped, " a\nb ", "line start after {term:?}");
+            } else {
+                // `x` opens the line, so there is no indentation to strip at all.
+                assert_eq!(stripped, " a\n\t\tb ", "no line start at {term:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_strip_comment_indentation_strips_after_every_terminator() {
+        // The other half is the opposite class: the strip is `^` under the `m` flag, whose
+        // line starts are the whole terminator set. Splitting the content on `'\n'` alone
+        // leaves the indent standing after a `<CR>` / `<LS>` / `<PS>`, under-dedenting.
+        for (term, _) in TERMINATORS {
             assert_eq!(
-                strip_comment_indentation(&source, " a\n\t   b ", comment_start),
-                " a\n   b ",
+                strip_comment_indentation("\t/* x */", &format!(" a\n\tb{term}\tc "), 1),
+                format!(" a\nb{term}c "),
                 "indent stripped after {term:?}"
             );
         }

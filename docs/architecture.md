@@ -591,7 +591,7 @@ LF-only, including inside the regions it copies verbatim — a frozen embedded b
 
 Ahead of the parse is the only place the question can be answered once. The printers ask
 *where are the lines?* in several places that split on `'\n'` alone — `Comment::multiline`
-at parse, `is_indentable_block_comment` / `strip_comment_indentation` at doc-build, and the
+at parse, `is_indentable_block_comment` at doc-build, and the
 per-line emitters under them — and a fold applied to the finished string leaves all of them
 disagreeing with the output about where the lines are, so the same document formats two
 ways on two passes. It is also where prettier folds (`normalizeEndOfLine`, in

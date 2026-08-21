@@ -16,7 +16,7 @@
 //! The payload is deliberately an **indentable block comment sitting at the wrong indent**,
 //! because that is the shape that fails when the fold happens too late. Answering `<CR>` on
 //! the finished string instead leaves the doc-builder's line splits — `Comment::multiline`
-//! at parse, `is_indentable_block_comment` / `strip_comment_indentation` at build —
+//! at parse, `is_indentable_block_comment` at build —
 //! reading a lone-`<CR>` document as ONE line: the comment rides out verbatim, the fold
 //! then splits it, and the second pass re-indents what the first left alone. The `<CR><LF>`
 //! twin is the null control on the same dimension: its `<CR>` lands at a line END, so it
