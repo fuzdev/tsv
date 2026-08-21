@@ -2404,6 +2404,40 @@ Deno.test('css_scss_directive_number: negative - dropped numeric value not claim
 	assertEquals(match, null);
 });
 
+// ─── foreign_body_freeze (positive + unterminated-open negatives) ──────────
+
+Deno.test('foreign_body_freeze: positive - a frozen <style> body tsv keeps verbatim', () => {
+	// tsv emits the author's bytes for a lang it does not format at that position;
+	// prettier restyles the body with its scss parser. Both hunk sides sit inside the
+	// frozen region, so the hunk is claimed.
+	const prettier = '<style lang="scss">\n\ta {\n\t\tcolor: red;\n\t}\n</style>';
+	const ours = '<style lang="scss">\n\ta{color:red}\n</style>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('foreign_body_freeze', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'foreign_body_freeze');
+});
+
+// An opening tag with no closing tag after it must open NO region. Clamping such a scan to
+// the last line instead makes the region swallow the rest of the file, so an unrelated hunk
+// below is claimed at `certain` confidence and a real divergence is filed as known. All
+// three shapes below parse on both sides, so they genuinely reach the detector; the hunk in
+// each is prettier's tag-dangling on a `<span>`, which is not this pattern's.
+const UNTERMINATED_OPEN_HEADS: ReadonlyArray<readonly [string, string]> = [
+	['inside a comment', '<!-- example: <style lang="less"> -->'],
+	['inside an attribute value', '<div title="<script lang=\'coffee\'>">x</div>'],
+	['on a self-closing template', '<template lang="pug" />']
+];
+
+for (const [where, head] of UNTERMINATED_OPEN_HEADS) {
+	Deno.test(`foreign_body_freeze: negative - an unterminated open ${where} claims nothing`, () => {
+		const prettier = `${head}\n<div>\n\t<span\n\t\t>a</span\n\t>\n</div>`;
+		const ours = `${head}\n<div>\n\t<span>a</span>\n</div>`;
+		const ctx = make_context(ours, prettier, 'svelte');
+		assertEquals(run_pattern('foreign_body_freeze', ctx), null);
+	});
+}
+
 // ─── hunk-scoped SAFETY vouching ───────────────────────────────────────────
 //
 // `safety_vouched` is deliberately stricter than `classification === 'all_explained'`:

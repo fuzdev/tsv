@@ -29,7 +29,7 @@ use super::profile::resolve_seed_files;
 /// Graded as a RATCHET over `fabrication_audit_known.txt`, keyed by the *shape* of the two
 /// lines bracketing the invented blank (so it is corpus-portable — no paths). Every line is a
 /// bug; the file shrinking is the goal. The three legitimate fabrications — the hoisted-section
-/// seam, an empty block body, and an empty foreign-`<template>` body — are structural carve-outs
+/// seam, an empty block body, and an empty frozen verbatim body — are structural carve-outs
 /// ([`is_sanctioned`]) rather than snapshot lines, so the snapshot never mixes sanctioned rules
 /// with debt.
 ///
@@ -59,7 +59,7 @@ const SNAPSHOT_HEADER: &str = "\
 #
 # A shape found but not pinned FAILS (a new fabrication). A pinned shape that no longer
 # fires FAILS (fix landed — re-pin). The three sanctioned layout rules — the hoisted-section
-# seam, an empty block body, and an empty foreign-`<template>` body — are NOT here: they are
+# seam, an empty block body, and an empty frozen verbatim body — are NOT here: they are
 # carved out structurally in `fabrication_audit.rs`.
 #
 # Regenerate with `deno task fabrication:audit:update`.
@@ -300,7 +300,7 @@ fn count_blank_runs(s: &str) -> usize {
 fn is_sanctioned(shape: &FabricationShape) -> bool {
     is_section_seam(&shape.before, &shape.after)
         || is_empty_block_body(&shape.before, &shape.after)
-        || is_empty_foreign_template_body(&shape.before, &shape.after)
+        || is_empty_frozen_body(&shape.before, &shape.after)
 }
 
 /// Whether the run sits at a hoisted-section boundary.
@@ -346,23 +346,43 @@ fn is_empty_block_body(prev: &str, next: &str) -> bool {
     opens_body && closes_body
 }
 
-/// Whether the run IS an empty foreign-`<template>` body — [`is_empty_block_body`]'s rule one
+/// Whether the run IS an empty **frozen verbatim body** — [`is_empty_block_body`]'s rule one
 /// construct over, and sanctioned for the same reason.
 ///
-/// A `<template lang="…">` in a language tsv does not format copies its body out verbatim
-/// between the two delimiter lines the geometry requires, so a body that holds only whitespace
-/// leaves those two lines with nothing between them: `<template lang="pug">⏎</template>` becomes
+/// A body in a language tsv does not format at that position is copied out verbatim between the
+/// two delimiter lines the geometry requires, so a body that holds only whitespace leaves those
+/// two lines with nothing between them: `<template lang="pug">⏎</template>` becomes
 /// `<template lang="pug">⏎⏎</template>`. That blank IS the body, not a separator the author
 /// wrote, and prettier's `preformattedBody` emits it identically.
 ///
+/// **All three tags reach it**, because the freeze is one rule asked at every position that
+/// has a body: a foreign `<template>`, `<script>` or `<style>`. See
+/// docs/conformance_prettier_svelte.md §Foreign-language embedded bodies.
+///
 /// As narrow as its sibling and for the same reason: the run must be adjacent to the opening
 /// tag on one side and the element's own closing tag on the other, which only an empty body can
-/// be — any real content puts a non-blank line between them. A plain (formatted) `<template>`
-/// cannot reach this shape either: an empty one prints as `<template></template>` with no
-/// newlines at all, so a blank between those two lines can only have been authored, and an
-/// authored one is already in the input count.
-fn is_empty_foreign_template_body(prev: &str, next: &str) -> bool {
-    prev == "<template" && next == "</template"
+/// be — any real content puts a non-blank line between them.
+///
+/// ⚠️ **It is keyed on the TAG, not on the lang** — and it has to be, because
+/// [`line_shape`] normalizes a line to [`markup_head`], which strips attributes: `<script
+/// lang="coffee">` and a plain `<script>` are the same token `<script` here. So this sanction
+/// exempts a **formattable** body's blank too, and what keeps that from being a hole is a
+/// property of the PRINTER rather than of this predicate: a formattable body cannot reach the
+/// shape, since an empty one prints as `<tag></tag>` with no newlines at all and a
+/// whitespace-only one takes the single delimiter break (adjacent lines, no run between them).
+/// A blank there could only have been authored — and an authored one is already in the input
+/// count. Pinned by
+/// `tests/fixtures/svelte/elements/nested_script_style_whitespace_only`, which holds the
+/// formattable cells against an empty control; if that premise ever breaks, this arm goes
+/// quiet on the two commonest tags in the corpus rather than failing. The run's raw `prev`
+/// line is available one frame up (`scan_output`) should the sanction ever need to read the
+/// `lang` itself — only the snapshot KEY has to stay attribute-free (corpus-portable), not
+/// the sanction.
+fn is_empty_frozen_body(prev: &str, next: &str) -> bool {
+    matches!(
+        (prev, next),
+        ("<template", "</template") | ("<script", "</script") | ("<style", "</style")
+    )
 }
 
 /// The syntactic shape of `line` — a stable token standing for what kind of construct opens it.
@@ -547,15 +567,25 @@ mod tests {
         // A block section's empty body: the opener and the terminator each keep their line.
         assert!(sanctioned("{:catch error}", "{/await}"));
         assert!(sanctioned("{#if cond}", "{:else if b}"));
-        // A foreign template's empty body, the same rule one construct over.
+        // A frozen verbatim body's empty body, the same rule one construct over — at each
+        // of the three tags a freeze can reach.
         assert!(sanctioned("<template lang=\"pug\">", "</template>"));
         assert!(sanctioned(
             "\t<template lang=\"coffee\">  ",
             "\t</template>"
         ));
+        assert!(sanctioned("<script lang=\"coffee\">", "</script>"));
+        assert!(sanctioned(
+            "\t<script type=\"text/coffeescript\">  ",
+            "\t</script>"
+        ));
+        assert!(sanctioned("<style lang=\"less\">", "</style>"));
+        assert!(sanctioned("\t<style lang=\"sass\">  ", "\t</style>"));
         // Both sides must bracket the run: real content puts a non-blank line between them.
         assert!(!sanctioned("<template lang=\"pug\">", "text"));
         assert!(!sanctioned("text", "</template>"));
+        assert!(!sanctioned("<script lang=\"coffee\">", "text"));
+        assert!(!sanctioned("<style lang=\"less\">", "text"));
         assert!(!sanctioned("{#if cond}", "text"));
         // Keyed on the exact tag name, like the section seam.
         assert!(!sanctioned("<template-host>", "</template>"));

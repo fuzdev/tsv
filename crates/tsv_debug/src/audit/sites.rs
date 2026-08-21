@@ -56,11 +56,22 @@ fn span_of(node: &serde_json::Value) -> Option<(usize, usize)> {
 ///   `>`-to-`</script>` region), and an `ExpressionTag`'s brace interior
 ///   (`{ /* c */ x.y }` is legal). It finds them by recursive walk, so it cannot miss a
 ///   path an `ExpressionTag` hides in (an attribute value, a `<svelte:element this={…}>`).
-/// - [`svelte_only_regions`] over tsv's **internal** AST names the rest, which exist only
+/// - [`svelte_internal_regions`] over tsv's **internal** AST names the rest, which exist only
 ///   as tsv's own parse bookkeeping: a block's `opening_tag_span` and a directive's
 ///   `head_span`. Svelte's AST carries neither, so the wire cannot express them — an
 ///   `IfBlock`'s span covers the whole block (body included) and its `test` span is the
-///   expression alone, so the head is not derivable from either without a scan.
+///   expression alone, so the head is not derivable from either without a scan. That walk
+///   also reports the spans the wire named but this one must **take back** (below).
+///
+/// A **frozen-language `<script>` body** (a `lang`/`type` outside the JS/TS family) is
+/// deliberately not a region: the printer freezes it verbatim, so its blank/comment policy is
+/// the author's bytes, outside the formatted-output model these audits assert. The question is
+/// asked with the printer's own predicate (`internal::EmbeddedLang::Script.is_frozen`) rather
+/// than a wire-shape copy of it — a copy drifts silently, and this audit would go on probing a
+/// body the printer had started freezing (every injected comment "surviving" verbatim, proving
+/// nothing) or stop probing one it still formats (a coverage hole nothing reports). (Nested
+/// script/style and frozen `<template>` bodies never were regions — only a top-level `Script`
+/// carries a `Program` span.)
 ///
 /// TODO: `<style>` content is still unnamed, so no comment is probed there. `Style` carries
 /// a `content_span` that names it in one line, and the prerequisite is now met — the ledger
@@ -85,10 +96,35 @@ pub(crate) fn code_regions(source: &str, parser: ParserType) -> Vec<(usize, usiz
                 .into_iter()
                 .filter_map(|(s, e)| Some((map.byte(s)?, map.byte(e)?)))
                 .collect();
-            byte_spans.extend(svelte_only_regions(source));
+            let internal = svelte_internal_regions(source);
+            // Take back what the wire named inside a frozen `<script>` before merging: a
+            // merge would weld it to a neighbour and make it unremovable.
+            //
+            // The test is OVERLAP, not containment: the two spans are the same region today
+            // (the wire's `Script.content` and tsv's `script.content.span` both being the
+            // `>`-to-`</script>` run), so containment would work — and would silently stop
+            // working if either side's bound ever moved by a byte, resuming injection inside
+            // a frozen body with nothing to report it. Over-removal is not the opposing risk
+            // it would be elsewhere: a frozen `<script>`'s content is raw text, so the only
+            // wire region that can overlap one is that script's own.
+            if !internal.frozen.is_empty() {
+                byte_spans
+                    .retain(|&(s, e)| !internal.frozen.iter().any(|&(fs, fe)| s < fe && e > fs));
+            }
+            byte_spans.extend(internal.named);
             merge_regions(byte_spans)
         }
     }
+}
+
+/// What tsv's internal AST has to say about the region set, in one parse: the regions the
+/// wire shape cannot express, plus the frozen `<script>` bodies the wire named and
+/// [`code_regions`] must take back.
+struct InternalRegions {
+    /// Regions to ADD — see [`svelte_internal_regions`].
+    named: Vec<(usize, usize)>,
+    /// Content spans of top-level `<script>`s the printer freezes, to SUBTRACT.
+    frozen: Vec<(usize, usize)>,
 }
 
 /// The Svelte regions the wire shape cannot express — read off tsv's internal AST.
@@ -110,8 +146,10 @@ pub(crate) fn code_regions(source: &str, parser: ParserType) -> Vec<(usize, usiz
 /// own hand-read pattern slots, not acorn's, and it rejects a comment in them. No
 /// whitelist is needed because **tsv rejects there too**, so `Formatted::Rejected` filters
 /// them exactly as it does a word interior. The same covers `{⟨⟩#if` and `{#⟨⟩if`.
-fn svelte_only_regions(source: &str) -> Vec<(usize, usize)> {
-    use tsv_svelte::ast::internal::{AttributeNode, Fragment, FragmentNode, SpecialElementKind};
+fn svelte_internal_regions(source: &str) -> InternalRegions {
+    use tsv_svelte::ast::internal::{
+        AttributeNode, EmbeddedLang, Fragment, FragmentNode, SpecialElementKind,
+    };
 
     /// A `{…}`-delimited construct: its interior, both delimiters excluded.
     fn interior(span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
@@ -244,11 +282,25 @@ fn svelte_only_regions(source: &str) -> Vec<(usize, usize)> {
     // any seed file tsv rejects, and an injected source that stops parsing is a `Rejected`
     // the inject loop drops on the floor.
     let Ok(root) = tsv_svelte::parse(source, &arena) else {
-        return Vec::new();
+        return InternalRegions {
+            named: Vec::new(),
+            frozen: Vec::new(),
+        };
     };
-    let mut out = Vec::new();
-    walk(&root.fragment, &mut out);
-    out
+    let mut named = Vec::new();
+    walk(&root.fragment, &mut named);
+    let frozen = [root.instance, root.module]
+        .into_iter()
+        .flatten()
+        .filter(|script| EmbeddedLang::Script.is_frozen(script.attributes, source))
+        .map(|script| {
+            (
+                script.content.span.start as usize,
+                script.content.span.end as usize,
+            )
+        })
+        .collect();
+    InternalRegions { named, frozen }
 }
 
 /// Walk the wire AST accumulating [`code_regions`]' carriers.
@@ -690,6 +742,91 @@ mod tests {
         assert_eq!(regions.len(), 1, "one script body: {regions:?}");
         let (s, e) = regions[0];
         assert_eq!(&src[s..e], "\n\tconst a = 1;\n");
+    }
+
+    /// The `lang`/`type` spellings the region walk must answer, and — the point of the
+    /// table — what the **printer** does with each one.
+    ///
+    /// The walk asks `internal::EmbeddedLang::Script.is_frozen`, the printer's own predicate,
+    /// so the two cannot disagree by construction. This table is the standing proof that the
+    /// *coupling* is the right one: each case asserts the region walk and the formatter reach
+    /// the same verdict, with the formatter's verdict read off its OUTPUT rather than off any
+    /// predicate. A future change that re-introduces a copy here fails these rows.
+    const FROZEN_SCRIPT_CASES: &[(&str, bool)] = &[
+        // Formattable: absent, `ts`, and the narrowings this reader applies.
+        ("<script>", false),
+        ("<script lang=\"ts\">", false),
+        ("<script lang=\" ts \">", false),
+        ("<script type=\"text/ts\">", false),
+        ("<script lang=\"\">", false),
+        ("<script lang>", false),
+        // The rest of the JS/TS family — the bare names and the living MIME essences.
+        ("<script lang=\"js\">", false),
+        ("<script lang=\"javascript\">", false),
+        ("<script lang=\"typescript\">", false),
+        ("<script type=\"module\">", false),
+        ("<script type=\"text/javascript\">", false),
+        ("<script type=\"text/ecmascript\">", false),
+        ("<script type=\"application/javascript\">", false),
+        ("<script type=\"application/ecmascript\">", false),
+        // Frozen: every other name, at either attribute — the dead MIME essences included.
+        ("<script lang=\"coffee\">", true),
+        ("<script type=\"text/coffeescript\">", true),
+        ("<script type=\"application/json\">", true),
+        ("<script type=\"application/ld+json\">", true),
+        ("<script type=\"text/jscript\">", true),
+        ("<script type=\"application/x-javascript\">", true),
+        // `lang` outranks `type` whatever the source order, and an empty value names
+        // nothing — the two reader rules most likely to drift between the spellings.
+        ("<script type=\"text/coffeescript\" lang=\"ts\">", false),
+        ("<script lang=\"ts\" type=\"text/coffeescript\">", false),
+        ("<script type=\"text/ts\" lang=\"coffee\">", true),
+        ("<script lang=\"\" type=\"text/coffeescript\">", true),
+        ("<script type=\"text/coffeescript\" lang=\"\">", true),
+        // A brace in a `<script>` tag's head is plain attribute text — Svelte runs no
+        // interpolation there — so `{x}` is read as a language name like any other, and
+        // both spellings call it frozen. (The row is here because it looks like the
+        // no-Text-part case and is not one.)
+        ("<script lang={x}>", true),
+    ];
+
+    /// A body only the formatter would touch: if it is reprinted the freeze is off, and if
+    /// it comes back verbatim the freeze is on. Deliberately not idempotent as authored.
+    const UNFORMATTED_BODY: &str = "\nlet  a  =  1\n";
+
+    #[test]
+    fn a_frozen_script_body_is_not_a_code_region() {
+        for &(open_tag, frozen) in FROZEN_SCRIPT_CASES {
+            let src = format!("{open_tag}{UNFORMATTED_BODY}</script>\n");
+            let named = code_regions(&src, ParserType::Svelte).len();
+            assert_eq!(
+                named,
+                usize::from(!frozen),
+                "region walk disagrees on {open_tag}"
+            );
+        }
+    }
+
+    /// The other half of the same pin, read off the printer instead of the predicate: a
+    /// body the walk declined to name must be the one the formatter left alone.
+    #[test]
+    fn the_walk_declines_exactly_the_bodies_the_formatter_freezes() {
+        for &(open_tag, frozen) in FROZEN_SCRIPT_CASES {
+            let src = format!("{open_tag}{UNFORMATTED_BODY}</script>\n");
+            let arena = bumpalo::Bump::new();
+            let ast = tsv_svelte::parse(&src, &arena).expect("parses");
+            let out = tsv_svelte::format(&ast, &src);
+            assert_eq!(
+                out.contains(UNFORMATTED_BODY.trim_end()),
+                frozen,
+                "formatter disagrees on {open_tag} (output: {out:?})"
+            );
+            assert_eq!(
+                code_regions(&src, ParserType::Svelte).is_empty(),
+                frozen,
+                "the walk and the formatter disagree on {open_tag}"
+            );
+        }
     }
 
     /// Every region as a source slice, for tests that care about *what* was named rather

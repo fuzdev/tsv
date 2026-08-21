@@ -365,7 +365,7 @@ fn line_head_boundary_spaces(source: &str) -> Vec<(usize, String)> {
 ///   content, and those elements are dispatched to the verbatim builders before any of the
 ///   layout this audit grades ever runs.
 /// - **raw content** — `<script>`/`<style>`, and a `<template>` in a foreign language
-///   ([`Element::is_foreign_template`]), whose bodies the printer emits verbatim.
+///   ([`Element::is_frozen_template`]), whose bodies the printer emits verbatim.
 /// - **decoding** — a `Text` that is not [`TextDecoding::Fragment`] is raw-content element text
 ///   or an attribute value.
 /// - **format-ignore** — both the *node* form (`<!-- prettier-ignore -->` freezes the next
@@ -464,16 +464,16 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
 }
 
 /// Whether the printer emits this element's body **verbatim** — `<script>` / `<style>` (raw
-/// text) or a foreign-language `<template>`. Mirrors the two leading arms of
+/// text) or a frozen-language `<template>`. Mirrors the two leading arms of
 /// `build_element_doc`: the body is the author's bytes, so its whitespace is never the
 /// formatter's to answer for.
 fn emits_verbatim_body(element: &Element<'_>, source: &str) -> bool {
     let name = element.name(source);
-    // The foreign-template arm asks the printer's own predicate rather than a copy of it. A
+    // The frozen-template arm asks the printer's own predicate rather than a copy of it. A
     // copy here would have to track what the printer reads the `lang` value OFF — the decoded
     // text, not the raw bytes — and the copy that stood here did not, so `lang="&#112;ug"`
-    // would have been a foreign body to the printer and a graded one to this audit.
-    name == "script" || name == "style" || element.is_foreign_template(source)
+    // would have been a frozen body to the printer and a graded one to this audit.
+    name == "script" || name == "style" || element.is_frozen_template(source)
 }
 
 fn is_collapsible(c: char) -> bool {
@@ -602,7 +602,7 @@ mod tests {
 
     #[test]
     fn ignores_a_line_head_space_in_a_verbatim_body() {
-        // `<script>`/`<style>` and a foreign-language `<template>` are emitted verbatim — the
+        // `<script>`/`<style>` and a frozen-language `<template>` are emitted verbatim — the
         // arms `build_element_doc` dispatches before any layout this audit grades.
         assert!(lines("<template lang=\"pug\">\n\th1 Title\n\t\tp Hey\n</template>\n").is_empty());
         assert!(

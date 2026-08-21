@@ -1127,14 +1127,21 @@ impl Element<'_> {
     /// [`lang_attribute`]: the decoded text, not the raw bytes). The template question stays on
     /// the parse-time [`TagFacts`] bitfield, so the printer's hot paths keep the field load
     /// rather than re-comparing the tag name.
-    pub fn is_foreign_template(&self, source: &str) -> bool {
-        self.facts.is_template()
-            && lang_attribute(self.attributes, source).is_some_and(|lang| lang != "html")
+    pub fn is_frozen_template(&self, source: &str) -> bool {
+        self.facts.is_template() && EmbeddedLang::Template.is_frozen(self.attributes, source)
     }
 }
 
 /// The `lang` or `type` attribute value from an attribute list, `text/` prefix stripped
 /// (`type="text/less"` → `"less"`). `None` when neither attribute is present.
+///
+/// **`lang` outranks `type`**, whatever their source order — prettier's `getLangAttribute`
+/// is `lang || type`, so `<template type="text/html" lang="pug">` is pug to both formatters.
+/// A first-hit-in-source-order read answered that tag "html" and formatted a pug body as
+/// markup. **An empty value names no language** and reads as absent (the attribute falls out
+/// of the answer entirely, so an empty `lang` still yields the `type` beside it) — prettier
+/// again: `''` is falsy on both sides of its `||`, and Svelte's own `lang` regex cannot
+/// match an empty value either. Pinned by `tests/fixtures/svelte/attributes/lang_priority`.
 ///
 /// Reads the **decoded** value ([`Text::data`]), never the raw bytes: the language a
 /// `lang`/`type` names is what the attribute *means*, and the parser already computed that —
@@ -1150,25 +1157,108 @@ impl Element<'_> {
 /// TypeScript body to *this* reader and NOT TypeScript to the wire, and `convert`'s
 /// `script_lang` deliberately stays a separate raw-keyed reader rather than sharing this one.
 /// Pinned by `tests/fixtures/svelte/attributes/lang_entity`, which holds both answers.
-pub(crate) fn lang_attribute<'s>(
-    attributes: &[AttributeNode<'_>],
-    source: &'s str,
-) -> Option<Cow<'s, str>> {
+fn lang_attribute<'s>(attributes: &[AttributeNode<'_>], source: &'s str) -> Option<Cow<'s, str>> {
+    let mut type_value = None;
     for attr_node in attributes {
         if let AttributeNode::Attribute(attr) = attr_node {
             let name = attr.name(source);
-            if (name == "lang" || name == "type")
+            let is_lang = name == "lang";
+            if (is_lang || name == "type")
                 && let Some(value_parts) = attr.value
             {
                 for part in value_parts {
                     if let AttributeValue::Text(text) = part {
-                        return Some(narrow_lang_value(text.data(source)));
+                        let value = narrow_lang_value(text.data(source));
+                        if !value.is_empty() {
+                            if is_lang {
+                                return Some(value);
+                            }
+                            if type_value.is_none() {
+                                type_value = Some(value);
+                            }
+                        }
+                        break;
                     }
                 }
             }
         }
     }
-    None
+    type_value
+}
+
+/// A position that carries an embedded body the printer either formats or freezes — the only
+/// variable in the opacity rule below, and the owner of that position's formattable-name set.
+///
+/// **The rule: a body declared as a language tsv does not format at that position is the
+/// author's own bytes.** One reader answers it everywhere ([`lang_attribute`] — decoded,
+/// trimmed, `text/`-stripped, `lang` over `type`), an absent attribute is always formattable,
+/// and this enum names the only thing that differs between positions. Asked at every position
+/// that has a body — both `<script>` positions, both `<style>` positions, and `<template>` —
+/// and answered the same way at each, since a nested body has had *nothing* established about
+/// it (no parser reads it) and a top-level one only that it parsed.
+///
+/// A **tag**, not a body kind: the two `<script>` positions share `Script` because they share
+/// the answer. See docs/conformance_prettier_svelte.md §Foreign-language embedded bodies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmbeddedLang {
+    Script,
+    Style,
+    Template,
+}
+
+impl EmbeddedLang {
+    /// The `lang` / `type` values whose body this position's printer formats; every other
+    /// name freezes. [`lang_attribute`]'s narrowing applies, so `lang=" ts "` and
+    /// `type="text/javascript"` are in the script set.
+    ///
+    /// - **`Style`** — `css` alone: tsv has one CSS parser and no scss/less one, and guessing
+    ///   with the CSS printer corrupts what it half-understands (`@color: red;` →
+    ///   `@color : red;`, no longer a less variable declaration).
+    /// - **`Script`** — the JS/TS family, under the bare names and the living JavaScript MIME
+    ///   essences. The line is where tsv's **printer** stops, not where Svelte's *parser*
+    ///   switches grammars (`this.ts` recognizes the single raw value `ts`): tsv parses every
+    ///   body under the TS grammar whatever the tag says. `module` is here because on a
+    ///   `<script>` `type` is a loading and MIME attribute, so its value need not be a
+    ///   language at all. Out: `coffee`, the `json` / `importmap` family, every unknown name,
+    ///   and the **dead** MIME essences mimesniff still lists (`text/jscript`,
+    ///   `text/livescript`, the `x-` spellings, `text/javascript1.<n>`).
+    /// - **`Template`** — `html` alone; any other name (`pug`, `jade`, …) is a markup
+    ///   language tsv cannot reflow.
+    ///
+    /// The argument for each line — and every divergence from prettier it creates — is
+    /// docs/conformance_prettier_svelte.md §Foreign-language embedded bodies, which owns the
+    /// rule; this doc says only what a reader of the list needs.
+    fn formattable_langs(self) -> &'static [&'static str] {
+        match self {
+            Self::Script => &[
+                "ts",
+                "typescript",
+                "js",
+                "javascript",
+                "ecmascript",
+                "application/javascript",
+                "application/ecmascript",
+                "module",
+            ],
+            Self::Style => &["css"],
+            Self::Template => &["html"],
+        }
+    }
+
+    /// Whether an attribute list's `lang`/`type` names a language outside this position's
+    /// [formattable set](Self::formattable_langs) — the bodies the printer freezes (emits
+    /// verbatim, the author's own bytes) instead of reprinting from the AST.
+    ///
+    /// Note the **parser** is untouched by this: at a *top-level* position a body must still
+    /// parse under its grammar whatever its `lang` says (canonical Svelte runs acorn and
+    /// `parseCss` on every top-level body regardless), so a top-level freeze only ever sees
+    /// parseable files. A *nested* body is raw text to both parsers and carries no such
+    /// guarantee — which is why the freeze it takes is verbatim rather than anything that
+    /// would rewrite it.
+    pub fn is_frozen(self, attributes: &[AttributeNode<'_>], source: &str) -> bool {
+        lang_attribute(attributes, source)
+            .is_some_and(|lang| !self.formattable_langs().contains(&lang.as_ref()))
+    }
 }
 
 /// Trim a decoded `lang` / `type` value and strip its `text/` prefix, keeping the borrow when
@@ -1704,6 +1794,173 @@ mod tests {
                 tag.starts_with('!'),
                 "declaration: {tag:?}"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod lang_attribute_tests {
+    use super::EmbeddedLang;
+
+    /// The reader's answer for one opening tag, read through the two positions that carry a
+    /// non-trivial allowlist — `<style>`'s (`css`) and `<script>`'s (the JS/TS family).
+    ///
+    /// Goes through a real parse rather than hand-built nodes: `lang_attribute` reads the
+    /// *decoded* `Text::data`, and a synthetic attribute list would skip the decode the rule
+    /// is partly about.
+    fn langs(open_tag: &str) -> (bool, bool) {
+        let tag = if open_tag.starts_with("<style") {
+            "style"
+        } else {
+            "script"
+        };
+        // Nested rather than top-level: the reader is position-independent, and nested
+        // raw-text content is parsed by nobody, so the body need not be valid TS/CSS.
+        let src = format!("<div>{open_tag}x</{tag}></div>");
+        let arena = bumpalo::Bump::new();
+        let ast = crate::parse(&src, &arena).expect("parses");
+        let attrs =
+            raw_text_attributes(ast.fragment.nodes, tag, &src).expect("the raw-text element");
+        (
+            EmbeddedLang::Style.is_frozen(attrs, &src),
+            EmbeddedLang::Script.is_frozen(attrs, &src),
+        )
+    }
+
+    /// The attribute list of the first `<tag>` element in the tree.
+    fn raw_text_attributes<'a>(
+        nodes: &'a [super::FragmentNode<'a>],
+        tag: &str,
+        source: &str,
+    ) -> Option<&'a [super::AttributeNode<'a>]> {
+        nodes.iter().find_map(|node| match node {
+            super::FragmentNode::Element(el) if el.name(source) == tag => Some(el.attributes),
+            super::FragmentNode::Element(el) => raw_text_attributes(el.fragment.nodes, tag, source),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn an_absent_or_matching_lang_is_native() {
+        assert!(!langs("<style>").0, "<style>");
+        assert!(!langs("<style lang=\"css\">").0, "<style lang=\"css\">");
+        assert!(!langs("<script>").1, "<script>");
+        assert!(!langs("<script lang=\"ts\">").1, "<script lang=\"ts\">");
+    }
+
+    #[test]
+    fn the_value_is_trimmed_and_text_stripped() {
+        assert!(!langs("<style lang=\" css \">").0, "<style lang=\" css \">");
+        assert!(
+            !langs("<style type=\"text/css\">").0,
+            "<style type=\"text/css\">"
+        );
+        assert!(
+            !langs("<script type=\"text/ts\">").1,
+            "<script type=\"text/ts\">"
+        );
+    }
+
+    /// The decoded value, never the raw bytes — `lang="&#99;ss"` is css to the formatter
+    /// (the *wire*'s `this.ts` question reads raw, and is a different reader on purpose).
+    #[test]
+    fn the_value_is_decoded() {
+        assert!(
+            !langs("<style lang=\"&#99;ss\">").0,
+            "<style lang=\"&#99;ss\">"
+        );
+        assert!(
+            !langs("<script lang=\"&#116;s\">").1,
+            "<script lang=\"&#116;s\">"
+        );
+    }
+
+    /// `lang` outranks `type` whatever their source order — prettier's `getLangAttribute`
+    /// is `lang || type`. A first-hit-in-source-order read answered `<style type="text/css"
+    /// lang="scss">` "css" and handed a scss body to the CSS printer.
+    #[test]
+    fn lang_outranks_type_in_either_order() {
+        assert!(
+            langs("<style type=\"text/css\" lang=\"scss\">").0,
+            "<style type=\"text/css\" lang=\"scss\">"
+        );
+        assert!(
+            langs("<style lang=\"scss\" type=\"text/css\">").0,
+            "<style lang=\"scss\" type=\"text/css\">"
+        );
+        assert!(
+            !langs("<script type=\"text/coffeescript\" lang=\"ts\">").1,
+            "<script type=\"text/coffeescript\" lang=\"ts\">"
+        );
+        assert!(
+            !langs("<script lang=\"ts\" type=\"text/coffeescript\">").1,
+            "<script lang=\"ts\" type=\"text/coffeescript\">"
+        );
+    }
+
+    /// An empty value names no language and reads as *absent* — so it neither freezes on its
+    /// own nor shadows the `type` beside it.
+    #[test]
+    fn an_empty_value_names_nothing() {
+        assert!(!langs("<style lang=\"\">").0, "<style lang=\"\">");
+        assert!(!langs("<script lang=\"\">").1, "<script lang=\"\">");
+        assert!(
+            langs("<style lang=\"\" type=\"text/less\">").0,
+            "<style lang=\"\" type=\"text/less\">"
+        );
+        assert!(
+            langs("<style type=\"text/less\" lang=\"\">").0,
+            "<style type=\"text/less\" lang=\"\">"
+        );
+    }
+
+    /// A value-less attribute names nothing either: there is no `Text` part to read.
+    #[test]
+    fn a_boolean_attribute_names_nothing() {
+        assert!(!langs("<style lang>").0, "<style lang>");
+        assert!(!langs("<script lang>").1, "<script lang>");
+    }
+
+    /// `<script>` takes the whole JS/TS family — the bare language names plus the living
+    /// JavaScript MIME essences. The set is drawn where tsv's PRINTER stops, not where
+    /// Svelte's parser switches grammars, and `type="module"` names JavaScript rather than a
+    /// language of its own.
+    #[test]
+    fn the_script_set_is_the_js_ts_family() {
+        for tag in [
+            "<script lang=\"js\">",
+            "<script lang=\"javascript\">",
+            "<script lang=\"typescript\">",
+            "<script type=\"module\">",
+            "<script type=\"text/javascript\">",
+            "<script type=\"text/ecmascript\">",
+            "<script type=\"application/javascript\">",
+            "<script type=\"application/ecmascript\">",
+        ] {
+            assert!(!langs(tag).1, "{tag}");
+        }
+    }
+
+    #[test]
+    fn any_other_name_is_foreign() {
+        assert!(langs("<style lang=\"less\">").0, "<style lang=\"less\">");
+        assert!(langs("<style lang=\"scss\">").0, "<style lang=\"scss\">");
+        assert!(langs("<style lang=\"sass\">").0, "<style lang=\"sass\">");
+        // What tsv genuinely cannot print, JSON included: prettier reaches for its JSON
+        // parser there and hard-errors on a body that is not JSON. The dead MIME essences
+        // freeze with them — mimesniff still lists them, tsv deliberately does not.
+        for tag in [
+            "<script lang=\"coffee\">",
+            "<script type=\"text/coffeescript\">",
+            "<script type=\"application/json\">",
+            "<script type=\"application/ld+json\">",
+            "<script type=\"importmap\">",
+            "<script type=\"text/jscript\">",
+            "<script type=\"text/livescript\">",
+            "<script type=\"application/x-javascript\">",
+            "<script type=\"text/javascript1.5\">",
+        ] {
+            assert!(langs(tag).1, "{tag}");
         }
     }
 }

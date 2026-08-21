@@ -3456,6 +3456,161 @@ const union_paren_member_inline: DivergencePattern = {
 	}
 };
 
+// `(?<![\w-])` and not `\b`: a hyphen is a word boundary, so `\blang=` claims
+// `data-lang="pug"` and would let this pattern claim a hunk that is a real bug.
+//
+// Compiled once rather than per tag, unlike the other built-per-call regexes in this file:
+// `foreign_body_line_regions` reaches this per LINE of both sides of every divergent Svelte
+// file, where those ask once per file or per hunk.
+const LANG_ATTR = /(?<![\w-])lang\s*=\s*(?:"([^"]*)"|'([^']*)')/;
+const TYPE_ATTR = /(?<![\w-])type\s*=\s*(?:"([^"]*)"|'([^']*)')/;
+
+/**
+ * The narrowed `lang`/`type` value an opening tag names, mirroring
+ * `internal::lang_attribute`'s reader rules over raw tag text: `lang` outranks `type`
+ * whatever their order, the value is trimmed and `text/`-stripped, and an empty value
+ * names nothing (falls through to `type`). Entity-spelled values are not decoded here —
+ * a corpus heuristic; such a tag goes unclaimed and its file stays `unknown`.
+ */
+function tag_lang_value(tag: string): string | null {
+	const pick = (attr: RegExp): string | null => {
+		const m = attr.exec(tag);
+		if (!m) return null;
+		const narrowed = (m[1] ?? m[2] ?? '').trim().replace(/^text\//, '');
+		return narrowed === '' ? null : narrowed;
+	};
+	return pick(LANG_ATTR) ?? pick(TYPE_ATTR);
+}
+
+/** A frozen-body region as line indices into one side's lines, tag lines included. */
+interface ForeignBodyRegion {
+	start: number;
+	end: number;
+}
+
+/**
+ * Mirrors `internal::EmbeddedLang::formattable_langs`, per tag. A hand copy: this is a TS
+ * harness and cannot call the Rust predicate.
+ *
+ * ⚠️ The two drift directions are NOT symmetric, so keep this list in step in one direction
+ * above all. **Wider than Rust's** (a name here that Rust freezes) is the safe half: no
+ * region, the hunk goes unclaimed, and the file lands in `unknown`, which is gated. **Narrower
+ * than Rust's** is the one that hides a bug: this file calls a body frozen that tsv has
+ * started FORMATTING, the region is claimed, and a real printer bug inside it is filed as a
+ * known divergence. That is the direction a future change takes — the day tsv gains an scss
+ * parser, `scss` moves into the `style` set here, and a stale copy would blind the detector
+ * to the new printer exactly when it is likeliest to be wrong.
+ */
+const FORMATTABLE_EMBEDDED_LANGS: Record<string, readonly string[]> = {
+	script: [
+		'ts',
+		'typescript',
+		'js',
+		'javascript',
+		'ecmascript',
+		'application/javascript',
+		'application/ecmascript',
+		'module'
+	],
+	style: ['css'],
+	template: ['html']
+};
+
+/** The closing tag each frozen-body region scans forward for. */
+const EMBEDDED_CLOSING_TAG: Record<string, RegExp> = {
+	script: /<\/script\s*>/,
+	style: /<\/style\s*>/,
+	template: /<\/template\s*>/
+};
+
+/**
+ * The opening tag each frozen-body region starts at — module-level for the same reason as
+ * `LANG_ATTR`: it is asked once per LINE.
+ */
+const EMBEDDED_OPENING_TAG = /<(script|style|template)\b([^>]*)>/;
+
+/**
+ * The line regions of frozen foreign-language bodies: each single-line opening
+ * `<script|style|template …>` whose `lang`/`type` names a language tsv does not format at
+ * that position (style: `css`; script: `ts`; template: `html`), through its closing tag.
+ *
+ * Every unrecognized shape FAILS OPEN — no region, so the hunk goes unclaimed and its file
+ * lands in `unknown`, which is gated. A tag whose attributes wrap across lines is one such
+ * shape; **an opening tag with no closing tag after it is the other**, and it is the one that
+ * bites, because the natural spelling of the scan fails CLOSED: run `end` to the last line
+ * and the region swallows the rest of the file, so every later hunk is claimed as this
+ * pattern at `certain` confidence and a real divergence is filed as known. That is not a
+ * hypothetical shape — this regex matches an opening tag wherever it appears, including
+ * inside a comment (`<!-- example: <style lang="less"> -->`), inside an attribute value, and
+ * on a self-closing `<template lang="pug" />`, none of which have a closing tag and all of
+ * which parse. So an unterminated open is dropped rather than clamped.
+ */
+function foreign_body_line_regions(lines: string[]): ForeignBodyRegion[] {
+	const regions: ForeignBodyRegion[] = [];
+	for (let i = 0; i < lines.length; i++) {
+		const open = EMBEDDED_OPENING_TAG.exec(lines[i]);
+		if (!open) continue;
+		const kind = open[1];
+		const lang = tag_lang_value(open[2]);
+		if (lang === null || FORMATTABLE_EMBEDDED_LANGS[kind].includes(lang)) continue;
+		const close = EMBEDDED_CLOSING_TAG[kind];
+		let end = i;
+		while (end < lines.length && !close.test(lines[end].slice(end === i ? open.index : 0))) {
+			end++;
+		}
+		if (end === lines.length) continue;
+		regions.push({ start: i, end });
+		i = end;
+	}
+	return regions;
+}
+
+const foreign_body_freeze: DivergencePattern = {
+	id: 'foreign_body_freeze',
+	description:
+		'tsv freezes an embedded body whose lang/type names a language it does not format at that position (style: only css; script: the JS/TS family; template: only html); prettier formats scss/less with real parsers, unknown script langs via babel-ts, json/importmap scripts via its JSON parser, and unknown-lang templates as markup',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Foreign-language embedded bodies'],
+	fixtures: [
+		'svelte/script/foreign_lang_frozen_prettier_divergence',
+		'svelte/style/foreign_lang_frozen_prettier_divergence',
+		'svelte/elements/style_foreign_lang_nested_prettier_divergence',
+		'svelte/elements/template_foreign_lang_unknown_prettier_divergence',
+		'svelte/elements/template_lang_trim_prettier_divergence'
+	],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+		const ours_lines = ctx.ours_lines ?? ctx.ours.split('\n');
+		const prettier_lines = ctx.prettier_lines ?? ctx.prettier.split('\n');
+		const ours_regions = foreign_body_line_regions(ours_lines);
+		const prettier_regions = foreign_body_line_regions(prettier_lines);
+		if (ours_regions.length === 0 && prettier_regions.length === 0) return null;
+
+		const inside = (
+			range: ForeignBodyRegion | null,
+			regions: ForeignBodyRegion[]
+		): boolean | null => {
+			if (!range) return null;
+			return regions.some((r) => range.start >= r.start && range.end <= r.end);
+		};
+		// A hunk is claimed only when every side it has lines on falls inside a frozen
+		// region on that side — a diff outside the frozen bodies is not this pattern's.
+		const hunk_indices = find_matching_hunks(ctx.hunks, (h) => {
+			const ours_in = inside(h.ours_range, ours_regions);
+			const prettier_in = inside(h.prettier_range, prettier_regions);
+			if (ours_in === null && prettier_in === null) return false;
+			return ours_in !== false && prettier_in !== false;
+		});
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'foreign_body_freeze',
+			confidence: 'certain',
+			hunk_indices,
+			reason: 'foreign-language embedded body: tsv keeps the author bytes, prettier formats it'
+		};
+	}
+};
+
 export const PATTERNS: DivergencePattern[] = [
 	// 1. Language-specific narrow patterns (certain or rare)
 	bom_strip,
@@ -3491,6 +3646,7 @@ export const PATTERNS: DivergencePattern[] = [
 	forced_continuation_indent,
 
 	// 4. Svelte-specific patterns
+	foreign_body_freeze,
 	spec_block_elements,
 	inline_content_hug,
 	inline_sibling_newline_flow,

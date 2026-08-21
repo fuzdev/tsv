@@ -1,0 +1,539 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 414,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 40,
+				"end": 42,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 42,
+				"end": 146,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 43
+					},
+					"end": {
+						"line": 5,
+						"column": 12,
+						"character": 54
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 55,
+							"end": 57,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 57,
+							"end": 131,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 2,
+									"character": 58
+								},
+								"end": {
+									"line": 6,
+									"column": 8,
+									"character": 64
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 65,
+									"end": 78,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 9,
+											"character": 65
+										},
+										"end": {
+											"line": 6,
+											"column": 13,
+											"character": 69
+										}
+									},
+									"value": [
+										{
+											"start": 71,
+											"end": 77,
+											"type": "Text",
+											"raw": "module",
+											"data": "module"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 79,
+										"end": 122,
+										"type": "Text",
+										"data": "\n\t\timport { b } from './b.js';\n\t\tb(1, 2);\n\t",
+										"raw": "\n\t\timport { b } from './b.js';\n\t\tb(1, 2);\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 131,
+							"end": 132,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 146,
+				"end": 148,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 148,
+				"end": 413,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 149
+					},
+					"end": {
+						"line": 12,
+						"column": 4,
+						"character": 152
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 153,
+							"end": 155,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 155,
+							"end": 215,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 13,
+									"column": 2,
+									"character": 156
+								},
+								"end": {
+									"line": 13,
+									"column": 8,
+									"character": 162
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 163,
+									"end": 180,
+									"name": "lang",
+									"name_loc": {
+										"start": {
+											"line": 13,
+											"column": 9,
+											"character": 163
+										},
+										"end": {
+											"line": 13,
+											"column": 13,
+											"character": 167
+										}
+									},
+									"value": [
+										{
+											"start": 169,
+											"end": 179,
+											"type": "Text",
+											"raw": "typescript",
+											"data": "typescript"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 181,
+										"end": 206,
+										"type": "Text",
+										"data": "\n\t\tconst c: number = 3;\n\t",
+										"raw": "\n\t\tconst c: number = 3;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 215,
+							"end": 217,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 217,
+							"end": 281,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 2,
+									"character": 218
+								},
+								"end": {
+									"line": 16,
+									"column": 8,
+									"character": 224
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 225,
+									"end": 254,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 16,
+											"column": 9,
+											"character": 225
+										},
+										"end": {
+											"line": 16,
+											"column": 13,
+											"character": 229
+										}
+									},
+									"value": [
+										{
+											"start": 231,
+											"end": 253,
+											"type": "Text",
+											"raw": "application/javascript",
+											"data": "application/javascript"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 255,
+										"end": 272,
+										"type": "Text",
+										"data": "\n\t\tconst d = 4;\n\t",
+										"raw": "\n\t\tconst d = 4;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 281,
+							"end": 283,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 283,
+							"end": 340,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 2,
+									"character": 284
+								},
+								"end": {
+									"line": 19,
+									"column": 8,
+									"character": 290
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 291,
+									"end": 313,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 19,
+											"column": 9,
+											"character": 291
+										},
+										"end": {
+											"line": 19,
+											"column": 13,
+											"character": 295
+										}
+									},
+									"value": [
+										{
+											"start": 297,
+											"end": 312,
+											"type": "Text",
+											"raw": "text/ecmascript",
+											"data": "text/ecmascript"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 314,
+										"end": 331,
+										"type": "Text",
+										"data": "\n\t\tconst e = 5;\n\t",
+										"raw": "\n\t\tconst e = 5;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 340,
+							"end": 342,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 342,
+							"end": 406,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 22,
+									"column": 2,
+									"character": 343
+								},
+								"end": {
+									"line": 22,
+									"column": 8,
+									"character": 349
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 350,
+									"end": 379,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 22,
+											"column": 9,
+											"character": 350
+										},
+										"end": {
+											"line": 22,
+											"column": 13,
+											"character": 354
+										}
+									},
+									"value": [
+										{
+											"start": 356,
+											"end": 378,
+											"type": "Text",
+											"raw": "application/ecmascript",
+											"data": "application/ecmascript"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 380,
+										"end": 397,
+										"type": "Text",
+										"data": "\n\t\tconst f = 6;\n\t",
+										"raw": "\n\t\tconst f = 6;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 406,
+							"end": 407,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 40,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 31,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 30,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 24,
+							"end": 29,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 24,
+								"end": 25,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 28,
+								"end": 29,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 9
+									},
+									"end": {
+										"line": 2,
+										"column": 10
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "js",
+						"data": "js"
+					}
+				]
+			}
+		]
+	}
+}
