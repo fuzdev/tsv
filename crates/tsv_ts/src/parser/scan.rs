@@ -43,22 +43,25 @@ const LOOKAHEAD_WS_LUT: [bool; 256] = {
 /// Narrowing the class to make some construct reject "works" only by accident and
 /// takes every legal whitespace character down with it.
 ///
-/// The ASCII path is a table lookup (the idiom the identifier classes below use);
-/// only a byte ≥ `0x80` — which ends the run under any classification, so the
-/// branch is off the hot path — decodes a `char` to test the non-ASCII members.
+/// The ASCII path is a table lookup (the idiom the identifier classes below use); a
+/// decode is reached only at the five [`is_es_whitespace_lead`] bytes, and every one of
+/// those ends the run under any classification, so the branch is off the hot path.
 #[inline]
 pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
     while pos < bytes.len() {
         let b = bytes[pos];
         if LOOKAHEAD_WS_LUT[b as usize] {
             pos += 1;
-        } else if b >= 0x80 {
-            // A lead byte here may begin NBSP/ZWNBSP/a `Zs`/LS/PS, or an ordinary
-            // non-ASCII token character. Only a decode can tell them apart, and a
-            // partial decode must not advance — hence stepping by `len_utf8`.
-            match decode_char(bytes, pos) {
-                Some(c) if is_es_whitespace(c) || is_es_line_terminator(c) => pos += c.len_utf8(),
-                _ => break,
+        } else if is_es_whitespace_lead(b) {
+            // One of the five leads that can begin NBSP/ZWNBSP/a `Zs`/LS/PS — but each
+            // also leads ordinary non-ASCII token characters, so only a decode tells
+            // them apart, and a partial decode must not advance: step by the character's
+            // own width, which is what the shared helper returns. Every other byte
+            // `>= 0x80` ends the run without decoding, by the same filter the identifier
+            // tables gate their `MAYBE` entries on.
+            match non_ascii_es_whitespace_len_at(bytes, pos) {
+                0 => break,
+                len => pos += len,
             }
         } else {
             break;
@@ -67,8 +70,25 @@ pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
     pos
 }
 
-/// The `char` starting at `pos`, or `None` when the bytes there are not a
-/// complete UTF-8 sequence.
+/// The UTF-8 length of the **non-ASCII** ECMAScript `WhiteSpace` ∪ `LineTerminator`
+/// character beginning at `bytes[pos]`, or `0` when none does.
+///
+/// The one decode both non-ASCII askers share — [`skip_whitespace`], which needs the
+/// width to advance, and [`id_class_holds`], which needs only the verdict — so the class
+/// keeps exactly one spelling ([`is_es_whitespace`] / [`is_es_line_terminator`], the
+/// lexer's own). The ASCII members are answered by table lookup instead
+/// ([`LOOKAHEAD_WS_LUT`], and by their `IdByte::OUT` entries in the identifier tables),
+/// which is why this never sees an ASCII byte: [`decode_char`] returns `None` for one.
+#[inline]
+fn non_ascii_es_whitespace_len_at(bytes: &[u8], pos: usize) -> usize {
+    match decode_char(bytes, pos) {
+        Some(c) if is_es_whitespace(c) || is_es_line_terminator(c) => c.len_utf8(),
+        _ => 0,
+    }
+}
+
+/// The **multi-byte** `char` starting at `pos`, or `None` when no complete one does —
+/// including for an ASCII byte, which has no multi-byte lead to match.
 ///
 /// The scans work on `&[u8]` taken from a `&str`, so a lead byte is always
 /// followed by its continuation bytes; the fallible form exists so a malformed
@@ -148,65 +168,125 @@ pub(super) fn skip_whitespace_and_comments(bytes: &[u8], mut pos: usize) -> usiz
 /// lookup replaces the OR-chain with one L1 load.
 ///
 /// These are the **lookahead** classes, deliberately *not* the lexer's
-/// (`lexer::core::ID_START_LUT` / `ID_CONTINUE_LUT`): both include every byte `> 127`,
-/// since a lookahead only needs to step over a multi-byte UTF-8 sequence, not validate
-/// it. That extra term is also why the table beats the chain by more here than it does
-/// in the lexer — `> 127` cannot fold into a 64-bit bitmask test, so LLVM emits the
-/// full arithmetic chain, and it orders the common case (a letter) *last*, behind the
-/// `> 127`, `$`, `_` and digit tests.
-const LOOKAHEAD_ID_START_LUT: [bool; 256] = {
-    let mut t = [false; 256];
-    let mut i = 0;
-    while i < 256 {
-        let b = i as u8;
-        t[i] = b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127;
-        i += 1;
-    }
-    t
-};
-const LOOKAHEAD_ID_CONTINUE_LUT: [bool; 256] = {
-    let mut t = [false; 256];
-    let mut i = 0;
-    while i < 256 {
-        let b = i as u8;
-        t[i] = b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127;
-        i += 1;
-    }
-    t
-};
-
-/// Check if a byte can start an identifier (letter, underscore, dollar sign, or non-ASCII)
+/// (`lexer::core::ID_START_LUT` / `ID_CONTINUE_LUT`): a lookahead only needs to step
+/// over a multi-byte UTF-8 sequence, not validate it, so almost every byte `> 127`
+/// counts as an identifier character here where the lexer would decode and test
+/// `ID_Start` / `ID_Continue`. That extra term is also why the table beats the chain by
+/// more here than it does in the lexer — `> 127` cannot fold into a 64-bit bitmask test,
+/// so LLVM emits the full arithmetic chain, and it orders the common case (a letter)
+/// *last*, behind the `> 127`, `$`, `_` and digit tests.
 ///
-/// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
-/// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
-/// `ID_Start` validation (`lexer::ident::is_id_start`) on the decoded char.
-#[inline]
-pub(super) const fn is_identifier_start(b: u8) -> bool {
-    LOOKAHEAD_ID_START_LUT[b as usize]
+/// ⚠️ **"Almost" every byte `> 127`, and the exception is the whole reason these are
+/// tables of [`IdByte`] rather than of `bool`.** A lookahead asks the identifier classes
+/// two different questions — *step over this name* and *does the word end here?* — and
+/// the second is a WORD BOUNDARY, where reading a non-ASCII whitespace character as
+/// "the identifier continues" merges a keyword into its neighbour. A byte test cannot
+/// settle it: `0xC2` leads both `<NBSP>` (`c2 a0`) and ordinary identifier characters
+/// (`µ` is `c2 b5`), so the five lead bytes that can begin ECMAScript whitespace are
+/// entered as [`IdByte::MAYBE`] and resolved by [`non_ascii_es_whitespace_len_at`]
+/// against the same productions [`skip_whitespace`] crosses.
+const LOOKAHEAD_ID_START_LUT: [u8; 256] = build_id_lut(false);
+const LOOKAHEAD_ID_CONTINUE_LUT: [u8; 256] = build_id_lut(true);
+
+/// What a byte contributes to a lookahead identifier scan. Stored as a `u8` because the
+/// tables are built in a `const` block; the three values are named rather than matched
+/// as bare integers so a table entry and its meaning can't drift.
+struct IdByte;
+impl IdByte {
+    /// The identifier ends at this byte.
+    const OUT: u8 = 0;
+    /// This byte is part of the identifier, unconditionally.
+    const IN: u8 = 1;
+    /// A UTF-8 lead byte that begins EITHER an ECMAScript whitespace character or an
+    /// ordinary non-ASCII identifier character — only the bytes after it can say which.
+    const MAYBE: u8 = 2;
 }
 
-/// Check if a byte can continue an identifier (alphanumeric, underscore, dollar sign, or non-ASCII)
+/// Build one of the two tables above. `continuing` picks the `ID_Continue` membership
+/// (digits admitted) over the `ID_Start` one.
+const fn build_id_lut(continuing: bool) -> [u8; 256] {
+    let mut t = [IdByte::OUT; 256];
+    let mut i = 0;
+    while i < 256 {
+        let b = i as u8;
+        let ascii_member = b == b'_'
+            || b == b'$'
+            || if continuing {
+                b.is_ascii_alphanumeric()
+            } else {
+                b.is_ascii_alphabetic()
+            };
+        t[i] = if is_es_whitespace_lead(b) {
+            IdByte::MAYBE
+        } else if b > 127 || ascii_member {
+            IdByte::IN
+        } else {
+            IdByte::OUT
+        };
+        i += 1;
+    }
+    t
+}
+
+/// The five UTF-8 lead bytes that can begin a non-ASCII ECMAScript `WhiteSpace` or
+/// `LineTerminator` character: `c2` (U+00A0 `<NBSP>`), `e1` (U+1680), `e2`
+/// (U+2000..U+200A, U+2028 `<LS>`, U+2029 `<PS>`, U+202F, U+205F), `e3` (U+3000) and
+/// `ef` (U+FEFF `<ZWNBSP>`).
 ///
-/// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
-/// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
-/// `ID_Continue` validation (`lexer::ident::is_id_continue`) on the decoded char.
+/// A conservative *filter*, never the answer: every one of them also leads ordinary
+/// identifier characters, which is why an [`IdByte::MAYBE`] entry is resolved by a decode rather
+/// than by this. Kept exact by `es_whitespace_leads_cover_the_class` below, which walks
+/// the whole code-point space so a widened whitespace class cannot leave a lead behind.
+const fn is_es_whitespace_lead(b: u8) -> bool {
+    matches!(b, 0xC2 | 0xE1 | 0xE2 | 0xE3 | 0xEF)
+}
+
+/// Whether an identifier character begins at `bytes[pos]` — the lookahead's `ID_Start`
+/// class, asked of a POSITION rather than of a byte.
+///
+/// `false` past the end of `bytes`: nothing starts where there is nothing.
 #[inline]
-pub(super) const fn is_identifier_continue(b: u8) -> bool {
-    LOOKAHEAD_ID_CONTINUE_LUT[b as usize]
+pub(super) fn identifier_starts_at(bytes: &[u8], pos: usize) -> bool {
+    id_class_holds(&LOOKAHEAD_ID_START_LUT, bytes, pos)
+}
+
+/// Whether an identifier character continues at `bytes[pos]` — the lookahead's
+/// `ID_Continue` class, asked of a POSITION rather than of a byte.
+///
+/// ⚠️ The position is load-bearing, and asking this of a bare byte is the bug this
+/// signature exists to prevent: at a **word boundary** (`is_word_at`, the `in` of a
+/// mapped type) a non-ASCII whitespace character must END the word, while the `0xC2`
+/// that leads `<NBSP>` also leads `µ`. `false` past the end of `bytes`.
+#[inline]
+pub(super) fn identifier_continues_at(bytes: &[u8], pos: usize) -> bool {
+    id_class_holds(&LOOKAHEAD_ID_CONTINUE_LUT, bytes, pos)
+}
+
+/// The shared body of the two predicates above: one table load, and a decode only at the
+/// [`IdByte::MAYBE`] leads.
+#[inline]
+fn id_class_holds(lut: &[u8; 256], bytes: &[u8], pos: usize) -> bool {
+    match bytes.get(pos) {
+        Some(&b) => match lut[b as usize] {
+            IdByte::IN => true,
+            IdByte::MAYBE => non_ascii_es_whitespace_len_at(bytes, pos) == 0,
+            _ => false,
+        },
+        None => false,
+    }
 }
 
 /// Check if `word` sits at `pos` as a whole identifier, not as the prefix of a longer
 /// one — `is_word_at(b"extendsFoo", 0, b"extends")` is false.
 ///
-/// A bare `starts_with` is the trap this exists to close: the byte after the word decides
+/// A bare `starts_with` is the trap this exists to close: what follows the word decides
 /// whether a lookahead is looking at a keyword or at an ordinary identifier that happens
-/// to share its opening bytes.
+/// to share its opening bytes. That "what follows" is a *character*, not a byte — a
+/// keyword followed by `<NBSP>` is still the keyword — so the boundary test goes through
+/// [`identifier_continues_at`].
 #[inline]
 pub(super) fn is_word_at(bytes: &[u8], pos: usize, word: &[u8]) -> bool {
-    bytes[pos..].starts_with(word)
-        && bytes
-            .get(pos + word.len())
-            .is_none_or(|&b| !is_identifier_continue(b))
+    bytes[pos..].starts_with(word) && !identifier_continues_at(bytes, pos + word.len())
 }
 
 /// Skip a numeric literal, returning the position after it — or `pos` unchanged when no
@@ -246,12 +326,21 @@ pub(super) fn skip_numeric_literal(bytes: &[u8], pos: usize) -> usize {
     cursor
 }
 
-/// Skip an identifier, returning position after the identifier
-/// Assumes `pos` is at the start of an identifier
+/// Skip an identifier, returning the position after it. Assumes `pos` is at the start of
+/// one.
+///
+/// The loop is the lookahead's hot path, so it reads the table directly rather than
+/// calling [`identifier_continues_at`]: the fast arm stays one L1 load and one compare
+/// per byte, and the decode is reached only at the [`IdByte::MAYBE`] leads — in practice
+/// once per call, on the byte that ends the run.
 #[inline]
 pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
-    while pos < bytes.len() && is_identifier_continue(bytes[pos]) {
-        pos += 1;
+    while pos < bytes.len() {
+        match LOOKAHEAD_ID_CONTINUE_LUT[bytes[pos] as usize] {
+            IdByte::IN => pos += 1,
+            IdByte::MAYBE if non_ascii_es_whitespace_len_at(bytes, pos) == 0 => pos += 1,
+            _ => break,
+        }
     }
     pos
 }
@@ -314,22 +403,189 @@ fn parse_radix_f64(digits: &str, radix: u32) -> f64 {
 mod tests {
     use super::*;
 
-    // The lookahead scanners decide identifier bytes from the `[bool; 256]` tables
-    // rather than the OR-chain they were written as. The tables are const-derived
-    // from that chain, so this grades the lookup against a plain re-spelling of the
-    // predicate — the guard against a table and its documented membership drifting.
+    /// Encode `c` on its own, plus the trailing bytes some callers need past it.
+    fn utf8(c: char) -> Vec<u8> {
+        let mut buf = [0u8; 4];
+        c.encode_utf8(&mut buf).as_bytes().to_vec()
+    }
+
+    /// ECMAScript `WhiteSpace` ∪ `LineTerminator`, spelled from the spec's two tables
+    /// rather than from the predicates under test — the reference the whole file grades
+    /// against, so a widening has to be made in two places to pass.
+    fn in_js_s_class(cp: u32) -> bool {
+        matches!(
+            cp,
+            0x0009 // <TAB>
+            | 0x000B // <VT>
+            | 0x000C // <FF>
+            | 0xFEFF // <ZWNBSP>
+            | 0x0020 | 0x00A0 | 0x1680 | 0x2000
+                ..=0x200A | 0x202F | 0x205F | 0x3000 // <USP>: Zs
+            | 0x000A | 0x000D | 0x2028 | 0x2029 // LineTerminator
+        )
+    }
+
+    // The lookahead scanners decide identifier bytes from the `[u8; 256]` tables rather
+    // than the OR-chain they were written as. The tables are const-derived from that
+    // chain, so this grades the lookup against a plain re-spelling of the predicate —
+    // the guard against a table and its documented membership drifting. The `Maybe`
+    // leads are excluded here and graded per code point below; a byte test cannot
+    // answer for them, which is the point of the third state.
     #[test]
     fn lookahead_id_luts_match_the_predicates_they_replace() {
         for b in 0..=u8::MAX {
+            if is_es_whitespace_lead(b) {
+                assert_eq!(LOOKAHEAD_ID_START_LUT[b as usize], IdByte::MAYBE);
+                assert_eq!(LOOKAHEAD_ID_CONTINUE_LUT[b as usize], IdByte::MAYBE);
+                continue;
+            }
             assert_eq!(
-                is_identifier_start(b),
+                LOOKAHEAD_ID_START_LUT[b as usize] == IdByte::IN,
                 b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127,
                 "id_start mismatch at byte {b:#x}"
             );
             assert_eq!(
-                is_identifier_continue(b),
+                LOOKAHEAD_ID_CONTINUE_LUT[b as usize] == IdByte::IN,
                 b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127,
                 "id_continue mismatch at byte {b:#x}"
+            );
+        }
+    }
+
+    /// `is_es_whitespace_lead` is a *filter* in front of the decode, so it must cover
+    /// the class exactly: a member left out is a whitespace character the identifier
+    /// scans would swallow (the bug this file's `Maybe` state exists to fix), and a
+    /// non-member left in is a decode on the hot path buying nothing.
+    #[test]
+    fn es_whitespace_leads_cover_the_class() {
+        let mut expected = [false; 256];
+        for cp in 0..=0x10ffff_u32 {
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            if in_js_s_class(cp) && cp > 0x7f {
+                expected[utf8(c)[0] as usize] = true;
+            }
+        }
+        for b in 0..=u8::MAX {
+            assert_eq!(
+                is_es_whitespace_lead(b),
+                expected[b as usize],
+                "whitespace-lead filter is wrong at byte {b:#x}"
+            );
+        }
+    }
+
+    /// The word-BOUNDARY claim, graded at every code point rather than at the handful a
+    /// fixture can reach: an identifier ends at exactly the ECMAScript whitespace and
+    /// line-terminator characters, and at nothing else the lexer would accept inside a
+    /// name.
+    ///
+    /// Both directions matter and both have bitten. Under-matching was the live bug —
+    /// `0xC2` was read as "the identifier continues", so `[K in<NBSP>keyof T]` and
+    /// `f<T extends<NBSP>string ? 1 : 2>(1)` were rejected and
+    /// `f<new<NBSP>(v: T) => R>(1)` was silently reprinted as a comparison. Over-matching
+    /// is the failure the naive fix produces: excluding the `0xC2` lead wholesale would
+    /// end an identifier inside `µ` (`c2 b5`), so every real Unicode name sharing a
+    /// whitespace lead byte is checked against the lexer's own `ID_Continue`.
+    #[test]
+    fn identifier_scan_ends_at_exactly_the_js_s_class() {
+        for cp in 0..=0x10ffff_u32 {
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            let bytes = utf8(c);
+            let is_space = in_js_s_class(cp);
+
+            // A whitespace character never continues (or starts) an identifier…
+            if is_space {
+                assert!(
+                    !identifier_continues_at(&bytes, 0),
+                    "U+{cp:04X} must end an identifier"
+                );
+                assert!(
+                    !identifier_starts_at(&bytes, 0),
+                    "U+{cp:04X} must not start an identifier"
+                );
+                assert_eq!(
+                    skip_identifier(&bytes, 0),
+                    0,
+                    "U+{cp:04X} must not be skipped as an identifier character"
+                );
+                continue;
+            }
+
+            // …and every character the LEXER admits inside a name still does, which is
+            // what keeps the whitespace-lead filter from eating real identifiers.
+            if crate::lexer::ident::is_id_continue(c) {
+                assert!(
+                    identifier_continues_at(&bytes, 0),
+                    "U+{cp:04X} is `ID_Continue` and must not end an identifier"
+                );
+                assert_eq!(
+                    skip_identifier(&bytes, 0),
+                    bytes.len(),
+                    "U+{cp:04X} is `ID_Continue` and must be skipped whole"
+                );
+            }
+            if crate::lexer::ident::is_id_start(c) {
+                assert!(
+                    identifier_starts_at(&bytes, 0),
+                    "U+{cp:04X} is `ID_Start` and must start an identifier"
+                );
+            }
+        }
+    }
+
+    /// The same class, asked through [`is_word_at`] — the shape that decides whether a
+    /// `<` opens type arguments. A keyword followed by any whitespace character is still
+    /// that keyword; a keyword followed by any `ID_Continue` character is not.
+    #[test]
+    fn is_word_at_ends_the_word_at_exactly_the_js_s_class() {
+        for cp in 0..=0x10ffff_u32 {
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            let mut bytes = b"extends".to_vec();
+            bytes.extend_from_slice(&utf8(c));
+            if in_js_s_class(cp) {
+                assert!(
+                    is_word_at(&bytes, 0, b"extends"),
+                    "`extends` followed by U+{cp:04X} is still the keyword"
+                );
+            } else if crate::lexer::ident::is_id_continue(c) {
+                assert!(
+                    !is_word_at(&bytes, 0, b"extends"),
+                    "`extends` followed by U+{cp:04X} is one longer identifier"
+                );
+            }
+        }
+        // The end of input is a boundary too.
+        assert!(is_word_at(b"extends", 0, b"extends"));
+    }
+
+    /// A whitespace character glued to a keyword must leave the scan positioned on the
+    /// *next* token, not inside the character — the composition every caller relies on
+    /// (`skip_identifier` then `skip_whitespace_and_comments`) and the one a byte-wise
+    /// step would break.
+    #[test]
+    fn identifier_scan_hands_off_to_the_whitespace_scan() {
+        for cp in 0..=0x10ffff_u32 {
+            if !in_js_s_class(cp) {
+                continue;
+            }
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            let s = format!("in{c}keyof");
+            let bytes = s.as_bytes();
+            let after_word = skip_identifier(bytes, 0);
+            assert_eq!(after_word, 2, "U+{cp:04X} was absorbed into `in`");
+            let after_gap = skip_whitespace(bytes, after_word);
+            assert_eq!(
+                &s[after_gap..],
+                "keyof",
+                "U+{cp:04X} left the cursor off the next token"
             );
         }
     }

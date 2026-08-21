@@ -9,7 +9,7 @@
 // All functions operate on byte slices for performance (no tokenization needed).
 
 use super::scan::{
-    is_identifier_start, is_word_at, skip_identifier, skip_numeric_literal,
+    identifier_starts_at, is_word_at, skip_identifier, skip_numeric_literal,
     skip_whitespace_and_comments,
 };
 use crate::lexer::is_es_line_terminator_at;
@@ -219,7 +219,7 @@ fn scan_for_arrow(bytes: &[u8], colon: usize) -> bool {
         // Consume whole identifiers in one step, so a name's bytes can never be
         // read as operators and so a keyword is matched as a word (never as the
         // opening of an `extendsFoo`).
-        if is_identifier_start(bytes[pos]) {
+        if identifier_starts_at(bytes, pos) {
             position = if is_word_at(bytes, pos, b"extends") {
                 // The extends-type and both branches are full types.
                 saw_extends = true;
@@ -385,7 +385,7 @@ fn paren_starts_function_type(bytes: &[u8], paren: usize) -> bool {
     // A parameter start: an identifier (covers `this` and contextual keywords),
     // or a destructuring pattern, which is skipped as a balanced group rather
     // than parsed — a malformed one only fails the follow-token check below.
-    pos = if is_identifier_start(bytes[pos]) {
+    pos = if identifier_starts_at(bytes, pos) {
         skip_identifier(bytes, pos)
     } else if matches!(bytes[pos], b'{' | b'[') {
         match matching_delimiter_close(bytes, pos) {
@@ -483,7 +483,7 @@ pub(super) fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
     }
 
     // `(identifier:` or `(identifier?:` → function type parameter
-    if is_identifier_start(bytes[after_paren]) {
+    if identifier_starts_at(bytes, after_paren) {
         let after_id = skip_whitespace_and_comments(bytes, skip_identifier(bytes, after_paren));
         if after_id < bytes.len() {
             match bytes[after_id] {
@@ -747,8 +747,7 @@ fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usize> {
 /// instantiation instead and are deliberately excluded; regex is excluded
 /// because acorn also rejects `x < y > /a/`.
 fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
-    let b = bytes[pos];
-    if is_identifier_start(b) {
+    if identifier_starts_at(bytes, pos) {
         // `in` and `instanceof` are binary keyword operators — acorn's `tt._in` /
         // `tt._instanceof` have `startsExpr = false`, so a would-be `<…>` close
         // followed by one continues the instantiation (`f<T> in x` is `(f<T>) in x`)
@@ -760,6 +759,7 @@ fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
             b"in" | b"instanceof"
         );
     }
+    let b = bytes[pos];
     // `!` starts an expression only as prefix negation (`!x`); `!=` / `!==` are
     // equality operators (acorn's tokens aren't `startsExpr`), so a would-be close
     // followed by one continues the instantiation (`f<T> != c` is `(f<T>) != c`).
