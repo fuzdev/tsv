@@ -453,9 +453,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.had_line_terminator {
             return Ok(false);
         }
-        // `as` is the Svelte `#each … as pattern` binding separator when type assertions
-        // are disabled and we're outside grouping — leave it for the `#each` parser.
-        // Inside grouping (`(x as T)`) it is always a type assertion.
+        // `as` is the Svelte `#each … as pattern` binding separator when the host claims
+        // it and we're outside grouping — leave it for the `#each` parser. Inside
+        // grouping (`(x as T)`) it is always a type assertion.
+        //
+        // ⚠️ `is_as` is part of the gate, not decoration: the question is which keyword
+        // the HOST spells, and no host separator is spelled `satisfies`. Gating both
+        // together rejected `{#each xs satisfies T as item}` — valid, and accepted by
+        // canonical Svelte — for a collision that only `as` can have.
         //
         // The literal `0` here is the baseline, and it differs from the `in` gate's
         // (`no_in_depth`) on purpose: this region opens at the PARSE ROOT — a partial
@@ -463,7 +468,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // delimiter counted is one the `#each` expression itself opened. The `[~In]`
         // region opens MID-parse instead, at whatever depth the enclosing expression
         // had reached, so it must carry its own baseline. Same field, two questions.
-        if !self.allow_ts_type_assertions && self.grouping_depth == 0 {
+        if is_as && !self.top_level_as_is_assertion && self.grouping_depth == 0 {
             return Ok(false);
         }
         // Relational binding power: looser than the caller's minimum (e.g. as the right

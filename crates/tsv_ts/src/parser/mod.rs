@@ -23,6 +23,35 @@ mod types; // TypeScript type-syntax parsing (annotations, type expressions, typ
 
 pub(crate) use expression::is_jsdoc_type_cast_comment;
 
+/// Who owns a top-level `as` in a partial expression parse — TypeScript, or the host
+/// grammar the expression is embedded in.
+///
+/// Svelte's block heads are the only callers, and they split on whether the head's own
+/// binding separator is spelled `as`:
+///
+/// - [`TopLevelAs::Assertion`] — `{#await p as T then v}`. `then` / `catch` are not type
+///   syntax, so an `as` in an await head is always TypeScript's; the parse ends on its
+///   own at the clause keyword.
+/// - [`TopLevelAs::HostSeparator`] — `{#each xs as item}`, where the separator *is* `as`.
+///   The parse must leave the keyword for the block reader, which then walks the
+///   assertion run itself (`tsv_svelte`'s `each_binding_separator`).
+///
+/// ⚠️ The axis is `as` **alone**, which is why the name says so. `satisfies` is a type
+/// assertion too, but no host separator is spelled `satisfies`, so it is never in
+/// question and stays consumable under both variants — the wider "type assertions"
+/// framing this replaced denied it in `{#each}` for no reason, rejecting
+/// `{#each xs satisfies T as item}`, which canonical Svelte accepts.
+///
+/// The policy applies only at [`Parser::grouping_depth`] `0` — inside grouping,
+/// `(x as T)` is unambiguously an assertion under both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopLevelAs {
+    /// Consume `as` wherever it is grammatical.
+    Assertion,
+    /// Stop at a top-level `as`, leaving the keyword to the host grammar.
+    HostSeparator,
+}
+
 /// Build a detached [`Comment`] from a lexed comment token's positions.
 ///
 /// `content_start` / `token_*` are local (pre-`base_offset`) byte offsets; the
@@ -116,15 +145,19 @@ pub struct Parser<'a, 'arena> {
     /// End position of the previous token (before current). Used for span calculation
     /// when ASI inserts a semicolon.
     prev_end: usize,
-    /// Whether to parse TypeScript `as`/`satisfies` operators.
-    /// Disabled in partial expression parsing for Svelte template contexts
-    /// where `as` has different meaning (e.g., `{#each items as pattern}`).
-    allow_ts_type_assertions: bool,
+    /// Whether a top-level `as` is TypeScript's assertion operator. Set per partial
+    /// parse from a [`TopLevelAs`] policy — false only where the host grammar spells its
+    /// own separator `as` (`{#each items as pattern}`), never as a blanket
+    /// "Svelte template" rule (`{#await p as T then v}` keeps it).
+    ///
+    /// `satisfies` is deliberately NOT gated by this: no host separator collides with it,
+    /// so it is an assertion in every context.
+    top_level_as_is_assertion: bool,
     /// Nesting depth inside grouping delimiters (`(...)`, `[...]`, `{...}`, `${...}`),
     /// maintained by [`Parser::enter_grouping`] / [`Parser::exit_grouping`].
     /// Used to disambiguate context-sensitive keywords inside nested expressions:
-    /// - `as`/`satisfies`: always type assertions when depth > 0, even when
-    ///   `allow_ts_type_assertions` is false (Svelte `#each` partial parsing)
+    /// - `as`: always a type assertion when depth > 0, even when
+    ///   `top_level_as_is_assertion` is false (Svelte `#each` partial parsing)
     /// - `in`: a binary operator once the depth rises above [`Parser::no_in_depth`],
     ///   even when `allow_in` is false (for-loop header parsing)
     ///
@@ -352,14 +385,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             comments,
             had_line_terminator: false, // No line terminator before first token
             prev_end: 0,
-            allow_ts_type_assertions: true, // Enable by default (TypeScript context)
-            grouping_depth: 0,              // Not inside any grouping delimiters
-            preserve_parens: false,         // Discard grouping parens (paren-free public AST)
-            in_ambient_context: false,      // Not in declare namespace/module
-            lexer_error: None,              // No stored lexer error
+            top_level_as_is_assertion: true, // Enable by default (TypeScript context)
+            grouping_depth: 0,               // Not inside any grouping delimiters
+            preserve_parens: false,          // Discard grouping parens (paren-free public AST)
+            in_ambient_context: false,       // Not in declare namespace/module
+            lexer_error: None,               // No stored lexer error
             peek_had_line_terminator: false, // No peek cached yet
-            allow_in: true,                 // Allow `in` binary operator by default
-            no_in_depth: 0,                 // Only read while `allow_in` is false
+            allow_in: true,                  // Allow `in` binary operator by default
+            no_in_depth: 0,                  // Only read while `allow_in` is false
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
@@ -2046,20 +2079,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// This is useful for parsing expressions embedded in contexts where commas
     /// have other meanings (like `{#each items as pattern, index}`).
     ///
-    /// TypeScript `as`/`satisfies` parsing is disabled in this mode because `as`
-    /// has special meaning in Svelte template contexts (e.g., `{#each items as pattern}`).
+    /// `top_level_as` decides whether a top-level `as` belongs to this parse or to the
+    /// host's own grammar — see [`TopLevelAs`], which states the rule and names both
+    /// callers. `satisfies` is unaffected either way.
     ///
     /// Returns (expression, end_position) where end_position is where the next
     /// unparsed content begins (in absolute source coordinates with base_offset).
     pub fn parse_assignment_expression_partial(
         &mut self,
+        top_level_as: TopLevelAs,
     ) -> Result<(Expression<'arena>, usize), ParseError> {
-        // Disable TypeScript type assertion parsing in partial mode
-        // to avoid consuming `as` which has different meaning in Svelte templates
-        let saved = self.allow_ts_type_assertions;
-        self.allow_ts_type_assertions = false;
+        let saved = std::mem::replace(
+            &mut self.top_level_as_is_assertion,
+            top_level_as == TopLevelAs::Assertion,
+        );
         let result = self.parse_assignment_expression();
-        self.allow_ts_type_assertions = saved;
+        self.top_level_as_is_assertion = saved;
 
         let expr = result?;
         // Return the start of the current (unconsumed) token

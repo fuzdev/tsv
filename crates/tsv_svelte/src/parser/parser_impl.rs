@@ -8,6 +8,7 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, ParseError, Span};
 use tsv_ts::Expression;
 use tsv_ts::TSTypeAnnotation;
+use tsv_ts::TopLevelAs;
 use tsv_ts::{is_id_continue, is_id_start};
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
@@ -527,16 +528,28 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(expr)
     }
 
-    /// Parse a partial TypeScript expression (stops at top-level identifiers like `as`).
+    /// Parse a partial TypeScript expression — one assignment expression, stopping at the
+    /// first top-level comma.
+    ///
+    /// `top_level_as` is the block head's answer to "is a top-level `as` mine or
+    /// TypeScript's" ([`tsv_ts::TopLevelAs`]). There is no default to fall back on —
+    /// `{#each}` and `{#await}` answer it oppositely, and each answer carries an
+    /// obligation the other does not. Neither head is ever asked about `satisfies`: no
+    /// Svelte separator is spelled that way, so it stays TypeScript's in both.
     ///
     /// Comments are collected.
     pub(crate) fn parse_ts_expression_partial(
         &mut self,
         source: &str,
         base_offset: usize,
+        top_level_as: TopLevelAs,
     ) -> Result<(Expression<'arena>, usize), ParseError> {
-        let (expr, end_pos, comments) =
-            tsv_ts::parse_expression_partial_with_comments(source, base_offset, self.arena)?;
+        let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
+            source,
+            base_offset,
+            self.arena,
+            top_level_as,
+        )?;
         self.expression_comments.extend_from_slice(comments);
         Ok((expr, end_pos))
     }
