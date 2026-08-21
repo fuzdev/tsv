@@ -91,7 +91,7 @@ import type { Language } from './types.ts';
  */
 export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: string }> = {
 	'../svelte': {
-		commit: '20b341f10',
+		commit: '5ccdfe355',
 		pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*'
 	},
 	'../acorn-typescript': { commit: '923b213', pins: 'TS_FIXTURES_PINS' },
@@ -99,7 +99,7 @@ export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: strin
 		commit: '637d5746b',
 		pins: 'TS_REPO_PINS, TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN'
 	},
-	'../kit': { commit: 'b27c82f9c', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../kit': { commit: 'c0c936124', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../svelte.dev': { commit: '996bd63e4', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../prettier': { commit: '1dcd0b05d', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../prettier-plugin-svelte': { commit: '7809486', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' }
@@ -128,9 +128,23 @@ export interface GatePins {
 
 /** conformance:svelte-fixtures — `scanned` suite inputs + `both_accept`; provenance in `GATE_CHECKOUT_COMMITS`. */
 export const SVELTE_FIXTURES_PINS: GatePins = {
-	scanned: 3392,
-	both_accept: 3297,
-	over_acceptance: 16
+	// 3392 → 3406 / 3297 → 3308 / 16 → 17: a `../svelte` pull (20b341f10 → 5ccdfe355) added 14
+	// graded `.svelte` inputs — the version-window this file's header describes, since the
+	// checkout still declares 5.56.9 while carrying commits published after that release. No
+	// tsv change is in it: an accept-verdict diff over 11318 corpus files across the change
+	// that landed beside this re-pin moved ZERO of them, and `unexpected` (over-REJECTIONS,
+	// the gated direction) stays 0.
+	//
+	// The `over_acceptance` step is an ORACLE-SKEW artifact rather than frontier growth, and
+	// is expected to fall back to 16 on its own. Its one new entry is
+	// `parser-modern/samples/css-nth-of-minified`, added by the upstream fix that parses
+	// `:nth-child(2n of.important)` with no whitespace after `of`. The checkout carries that
+	// fix; the pinned npm oracle (svelte@5.56.9) predates it and rejects the file, so tsv —
+	// which accepts it, agreeing with CURRENT Svelte — grades as over-accepting. Lower this
+	// deliberately when the canonical pin next moves past the fix.
+	scanned: 3406,
+	both_accept: 3308,
+	over_acceptance: 17
 };
 
 /** conformance:ts-fixtures — provenance in `GATE_CHECKOUT_COMMITS` (../acorn-typescript, oracle @sveltejs/acorn-typescript). */

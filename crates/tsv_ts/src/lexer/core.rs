@@ -742,10 +742,11 @@ impl<'a> Lexer<'a> {
     /// out-of-band via the parked `decode_scratch` only when it contains escapes. Mirrors the
     /// `_into` write-through of the other large scanners.
     ///
-    /// The inner run skips everything that is neither the close quote nor a
-    /// backslash — a 2-byte search the compiler auto-vectorizes. Byte-at-a-time is
-    /// sound: quote and `\` are ASCII (`< 0x80`) and so never appear as a UTF-8
-    /// continuation byte. `has_escapes` gates the (rare) decode pass.
+    /// The inner run skips everything that is none of the close quote, a backslash, and the
+    /// two raw line terminators a `StringLiteral` may not contain — a 4-byte search the
+    /// compiler auto-vectorizes. Byte-at-a-time is sound: all four are ASCII (`< 0x80`) and
+    /// so never appear as a UTF-8 continuation byte. `has_escapes` gates the (rare) decode
+    /// pass.
     fn scan_string_into(
         &mut self,
         start: usize,
@@ -760,11 +761,21 @@ impl<'a> Lexer<'a> {
         let mut p = content_start;
         let mut has_escapes = false;
         loop {
-            while p < len && bytes[p] != quote && bytes[p] != b'\\' {
+            while p < len
+                && bytes[p] != quote
+                && bytes[p] != b'\\'
+                && bytes[p] != b'\n'
+                && bytes[p] != b'\r'
+            {
                 p += 1;
             }
-            if p >= len {
-                // Unterminated string
+            // Unterminated: the source ran out, or a raw `<LF>` / `<CR>` ended the line the
+            // literal opened on. `StringLiteral` excludes a raw LineTerminator (the character
+            // reaches one only as an escape), and acorn rejects both — this used to skip them
+            // and swallow the rest of the file up to some later quote. `<LS>` / `<PS>` are NOT
+            // here: ES2019's JSON-superset change made them legal in a string literal, and
+            // being multi-byte they never match these ASCII tests anyway.
+            if p >= len || bytes[p] == b'\n' || bytes[p] == b'\r' {
                 self.position = p;
                 return Err(lex_err("Unterminated string literal", start));
             }
@@ -796,7 +807,14 @@ impl<'a> Lexer<'a> {
             has_escapes = true;
             p += 1;
             if p < len {
-                p += utf8_len(bytes[p]);
+                if bytes[p] == b'\r' && bytes.get(p + 1) == Some(&b'\n') {
+                    // A LineContinuation's terminator is a whole LineTerminatorSequence, so
+                    // `<CR><LF>` goes as one: leaving the `<LF>` behind would meet the
+                    // raw-terminator gate above and reject a legal continuation.
+                    p += 2;
+                } else {
+                    p += utf8_len(bytes[p]);
+                }
             }
         }
     }

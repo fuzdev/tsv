@@ -14,6 +14,12 @@ Put a `format-ignore` comment immediately before a construct to emit it verbatim
 instead of formatting it. The marked construct keeps its original spacing, line
 breaks, and alignment; everything else in the file is formatted normally.
 
+"Verbatim" is verbatim about the frozen construct, not about the file's line
+terminators: a format run folds every `<CR>` in its input to `<LF>` before it
+parses (the same fold, in the same place, that prettier and the HTML and CSS
+tokenizers do), so a frozen region in a CRLF file comes out LF-terminated like
+the rest of it. Nothing else inside the region moves.
+
 ```svelte
 <script lang="ts">
 	// format-ignore

@@ -33,22 +33,20 @@ impl ErrorContext {
             position -= 1;
         }
 
-        // Find line start: search backwards for '\n' and go past it
-        let line_start = source[..position].rfind('\n').map_or(0, |i| i + 1);
-
-        // Find line end: search forwards for '\n' or end of string
-        let line_end = source[position..]
-            .find('\n')
-            .map_or(source.len(), |i| position + i);
+        // The line's bounds and number, over the ECMAScript terminator class (`\n`, `\r`,
+        // `\r\n`, `<LS>`, `<PS>`) rather than `\n` alone — one question, stated once, in
+        // `printing` beside the class itself.
+        let (line_start, line_end, line_number) = crate::printing::line_bounds_at(source, position);
 
         // Extract the line
         let source_line = source[line_start..line_end].to_string();
 
-        // Calculate column (bytes from line start to error position)
-        let column = position.saturating_sub(line_start);
-
-        // Calculate line number (1-indexed)
-        let line_number = source[..line_start].matches('\n').count() + 1;
+        // Calculate column (CHARACTERS from line start to error position, matching the
+        // character-based columns the wire AST reports — a byte count puts the caret past
+        // its token on any line with a multi-byte character ahead of the error). Clamped to
+        // the line's own end, which `position` can exceed only by sitting inside the
+        // terminator sequence that ends it.
+        let column = source[line_start..position.min(line_end)].chars().count();
 
         Some(ErrorContext {
             source_line,
@@ -59,15 +57,28 @@ impl ErrorContext {
 
     /// Format error context with caret pointer
     pub fn format_with_caret(&self, message: &str) -> String {
-        let indent = " ".repeat(format!("{}:", self.line_number).len() + self.column + 1);
-        format!(
-            "{}\n{}:{} {}\n{}^ here",
-            message,
-            self.line_number,
-            self.column + 1, // Display as 1-indexed for users
-            self.source_line,
-            indent,
-        )
+        // The pad reproduces what the excerpt PRINTS ahead of the error, not how many
+        // characters it holds. Two independent reasons a character count is wrong: a CJK
+        // character occupies two columns, and a tab occupies however many the *terminal*
+        // says — its stops are absolute, so no fixed width can stand in for one. So a tab
+        // is echoed AS a tab (both lines then reach the same stop, whatever it is) and
+        // everything else is padded by its display width.
+        let header = format!("{}:{}", self.line_number, self.column + 1);
+        // Everything printed ahead of the excerpt: the whole `{line}:{col}` header plus its
+        // one separating space. Measuring only `{line}:` left the caret short by the
+        // column's own digits at every position past column 9.
+        let mut indent = " ".repeat(header.chars().count() + 1);
+        let prefix: String = self.source_line.chars().take(self.column).collect();
+        for (i, segment) in prefix.split('\t').enumerate() {
+            if i > 0 {
+                indent.push('\t');
+            }
+            // Tab-free by construction, so the tab width passed here is unreachable.
+            for _ in 0..crate::printing::visual_width(segment, crate::config::TAB_WIDTH) {
+                indent.push(' ');
+            }
+        }
+        format!("{message}\n{header} {}\n{indent}^ here", self.source_line,)
     }
 }
 
@@ -306,14 +317,14 @@ mod tests {
         assert_eq!(e.to_string(), "bad token at position 4");
         assert_eq!(
             e.with_context(source).to_string(),
-            "bad token\n1:5 let x =\n       ^ here"
+            "bad token\n1:5 let x =\n        ^ here"
         );
 
         let e = ParseError::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
         assert_eq!(e.to_string(), "Expected ';', found 'y' at position 8");
         assert_eq!(
             e.with_context(source).to_string(),
-            "Expected ';', found 'y'\n2:1 y\n   ^ here"
+            "Expected ';', found 'y'\n2:1 y\n    ^ here"
         );
 
         assert_eq!(
@@ -341,6 +352,70 @@ mod tests {
         assert!(
             format!("{:?}", ParseError::unexpected_eof(9)).starts_with("UnexpectedEof"),
             "Debug must forward to the kind"
+        );
+    }
+
+    /// The excerpt is bounded by the ECMAScript terminator class, not by `\n` alone. On a
+    /// lone-`<CR>` source the `\n`-only reading made the whole file one line, so the line
+    /// number was 1 whatever the position and the excerpt carried raw `<CR>`s — which a
+    /// terminal renders by overwriting, hiding the very text the caret points into.
+    #[test]
+    fn context_bounds_the_line_on_every_terminator() {
+        let cr = "let a = 1;\rlet b = 2;\r";
+        let ctx = ErrorContext::from_source(cr, 15).expect("context");
+        assert_eq!(ctx.source_line, "let b = 2;");
+        assert_eq!(ctx.line_number, 2);
+        assert_eq!(ctx.column, 4);
+
+        // `<CR><LF>` is ONE terminator, so the second line is still line 2.
+        let crlf = "let a = 1;\r\nlet b = 2;\r\n";
+        let ctx = ErrorContext::from_source(crlf, 16).expect("context");
+        assert_eq!(ctx.source_line, "let b = 2;");
+        assert_eq!(ctx.line_number, 2);
+        assert_eq!(ctx.column, 4);
+
+        // `<LS>` and `<PS>` terminate a line for ECMAScript too.
+        let ls = "let a = 1;\u{2028}let b = 2;";
+        let ctx = ErrorContext::from_source(ls, 17).expect("context");
+        assert_eq!(ctx.source_line, "let b = 2;");
+        assert_eq!(ctx.line_number, 2);
+        assert_eq!(ctx.column, 4);
+    }
+
+    /// A position INSIDE a terminator sequence — the byte between a `<CR>` and its `<LF>`
+    /// — belongs to the line that sequence ends, and the excerpt stops before the `<CR>`
+    /// rather than carrying it.
+    #[test]
+    fn context_of_a_position_inside_a_terminator_sequence() {
+        let crlf = "let a = 1;\r\nlet b = 2;\r\n";
+        let ctx = ErrorContext::from_source(crlf, 11).expect("context");
+        assert_eq!(ctx.source_line, "let a = 1;");
+        assert_eq!(ctx.line_number, 1);
+        assert_eq!(ctx.column, 10);
+    }
+
+    /// The column counts CHARACTERS and the caret pads by DISPLAY width — the two differ
+    /// from a byte count in opposite directions, and a byte count gets both wrong.
+    #[test]
+    fn caret_lands_under_its_token_past_a_multibyte_prefix() {
+        // `à` is 2 bytes, 1 character, 1 column: a byte column would report 12 and pad one
+        // space too far.
+        let src = "const à = ;";
+        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi")).expect("context");
+        assert_eq!(ctx.column, 10);
+        assert_eq!(
+            ctx.format_with_caret("bad"),
+            "bad\n1:11 const à = ;\n               ^ here"
+        );
+
+        // A tab is 1 character and however many columns the terminal's stops give it, so
+        // the pad echoes the tab itself rather than guessing a width for it.
+        let src = "\tconst a = ;";
+        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi")).expect("context");
+        assert_eq!(ctx.column, 11);
+        assert_eq!(
+            ctx.format_with_caret("bad"),
+            "bad\n1:12 \tconst a = ;\n     \t          ^ here"
         );
     }
 
@@ -392,12 +467,13 @@ mod tests {
                 .expect("in-bounds position yields a context");
             assert_eq!(ctx.source_line, source);
             assert_eq!(ctx.line_number, 1);
-            // Floored to the char boundary at byte 4 (the start of `名`).
+            // Floored to the char boundary at byte 4 (the start of `名`) — which is
+            // character 4 as well, everything before it being ASCII.
             assert_eq!(ctx.column, 4);
         }
-        // A boundary just past the multibyte char is kept as-is.
+        // A boundary just past the multibyte char is kept as-is: byte 7, character 5.
         let ctx = ErrorContext::from_source(source, 7).unwrap();
-        assert_eq!(ctx.column, 7);
+        assert_eq!(ctx.column, 5);
     }
 
     #[test]

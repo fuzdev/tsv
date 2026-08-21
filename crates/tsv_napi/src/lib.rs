@@ -68,15 +68,20 @@ macro_rules! parse_internal {
 
 #[cfg(feature = "format")]
 macro_rules! parse_format {
-    ($lang:ident, $source:expr) => {
+    ($lang:ident, $source:expr) => {{
+        // The format path's line-terminator fold, ahead of the parse — see
+        // `tsv_lang::printing::normalize_carriage_returns`. `parse_convert!` deliberately
+        // skips it: the wire's offsets are a drop-in contract over the author's own bytes.
+        let normalized = tsv_lang::printing::normalize_carriage_returns($source);
+        let source = normalized.as_ref();
         with_ast_arena(|arena| {
-            let ast = $lang::parse($source, arena)
-                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+            let ast =
+                $lang::parse(source, arena).map_err(|e| napi::Error::from_reason(e.to_string()))?;
             Ok(with_doc_arena(|doc_arena| {
-                $lang::format_in(&ast, $source, doc_arena)
+                $lang::format_in(&ast, source, doc_arena)
             }))
         })
-    };
+    }};
 }
 
 macro_rules! lang_bindings {

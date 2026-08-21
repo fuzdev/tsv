@@ -17,17 +17,28 @@ use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
 /// The horizontal filler a frozen body's own delimiter line may carry — prettier's
-/// `[\t\f\r ]` in [`frozen_body_span`], spelled once.
+/// `[\t\f\r ]` in [`frozen_body_span`], minus the `\r`.
 ///
 /// Deliberately **not** `is_collapsible_ws_char`: a form feed belongs here (it is filler on
 /// the delimiter's line) where the template's own text nodes treat it as content, and `\n` is
 /// excluded because it is the terminator these scans are looking for, never part of the run.
 ///
-/// So this is the crate's *other* `[\t\f\r ]`, and the two split on the form feed on purpose:
+/// So this is the crate's *other* `[\t\f ]`, and the two split on the form feed on purpose:
 /// `fragment_doc`'s `text_starts_with_linebreak` drops it, because there the run is template
 /// text the compiler renders. Here the run is a delimiter line tsv itself emits and no reader
-/// ever sees, so prettier's class is taken whole.
-const DELIMITER_LINE_FILLER: [char; 4] = ['\t', '\x0c', '\r', ' '];
+/// ever sees, so the form feed stays filler.
+///
+/// ⚠️ **`\r` is a terminator here, never filler.** Prettier normalizes its input to LF
+/// before this scan runs, so a `\r` reaching its `[\t\f\r ]` is stray filler by
+/// construction and the branch that treats it so is unreachable. tsv folds the same way at
+/// the same point ([`tsv_lang::printing::normalize_carriage_returns`], ahead of the parse),
+/// so no format entry point brings one here either — but the library primitive
+/// `format(&ast, source)` takes the caller's bytes as given, and there a `\r` is
+/// overwhelmingly the delimiter's own line ending. So it is matched as a terminator by
+/// [`strip_one_terminator_front`] / [`strip_one_terminator_back`] rather than eaten as
+/// filler: eaten, the `\n` the scan then looked for was never there, and a CR-terminated
+/// document kept its opening delimiter as a blank first body line.
+const DELIMITER_LINE_FILLER: [char; 3] = ['\t', '\x0c', ' '];
 
 /// The trailing run a rendered line never keeps — prettier's `trimIndentation`, which is
 /// **space and tab only** (never `\r`, `\f` or `\n`).
@@ -38,15 +49,31 @@ const DELIMITER_LINE_FILLER: [char; 4] = ['\t', '\x0c', '\r', ' '];
 /// or the same body comes out two ways at its two positions.
 const RENDERED_LINE_TRAILING_WS: [char; 2] = [' ', '\t'];
 
+/// Strip ONE line terminator from the front of `s` — `\r\n`, `\n`, or `\r`, longest first
+/// so a CRLF pair is never read as two. `None` when `s` does not open with one.
+fn strip_one_terminator_front(s: &str) -> Option<&str> {
+    s.strip_prefix("\r\n")
+        .or_else(|| s.strip_prefix('\n'))
+        .or_else(|| s.strip_prefix('\r'))
+}
+
+/// [`strip_one_terminator_front`]'s mirror at the end of `s`.
+fn strip_one_terminator_back(s: &str) -> Option<&str> {
+    s.strip_suffix("\r\n")
+        .or_else(|| s.strip_suffix('\n'))
+        .or_else(|| s.strip_suffix('\r'))
+}
+
 /// The span a frozen body contributes — the whole content run minus the two delimiter lines'
-/// own newlines, prettier's `.replace(/^[\t\f\r ]*\n/, '').replace(/\n[\t\f\r ]*$/, '')`.
+/// own terminators, prettier's `.replace(/^[\t\f\r ]*\n/, '').replace(/\n[\t\f\r ]*$/, '')`
+/// with `\r` read as a terminator rather than as filler (see [`DELIMITER_LINE_FILLER`]).
 /// Empty when the body is nothing but those two lines.
 ///
 /// **Every** freeze goes through it — a frozen `<template>`, `<script>` or `<style>` body,
 /// at each of its positions: one shape, because the claim they all make is the same one
 /// (these bytes are the author's).
 ///
-/// Only the FIRST newline goes at each end — a body that opens or closes with blank lines
+/// Only the FIRST terminator goes at each end — a body that opens or closes with blank lines
 /// keeps every one of them but the delimiter's own. The strips are sequential in prettier, so
 /// they are here too: a lone `"\n"` body loses its newline to the leading strip and has
 /// nothing left for the trailing one.
@@ -57,16 +84,14 @@ const RENDERED_LINE_TRAILING_WS: [char; 2] = [' ', '\t'];
 pub(in crate::printer) fn frozen_body_span(source: &str, content: Span) -> Span {
     let raw = content.extract(source);
     let rest = raw.trim_start_matches(DELIMITER_LINE_FILLER);
-    let start = if rest.starts_with('\n') {
-        raw.len() - rest.len() + 1
-    } else {
-        0
+    let start = match strip_one_terminator_front(rest) {
+        Some(after) => raw.len() - after.len(),
+        None => 0,
     };
     let head = raw[start..].trim_end_matches(DELIMITER_LINE_FILLER);
-    let end = if head.ends_with('\n') {
-        start + head.len() - 1
-    } else {
-        raw.len()
+    let end = match strip_one_terminator_back(head) {
+        Some(shorter) => start + shorter.len(),
+        None => raw.len(),
     };
     Span::new(content.start + start as u32, content.start + end as u32)
 }
@@ -177,17 +202,27 @@ mod tests {
         assert_eq!(body("\u{c}\nh1 text\u{c}\n\u{c}"), "h1 text\u{c}");
     }
 
+    /// The delimiter's own terminator goes whole at each end — CRLF or lone CR — while an
+    /// INTERIOR line's terminator stays in the span. The span is the caller's bytes, so the
+    /// two questions stay separate: every format entry point has already folded its input
+    /// (`tsv_lang::printing::normalize_carriage_returns`), and these bounds answer the
+    /// library primitive that has not.
     #[test]
-    fn body_bounds_keep_a_crlf_bodys_own_carriage_returns() {
-        // `\r` is filler, so the delimiter lines' CRLFs go whole — but an interior line's
-        // `\r` is the author's byte and rides out with it.
-        assert_eq!(body("\r\nh1 text\r\n"), "h1 text\r");
-        assert_eq!(body("\r\na\r\nb\r\n"), "a\r\nb\r");
+    fn body_bounds_drop_the_delimiters_own_terminator_however_it_is_spelled() {
+        assert_eq!(body("\r\nh1 text\r\n"), "h1 text");
+        assert_eq!(body("\r\na\r\nb\r\n"), "a\r\nb");
+        // A lone CR is a terminator too. Read as delimiter FILLER it was eaten, the `\n` the
+        // scan then looked for was never there, and the opening delimiter survived as a blank
+        // first body line — a whole extra line in a CR-terminated document.
+        assert_eq!(body("\rh1 text\r"), "h1 text");
+        assert_eq!(body("\ra\rb\r"), "a\rb");
     }
 
     /// The trailing run every emitter owes the slice's last line, and only its last line —
     /// the run the closing break is about to end. `\r` and `\f` are not in the class
-    /// (prettier's `trimIndentation` is space and tab), so a CRLF body's own `\r` survives.
+    /// (prettier's `trimIndentation` is space and tab), so this trim never touches a
+    /// terminator; the delimiter's own goes to the bounds above, and an interior one is
+    /// already `<LF>` on every path that folded its input.
     #[test]
     fn a_frozen_bodys_last_line_owes_the_rendered_line_trim() {
         fn trim(raw: &str) -> &str {
@@ -197,6 +232,6 @@ mod tests {
         assert_eq!(trim("\nh1 text  "), "h1 text");
         // Interior lines keep theirs.
         assert_eq!(trim("\na  \nb  \n"), "a  \nb");
-        assert_eq!(trim("\r\nh1 text\r\n"), "h1 text\r");
+        assert_eq!(trim("\r\nh1 text\r\n"), "h1 text");
     }
 }

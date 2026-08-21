@@ -64,9 +64,13 @@ pub fn format(root: &Root<'_>, source: &str) -> String {
 /// `tsv_ts::format_str`), for callers that just want the formatted string and
 /// never touch the AST. Batch drivers thread [`parse`] + [`format_in`] instead.
 pub fn format_str(source: &str) -> Result<String> {
+    // The format path's line-terminator fold, ahead of the parse (see
+    // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
+    // alone so its offsets stay a drop-in contract with Svelte's.
+    let source = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let root = parse(source, &arena)?;
-    Ok(format(&root, source))
+    let root = parse(&source, &arena)?;
+    Ok(format(&root, &source))
 }
 
 /// Format into a caller-provided doc arena.
