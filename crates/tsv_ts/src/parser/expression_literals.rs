@@ -20,7 +20,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - String/number literal keys: `{ "key": value, 123: value }`
     /// - Trailing commas: `{ a: 1, }`
     /// - Empty objects: `{}`
-    pub(super) fn parse_object_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(super) fn parse_object_expression(
+        &mut self,
+    ) -> Result<ObjectExpression<'arena>, ParseError> {
         let arena = self.arena;
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
@@ -36,11 +38,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (_, end) = self.current_pos();
             self.advance()?; // consume '}'
             self.exit_grouping();
-            return Ok(Expression::ObjectExpression(ObjectExpression {
+            return Ok(ObjectExpression {
                 properties: properties.into_bump_slice(),
                 spread_trailing_comma: false,
                 span: Span::new(start as u32, end as u32),
-            }));
+            });
         }
 
         // Parse properties
@@ -302,11 +304,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BraceClose)?; // consume '}'
         self.exit_grouping();
 
-        Ok(Expression::ObjectExpression(ObjectExpression {
+        Ok(ObjectExpression {
             properties: properties.into_bump_slice(),
             spread_trailing_comma,
             span: Span::new(start as u32, end as u32),
-        }))
+        })
     }
 
     /// Parse array literal: `[elem, ...]`
@@ -317,7 +319,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Elision (holes/sparse arrays): `[, a]`, `[1,,3]`, `[, , a]`
     /// - Trailing commas: `[1, 2, 3,]`
     /// - Empty arrays: `[]`
-    pub(super) fn parse_array_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(super) fn parse_array_expression(&mut self) -> Result<ArrayExpression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
         self.enter_grouping();
@@ -332,11 +334,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (_, end) = self.current_pos();
             self.advance()?; // consume ']'
             self.exit_grouping();
-            return Ok(Expression::ArrayExpression(ArrayExpression {
+            return Ok(ArrayExpression {
                 elements: elements.into_bump_slice(),
                 spread_trailing_comma: false,
                 span: Span::new(start as u32, end as u32),
-            }));
+            });
         }
 
         // Parse elements (including elision/holes)
@@ -387,11 +389,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BracketClose)?; // consume ']'
         self.exit_grouping();
 
-        Ok(Expression::ArrayExpression(ArrayExpression {
+        Ok(ArrayExpression {
             elements: elements.into_bump_slice(),
             spread_trailing_comma,
             span: Span::new(start as u32, end as u32),
-        }))
+        })
     }
 
     /// Parse method body for method shorthand: `foo() { return 1; }`

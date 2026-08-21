@@ -11,6 +11,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
+use super::super::expression::ParsedExpr;
 
 /// Everything parsed off the front of a class member before its body — the
 /// modifier set, the (possibly computed) key, and the optional/type-param
@@ -266,7 +267,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// declaration-only, so neither appears here.
     pub(in crate::parser) fn parse_decorated_class_expression(
         &mut self,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         let decorators = self.parse_decorators()?;
@@ -275,17 +276,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_expected_after("'class'", "decorator"));
         }
 
-        let mut expr = self.parse_class_expression()?;
-        if let Expression::ClassExpression(class) = &mut expr {
-            class.decorators = if decorators.is_empty() {
-                None
-            } else {
-                Some(decorators.into_bump_slice())
-            };
-            // Extend the span to cover the leading decorators.
-            class.span = Span::new(start as u32, class.span.end);
-        }
-        Ok(expr)
+        // The run is non-empty — this is only reached at a `@` — so it is always a
+        // `Some`. `start` is that first `@`, so the class node's span covers it.
+        self.parse_class_expression_from(start, Some(decorators.into_bump_slice()))
     }
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
@@ -390,9 +383,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - The name is always optional
     /// - They appear in expression position
     /// - No `declare` field
-    pub fn parse_class_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(in crate::parser) fn parse_class_expression(
+        &mut self,
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         let (start, _) = self.current_pos();
+        self.parse_class_expression_from(start, None)
+    }
 
+    /// Parse a class expression whose span starts at `start` and which carries
+    /// `decorators`, the two things a decorated class expression (`@dec class {}`)
+    /// changes about the plain one.
+    ///
+    /// The decorators are a parameter rather than a post-hoc patch so the node is
+    /// built once, in place: a builder that hands a bare `Expression` back for its
+    /// caller to fix up makes that caller hold the 176 B value across the boxing
+    /// call — see `ParsedExpr::from_expr`.
+    ///
+    /// `None` and `Some(&[])` are **different wire shapes** — the field is omitted
+    /// for the first and emitted as `[]` for the second (`write_decorators_field`) —
+    /// so this takes the caller's answer as given rather than folding an empty slice
+    /// back to `None`. It can: the undecorated entry point passes `None`, and the
+    /// decorated one is only reached at a `@`, so its run is never empty.
+    fn parse_class_expression_from(
+        &mut self,
+        start: usize,
+        decorators: Option<&'arena [Decorator<'arena>]>,
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         // Consume 'class' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -421,17 +437,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.parse_class_body()?;
         let end = body.span.end;
 
-        Ok(Expression::ClassExpression(ClassExpression {
-            decorators: None,
-            id,
-            super_class,
-            super_type_parameters,
-            implements,
-            body,
-            r#abstract: false,
-            type_parameters,
-            span: Span::new(start as u32, end),
-        }))
+        Ok(ParsedExpr::from_expr(
+            self.arena,
+            Expression::ClassExpression(ClassExpression {
+                decorators,
+                id,
+                super_class,
+                super_type_parameters,
+                implements,
+                body,
+                r#abstract: false,
+                type_parameters,
+                span: Span::new(start as u32, end),
+            }),
+        ))
     }
 
     /// Inner function that returns the ClassDeclaration directly
