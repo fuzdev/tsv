@@ -42,6 +42,12 @@
 //! `RLIMIT_AS` (`ulimit -v`), which counts reservations rather than resident pages —
 //! container memory limits do not work that way, so this is a nearly-unused knob, but
 //! it is the setting under which a wide pool would fail to spawn.
+//!
+//! One question over: how *many* such threads tsv will ask the OS for. Both `--jobs`
+//! flags (the format pool's and the injection audits') are held to
+//! [`clamp_worker_count`], stated here for the same reason the size is — a rule with two
+//! spellings drifts, and this is the module both pools already go through to build a
+//! thread.
 
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
@@ -56,6 +62,44 @@ pub const STACK_SIZE: usize = 32 * 1024 * 1024;
 /// [`run_on_sized_stack`] *joins* the panic rather than letting it unwind out of
 /// `main`.
 const PANIC_EXIT_CODE: i32 = 101;
+
+/// Workers per logical CPU an explicit `--jobs` is held to.
+///
+/// Four is far past anything tsv's workloads can *use*: the format pool's own default
+/// (`commands::format::default_jobs`) deliberately lands **below** the logical count,
+/// because the per-file work is memory-bound and a discovery walk competes with the pool
+/// for the same cores. So this is not a tuning knob — it is loose enough that no
+/// deliberate over-subscription (a slow filesystem, a shared machine, a bench sweep
+/// comparing widths) reaches it, and tight enough that a mistyped number cannot ask the
+/// OS for every task slot it will give.
+///
+/// The honest reason for a ceiling at all is **blast radius**, not throughput: each
+/// worker reserves [`STACK_SIZE`] of address space, and an unbounded `--jobs` takes task
+/// slots until the OS starts refusing — which on a systemd machine means the login
+/// session's whole `TasksMax`, wedging every *other* process on it. A formatter should
+/// not be able to do that to a user who mistyped a number.
+pub const MAX_WORKERS_PER_LOGICAL_CPU: usize = 4;
+
+/// Hold an explicit `--jobs` to [`MAX_WORKERS_PER_LOGICAL_CPU`] per logical CPU.
+///
+/// Here rather than beside either pool because **both** `--jobs` flags ask it — `tsv
+/// format`'s and the injection audits' (`tsv_debug`'s `audit::parallel::run_pool`) — and
+/// a rule with two spellings is the shape that lets them drift. This module already
+/// states how *big* every tsv work thread is; this is how *many* tsv will ask for.
+///
+/// Said out loud when it bites, never silently: the flag means "use this width", and a
+/// run that quietly used a different one is a worse answer than a slower run. Anything
+/// at or under the ceiling passes through untouched — including 0, which each pool floors
+/// at 1 in its own way, not a value for this function to have an opinion about.
+pub fn clamp_worker_count(requested: usize) -> usize {
+    let logical = thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
+    let ceiling = logical.saturating_mul(MAX_WORKERS_PER_LOGICAL_CPU);
+    if requested > ceiling {
+        eprintln!("warning: --jobs {requested} exceeds this machine's ceiling; using {ceiling}");
+        return ceiling;
+    }
+    requested
+}
 
 /// A [`thread::Builder`] with [`STACK_SIZE`] reserved and `name` set.
 ///
@@ -82,10 +126,11 @@ pub fn sized_thread(name: &str) -> thread::Builder {
 ///
 /// A refused spawn runs `f` on this thread instead. That gives up the reservation, but
 /// a machine that cannot spawn a thread is not one where refusing to work is the
-/// better answer — and unlike the format workers, this caller has an alternative that
-/// does not need a thread at all, so declining to recover would be a choice rather
-/// than a constraint. The closure is consumed by the failed attempt, so it is handed
-/// over in a cell the fallback can take it back out of.
+/// better answer — and the format pool answers the same refusal the same way (narrow
+/// to however many threads the OS gave, and format on the calling thread if that was
+/// none), so no route turns a busy machine into a failed run. The closure is consumed
+/// by the failed attempt, so it is handed over in a cell the fallback can take it back
+/// out of.
 pub fn run_on_sized_stack<F, T>(f: F) -> T
 where
     F: FnOnce() -> T + Send + 'static,
@@ -123,4 +168,26 @@ fn take_and_run<F: FnOnce() -> T, T>(cell: &Mutex<Option<F>>) -> T {
         .take()
         .expect("the closure is taken by exactly one side");
     f()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_WORKERS_PER_LOGICAL_CPU, clamp_worker_count};
+
+    /// The ceiling holds against any number a caller can type — `usize::MAX` included,
+    /// which is what makes it a bound on how many threads tsv will ask the OS for.
+    /// Everything at or under it passes through untouched: the clamp is a ceiling, not a
+    /// second opinion about the width that was asked for.
+    #[test]
+    fn clamp_worker_count_holds_the_ceiling_and_passes_everything_under_it() {
+        let logical = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
+        let ceiling = logical * MAX_WORKERS_PER_LOGICAL_CPU;
+        assert_eq!(clamp_worker_count(usize::MAX), ceiling);
+        assert_eq!(clamp_worker_count(ceiling + 1), ceiling);
+        assert_eq!(clamp_worker_count(ceiling), ceiling);
+        assert_eq!(clamp_worker_count(1), 1);
+        // 0 is a width each pool floors at 1 in its own way, not something to
+        // reinterpret here.
+        assert_eq!(clamp_worker_count(0), 0);
+    }
 }
