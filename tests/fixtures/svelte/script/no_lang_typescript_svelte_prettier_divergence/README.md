@@ -3,16 +3,18 @@
 A component whose only `<script>` carries **no** `lang` attribute, using TypeScript syntax
 in every island: type annotations in the script itself (`let x: number`), a generic and
 typed snippet head (`{#snippet fn<T>(a: T)}`), a typed `{#each}` binding
-(`as item: string`), and `satisfies` / `as` casts in expression tags.
+(`as item: string`), a type assertion in an `{#await}` head (`p as Promise<string>`), and
+`satisfies` / `as` casts in expression tags.
 
 ## What each side does
 
 - **Svelte** decides TypeScript **once per document** — `lang="ts"` on any `<script>` sets
   `parser.ts` — and every reader keys on that flag: a plain `<script>` is handed to vanilla
   acorn (which rejects `x: number`), the snippet reader matches `<` only when `parser.ts`,
-  the block readers hand a typed binding to plain acorn, and the expression readers reject
-  `as` / `satisfies`. So Svelte **rejects** this input at the first island it reaches
-  (`Unexpected token` on the script). `expected_svelte.json` holds the parse-failure marker.
+  the block readers hand a typed binding — and an `{#await}` head — to plain acorn, and the
+  expression readers reject `as` / `satisfies`. So Svelte **rejects** this input at the
+  first island it reaches (`Unexpected token` on the script). `expected_svelte.json` holds
+  the parse-failure marker.
 - **prettier** (via prettier-plugin-svelte) inherits that verdict and throws — no format
   oracle exists, which is what `prettier_rejects.txt` pins (`Expected token (`, the plugin
   reaching the snippet head first).

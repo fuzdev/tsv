@@ -1,0 +1,1648 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 778,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 76,
+				"end": 78,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 78,
+				"end": 123,
+				"data": " function type inside a type argument "
+			},
+			{
+				"type": "Text",
+				"start": 123,
+				"end": 124,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 124,
+				"end": 189,
+				"expression": {
+					"type": "TSAsExpression",
+					"start": 131,
+					"end": 153,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 7
+						},
+						"end": {
+							"line": 9,
+							"column": 29
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 131,
+						"end": 134,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 7
+							},
+							"end": {
+								"line": 9,
+								"column": 10
+							}
+						},
+						"name": "fns"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 138,
+						"end": 153,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 14
+							},
+							"end": {
+								"line": 9,
+								"column": 29
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 138,
+							"end": 139,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 14
+								},
+								"end": {
+									"line": 9,
+									"column": 15
+								}
+							},
+							"name": "A"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 139,
+							"end": 153,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 15
+								},
+								"end": {
+									"line": 9,
+									"column": 29
+								}
+							},
+							"params": [
+								{
+									"type": "TSFunctionType",
+									"start": 140,
+									"end": 152,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 16
+										},
+										"end": {
+											"line": 9,
+											"column": 28
+										}
+									},
+									"parameters": [],
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 143,
+										"end": 152,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 19
+											},
+											"end": {
+												"line": 9,
+												"column": 28
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSStringKeyword",
+											"start": 146,
+											"end": 152,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 22
+												},
+												"end": {
+													"line": 9,
+													"column": 28
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 162,
+							"end": 164,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 164,
+							"end": 181,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 2,
+									"character": 165
+								},
+								"end": {
+									"line": 10,
+									"column": 5,
+									"character": 168
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 169,
+										"end": 175,
+										"expression": {
+											"type": "Identifier",
+											"start": 170,
+											"end": 174,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 7
+												},
+												"end": {
+													"line": 10,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 181,
+							"end": 182,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 157,
+					"end": 161,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 33,
+							"character": 157
+						},
+						"end": {
+							"line": 9,
+							"column": 37,
+							"character": 161
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 189,
+				"end": 191,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 191,
+				"end": 244,
+				"data": " parenthesized function type in an array type "
+			},
+			{
+				"type": "Text",
+				"start": 244,
+				"end": 245,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 245,
+				"end": 311,
+				"expression": {
+					"type": "TSAsExpression",
+					"start": 252,
+					"end": 275,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 7
+						},
+						"end": {
+							"line": 14,
+							"column": 30
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 252,
+						"end": 255,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 7
+							},
+							"end": {
+								"line": 14,
+								"column": 10
+							}
+						},
+						"name": "fns"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 259,
+						"end": 275,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 14
+							},
+							"end": {
+								"line": 14,
+								"column": 30
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 259,
+							"end": 273,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 14
+								},
+								"end": {
+									"line": 14,
+									"column": 28
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSFunctionType",
+								"start": 260,
+								"end": 272,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 15
+									},
+									"end": {
+										"line": 14,
+										"column": 27
+									}
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 263,
+									"end": 272,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 18
+										},
+										"end": {
+											"line": 14,
+											"column": 27
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 266,
+										"end": 272,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 21
+											},
+											"end": {
+												"line": 14,
+												"column": 27
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 284,
+							"end": 286,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 286,
+							"end": 303,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 2,
+									"character": 287
+								},
+								"end": {
+									"line": 15,
+									"column": 5,
+									"character": 290
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 291,
+										"end": 297,
+										"expression": {
+											"type": "Identifier",
+											"start": 292,
+											"end": 296,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 7
+												},
+												"end": {
+													"line": 15,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 303,
+							"end": 304,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 279,
+					"end": 283,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 34,
+							"character": 279
+						},
+						"end": {
+							"line": 14,
+							"column": 38,
+							"character": 283
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 311,
+				"end": 313,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 313,
+				"end": 360,
+				"data": " function type nested in a type literal "
+			},
+			{
+				"type": "Text",
+				"start": 360,
+				"end": 361,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 361,
+				"end": 433,
+				"expression": {
+					"type": "TSAsExpression",
+					"start": 368,
+					"end": 397,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 7
+						},
+						"end": {
+							"line": 19,
+							"column": 36
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 368,
+						"end": 371,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 7
+							},
+							"end": {
+								"line": 19,
+								"column": 10
+							}
+						},
+						"name": "fns"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 375,
+						"end": 397,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 14
+							},
+							"end": {
+								"line": 19,
+								"column": 36
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 375,
+							"end": 376,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 14
+								},
+								"end": {
+									"line": 19,
+									"column": 15
+								}
+							},
+							"name": "A"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 376,
+							"end": 397,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 15
+								},
+								"end": {
+									"line": 19,
+									"column": 36
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeLiteral",
+									"start": 377,
+									"end": 396,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 16
+										},
+										"end": {
+											"line": 19,
+											"column": 35
+										}
+									},
+									"members": [
+										{
+											"type": "TSPropertySignature",
+											"start": 379,
+											"end": 394,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 18
+												},
+												"end": {
+													"line": 19,
+													"column": 33
+												}
+											},
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 379,
+												"end": 380,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 18
+													},
+													"end": {
+														"line": 19,
+														"column": 19
+													}
+												},
+												"name": "a"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 380,
+												"end": 394,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 19
+													},
+													"end": {
+														"line": 19,
+														"column": 33
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSFunctionType",
+													"start": 382,
+													"end": 394,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 21
+														},
+														"end": {
+															"line": 19,
+															"column": 33
+														}
+													},
+													"parameters": [],
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 385,
+														"end": 394,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 24
+															},
+															"end": {
+																"line": 19,
+																"column": 33
+															}
+														},
+														"typeAnnotation": {
+															"type": "TSStringKeyword",
+															"start": 388,
+															"end": 394,
+															"loc": {
+																"start": {
+																	"line": 19,
+																	"column": 27
+																},
+																"end": {
+																	"line": 19,
+																	"column": 33
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 406,
+							"end": 408,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 408,
+							"end": 425,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 2,
+									"character": 409
+								},
+								"end": {
+									"line": 20,
+									"column": 5,
+									"character": 412
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 413,
+										"end": 419,
+										"expression": {
+											"type": "Identifier",
+											"start": 414,
+											"end": 418,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 7
+												},
+												"end": {
+													"line": 20,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 425,
+							"end": 426,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 401,
+					"end": 405,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 40,
+							"character": 401
+						},
+						"end": {
+							"line": 19,
+							"column": 44,
+							"character": 405
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 433,
+				"end": 435,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 435,
+				"end": 512,
+				"data": " assertion chain whose last type holds a function type, with an index "
+			},
+			{
+				"type": "Text",
+				"start": 512,
+				"end": 513,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 513,
+				"end": 597,
+				"expression": {
+					"type": "TSAsExpression",
+					"start": 520,
+					"end": 553,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 7
+						},
+						"end": {
+							"line": 24,
+							"column": 40
+						}
+					},
+					"expression": {
+						"type": "TSAsExpression",
+						"start": 520,
+						"end": 534,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 7
+							},
+							"end": {
+								"line": 24,
+								"column": 21
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 520,
+							"end": 523,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 10
+								}
+							},
+							"name": "fns"
+						},
+						"typeAnnotation": {
+							"type": "TSUnknownKeyword",
+							"start": 527,
+							"end": 534,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 14
+								},
+								"end": {
+									"line": 24,
+									"column": 21
+								}
+							}
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 538,
+						"end": 553,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 25
+							},
+							"end": {
+								"line": 24,
+								"column": 40
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 538,
+							"end": 539,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 25
+								},
+								"end": {
+									"line": 24,
+									"column": 26
+								}
+							},
+							"name": "A"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 539,
+							"end": 553,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 26
+								},
+								"end": {
+									"line": 24,
+									"column": 40
+								}
+							},
+							"params": [
+								{
+									"type": "TSFunctionType",
+									"start": 540,
+									"end": 552,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 27
+										},
+										"end": {
+											"line": 24,
+											"column": 39
+										}
+									},
+									"parameters": [],
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 543,
+										"end": 552,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 30
+											},
+											"end": {
+												"line": 24,
+												"column": 39
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSStringKeyword",
+											"start": 546,
+											"end": 552,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 33
+												},
+												"end": {
+													"line": 24,
+													"column": 39
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 565,
+							"end": 567,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 567,
+							"end": 589,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 25,
+									"column": 2,
+									"character": 568
+								},
+								"end": {
+									"line": 25,
+									"column": 5,
+									"character": 571
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 572,
+										"end": 575,
+										"expression": {
+											"type": "Identifier",
+											"start": 573,
+											"end": 574,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 7
+												},
+												"end": {
+													"line": 25,
+													"column": 8
+												}
+											},
+											"name": "i"
+										}
+									},
+									{
+										"type": "Text",
+										"start": 575,
+										"end": 577,
+										"raw": ": ",
+										"data": ": "
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 577,
+										"end": 583,
+										"expression": {
+											"type": "Identifier",
+											"start": 578,
+											"end": 582,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 12
+												},
+												"end": {
+													"line": 25,
+													"column": 16
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 589,
+							"end": 590,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 557,
+					"end": 561,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 44,
+							"character": 557
+						},
+						"end": {
+							"line": 24,
+							"column": 48,
+							"character": 561
+						}
+					}
+				},
+				"index": "i"
+			},
+			{
+				"type": "Text",
+				"start": 597,
+				"end": 599,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 599,
+				"end": 676,
+				"data": " mapped type spelling its own `as`, with a function type in the value "
+			},
+			{
+				"type": "Text",
+				"start": 676,
+				"end": 677,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 677,
+				"end": 777,
+				"expression": {
+					"type": "TSAsExpression",
+					"start": 684,
+					"end": 741,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 7
+						},
+						"end": {
+							"line": 29,
+							"column": 64
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 684,
+						"end": 687,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 7
+							},
+							"end": {
+								"line": 29,
+								"column": 10
+							}
+						},
+						"name": "fns"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 691,
+						"end": 741,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 14
+							},
+							"end": {
+								"line": 29,
+								"column": 64
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 694,
+							"end": 714,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 17
+								},
+								"end": {
+									"line": 29,
+									"column": 37
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSTypeOperator",
+								"start": 699,
+								"end": 714,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 22
+									},
+									"end": {
+										"line": 29,
+										"column": 37
+									}
+								},
+								"operator": "keyof",
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 705,
+									"end": 714,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 28
+										},
+										"end": {
+											"line": 29,
+											"column": 37
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 705,
+										"end": 706,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 28
+											},
+											"end": {
+												"line": 29,
+												"column": 29
+											}
+										},
+										"name": "A"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 706,
+										"end": 714,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 29
+											},
+											"end": {
+												"line": 29,
+												"column": 37
+											}
+										},
+										"params": [
+											{
+												"type": "TSStringKeyword",
+												"start": 707,
+												"end": 713,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 30
+													},
+													"end": {
+														"line": 29,
+														"column": 36
+													}
+												}
+											}
+										]
+									}
+								}
+							}
+						},
+						"nameType": {
+							"type": "TSStringKeyword",
+							"start": 718,
+							"end": 724,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 41
+								},
+								"end": {
+									"line": 29,
+									"column": 47
+								}
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSFunctionType",
+							"start": 727,
+							"end": 739,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 50
+								},
+								"end": {
+									"line": 29,
+									"column": 62
+								}
+							},
+							"parameters": [],
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 730,
+								"end": 739,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 53
+									},
+									"end": {
+										"line": 29,
+										"column": 62
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 733,
+									"end": 739,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 56
+										},
+										"end": {
+											"line": 29,
+											"column": 62
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 750,
+							"end": 752,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 752,
+							"end": 769,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 30,
+									"column": 2,
+									"character": 753
+								},
+								"end": {
+									"line": 30,
+									"column": 5,
+									"character": 756
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 757,
+										"end": 763,
+										"expression": {
+											"type": "Identifier",
+											"start": 758,
+											"end": 762,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 7
+												},
+												"end": {
+													"line": 30,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 769,
+							"end": 770,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 745,
+					"end": 749,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 68,
+							"character": 745
+						},
+						"end": {
+							"line": 29,
+							"column": 72,
+							"character": 749
+						}
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 76,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 67,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 20,
+					"end": 47,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 30,
+						"end": 31,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 2,
+								"column": 12
+							}
+						},
+						"name": "A"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 31,
+						"end": 34,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 12
+							},
+							"end": {
+								"line": 2,
+								"column": 15
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 32,
+								"end": 33,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 13
+									},
+									"end": {
+										"line": 2,
+										"column": 14
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 35,
+						"end": 47,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 4,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 39,
+								"end": 44,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 39,
+									"end": 40,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 2
+										},
+										"end": {
+											"line": 3,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 40,
+									"end": 43,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 3
+										},
+										"end": {
+											"line": 3,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 42,
+										"end": 43,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 5
+											},
+											"end": {
+												"line": 3,
+												"column": 6
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 42,
+											"end": 43,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 5
+												},
+												"end": {
+													"line": 3,
+													"column": 6
+												}
+											},
+											"name": "T"
+										}
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 49,
+					"end": 66,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 53,
+							"end": 65,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 5
+								},
+								"end": {
+									"line": 5,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 53,
+								"end": 65,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 5
+									},
+									"end": {
+										"line": 5,
+										"column": 17
+									}
+								},
+								"name": "fns",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 56,
+									"end": 65,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 8
+										},
+										"end": {
+											"line": 5,
+											"column": 17
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnknownKeyword",
+										"start": 58,
+										"end": 65,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 10
+											},
+											"end": {
+												"line": 5,
+												"column": 17
+											}
+										}
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
