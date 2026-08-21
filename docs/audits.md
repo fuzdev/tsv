@@ -224,7 +224,7 @@ Why it needs its own gate. A fabricated blank is indistinguishable from an autho
 
 ```bash
 # fabrication_audit - format each pristine seed and report every blank RUN the output
-# holds that the input did not, minus two structurally sanctioned layout rules.
+# holds that the input did not, minus three structurally sanctioned layout rules.
 # Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to audit real code.
 cargo run --profile corpus -p tsv_debug --features audits fabrication_audit
 cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../zzz/src
@@ -238,10 +238,11 @@ cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../z
 
 **The metric.** Blank *runs*, not blank lines: collapsing `a⏎⏎⏎⏎b` to `a⏎⏎b` removes newlines but not the author's "there is a break here" signal. A finding is `unsanctioned_runs(output) > runs(input)`.
 
-**The two sanctioned fabrications** are structural carve-outs in the audit, deliberately not snapshot lines — mixing sanctioned rules into a known-bug list would make "every line is a bug" false:
+**The three sanctioned fabrications** are structural carve-outs in the audit, deliberately not snapshot lines — mixing sanctioned rules into a known-bug list would make "every line is a bug" false:
 
 1. **Hoisted-section seam** — tsv moves `<script>` / `<style>` / `<svelte:options>` to canonical positions and separates each from its neighbours with a blank. The carve-out is **two-sided**: a glued `</script><div>` puts the closing tag before the run, a glued `</div><style>` puts the opening tag after it.
 2. **Empty block body** — a kept-but-empty block section prints in block form, and the empty body between opener and terminator is a blank line (`{:catch error}{/await}` → `{:catch error}⏎⏎{/await}`). Sanctioned by [`empty_branch_collapse`](../tests/fixtures/svelte/blocks/empty_branch_collapse_prettier_divergence/) and [`empty_catch_multiline`](../tests/fixtures/svelte/blocks/await/empty_catch_multiline_prettier_divergence/), whose READMEs state it.
+3. **Empty foreign-`<template>` body** — rule 2 one construct over. A `<template lang="…">` in a language tsv does not format copies its body out between the two delimiter lines the geometry requires, so a whitespace-only body leaves those lines with nothing between them (`<template lang="pug">⏎</template>` → `<template lang="pug">⏎⏎</template>`). Prettier's `preformattedBody` emits it identically; pinned by [`template_foreign_lang_body`](../tests/fixtures/svelte/elements/template_foreign_lang_body/), whose `unformatted_compact` variant is the authoring that reaches it.
 
 **Known over-report: a section's leading comment run.** Rule 1 recognizes the seam by the section *tag*, but comments travel with the section, so a glued `<div>block1</div>⏎<!-- comment -->⏎<style>` puts the section's **leading comment** where the tag would be — the run reads `</div` ⇢ `<!--` and no carve-out fires, though prettier emits the identical blank. Left un-widened deliberately: the shape the audit can see is "a blank before some comment", and excusing that would blind it to a whole class of real fabrications. The narrow statement needs the AST, not the line shapes. Currently latent — an already-formatted corpus carries the blank in its input, so counts match and nothing trips; it fires only on pristine glued input.
 
