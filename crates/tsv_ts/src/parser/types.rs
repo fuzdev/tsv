@@ -12,7 +12,7 @@ use tsv_lang::{ParseError, Span};
 use super::Parser;
 use super::expression_lookahead::{paren_pattern_then_type_operator, scan_parens_then_arrow};
 use super::scan::{
-    is_identifier_continue, is_identifier_start, skip_identifier, skip_whitespace_and_comments,
+    identifier_starts_at, is_word_at, skip_identifier, skip_whitespace_and_comments,
 };
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -551,7 +551,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let pos = skip_whitespace_and_comments(bytes, self.current.start as usize + 1); // skip '[' and whitespace/comments
 
         // Must be followed by an identifier
-        if pos >= bytes.len() || !is_identifier_start(bytes[pos]) {
+        if !identifier_starts_at(bytes, pos) {
             return false;
         }
 
@@ -594,16 +594,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         pos = skip_whitespace_and_comments(bytes, pos + 1);
 
         // Followed by the type-parameter name (an identifier)
-        if pos >= bytes.len() || !is_identifier_start(bytes[pos]) {
+        if !identifier_starts_at(bytes, pos) {
             return false;
         }
         pos = skip_whitespace_and_comments(bytes, skip_identifier(bytes, pos));
 
         // Then the `in` keyword, at a word boundary so `[index]` and `[inK in K]`
         // don't false-match on a leading `in`.
-        pos + 2 <= bytes.len()
-            && &bytes[pos..pos + 2] == b"in"
-            && (pos + 2 == bytes.len() || !is_identifier_continue(bytes[pos + 2]))
+        is_word_at(bytes, pos, b"in")
     }
 
     /// Parse type reference: `Foo` or `Foo.Bar` or `Foo<T>`

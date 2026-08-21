@@ -7,7 +7,7 @@ use super::expression_lookahead::{
     scan_for_closing_angle_bracket,
 };
 use super::scan::{
-    is_identifier_start, is_word_at, skip_identifier, skip_numeric_literal,
+    identifier_starts_at, is_word_at, skip_identifier, skip_numeric_literal,
     skip_whitespace_and_comments,
 };
 
@@ -50,11 +50,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // A keyword can also be a value (`null`, `true`, `undefined`, or a variable
                 // named `string`, etc.), so `x < null` is a comparison. Confirm a closing
                 // `>` follows before committing to type arguments.
+                //
+                // TODO: this arm confirms only that a `>` closes and what follows it —
+                // unlike the identifier arm below, it never checks that what sits BETWEEN
+                // the angles could be a type. So a keyword used as an ordinary name with
+                // non-type content after it is over-rejected whenever the follow token
+                // does not start an expression: ``p < string ? q : r > `t` `` and
+                // ``p < string - 1 > `t` `` are plain conditionals to acorn and parse
+                // errors here. 18 of the 20 keywords reach it (all but `typeof`, `void`,
+                // `import` and `new`, which acorn also rejects). The fix is the
+                // identifier arm's what-follows-the-name filter, applied here too.
                 scan_for_closing_angle_bracket(bytes, pos)
             }
 
             // Identifier: type reference like `<T>` or `<Ns.Type>`
-            _ if is_identifier_start(bytes[pos]) => {
+            _ if identifier_starts_at(bytes, pos) => {
                 self.check_identifier_type_arg_pattern(bytes, pos)
             }
 
@@ -149,7 +159,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if pos < bytes.len() && bytes[pos] == b'.' {
                 pos += 1;
                 pos = skip_whitespace_and_comments(bytes, pos);
-                if pos < bytes.len() && is_identifier_start(bytes[pos]) {
+                if identifier_starts_at(bytes, pos) {
                     pos = skip_identifier(bytes, pos);
                     pos = skip_whitespace_and_comments(bytes, pos);
                     continue;
@@ -234,7 +244,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             b'\'' | b'"' | b'`' => true,
 
             // Identifier index: check for type keywords then what follows the identifier
-            _ if is_identifier_start(first) => {
+            _ if identifier_starts_at(bytes, inside) => {
                 let after_id = skip_identifier(bytes, inside);
 
                 // Type operator keywords: `T[keyof U]`, `T[typeof x]`
@@ -256,20 +266,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Called on every `<`/`<<` disambiguation in the postfix loop, so ordinary
     /// relational comparisons (`i < n`) and shifts hit it — keep it cheap. A first-byte
     /// `match` dispatches to only the same-initial-letter candidate(s), so a byte that
-    /// can't begin any of the 19 keywords (a digit, `(`, `[`, a quote, or an identifier
+    /// can't begin any of the 20 keywords (a digit, `(`, `[`, a quote, or an identifier
     /// starting with one of the other 14 letters) bails in O(1) instead of scanning all
-    /// 19. Byte-identical to the prior linear scan: each keyword is checked with the
-    /// same full-string compare + non-identifier-boundary condition, and no keyword is a
-    /// prefix of another, so at most one can match at a position.
+    /// 20. No keyword is a prefix of another, so at most one can match at a position.
+    ///
+    /// The whole-word test is [`is_word_at`], the same one every other keyword lookahead
+    /// asks. This used to hand-roll its own boundary and got two character classes wrong
+    /// in the same direction: `$` was read as *ending* the word (so `string$` matched
+    /// `string`), and so was every byte `>= 0x80` (so `stringµ` did too). Either way an
+    /// ordinary identifier went down the keyword arm, which runs the closing-`>` scan
+    /// directly and so never applies the inside-the-angles filter
+    /// [`Parser::check_identifier_type_arg_pattern`] carries.
+    ///
+    /// ⚠️ That only bites where the token past the would-be closing `>` does **not**
+    /// start an expression, because an expression-starting one disqualifies the
+    /// type-argument reading in *both* arms. So `a < string$ ? b : c > d` parsed fine
+    /// even with the bad boundary, while ``a < string$ ? b : c > `t` `` and
+    /// `a < string$ ? b : c > (d, e)` were parse errors — a case that reaches only one
+    /// arm is the only case a mis-dispatch can be observed through, and the fixture pins
+    /// those rather than the inert form:
+    /// [less_than_keyword_boundary](../../../../tests/fixtures/typescript/syntax/disambiguation/less_than_keyword_boundary/).
     fn is_type_keyword_at(&self, bytes: &[u8], pos: usize) -> bool {
         // Full keyword match at `pos`, not part of a longer identifier.
-        let kw = |k: &[u8]| -> bool {
-            pos + k.len() <= bytes.len()
-                && &bytes[pos..pos + k.len()] == k
-                && bytes
-                    .get(pos + k.len())
-                    .is_none_or(|&b| !b.is_ascii_alphanumeric() && b != b'_')
-        };
+        let kw = |k: &[u8]| is_word_at(bytes, pos, k);
         match bytes.get(pos) {
             Some(b'n') => kw(b"never") || kw(b"number") || kw(b"null"),
             Some(b's') => kw(b"string") || kw(b"symbol"),

@@ -9,10 +9,21 @@ use crate::printer::Printer;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
-/// Skip past identifier characters (alphanumeric, `_`, `$`, non-ASCII) starting at `pos`.
+/// Skip past identifier characters (alphanumeric, `_`, `$`, non-ASCII) starting at `pos`,
+/// stopping at `end`. Returns the position after the last one, or `pos` if none found.
 ///
-/// Returns the position after the last identifier character, or `pos` if none found.
-/// Handles multi-byte UTF-8 sequences for Unicode identifiers.
+/// ⚠️ Deliberately **not** the parser's lookahead class (`parser::scan`'s
+/// `identifier_continues_at`), which resolves the five UTF-8 lead bytes that can begin
+/// ECMAScript whitespace and so ends a name at an `<NBSP>`. This one takes every byte
+/// `> 127` as part of the name, and that is sound here only because every caller uses the
+/// result as the **start of a comment-gap scan** — the name's own text comes from the
+/// node (`Printer::identifier_name_doc`), never from slicing to this offset. Widening or
+/// narrowing a gap's start by a whitespace character can neither add nor drop a comment,
+/// since whitespace ahead of a comment is inert to those scans.
+///
+/// A caller that wants this as a *decision* — "does the word end here?" — must ask
+/// `parser::scan::is_word_at` instead; asking it here would read `[K in<NBSP>keyof T]` as
+/// one identifier, which is the bug that class exists to prevent.
 pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize {
     let mut i = pos;
     while i < end
