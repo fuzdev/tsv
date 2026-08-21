@@ -659,10 +659,11 @@ in `deno.json`).
   an optional dependency of main — it ships alongside native, not as a separate
   product. Depends on `@napi-rs/wasm-runtime` → `@emnapi/runtime`, `@emnapi/core`,
   `@tybys/wasm-util`. (`@oxc-parser/wasm` exists on npm but is **deprecated**.)
-  Its default CJS entry uses `node:wasi`, which Deno doesn't support, so
-  `lib/oxc_wasm.ts` imports the browser entry
-  (`…/parser.wasi-browser.js`, `fetch()` + `WebAssembly` via
-  `@napi-rs/wasm-runtime`) per runtime.
+  Its default CJS entry uses `node:wasi`, which only Node implements far enough to
+  instantiate (Deno ships none; Bun's `WASI` has no `initialize`), so
+  `lib/oxc_wasm.ts` sends Node alone to that entry and Deno and Bun to the browser
+  entry (`…/parser.wasi-browser.js`, `fetch()` + `WebAssembly` via
+  `@napi-rs/wasm-runtime`).
 
 **oxfmt** ships native bindings only: main (`oxfmt`, a JS wrapper bundling Prettier
 internals, depending on `tinypool` for the CLI only) and `@oxfmt/binding-{platform}` (19

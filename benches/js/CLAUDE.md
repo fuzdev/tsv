@@ -169,15 +169,20 @@ its row with that pin, so a version skew there is exactly the mislabeling this c
 prevents). Its **absence** is not graded — nothing is measured then, so nothing is
 mislabeled, and the report's `unavailable` carries the missing row's cause.
 
-**Per-runtime impl availability.** `oxc-parser-wasm` runs under Deno and Node — its
-binding ships a fetch-based browser entry (`parser.wasi-browser.js`) that Deno needs
-and a default `node:wasi` entry that Node needs, so `oxc_wasm.ts` picks per runtime.
-Under Bun the `node:wasi` entry fails to load, so the Bun report has no
-oxc-parser-wasm row (same class as the biome-wasm Bun-load issue); Node also has oxc
-native, the more relevant Node number, regardless. `dprint-wasm` runs under all
-three: the `@dprint/formatter` host loads its plugin from a plain buffer
-(`createFromBuffer` over `node:fs`) with no wasm-bindgen `start` hook and no
-`node:wasi` dependency — verified byte-identical output under all three.
+**Per-runtime impl availability.** `oxc-parser-wasm` runs under all three, but the
+two entries its binding ships split them 2–1 rather than by runtime family: the
+default `node:wasi` entry (`parser.wasi.cjs`) instantiates only under Node — Deno
+ships no `node:wasi`, and Bun's `WASI` class has no `initialize` — while the explicit
+fetch-based browser entry (`parser.wasi-browser.js`, `@napi-rs/wasm-runtime` +
+`WebAssembly`) loads under Deno and Bun but not Node. So `oxc_wasm.ts` sends Node
+alone to the default entry and everything else to the browser one. `dprint-wasm` runs
+under all three for a simpler reason: the `@dprint/formatter` host loads its plugin
+from a plain buffer (`createFromBuffer` over `node:fs`) with no wasm-bindgen `start`
+hook and no `node:wasi` dependency — verified byte-identical output under all three.
+`biome-wasm` is the one row Bun still lacks: `@biomejs/wasm-bundler` is a
+wasm-bindgen *bundler*-target build whose `__wbindgen_start` hook Bun's ESM wasm
+handling never calls, and the `@biomejs/wasm-nodejs` target that would sidestep it is
+an optional peer the harness does not install.
 
 ## Corpus Comparison
 
@@ -721,9 +726,8 @@ pre-flight accept sets disagreed (`[]` when healthy — a non-empty list in a
 committed report is a binding-boundary bug surfacing in the diff); top-level
 `unavailable` records each optional impl that failed to init, as `{impl, reason,
 rows}` — the ⚠ init line's label, the load error's first line, and the ROW names its
-absence removed from this surface (`[]` on a full machine; under Bun the two known
-per-runtime load failures land there as `OXC WASM → [oxc-parser-wasm]` and `Biome →
-[biome-wasm]`, §Cross-Runtime). The
+absence removed from this surface (`[]` on a full machine; under Bun the one known
+per-runtime load failure lands there as `Biome → [biome-wasm]`, §Cross-Runtime). The
 three answer escalating
 questions about the same surface — noise silenced, a row behaving wrongly, a row
 NOT THERE — and the last is the one a table can't ask, since an impl that stops
@@ -740,7 +744,7 @@ gone behind one ⚠ line, and five diagnostics each hand-rolled their own
 `if (!impls.native) throw`. Note the division of labour with the freshness guard:
 `check_artifact_freshness` makes a MISSING artifact fatal, a present-yet-unloadable
 one surfaces only here. The expected-`unavailable` set is never tsv on any runtime
-(under Bun it is biome + oxc-parser-wasm), so nothing legitimate is refused.
+(under Bun it is biome), so nothing legitimate is refused.
 
 **`rows` is the joinable half, and the reason it exists.** Every other identity the
 report publishes is a row name (`entries[].name`, `variant_parity.impl`/`.sibling`,

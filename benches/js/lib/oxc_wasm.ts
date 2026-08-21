@@ -2,7 +2,7 @@
  * OXC WASM implementation wrapper (oxc-parser via wasm32-wasi)
  *
  * Loads @oxc-parser/binding-wasm32-wasi via the entry each runtime can handle
- * (see `init`): Deno gets the fetch-based browser entry, Node/Bun get the
+ * (see `init`): Deno and Bun get the fetch-based browser entry, Node gets the
  * default `node:wasi` entry — so the oxc-parser-wasm row runs under all three.
  *
  * Supports: Parse only (TypeScript, JS). No formatting (oxfmt has no WASM variant).
@@ -47,15 +47,18 @@ export class OxcWasmImplementation extends BaseImplementation {
 	}
 
 	async init(): Promise<void> {
-		// The WASI binding ships two entries: the default CJS entry uses `node:wasi`
-		// (Node/Bun support it, Deno doesn't), and an explicit fetch-based browser
-		// entry (`parser.wasi-browser.js`, `@napi-rs/wasm-runtime` + `WebAssembly`)
-		// that Deno can load but Node can't. Pick per runtime so the
-		// oxc-parser-wasm comparison row is available on all three.
+		// The WASI binding ships two entries: the default CJS entry (`parser.wasi.cjs`)
+		// uses `node:wasi`, which only Node implements far enough to instantiate —
+		// Deno ships no `node:wasi` at all, and Bun's `WASI` class has no
+		// `initialize`. The explicit fetch-based browser entry
+		// (`parser.wasi-browser.js`, `@napi-rs/wasm-runtime` + `WebAssembly`) is the
+		// mirror image: Deno and Bun both load it, Node can't. So the runtime that
+		// takes the default entry is Node alone, and the oxc-parser-wasm comparison
+		// row is available on all three.
 		const entry =
-			current_runtime() === 'deno'
-				? '@oxc-parser/binding-wasm32-wasi/parser.wasi-browser.js'
-				: '@oxc-parser/binding-wasm32-wasi';
+			current_runtime() === 'node'
+				? '@oxc-parser/binding-wasm32-wasi'
+				: '@oxc-parser/binding-wasm32-wasi/parser.wasi-browser.js';
 		const mod = await import(entry);
 		this._parser = mod as OxcParserWasmModule;
 		// The native package's own deserializer (dependency-free ESM; the package has
