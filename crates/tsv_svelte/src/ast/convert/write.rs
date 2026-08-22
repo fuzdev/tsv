@@ -114,12 +114,30 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
         (tracker, map, false)
     };
 
-    // acorn's line table, built ONLY when the two classes actually draw
-    // different lines — a lone CR, U+2028, or U+2029 somewhere in the source.
-    // Otherwise this table would be byte-identical to the LF one, every
-    // `AcornSeed` would be the identity, and the whole acorn-region route is
-    // provably the LF one: real code lands here, and pays nothing.
+    // acorn's line table, built ONLY when the two classes actually draw different
+    // lines — a lone CR, U+2028, or U+2029 somewhere in the source. Otherwise it
+    // would be byte-identical to the LF one, so the LF mapper stands in for it
+    // below and real code pays nothing for the table.
     let acorn_tracker = ecmascript_lines_differ.then(|| LocationTracker::new_ecmascript(source));
+
+    // Whether any seed can be non-identity — a STRICTLY WIDER question than
+    // "do the two classes differ", and the two must not be conflated.
+    //
+    // Five of the six region kinds seed from the class difference alone, so a
+    // document without one leaves them all inert. The **annotation** region does
+    // not: Svelte's `read_type_annotation` enters acorn five bytes behind the
+    // colon on a synthetic `_ as ` that OVERWRITES them, so a newline the author
+    // wrote between a block binding and its `: T` is erased before acorn sees it
+    // and the annotation's nodes stay on the binding's line. A plain `\n` is
+    // enough; no second line class need be present. `origin != lex_start` is
+    // exactly that region — it is the only kind whose parse starts behind where
+    // it lexes — so the scan asks the property rather than a kind tag, and a
+    // future region that inserts synthetic text is covered the day it appears.
+    let acorn_seeds_needed = ecmascript_lines_differ
+        || root
+            .acorn_regions
+            .iter()
+            .any(|region| region.origin != region.lex_start);
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.
@@ -136,10 +154,13 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
             tracker: &tracker,
             map: &map,
         },
-        // One `Option` rather than a table plus a region slice, because it is one
-        // fact: the regions matter exactly when acorn's table exists.
-        acorn: acorn_tracker.as_ref().map(|tracker| AcornLines {
-            loc: LocationMapper { tracker, map: &map },
+        acorn: acorn_seeds_needed.then(|| AcornLines {
+            // acorn's own table when it exists; otherwise the LF one, which the
+            // classes-agree probe has just certified is byte-identical to it.
+            loc: LocationMapper {
+                tracker: acorn_tracker.as_ref().unwrap_or(&tracker),
+                map: &map,
+            },
             regions: root.acorn_regions,
         }),
         comments: &template_comments,
@@ -154,15 +175,19 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     w.into_bytes()
 }
 
-/// acorn's line table and the parses that must be re-based onto it — the whole
-/// re-seeding route, present only when the two line classes actually differ.
+/// The line table an acorn-owned position answers through, and the parses that
+/// must be re-based onto it — the whole re-seeding route, present only when some
+/// seed can actually be non-identity (`acorn_seeds_needed`).
 ///
-/// The two travel together because they are **one** fact, and splitting them
-/// admits a state that silently emits wrong positions: regions without acorn's
-/// table would re-base the *Svelte* table's answers, and acorn's table without
-/// regions would hand every island an unseeded ECMAScript count. Neither fails
-/// loudly — both just move `loc`s. As an `Option`, "the classes agree" is the
-/// absence of the whole thing.
+/// The two travel together because splitting them admits a state that silently
+/// emits wrong positions: regions without a table to answer through would re-base
+/// nothing, and a table without regions would hand every island an unseeded count.
+/// Neither fails loudly — both just move `loc`s.
+///
+/// ⚠️ `loc` is **not** always acorn's own table. When the two line classes agree it
+/// is the Svelte (LF) one, which is then byte-identical — the route is still built
+/// because an annotation region's seed does not come from the class difference. So
+/// "this is `Some`" means *a seed may be non-identity*, never *the classes differ*.
 #[derive(Clone, Copy)]
 struct AcornLines<'a> {
     /// The document's byte→UTF-16 map under **acorn's** line table (the

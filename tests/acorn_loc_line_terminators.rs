@@ -216,7 +216,16 @@ fn an_annotation_seed_survives_a_newline_the_as_insert_overwrites() {
     // `number` is authored on line 7 in both, and acorn reports line 6 in both.
     let with_second_class =
         format!("{head}<p>a\u{2028}b</p>\n{{#each xs as e\n\t: number}}\n\t{{e}}\n{{/each}}\n");
-    let one_class_only = format!("{head}<p>ab</p>\n{{#each xs as e\n\t: number}}\n\t{{e}}\n{{/each}}\n");
-    assert_eq!(line_of(&with_second_class, PATH), 6, "with a <LS> in the document");
-    assert_eq!(line_of(&one_class_only, PATH), 6, "with no second line class");
+    let one_class_only =
+        format!("{head}<p>ab</p>\n{{#each xs as e\n\t: number}}\n\t{{e}}\n{{/each}}\n");
+    assert_eq!(
+        line_of(&with_second_class, PATH),
+        6,
+        "with a <LS> in the document"
+    );
+    assert_eq!(
+        line_of(&one_class_only, PATH),
+        6,
+        "with no second line class"
+    );
 }
