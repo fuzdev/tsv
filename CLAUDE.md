@@ -811,7 +811,7 @@ identifiers `read_identifier` builds. Everything **acorn** parses carries acorn'
 ECMAScript class. And it is not one table per class either: acorn seeds its counter **once per
 parse**, over whatever prefix Svelte prepared for that island (blanked to LF for `<script>` /
 `read_pattern` / `read_type_annotation`, raw for every `read_expression` / `{@const}` /
-snippet-parameter list), and skips `[lineStart, startPos)` outright. `tsv_lang::AcornSeed`
+snippet-parameter list), and skips `[lineStart, startPos)` outright. `tsv_ts::AcornSeed`
 carries that per-parse difference, `tsv_svelte`'s `Root::acorn_regions` records where each
 parse began, and the ECMAScript tracker is built only when the two classes actually differ —
 which `LocationTracker::new_with_map` reports out of the scan it already runs, so a source with

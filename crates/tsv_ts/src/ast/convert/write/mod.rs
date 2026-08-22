@@ -26,7 +26,8 @@
 
 use super::super::internal;
 use super::{Schema, bigint_to_decimal};
-use tsv_lang::{AcornSeed, LocationMapper, Position, Span};
+use crate::acorn_loc::AcornSeed;
+use tsv_lang::{LocationMapper, Position, Span};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
 // TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
@@ -197,7 +198,8 @@ pub fn write_pattern_embedded(
                 // against a re-seeded line in `emitted_position`.
                 let line = env
                     .acorn
-                    .line(env.loc.pos_and_position(expr.span().start).1.line);
+                    .position(env.loc.pos_and_position(expr.span().start).1)
+                    .line;
                 if line > 1 {
                     ctx.pattern_line = line;
                 }
@@ -515,9 +517,9 @@ pub(super) fn close_node(w: &mut JsonWriter, node_type: &'static str, span: Span
     w.raw("}");
 }
 
-/// The emitted `(line, column)` for one endpoint: the tracker's answer re-seeded
-/// onto the acorn parse that produced this node, then the block-pattern
-/// `+1`-column bump.
+/// The emitted position for one endpoint: the tracker's answer re-seeded onto
+/// the acorn parse that produced this node, then the block-pattern `+1`-column
+/// bump.
 ///
 /// **One boundary answers both questions.** A block pattern's trailing `: T` is a
 /// *second* acorn parse (`read_type_annotation`'s `_ as ` trick), so it carries
@@ -527,19 +529,18 @@ pub(super) fn close_node(w: &mut JsonWriter, node_type: &'static str, span: Span
 /// (`pattern_ann_span.start == u32::MAX`, `pattern_line == 0` — which never equals
 /// a real 1-based line — and `AcornSeed::NONE` is the identity).
 #[inline]
-pub(super) fn emitted_position(ctx: &Ctx<'_>, offset: u32, pos: Position) -> (usize, usize) {
+pub(super) fn emitted_position(ctx: &Ctx<'_>, offset: u32, pos: Position) -> Position {
     let in_pattern = offset <= ctx.pattern_ann_span.start;
     let seed = if in_pattern {
         ctx.acorn
     } else {
         ctx.acorn_annotation
     };
-    let line = seed.line(pos.line);
-    let mut column = seed.column(line, pos.column);
-    if in_pattern && line == ctx.pattern_line {
-        column += 1;
+    let mut pos = seed.position(pos);
+    if in_pattern && pos.line == ctx.pattern_line {
+        pos.column += 1;
     }
-    (line, column)
+    pos
 }
 
 /// Emit a node with no fields beyond the universal prefix (`ThisExpression`,
@@ -615,20 +616,20 @@ pub(super) fn node_header_wide_end(
         return;
     }
     let ((start_pos, start), (_, end)) = ctx.loc.span_positions(span.start, span.end);
-    let (start_line, start_column) = emitted_position(ctx, span.start, start);
-    let (end_line, end_column) = emitted_position(ctx, span.end, end);
+    let start = emitted_position(ctx, span.start, start);
+    let end = emitted_position(ctx, span.end, end);
     w.raw(",\"start\":");
     w.u32(start_pos);
     w.raw(",\"end\":");
     w.u32(ctx.loc.pos(wire_end));
     w.raw(",\"loc\":{\"start\":{\"line\":");
-    w.usize(start_line);
+    w.usize(start.line);
     w.raw(",\"column\":");
-    w.usize(start_column);
+    w.usize(start.column);
     w.raw("},\"end\":{\"line\":");
-    w.usize(end_line);
+    w.usize(end.line);
     w.raw(",\"column\":");
-    w.usize(end_column);
+    w.usize(end.column);
     w.raw("}}");
 }
 
@@ -680,24 +681,24 @@ fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &
         return;
     }
     let ((start_pos, start), (end_pos, end)) = ctx.loc.span_positions(span.start, span.end);
-    let (start_line, start_column) = emitted_position(ctx, span.start, start);
-    let (end_line, end_column) = emitted_position(ctx, span.end, end);
+    let start = emitted_position(ctx, span.start, start);
+    let end = emitted_position(ctx, span.end, end);
     w.stage_raw(",\"start\":");
     w.stage_u32(start_pos);
     w.stage_raw(",\"end\":");
     w.stage_u32(end_pos);
     w.stage_raw(",\"loc\":{\"start\":{\"line\":");
-    w.stage_usize(start_line);
+    w.stage_usize(start.line);
     w.stage_raw(",\"column\":");
-    w.stage_usize(start_column);
+    w.stage_usize(start.column);
     if CHARACTER {
         w.stage_raw(",\"character\":");
         w.stage_u32(start_pos);
     }
     w.stage_raw("},\"end\":{\"line\":");
-    w.stage_usize(end_line);
+    w.stage_usize(end.line);
     w.stage_raw(",\"column\":");
-    w.stage_usize(end_column);
+    w.stage_usize(end.column);
     if CHARACTER {
         w.stage_raw(",\"character\":");
         w.stage_u32(end_pos);

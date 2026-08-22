@@ -127,9 +127,10 @@ enum LineRule {
 /// dropped half of what the scan found. The `None` and `Ecmascript` rules leave
 /// it `false`.
 ///
-/// The two constructors carry the leading-`0` precondition the builders rely on,
-/// so it is a type state rather than a doc comment.
-#[derive(Default)]
+/// The constructors carry the leading-`0` precondition the builders rely on, so
+/// it is a type state rather than a doc comment — which is why there is no
+/// `Default`: the derived one would seed no line 1 while collecting starts, the
+/// single state the builders cannot produce a correct table from.
 struct LineScan {
     starts: Vec<u32>,
     ecmascript_differs: bool,
@@ -146,7 +147,18 @@ impl LineScan {
 
     /// A scan that collects no line data at all ([`LineRule::None`]).
     fn map_only() -> Self {
-        Self::default()
+        Self {
+            starts: Vec::new(),
+            ecmascript_differs: false,
+        }
+    }
+
+    /// An unseeded scan, for the unit tests that grade a single ASCII *run*
+    /// against a reference scan of that same run — where a line-1 start the
+    /// reference never emits would be the only difference.
+    #[cfg(test)]
+    fn bare() -> Self {
+        Self::map_only()
     }
 }
 
@@ -242,7 +254,7 @@ fn build_deltas<T: DeltaElem>(
             match line_rule {
                 LineRule::Lf => ascii_lf_line_starts_into(&bytes[i..run_end], i, lines),
                 LineRule::Ecmascript => {
-                    ascii_ecmascript_line_starts_into(&bytes[i..run_end], i, &mut lines.starts);
+                    ascii_ecmascript_line_starts_into(&bytes[i..run_end], i, lines);
                 }
                 LineRule::None => {}
             }
@@ -486,127 +498,6 @@ impl<'a> LocationMapper<'a> {
     }
 }
 
-/// Which line-terminator class acorn counted in the text **ahead of** one
-/// embedded parse — the axis Svelte's per-call source preparation decides.
-///
-/// Svelte hands acorn a different string at every embedded parse, and the choice
-/// of what it does to the bytes before the region is exactly this enum:
-///
-/// - [`Lf`](Self::Lf) — the prefix was blanked with `replace(/[^\n]/g, ' ')`, so
-///   only its LFs survived and acorn's line count over it is Svelte's own
-///   (`<script>` content, `read_pattern` destructures, `read_type_annotation`).
-/// - [`Ecmascript`](Self::Ecmascript) — acorn got the raw template (every
-///   `read_expression` island, the `{@const}`/`{@let}` statement, and the snippet
-///   parameter list, whose `replace(/\S/g, ' ')` prelude keeps *all* whitespace),
-///   so every ECMAScript terminator ahead of the region counted.
-#[derive(Clone, Copy, Debug)]
-pub enum PrefixLines {
-    Lf,
-    Ecmascript,
-}
-
-/// The line/column origin of one **acorn parse**, for re-seeding an
-/// ECMAScript-rule tracker's answers onto it.
-///
-/// acorn seeds `curLine` / `lineStart` **once**, at construction, and only then
-/// advances them over the ECMAScript terminators it lexes:
-///
-/// ```js
-/// this.lineStart = input.lastIndexOf("\n", startPos - 1) + 1;  // LF only
-/// this.curLine   = input.slice(0, this.lineStart).split(lineBreak).length;
-/// ```
-///
-/// So an acorn-owned `loc` is *not* the ECMAScript tracker's answer: the tracker
-/// counts every terminator in the source, while acorn counted only the ones in
-/// the prefix Svelte let it see, and none at all in `[lineStart, startPos)` —
-/// which it skips over entirely. This carries that difference as two constants
-/// applied to the tracker's answer, plus the line they apply on.
-///
-/// [`NONE`](Self::NONE) is the identity, and is what every non-Svelte writer —
-/// and every Svelte document whose two line classes agree, which is essentially
-/// all of them (see `LocationTracker::new_with_map`) — emits under.
-///
-/// The three fields are `u32` for the same reason [`Span`](crate::Span) is: each
-/// is bounded by the source length, which the parsers already refuse past
-/// `u32::MAX`. That keeps the seed 12 bytes, so carrying two of them (a block
-/// pattern's two parses) costs an `EmbedWriter` less than one `Position` would.
-#[derive(Clone, Copy, Debug)]
-pub struct AcornSeed {
-    /// acorn's line number for the region's first line, or `0` when inactive.
-    /// `0` never equals a real 1-based line, so the column rule is then inert.
-    first_line: u32,
-    /// Lines to subtract from the ECMAScript tracker's answer: the terminators
-    /// it counted ahead of the region that acorn did not.
-    line_delta: u32,
-    /// Columns to add on `first_line` only: the distance from acorn's own
-    /// `lineStart` out to the ECMAScript tracker's, in emitted units. Nonzero
-    /// only when a non-LF terminator sits between the two.
-    column_shift: u32,
-}
-
-impl AcornSeed {
-    /// The identity seed: the tracker's answer, emitted as-is.
-    pub const NONE: Self = Self {
-        first_line: 0,
-        line_delta: 0,
-        column_shift: 0,
-    };
-
-    /// The seed for the acorn parse Svelte started at `origin` and that begins
-    /// lexing real source bytes at `lex_start`.
-    ///
-    /// The two positions differ only where Svelte *inserts* synthetic text at the
-    /// parse start — `read_type_annotation`'s `_ as `, which acorn lexes instead
-    /// of the bytes it covers. Everywhere else they are the same position.
-    ///
-    /// `acorn` is the ECMAScript-rule mapper the re-seeded answers come from and
-    /// `lf` the LF-rule tracker over that same source. Taking a *mapper* on the
-    /// acorn side rather than a second bare tracker is what keeps the byte→UTF-16
-    /// map this shifts columns in the very one those answers were emitted
-    /// through — a line rule never affects the map, so there is only ever one.
-    pub fn new(
-        lf: &LocationTracker,
-        acorn: LocationMapper<'_>,
-        origin: u32,
-        lex_start: u32,
-        prefix: PrefixLines,
-    ) -> Self {
-        // acorn's `lineStart` at `origin` is the last LF at or before it, and its
-        // `curLine` is that position's line under whichever rule the prefix left
-        // standing — which is the same line as `origin`'s under both.
-        let column_origin = lf.line_start_byte(origin as usize);
-        let first_line = match prefix {
-            PrefixLines::Lf => lf.get_line_column(origin as usize).0,
-            PrefixLines::Ecmascript => acorn.tracker.get_line_column(column_origin).0,
-        };
-        // Both hit the tracker's 1-entry line cache, the second for free.
-        let acorn_line = acorn.tracker.get_line_column(lex_start as usize).0;
-        let acorn_line_start = acorn.tracker.line_start_byte(lex_start as usize);
-        Self {
-            first_line: first_line as u32,
-            line_delta: (acorn_line - first_line) as u32,
-            column_shift: acorn.pos(acorn_line_start as u32) - acorn.pos(column_origin as u32),
-        }
-    }
-
-    /// acorn's line for a position the ECMAScript tracker put on `es_line`.
-    #[inline]
-    pub fn line(self, es_line: usize) -> usize {
-        es_line - self.line_delta as usize
-    }
-
-    /// acorn's column for a position the ECMAScript tracker put at `column` on
-    /// (already re-seeded) `line`.
-    #[inline]
-    pub fn column(self, line: usize, column: usize) -> usize {
-        if line == self.first_line as usize {
-            column + self.column_shift as usize
-        } else {
-            column
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct LocationTracker {
     /// Byte offset of each line's first byte, ascending, `[0]` always present.
@@ -660,8 +551,11 @@ impl LocationTracker {
     /// U+2028, U+2029) — acorn's rule, applied everywhere including inside
     /// string literals. Used for standalone TypeScript locations.
     ///
-    /// Production callers use the fused `new_ecmascript_with_map`; this
-    /// survives as its differential test oracle.
+    /// The unfused builder, for the one caller that wants acorn's line table
+    /// and *not* a second byte→char map: a Svelte document whose two line
+    /// classes disagree already holds the map (a line rule never affects it),
+    /// so `new_ecmascript_with_map`'s second return would be discarded. It is
+    /// also `new_ecmascript_with_map`'s differential test oracle.
     pub fn new_ecmascript(source: &str) -> Self {
         if source.is_ascii() {
             return Self::with_line_starts(ascii_ecmascript_line_starts(source.as_bytes()));
@@ -718,9 +612,9 @@ impl LocationTracker {
     /// CR, U+2028, or U+2029. `false` means [`new_ecmascript`](Self::new_ecmascript)
     /// over the same source would build a byte-identical table (CRLF is one
     /// ECMAScript break holding one LF, so it never counts), which is what lets
-    /// the Svelte writer skip acorn's second table — and every [`AcornSeed`] that
-    /// reads it — on essentially every real document. Detected in this same scan,
-    /// so it costs no extra pass.
+    /// the Svelte writer skip acorn's second table — and every `tsv_ts::AcornSeed`
+    /// that reads it — on essentially every real document. Detected in this same
+    /// scan, so it costs no extra pass.
     pub fn new_with_map(source: &str) -> (Self, ByteToCharMap, bool) {
         let mut lines = LineScan::lines();
         let map = if source.is_ascii() {
@@ -913,9 +807,9 @@ impl LocationTracker {
 /// ECMAScript-rule line starts for ASCII-only source: no U+2028/U+2029
 /// possible, so line terminators are single bytes with CRLF fusing.
 fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<u32> {
-    let mut line_starts = vec![0];
-    ascii_ecmascript_line_starts_into(bytes, 0, &mut line_starts);
-    line_starts
+    let mut lines = LineScan::lines();
+    ascii_ecmascript_line_starts_into(bytes, 0, &mut lines);
+    lines.starts
 }
 
 /// Index of the first `\n` **or** `\r` at or after `from`, or `bytes.len()`.
@@ -958,13 +852,16 @@ fn next_ecmascript_terminator(bytes: &[u8], from: usize) -> usize {
 /// The multibyte builder splits the source into ASCII runs at its multibyte
 /// characters, so each run's line scan is exactly the all-ASCII one — shared
 /// with the fast path rather than re-derived. A run boundary can never split a
-/// line terminator: every terminator this rule recognizes is one ASCII byte.
+/// terminator this scan reads — the LFs it collects are one ASCII byte, and the
+/// CRLF pair it probes for cannot straddle one either, since a run only ends at
+/// a non-ASCII byte and `\n` is not one. So a `\r` at the end of a run is a lone
+/// CR, exactly as this reads it.
 ///
 /// The scan looks for `\r` alongside `\n` — both needles ride one loaded word
 /// (see [`next_ecmascript_terminator`]), so the probe costs no extra pass and no
 /// extra memory traffic. It is what lets `tsv_svelte` skip building acorn's
 /// second line table on every document that does not need one; see
-/// [`AcornSeed`].
+/// `tsv_ts::AcornSeed`.
 fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
     let mut i = next_ecmascript_terminator(bytes, 0);
     while i < bytes.len() {
@@ -979,8 +876,10 @@ fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
     }
 }
 
-/// Append the ECMAScript-rule line starts of an ASCII run to `line_starts`,
-/// offset by the run's `base` position in the source.
+/// Append the ECMAScript-rule line starts of an ASCII run to `lines`, offset by
+/// the run's `base` position in the source. This rule counts the whole class, so
+/// it never has an `ecmascript_differs` to report — it takes the same
+/// [`LineScan`] as its LF sibling so the builder's two arms read alike.
 ///
 /// A CRLF pair can never straddle a run boundary — a run only ends at a
 /// non-ASCII byte, which `\n` is not — so a `\r` at the end of a run is a lone
@@ -990,14 +889,14 @@ fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
 /// and a lone `\r` both start the next line at `i + 1`, and CRLF is the same
 /// after stepping `i` onto its `\n`. So the only per-byte work left is the CRLF
 /// test, run once per line instead of once per byte.
-fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<u32>) {
+fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
     let mut i = next_ecmascript_terminator(bytes, 0);
     while i < bytes.len() {
         // CRLF counts as a single line terminator.
         if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
             i += 1;
         }
-        line_starts.push((base + i + 1) as u32);
+        lines.starts.push((base + i + 1) as u32);
         i = next_ecmascript_terminator(bytes, i + 1);
     }
 }
@@ -1272,7 +1171,7 @@ mod tests {
                     bytes.extend_from_slice(b"yy");
                     let label = format!("{bytes:?}");
 
-                    let mut lf = LineScan::default();
+                    let mut lf = LineScan::bare();
                     ascii_lf_line_starts_into(&bytes, 100, &mut lf);
                     assert_eq!(
                         lf.starts,
@@ -1280,16 +1179,16 @@ mod tests {
                         "lf {label}"
                     );
 
-                    let mut es = Vec::new();
+                    let mut es = LineScan::bare();
                     ascii_ecmascript_line_starts_into(&bytes, 100, &mut es);
                     assert_eq!(
-                        es,
+                        es.starts,
                         reference_ecmascript_line_starts(&bytes, 100),
                         "ecmascript {label}"
                     );
                     assert_eq!(
                         lf.ecmascript_differs,
-                        es != lf.starts,
+                        es.starts != lf.starts,
                         "ecmascript-differs probe {label}"
                     );
                 }
@@ -1316,7 +1215,7 @@ mod tests {
                     _ => b'a',
                 });
             }
-            let mut lf = LineScan::default();
+            let mut lf = LineScan::bare();
             ascii_lf_line_starts_into(&bytes, 0, &mut lf);
             assert_eq!(
                 lf.starts,
@@ -1324,16 +1223,16 @@ mod tests {
                 "lf case {case}"
             );
 
-            let mut es = Vec::new();
+            let mut es = LineScan::bare();
             ascii_ecmascript_line_starts_into(&bytes, 0, &mut es);
             assert_eq!(
-                es,
+                es.starts,
                 reference_ecmascript_line_starts(&bytes, 0),
                 "ecmascript case {case}"
             );
             assert_eq!(
                 lf.ecmascript_differs,
-                es != lf.starts,
+                es.starts != lf.starts,
                 "ecmascript-differs probe case {case}"
             );
         }

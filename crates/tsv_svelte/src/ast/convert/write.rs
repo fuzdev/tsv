@@ -63,9 +63,10 @@ use crate::ast::internal;
 use crate::whitespace::is_svelte_ws;
 use tsv_css::ast::convert::{write_css_children, write_css_comments};
 use tsv_lang::{
-    AcornSeed, Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span,
-    estimated_json_capacity, write_array, write_or_null,
+    Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
+    write_array, write_or_null,
 };
+use tsv_ts::AcornSeed;
 use tsv_ts::ast::convert::{
     CommentMode, EmbedWriter, ProgramLoc, ProgramWriter, Schema, translate_column,
     write_expression_embedded, write_identifier_expression_with_character, write_pattern_embedded,
@@ -470,24 +471,24 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
         (ctx.acorn_loc(), ctx.acorn_seed(comment.span.start))
     };
     let ((_, start_pos), (_, end_pos)) = loc.span_positions(comment.span.start, comment.span.end);
-    let start_line = seed.line(start_pos.line);
-    let end_line = seed.line(end_pos.line);
+    let start = seed.position(start_pos);
+    let end = seed.position(end_pos);
     // The block-pattern synthetic-`(` column shift (`bump_pattern_columns`);
     // a multiline block comment's `end` sits on an unshifted later line.
     let bump = usize::from(comment.bump_pattern_columns);
     let bump_end = usize::from(comment.bump_pattern_columns && !comment.multiline);
     w.raw(",\"loc\":{\"start\":{\"line\":");
-    w.usize(start_line);
+    w.usize(start.line);
     w.raw(",\"column\":");
-    w.usize(seed.column(start_line, start_pos.column) + bump);
+    w.usize(start.column + bump);
     if comment.emit_character_field {
         w.raw(",\"character\":");
         w.u32(start_char);
     }
     w.raw("},\"end\":{\"line\":");
-    w.usize(end_line);
+    w.usize(end.line);
     w.raw(",\"column\":");
-    w.usize(seed.column(end_line, end_pos.column) + bump_end);
+    w.usize(end.column + bump_end);
     if comment.emit_character_field {
         w.raw(",\"character\":");
         w.u32(end_char);

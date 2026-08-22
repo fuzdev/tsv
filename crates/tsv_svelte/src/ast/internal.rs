@@ -19,7 +19,8 @@
 use std::borrow::Cow;
 
 use tsv_css::ast::internal::CssStyleSheet;
-pub use tsv_lang::{Comment, PrefixLines, Span};
+pub use tsv_lang::{Comment, Span};
+pub use tsv_ts::PrefixLines;
 use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
@@ -47,7 +48,7 @@ pub struct Root<'arena> {
 ///
 /// Svelte runs acorn once per island over a *purpose-built* string, and the
 /// wire `loc` those nodes carry is acorn's, seeded from that string — see
-/// [`tsv_lang::AcornSeed`]. Recording the parse start here is what lets the wire
+/// [`tsv_ts::AcornSeed`]. Recording the parse start here is what lets the wire
 /// writer rebuild the seed: it cannot be recovered from a node's own span (a
 /// leading comment, or whitespace Svelte had already stepped over, sits between
 /// them), and the root `comments` array is emitted outside the tree walk that

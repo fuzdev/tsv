@@ -632,7 +632,7 @@ and then, whatever the prefix, it *skips* `[lineStart, startPos)` outright — `
 found with `lastIndexOf("\n", startPos - 1)`, so a non-LF terminator between that LF and the
 island is counted by neither half.
 
-`tsv_lang::AcornSeed` carries that per-parse difference as two constants over the
+`tsv_ts::AcornSeed` carries that per-parse difference as two constants over the
 ECMAScript-rule tracker's answer (lines to subtract, columns to add on the region's first
 line), and `tsv_svelte`'s parser records the parse start of every island in
 `Root::acorn_regions` so the writer can rebuild the seed — including for the root `comments`

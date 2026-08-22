@@ -19,6 +19,7 @@
 //! let json_bytes = convert_ast_json_bytes(&ast, source);
 //! ```
 
+mod acorn_loc;
 pub mod ast;
 mod goal;
 mod lexer;
@@ -31,6 +32,7 @@ use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::build_line_breaks_into;
 pub use tsv_lang::{ParseError, Result};
 
+pub use acorn_loc::{AcornSeed, PrefixLines};
 pub use goal::Goal;
 pub use parser::TopLevelAs;
 

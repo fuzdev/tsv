@@ -9,7 +9,7 @@
 //! `read_identifier` builds. Everything acorn parses carries acorn's, which is the ECMAScript
 //! class: `\n`, `\r`, `\r\n`, `<LS>`, `<PS>`. And acorn seeds that counter **once per parse**,
 //! over whatever prefix Svelte prepared for it, so an island's `loc` is not simply "the
-//! ECMAScript table's answer" either — see `tsv_lang::AcornSeed`.
+//! ECMAScript table's answer" either — see `tsv_ts::AcornSeed`.
 //!
 //! **Why a test rather than a fixture.** The `<LS>` / `<PS>` spellings are format-stable
 //! inside a verbatim region and are pinned by

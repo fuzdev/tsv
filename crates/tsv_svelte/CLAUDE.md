@@ -41,7 +41,7 @@ What separates this crate from `tsv_ts` / `tsv_css`:
   Svelte prepared for *that* island (blanked to LF for `<script>` / `read_pattern` /
   `read_type_annotation`, raw for every `read_expression` / `{@const}` / snippet-parameter
   list). The parser records each parse's start in `Root::acorn_regions`, and the writer
-  rebuilds the seed from it (`tsv_lang::AcornSeed`) — including for the root `comments` array,
+  rebuilds the seed from it (`tsv_ts::AcornSeed`) — including for the root `comments` array,
   which is emitted outside the tree walk that would otherwise carry it. Gated by
   `tests/fixtures/svelte/syntax/whitespace/line_terminators_acorn_regions` and
   [`tests/acorn_loc_line_terminators.rs`](../../tests/acorn_loc_line_terminators.rs) (the

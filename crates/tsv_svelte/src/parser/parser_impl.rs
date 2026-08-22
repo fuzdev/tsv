@@ -3,11 +3,12 @@
 use crate::ast::internal::{self, FragmentNode};
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::parser::element::tag_name_end;
-use crate::whitespace::is_svelte_ws;
+use crate::whitespace::skip_svelte_ws;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{Comment, ParseError, PrefixLines, Span};
+use tsv_lang::{Comment, ParseError, Span};
 use tsv_ts::Expression;
+use tsv_ts::PrefixLines;
 use tsv_ts::TSTypeAnnotation;
 use tsv_ts::TopLevelAs;
 use tsv_ts::{is_id_continue, is_id_start};
@@ -646,18 +647,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Record the embedded **acorn parse** Svelte runs over this component
     /// starting around `origin` — the fact `Root.acorn_regions` carries to the
     /// wire writer, which rebuilds acorn's line/column seed from it
-    /// ([`tsv_lang::AcornSeed`]).
+    /// ([`tsv_ts::AcornSeed`]).
     ///
     /// Svelte calls `allow_whitespace()` before every one of these reads, so
     /// acorn's `startPos` is the first non-whitespace byte — while tsv's own
-    /// sub-parse offsets are sometimes the delimiter still behind it. The skip
-    /// lives here rather than at each call site because it is one rule, and
+    /// sub-parse offsets are sometimes the delimiter still behind it.
+    /// [`skip_svelte_ws`] is that same `allow_whitespace()` over a raw offset. The
+    /// skip lives here rather than at each call site because it is one rule, and
     /// getting it wrong is invisible until it isn't: a terminator tsv is still
     /// standing behind belongs to the prefix acorn **skipped**, and counting it
     /// moves every position in the island a line.
     pub(crate) fn record_acorn_region(&mut self, origin: usize, prefix: PrefixLines) {
-        let rest = &self.source[origin..];
-        let at = origin + (rest.len() - rest.trim_start_matches(is_svelte_ws).len());
+        let at = skip_svelte_ws(self.source, origin);
         self.record_acorn_region_at(at, at, prefix);
     }
 
