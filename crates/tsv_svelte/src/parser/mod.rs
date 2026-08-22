@@ -182,6 +182,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // the style node via `write_css_comments`, matching where parseCss puts them —
         // so they are never merged into `Root.comments`.
 
+        // Recorded in read order, which is source order — the wire writer
+        // binary-searches this by position (`SvelteParser::record_acorn_region_at`
+        // asserts the order at each push).
+        let acorn_regions = self.arena.alloc_slice_copy(&self.acorn_regions);
+
         Ok(Root {
             fragment,
             instance,
@@ -189,6 +194,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             css,
             options,
             comments,
+            acorn_regions,
         })
     }
 

@@ -63,13 +63,13 @@ use crate::ast::internal;
 use crate::whitespace::is_svelte_ws;
 use tsv_css::ast::convert::{write_css_children, write_css_comments};
 use tsv_lang::{
-    Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
-    write_array, write_or_null,
+    AcornSeed, Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span,
+    estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
-    CommentMode, EmbedWriter, ProgramLoc, Schema, translate_column, write_expression_embedded,
-    write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
-    write_variable_declaration_embedded,
+    CommentMode, EmbedWriter, ProgramLoc, ProgramWriter, Schema, block_pattern_annotation_span,
+    translate_column, write_expression_embedded, write_identifier_expression_with_character,
+    write_pattern_embedded, write_program_embedded, write_variable_declaration_embedded,
 };
 
 use super::comment_attachment::{AttachInputs, get_comment_value, is_template_comment};
@@ -102,11 +102,19 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     // `no-locations` path emits no line/column at all (loc, name_loc, and
     // root-comment loc are all gated off), so it skips the LF line scan entirely
     // (`new_map_only` builds just the byte→char map) — once per file, no per-node cost.
-    let (tracker, map) = if emit_loc {
+    let (tracker, map, ecmascript_lines_differ) = if emit_loc {
         LocationTracker::new_with_map(source)
     } else {
-        LocationTracker::new_map_only(source)
+        let (tracker, map) = LocationTracker::new_map_only(source);
+        (tracker, map, false)
     };
+
+    // acorn's line table, built ONLY when the two classes actually draw
+    // different lines — a lone CR, U+2028, or U+2029 somewhere in the source.
+    // Otherwise this table would be byte-identical to the LF one, every
+    // `AcornSeed` would be the identity, and the whole acorn-region route is
+    // provably the LF one: real code lands here, and pays nothing.
+    let acorn_tracker = ecmascript_lines_differ.then(|| LocationTracker::new_ecmascript(source));
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.
@@ -122,6 +130,17 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
         loc: LocationMapper {
             tracker: &tracker,
             map: &map,
+        },
+        acorn_loc: LocationMapper {
+            tracker: acorn_tracker.as_ref().unwrap_or(&tracker),
+            map: &map,
+        },
+        // Empty when the two classes agree, which makes every seed lookup a
+        // single length check that returns `AcornSeed::NONE`.
+        acorn_regions: if ecmascript_lines_differ {
+            root.acorn_regions
+        } else {
+            &[]
         },
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
@@ -139,12 +158,28 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
 #[derive(Clone, Copy)]
 struct Ctx<'a> {
     source: &'a str,
-    /// Real-map mapper for fused char-space spine emission and the embedded TS
-    /// expression writer. Its `tracker` also serves byte-space uses alone (the
-    /// comment-island skeleton builders, paired with `LocationMapper::identity`,
-    /// and the `<script>` tag-line lookups); its `map`, the `<style>` CSS
-    /// children.
+    /// Real-map mapper for fused char-space spine emission. Its `tracker` also
+    /// serves byte-space uses alone (the comment-island skeleton builders,
+    /// paired with `LocationMapper::identity`, and the `<script>` tag-line
+    /// lookups); its `map`, the `<style>` CSS children.
+    ///
+    /// This is the **Svelte** line table (`locate-character`, LF only): the
+    /// spine, `name_loc`, the CSS `loc`, the `Program`'s own `loc`, and the
+    /// `character`-bearing identifiers Svelte's `read_identifier` builds.
     loc: LocationMapper<'a>,
+    /// The same map under **acorn's** line table (the ECMAScript class), for the
+    /// embedded islands — see `acorn_regions`. Identical to `loc` whenever the
+    /// two classes agree, which is every source without a lone CR, U+2028 or
+    /// U+2029.
+    acorn_loc: LocationMapper<'a>,
+    /// Every embedded acorn parse in this component, ascending and disjoint, or
+    /// **empty** when the two line classes agree — the gate that keeps the whole
+    /// re-seeding route off the common path.
+    ///
+    /// Each island's `loc` is acorn's, seeded once at the start of the parse
+    /// Svelte prepared for it, so `acorn_loc`'s answer has to be re-based onto
+    /// that parse: `acorn_seed`.
+    acorn_regions: &'a [internal::AcornRegion],
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -167,8 +202,9 @@ impl<'a> Ctx<'a> {
         self.loc.pos(byte)
     }
 
-    /// The shared inputs for an embedded `tsv_ts` writer — this document's
-    /// `source` / `loc` / `emit_loc` / parser variant paired with the per-call
+    /// The shared inputs for an embedded `tsv_ts` writer over an **acorn** island
+    /// at `pos` — this document's `source` / `emit_loc` / parser variant, acorn's
+    /// line table, the seed of the parse `pos` belongs to, and the per-call
     /// comment `mode`.
     ///
     /// Every expression island funnels through here, which is what makes the
@@ -177,14 +213,84 @@ impl<'a> Ctx<'a> {
     /// an attribute or directive value, a `{@const}` and a `{#snippet}` body all
     /// carry vanilla acorn's wire quirks in a non-TS component.
     #[inline]
-    fn embed(&self, mode: CommentMode<'a>) -> EmbedWriter<'a> {
+    fn embed(&self, mode: CommentMode<'a>, pos: u32) -> EmbedWriter<'a> {
+        EmbedWriter {
+            source: self.source,
+            loc: self.acorn_loc,
+            comments: mode,
+            emit_loc: self.emit_loc,
+            vanilla_acorn: !self.component_is_ts,
+            acorn: self.acorn_seed(pos),
+            acorn_annotation: AcornSeed::NONE,
+        }
+    }
+
+    /// The same, for an island Svelte builds **itself** with `locate-character`
+    /// rather than handing to acorn: the `character`-bearing identifiers of a
+    /// shorthand attribute (`{name}`) and a snippet name, both from
+    /// `read_identifier`. Those take the Svelte line table and no seed.
+    ///
+    /// The *third* `read_identifier` position — a simple `{#each … as id}`
+    /// binding — does not come through here, because its island can also carry a
+    /// trailing `: T` that IS acorn's. It rides `embed_pattern` instead, under a
+    /// `PrefixLines::Lf` seed anchored at the identifier's own start, which
+    /// reproduces `locate-character` exactly: an identifier holds no line
+    /// terminator, so every position in it sits on the seed's first line, where
+    /// the seed's line is the LF-rule one and its column origin is the LF line
+    /// start.
+    #[inline]
+    fn embed_locator(&self, mode: CommentMode<'a>) -> EmbedWriter<'a> {
         EmbedWriter {
             source: self.source,
             loc: self.loc,
             comments: mode,
             emit_loc: self.emit_loc,
             vanilla_acorn: !self.component_is_ts,
+            acorn: AcornSeed::NONE,
+            acorn_annotation: AcornSeed::NONE,
         }
+    }
+
+    /// The same, for a **block pattern** island — which is up to *two* parses:
+    /// the pattern itself, and its trailing `: T`, which Svelte reads with a
+    /// separately padded second one (`read_type_annotation`). The annotation's
+    /// own bytes start one past the `:`; Svelte's `_ as ` insert sits behind
+    /// that, which is what `record_annotation_acorn_region` recorded.
+    ///
+    /// A simple identifier binding is Svelte's `read_identifier`, not an acorn
+    /// parse at all — see `embed_locator` for why its `PrefixLines::Lf` seed is
+    /// nonetheless the `locate-character` answer.
+    #[inline]
+    fn embed_pattern(
+        &self,
+        mode: CommentMode<'a>,
+        expr: &tsv_ts::ast::internal::Expression<'_>,
+    ) -> EmbedWriter<'a> {
+        let mut env = self.embed(mode, expr.span().start);
+        if let Some(ann) = block_pattern_annotation_span(expr) {
+            env.acorn_annotation = self.acorn_seed(ann.start + 1);
+        }
+        env
+    }
+
+    /// The line/column seed of the acorn parse `pos` belongs to — the last
+    /// region starting at or before it, since regions never nest or overlap.
+    ///
+    /// `AcornSeed::NONE` when `acorn_regions` is empty (the two line classes
+    /// agree, so acorn's table IS the Svelte one and there is nothing to
+    /// re-base), and for a position ahead of every region.
+    fn acorn_seed(&self, pos: u32) -> AcornSeed {
+        let before = self.acorn_regions.partition_point(|r| r.lex_start <= pos);
+        let Some(region) = before.checked_sub(1).map(|i| &self.acorn_regions[i]) else {
+            return AcornSeed::NONE;
+        };
+        AcornSeed::new(
+            self.loc.tracker,
+            self.acorn_loc,
+            region.origin,
+            region.lex_start,
+            region.prefix,
+        )
     }
 
     /// The shared inputs for a template comment-attach builder
@@ -327,24 +433,35 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
         w.raw("}");
         return;
     }
-    let ((_, start_pos), (_, end_pos)) =
-        ctx.loc.span_positions(comment.span.start, comment.span.end);
+    // The same axis that picks the literal's shape picks its line table: a
+    // template-reader comment is Svelte's own (`locate-character`), an
+    // acorn-shape one carries the `loc` of whichever acorn parse produced it —
+    // this array holds both, and is emitted outside the tree walk that would
+    // otherwise carry the seed, which is what `acorn_regions` exists for.
+    let (loc, seed) = if comment.emit_character_field {
+        (ctx.loc, AcornSeed::NONE)
+    } else {
+        (ctx.acorn_loc, ctx.acorn_seed(comment.span.start))
+    };
+    let ((_, start_pos), (_, end_pos)) = loc.span_positions(comment.span.start, comment.span.end);
+    let start_line = seed.line(start_pos.line);
+    let end_line = seed.line(end_pos.line);
     // The block-pattern synthetic-`(` column shift (`bump_pattern_columns`);
     // a multiline block comment's `end` sits on an unshifted later line.
     let bump = usize::from(comment.bump_pattern_columns);
     let bump_end = usize::from(comment.bump_pattern_columns && !comment.multiline);
     w.raw(",\"loc\":{\"start\":{\"line\":");
-    w.usize(start_pos.line);
+    w.usize(start_line);
     w.raw(",\"column\":");
-    w.usize(start_pos.column + bump);
+    w.usize(seed.column(start_line, start_pos.column) + bump);
     if comment.emit_character_field {
         w.raw(",\"character\":");
         w.u32(start_char);
     }
     w.raw("},\"end\":{\"line\":");
-    w.usize(end_pos.line);
+    w.usize(end_line);
     w.raw(",\"column\":");
-    w.usize(end_pos.column + bump_end);
+    w.usize(seed.column(end_line, end_pos.column) + bump_end);
     if comment.emit_character_field {
         w.raw(",\"character\":");
         w.u32(end_char);
@@ -398,10 +515,14 @@ fn write_generic_island(
 ) {
     if ctx.any_comment_in(container_start, range_end) {
         let wc = build_expression_writer_comments(expr, ctx.attach(), container_start, range_end);
-        write_expression_embedded(w, expr, ctx.embed(CommentMode::Emit(&wc)));
+        write_expression_embedded(
+            w,
+            expr,
+            ctx.embed(CommentMode::Emit(&wc), expr.span().start),
+        );
         wc.debug_assert_consumed();
     } else {
-        write_expression_embedded(w, expr, ctx.embed(CommentMode::Off));
+        write_expression_embedded(w, expr, ctx.embed(CommentMode::Off, expr.span().start));
     }
 }
 
@@ -584,7 +705,11 @@ fn write_shorthand_expression_tag(
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_identifier_expression_with_character(w, &tag.expression, ctx.embed(CommentMode::Off));
+    write_identifier_expression_with_character(
+        w,
+        &tag.expression,
+        ctx.embed_locator(CommentMode::Off),
+    );
     w.raw("}");
 }
 
@@ -803,10 +928,14 @@ fn write_snippet_name(
         // affect the attach walk (span/type keyed), so the skeleton builds
         // without it and the fused emit adds it.
         let wc = build_expression_writer_comments(expr, ctx.attach(), container_start, range_end);
-        write_identifier_expression_with_character(w, expr, ctx.embed(CommentMode::Emit(&wc)));
+        write_identifier_expression_with_character(
+            w,
+            expr,
+            ctx.embed_locator(CommentMode::Emit(&wc)),
+        );
         wc.debug_assert_consumed();
     } else {
-        write_identifier_expression_with_character(w, expr, ctx.embed(CommentMode::Off));
+        write_identifier_expression_with_character(w, expr, ctx.embed_locator(CommentMode::Off));
     }
 }
 
@@ -832,12 +961,12 @@ fn write_snippet_parameters(
             None,
         );
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(w, p, ctx.embed(CommentMode::Emit(&wc)));
+            write_expression_embedded(w, p, ctx.embed(CommentMode::Emit(&wc), p.span().start));
         });
         wc.debug_assert_consumed();
     } else {
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(w, p, ctx.embed(CommentMode::Off));
+            write_expression_embedded(w, p, ctx.embed(CommentMode::Off, p.span().start));
         });
     }
 }
@@ -924,7 +1053,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
             Some(Span::new(first.span().start, last.span().end)),
         );
         write_array(w, identifiers, |w, id| {
-            write_expression_embedded(w, id, ctx.embed(CommentMode::Emit(&wc)));
+            write_expression_embedded(w, id, ctx.embed(CommentMode::Emit(&wc), id.span().start));
         });
         wc.debug_assert_consumed();
     } else {
@@ -1036,9 +1165,9 @@ fn write_const_declaration(
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(w, &tag.id, ctx.embed(mode));
+    write_pattern_embedded(w, &tag.id, ctx.embed_pattern(mode, &tag.id));
     w.raw(",\"init\":");
-    write_expression_embedded(w, &tag.init, ctx.embed(mode));
+    write_expression_embedded(w, &tag.init, ctx.embed(mode, tag.init.span().start));
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
@@ -1067,7 +1196,11 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
     // Scoped comment pre-check (see `write_const_tag`): no comment inside this
     // tag's span means the attach map is empty, so fuse directly.
     if !ctx.any_comment_in(tag.span.start, tag.span.end) {
-        write_variable_declaration_embedded(w, &tag.declaration, ctx.embed(CommentMode::Off));
+        write_variable_declaration_embedded(
+            w,
+            &tag.declaration,
+            ctx.embed(CommentMode::Off, tag.declaration.span.start),
+        );
     } else {
         let wc = build_declaration_tag_writer_comments(
             &tag.declaration,
@@ -1075,7 +1208,11 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             tag.span.start,
             tag.span.end,
         );
-        write_variable_declaration_embedded(w, &tag.declaration, ctx.embed(CommentMode::Emit(&wc)));
+        write_variable_declaration_embedded(
+            w,
+            &tag.declaration,
+            ctx.embed(CommentMode::Emit(&wc), tag.declaration.span.start),
+        );
         wc.debug_assert_consumed();
     }
     w.raw("}");
@@ -1525,11 +1662,18 @@ fn write_script_program_fused(
     write_program_embedded(
         w,
         program,
-        ctx.source,
-        ctx.loc,
-        schema,
-        program_loc,
-        comments,
+        ProgramWriter {
+            source: ctx.source,
+            // The `Program`'s own `loc` is Svelte's (`locator`, computed above);
+            // its BODY is acorn's, so the body walk takes acorn's table and the
+            // script's own seed — `read_script` blanks everything ahead of the
+            // content.
+            loc: ctx.acorn_loc,
+            schema,
+            program_loc,
+            comments,
+            acorn: ctx.acorn_seed(program.span.start),
+        },
     );
 }
 
@@ -1712,7 +1856,11 @@ fn write_custom_element_field(
                 Some(shadow_expr @ Expression::ObjectExpression(_)) => {
                     json_comma(w, &mut first);
                     w.raw("\"shadow\":");
-                    write_expression_embedded(w, shadow_expr, ctx.embed(CommentMode::Off));
+                    write_expression_embedded(
+                        w,
+                        shadow_expr,
+                        ctx.embed(CommentMode::Off, shadow_expr.span().start),
+                    );
                 }
                 _ => {}
             }
@@ -1720,7 +1868,11 @@ fn write_custom_element_field(
             if let Some(extend_expr) = extend {
                 json_comma(w, &mut first);
                 w.raw("\"extend\":");
-                write_expression_embedded(w, extend_expr, ctx.embed(CommentMode::Off));
+                write_expression_embedded(
+                    w,
+                    extend_expr,
+                    ctx.embed(CommentMode::Off, extend_expr.span().start),
+                );
             }
             w.raw("}");
             return;
@@ -1771,7 +1923,7 @@ fn write_pattern_island(
     expr: &tsv_ts::ast::internal::Expression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_pattern_embedded(w, expr, ctx.embed(CommentMode::Off));
+    write_pattern_embedded(w, expr, ctx.embed_pattern(CommentMode::Off, expr));
 }
 
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s

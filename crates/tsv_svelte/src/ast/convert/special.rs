@@ -12,11 +12,13 @@ use crate::ast::internal;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use tsv_lang::{
-    Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
+    AcornSeed, Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span,
+    estimated_json_capacity,
 };
 use tsv_ts::ast::convert::{
-    CommentMode, EmbedWriter, ProgramLoc, Schema, SkeletonRecorder, SkeletonTree, WriterComments,
-    write_expression_embedded, write_program_embedded, write_variable_declaration_embedded,
+    CommentMode, EmbedWriter, ProgramLoc, ProgramWriter, Schema, SkeletonRecorder, SkeletonTree,
+    WriterComments, write_expression_embedded, write_program_embedded,
+    write_variable_declaration_embedded,
 };
 
 use super::comment_attachment::{
@@ -53,6 +55,9 @@ fn skeleton_env<'a>(attach: AttachInputs<'a>, recorder: &'a SkeletonRecorder) ->
         comments: CommentMode::Record(recorder),
         emit_loc: true,
         vanilla_acorn: attach.vanilla_acorn,
+        // Same reason as `loc`: the emitted positions are discarded.
+        acorn: AcornSeed::NONE,
+        acorn_annotation: AcornSeed::NONE,
     }
 }
 
@@ -227,11 +232,16 @@ pub(super) fn build_script_writer_comments(
     write_program_embedded(
         &mut w,
         &script.content,
-        source,
-        LocationMapper::identity(tracker),
-        schema,
-        ProgramLoc::Emit(dummy, dummy), // skeleton pass: bytes discarded, loc irrelevant
-        CommentMode::Record(&recorder),
+        ProgramWriter {
+            source,
+            loc: LocationMapper::identity(tracker),
+            schema,
+            // Skeleton pass: bytes discarded, loc irrelevant — same reason the
+            // seed below is the identity.
+            program_loc: ProgramLoc::Emit(dummy, dummy),
+            comments: CommentMode::Record(&recorder),
+            acorn: AcornSeed::NONE,
+        },
     );
     let tree = recorder.finish();
     let root = tree.roots()[0];

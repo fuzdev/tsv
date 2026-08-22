@@ -1318,6 +1318,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Snippet parameters preserve grouping parens (acorn's `preserveParens`,
             // without Svelte's `remove_parens`), so a default like `c = (2, 3)` keeps
             // its `ParenthesizedExpression` — matching Svelte's snippet-param AST.
+            // Svelte's own prelude is `replace(/\S/g, ' ')` — it blanks the
+            // non-whitespace and keeps every terminator — so acorn counted the
+            // ECMAScript class over the whole prefix, exactly as for the raw
+            // template the expression islands get.
+            self.record_acorn_region(content_offset + head_start, PrefixLines::Ecmascript);
             let program = tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena)?;
             self.expression_comments.extend_from_slice(program.comments);
             // The wrapper is literally a `function` declaration, so the match holds by

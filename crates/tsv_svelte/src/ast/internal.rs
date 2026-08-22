@@ -19,7 +19,7 @@
 use std::borrow::Cow;
 
 use tsv_css::ast::internal::CssStyleSheet;
-pub use tsv_lang::{Comment, Span};
+pub use tsv_lang::{Comment, PrefixLines, Span};
 use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
@@ -37,6 +37,35 @@ pub struct Root<'arena> {
     /// All comments from scripts and template expressions.
     /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
+    /// Every embedded acorn parse this component contains, ascending by
+    /// [`AcornRegion::lex_start`] and disjoint — see [`AcornRegion`].
+    pub acorn_regions: &'arena [AcornRegion],
+}
+
+/// One embedded **acorn parse**: where it began reading the component's own
+/// bytes, and what Svelte did to the text ahead of it.
+///
+/// Svelte runs acorn once per island over a *purpose-built* string, and the
+/// wire `loc` those nodes carry is acorn's, seeded from that string — see
+/// [`tsv_lang::AcornSeed`]. Recording the parse start here is what lets the wire
+/// writer rebuild the seed: it cannot be recovered from a node's own span (a
+/// leading comment, or whitespace Svelte had already stepped over, sits between
+/// them), and the root `comments` array is emitted outside the tree walk that
+/// would otherwise carry it.
+///
+/// Regions never nest and never overlap, so "the region a position belongs to"
+/// is the last one starting at or before it.
+#[derive(Debug, Clone, Copy)]
+pub struct AcornRegion {
+    /// First byte of the component acorn lexes for real.
+    pub lex_start: u32,
+    /// acorn's `startPos` for this parse. Behind `lex_start` only where Svelte
+    /// *inserts* synthetic text there (`read_type_annotation`'s `_ as `), which
+    /// acorn lexes in place of the bytes it covers.
+    pub origin: u32,
+    /// The line class acorn counted in the text ahead of `origin`, which is
+    /// decided by how Svelte prepared that prefix.
+    pub prefix: PrefixLines,
 }
 
 /// Svelte Fragment - container for template nodes

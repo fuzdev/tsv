@@ -602,6 +602,46 @@ and ECMAScript normalizes `<CR>` and `<CR><LF>` to `<LF>` in both TV and TRV. `<
 `<PS>` are deliberately untouched — ECMAScript keeps each as itself, and HTML and CSS read
 them as ordinary characters.
 
+### `loc` lines: two classes, one per acorn parse
+
+The fold above is about the bytes tsv *writes*. The counting question is separate, and the
+Svelte wire answers it two ways at once, because Svelte's parser does.
+
+Svelte's own positions come from `locate-character`, which opens a line at `\n` and nothing
+else — the template spine, `name_loc`, the CSS `loc`, a `<script>`'s `Program` `loc` (which
+`read_script` re-stamps after the parse), and the identifiers `read_identifier` builds
+(recognizable in the wire by the `character` field beside `line`/`column`). Everything acorn
+parses carries acorn's `loc`, and acorn's is the ECMAScript class: `\n`, `\r`, `\r\n`, `<LS>`,
+`<PS>`. Since `format` folds `<CR>` and `<LS>`/`<PS>` are vanishingly rare in real code, the two
+agree on essentially every document — but where they disagree, a single table is a whole class
+of silently-off positions.
+
+**It is not "route acorn's islands to an ECMAScript table" either.** acorn seeds its line
+counter *once per parse*, and Svelte hands it a differently prepared string at every island:
+
+| island | source acorn receives | prefix counts as |
+| --- | --- | --- |
+| `<script>` (`read_script`) | prefix blanked with `replace(/[^\n]/g, ' ')` + content | LF only |
+| `{expr}` / attribute values (`read_expression`) | the raw template | ECMAScript |
+| `{@const}` / `{@let}` (`parse_statement_at`) | the raw template | ECMAScript |
+| `{#snippet}` parameters | prefix `replace(/\S/g, ' ')` — whitespace survives | ECMAScript |
+| a destructured block binding (`read_pattern`) | blanked prefix + `(pattern = 1)` | LF only |
+| a binding's trailing `: T` (`read_type_annotation`) | blanked prefix + `_ as ` + raw rest | LF only |
+
+and then, whatever the prefix, it *skips* `[lineStart, startPos)` outright — `lineStart` is
+found with `lastIndexOf("\n", startPos - 1)`, so a non-LF terminator between that LF and the
+island is counted by neither half.
+
+`tsv_lang::AcornSeed` carries that per-parse difference as two constants over the
+ECMAScript-rule tracker's answer (lines to subtract, columns to add on the region's first
+line), and `tsv_svelte`'s parser records the parse start of every island in
+`Root::acorn_regions` so the writer can rebuild the seed — including for the root `comments`
+array, which is emitted outside the tree walk that would otherwise carry it. The second
+tracker is built **only** when the two classes actually differ, which
+`LocationTracker::new_with_map` reports out of the scan it already runs: no lone `<CR>`, `<LS>`
+or `<PS>` in the source means every seed is the identity and the whole route collapses to the
+LF one.
+
 ### Source-Based Printing
 
 All printers accept `source: &str` to preserve escape sequences:

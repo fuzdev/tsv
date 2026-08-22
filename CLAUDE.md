@@ -804,6 +804,20 @@ then formats two ways on two passes.
 `<LS>` / `<PS>` are deliberately NOT folded. Full rationale + spec citations:
 ./docs/architecture.md#line-terminators-parse-takes-the-authors-bytes-format-folds-first
 
+**Counting them is a separate question, and the Svelte wire answers it TWO ways** — because
+Svelte's parser does. Svelte's own positions (`locate-character`) open a line at `\n` alone:
+the spine, `name_loc`, CSS `loc`, a `Program`'s own `loc`, and the `character`-bearing
+identifiers `read_identifier` builds. Everything **acorn** parses carries acorn's, the
+ECMAScript class. And it is not one table per class either: acorn seeds its counter **once per
+parse**, over whatever prefix Svelte prepared for that island (blanked to LF for `<script>` /
+`read_pattern` / `read_type_annotation`, raw for every `read_expression` / `{@const}` /
+snippet-parameter list), and skips `[lineStart, startPos)` outright. `tsv_lang::AcornSeed`
+carries that per-parse difference, `tsv_svelte`'s `Root::acorn_regions` records where each
+parse began, and the ECMAScript tracker is built only when the two classes actually differ —
+which `LocationTracker::new_with_map` reports out of the scan it already runs, so a source with
+no lone `<CR>` / `<LS>` / `<PS>` pays nothing. Full model:
+./docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse
+
 ### Language-Level concerns (classification)
 
 HTML element classification is split between the `tsv_html` crate — pure functions over tag names (`is_block_element()`, `is_void_element()`, `preserves_whitespace()`, and the other whitespace rules) — and thin printer adapters (`tsv_svelte/src/printer/classification/`) that resolve symbols, call tsv_html, and traverse the AST. Enables reuse across all planned tools (formatter, linter, compiler, LSP).
