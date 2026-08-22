@@ -55,8 +55,21 @@ function file_size(path: URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-07-27 (deno target; npm == deno, identical `.wasm`): format
-// 2,118,243 B; parse 887,893 B; all 2,360,007 B. Bounds recentered ±8%.
+// Measured 2026-08-21 at the 0.3 release tip (deno target; npm == deno,
+// identical `.wasm`): format 2,218,322 B; parse 913,218 B; all 2,470,951 B.
+// Bounds recentered ±8%.
+//
+// Drift, not a step: +4.7% format, +2.9% parse, +4.7% all above the 2026-07-27
+// center, accumulated across the whole 0.3 fix run rather than traceable to one
+// change. Recentered here because two measures had walked to within ~3% of a
+// band edge (`all` and `all − format`) — a release-time change would have
+// discovered them as a publish failure instead of as a visible size move.
+// The smallest identifiable contributor at the tail is `reinstantiate` (#886),
+// which adds an export to every variant; parse moving least is the expected
+// shape, since most of the run's work landed in the printers.
+//
+// Prior center, 2026-07-27: format 2,118,243 B; parse 887,893 B; all
+// 2,360,007 B.
 //
 // A real size cut, not drift: `ParseError` became a newtype over a boxed payload
 // (`struct ParseError(Box<ParseErrorKind>)`), so the type is pointer-sized and a
@@ -81,9 +94,9 @@ const TARGETS = ['npm', 'deno'] as const;
 // allocator, dropping a few more KB per bundle): format 2,178,122 B; parse
 // 1,015,388 B; all 2,401,628 B.
 const BOUNDS = {
-	format: { min: 1_949_000, max: 2_288_000 },
-	parse: { min: 817_000, max: 959_000 },
-	all: { min: 2_171_000, max: 2_549_000 }
+	format: { min: 2_041_000, max: 2_396_000 },
+	parse: { min: 840_000, max: 986_000 },
+	all: { min: 2_273_000, max: 2_669_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -102,14 +115,19 @@ const BOUNDS = {
 // a smaller delta rather than a bundle-wide move — and the delta is no longer a
 // clean readout of "the parse feature", it is the parse feature minus whatever
 // the two now share. It stood at 241,764 B at the
-// 2026-07-27 center and measures 238,795 B now (format 2,144,940 B, all
-// 2,383,735 B); the shared `js-sys` is the only feature-boundary change between
-// those two points, but accumulated work moved both bundles too, so read the
-// ≈3 KB as attribution rather than a controlled A/B. Read a future move against
-// the current number.
+// 2026-07-27 center and measures 252,629 B at the 2026-08-21 one (format
+// 2,218,322 B, all 2,470,951 B); the shared `js-sys` is the only
+// feature-boundary change across those points, but accumulated work moved both
+// bundles too, so read the difference as attribution rather than a controlled
+// A/B. Read a future move against the current number.
+//
+// `all − parse` (the format feature's weight) is 1,557,733 B at this center,
+// up from 1,472,114 B — the printers are where the 0.3 run's work landed, so
+// this is the delta that grew, and it was the measure nearest a band edge
+// (2.0% of headroom) before the recentering.
 const DELTAS = {
-	format: { min: 222_000, max: 261_000 }, // all − format
-	parse: { min: 1_354_000, max: 1_590_000 } // all − parse
+	format: { min: 232_000, max: 273_000 }, // all − format
+	parse: { min: 1_433_000, max: 1_682_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');
