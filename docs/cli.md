@@ -49,9 +49,19 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
     N-API mirror has no compiler thread to compete with and peaks at the
     physical core count.
 
-  An explicit `--jobs N` is obeyed at any size, exactly as it is natively — and
-  it is the only way to compare the two paths at a given size, which
-  calibrating those defaults needed.
+  An explicit `--jobs N` is held to the same `4 × logical` ceiling as the
+  native CLI, warned about on stderr when it bites (see
+  [§Multi-File Formatting](#multi-file-formatting)'s parallelism note; `cli.js`
+  restates the native `clamp_worker_count` by hand — same constant, same
+  message, so both surfaces refuse the same numbers). The bound does a
+  different job here than natively: a JS worker is a whole V8 isolate (~13 MB
+  resident on either engine, where the native thread's reservation is lazily
+  committed and costs ~none), so an unbounded width on a large tree hits the
+  machine's *memory* — ending in an uncatchable OOM SIGKILL — long before the
+  OS refuses a thread, and the file-count clamp bounds nothing on exactly the
+  trees large enough to matter. An explicit width remains the only way to
+  compare the two paths at a given size, which calibrating those defaults
+  needed; every size that calibration uses is far under the ceiling on both.
   `--jobs 1`, `--content`, `--stdin`, and `--list` are single-threaded on both
   CLIs. The parallel and single-threaded paths report identically (same sorted
   stdout, same summary, same exit code), so the split is a cost decision and
@@ -211,6 +221,10 @@ installed by its runtime startup and a cdylib loaded into Node never runs it.
 - **`--check`**: lists files that would change without writing; exits 1 if any would. For CI. Also works with `--content`/`--stdin` (nothing printed to stdout; the exit code is the API) for editor integrations.
 - **`--list`**: prints the discovered in-scope files (one per line) without formatting — a read-only view of the set `format` would touch, after the ignore files are applied. Path mode only (errors with `--content`/`--stdin`) and mutually exclusive with `--check`. Unlike the format action, an empty scope is a valid answer (exit 0, no output) rather than the "no supported files" error; traversal errors still exit 2. Useful for debugging ignore-file scoping and for scripting over the set.
 - **Parallelism**: files format concurrently on `std::thread::scope` workers claiming one file at a time from a shared queue — dynamic load balancing with no thread-pool dependency. `--jobs N` overrides the worker count, clamped to the file count and floored at 1 (`--jobs 0` is a width, not an opt-out — it means `--jobs 1`); path mode only, an error with `--content`/`--stdin`. Each worker reserves the same stack every other tsv thread runs on (`STACK_SIZE`, `cli/stack.rs`), so the pool is not a route with a depth ceiling of its own — see [§Recursion Depth](#recursion-depth).
+
+  **An explicit `--jobs` is held to `4 × logical CPUs`**, warned about on stderr when it bites. Four per core is far past what the workload can use — the *default* lands below the logical count for measured reasons — so the ceiling is about blast radius, not throughput: each worker reserves `STACK_SIZE` of address space, and an unbounded count takes task slots until the OS refuses, which on a systemd machine is the login session's whole `TasksMax` and wedges every other process on it.
+
+  **And a `--jobs` the OS still won't give narrows the pool rather than failing the run.** The count is a user-supplied number, so a refused thread is an ordinary outcome of an ordinary argument, and the work is *claimed* rather than partitioned — however many workers exist drain the whole list between them. tsv warns (`warning: only N of M format workers started`) and formats the tree; if not one thread could be started, it says so and formats on the calling thread. Both messages are the JS CLI's, word for word.
 
   The default is **`min(logical CPUs, ceil(1.5 × physical cores))`**, not one worker per logical CPU. This workload does not scale onto SMT siblings — the per-file work is memory-bound, and on a large tree the discovery walk is the bottleneck, so extra workers compete with it for cores. One worker per logical CPU costs up to 28% on walk-bound trees while buying nothing on flat repos. The SMT width is read once from `/sys/devices/system/cpu/cpu0/topology/thread_siblings_list`; where that is unavailable (no SMT, or a non-Linux platform) the cap is inert and the default is the logical count, so it can only ever lower the worker count.
 - **Streaming discovery**: a single directory root — the common invocation — feeds the workers *as the walk finds files*, so the directory walk runs beside the first files' parse+format rather than in front of an idle pool. It is worth having: the walk is 5–10% of the wall on an application repo, and 40–67% on a repo with a large tree, where it can outrun what the pool consumes. Other argument shapes (explicit files, multiple roots) discover the whole set first, because the canonical-path dedup above is set-wide. The set of files formatted is identical either way, as is the reporting order below — only the order work is handed out differs.

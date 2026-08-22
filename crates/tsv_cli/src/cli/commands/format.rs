@@ -2,7 +2,7 @@ use crate::cli::commands::parse::parse_goal_arg;
 use crate::cli::discover::{Diagnostics, FileSink, discover_files, discover_into, path_sort_key};
 use crate::cli::format_source::{format_source_in, format_source_with_goal};
 use crate::cli::input::{InputArgs, ParserType};
-use crate::cli::stack::sized_thread;
+use crate::cli::stack::{clamp_worker_count, sized_thread};
 use argh::FromArgs;
 use std::fs;
 use std::num::NonZeroUsize;
@@ -51,7 +51,7 @@ pub struct FormatCommand {
     #[argh(switch)]
     list: bool,
 
-    /// worker thread count (default: 1.5x physical cores, capped at logical)
+    /// worker thread count (default: 1.5x physical cores; explicit values capped at 4x logical)
     #[argh(option)]
     jobs: Option<usize>,
 
@@ -181,7 +181,9 @@ impl FormatCommand {
             return;
         }
 
-        let jobs = self.jobs.unwrap_or_else(default_jobs);
+        // An explicit width is held to the shared ceiling (`cli::stack`); the default
+        // is computed under one already (`default_jobs`).
+        let jobs = self.jobs.map_or_else(default_jobs, clamp_worker_count);
         // A single directory root streams: the walk hands files to the pool as it
         // finds them, so it runs *beside* the first files' parse+format instead of
         // in front of an idle pool. Every other shape needs the whole set before
@@ -343,33 +345,85 @@ fn cpu_list_len(list: &str) -> usize {
 /// should start on the first directory the walk finishes.
 const DISCOVERY_BATCH: usize = 8;
 
-/// Spawn one format worker into `scope` on the shared reservation.
+/// Bring up at most `jobs` format workers in `scope`, returning however many the
+/// OS actually gave.
 ///
 /// [`sized_thread`] is the same constructor `main` runs the whole subcommand through
 /// (see `cli::stack`): the pool is one more thread tsv dispatches language work on,
 /// not a route with a ceiling of its own.
 ///
-/// `Scope::spawn` is documented to panic when the OS refuses the thread;
-/// `Builder::spawn_scoped` returns that same failure as an `Err` instead, so the
-/// `expect` below reproduces the existing behavior rather than introducing a new panic
-/// point. Unlike `run_on_sized_stack`, there is no recovery worth attempting: a pool
-/// worker has no thread-free alternative to fall back to, and a plain spawn would fail
-/// for the same reason the sized one did.
-#[expect(
-    clippy::expect_used,
-    reason = "matches Scope::spawn's own documented panic-on-OS-failure behavior"
-)]
-fn spawn_worker<'scope, F, T>(
+/// **A refused thread narrows the pool; it never fails the run.** `--jobs` is a
+/// user-supplied number, so the OS refusing the *n*th thread is an ordinary outcome
+/// of an ordinary argument — and `Builder::spawn_scoped`'s `Err` used to reach an
+/// `expect` here, which made this the one `format` argument that could answer with a
+/// panic where every other bad one exits 2 with a message. On the streamed path it
+/// was worse than a crash: the panic unwound past [`FileQueue::finish`], so every
+/// worker already parked on the condvar stayed parked, and `thread::scope` joins the
+/// pool *before* it resumes a panic — the process hung holding N thread stacks
+/// instead of dying (see [`ReleasePoolOnUnwind`], which now covers that gap for any
+/// other unwind through the producer).
+///
+/// Narrowing is safe because the work is *claimed*, not partitioned: however few
+/// workers exist drain the whole list between them. It is the answer the JS CLI
+/// already gives for the same situation (`crates/tsv_wasm/npm/cli.js`), warning text
+/// included, and the caller's own thread is the floor under it — both call sites
+/// format on it when the pool comes up empty, so "no thread was available" costs
+/// parallelism rather than the run.
+fn spawn_pool<'scope, F, T>(
     scope: &'scope thread::Scope<'scope, '_>,
+    jobs: usize,
     worker: F,
-) -> thread::ScopedJoinHandle<'scope, T>
+) -> Vec<thread::ScopedJoinHandle<'scope, T>>
 where
-    F: FnOnce() -> T + Send + 'scope,
+    F: FnOnce() -> T + Send + Copy + 'scope,
     T: Send + 'scope,
 {
-    sized_thread("tsv-format")
-        .spawn_scoped(scope, worker)
-        .expect("format worker thread should spawn")
+    // Deliberately not `with_capacity(jobs)`: `jobs` is whatever the user typed, and
+    // reserving for `--jobs 18446744073709551615` aborts on the allocation failure —
+    // the same "an argument reaches a fatal" shape one layer down.
+    let mut handles = Vec::new();
+    for _ in 0..jobs {
+        match sized_thread("tsv-format").spawn_scoped(scope, worker) {
+            Ok(handle) => handles.push(handle),
+            Err(e) => {
+                // Same two sentences the JS CLI prints, deliberately word for word:
+                // one situation should not read as two different failures depending
+                // on which `tsv` the caller invoked.
+                if handles.is_empty() {
+                    eprintln!(
+                        "warning: could not start format workers ({e}); formatting on one thread"
+                    );
+                } else {
+                    eprintln!(
+                        "warning: only {} of {jobs} format workers started",
+                        handles.len()
+                    );
+                }
+                break;
+            }
+        }
+    }
+    handles
+}
+
+/// Releases the pool if the producer unwinds.
+///
+/// Every parked worker is waiting for [`FileQueue::finish`], and `thread::scope`
+/// joins the pool before it resumes a panic — so a producer that dies before calling
+/// it hangs the process on its own workers rather than crashing, holding every
+/// worker's stack reservation until something kills it. Release builds are
+/// `panic = "abort"` and never unwind here; the dev and `corpus` profiles do, and
+/// `corpus` is what whole-tree audit sweeps run.
+///
+/// [`FileQueue::finish`] is idempotent (a second `done = true` plus a `notify_all`
+/// nobody is parked for), so the happy path's explicit call stands and this only ever
+/// fires on the way out.
+struct ReleasePoolOnUnwind<'a>(&'a FileQueue);
+
+impl Drop for ReleasePoolOnUnwind<'_> {
+    fn drop(&mut self) {
+        self.0.finish();
+    }
 }
 
 /// The hand-off between the discovery walk and the format workers.
@@ -533,24 +587,8 @@ fn format_streamed(
     let jobs = jobs.max(1);
 
     thread::scope(|scope| {
-        let handles: Vec<_> = (0..jobs)
-            .map(|_| {
-                spawn_worker(scope, || {
-                    // one AST `Bump` and one `DocArena` per worker, reused across
-                    // its files — see `format_files`, which does the same
-                    let mut arena = bumpalo::Bump::new();
-                    let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
-                    let mut outcomes = Vec::new();
-                    while let Some((i, path)) = queue.claim() {
-                        let outcome = format_file(&path, check, &arena, &doc_arena);
-                        arena.reset();
-                        doc_arena.reset();
-                        outcomes.push((i, path, outcome));
-                    }
-                    outcomes
-                })
-            })
-            .collect();
+        let _release = ReleasePoolOnUnwind(&queue);
+        let handles = spawn_pool(scope, jobs, || drain_queue(&queue, check));
 
         // this thread is the producer
         discovery = discover_into(paths, &mut sink);
@@ -558,6 +596,15 @@ fn format_streamed(
         // ordering the results is this thread's work too, and the pool is still
         // draining, so it costs nothing on the wall
         sink.keys.sort_by(|a, b| a.0.cmp(&b.0));
+
+        // A pool the OS refused outright leaves this thread as the only worker. It
+        // has already walked, so nothing streams — but the alternative is a run that
+        // formats nothing and reports every file as a panic from a worker that never
+        // existed (the slot sweep below), which is the same lie `--jobs 0` used to
+        // tell. The queue is finished, so this drains what the walk left and stops.
+        if handles.is_empty() {
+            claimed = drain_queue(&queue, check);
+        }
 
         for handle in handles {
             if let Ok(mut outcomes) = handle.join() {
@@ -595,6 +642,28 @@ fn format_streamed(
         outcomes.push(outcome);
     }
     (files, outcomes, diagnostics.errors.len())
+}
+
+/// One streamed worker's whole life: claim a path, format it, keep the outcome
+/// against the index it was claimed at. Returns when the walk is done and the queue
+/// is drained.
+///
+/// A function rather than a closure inside the spawn loop because the producer runs
+/// it too when the pool comes up empty — the fallback and the worker cannot drift
+/// apart if there is only one of them.
+fn drain_queue(queue: &FileQueue, check: bool) -> Vec<(usize, PathBuf, FileOutcome)> {
+    // one AST `Bump` and one `DocArena` per worker, reused across its files — see
+    // `drain_indexed`, which does the same
+    let mut arena = bumpalo::Bump::new();
+    let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
+    let mut outcomes = Vec::new();
+    while let Some((i, path)) = queue.claim() {
+        let outcome = format_file(&path, check, &arena, &doc_arena);
+        arena.reset();
+        doc_arena.reset();
+        outcomes.push((i, path, outcome));
+    }
+    outcomes
 }
 
 /// Format one file into the worker's reusable arenas, writing in place when the
@@ -643,31 +712,15 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
     merged.resize_with(files.len(), || None);
 
     thread::scope(|scope| {
-        let handles: Vec<_> = (0..workers)
-            .map(|_| {
-                spawn_worker(scope, || {
-                    let mut outcomes = Vec::new();
-                    // One AST `Bump` and one `DocArena` per worker, reused across
-                    // its files: each `reset()` keeps the largest chunk and rewinds,
-                    // so only the first file (and any that grow past the high-water
-                    // mark) pays an alloc — the rest reuse it. The per-file AST and
-                    // doc tree borrow the arenas and are dropped inside `format_file`
-                    // (which returns an owned outcome), so the `&mut` resets are sound.
-                    let mut arena = bumpalo::Bump::new();
-                    let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
-                    loop {
-                        let i = next.fetch_add(1, Ordering::Relaxed);
-                        if i >= files.len() {
-                            break;
-                        }
-                        outcomes.push((i, format_file(&files[i], check, &arena, &doc_arena)));
-                        arena.reset();
-                        doc_arena.reset();
-                    }
-                    outcomes
-                })
-            })
-            .collect();
+        let handles = spawn_pool(scope, workers, || drain_indexed(files, check, &next));
+        // A pool the OS refused outright leaves this thread as the only worker —
+        // otherwise every slot stays `None` and reads out below as a panic from a
+        // worker that never existed.
+        if handles.is_empty() {
+            for (i, outcome) in drain_indexed(files, check, &next) {
+                merged[i] = Some(outcome);
+            }
+        }
         for handle in handles {
             if let Ok(outcomes) = handle.join() {
                 for (i, outcome) in outcomes {
@@ -684,6 +737,33 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
             outcome.unwrap_or_else(|| FileOutcome::Error("worker thread panicked".to_string()))
         })
         .collect()
+}
+
+/// One collected worker's whole life: take the next index off the shared counter,
+/// format that file, keep the pair — dynamic load balancing with no lock, and
+/// results that land in input order without one either.
+///
+/// A function rather than a closure inside the spawn loop because the caller runs it
+/// too when the pool comes up empty (see [`spawn_pool`]).
+fn drain_indexed(files: &[PathBuf], check: bool, next: &AtomicUsize) -> Vec<(usize, FileOutcome)> {
+    let mut outcomes = Vec::new();
+    // One AST `Bump` and one `DocArena` per worker, reused across its files: each
+    // `reset()` keeps the largest chunk and rewinds, so only the first file (and any
+    // that grow past the high-water mark) pays an alloc — the rest reuse it. The
+    // per-file AST and doc tree borrow the arenas and are dropped inside
+    // `format_file` (which returns an owned outcome), so the `&mut` resets are sound.
+    let mut arena = bumpalo::Bump::new();
+    let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
+    loop {
+        let i = next.fetch_add(1, Ordering::Relaxed);
+        if i >= files.len() {
+            break;
+        }
+        outcomes.push((i, format_file(&files[i], check, &arena, &doc_arena)));
+        arena.reset();
+        doc_arena.reset();
+    }
+    outcomes
 }
 
 #[cfg(test)]
