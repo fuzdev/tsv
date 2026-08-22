@@ -668,12 +668,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// rest`, entered at `a = parser.index - "_ as ".len()` with `parser.index`
     /// just past the `:` — so acorn seeds five bytes behind the colon and starts
     /// lexing real source again one past it.
-    pub(crate) fn record_annotation_acorn_region(&mut self, colon: usize) {
+    fn record_annotation_acorn_region(&mut self, colon: usize) {
         const AS_INSERT_LEN: usize = "_ as ".len();
-        let colon_end = colon + 1;
+        let lex_start = internal::AcornRegion::annotation_lex_start(colon as u32) as usize;
         self.record_acorn_region_at(
-            colon_end,
-            colon_end.saturating_sub(AS_INSERT_LEN),
+            lex_start,
+            lex_start.saturating_sub(AS_INSERT_LEN),
             PrefixLines::Lf,
         );
     }

@@ -131,17 +131,12 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
             tracker: &tracker,
             map: &map,
         },
-        acorn_loc: LocationMapper {
-            tracker: acorn_tracker.as_ref().unwrap_or(&tracker),
-            map: &map,
-        },
-        // Empty when the two classes agree, which makes every seed lookup a
-        // single length check that returns `AcornSeed::NONE`.
-        acorn_regions: if ecmascript_lines_differ {
-            root.acorn_regions
-        } else {
-            &[]
-        },
+        // One `Option` rather than a table plus a region slice, because it is one
+        // fact: the regions matter exactly when acorn's table exists.
+        acorn: acorn_tracker.as_ref().map(|tracker| AcornLines {
+            loc: LocationMapper { tracker, map: &map },
+            regions: root.acorn_regions,
+        }),
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
         // acorn-typescript wire shape (Svelte's single `this.ts` flag).
@@ -152,6 +147,27 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len()));
     write_root(&mut w, root, &ctx);
     w.into_bytes()
+}
+
+/// acorn's line table and the parses that must be re-based onto it — the whole
+/// re-seeding route, present only when the two line classes actually differ.
+///
+/// The two travel together because they are **one** fact, and splitting them
+/// admits a state that silently emits wrong positions: regions without acorn's
+/// table would re-base the *Svelte* table's answers, and acorn's table without
+/// regions would hand every island an unseeded ECMAScript count. Neither fails
+/// loudly — both just move `loc`s. As an `Option`, "the classes agree" is the
+/// absence of the whole thing.
+#[derive(Clone, Copy)]
+struct AcornLines<'a> {
+    /// The document's byte→UTF-16 map under **acorn's** line table (the
+    /// ECMAScript class).
+    loc: LocationMapper<'a>,
+    /// Every embedded acorn parse in this component, ascending and disjoint.
+    /// Each island's `loc` is acorn's, seeded once at the start of the parse
+    /// Svelte prepared for it, so `loc`'s answer has to be re-based onto that
+    /// parse: `Ctx::acorn_seed`.
+    regions: &'a [internal::AcornRegion],
 }
 
 /// The per-document environment every writer function shares.
@@ -167,19 +183,10 @@ struct Ctx<'a> {
     /// spine, `name_loc`, the CSS `loc`, the `Program`'s own `loc`, and the
     /// `character`-bearing identifiers Svelte's `read_identifier` builds.
     loc: LocationMapper<'a>,
-    /// The same map under **acorn's** line table (the ECMAScript class), for the
-    /// embedded islands — see `acorn_regions`. Identical to `loc` whenever the
-    /// two classes agree, which is every source without a lone CR, U+2028 or
-    /// U+2029.
-    acorn_loc: LocationMapper<'a>,
-    /// Every embedded acorn parse in this component, ascending and disjoint, or
-    /// **empty** when the two line classes agree — the gate that keeps the whole
-    /// re-seeding route off the common path.
-    ///
-    /// Each island's `loc` is acorn's, seeded once at the start of the parse
-    /// Svelte prepared for it, so `acorn_loc`'s answer has to be re-based onto
-    /// that parse: `acorn_seed`.
-    acorn_regions: &'a [internal::AcornRegion],
+    /// The acorn-owned half of the wire, or `None` when the two line classes
+    /// agree — which is every source without a lone CR, U+2028 or U+2029, so
+    /// essentially every real document. See [`AcornLines`].
+    acorn: Option<AcornLines<'a>>,
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -202,6 +209,14 @@ impl<'a> Ctx<'a> {
         self.loc.pos(byte)
     }
 
+    /// The mapper an **acorn-owned** position answers through: acorn's line
+    /// table when the two classes differ, and otherwise `loc` — which is then
+    /// byte-identical to it, so this is the same answer either way.
+    #[inline]
+    fn acorn_loc(&self) -> LocationMapper<'a> {
+        self.acorn.map_or(self.loc, |acorn| acorn.loc)
+    }
+
     /// The shared inputs for an embedded `tsv_ts` writer over an **acorn** island
     /// at `pos` — this document's `source` / `emit_loc` / parser variant, acorn's
     /// line table, the seed of the parse `pos` belongs to, and the per-call
@@ -214,7 +229,7 @@ impl<'a> Ctx<'a> {
     /// carry vanilla acorn's wire quirks in a non-TS component.
     #[inline]
     fn embed(&self, mode: CommentMode<'a>, pos: u32) -> EmbedWriter<'a> {
-        self.embed_under(mode, self.acorn_loc, self.acorn_seed(pos))
+        self.embed_under(mode, self.acorn_loc(), self.acorn_seed(pos))
     }
 
     /// The same, for an island Svelte builds **itself** with `locate-character`
@@ -260,9 +275,9 @@ impl<'a> Ctx<'a> {
 
     /// The same, for a **block pattern** island — which is up to *two* parses:
     /// the pattern itself, and its trailing `: T`, which Svelte reads with a
-    /// separately padded second one (`read_type_annotation`). The annotation's
-    /// own bytes start one past the `:`; Svelte's `_ as ` insert sits behind
-    /// that, which is what `record_annotation_acorn_region` recorded.
+    /// separately padded second one (`read_type_annotation`). `AcornRegion::annotation_lex_start`
+    /// is what names that second region — the one position the parser records it
+    /// at and this looks it up by.
     ///
     /// A simple identifier binding is Svelte's `read_identifier`, not an acorn
     /// parse at all — see `embed_locator` for why its `PrefixLines::Lf` seed is
@@ -275,7 +290,8 @@ impl<'a> Ctx<'a> {
     ) -> EmbedWriter<'a> {
         let mut env = self.embed(mode, expr.span().start);
         if let Some(ann) = tsv_ts::pattern_type_annotation(expr) {
-            env.acorn_annotation = self.acorn_seed(ann.span.start + 1);
+            env.acorn_annotation =
+                self.acorn_seed(internal::AcornRegion::annotation_lex_start(ann.span.start));
         }
         env
     }
@@ -283,17 +299,20 @@ impl<'a> Ctx<'a> {
     /// The line/column seed of the acorn parse `pos` belongs to — the last
     /// region starting at or before it, since regions never nest or overlap.
     ///
-    /// `AcornSeed::NONE` when `acorn_regions` is empty (the two line classes
-    /// agree, so acorn's table IS the Svelte one and there is nothing to
+    /// `AcornSeed::NONE` when there is no [`AcornLines`] at all (the two line
+    /// classes agree, so acorn's table IS the Svelte one and there is nothing to
     /// re-base), and for a position ahead of every region.
     fn acorn_seed(&self, pos: u32) -> AcornSeed {
-        let before = self.acorn_regions.partition_point(|r| r.lex_start <= pos);
-        let Some(region) = self.acorn_regions[..before].last() else {
+        let Some(acorn) = self.acorn else {
+            return AcornSeed::NONE;
+        };
+        let before = acorn.regions.partition_point(|r| r.lex_start <= pos);
+        let Some(region) = acorn.regions[..before].last() else {
             return AcornSeed::NONE;
         };
         AcornSeed::new(
             self.loc.tracker,
-            self.acorn_loc,
+            acorn.loc,
             region.origin,
             region.lex_start,
             region.prefix,
@@ -444,11 +463,11 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     // template-reader comment is Svelte's own (`locate-character`), an
     // acorn-shape one carries the `loc` of whichever acorn parse produced it —
     // this array holds both, and is emitted outside the tree walk that would
-    // otherwise carry the seed, which is what `acorn_regions` exists for.
+    // otherwise carry the seed, which is what `AcornLines::regions` exists for.
     let (loc, seed) = if comment.emit_character_field {
         (ctx.loc, AcornSeed::NONE)
     } else {
-        (ctx.acorn_loc, ctx.acorn_seed(comment.span.start))
+        (ctx.acorn_loc(), ctx.acorn_seed(comment.span.start))
     };
     let ((_, start_pos), (_, end_pos)) = loc.span_positions(comment.span.start, comment.span.end);
     let start_line = seed.line(start_pos.line);
@@ -1675,7 +1694,7 @@ fn write_script_program_fused(
             // its BODY is acorn's, so the body walk takes acorn's table and the
             // script's own seed — `read_script` blanks everything ahead of the
             // content.
-            loc: ctx.acorn_loc,
+            loc: ctx.acorn_loc(),
             schema,
             program_loc,
             comments,

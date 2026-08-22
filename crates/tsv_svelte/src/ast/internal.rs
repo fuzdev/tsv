@@ -68,6 +68,23 @@ pub struct AcornRegion {
     pub prefix: PrefixLines,
 }
 
+impl AcornRegion {
+    /// Where the second acorn parse of a block pattern's trailing `: T` begins
+    /// lexing real bytes, given the `:` at `colon` — one past it.
+    ///
+    /// Stated once because two sides must agree on it and neither can check the
+    /// other: the parser RECORDS the annotation's region at this position, and
+    /// the wire writer LOOKS IT UP by it. A disagreement does not fail — the
+    /// lookup is "the last region starting at or before the position", so it
+    /// quietly resolves to the *pattern's* region instead and the annotation's
+    /// type nodes take the wrong parse's line seed. `colon` itself is behind
+    /// `lex_start`, which is exactly why the lookup cannot just pass the
+    /// annotation's own span start.
+    pub(crate) fn annotation_lex_start(colon: u32) -> u32 {
+        colon + 1
+    }
+}
+
 /// Svelte Fragment - container for template nodes
 ///
 /// A fragment contains a sequence of template nodes (elements, text, expressions).

@@ -80,9 +80,22 @@ fn line_of(src: &str, suffix: &str) -> u64 {
     *line
 }
 
+/// Every spelling of the line-terminator class, in the order each test lists them. `\r\n` is
+/// in every list on purpose: it is the null control, and a shape that skipped it would assert
+/// only that *something* moved, never that CRLF leaves the two classes agreeing.
+const TERMINATORS: [&str; 4] = ["\n", "\r\n", "\r", "\u{2028}"];
+
 /// Run one shape against each spelling of the class: `{T}` in `shape` is the terminator, and
 /// each row pairs it with the line the oracle reports for the node at `suffix`.
+///
+/// The rows name their own terminator so each expectation reads beside the case it belongs to,
+/// and the class check below is what keeps that from drifting into six different classes.
 fn assert_each_terminator(shape: &str, suffix: &str, cases: [(&str, u64); 4]) {
+    assert_eq!(
+        cases.map(|(terminator, _)| terminator),
+        TERMINATORS,
+        "every shape must run the whole class, in one order"
+    );
     for (terminator, expected) in cases {
         let src = shape.replace("{T}", terminator);
         assert_eq!(line_of(&src, suffix), expected, "terminator {terminator:?}");
