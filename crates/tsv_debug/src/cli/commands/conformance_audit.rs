@@ -107,6 +107,11 @@ const ALLOWED_NONDIVERGENCE_READMES: &[&str] = &[
     "typescript/declarations/function/type_params_paren_comment",
     // Empty-brace-drop matching behavior + idempotency note + `basic` contrast.
     "typescript/modules/imports/default_empty_braces",
+    // Which line-terminator class each canonical reader counts, and which of the
+    // cases belong to the sibling Rust tests because a `<CR>` cannot be a fixture
+    // input (the format path folds it, so such a document is not a fixed point).
+    "svelte/syntax/whitespace/line_terminators_acorn_regions",
+    "svelte/syntax/whitespace/line_terminators_comment_dedent",
 ];
 
 impl ConformanceAuditCommand {

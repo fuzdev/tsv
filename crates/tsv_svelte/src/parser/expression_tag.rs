@@ -60,12 +60,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Extract expression content
         let expr_content = &self.source[expr_start..expr_end];
 
-        // Parse expression using TypeScript parser (with comments)
-        let (expression, comments) =
-            tsv_ts::parse_expression_with_comments(expr_content, expr_start, self.arena)?;
-
-        // Add expression comments to the parser's collection for later inclusion in Root.comments
-        self.expression_comments.extend_from_slice(comments);
+        // Parse expression using TypeScript parser — the shared helper, which
+        // collects the comments into `Root.comments` and records the acorn
+        // region the wire writer seeds this island's `loc` from.
+        let expression = self.parse_ts_expression(expr_content, expr_start)?;
 
         // The span end is right after the closing brace
         let end = expr_end + 1;

@@ -200,6 +200,15 @@ impl<'a> Lexer<'a> {
                 // whitespace run stops at one; it lexes as identifier content instead. Only
                 // the sub-U+00A0 non-ASCII whitespace (the C1 controls, e.g. NEL U+0085 —
                 // not identifier code points here) stays whitespace.
+                //
+                // ⚠️ That is the right class HERE and the wrong one at a **boundary**, where
+                // `parseCss` runs `allow_whitespace()` (JS `\s`) before the token starts and
+                // would step over the very same character. The lexer cannot tell the two
+                // apart — only the parser knows which juncture it is at — so the boundary
+                // half lives in `CssParser::skip_boundary_whitespace`, called from the
+                // parser's own whitespace skips. Keeping it out of the lexer is what leaves
+                // a declaration VALUE alone, where a non-ASCII space is content
+                // (`css/values/boundary_nonascii_space_prettier_divergence`).
                 Some(_) => match self.current_char() {
                     Some(ch) if ch.is_whitespace() && !is_non_ascii_identifier_codepoint(ch) => {
                         self.pos += ch.len_utf8();
@@ -214,6 +223,20 @@ impl<'a> Lexer<'a> {
             start: start as u32,
             end: self.pos as u32,
         }
+    }
+
+    /// Lex a token starting at `at`, re-reading from a position the parser has stepped the
+    /// cursor back to — the boundary-whitespace skip `parseCss` performs with
+    /// `allow_whitespace()` before a token starts (`CssParser::skip_boundary_whitespace`).
+    ///
+    /// It exists because the two readings of a code point ≥ U+00A0 disagree and only position
+    /// resolves them: inside a value or glued to a name it is identifier content, which is
+    /// what the dispatch above assumes, and at a boundary it is a separator. Routed through
+    /// the same `read_identifier` the ordinary dispatch uses, so the re-read is
+    /// byte-identical to what the dispatch would have produced from that offset.
+    pub(crate) fn token_at(&mut self, at: usize) -> Result<Token, ParseError> {
+        self.seek(at);
+        self.read_identifier().map_err(|err| self.host_err(err))
     }
 
     /// Lex an identifier, stashing any decoded escape value out-of-band in the
@@ -417,12 +440,11 @@ impl<'a> Lexer<'a> {
                 self.pos,
             )),
 
-            // Non-ASCII lead byte: decode the full char and dispatch. tsv follows
-            // `parseCss` in treating every code point ≥ U+00A0 (NBSP, em space, …) as an
-            // identifier code point — not whitespace (CSS whitespace is ASCII-only, CSS
-            // Syntax 3 §4.2), so it opens an identifier; only sub-U+00A0 non-ASCII
-            // whitespace (the C1 controls, e.g. NEL) is whitespace, then the
-            // unknown-character error.
+            // Non-ASCII lead byte: decode the full char and dispatch. Every code point
+            // ≥ U+00A0 opens an identifier — `parseCss`'s `read_identifier` takes it, and a
+            // value is exactly where that reading is right. The boundary reading is the
+            // parser's (`CssParser::skip_boundary_whitespace`), because only it knows
+            // whether an `allow_whitespace()` would have run here first.
             _ => match self.current_char() {
                 Some(ch) if is_identifier_start(ch) => self.read_identifier(),
                 Some(ch) if ch.is_whitespace() => Ok(self.skip_whitespace()),

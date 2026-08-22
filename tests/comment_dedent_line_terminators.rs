@@ -21,14 +21,19 @@
 //! **Why a test rather than a fixture.** Two of the five spellings cannot be a fixture
 //! *input*: every parse-then-format entry point folds `<CR>` to `<LF>` before it parses
 //! (`tsv_lang::printing::normalize_carriage_returns`), so a document carrying a raw `<CR>`
-//! formats to its `<LF>` twin and is not the fixed point F1 requires. `<LS>` / `<PS>` are
-//! deliberately not folded and *are* format-stable inside a verbatim region — but a `.svelte`
-//! fixture pins the whole wire, and tsv's Svelte writer counts lines for the acorn-owned
-//! region with Svelte's LF-only `locate-character` rule where acorn itself uses the
-//! ECMAScript class, so every `loc` after an `<LS>` in a `<script>` is a line behind. That is
-//! a separate bug on a separate seam; until it is fixed, these five spellings live here, with
-//! every expectation transcribed from the live modern Svelte parser
-//! (`cargo run -p tsv_debug canonical_parse`).
+//! formats to its `<LF>` twin and is not the fixed point F1 requires. The `<LS>` / `<PS>`
+//! spellings are deliberately not folded and *are* format-stable inside a verbatim region;
+//! they are pinned by
+//! `tests/fixtures/svelte/syntax/whitespace/line_terminators_comment_dedent`, whose
+//! `expected.json` the oracle generates. What can live ONLY here is the `<CR>` half — the
+//! other four spellings stay in the tables below too, since a shape that dropped them would
+//! assert the class without ever running its null controls — and with them stays the
+//! arrangement `<CR>` forces: every expectation is transcribed from the live modern Svelte parser
+//! (`cargo run -p tsv_debug canonical_parse`) rather than regenerated, so it would go stale
+//! silently if `onComment` changed.
+//!
+//! `tests/acorn_loc_line_terminators.rs` is the same arrangement for the *other* thing these
+//! terminators decide — which line count a wire `loc` carries.
 
 /// The one comment's dedented wire `value` — the field `onComment` writes.
 fn comment_value(src: &str) -> String {

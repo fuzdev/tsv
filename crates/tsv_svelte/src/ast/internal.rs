@@ -20,6 +20,7 @@ use std::borrow::Cow;
 
 use tsv_css::ast::internal::CssStyleSheet;
 pub use tsv_lang::{Comment, Span};
+pub use tsv_ts::PrefixLines;
 use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
@@ -37,6 +38,87 @@ pub struct Root<'arena> {
     /// All comments from scripts and template expressions.
     /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
+    /// Every embedded acorn parse this component contains, ascending by
+    /// [`AcornRegion::lex_start`] — see [`AcornRegion`].
+    pub acorn_regions: &'arena [AcornRegion],
+}
+
+/// One embedded **acorn parse**: where it began reading the component's own
+/// bytes, and what Svelte did to the text ahead of it.
+///
+/// Svelte runs acorn once per island over a *purpose-built* string, and the
+/// wire `loc` those nodes carry is acorn's, seeded from that string — see
+/// [`tsv_ts::AcornSeed`]. Recording the parse start here is what lets the wire
+/// writer rebuild the seed: it cannot be recovered from a node's own span (a
+/// leading comment, or whitespace Svelte had already stepped over, sits between
+/// them), and the root `comments` array is emitted outside the tree walk that
+/// would otherwise carry it.
+///
+/// Regions are recorded in strict source order, so "the region a position belongs
+/// to" is the last one starting at or before it.
+///
+/// ⚠️ They **can nest**: a block pattern with a trailing `: T` is two parses, and
+/// the annotation's runs inside the pattern's (both were handed the same slice —
+/// `{:then v: T}` reads the whole thing in one `parse_pattern_with_comments` and
+/// the annotation region is recorded within it). The "last start at or before"
+/// rule is still the right answer there: the later start is the inner, more
+/// specific parse, which is the one that lexed the position.
+#[derive(Debug, Clone, Copy)]
+pub struct AcornRegion {
+    /// First byte of the component acorn lexes for real.
+    pub lex_start: u32,
+    /// One past the last byte of the slice this sub-parse was handed — the extent
+    /// a position resolving to this region must fall inside.
+    ///
+    /// Carried so the position→parse lookup can be **checked**. Without it the
+    /// lookup's failure mode is silent: a caller that passes a position ahead of
+    /// its own island (a container start, an enclosing tag's span) resolves to the
+    /// *previous* parse, the wire stays well-formed, and only its lines move. With
+    /// it, `Ctx::acorn_seed`'s `debug_assert` catches that in every test, fixture
+    /// run and audit. Inclusive at the bound — an empty `<script>` records a
+    /// zero-length region whose `Program` starts exactly at `end`.
+    pub end: u32,
+    /// acorn's `startPos` for this parse. Behind `lex_start` only where Svelte
+    /// *inserts* synthetic text there (`read_type_annotation`'s `_ as `), which
+    /// acorn lexes in place of the bytes it covers.
+    pub origin: u32,
+    /// The line class acorn counted in the text ahead of `origin`, which is
+    /// decided by how Svelte prepared that prefix.
+    pub prefix: PrefixLines,
+}
+
+impl AcornRegion {
+    /// Where the second acorn parse of a block pattern's trailing `: T` begins
+    /// lexing real bytes — one past the `:`, found from the annotation's own
+    /// span start.
+    ///
+    /// The annotation is anchored at the **binding's** end, not at the colon
+    /// (`tsv_ts::attach_pattern_type_annotation`), so the two differ by whatever
+    /// whitespace the author left between them. Only whitespace can be there:
+    /// Svelte reaches the colon with `allow_whitespace()` + `eat(':')`, so
+    /// anything else means this is not an annotation at all and no region was
+    /// recorded.
+    ///
+    /// Stated once because two sides must agree on it: the parser RECORDS the
+    /// annotation's region at this position, and the wire writer LOOKS IT UP by it.
+    /// A disagreement resolves to the *pattern's* region instead — the enclosing
+    /// parse, which nests this one — and the annotation's type nodes take the wrong
+    /// line seed. `AcornRegion::end` is what makes that loud rather than silent, but
+    /// only for a position that leaves the pattern's extent too; inside it the two
+    /// regions are indistinguishable to any check, which is why the derivation lives
+    /// here in one place rather than at each side. That is also why the lookup cannot
+    /// just pass the annotation's span start: it is behind `lex_start`, and now by an
+    /// author-controlled distance rather than exactly one byte.
+    pub(crate) fn annotation_lex_start(source: &str, annotation_start: u32) -> u32 {
+        // The colon is the first NON-WHITESPACE byte, so this steps over the run
+        // rather than searching for the glyph. Not a stylistic choice: a `:` scan
+        // is not a discriminator here — it finds one wherever it looks, including
+        // far down the document, so on any position that is not in fact an
+        // annotation's gap it returns a confidently wrong answer instead of a
+        // recognizable one. `skip_svelte_ws` is Svelte's own `allow_whitespace()`,
+        // the same step `read_type_annotation` takes to reach the colon.
+        crate::whitespace::skip_svelte_ws(source, annotation_start as usize) as u32 + 1
+    }
 }
 
 /// Svelte Fragment - container for template nodes

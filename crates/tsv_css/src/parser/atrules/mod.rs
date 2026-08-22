@@ -240,7 +240,12 @@ fn parse_atrule_block<'arena>(
 
     // Expect {
     parser.expect(TokenKind::LeftBrace)?;
-    parser.skip_whitespace()?;
+    // `allow_comment_or_whitespace`, here and after every child below — so the skip is the
+    // boundary one, which also steps a JS-`\s` run the lexer read as the head of an
+    // identifier (`CssParser::skip_boundary_whitespace`). This loop is the one such juncture
+    // that does not route through `skip_html_comment_markers`: legacy `<!--` markers are a
+    // stylesheet-body and style-rule-block form, not an at-rule-block one.
+    parser.skip_boundary_whitespace()?;
 
     let mut children = parser.bvec();
 
@@ -287,7 +292,7 @@ fn parse_atrule_block<'arena>(
             // rule, `nested_in_rule` is false and this stays a normal at-rule block.
             let atrule = parse_atrule(parser, nested_in_rule)?;
             children.push(CssBlockChild::Atrule(atrule));
-            parser.skip_whitespace()?;
+            parser.skip_boundary_whitespace()?;
             continue;
         }
 
@@ -300,7 +305,7 @@ fn parse_atrule_block<'arena>(
         // top-level complex selectors parse unchanged.
         if expect_rules {
             children.push(parse_block_child(parser, false, atrule_name)?);
-            parser.skip_whitespace()?;
+            parser.skip_boundary_whitespace()?;
             continue;
         }
 
@@ -309,7 +314,7 @@ fn parse_atrule_block<'arena>(
         // via `is_nested_rule_start`. `true` allows a leading combinator (a `> .child {}`
         // relative selector in a `@scope` body).
         children.push(parse_block_child(parser, true, atrule_name)?);
-        parser.skip_whitespace()?;
+        parser.skip_boundary_whitespace()?;
     }
 
     // Expect }

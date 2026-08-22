@@ -234,6 +234,86 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.current_decoded = None;
     }
 
+    /// Byte length of the boundary whitespace run at the head of the current token, or `0`.
+    ///
+    /// The non-consuming half of [`skip_boundary_whitespace`](Self::skip_boundary_whitespace),
+    /// split out so that loop reads as "measure the run, then step it" rather than doing both
+    /// in one expression. Private: the compound chain loop is the caller that would want the
+    /// measurement alone, and it deliberately does not break on a run yet — see the note at
+    /// that loop in `parser/selectors.rs`.
+    fn boundary_run_len(&self) -> usize {
+        if self.current_kind != TokenKind::Identifier {
+            return 0;
+        }
+        self.source[self.current_start..self.current_end]
+            .chars()
+            .take_while(|c| crate::whitespace::is_boundary_only_whitespace(*c))
+            .map(char::len_utf8)
+            .sum()
+    }
+
+    /// Step over `parseCss`'s `allow_whitespace()` — whose class is JS `\s`
+    /// ([`tsv_lang::is_js_whitespace`]) and therefore includes every code point at or above
+    /// U+00A0 that the lexer has just read as the head of an identifier, alongside the
+    /// ordinary whitespace the lexer does tokenize.
+    ///
+    /// The two readings are both right and only position separates them. `read_identifier`
+    /// takes `<NBSP>`, every `Zs`, `<LS>`, `<PS>` and `<ZWNBSP>` as identifier content —
+    /// correct inside a value (`css/values/boundary_nonascii_space_prettier_divergence` pins
+    /// exactly that) and correct for a name glued to its `.` / `#` / `:` / `|` / `@` sigil,
+    /// where Svelte calls `read_identifier` with no skip in front of it. At a **boundary** —
+    /// a selector-list start, after a `,`, inside a `[`, after a combinator, before a
+    /// declaration's property — the skip runs first and the same character is a separator.
+    /// Only the parser knows which it is at, which is why this lives here and not in the
+    /// lexer: putting the class there changed values and the BOM too.
+    ///
+    /// This is the **whole** `allow_whitespace()`, not the non-ASCII half: it skips ordinary
+    /// whitespace tokens too, and loops, because a boundary run is one run however its
+    /// members are spelled. `<NBSP><SP>` is a single `allow_whitespace()` to `parseCss`;
+    /// stepping only the non-ASCII half leaves an ASCII gap standing where a name is due,
+    /// which moved every offset captured after it and made `[<NBSP> a]` and `a ><NBSP> b`
+    /// parse **errors** on input canonical accepts. So callers use this in place of
+    /// [`skip_whitespace`](Self::skip_whitespace) at a boundary rather than beside it.
+    ///
+    /// ⚠️ It stops **on** a comment, exactly where the plain skip does. That is what keeps
+    /// the disposition of a comment with its juncture — the stylesheet body registers one,
+    /// a block pushes it as a child, a selector list has its own rule — and it is why the
+    /// call belongs at the top of those loops rather than after their comment arm: a run
+    /// stepped later lands the cursor on a comment the arm has already been passed, where
+    /// the "skip unexpected token" tail silently eats it.
+    ///
+    /// ⚠️ Deliberately blind to `<NEL>` (U+0085), which is `White_Space` to Rust and **not**
+    /// JS `\s`. The lexer still reads it as whitespace, so tsv accepts a selector Svelte
+    /// rejects; correcting that means giving a declaration's property and value their own raw
+    /// readers, since `<NEL>` is content there. Tracked with that family — see
+    /// [`tests/css_boundary_whitespace.rs`](../../../../tests/css_boundary_whitespace.rs).
+    pub(in crate::parser) fn skip_boundary_whitespace(&mut self) -> Result<(), ParseError> {
+        loop {
+            self.skip_whitespace()?;
+            let run = self.boundary_run_len();
+            if run == 0 {
+                return Ok(());
+            }
+            let at = self.current_start + run;
+            // Any lookahead was lexed from past this token and is void once the cursor moves.
+            self.peek = None;
+            if at != self.current_end {
+                // A name follows the run inside this same token: re-read from past it.
+                let token = self.lexer.token_at(at)?;
+                self.current_kind = token.kind;
+                self.current_start = token.start as usize;
+                self.current_end = token.end as usize;
+                self.current_decoded = self.decoded_to_arena();
+                return Ok(());
+            }
+            // The whole identifier was the run — there is no name here at all. Consume it
+            // and ask again from the top: the two classes can alternate any number of times
+            // inside one run, and the loop's own leading skip is what steps the ASCII half.
+            self.lexer.seek(at);
+            self.advance()?;
+        }
+    }
+
     /// Peek at the next token's kind without consuming it. Returns the kind by
     /// value (`TokenKind` is `Copy`) — like `tsv_ts`'s `peek_kind`, not a borrow of
     /// `self`. Result is cached so repeated peeks are efficient. (Named `peek_kind`,
@@ -441,11 +521,15 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// `eat('-->', true)`.
     ///
     /// Skips leading whitespace itself, so it is a self-sufficient drop-in at any
-    /// boundary (the `<!--`-preceding whitespace need not already be consumed). Does
-    /// **not** handle `/* */` comments — their disposition (register vs. push as a
-    /// block child) is context-specific and stays with each call site.
+    /// boundary (the `<!--`-preceding whitespace need not already be consumed) — and it
+    /// skips it through [`skip_boundary_whitespace`](Self::skip_boundary_whitespace),
+    /// because every call site of this is an `allow_comment_or_whitespace` juncture, which
+    /// is where the two whitespace classes are one class. Does **not** handle `/* */`
+    /// comments — their disposition (register vs. push as a block child) is context-specific
+    /// and stays with each call site, which is precisely why the boundary run has to be
+    /// stepped *here*, before that site's comment arm, rather than after it.
     pub(crate) fn skip_html_comment_markers(&mut self) -> Result<(), ParseError> {
-        self.skip_whitespace()?;
+        self.skip_boundary_whitespace()?;
         while self.check(TokenKind::LessThan)
             && self.source[self.current_start..].starts_with("<!--")
         {
@@ -466,7 +550,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             self.peek = None; // any lookahead was lexed from before the marker
             self.lexer.seek(after);
             self.advance()?;
-            self.skip_whitespace()?;
+            self.skip_boundary_whitespace()?;
         }
         Ok(())
     }

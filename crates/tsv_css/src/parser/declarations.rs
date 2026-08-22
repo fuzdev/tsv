@@ -93,6 +93,15 @@ pub(crate) fn parse_rule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested: bool,
 ) -> Result<CssRule<'arena>, ParseError> {
+    // Ahead of the capture: this offset becomes the rule's AND its prelude's `start`, both
+    // of which sit past a boundary whitespace run in `parseCss` (see
+    // `skip_boundary_whitespace`). Two of the three callers reach here having already
+    // stepped one — the stylesheet body and a style rule's block, through
+    // `skip_html_comment_markers` — but an at-rule block's `parse_block_child` asks
+    // `is_nested_rule_start` first and arrives with the run still standing, so this is a
+    // load-bearing skip and not only a guard on the span capture. The selector list skips
+    // again on its own: the two captures are separate and neither derivable from the other.
+    parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start);
 
     // Nested rules use relative selectors (can start with combinators like `> .child`)

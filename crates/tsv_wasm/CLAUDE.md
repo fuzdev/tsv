@@ -219,8 +219,8 @@ a distinct narrower product, not a second encoding of the drop-in contract.
 
 ### Line/Column Reconstruction Helper (`npm/locations.js`)
 
-Because `loc` is a pure function of `start`/`end` + source, a consumer holding
-only the span-only wire recovers it in JS — and, for a consumer that needs full
+Because `loc` is a pure function of `start`/`end` + source — with one exception,
+below — a consumer holding only the span-only wire recovers it in JS — and, for a consumer that needs full
 `loc`, no-loc-wire + JS-reconstruct beats the full loc-bearing wire end-to-end
 (the full wire's `loc` bytes cost real `JSON.parse` tokenization; a line-start
 table + binary search is cheaper). `npm/locations.js` (pure JS, zero deps, no
@@ -238,7 +238,12 @@ identifiers, snippet names, and simple-identifier block patterns, and the
 between an element's attributes, i.e. inside its opening tag at brace depth 0 —
 including the `<svelte:options>` head, whose wire node carries no `type` and is
 pushed into the host-element pass explicitly);
-**a no-op for CSS**. It rides every package that parses —
+**a no-op for CSS**. The exception is not an approximation but a **refusal**: a Svelte
+source holding a lone CR, U+2028 or U+2029 carries two line counts — acorn's on the nodes
+it parsed, `locate-character`'s on the rest — and which one a node takes is not a function
+of its offsets, so every entry point throws rather than returning quietly-wrong lines
+(parse those with `loc`; see [docs/architecture.md §`loc` lines](../../docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse)). The `reconstruct` forms carry a second refusal on the same principle — a block binding whose `: T` sits behind a newline, whose annotation acorn reads under a seed the offsets cannot supply — checked against the tree rather than the source, since only a parse says where a block binding is.
+It rides every package that parses —
 `@fuzdev/tsv_parse_wasm`, `@fuzdev/tsv_wasm`, and the native `@fuzdev/tsv` loader
 (`build_napi_packages.ts` stages it there) — it operates on the
 parse wire, so only the format-only package has no use for it. `patch_npm_package.ts`

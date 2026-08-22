@@ -23,6 +23,9 @@ pub(crate) fn parse_attribute_selector<'arena>(
 ) -> Result<SimpleSelector<'arena>, ParseError> {
     parser.expect(TokenKind::LeftBracket)?;
     parser.skip_whitespace_registering_comments()?;
+    // `[` is its own `allow_whitespace()` juncture (`read_selector`'s attribute arm skips
+    // before the name), so the run belongs to neither the bracket nor the name.
+    parser.skip_boundary_whitespace()?;
 
     // Parse namespace prefix (optional):
     // - [ns|attr] - namespace prefix "ns"

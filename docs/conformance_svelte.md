@@ -110,6 +110,44 @@ _relation_ between parses (the two spellings agree for tsv and disagree for
   pair reports it as a value mismatch, an extra, _or_ a missing field depending
   on which side's comment carries it.
 
+**Boundary whitespace is JS `\s`.** `parseCss` skips whitespace through the template
+parser's `allow_whitespace()`, which is spelled in JavaScript, so `<NBSP>`, every `Zs`,
+`<LS>`, `<PS>` and `<ZWNBSP>` separate tokens at a selector-list start, after a `,`, inside a
+`[`, after a combinator, after a `;`, and at each child of an at-rule block — while its
+`read_identifier` takes every code point ≥ U+00A0 as identifier content. Which rule applies
+is decided by ORDER, and tsv mirrors the order rather than the class: the **lexer** keeps
+reading those code points as identifier content (which is what a declaration value needs, and
+what a name glued to its `.` / `#` / `:` / `|` / `@` sigil needs — there Svelte calls
+`read_identifier` with no skip in front of it), and the **parser** steps the run back off at
+each juncture where an `allow_whitespace()` would have run first, through
+`CssParser::skip_boundary_whitespace`. Only the parser knows which juncture it is at, which
+is why the class cannot live in the lexer.
+
+A boundary run is **one** run however its members are spelled: `<NBSP><SP>` is a single
+`allow_whitespace()` there, so the skip loops over both classes and the printer's
+preservation scans back over both. The **formatter** keeps every non-ASCII member
+(`preserved_boundary_ws`) rather than replacing the run with its own indentation — the AST
+mirrors Svelte, the printer emits the author's bytes, the same call the escaped-selector
+names make, and dropping one would read as `content_lost` to the corpus safety check. It
+emits from the run's first non-ASCII member on, which is prettier's answer at every
+selector juncture; two spellings inside the run diverge from prettier and are pinned as
+ratchets rather than closed — an ASCII run *interior* to a preserved run keeps the author's
+spelling where prettier respells it as a space, and inside a `[` tsv keeps the character
+where prettier drops it outright (`[<NBSP>a]` → `[a]`), a content difference tsv will not
+copy.
+
+`<NEL>` (U+0085) is `White_Space` to Rust and **not** JS `\s`, so it is whitespace to neither
+and `parseCss` rejects it wherever a name is read — tsv's lexer still reads it as whitespace
+and accepts, a tracked gap that cannot be closed alone (see the raw-scan bullet below).
+
+Pinned by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs); found by
+[wire:audit:terminators](./audits.md#wire-injection-audit-wireaudit). Four junctures still
+read the run as identifier content — a descendant combinator's `end`, a pseudo-argument
+list's `start`, a `<ZWNBSP>` leading a value, and the compound break after a `&` or `*`
+(the one that reaches a NAME, and the one whose fix has to land the break and the
+combinator that replaces it together — doing only the break turns both spellings into parse
+errors). They are enumerated and pinned in that test.
+
 ### CSS Parser Scope & Error Model
 
 **Goal: CSS-spec compliance. Near-term: match Svelte's `parseCss`.** tsv targets
@@ -119,6 +157,17 @@ CSS-spec conformance — grammar-correct _and_ implementing the spec's
 immediate, enforced goal is **parity with Svelte's `parseCss`** on the conformant
 subset: tsv is a drop-in replacement and Svelte's parser is the fixture baseline.
 Where the two goals conflict on conformant input, Svelte-parity wins for now.
+
+- **A declaration's property and value are RAW SCANS in `parseCss`, and identifier TOKENS in
+  tsv — a tracked gap.** `read_declaration` reads a property with `read_until(/[\s:]/)` and a
+  value with `read_value`, so *any* character that is neither JS-`\s` nor the delimiter is
+  content: canonical accepts `%top`, `!top`, `(top`, `1top`, `+top` and `<NEL>top` as property
+  names. tsv reads an identifier token there, so it either **silently truncates** the prefix
+  (`%top`, `!top`, `(top` all reach the wire as `top` — content loss the wire cannot show) or
+  **rejects** (`1top`, `+top`, `<NEL>top`). Closing it means giving the property and value
+  positions their own raw readers rather than the shared identifier token. Pinned as a
+  ratchet by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs), whose `<NEL>`
+  case is the one member this family shares with the whitespace class below.
 
 - **Current behavior is hard-fail; recovery is the target, not the design.**
   Today tsv **errors on the first invalid construct**, which aborts the whole
@@ -391,6 +440,36 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 - **A TypeScript import-equals at `Goal::Script`** — `import x = A.B`, `import x = require('y')`, `import await = foo.await`. Not an ES `ImportDeclaration` and so not a `ModuleItem`: it predates ES modules and is how a script or namespace aliases, which is why tsv's goal gate fires at the two `ImportDeclaration` construction sites rather than on the `import` keyword. tsc asserts the shape in `conformance/externalModules/topLevelAwait.2.ts` (commented *"await allowed in import=namespace when not a module"*, no `.errors.txt`). acorn's rejection is base acorn's ES-grammar check firing before the TS plugin sees the statement — a slip, not a judgement. Every genuine ES import shape still rejects at that goal — [import_equals](../tests/fixtures/typescript/script_goal/import_equals_svelte_divergence/)
 - A **non-simple assignment target** — a call (`foo() = bar`, `foo() += 1`), a literal (`1 >>= 2`), or `this` (`this = x`). The production is `LeftHandSideExpression = AssignmentExpression`; the "is it assignable?" refinement (`AssignmentTargetType`) is an early error layered on top, which tsv defers, so all four parse and prettier formats all four. acorn enforces it (`Assigning to rvalue`). The deferral does **not** reach a no-declaration `for`-in/of head — that is a `LeftHandSideExpression` position but not an assignment context, so a non-simple target there stays a parse error in tsv as in prettier — [nonsimple_target](../tests/fixtures/typescript/expressions/assignment/nonsimple_target_svelte_divergence/)
 - A **shorthand property carrying an initializer** in an object *literal* — `({ a = 1 })`. `PropertyDefinition : CoverInitializedName` is a real production, present so `ObjectLiteral` can cover `ObjectAssignmentPattern`; the rejection is the early error layered on top ("It is a Syntax Error if any source text is matched by this production", [§13.2.5.1](https://tc39.es/ecma262/#sec-object-initializer-static-semantics-early-errors)), which tsv defers, so it parses as a `shorthand` `Property` whose `value` is an `AssignmentExpression`. acorn enforces it (`Shorthand property assignments are valid only in destructuring patterns`). Every *valid* spelling is refined to an `ObjectPattern` before it is printed, so the literal shape is reachable only here — which is why the property's comment seam had never been asked about it — [shorthand_initializer_name_comment](../tests/fixtures/typescript/expressions/objects/shorthand_initializer_name_comment_svelte_divergence/)
+
+**An optional member or parameter inside a block binding's type annotation** —
+`{#each xs as e: { a?: number }}`. Both parsers accept; the ASTs differ, and tsv's is the
+source's. Svelte reads a block binding's `: T` by tricking acorn into parsing a synthetic
+expression, and part of that trick **rewrites the remaining template**
+(`1-parse/read/context.js`, `read_type_annotation`):
+
+```js
+parser.template.slice(parser.index).replace(/\?\s*:/g, ':');
+```
+
+Its stated purpose is to stop acorn-TS reading a following parameter as a sequence
+expression, but the substitution lands in the very string acorn then measures positions
+in. So for any annotation containing a `?:`, Svelte loses `optional: true` (the `?` is
+gone before the parse) and reports every offset after it **one byte short** — its
+`TSPropertySignature` span slices to `a?: numbe`, a truncated token. The shortfall escapes
+the annotation, because the head reader measures from it: `TSTypeAnnotation.end` comes back
+one short of taking in the type literal's own `}`, the `{#each}` reader consumes that brace
+as the head's closer, and the block body's first `Text` node then begins on the head's real
+closing brace with a stray `}` in its `data`/`raw`. tsv parses the real source and emits the real thing. The rewrite has a **second landing**:
+where the annotation is an object type its own `}` absorbs the one-byte slip and the document
+parses with a corrupted AST, but a **function type** has no absorbing token, so
+`{#each xs as e: (a?: number) => void}` makes the head reader run out of head and canonical
+**rejects** it (`expected_token`) where tsv parses it — an over-acceptance whose `?`-free
+control (`(a) => void`, accepted by both) is what attributes it to the `?:` rather than the
+arrow, pinned in
+[block_pattern_annotation_span.rs](../tests/block_pattern_annotation_span.rs). The adjacent-colon, `?`-free spelling every other fixture uses matches exactly — the
+regex finds nothing to substitute — which is why this stayed invisible until an injected
+input produced one ([audits.md §Wire-Injection](./audits.md#wire-injection-audit-wireaudit)) —
+[context_annotation_optional_member](../tests/fixtures/svelte/blocks/each/context_annotation_optional_member_svelte_divergence/)
 
 **A strict-mode-reserved word as a name** ([strict_reserved_name](../tests/fixtures/typescript/declarations/variable/strict_reserved_name_svelte_divergence/); the load-bearing parens that follow from it are [statement_head_paren](../tests/fixtures/typescript/statements/expression/statement_head_paren_svelte_divergence/)) — `implements`, `interface`, `let`, `package`, `private`, `protected`, `public`, `static`, `yield` are barred as names by a *single* bullet of ecma262 §sec-identifiers-static-semantics-early-errors, a Static Semantics early error tsv defers. So tsv parses all nine as names in every position — `var let = 1`, `function f(yield) {}`, `class implements {}`, `function f(private) {}`, `enum yield {}`, `private: for (;;) break private;`, `type T = X extends Y ? infer let : never` — as tsc's parser and prettier do, while acorn enforces the early error and rejects. Most of the list was always accepted, because tsv's lexer leaves those words as plain `Identifier`s; the holes were `let`/`yield` (keyword-lexed) and `implements`/`private`/`protected`/`public` (swallowed by a competing syntactic role), and both are artifacts of tokenization and lookahead rather than rules.
 
@@ -949,6 +1028,7 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 **Svelte template parser** — fix directly in Svelte:
 
 - each-`as` stale `loc.end` — TS-mode as-expression unwrap patches the expression's `end` offset but not `loc.end`
+- Block-annotation `?:` rewrite — `read_type_annotation`'s `.replace(/\?\s*:/g, ':')` edits the string acorn measures positions in, so an optional member in a block binding's `: T` loses `optional` and shifts every later offset one byte short (see §TypeScript Corrections)
 
 ### Comment Attachment Differences
 

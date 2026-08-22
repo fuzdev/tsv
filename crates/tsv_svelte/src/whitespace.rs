@@ -3,76 +3,30 @@
 /// Whether `c` is whitespace to **Svelte's parser** — the class that separates tokens,
 /// ends a tag-name or attribute-name run, and satisfies a block keyword's required space.
 ///
-/// This is exactly JavaScript's `\s`, because every place Svelte asks the question is
-/// spelled in JavaScript: `is_whitespace(cc)` (`1-parse/index.js`, backing
-/// `allow_whitespace` / `require_whitespace`) enumerates these code points by hand, and the
-/// name-run regexes match the same set through `\s` —
-/// `regex_whitespace_or_slash_or_closing_tag = /(\s|\/|>)/` for tag names and
-/// `regex_token_ending_character = /[\s=/>"']/` for attribute and directive names (both in
-/// `1-parse/state/element.js`), as do the raw-text closes `/<\/script\s*>/`,
+/// This is exactly JavaScript's `\s` ([`tsv_lang::is_js_whitespace`], which owns the set and
+/// its exhaustive test), because every place Svelte asks the question is spelled in
+/// JavaScript: `is_whitespace(cc)` (`1-parse/index.js`, backing `allow_whitespace` /
+/// `require_whitespace`) enumerates these code points by hand, and the name-run regexes match
+/// the same set through `\s` — `regex_whitespace_or_slash_or_closing_tag = /(\s|\/|>)/` for
+/// tag names and `regex_token_ending_character = /[\s=/>"']/` for attribute and directive
+/// names (both in `1-parse/state/element.js`), as do the raw-text closes `/<\/script\s*>/`,
 /// `/<\/style\s*>/` and the RCDATA close `/<\/textarea(\s[^>]*)?>/iy`.
 ///
-/// Per ECMA-262, the `\s` CharSet is the union of the `WhiteSpace` and `LineTerminator`
-/// productions: `<TAB>`, `<VT>`, `<FF>`, `<ZWNBSP>` and every code point in general category
-/// `Space_Separator` (`Zs`), plus `<LF>`, `<CR>`, `<LS>` and `<PS>` — 25 in total.
+/// It keeps its own name here because the *question* is Svelte-specific — "does this end a
+/// token in this parser" — while the shared definition answers only "is this JS `\s`". The
+/// two ⚠️ traps (`char::is_whitespace()` differs in both directions; U+FEFF and U+0085 are
+/// the witnesses) live with the definition.
 ///
-/// ⚠️ **Not Rust's `char::is_whitespace()`**, which is the Unicode `White_Space` property.
-/// The two are both 25 code points and differ in *both* directions, so neither is a superset
-/// and either substitution is a bug:
-///
-/// - **U+FEFF** ZERO WIDTH NO-BREAK SPACE is in `\s` but is `Cf`, not `White_Space`. Rust's
-///   predicate misses it, so a name run swallows it (`data-attr<U+FEFF>data-attr2` parses as
-///   one attribute instead of two).
-/// - **U+0085** NEXT LINE is `White_Space` but is not `Zs`, so ECMA-262 excludes it
-///   deliberately ("intentionally excludes all code points that have the Unicode
-///   'White_Space' property but which are not classified in general category
-///   'Space_Separator'"). Rust's predicate over-matches it, which silently *accepts* input
-///   Svelte rejects (`{#if<U+0085>cond}`) and splits a name Svelte keeps whole.
-///
-/// ⚠️ Also **not** [`is_collapsible_ws`](crate::ast::internal::is_collapsible_ws), the
-/// narrower render class (`[ \t\n\r]`). That one answers "may a formatter add, drop or
-/// respell this without changing what renders"; this one answers "does this end a token".
-/// A form feed is whitespace here and rendered content there.
+/// ⚠️ Not [`is_collapsible_ws`](crate::ast::internal::is_collapsible_ws), the narrower render
+/// class (`[ \t\n\r]`). That one answers "may a formatter add, drop or respell this without
+/// changing what renders"; this one answers "does this end a token". A form feed is
+/// whitespace here and rendered content there.
 ///
 /// ⚠️ And **not** `tsv_ts`'s `is_es_whitespace`, which is the `WhiteSpace` production
 /// *alone*: a JS lexer matches `LineTerminator` separately because a newline drives ASI,
 /// so that predicate deliberately omits `<LF>`/`<CR>`/`<LS>`/`<PS>`. This class is the
-/// union of both productions (that is what `\s` means), so it is a strict superset. The
-/// three predicates are deliberately separate — each is named for the question it answers,
-/// and the exhaustive test below grades this one against Svelte's own enumeration rather
-/// than against either sibling.
-#[inline]
-pub(crate) const fn is_svelte_ws(c: char) -> bool {
-    // ASCII is split out rather than folded into one `matches!` so the common path stays a
-    // handful of compares instead of a decision tree over the full (mostly non-ASCII) member
-    // set — these predicates run per character of every name in the document. The two arms
-    // partition the set, and `matches_svelte_is_whitespace_at_every_code_point` grades the
-    // whole predicate per code point, so a member landing in the wrong arm cannot hide.
-    if (c as u32) < 0x80 {
-        return matches!(
-            c,
-            '\u{9}'      // <TAB>
-            | '\u{a}'    // <LF>
-            | '\u{b}'    // <VT>
-            | '\u{c}'    // <FF>
-            | '\u{d}'    // <CR>
-            | '\u{20}' // SPACE                     (Zs)
-        );
-    }
-    matches!(
-        c,
-        '\u{a0}'         // NO-BREAK SPACE           (Zs)
-        | '\u{1680}'     // OGHAM SPACE MARK         (Zs)
-        | '\u{2000}'
-            ..='\u{200a}' // EN QUAD..HAIR SPACE (Zs)
-        | '\u{2028}'     // <LS>
-        | '\u{2029}'     // <PS>
-        | '\u{202f}'     // NARROW NO-BREAK SPACE    (Zs)
-        | '\u{205f}'     // MEDIUM MATHEMATICAL SPACE (Zs)
-        | '\u{3000}'     // IDEOGRAPHIC SPACE        (Zs)
-        | '\u{feff}' // <ZWNBSP>
-    )
-}
+/// union of both productions (that is what `\s` means), so it is a strict superset.
+pub(crate) use tsv_lang::is_js_whitespace as is_svelte_ws;
 
 /// The character at byte offset `i` in `source` and its UTF-8 width, or `None` at or past
 /// the end. `i` must be a character boundary.
@@ -151,49 +105,6 @@ pub(crate) fn skip_svelte_ws(source: &str, start: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Svelte's own `is_whitespace(cc)` (`1-parse/index.js`), transcribed. The predicate
-    /// must agree with it at every code point — this is the drop-in contract, and the set is
-    /// small enough to check exhaustively rather than by sampling.
-    const fn svelte_is_whitespace(cc: u32) -> bool {
-        if cc == 32 || (cc <= 13 && cc >= 9) {
-            return true;
-        }
-        if cc < 160 {
-            return false;
-        }
-        cc == 160
-            || cc == 5760
-            || (cc >= 8192 && cc <= 8202)
-            || cc == 8232
-            || cc == 8233
-            || cc == 8239
-            || cc == 8287
-            || cc == 12288
-            || cc == 65279
-    }
-
-    #[test]
-    fn matches_svelte_is_whitespace_at_every_code_point() {
-        for cp in 0..=0x10ffff_u32 {
-            let Some(c) = char::from_u32(cp) else {
-                continue;
-            };
-            assert_eq!(
-                is_svelte_ws(c),
-                svelte_is_whitespace(cp),
-                "U+{cp:04X} disagrees with Svelte's is_whitespace"
-            );
-        }
-    }
-
-    /// The two directions Rust's `char::is_whitespace()` gets wrong; each has its own
-    /// fixture, and both would be silent if the predicate were swapped for the convenient one.
-    #[test]
-    fn differs_from_unicode_white_space_in_both_directions() {
-        assert!(is_svelte_ws('\u{feff}') && !'\u{feff}'.is_whitespace());
-        assert!(!is_svelte_ws('\u{85}') && '\u{85}'.is_whitespace());
-    }
 
     /// `char_at`'s two branches must agree with a plain decode at every code point — the
     /// ASCII branch skips the decoder entirely, so a divergence there would mis-scan silently.

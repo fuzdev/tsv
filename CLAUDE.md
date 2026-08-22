@@ -213,6 +213,8 @@ deno task razor:audit                # print-width RAZOR SWEEP: pads a text word
 deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar — NOT in check; release-gated leg of `deno task conformance`)
 deno task idempotency:sweep          # F1 idempotency sweep over the real-code corpus (minutes — NOT in check; conformance cadence)
 deno task audit:corpus               # the standing content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
+deno task wire:audit                 # WIRE-INJECTION: whitespace injected into every Svelte tag/block head, the resulting wire graded against the canonical parser — the parse-side sibling of gaps/blanks, which grade the formatter. Each variant is graded against its OWN base, so a deliberate divergence fixture contributes nothing. ⚠️ RED BY DESIGN (a discovery tool, like compile:fuzz); needs the canonical parser, so NOT in check
+deno task wire:audit:terminators     # the same harness, injecting a lone CR / U+2028 / U+2029 anywhere in the document — the spellings on which the two `loc` line classes DISAGREE. The ONLY grader of that model: no fixture can carry a raw CR (the format path folds it) and no real repo has one. ⚠️ RED BY DESIGN
 deno task compile:corpus:compare     # compile-parity wide net over real repos + Svelte suites (sidecar, on demand; ./docs/compile_tooling.md)
 deno task compile:validation         # validation-suite RATCHET over Svelte's compiler-errors + validator suites (sidecar, on demand; :update re-pins, never a MISMATCH; ./docs/compile_validation_ratchet.md)
 deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool, currently RED by design (sidecar, on demand; ./docs/compile_tooling.md)
@@ -803,6 +805,20 @@ finished string instead leaves those disagreeing with the output — the same do
 then formats two ways on two passes.
 `<LS>` / `<PS>` are deliberately NOT folded. Full rationale + spec citations:
 ./docs/architecture.md#line-terminators-parse-takes-the-authors-bytes-format-folds-first
+
+**Counting them is a separate question, and the Svelte wire answers it TWO ways** — because
+Svelte's parser does. Svelte's own positions (`locate-character`) open a line at `\n` alone:
+the spine, `name_loc`, CSS `loc`, a `Program`'s own `loc`, and the `character`-bearing
+identifiers `read_identifier` builds. Everything **acorn** parses carries acorn's, the
+ECMAScript class. And it is not one table per class either: acorn seeds its counter **once per
+parse**, over whatever prefix Svelte prepared for that island (blanked to LF for `<script>` /
+`read_pattern` / `read_type_annotation`, raw for every `read_expression` island, the bare
+`{const …}` / `{let …}` statement, and the snippet-parameter list), and skips `[lineStart, startPos)` outright. `tsv_ts::AcornSeed`
+carries that per-parse difference, `tsv_svelte`'s `Root::acorn_regions` records where each
+parse began, and the ECMAScript tracker is built only when the two classes actually differ —
+which `LocationTracker::new_with_map` reports out of the scan it already runs, so a source with
+no lone `<CR>` / `<LS>` / `<PS>` pays nothing. Full model:
+./docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse
 
 ### Language-Level concerns (classification)
 

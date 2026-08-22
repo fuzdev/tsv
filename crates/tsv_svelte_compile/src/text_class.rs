@@ -18,34 +18,15 @@
 //! target language's is a recurring defect in this crate, so the class lives
 //! here once rather than being re-derived per scan.
 
-/// ECMAScript `WhiteSpace` ∪ `LineTerminator` — equivalently the class JavaScript's
-/// `\s` regex matches (ECMA-262 §12.2 table 34 + §12.3 table 35, and §22.2.2.9's
-/// `WhiteSpace`/`LineTerminator` production for `\s`).
+/// ECMAScript `WhiteSpace` ∪ `LineTerminator` — the class JavaScript's `\s` matches.
 ///
-/// `WhiteSpace` is TAB / VT / FF / SP / NBSP / ZWNBSP plus the `Zs` general
-/// category (`U+1680`, `U+2000`..=`U+200A`, `U+202F`, `U+205F`, `U+3000`);
-/// `LineTerminator` is LF / CR / LS / PS.
-pub(crate) fn is_js_whitespace(c: char) -> bool {
-    matches!(
-        c,
-        '\u{0009}' // <TAB>
-            | '\u{000A}' // <LF>, a LineTerminator
-            | '\u{000B}' // <VT>
-            | '\u{000C}' // <FF>
-            | '\u{000D}' // <CR>, a LineTerminator
-            | '\u{0020}' // <SP>
-            | '\u{00A0}' // <NBSP>
-            | '\u{1680}'
-            | '\u{2000}'
-            ..='\u{200A}'
-            | '\u{2028}' // <LS>, a LineTerminator
-            | '\u{2029}' // <PS>, a LineTerminator
-            | '\u{202F}'
-            | '\u{205F}'
-            | '\u{3000}'
-            | '\u{FEFF}' // <ZWNBSP>
-    )
-}
+/// Re-exported from [`tsv_lang`] rather than enumerated here: three crates in this workspace
+/// need the same 25 code points ([`tsv_svelte`]'s tokenizer class, the class `parseCss` skips
+/// at its `allow_whitespace()` junctures, and this crate's source scans), and each had
+/// written its own copy with its own restatement of the two traps above. One definition means
+/// one exhaustive per-code-point test — which this copy never had — and no way for the three
+/// to drift.
+pub(crate) use tsv_lang::is_js_whitespace;
 
 /// `String.prototype.trim` — strips a leading and trailing [`is_js_whitespace`]
 /// run, the `TrimString` production's `WhiteSpace`/`LineTerminator` class

@@ -12,7 +12,7 @@ use tsv_lang::{ParseError, Span};
 use tsv_ts::{Expression, TopLevelAs};
 
 use super::expression_tag::scan_to_matching_brace;
-use super::parser_impl::SvelteParser;
+use super::parser_impl::{EmbeddedParseMark, SvelteParser};
 use super::{match_bracket, subslice_offset};
 
 /// Strip a **mid-head keyword separator** — optional leading whitespace, the keyword,
@@ -401,19 +401,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// assertion run turned out to cover, once [`each_binding_separator`] has said where
     /// the run really ends.
     ///
-    /// The slice STARTS where the partial parse did and reaches further, so it re-collects
-    /// every comment that parse registered — rewinding to `comments_mark` first is what
-    /// keeps each comment registered exactly once. Without it a comment here was listed
-    /// twice in the root `comments` array and printed twice by whichever emitter owned its
-    /// gap. Both re-parsing arms share this, so the rewind cannot be done at one and
-    /// forgotten at the other.
+    /// The slice STARTS where the partial parse did and reaches further, so it re-registers
+    /// everything that parse registered — rewinding to `mark` first is what keeps each
+    /// registration single. Without it a comment here was listed twice in the root
+    /// `comments` array and printed twice by whichever emitter owned its gap, and the
+    /// iterable's `AcornRegion` was pushed twice. Both re-parsing arms share this, so the
+    /// rewind cannot be done at one and forgotten at the other.
     fn reparse_each_iterable(
         &mut self,
         iterable: &str,
         expr_offset: usize,
-        comments_mark: usize,
+        mark: EmbeddedParseMark,
     ) -> Result<Expression<'arena>, ParseError> {
-        self.expression_comments.truncate(comments_mark);
+        self.rewind_embedded_parses(mark);
         self.parse_ts_expression(iterable.trim_matches(is_svelte_ws), expr_offset)
     }
 
@@ -441,10 +441,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // assertion run itself (`each_binding_separator`). `satisfies` is not in question
         // and stays TypeScript's, so `{#each xs satisfies A[] as item}` parses here.
         //
-        // The mark is what the type-assertion branch below rewinds the collected comments to
-        // before re-parsing the same region — see its `truncate`; `expr_offset` is where BOTH
-        // parses of the iterable start, so it is derived once rather than twice.
-        let comments_before_expr = self.expression_comments.len();
+        // The mark is what the type-assertion branch below rewinds the embedded-parse ledgers
+        // to before re-parsing the same region — see `reparse_each_iterable`; `expr_offset` is
+        // where BOTH parses of the iterable start, so it is derived once rather than twice.
+        let mark_before_expr = self.embedded_parse_mark();
         let expr_str = content.trim_start_matches(is_svelte_ws);
         let expr_offset = content_offset + subslice_offset(content, expr_str);
         let (expression, expr_end_pos) =
@@ -477,20 +477,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     EachHeadSplit::FirstAs => Some((binding_str, binding_offset)),
                     EachHeadSplit::LaterAs { separator, binding } => {
                         let iterable = &content[..separator - content_offset];
-                        expression = self.reparse_each_iterable(
-                            iterable,
-                            expr_offset,
-                            comments_before_expr,
-                        )?;
+                        expression =
+                            self.reparse_each_iterable(iterable, expr_offset, mark_before_expr)?;
                         Some((&content[binding - content_offset..], binding))
                     }
                     EachHeadSplit::NoBinding { run_end } => {
                         let iterable = &content[..run_end - content_offset];
-                        expression = self.reparse_each_iterable(
-                            iterable,
-                            expr_offset,
-                            comments_before_expr,
-                        )?;
+                        expression =
+                            self.reparse_each_iterable(iterable, expr_offset, mark_before_expr)?;
                         None
                     }
                 }
@@ -1318,6 +1312,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Snippet parameters preserve grouping parens (acorn's `preserveParens`,
             // without Svelte's `remove_parens`), so a default like `c = (2, 3)` keeps
             // its `ParenthesizedExpression` — matching Svelte's snippet-param AST.
+            // Svelte's own prelude is `replace(/\S/g, ' ')` — it blanks the
+            // non-whitespace and keeps every terminator — so acorn counted the
+            // ECMAScript class over the whole prefix, exactly as for the raw
+            // template the expression islands get.
+            // The extent is the head slice itself — from the `<` or `(` through the
+            // matching `)` — not the wrapper the parse actually runs over, whose
+            // `function f` prefix sits at synthetic offsets outside the document.
+            self.record_acorn_region(
+                content_offset + head_start,
+                &content[head_start..=close_paren],
+                PrefixLines::Ecmascript,
+            );
             let program = tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena)?;
             self.expression_comments.extend_from_slice(program.comments);
             // The wrapper is literally a `function` declaration, so the match holds by
