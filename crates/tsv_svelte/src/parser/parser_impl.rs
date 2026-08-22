@@ -59,7 +59,11 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// Every embedded acorn parse, in the order the reads happen — which is
     /// source order, so `Root.acorn_regions` needs no sort. See
     /// [`record_acorn_region`](Self::record_acorn_region).
-    pub(crate) acorn_regions: Vec<internal::AcornRegion>,
+    ///
+    /// Bump-allocated because `Root` wants an `&'arena [_]`: growing in the
+    /// arena hands the finished run straight over (`into_bump_slice`), where a
+    /// heap `Vec` owes a malloc, a free, and a copy into the arena at the end.
+    pub(crate) acorn_regions: BumpVec<'arena, internal::AcornRegion>,
     /// True while the nearest *element* ancestor is `<svelte:head>` — mirrors Svelte's
     /// `parent_is_head` (`1-parse/state/element.js`): set entering a head's children, reset by a
     /// nested RegularElement/Component, transparent through other special elements and blocks.
@@ -70,6 +74,14 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// attribute). Monotonic within a subtree (descendants inherit) but scoped to the template
     /// (restored for siblings). Suppresses `<slot>` → `SlotElement` (it stays a `RegularElement`).
     pub(crate) in_shadowroot_template: bool,
+}
+
+/// A point in the parser's embedded-parse ledgers to rewind to — see
+/// [`SvelteParser::embedded_parse_mark`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct EmbeddedParseMark {
+    comments: usize,
+    acorn_regions: usize,
 }
 
 /// Svelte's reserved-word list (`RESERVED_WORDS`, `svelte/src/utils.js`): the JS
@@ -163,7 +175,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             peek: None,
             base_offset: 0,
             expression_comments: Vec::new(),
-            acorn_regions: Vec::new(),
+            acorn_regions: BumpVec::new_in(arena),
             in_svelte_head: false,
             in_shadowroot_template: false,
         })
@@ -683,14 +695,39 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         debug_assert!(
             self.acorn_regions
                 .last()
-                .is_none_or(|r| r.lex_start as usize <= lex_start),
-            "acorn regions are recorded in source order (binary-searched by the wire writer)"
+                .is_none_or(|r| (r.lex_start as usize) < lex_start),
+            "acorn regions are recorded in strict source order and never repeat \
+             (binary-searched by the wire writer); a re-parse over the same region \
+             must rewind through `EmbeddedParseMark`"
         );
         self.acorn_regions.push(internal::AcornRegion {
             lex_start: lex_start as u32,
             origin: origin as u32,
             prefix,
         });
+    }
+
+    /// How far both of the ledgers an embedded parse appends to had filled before
+    /// it ran, so a **re-parse over the same region** can rewind them together.
+    ///
+    /// One value rather than two marks because the two ledgers fail differently
+    /// and only one of the failures is loud: a comment registered twice is
+    /// printed twice, while a repeated [`internal::AcornRegion`] is (today) an
+    /// exact duplicate that `partition_point` resolves to the same seed — so
+    /// rewinding one and forgetting the other reads as correct until the regions
+    /// stop being identical.
+    pub(crate) fn embedded_parse_mark(&self) -> EmbeddedParseMark {
+        EmbeddedParseMark {
+            comments: self.expression_comments.len(),
+            acorn_regions: self.acorn_regions.len(),
+        }
+    }
+
+    /// Drop everything the embedded parses since `mark` registered, leaving the
+    /// parser as if they had not run. See [`embedded_parse_mark`](Self::embedded_parse_mark).
+    pub(crate) fn rewind_embedded_parses(&mut self, mark: EmbeddedParseMark) {
+        self.expression_comments.truncate(mark.comments);
+        self.acorn_regions.truncate(mark.acorn_regions);
     }
 
     /// Parse a TypeScript statement (the body of a `{const}`/`{let}` tag is a

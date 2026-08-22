@@ -4,6 +4,7 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
 use crate::whitespace::{skip_svelte_ws, svelte_ws_width_at};
+use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
@@ -184,8 +185,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Recorded in read order, which is source order — the wire writer
         // binary-searches this by position (`SvelteParser::record_acorn_region_at`
-        // asserts the order at each push).
-        let acorn_regions = self.arena.alloc_slice_copy(&self.acorn_regions);
+        // asserts the order at each push). Already in the arena, so handing it over
+        // is a move; the empty replacement it leaves behind allocates nothing.
+        let acorn_regions = std::mem::replace(&mut self.acorn_regions, BumpVec::new_in(self.arena))
+            .into_bump_slice();
 
         Ok(Root {
             fragment,

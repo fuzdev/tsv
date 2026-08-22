@@ -490,7 +490,7 @@ impl<'a> LocationMapper<'a> {
 ///   `read_expression` island, the `{@const}`/`{@let}` statement, and the snippet
 ///   parameter list, whose `replace(/\S/g, ' ')` prelude keeps *all* whitespace),
 ///   so every ECMAScript terminator ahead of the region counted.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum PrefixLines {
     Lf,
     Ecmascript,
@@ -516,18 +516,23 @@ pub enum PrefixLines {
 /// [`NONE`](Self::NONE) is the identity, and is what every non-Svelte writer —
 /// and every Svelte document whose two line classes agree, which is essentially
 /// all of them (see `LocationTracker::new_with_map`) — emits under.
+///
+/// The three fields are `u32` for the same reason [`Span`](crate::Span) is: each
+/// is bounded by the source length, which the parsers already refuse past
+/// `u32::MAX`. That keeps the seed 12 bytes, so carrying two of them (a block
+/// pattern's two parses) costs an `EmbedWriter` less than one `Position` would.
 #[derive(Clone, Copy, Debug)]
 pub struct AcornSeed {
     /// acorn's line number for the region's first line, or `0` when inactive.
     /// `0` never equals a real 1-based line, so the column rule is then inert.
-    first_line: usize,
+    first_line: u32,
     /// Lines to subtract from the ECMAScript tracker's answer: the terminators
     /// it counted ahead of the region that acorn did not.
-    line_delta: usize,
+    line_delta: u32,
     /// Columns to add on `first_line` only: the distance from acorn's own
     /// `lineStart` out to the ECMAScript tracker's, in emitted units. Nonzero
     /// only when a non-LF terminator sits between the two.
-    column_shift: usize,
+    column_shift: u32,
 }
 
 impl AcornSeed {
@@ -545,13 +550,11 @@ impl AcornSeed {
     /// parse start — `read_type_annotation`'s `_ as `, which acorn lexes instead
     /// of the bytes it covers. Everywhere else they are the same position.
     ///
-    /// `lf` and `es` must be the LF-rule and ECMAScript-rule trackers over the
-    /// same source, and `map` its byte→UTF-16 map (a line rule never affects the
-    /// map, so one map serves both).
-    /// `lf` is the LF-rule tracker over the same source `acorn` maps; taking the
-    /// mapper rather than a second tracker is what keeps the byte→UTF-16 map the
-    /// seed shifts columns in the *same* one the answers it re-seeds came from
-    /// (a line rule never affects the map, so there is only ever one).
+    /// `acorn` is the ECMAScript-rule mapper the re-seeded answers come from and
+    /// `lf` the LF-rule tracker over that same source. Taking a *mapper* on the
+    /// acorn side rather than a second bare tracker is what keeps the byte→UTF-16
+    /// map this shifts columns in the very one those answers were emitted
+    /// through — a line rule never affects the map, so there is only ever one.
     pub fn new(
         lf: &LocationTracker,
         acorn: LocationMapper<'_>,
@@ -571,25 +574,24 @@ impl AcornSeed {
         let acorn_line = acorn.tracker.get_line_column(lex_start as usize).0;
         let acorn_line_start = acorn.tracker.line_start_byte(lex_start as usize);
         Self {
-            first_line,
-            line_delta: acorn_line - first_line,
-            column_shift: (acorn.pos(acorn_line_start as u32) - acorn.pos(column_origin as u32))
-                as usize,
+            first_line: first_line as u32,
+            line_delta: (acorn_line - first_line) as u32,
+            column_shift: acorn.pos(acorn_line_start as u32) - acorn.pos(column_origin as u32),
         }
     }
 
     /// acorn's line for a position the ECMAScript tracker put on `es_line`.
     #[inline]
     pub fn line(self, es_line: usize) -> usize {
-        es_line - self.line_delta
+        es_line - self.line_delta as usize
     }
 
     /// acorn's column for a position the ECMAScript tracker put at `column` on
     /// (already re-seeded) `line`.
     #[inline]
     pub fn column(self, line: usize, column: usize) -> usize {
-        if line == self.first_line {
-            column + self.column_shift
+        if line == self.first_line as usize {
+            column + self.column_shift as usize
         } else {
             column
         }

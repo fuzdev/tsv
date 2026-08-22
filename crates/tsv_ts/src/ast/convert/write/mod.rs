@@ -353,13 +353,12 @@ pub enum ProgramLoc {
 /// mapper, comment role, `loc`-emission flag, and parser variant each one
 /// funnels into a `Ctx`.
 ///
-/// Bundled into one `Copy` value (all fields are `Copy` — two references, an
-/// enum, two bools) so the call sites stop re-threading the same arguments.
-/// It is an entry-boundary convenience only: each writer destructures it into a
-/// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx` exactly
-/// as before — the fused char-space emission never sees it, so this is output-
-/// and hot-path-neutral. (`write_program_embedded` stays out of this set: it
-/// carries `Schema` + `ProgramLoc`, and its `loc` flag lives in `ProgramLoc`.)
+/// Bundled into one `Copy` value (every field is `Copy` — two references, an
+/// enum, two bools, two seeds) so the call sites stop re-threading the same
+/// arguments. It is an entry-boundary value: each writer destructures it into a
+/// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx`, so it
+/// is copied once per island rather than once per node. `ProgramWriter` is its
+/// sibling for a `<script>`'s `Program`, and says there why that one is separate.
 #[derive(Clone, Copy)]
 pub struct EmbedWriter<'a> {
     pub source: &'a str,

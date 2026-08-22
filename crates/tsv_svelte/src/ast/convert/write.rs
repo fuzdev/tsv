@@ -214,15 +214,7 @@ impl<'a> Ctx<'a> {
     /// carry vanilla acorn's wire quirks in a non-TS component.
     #[inline]
     fn embed(&self, mode: CommentMode<'a>, pos: u32) -> EmbedWriter<'a> {
-        EmbedWriter {
-            source: self.source,
-            loc: self.acorn_loc,
-            comments: mode,
-            emit_loc: self.emit_loc,
-            vanilla_acorn: !self.component_is_ts,
-            acorn: self.acorn_seed(pos),
-            acorn_annotation: AcornSeed::NONE,
-        }
+        self.embed_under(mode, self.acorn_loc, self.acorn_seed(pos))
     }
 
     /// The same, for an island Svelte builds **itself** with `locate-character`
@@ -240,13 +232,28 @@ impl<'a> Ctx<'a> {
     /// start.
     #[inline]
     fn embed_locator(&self, mode: CommentMode<'a>) -> EmbedWriter<'a> {
+        self.embed_under(mode, self.loc, AcornSeed::NONE)
+    }
+
+    /// The one `EmbedWriter` constructor the three above share — everything that
+    /// is a document-wide fact, plus the two fields that pick the line table:
+    /// which mapper answers a position, and which parse's seed re-bases it.
+    #[inline]
+    fn embed_under(
+        &self,
+        mode: CommentMode<'a>,
+        loc: LocationMapper<'a>,
+        acorn: AcornSeed,
+    ) -> EmbedWriter<'a> {
         EmbedWriter {
             source: self.source,
-            loc: self.loc,
+            loc,
             comments: mode,
             emit_loc: self.emit_loc,
             vanilla_acorn: !self.component_is_ts,
-            acorn: AcornSeed::NONE,
+            acorn,
+            // Only `embed_pattern` fills this: a block pattern is the one island
+            // that can be two parses.
             acorn_annotation: AcornSeed::NONE,
         }
     }
@@ -281,7 +288,7 @@ impl<'a> Ctx<'a> {
     /// re-base), and for a position ahead of every region.
     fn acorn_seed(&self, pos: u32) -> AcornSeed {
         let before = self.acorn_regions.partition_point(|r| r.lex_start <= pos);
-        let Some(region) = before.checked_sub(1).map(|i| &self.acorn_regions[i]) else {
+        let Some(region) = self.acorn_regions[..before].last() else {
             return AcornSeed::NONE;
         };
         AcornSeed::new(
