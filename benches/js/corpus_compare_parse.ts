@@ -1037,19 +1037,30 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	}
 
 	if (injecting) {
-		// Re-grade every manufactured input against its own base: a divergence the base
-		// file already had is not the injection's doing. See `subtract_baseline_diffs`.
+		// Re-grade every manufactured input against its own base: a divergence — or a parse
+		// failure — the base file already had is not the injection's doing. See
+		// `subtract_baseline_diffs`.
 		for (const lang of LANGUAGES) {
 			const kept = subtract_baseline_diffs(results.get(lang)!);
 			results.set(lang, kept);
 			const s = stats.get(lang)!;
-			s.undocumented = kept.filter((r) => r.status === 'undocumented').length;
-			s.documented = kept.filter((r) => r.status === 'documented').length;
+			const count = (status: string) => kept.filter((r) => r.status === status).length;
+			s.undocumented = count('undocumented');
+			s.documented = count('documented');
 			// A variant whose every diff its base already had is no longer a finding, so it
 			// is an exact match for this run's question. `match` has to be re-derived rather
 			// than left as the raw count, or the table reports those variants as neither
 			// matched nor diverging and the exact-% reads far below the truth.
 			s.match = s.compared - s.documented - s.undocumented;
+			// The tsv-side rejections likewise, which the raw count gets backwards on this
+			// corpus: `tests/fixtures` holds ~593 `input_invalid_*` files plus the
+			// `tsv_rejects` set, and each fails in every variant derived from it while its
+			// own base is excluded as a control — so the raw number reports inherited
+			// failures as injected ones. What survives here is an injection that turned an
+			// accepted document into a rejected one. The other two stay raw: neither is a
+			// finding, and "parse-fail skipped" is the right home for a manufactured input
+			// the oracle refused.
+			s.tsv_errors = count('tsv_error');
 		}
 	}
 

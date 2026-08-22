@@ -73,6 +73,8 @@ function loc_at(offset: number, starts: number[]): { line: number; column: numbe
 interface Tally {
 	/** Svelte sources refused up front: their two line classes disagree (see `TWO_LINE_CLASSES`). */
 	two_line_classes: number;
+	/** Svelte trees refused up front: a block binding's `: T` is split from it by a newline. */
+	seeded_annotation: number;
 	exact: number;
 	pattern_quirk: number;
 	script_override: number;
@@ -92,6 +94,34 @@ interface Tally {
  * than imported, like everything else here: this file is the independent oracle.
  */
 const TWO_LINE_CLASSES = /\r(?!\n)|[\u2028\u2029]/;
+
+/**
+ * The shipped helper's SECOND refusal, re-derived: a Svelte block binding whose `: T` is
+ * separated from it by a newline. Svelte reads that annotation with its own acorn parse,
+ * entered on a synthetic `_ as ` that OVERWRITES the five bytes behind the colon — so the
+ * break is erased before acorn sees it and the annotation's nodes stay on the binding's
+ * line, which no single table over the real source produces.
+ *
+ * Mirrored here for the reason this whole file exists: it is the independent oracle for what
+ * the reconstruction can serve, and an oracle scoped differently from the thing it grades
+ * reports a divergence that is really a disagreement about the corpus. The discriminator is
+ * a leading-whitespace run holding a newline — every acorn-built `TSTypeAnnotation` opens on
+ * a token (a `:`, or a function type's `=>`), while only Svelte's block-binding one is
+ * anchored at the *binding's* end.
+ */
+function has_seeded_annotation(node: unknown, source: string): boolean {
+	if (!node || typeof node !== 'object') return false;
+	if (Array.isArray(node)) return node.some((item) => has_seeded_annotation(item, source));
+	const record = node as Record<string, unknown>;
+	if (record.type === 'TSTypeAnnotation' && typeof record.start === 'number') {
+		for (let i = record.start; i < source.length && /\s/.test(source[i]); i++) {
+			if (source[i] === '\n') return true;
+		}
+	}
+	return Object.keys(record).some(
+		(key) => key !== 'loc' && key !== 'name_loc' && has_seeded_annotation(record[key], source)
+	);
+}
 
 // The Svelte name span is derivable from the node's own start/end + type, so the
 // no-locations wire keeps `name_loc` recoverable too. Re-derived here rather than
@@ -251,6 +281,7 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 	const is_svelte = language === 'svelte';
 	const t: Tally = {
 		two_line_classes: 0,
+		seeded_annotation: 0,
 		exact: 0,
 		pattern_quirk: 0,
 		script_override: 0,
@@ -283,6 +314,12 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 		} catch {
 			continue; // skip files the parser rejects
 		}
+		// The second refusal, which needs the TREE rather than the source — so unlike the one
+		// above it can only be asked here, after the parse.
+		if (is_svelte && has_seeded_annotation(full, f.content)) {
+			t.seeded_annotation++;
+			continue;
+		}
 		walk(full, build_line_starts(f.content, rule), is_svelte, f.content, t);
 		checked++;
 	}
@@ -294,9 +331,12 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 		console.error(
 			`  name_loc: line/col exact ${t.name_loc_exact}, MISMATCH ${t.name_loc_mismatch}; name span exact ${t.name_span_exact}, MISMATCH ${t.name_span_mismatch}`
 		);
-		// Reported, not just tallied: this is the count the shipped helper REFUSES, so a
+		// Reported, not just tallied: these are the counts the shipped helper REFUSES, so a
 		// corpus that grows one has to say so here rather than silently shrink `checked`.
-		console.error(`  refused up front (two line classes): ${t.two_line_classes}`);
+		console.error(
+			`  refused up front: ${t.two_line_classes} two line classes, ` +
+				`${t.seeded_annotation} seeded annotation`
+		);
 	}
 	if (t.mismatch > 0 || t.name_loc_mismatch > 0 || t.name_span_mismatch > 0) any_mismatch = true;
 }

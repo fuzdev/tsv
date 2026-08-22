@@ -232,9 +232,12 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
   line class and no per-parse seed), and the `ws` family additionally reaches only heads.
 - **A base that already diverges at a signature masks a new divergence at that same
   signature** in its variants. A clean base is the better seed.
-- **A rejected variant is not a finding.** The oracle refusing an injection buckets as
-  `canonical_error` and is skipped, so an over-acceptance introduced by an injection is
-  not graded here.
+- **A variant the ORACLE rejects is not a finding.** It buckets as `canonical_error` and is
+  skipped, so an over-acceptance introduced by an injection is not graded here. The mirror
+  case IS graded: a variant **tsv** rejects where its base parsed is kept as a finding, with
+  its `#inj:` label, since an injection-introduced over-rejection carries no diffs to be
+  found by (196 of them on `tests/fixtures` under `terminators` today, against 577 before
+  the inherited ones — every `input_invalid_*` fixture's — were subtracted out).
 - **The head scan is approximate** — it counts braces without tracking strings or
   comments, so a head containing `'}'` ends early. That costs sites; it cannot
   manufacture a wrong finding.
@@ -247,13 +250,22 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   bounded-slice tag readers. `{@html expr // c ⏎}` ends the comment before the trailing
   space where acorn ends it after; `{expr // c ⏎}` and `<script>` both agree, so the
   divergence is the bounded readers' whitespace-trimmed slice, not the comment lexer.
-- **`terminators`** — tsv's CSS parser skips a **narrower whitespace class than
-  `parseCss` does** at a selector boundary. Svelte reaches every one of those through the
-  template parser's `allow_whitespace()`, which is JS `\s` (the 25-code-point set in
-  `tsv_svelte`'s `is_svelte_ws`); tsv skips the css-syntax-3 class, so `<style>⏎<LS>div {}`
-  yields a `TypeSelector` named `"<LS>div"` where `parseCss` yields `"div"`. `<PS>` and
-  `U+00A0` reproduce it identically, so the class — not the terminator — is the bug. It
-  dominates a terminator run by file count; read past it when triaging the rest.
+- **`terminators`**, by file count over `tests/fixtures` — three groups, none of them a
+  line-*class* question despite the family that surfaced them:
+  - an attribute's `end` and its `value` **shape** when a JS-`\s` code point sits right
+    after its `{…}` (`<div onclick={…}<LS>>`): tsv absorbs the character into the attribute
+    and turns `value` into an array, where canonical ends the attribute before it (84 / 76
+    files);
+  - a `{@debug}` identifier's `loc` line and column under a **lone `<CR>`** (54 / 51 files);
+  - the selector-span residue this audit's own CSS finding left behind — a descendant
+    combinator's `end` and the compound break, enumerated and pinned in
+    [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs) (52 / 38 files).
+
+  The boundary-whitespace **class** finding this list used to lead with is closed: the CSS
+  parser now steps the whole `allow_whitespace()` run (`CssParser::skip_boundary_whitespace`,
+  called at every `allow_comment_or_whitespace` juncture — the stylesheet body, a style
+  rule's block and an at-rule's, plus the selector-internal ones), and the printer puts the
+  non-ASCII members back. See [conformance_svelte.md §Boundary whitespace](./conformance_svelte.md).
 
 ## Blank-Line Injection Audit (`blanks:audit`)
 

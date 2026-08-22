@@ -156,6 +156,11 @@ impl LineScan {
     /// An unseeded scan, for the unit tests that grade a single ASCII *run*
     /// against a reference scan of that same run — where a line-1 start the
     /// reference never emits would be the only difference.
+    ///
+    /// Deliberately spelled as `map_only`'s alias rather than as its own literal:
+    /// the two are the same VALUE and differ only in what the caller is claiming,
+    /// and writing the fields twice would let one drift while both names still
+    /// compiled.
     #[cfg(test)]
     fn bare() -> Self {
         Self::map_only()

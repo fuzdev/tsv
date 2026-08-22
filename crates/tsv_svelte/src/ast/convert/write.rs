@@ -171,8 +171,11 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     } else {
         Vec::new()
     };
-    let acorn_seeds_needed =
-        emit_loc && (ecmascript_lines_differ || acorn_seeds.iter().any(|seed| !seed.is_identity()));
+    // `may_need_seeds` already carries `emit_loc &&` and is implied by `ecmascript_lines_differ`
+    // there, so this asks only what the seeds themselves add — restating the gate would give
+    // the two conditions two places to drift apart.
+    let acorn_seeds_needed = may_need_seeds
+        && (ecmascript_lines_differ || acorn_seeds.iter().any(|seed| !seed.is_identity()));
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.

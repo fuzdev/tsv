@@ -16,14 +16,24 @@
 //!
 //! So a code point in both sets is whitespace when an `allow_whitespace()` reaches it first
 //! and identifier content when `read_identifier` does. The junctures decide: Svelte skips
-//! whitespace at a selector-list start, after a `,`, inside a `[`, after a combinator and
-//! after a `;`, and skips **nothing** between a sigil (`.` `#` `:` `::`) and the name it
-//! introduces, where selectors-4 forbids whitespace anyway.
+//! whitespace at a selector-list start, after a `,`, inside a `[`, after a combinator, after
+//! a `;`, and at each child of an at-rule block, and skips **nothing** between a sigil
+//! (`.` `#` `:` `::`) and the name it introduces, where selectors-4 forbids whitespace anyway.
 //!
-//! tsv reads ONE class at every boundary — `char::is_whitespace()` below U+00A0 — which is
-//! wrong in both directions: it misses every JS-`\s` code point at or above U+00A0 (folding
-//! it into the following name) and it over-matches `<NEL>` (accepting input Svelte rejects).
-//! This test is the pin for both.
+//! tsv resolves it the same way and in the same order: the lexer reads a code point at or
+//! above U+00A0 as identifier content, and `CssParser::skip_boundary_whitespace` steps the run
+//! back off at each of the junctures above. One direction is still open — the lexer's own
+//! class is `char::is_whitespace()`, which over-matches `<NEL>` (U+0085) and so accepts input
+//! Svelte rejects. This test pins the closed half and ratchets the open one.
+//!
+//! ⚠️ **A boundary run is ONE run however its members are spelled.** `<NBSP><SP>` is a single
+//! `allow_whitespace()` to `parseCss`, and only the non-ASCII half is hiding inside an
+//! identifier token — so the parser's skip loops rather than stepping once, and the printer's
+//! preservation scans back over both classes rather than the non-ASCII one alone. Getting
+//! either wrong is invisible to the single-character spellings above: the leftover ASCII gap
+//! is swallowed by the next ordinary whitespace skip, leaving the NAMES right and moving only
+//! the offsets captured before it — or, at `[` and after a combinator, leaving a gap where a
+//! name was due and turning input canonical accepts into a parse error.
 //!
 //! **Why a test rather than a fixture.** None of these inputs is a formatting fixed point:
 //! once the character is whitespace the formatter normalizes it away, so it cannot be an
@@ -33,7 +43,7 @@
 //! here is transcribed from the live modern parser
 //! (`cargo run -p tsv_debug canonical_parse`) rather than regenerated, so it would go stale
 //! silently if `parseCss` changed.
-
+//!
 //! **Residue, deliberately not closed here.** The junctures above are the ones the wire
 //! audit surfaced and this fix covers; four more still read the run as identifier content,
 //! all of them span- or structure-level rather than name-level, and none reachable from
@@ -111,9 +121,9 @@ const JS_WHITESPACE_AT_OR_ABOVE_A0: [(&str, &str); 5] = [
 /// treats as whitespace where Svelte does not.
 const NEL: &str = "\u{85}";
 
-/// The five junctures where Svelte runs `allow_whitespace()` before the next token starts.
+/// The junctures where Svelte runs `allow_whitespace()` before the next token starts.
 /// `{T}` marks the injection point; the pair is the node the character must NOT reach.
-const BOUNDARY_JUNCTURES: [(&str, &str, (&str, &str)); 5] = [
+const BOUNDARY_JUNCTURES: [(&str, &str, (&str, &str)); 8] = [
     (
         "selector-list start",
         "<style>{T}div { color: red; }</style>",
@@ -138,6 +148,53 @@ const BOUNDARY_JUNCTURES: [(&str, &str, (&str, &str)); 5] = [
         "after a declaration's semicolon",
         "<style>a { color: red;{T}top: 0; }</style>",
         ("Declaration", "top"),
+    ),
+    // The at-rule block is the one `allow_comment_or_whitespace` juncture that does not
+    // route through `skip_html_comment_markers` — legacy `<!--` markers are a
+    // stylesheet-body and style-rule-block form — so both of its arms are pinned: the
+    // rule-list one a conditional group takes, and the declaration one CSS block-parsing
+    // agnosticism allows in the same place.
+    (
+        "an at-rule block's first rule",
+        "<style>@media screen {{T}div { color: red } }</style>",
+        ("TypeSelector", "div"),
+    ),
+    (
+        "an at-rule block's first declaration",
+        "<style>@media screen {{T}color: red }</style>",
+        ("Declaration", "color"),
+    ),
+    (
+        "a nested at-rule block's first declaration",
+        "<style>a { @media screen {{T}color: red } }</style>",
+        ("Declaration", "color"),
+    ),
+];
+
+/// The junctures where a run is followed by a COMMENT, whose disposition belongs to the
+/// juncture rather than to the skip.
+///
+/// Their own family because the assertion is different: a comment is not a named node, and
+/// what goes wrong is not a name but a DROP or a rejection. The boundary skip stops on a
+/// comment exactly where the plain whitespace skip does — which is what leaves the loop's
+/// own comment arm in charge — and stepping the run *after* that arm instead put the cursor
+/// on a comment already passed, where the "skip unexpected token" tail ate it silently.
+const COMMENT_AFTER_RUN_JUNCTURES: [(&str, &str); 4] = [
+    (
+        "a stylesheet body",
+        "<style>{T}/* c */ div { color: red; }</style>",
+    ),
+    (
+        "a style rule's block",
+        "<style>a { b {} {T}/* c */ d { color: blue; } }</style>",
+    ),
+    (
+        "before a block's closing brace",
+        "<style>a { color: red; {T}/* c */ }</style>",
+    ),
+    (
+        "an at-rule block",
+        "<style>@media screen {{T}/* c */ div { color: red } }</style>",
     ),
 ];
 
@@ -331,5 +388,195 @@ fn the_remaining_junctures_are_a_tracked_gap() {
         values,
         vec!["\u{feff}red".to_owned()],
         "tsv keeps the ZWNBSP in the value; canonical's `read_value` drops it (`'red'`)"
+    );
+}
+
+/// UTF-16 offset of the first occurrence of `needle` — the units the wire counts, which are
+/// not byte offsets on any source this file builds.
+fn utf16_offset_of(src: &str, needle: &str) -> u64 {
+    let byte = src.find(needle).expect("needle should occur in the source");
+    src[..byte].encode_utf16().count() as u64
+}
+
+/// The `start` of the one `SelectorList` in the wire — the offset a rule, its prelude and its
+/// first complex selector all share, and the one a name-level assertion cannot see.
+fn selector_list_start(src: &str) -> u64 {
+    let arena = bumpalo::Bump::new();
+    let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
+    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let mut found = Vec::new();
+    fn walk(node: &Value, out: &mut Vec<u64>) {
+        match node {
+            Value::Object(fields) => {
+                if fields.get("type").and_then(Value::as_str) == Some("SelectorList") {
+                    out.extend(fields.get("start").and_then(Value::as_u64));
+                }
+                fields.values().for_each(|v| walk(v, out));
+            }
+            Value::Array(items) => items.iter().for_each(|i| walk(i, out)),
+            _ => {}
+        }
+    }
+    walk(&json, &mut found);
+    match found.as_slice() {
+        [one] => *one,
+        other => panic!("expected exactly one SelectorList, found {}", other.len()),
+    }
+}
+
+/// Every CSS comment in the wire, by value — the assertion the named-node collector cannot
+/// make, since a comment is not a named node.
+fn css_comment_values(src: &str) -> Vec<String> {
+    let arena = bumpalo::Bump::new();
+    let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
+    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let mut out = Vec::new();
+    fn walk(node: &Value, out: &mut Vec<String>) {
+        match node {
+            Value::Object(fields) => {
+                if fields.get("type").and_then(Value::as_str) == Some("CSSComment")
+                    && let Some(v) = fields.get("value").and_then(Value::as_str)
+                {
+                    out.push(v.to_owned());
+                }
+                fields.values().for_each(|v| walk(v, out));
+            }
+            Value::Array(items) => items.iter().for_each(|i| walk(i, out)),
+            _ => {}
+        }
+    }
+    walk(json.get("css").unwrap_or(&Value::Null), &mut out);
+    out
+}
+
+/// A comment behind a boundary run still belongs to its juncture.
+///
+/// The run is stepped by `skip_boundary_whitespace`, which stops ON a comment exactly where
+/// the plain whitespace skip does — so each loop's own comment arm keeps the disposition
+/// (the stylesheet body registers one, a block pushes it as a child). Step the run *after*
+/// that arm instead and the cursor lands on a comment the arm has already been passed: the
+/// stylesheet body then REJECTS the document and a block's "skip unexpected token" tail eats
+/// the comment silently. Both were live, in three of the four junctures below.
+#[test]
+fn a_comment_behind_a_boundary_run_still_reaches_its_juncture() {
+    for (juncture, template) in COMMENT_AFTER_RUN_JUNCTURES {
+        for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+            for run in [ch.to_owned(), format!("{ch} "), format!(" {ch}")] {
+                let src = component(&template.replace("{T}", &run));
+                assert_eq!(
+                    css_comment_values(&src),
+                    vec![" c ".to_owned()],
+                    "{label} {juncture} (run {run:?}): the comment must survive the skip"
+                );
+            }
+        }
+    }
+}
+
+/// A boundary run is one run however its members are spelled, so a member followed by ASCII
+/// whitespace must be skipped along with it.
+///
+/// `parseCss` reaches every juncture in the table through a single `allow_whitespace()`,
+/// whose class holds both halves — so `<NBSP><SP>` is one skip there, and a reader that steps
+/// only the non-ASCII half leaves an ASCII gap standing where a name is due. That is not a
+/// cosmetic residue: at `[` and after a combinator the leftover gap is where a name was
+/// expected, so tsv **rejected** input canonical accepts.
+///
+/// Both orders are asserted. Only member-then-ASCII was ever wrong — ASCII-then-member is
+/// consumed by the ordinary whitespace skip that runs first — and pinning the two together is
+/// what keeps the passing order a null control rather than an untested assumption.
+#[test]
+fn a_boundary_run_is_skipped_whole_whichever_order_its_halves_come_in() {
+    for (juncture, template, (expected_type, expected_name)) in BOUNDARY_JUNCTURES {
+        for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+            for run in [format!("{ch} "), format!(" {ch}"), format!("{ch}\t{ch}")] {
+                let src = component(&template.replace("{T}", &run));
+                let named = named_nodes(&src);
+                assert!(
+                    named
+                        .iter()
+                        .any(|(ty, name)| ty == expected_type && name == expected_name),
+                    "{label} {juncture} (run {run:?}): expected a {expected_type} named \
+                     {expected_name:?}, wire held {named:?}"
+                );
+            }
+        }
+    }
+}
+
+/// The same run, asked of a SPAN rather than a name: the selector list opens on the name.
+///
+/// The name-level assertion above cannot see this — a run the parser half-skips still yields
+/// the right name, because the leftover ASCII gap is stepped by the next ordinary whitespace
+/// skip. What it moves is the offset captured *before* that skip, which every enclosing node
+/// inherits: the rule's `start`, its prelude's, and the complex selector's.
+#[test]
+fn a_half_skipped_run_would_move_the_selector_lists_own_start() {
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        let src = component(&format!("<style>{ch} zz {{ color: red; }}</style>"));
+        assert_eq!(
+            selector_list_start(&src),
+            utf16_offset_of(&src, "zz"),
+            "{label} + SPACE at a selector-list start: the list must open on the name"
+        );
+    }
+}
+
+/// The printer keeps every member of the run, wherever in it they sit.
+///
+/// The parser skips them because `parseCss` skips them, but that is a statement about the
+/// AST; dropping one from the OUTPUT is content loss the corpus safety check reads as
+/// `content_lost`. prettier keeps the run verbatim from its first non-ASCII member on — the
+/// ASCII head is indentation, which the printer regenerates — and tsv matches it there.
+#[test]
+fn the_printer_keeps_every_member_of_a_mixed_run() {
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        // Not at offset 0 of the document, so a `<ZWNBSP>` here is an ordinary character
+        // rather than a byte-order mark (which tsv strips by policy).
+        // The last two are the two terms `is_boundary_whitespace` is a union of: a `<VT>` is
+        // whitespace to the lexer but not to `char::is_ascii_whitespace`, and a `<NEL>` is
+        // whitespace to the lexer but not to JS `\s`. Either term missing from the backward
+        // scan stops it on that character and deletes the member behind it.
+        for run in [
+            format!("{ch} "),
+            format!(" {ch}"),
+            format!("{ch}\t{ch}"),
+            format!("{ch}\u{b}"),
+            format!("{ch}\u{85}"),
+        ] {
+            let src = component(&format!("<style>{run}zz {{ color: red; }}</style>"));
+            let out = tsv_svelte::format_str(&src).expect("component should format");
+            assert_eq!(
+                out.matches(ch).count(),
+                run.matches(ch).count(),
+                "{label} (run {run:?}): every member must survive formatting — got {out:?}"
+            );
+            let again = tsv_svelte::format_str(&out).expect("output should re-format");
+            assert_eq!(
+                again, out,
+                "{label} (run {run:?}): formatting must be a fixed point"
+            );
+        }
+    }
+}
+
+/// ⚠️ **RATCHET.** An ASCII whitespace run *interior* to a preserved run keeps the author's
+/// spelling; prettier respells it as a single space.
+///
+/// Nothing is lost either way — both are ASCII whitespace, and every non-ASCII member
+/// survives — so this is a spelling difference, in a run no authored stylesheet contains.
+/// It is the one place `preserved_boundary_ws` and prettier disagree, and it is pinned rather
+/// than closed because collapsing it would give the printer two whitespace policies inside
+/// one run, and prettier is not a coherent oracle in this corner anyway: at the `[` juncture
+/// it DROPS the character outright (`[<NBSP>a]` → `[a]`) where tsv keeps it.
+#[test]
+fn an_interior_ascii_run_keeps_its_spelling() {
+    let out = tsv_svelte::format_str(&component(
+        "<style>\u{a0}\t\u{a0}zz { color: red; }</style>",
+    ))
+    .expect("component should format");
+    assert!(
+        out.contains("\u{a0}\t\u{a0}zz"),
+        "the interior TAB is kept as written; prettier respells it as a space — got {out:?}"
     );
 }

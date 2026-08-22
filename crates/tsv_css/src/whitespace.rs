@@ -44,3 +44,27 @@ pub(crate) fn is_css_whitespace(c: char) -> bool {
 pub(crate) fn is_boundary_only_whitespace(c: char) -> bool {
     !c.is_ascii() && tsv_lang::is_js_whitespace(c)
 }
+
+/// The whole run `CssParser::skip_boundary_whitespace` steps: the lexer's own whitespace
+/// (`is_ascii_css_whitespace` plus the sub-U+00A0 non-ASCII whitespace its dispatch admits)
+/// **and** the members hiding inside an identifier token.
+///
+/// Named once because the printer scans that run **backwards** out of the source, where the
+/// parser met it as a token stream, and the two must agree on where it starts — a printer
+/// that stops early deletes the members behind its stopping point. Both terms are load-
+/// bearing at that seam: `<NBSP><VT>div` needs the ASCII half to reach the `<NBSP>`, and
+/// `<NBSP><NEL>div` needs the `White_Space` half.
+///
+/// ⚠️ Neither term alone is this set, and neither is [`is_css_whitespace`] — that one is the
+/// css-syntax-3 *tokenization* class (ASCII, no `<VT>`), the right answer for value
+/// separation and the wrong one here. This is JS `\s` ∪ Unicode `White_Space`, which is JS
+/// `\s` plus `<NEL>` (U+0085): the lexer reads a `<NEL>` as whitespace where `parseCss`
+/// rejects it, so the run the parser really steps includes one, and the printer must scan
+/// past it to reach anything behind it. That over-acceptance is the tracked `<NEL>` gap — see
+/// [`tests/css_boundary_whitespace.rs`](../../../tests/css_boundary_whitespace.rs) — and
+/// mirroring it here is what keeps the printer preserving exactly what the parser skipped,
+/// gap included, rather than inventing a second answer.
+#[inline]
+pub(crate) fn is_boundary_whitespace(c: char) -> bool {
+    tsv_lang::is_js_whitespace(c) || c.is_whitespace()
+}

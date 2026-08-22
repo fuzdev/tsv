@@ -113,18 +113,34 @@ _relation_ between parses (the two spellings agree for tsv and disagree for
 **Boundary whitespace is JS `\s`.** `parseCss` skips whitespace through the template
 parser's `allow_whitespace()`, which is spelled in JavaScript, so `<NBSP>`, every `Zs`,
 `<LS>`, `<PS>` and `<ZWNBSP>` separate tokens at a selector-list start, after a `,`, inside a
-`[`, after a combinator and after a `;` — while its `read_identifier` takes every code point
-≥ U+00A0 as identifier content. Which rule applies is decided by ORDER, and tsv mirrors that:
-the lexer's boundary class is [`tsv_lang::is_js_whitespace`], and the junctures where Svelte
-calls `read_identifier` with no skip in front of it — a name glued to its `.` / `#` / `:` /
-`|` / `@` sigil — re-read the run through `CssParser::read_glued_identifier`. `<NEL>`
-(U+0085) is `White_Space` to Rust and **not** JS `\s`, so it is whitespace to neither and
-`parseCss` rejects it wherever a name is read; tsv now does too. The **formatter** keeps every
-one of these characters (`preserved_boundary_ws`) rather than replacing the run with its own
-indentation — the AST mirrors Svelte, the printer emits the author's bytes, the same call the
-escaped-selector names make, and prettier keeps them too, so dropping one would read as
-`content_lost` to the corpus safety check. Pinned by
-[css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs); found by
+`[`, after a combinator, after a `;`, and at each child of an at-rule block — while its
+`read_identifier` takes every code point ≥ U+00A0 as identifier content. Which rule applies
+is decided by ORDER, and tsv mirrors the order rather than the class: the **lexer** keeps
+reading those code points as identifier content (which is what a declaration value needs, and
+what a name glued to its `.` / `#` / `:` / `|` / `@` sigil needs — there Svelte calls
+`read_identifier` with no skip in front of it), and the **parser** steps the run back off at
+each juncture where an `allow_whitespace()` would have run first, through
+`CssParser::skip_boundary_whitespace`. Only the parser knows which juncture it is at, which
+is why the class cannot live in the lexer.
+
+A boundary run is **one** run however its members are spelled: `<NBSP><SP>` is a single
+`allow_whitespace()` there, so the skip loops over both classes and the printer's
+preservation scans back over both. The **formatter** keeps every non-ASCII member
+(`preserved_boundary_ws`) rather than replacing the run with its own indentation — the AST
+mirrors Svelte, the printer emits the author's bytes, the same call the escaped-selector
+names make, and dropping one would read as `content_lost` to the corpus safety check. It
+emits from the run's first non-ASCII member on, which is prettier's answer at every
+selector juncture; two spellings inside the run diverge from prettier and are pinned as
+ratchets rather than closed — an ASCII run *interior* to a preserved run keeps the author's
+spelling where prettier respells it as a space, and inside a `[` tsv keeps the character
+where prettier drops it outright (`[<NBSP>a]` → `[a]`), a content difference tsv will not
+copy.
+
+`<NEL>` (U+0085) is `White_Space` to Rust and **not** JS `\s`, so it is whitespace to neither
+and `parseCss` rejects it wherever a name is read — tsv's lexer still reads it as whitespace
+and accepts, a tracked gap that cannot be closed alone (see the raw-scan bullet below).
+
+Pinned by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs); found by
 [wire:audit:terminators](./audits.md#wire-injection-audit-wireaudit). Four junctures still
 read the run as identifier content — a descendant combinator's `end`, a pseudo-argument
 list's `start`, a `<ZWNBSP>` leading a value, and the compound break after a `&` or `*`

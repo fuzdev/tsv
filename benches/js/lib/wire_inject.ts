@@ -33,10 +33,12 @@
  * parse-preserving, which keeps the oracle-accepts rate high, and where it isn't the
  * variant is simply skipped.
  *
- * **A rejected variant is not a finding.** The comparison buckets a canonical-side
+ * **A variant the ORACLE rejects is not a finding.** The comparison buckets a canonical-side
  * throw as `canonical_error` and moves on, so an injection the oracle refuses costs a
  * parse and nothing else. That is what lets the generator be blunt: it does not need
- * to know which positions are legal, only which are worth trying.
+ * to know which positions are legal, only which are worth trying. A variant **tsv** rejects
+ * and the oracle accepts is the opposite — an over-rejection, and one of the findings this
+ * audit is for — so `subtract_baseline_diffs` keeps it where the base parsed.
  */
 
 import type { SourceFile } from './types.ts';
@@ -270,6 +272,16 @@ interface SubtractableResult {
 	diffs: Array<{ signature: string; documented: string | null }>;
 }
 
+/** The statuses that carry no diffs, so subtracting by signature alone cannot grade them. */
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
+	'tsv_error',
+	'canonical_error',
+	'both_error'
+]);
+
+/** The two of those in which tsv is the side that refused. */
+const TSV_REFUSED: ReadonlySet<string> = new Set(['tsv_error', 'both_error']);
+
 /**
  * Drop from each injected variant every diff its **base file already had**, and re-grade
  * what remains.
@@ -299,19 +311,48 @@ interface SubtractableResult {
  * subtract nothing. The cost is that a base already diverging at some signature masks a
  * genuinely new divergence at that same signature in its variants — a blind spot worth
  * naming, and the reason a base file with no divergence at all is the better seed.
+ *
+ * ⚠️ **One parse failure IS a finding, and it carries no diffs to be subtracted by.** An
+ * injection that turns a document tsv accepted into one it **rejects** is an over-rejection —
+ * exactly what this audit exists to manufacture — but its row holds `diffs: []`, so a
+ * signature-only pass drops it and leaves nothing behind but a number in the dim
+ * "parse-fail skipped" line. It is kept, with its `#inj:` label, which is the only thing
+ * that makes such a finding reproducible by hand. The base must have PARSED on tsv's side
+ * for that to be true: `tests/fixtures` holds ~593 `input_invalid_*` files plus the
+ * `tsv_rejects` set, each of which fails identically in every variant derived from it, and
+ * a base the oracle also refused is a document tsv never accepted at all.
+ *
+ * The other two terminal statuses are **not** findings and stay dropped. A variant the
+ * ORACLE refuses is the blunt generator working as designed (see this module's header), and
+ * one both sides refuse is an injection that simply made the document invalid. Their counts
+ * stay raw in the run's own "parse-fail skipped" line, which is where an unfindable
+ * manufactured input belongs.
  */
 export function subtract_baseline_diffs<T extends SubtractableResult>(results: T[]): T[] {
-	const baseline = new Map<string, Set<string>>();
+	const baseline = new Map<string, { signatures: Set<string>; status: string }>();
 	for (const r of results) {
 		if (r.path.includes(VARIANT_MARKER)) continue;
-		baseline.set(r.path, new Set(r.diffs.map((d) => d.signature)));
+		baseline.set(r.path, {
+			signatures: new Set(r.diffs.map((d) => d.signature)),
+			status: r.status
+		});
 	}
 	const kept: T[] = [];
 	for (const r of results) {
 		const marker = r.path.indexOf(VARIANT_MARKER);
 		if (marker === -1) continue; // a control, already consumed into `baseline`
-		const seen = baseline.get(r.path.slice(0, marker));
-		const diffs = seen ? r.diffs.filter((d) => !seen.has(d.signature)) : r.diffs;
+		const base = baseline.get(r.path.slice(0, marker));
+		if (r.status === 'tsv_error') {
+			// A base that parsed cleanly is absent from `baseline` (exact matches are counted,
+			// not stored), so an undefined base is one tsv accepted — which is the condition,
+			// since only then is the variant's rejection the injection's doing.
+			if (!TSV_REFUSED.has(base?.status ?? 'match')) kept.push(r);
+			continue;
+		}
+		// The oracle refused it, or both sides did: never a finding, and carrying no diffs to
+		// be graded by either.
+		if (TERMINAL_STATUSES.has(r.status)) continue;
+		const diffs = base ? r.diffs.filter((d) => !base.signatures.has(d.signature)) : r.diffs;
 		if (diffs.length === 0) continue; // the injection changed nothing — not a finding
 		kept.push({
 			...r,

@@ -405,12 +405,11 @@ fn explicit_combinator_kind(kind: TokenKind) -> Option<Combinator> {
 pub(crate) fn parse_explicit_combinator(
     parser: &mut CssParser<'_, '_>,
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
-    parser.skip_whitespace()?;
-
     // `parseCss` reaches this position through `allow_comment_or_whitespace` + the
-    // `allow_whitespace()` inside `read_combinator`, so a non-ASCII JS-whitespace run here
-    // belongs to the gap. It has to be stepped over BEFORE `combinator_start` is taken: that
-    // offset is both the descendant combinator's `end` and the next compound's start.
+    // `allow_whitespace()` inside `read_combinator`, so the whole run — both whitespace
+    // classes — belongs to the gap. It has to be stepped over BEFORE `combinator_start` is
+    // taken: that offset is both the descendant combinator's `end` and the next compound's
+    // start.
     parser.skip_boundary_whitespace()?;
     let combinator_start = parser.span_pos(parser.current_start());
 

@@ -269,30 +269,37 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// The run of **non-ASCII whitespace** immediately before `start` — the characters the
-    /// parser skipped at a boundary and this printer would otherwise replace with its own
-    /// indentation, deleting them from the output.
+    /// The tail of the boundary whitespace run before `start` that this printer must emit
+    /// verbatim: everything from its first **non-ASCII** member on.
     ///
-    /// They are skipped because `parseCss` skips them (JS `\s` at every `allow_whitespace()`
-    /// juncture — see `tsv_lang::is_js_whitespace`), but that is a statement about the AST,
-    /// not a licence to drop source. prettier's CSS keeps every one of them inside the
-    /// following identifier, so deleting one is a content difference the corpus SAFETY check
-    /// reads as `content_lost` — its semantic-character count excludes only ASCII whitespace,
-    /// so a `<NBSP>` or `<LS>` is a character like any other. Same call the escaped-selector
-    /// names make: the AST mirrors Svelte, the printer emits the author's bytes.
+    /// The parser skipped the whole run because `parseCss` skips it (JS `\s` at every
+    /// `allow_whitespace()` juncture — see `tsv_lang::is_js_whitespace`), but that is a
+    /// statement about the AST, not a licence to drop source. Deleting one of those
+    /// characters is a content difference the corpus SAFETY check reads as `content_lost` —
+    /// its semantic-character count excludes only ASCII whitespace, so a `<NBSP>` or `<LS>` is
+    /// a character like any other. Same call the escaped-selector names make: the AST mirrors
+    /// Svelte, the printer emits the author's bytes.
     ///
-    /// The scan stops at the first ASCII whitespace, which is what keeps it to the ambiguous
-    /// class: ordinary indentation is the printer's to regenerate, and a run mixing the two
-    /// contributes only its non-ASCII tail.
+    /// ⚠️ The run is scanned back over **both** classes and emitted from the first non-ASCII
+    /// member — not scanned back over the non-ASCII class alone. The two differ exactly on a
+    /// mixed run, and only the first is prettier's answer: `<NBSP><SP>div` keeps `<NBSP><SP>`
+    /// there, where a non-ASCII-only scan stops on the space, finds nothing, and DELETES the
+    /// `<NBSP>`. What the ASCII *head* of the run contributes is indentation, which the
+    /// printer regenerates — so it is dropped, while an interior one rides along inside the
+    /// slice as the author spelled it. prettier respells that interior run as a single space
+    /// (`<NBSP><TAB><NBSP>div` → `<NBSP><SP><NBSP>div`); tsv keeps the bytes, which is a
+    /// whitespace-SPELLING difference with no content at stake, in a run no authored
+    /// stylesheet contains. Pinned in `tests/css_boundary_whitespace.rs`.
     fn preserved_boundary_ws(&self, start: u32) -> &'a str {
-        let mut at = start as usize;
-        while at > 0 {
-            let prev = self.source[..at]
+        let start = start as usize;
+        let mut run_start = start;
+        while run_start > 0 {
+            let prev = self.source[..run_start]
                 .chars()
                 .next_back()
-                .filter(|c| crate::whitespace::is_boundary_only_whitespace(*c));
+                .filter(|c| crate::whitespace::is_boundary_whitespace(*c));
             match prev {
-                Some(c) => at -= c.len_utf8(),
+                Some(c) => run_start -= c.len_utf8(),
                 None => break,
             }
         }
@@ -301,11 +308,16 @@ impl<'a> Printer<'a> {
         // cataloged prettier divergence, `docs/conformance_prettier.md` §Whitespace: BOM
         // Handling), and re-emitting it here would quietly undo that. The exclusion is
         // anchored at offset 0 because that is what makes a `U+FEFF` a byte-order mark; one
-        // anywhere else is an ordinary character and is preserved with the rest.
-        if at == 0 && self.source.starts_with('\u{feff}') {
-            at = '\u{feff}'.len_utf8();
+        // anywhere else is an ordinary character and is preserved with the rest — including a
+        // second one later in this same run, which the forward scan below still reaches.
+        if run_start == 0 && self.source.starts_with('\u{feff}') {
+            run_start = '\u{feff}'.len_utf8();
         }
-        &self.source[at..start as usize]
+        let kept = self.source[run_start..start]
+            .char_indices()
+            .find(|(_, c)| crate::whitespace::is_boundary_only_whitespace(*c))
+            .map_or(start, |(i, _)| run_start + i);
+        &self.source[kept..start]
     }
 
     /// Whether this complex selector carries a comment at a combinator boundary — any
