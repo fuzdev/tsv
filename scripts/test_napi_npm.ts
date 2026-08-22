@@ -56,6 +56,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { CORE_CRATES } from '../benches/js/lib/check_artifact_freshness.ts';
+import { assert_staged_fresh } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 
 const pkg_root = 'crates/tsv_napi/pkg';
@@ -88,6 +90,45 @@ const stage = (with_platform: boolean): string => {
 };
 
 const cli_binary_name = process.platform === 'win32' ? 'tsv.exe' : 'tsv';
+
+// A stale staging silently green-tests OLD code: this suite once sat over a
+// pre-fix `tsv_cli` binary in crates/tsv_napi/pkg (it still panicked on
+// `--jobs 100000`) and `test:napi:npm:run` would have tested it without a
+// word. Staged mtimes are compared directly against the SOURCES, which
+// catches both lags at once — a `target/` build behind the sources, and a
+// staged copy behind the build. `deno task test:napi:npm` (build-first)
+// passes this for free; BENCH_STALE_OK=1 is the deliberate-stale override.
+await assert_staged_fresh([
+	{
+		label: 'staged N-API addon',
+		staged: `${pkg_root}/${triple}/tsv_napi.node`,
+		crates: [...CORE_CRATES, 'tsv_napi'],
+		files: ['scripts/build_napi_packages.ts'],
+		rebuild: 'deno task build:napi:packages'
+	},
+	{
+		// the incident artifact: the real tsv_cli binary shipped beside the addon
+		label: 'staged native CLI binary',
+		staged: `${pkg_root}/${triple}/${cli_binary_name}`,
+		crates: [...CORE_CRATES, 'tsv_cli', 'tsv_ignore', 'tsv_discover'],
+		files: ['scripts/build_napi_packages.ts'],
+		rebuild: 'deno task build:napi:packages'
+	},
+	{
+		label: 'staged loader',
+		staged: `${pkg_root}/napi/index.js`,
+		crates: [],
+		files: ['crates/tsv_napi/npm/index.js', 'scripts/build_napi_packages.ts'],
+		rebuild: 'deno task build:napi:packages'
+	},
+	{
+		label: 'staged cli.js mirror',
+		staged: `${pkg_root}/napi/cli.js`,
+		crates: [],
+		files: ['crates/tsv_wasm/npm/cli.js'],
+		rebuild: 'deno task build:napi:packages'
+	}
+]);
 
 const staged = stage(true);
 const staged_bare = stage(false);
@@ -154,6 +195,17 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.equal(api.format_typescript('const   x=1'), 'const x = 1;\n');
 		assert.equal(api.format_css('a{color:red}'), 'a {\n\tcolor: red;\n}\n');
 		assert.equal(api.format_svelte('<div   >x</div   >'), '<div>x</div>\n');
+	});
+
+	// The WASM lifecycle trio is deliberately ABSENT, and the absence is API:
+	// cli.js reads a missing `wasm_module` as "bind workers to this loader" and
+	// a missing `reinstantiate` as "a trapped engine cannot be recovered" — an
+	// accidental export here would silently flip those branches.
+	it('exports none of the WASM lifecycle trio', () => {
+		assert.strictEqual(api.wasm_module, undefined);
+		assert.strictEqual(api.reinstantiate, undefined);
+		assert.strictEqual(api.init, undefined);
+		assert.strictEqual(api.init_sync, undefined);
 	});
 
 	it('parses to objects with loc, and _json siblings return the string', () => {

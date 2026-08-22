@@ -3,7 +3,8 @@
  * surface (same option interfaces, same overloads, same `tsv_ast` re-export),
  * so the two packages type-check interchangeably except for what a WASM engine
  * needs and this one doesn't: `init()` and `init_sync()` (nothing here needs
- * initializing) and `wasm_module` (no compiled module to hand a worker). The
+ * initializing), `wasm_module` (no compiled module to hand a worker), and
+ * `reinstantiate()` (no instance to poison). The
  * `locations.js` helper's types are appended at stage time by
  * `scripts/build_napi_packages.ts`, alongside the copy of the helper itself.
  *

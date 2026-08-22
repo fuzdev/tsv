@@ -310,6 +310,21 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 			);
 		}
 	}
+	// The trap-recovery hook is patched into the npm packages' glue only (the
+	// raw wasm-pack deno bundles aren't patched), on every variant. Deno-runtime
+	// smoke: present, callable on a healthy instance, and the swapped-in fresh
+	// instance still answers. The full poison-then-recover contract is
+	// test_npm.ts's job (Node).
+	if (is_npm) {
+		check(label, 'reinstantiate', () => {
+			const reinstantiate = (mod as Record<string, unknown>).reinstantiate;
+			if (typeof reinstantiate !== 'function') return false;
+			(reinstantiate as () => void)();
+			return has_format
+				? mod.format_typescript('const   x=1') === 'const x = 1;\n'
+				: (mod.parse_typescript('const x = 1;') as { type: string }).type === 'Program';
+		});
+	}
 }
 
 function check(target: string, name: string, assertion: () => boolean): void {
