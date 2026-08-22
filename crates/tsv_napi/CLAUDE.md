@@ -89,8 +89,11 @@ fallback** — so parity runs the whole way, not just the engine calls. Same
 export names, same `(source, options?)` bags, same error strings: the loader's
 `read_options` mirrors the wasm crate's key for key, and
 `scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` returns the
-JSON-parsed object, `parse_<lang>_json` the wire string. `init()` is the one
-export that is deliberately absent — there is nothing to initialize. Neither
+JSON-parsed object, `parse_<lang>_json` the wire string. The deliberately
+absent exports are the WASM lifecycle trio — `init()`/`init_sync()` (nothing
+to initialize), `wasm_module` (no compiled module), and `reinstantiate()` (no
+instance to poison; a native overflow is a process-fatal SIGSEGV) — whose
+absence is itself the engine signal `cli.js` keys on. Neither
 package exports the bench-only `parse_internal_*` family
 (`scripts/patch_npm_package.ts` filters it out of the wasm wrappers too).
 
@@ -204,7 +207,7 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 ## Files
 
 - `src/lib.rs` — All bindings: the `lang_bindings!` macro, the three `lang_bindings!` invocations, the flat goal-aware TS exports, the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written, mirroring the wasm packages' surface minus `init`/`init_sync`/`wasm_module`, and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The Span-Only Wire), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written, mirroring the wasm packages' surface minus `init`/`init_sync`/`wasm_module`/`reinstantiate`, and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The Span-Only Wire), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two
 

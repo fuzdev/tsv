@@ -9,6 +9,14 @@
  * - index.d.ts / browser.d.ts — type declarations, one per entry (the Node
  *   entry has one export the lazy entries don't: `wasm_module`)
  *
+ * Also patches the generated glue itself (`tsv_wasm.js`): appends the
+ * `reinstantiate` trap-recovery hook — only the glue can reach its module-level
+ * `wasm` binding, which wasm-bindgen's `initSync` short-circuit otherwise makes
+ * unrecoverable after a poisoning stack-overflow trap — and guards each class's
+ * FinalizationRegistry so a stale handle GC'd after a reinstantiation leaks
+ * instead of freeing an old pointer into the fresh instance. Every entry
+ * re-exports the hook. See step 1b below.
+ *
  * Also patches package.json (name, description, conditional exports, npm
  * metadata) and copies the variant README + repo LICENSE into the package
  * root. The crate has no `README.md` at its root — `README_format.md`,
@@ -147,6 +155,96 @@ if (!has_parse_exports && has_parse) {
 // can't take the per-call init guard — re-exported directly in browser.js.
 const classes = [...generated_js.matchAll(/^export class (\w+)/gm)].map((m) => m[1]).sort();
 
+// 1b. Append the `reinstantiate` hook to the generated glue.
+//
+// A WASM stack overflow (input nested past the shadow stack, ~1,600 levels) is
+// the one trap the instance does not survive: `__stack_pointer` is a plain
+// mutable global the trap never restores, so every later call on the instance
+// throws `memory access out of bounds` — and wasm-bindgen's `initSync`
+// short-circuits once initialized, so no public entry can recover. Only this
+// module can reach the glue's module-level `wasm` binding, which is why the
+// hook is patched in here rather than written beside the facade. It resets that
+// binding and re-runs `initSync` with the retained compiled module
+// (`wasmModule`, stored by `__wbg_finalize_init` on every init path), so
+// recovery is synchronous and pays one instantiation, never a recompile — and
+// because every glue export reads `wasm` at call time, existing bindings
+// (facade functions, a worker's wrappers) work against the fresh instance with
+// no rebind. The anchors below are asserted so a wasm-bindgen upgrade that
+// reshapes the glue fails this build loudly instead of shipping a hook that
+// silently misses.
+const glue_anchors = ['let wasmModule, wasmInstance, wasm;', 'function initSync(module)'];
+for (const anchor of glue_anchors) {
+	if (!generated_js.includes(anchor)) {
+		console.error(
+			`FAIL: generated ${main_js} lacks the \`${anchor}\` anchor the reinstantiate hook ` +
+				`patches against — did a wasm-bindgen upgrade reshape the glue?`
+		);
+		Deno.exit(1);
+	}
+}
+if (generated_js.includes('__tsv_instance_generation')) {
+	console.error(
+		`FAIL: generated ${main_js} is already patched with the reinstantiate hook — ` +
+			`re-run the wasm-pack build before patching again`
+	);
+	Deno.exit(1);
+}
+// Guard each exported class's FinalizationRegistry: its callback frees through
+// the LIVE `wasm` binding, so a stale un-`free()`d handle GC'd after a
+// reinstantiation would free an old pointer into the NEW instance — allocator
+// corruption with no error at the point of cause. Guarded, a post-reinstantiate
+// finalization leaks the old object's bytes instead (the old instance is
+// unreachable anyway); explicit `free()` is unaffected and remains the correct
+// consumer move before reinstantiating.
+const registry_pattern = /new FinalizationRegistry\(ptr => wasm\.(\w+)\(ptr, 1\)\)/g;
+let registry_rewrites = 0;
+const patched_glue =
+	generated_js.replace(registry_pattern, (_m, free_fn) => {
+		registry_rewrites++;
+		return (
+			`new FinalizationRegistry(ptr => {\n` +
+			`    // patched by patch_npm_package.ts: after a reinstantiation this pointer\n` +
+			`    // belongs to a discarded instance — freeing it into the current one would\n` +
+			`    // corrupt its allocator, so leak it instead\n` +
+			`    if (__tsv_instance_generation === 0) wasm.${free_fn}(ptr, 1);\n` +
+			`})`
+		);
+	}) +
+	`
+// ---- appended by patch_npm_package.ts ----
+
+let __tsv_instance_generation = 0;
+
+/**
+ * Discard the current WASM instance and synchronously initialize a fresh one
+ * from the already-compiled module — the recovery for a poisoning trap (a stack
+ * overflow leaves \`__stack_pointer\` where the deep call left it, so every later
+ * call throws \`memory access out of bounds\`). Reuses the compiled
+ * \`WebAssembly.Module\`, so this never recompiles. Throws if the module was
+ * never initialized. Objects backed by the old instance (e.g. \`IgnoreStack\`)
+ * are invalidated — \`free()\` them before calling this and rebuild after.
+ */
+export function reinstantiate() {
+    if (wasm === undefined) {
+        throw new Error('cannot reinstantiate: the WASM module was never initialized');
+    }
+    const module = wasmModule;
+    wasm = undefined;
+    __tsv_instance_generation += 1;
+    initSync({ module });
+}
+`;
+if (registry_rewrites !== classes.length) {
+	console.error(
+		`FAIL: rewrote ${registry_rewrites} FinalizationRegistry callback(s) in ${main_js} but ` +
+			`found ${classes.length} exported class(es) — the registry shape drifted from the ` +
+			`pattern the reinstantiate guard rewrites`
+	);
+	Deno.exit(1);
+}
+Deno.writeTextFileSync(`${pkg_root}/${main_js}`, patched_glue);
+console.log(`Patched ${pkg_root}/${main_js}: reinstantiate hook`);
+
 // IgnoreStack is format-gated, so it rides the format and all variants only.
 if (has_format_exports) {
 	if (!classes.includes('IgnoreStack')) {
@@ -209,6 +307,7 @@ const index_js = `import { readFileSync } from 'node:fs';
 import {
 	default as init,
 	initSync,
+	reinstantiate,
 ${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
 } from './${main_js}';
 
@@ -220,7 +319,7 @@ const wasm_module = new WebAssembly.Module(
 );
 initSync({ module: wasm_module });
 
-export { init, initSync as init_sync, wasm_module, ${[...fns, ...classes].join(', ')} };
+export { init, initSync as init_sync, reinstantiate, wasm_module, ${[...fns, ...classes].join(', ')} };
 ${locations_reexport}`;
 
 Deno.writeTextFileSync(`${pkg_root}/index.js`, index_js);
@@ -235,6 +334,8 @@ const browser_js = `import {
 	initSync,
 ${fns.map((f) => `\t${f} as _${f},`).join('\n')}
 } from './${main_js}';
+// the trap-recovery hook re-exports as-is — it guards itself (throws until initialized)
+export { reinstantiate } from './${main_js}';
 ${
 	// classes re-export as-is — consumers must `await init()` before instantiating
 	classes.length ? `export { ${classes.join(', ')} } from './${main_js}';\n` : ''
@@ -324,6 +425,18 @@ export declare function init(module_or_path?: {
 export declare function init_sync(module: {
 	module: BufferSource | WebAssembly.Module;
 }): void;
+/**
+ * Discard the current WASM instance and synchronously initialize a fresh one
+ * from the already-compiled module — the recovery for a poisoning trap: a stack
+ * overflow (input nested past the ~1 MiB shadow stack) leaves the instance
+ * throwing \`memory access out of bounds\` on every later call, and \`init_sync\`
+ * short-circuits once initialized. Never recompiles (the compiled
+ * \`WebAssembly.Module\` is retained); synchronous, so the same environment
+ * constraints as \`init_sync\` apply. Throws if the module was never
+ * initialized. Objects backed by the old instance (e.g. \`IgnoreStack\`) are
+ * invalidated — \`free()\` them before calling this and rebuild after.
+ */
+export declare function reinstantiate(): void;
 `;
 
 const index_dts = `${shared_dts}/**

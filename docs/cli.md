@@ -197,6 +197,13 @@ is the same shape as the arena-retention advice in
 overflow there is a bare `SIGSEGV` with no message, since Rust's guard-page handler is
 installed by its runtime startup and a cdylib loaded into Node never runs it.
 
+The WASM overflow is a trap the process survives but the *instance* does not — it
+poisons every later call. The npm packages ship a `reinstantiate()` recovery hook, and
+the JS CLI (`cli.js`) calls it on any trap in `format_one`, so a too-deep file is one
+per-file error (`… (WASM engine trapped and was reinstantiated)`) and the rest of the
+run formats normally — on the sequential path and in every pool worker alike. See
+[tsv_wasm/CLAUDE.md §Panic Reporting](../crates/tsv_wasm/CLAUDE.md#panic-reporting).
+
 ## Multi-File Formatting
 
 `tsv format` accepts any mix of files and directories:

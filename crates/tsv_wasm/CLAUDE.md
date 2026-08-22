@@ -75,8 +75,28 @@ verified across `format_typescript` / `format_css` / `format_svelte` /
 recovers. The depth is ~1,630 nested parens at ~0.65 KiB of shadow stack per level, the
 lowest of any tsv surface — though above acorn's 497 and prettier's 805 — and unlike the
 native builds it does not move with the host, since the shadow stack is inside the
-module. Consumers that loop over files on one instance therefore need to re-instantiate
-after a trap, or one outsized file turns every file after it into a spurious error.
+module.
+
+**A fresh instance is what the npm packages' `reinstantiate()` export provides.**
+wasm-bindgen's `initSync` short-circuits once initialized, so the hook is patched
+into the generated glue by `scripts/patch_npm_package.ts` — the only module that can
+reach the glue's module-level `wasm` binding. It swaps in a fresh instance
+**synchronously** from the retained compiled `WebAssembly.Module` (no recompile),
+and because every glue export reads `wasm` at call time, every already-imported
+binding follows the swap with no rebind. It rides all three variants and every
+entry (the lazy entries re-export it; it self-guards until initialized). `npm/cli.js`
+calls it on any `WebAssembly.RuntimeError` in `format_one` — both roles, the
+sequential path and each pool worker — so one outsized file costs one honest
+per-file error instead of poisoning the rest of the run (before the hook, the
+sequential path reported every later file as `memory access out of bounds`, and the
+parallel path was only saved by whichever files the healthy workers drained first).
+Consumers that loop over files on one instance should do the same. Wasm-backed
+objects from before the swap (`IgnoreStack`) are invalidated — `free()` them before
+reinstantiating and rebuild after; the patcher also guards each class's
+`FinalizationRegistry` so an un-freed handle GC'd after a swap leaks its old bytes
+instead of freeing a stale pointer into the fresh instance's allocator. Gated by
+`scripts/test_npm.ts` (the poison-then-recover API contract + both CLI paths) and
+smoked per variant by `scripts/validate_artifacts.ts`.
 
 ## JSON-String Transport
 
@@ -382,7 +402,7 @@ require dual updates.
 
 - `src/lib.rs` — WASM bindings (`lang_bindings!` macro + `read_options` + the hand-written `TS_PARSE_DECLS` / `TS_FORMAT_DECLS` declarations) + the wasm32-gated talc `#[global_allocator]` and panic hook
 - `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
-- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps. Path mode fans onto `node:worker_threads` behind `--jobs`, spawning **itself** as the worker (`isMainThread` splits the two roles) and claiming work off one `Atomics` cursor. `WORKER_FILE_THRESHOLD` gates the **default** only — a JS pool costs tens of milliseconds to bring up against the native pool's ~50 µs thread spawn — while an explicit `--jobs N` bypasses the threshold at any file count and is held to the native CLI's `4 × logical` ceiling (`clamp_worker_count`, restated by hand), giving the threshold something to be calibrated against. Both the threshold and `default_jobs` are **per engine**, keyed off the same `wasm_module` export that decides how a worker binds: the crossover and the knee are properties of the engine, not the driver (see [../../docs/cli.md](../../docs/cli.md) §Binary Structure). On WASM the pool peaks at *half* the physical cores because V8's wasm tier-up is itself multithreaded and has claimed the rest before the first worker exists; over the N-API addon there is no compiler thread to compete with and it peaks at the core count. Which engine a worker binds is decided by whether the main thread's `./index.js` exported a `wasm_module`: here it did, so the worker takes it through the [`./worker` entry](#the-worker-entry) and recompiles nothing; in the native package it didn't, so the worker loads the addon. That is why the engine import is **dynamic** — a static one is hoisted above the branch, and the worker would have paid for `./index.js` before it could ask. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below. In the native package it is the *fallback*: the bin there is a napi-only dispatcher (`tsv_napi/npm/bin.js`) that execs the platform package's real `tsv_cli` binary, deferring to cli.js only when no binary is reachable — the dispatcher deliberately does NOT live in this shared source, so the wasm copy stays byte-identical and can never resolve a sibling-installed native binary
+- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps. Path mode fans onto `node:worker_threads` behind `--jobs`, spawning **itself** as the worker (`isMainThread` splits the two roles) and claiming work off one `Atomics` cursor. `WORKER_FILE_THRESHOLD` gates the **default** only — a JS pool costs tens of milliseconds to bring up against the native pool's ~50 µs thread spawn — while an explicit `--jobs N` bypasses the threshold at any file count and is held to the native CLI's `4 × logical` ceiling (`clamp_worker_count`, restated by hand), giving the threshold something to be calibrated against. Both the threshold and `default_jobs` are **per engine**, keyed off the same `wasm_module` export that decides how a worker binds: the crossover and the knee are properties of the engine, not the driver (see [../../docs/cli.md](../../docs/cli.md) §Binary Structure). On WASM the pool peaks at *half* the physical cores because V8's wasm tier-up is itself multithreaded and has claimed the rest before the first worker exists; over the N-API addon there is no compiler thread to compete with and it peaks at the core count. A WASM trap is contained to its file on both roles: `format_one` calls `reinstantiate` on any `WebAssembly.RuntimeError` (feature-detected — the native engine exports no hook and its overflow is process-fatal), so a too-deep file costs one per-file error instead of poisoning the rest of the run (see [§Panic Reporting](#panic-reporting)). Which engine a worker binds is decided by whether the main thread's `./index.js` exported a `wasm_module`: here it did, so the worker takes it through the [`./worker` entry](#the-worker-entry) and recompiles nothing; in the native package it didn't, so the worker loads the addon. That is why the engine import is **dynamic** — a static one is hoisted above the branch, and the worker would have paid for `./index.js` before it could ask. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below. In the native package it is the *fallback*: the bin there is a napi-only dispatcher (`tsv_napi/npm/bin.js`) that execs the platform package's real `tsv_cli` binary, deferring to cli.js only when no binary is reachable — the dispatcher deliberately does NOT live in this shared source, so the wasm copy stays byte-identical and can never resolve a sibling-installed native binary
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only `no-locations` wire; ships in the parse-capable packages, re-exported from index.js/browser.js by `patch_npm_package.ts`. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv_format_wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv_parse_wasm` (copied by `patch_npm_package.ts`)
@@ -406,11 +426,13 @@ export); the deno builds — subsets and `all` — are size-tracked by `binary_s
 `npm` builds are the published artifacts: a wasm-pack `web`-target build
 patched by `scripts/patch_npm_package.ts` into the multi-entry package shape
 (Node auto-init entry, guarded browser entry, conditional `exports`,
-metadata, README — plus `cli.js` and the `tsv` bin for the `all` variant).
+metadata, README, the `reinstantiate` glue hook — plus `cli.js` and the `tsv`
+bin for the `all` variant).
 `deno task test:npm[:parse|:all]` builds the package and then runs Node tests
 against it (the `all` variant adds CLI subprocess tests; the `:run` suffix —
-e.g. `test:npm:run` — skips the rebuild when the bundle is already fresh, as in
-the publish/CI pipelines), and `deno task validate:artifacts`
+e.g. `test:npm:run` — skips the rebuild, as in the publish/CI pipelines, and is
+freshness-guarded: `scripts/check_staged_freshness.ts` aborts it when a staged
+artifact is older than its sources), and `deno task validate:artifacts`
 checks tight wasm size bounds plus a Deno runtime smoke of every built
 bundle (both run in the publish pipeline). The npm package itself covers
 Node/browser/bundler consumers, so there is no standalone `web`-target

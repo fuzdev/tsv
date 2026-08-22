@@ -7,7 +7,10 @@
  * ~90s of unconditional wasm-opt across its four bundles. This wrapper is the
  * build-side sibling of `benches/js/lib/check_artifact_freshness.ts`: the
  * `:run` tasks abort when the artifact is STALE; the wrapped build tasks skip
- * when it is FRESH. Same mtime discipline, opposite ends.
+ * when it is FRESH. Same mtime discipline, opposite ends. (The third family
+ * member is `scripts/check_staged_freshness.ts`, the same abort posture over
+ * the STAGED npm packages the `test:npm:*:run` / `test:napi:npm:run` tasks
+ * consume.)
  *
  * Freshness inputs (newest mtime wins): every `*.rs` and `Cargo.toml` under
  * the crates that feed the WASM bundle (the run-side guard's `CORE_CRATES` +

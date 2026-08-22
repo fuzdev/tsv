@@ -24,6 +24,9 @@
  * export and its workers just load the addon. That same discriminant sizes the
  * pool — both the threshold and the worker count are per engine, because a WASM
  * run shares its cores with V8's wasm tier-up and a native one doesn't.
+ * A WASM trap (deeply nested input) is contained to its file on either path:
+ * `format_one` reinstantiates the engine and carries on (see
+ * `recover_engine_suffix`).
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
  * `parse` — 0 ok, 1 error. Flag-parsing errors exit 1 (both commands); `format`'s
@@ -151,6 +154,55 @@ const MAX_WORKERS_PER_LOGICAL_CPU = 4;
 /** Valid `--parser` values (shared by `format` and `parse` — `FORMATTERS` and
  * `PARSERS` are keyed by the same names). */
 const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
+
+/** Whether a WASM engine reinstantiation already failed this run — one warning,
+ * not one per remaining file. Declared with the other module state above the
+ * `main()` call: a `let` below it is dead-zoned for the whole run. */
+let engine_recovery_failed = false;
+
+/**
+ * Recover the WASM engine after a trap, returning the suffix `format_one`
+ * appends to that file's error message.
+ *
+ * A trap poisons the whole instance (the shadow-stack pointer is a mutable
+ * global the trap never restores), so without recovery every later file on this
+ * thread reports a bogus `memory access out of bounds`. `reinstantiate` — the
+ * WASM packages' trap-recovery hook, present on both the auto-init entry and
+ * the worker entry — swaps in a fresh instance from the already-compiled
+ * module (no recompile), and every already-bound export follows it. The native
+ * package exports no such hook and needs none: it runs no instance to poison
+ * (its overflow is a process-fatal SIGSEGV), so there the suffix is empty and
+ * a `WebAssembly.RuntimeError` cannot arise. The discovery `IgnoreStack`s are
+ * freed deterministically (see `discover_files`/`collect_root`), so no stale
+ * wasm-backed handle survives into the fresh instance.
+ */
+function recover_engine_suffix() {
+	if (engine.reinstantiate === undefined) return '';
+	if (!engine_recovery_failed) {
+		try {
+			engine.reinstantiate();
+			return ' (WASM engine trapped and was reinstantiated)';
+		} catch (error) {
+			engine_recovery_failed = true;
+			eprint(
+				`warning: could not reinstantiate the WASM engine after a trap (${error.message}); remaining files on this thread may fail\n`
+			);
+		}
+	}
+	return ' (WASM engine trapped; reinstantiation failed)';
+}
+
+/**
+ * Free a wasm-backed `IgnoreStack` deterministically, so no stale handle's GC
+ * finalizer survives into a post-trap `reinstantiate`d engine (where the
+ * registry's guard would leak it). Engine-split: the native addon's
+ * `IgnoreStack` is a napi-rs class with no `free()` — napi-rs owns its
+ * lifetime, and there is no instance to poison there — so absence is a no-op,
+ * not an error.
+ */
+function free_ignore_stack(stack) {
+	if (typeof stack.free === 'function') stack.free();
+}
 
 const HELP = `Usage: tsv <command> [<args>]
 
@@ -502,17 +554,19 @@ function format_one(path, check) {
 	try {
 		formatted = FORMATTERS[parser_from_extension(path)](source);
 	} catch (error) {
-		// TODO: a WASM stack overflow (input nested past ~300 levels — generated or
-		// minified code) is not a per-file failure like a parse error is: the trap
-		// leaves `__stack_pointer` where the deep call left it, so this instance is
-		// poisoned and every later file throws `memory access out of bounds` too. On
-		// this path that turns the rest of the run into spurious errors; the worker
-		// path is contained only because the throw kills the worker and the shared
-		// cursor lets the survivors drain the list. Recovering needs a fresh instance,
-		// which `init_sync` does not give (wasm-bindgen's `initSync` short-circuits
-		// once initialized) — so the fix is either a re-instantiation hook out of the
-		// package patcher, or reporting the remainder as engine-reset rather than as
-		// per-file errors.
+		// A trap (`WebAssembly.RuntimeError` — a parse error is a plain `Error`)
+		// is not a per-file failure: a stack overflow (input nested past ~1,600
+		// levels — generated or minified code) leaves `__stack_pointer` where the
+		// deep call left it, poisoning the instance so every later file throws
+		// `memory access out of bounds` too. That held on BOTH paths — a worker's
+		// catch here kept its poisoned instance claiming files, so the parallel
+		// run was only ever saved by whichever files the healthy workers drained
+		// first. So recover before the next file: `reinstantiate` (WASM engine
+		// only; see `recover_engine_suffix`) swaps in a fresh instance from the
+		// already-compiled module, and only this file reports an error.
+		if (error instanceof WebAssembly.RuntimeError) {
+			return { kind: 'error', message: `${error.message}${recover_engine_suffix()}` };
+		}
 		return { kind: 'error', message: error.message };
 	}
 	if (formatted === source) return { kind: 'unchanged' };
@@ -757,8 +811,12 @@ async function format_files_parallel(files, check, jobs) {
  * disk. Posting on the way out of the throw keeps the accounting honest without
  * a per-file message: the send is enqueued before the exception propagates, so
  * the parent gets the partial batch and only then the `error` event (verified
- * on Node and Bun). A hard abort — OOM, a kill — still loses the batch, and
- * there the conservative over-report is the right answer anyway.
+ * on Node and Bun; the package test pins the ordering by spawning this file as
+ * a worker with a cursor `Atomics.add` rejects). A hard abort — OOM, a kill —
+ * still loses the batch, and there the conservative over-report is the right
+ * answer anyway. (An OOM under an inherited heap limit is process-fatal, not
+ * worker-scoped — a worker-scoped one would need `resourceLimits`, which this
+ * pool deliberately doesn't set.)
  */
 function run_format_worker() {
 	const { files, check, cursor } = workerData;
@@ -996,6 +1054,9 @@ function discover_files(paths) {
 			return `${path}: not a file or directory`;
 		})
 		.filter((message) => message !== undefined);
+	// freed deterministically for the same reason as `collect_root`'s stack: no
+	// wasm-backed handle may outlive discovery into a run that can `reinstantiate`
+	free_ignore_stack(arg_policy);
 	if (bad.length > 0) {
 		for (const message of bad) eprint(`error: ${message}\n`);
 		process.exit(2);
@@ -1114,7 +1175,10 @@ function collect_root(root, cwd, files, errors, warnings) {
 	// build/sub` with a gitignored `build/`). Gate it once with the full
 	// ancestor-walking is_ignored: an ignored root means nothing under it is in
 	// scope. Mirrors the native collect_root.
-	if (base_rel !== '' && stack.is_ignored(base_rel, true)) return;
+	if (base_rel !== '' && stack.is_ignored(base_rel, true)) {
+		free_ignore_stack(stack);
+		return;
+	}
 
 	collect_recursive(
 		root,
@@ -1127,6 +1191,13 @@ function collect_root(root, cwd, files, errors, warnings) {
 		errors,
 		warnings
 	);
+	// freed deterministically (both exits) rather than left to GC: a wasm-backed
+	// handle finalized after a trap-triggered `reinstantiate` would hold a
+	// pointer into the discarded instance, and the registry's guard then leaks
+	// it — freeing here keeps discovery handle-clean before formatting can trap.
+	// (A throw out of discovery aborts the run before any format call, so no
+	// leaked registration can ever meet a reinstantiated engine.)
+	free_ignore_stack(stack);
 }
 
 /** A path's components, split on either separator spelling where the platform
