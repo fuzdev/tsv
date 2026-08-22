@@ -109,8 +109,8 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
         let (tracker, map) = LocationTracker::new_map_only(source);
         // NOT a claim that the two classes agree — this path emits no `loc` at
         // all, so the question is never asked and acorn's table would have no
-        // reader. A source with a lone CR reaches here reporting `false`, and
-        // that is correct for what the flag gates below, not for its name.
+        // reader. A source with a lone CR reaches here reporting `false`, which
+        // is why nothing below may read this flag without the `emit_loc` gate.
         (tracker, map, false)
     };
 
@@ -119,25 +119,60 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     // would be byte-identical to the LF one, so the LF mapper stands in for it
     // below and real code pays nothing for the table.
     let acorn_tracker = ecmascript_lines_differ.then(|| LocationTracker::new_ecmascript(source));
+    let acorn_loc = LocationMapper {
+        tracker: acorn_tracker.as_ref().unwrap_or(&tracker),
+        map: &map,
+    };
 
-    // Whether any seed can be non-identity — a STRICTLY WIDER question than
-    // "do the two classes differ", and the two must not be conflated.
+    // ⚠️ `AcornLines` answers TWO questions, and each has its own exact condition.
+    // Conflating them is a live bug in both directions, so they are spelled apart:
     //
-    // Five of the six region kinds seed from the class difference alone, so a
-    // document without one leaves them all inert. The **annotation** region does
-    // not: Svelte's `read_type_annotation` enters acorn five bytes behind the
-    // colon on a synthetic `_ as ` that OVERWRITES them, so a newline the author
-    // wrote between a block binding and its `: T` is erased before acorn sees it
-    // and the annotation's nodes stay on the binding's line. A plain `\n` is
-    // enough; no second line class need be present. `origin != lex_start` is
-    // exactly that region — it is the only kind whose parse starts behind where
-    // it lexes — so the scan asks the property rather than a kind tag, and a
-    // future region that inserts synthetic text is covered the day it appears.
-    let acorn_seeds_needed = ecmascript_lines_differ
-        || root
-            .acorn_regions
+    //   1. WHICH TABLE answers an acorn-owned position — acorn's or the Svelte one.
+    //      Exactly `ecmascript_lines_differ`. A terminator INSIDE an island moves
+    //      every node after it whether or not any seed re-bases anything, so this
+    //      term is not a stand-in for the seed question and cannot be dropped when
+    //      the seeds all come out inert.
+    //   2. WHETHER A SEED re-bases that answer. Exactly `any non-identity`, which
+    //      needs the seeds themselves.
+    //
+    // The cheap NECESSARY condition for (2) is asked first, because it costs no
+    // line-table work where computing the seeds costs one per region: a seed
+    // re-bases nothing when the classes agree AND the parse starts where it lexes
+    // (`first_line` is then `lex_start`'s line under either rule, `line_delta` is
+    // zero, and both column origins are the same line start).
+    //
+    // `origin != lex_start` is exactly one region kind — the block-binding `: T`,
+    // which Svelte's `read_type_annotation` enters five bytes behind the colon on a
+    // synthetic `_ as ` that OVERWRITES them, so a newline the author wrote there is
+    // erased before acorn sees it and the annotation's nodes stay on the binding's
+    // line. It is asked as a *property* rather than a kind tag, so a future region
+    // that inserts synthetic text is covered the day it appears.
+    //
+    // `emit_loc` comes first throughout: the `no-locations` path emits no
+    // line/column at all, so a seed built here would be built against the stub `[0]`
+    // line table `new_map_only` leaves behind and then consulted by nobody.
+    let may_need_seeds = emit_loc
+        && (ecmascript_lines_differ
+            || root
+                .acorn_regions
+                .iter()
+                .any(|region| region.origin != region.lex_start));
+
+    // The seeds themselves — one per region, in the regions' own order, computed
+    // ONCE rather than per island lookup. Asking `any non-identity` rather than the
+    // filter above is what keeps a glued `{#each xs as e: T}` — a region with
+    // `origin != lex_start` whose seed is nonetheless the identity, which is every
+    // typed block binding anyone writes — from switching the route on for nothing.
+    let acorn_seeds: Vec<AcornSeed> = if may_need_seeds {
+        root.acorn_regions
             .iter()
-            .any(|region| region.origin != region.lex_start);
+            .map(|r| AcornSeed::new(&tracker, acorn_loc, r.origin, r.lex_start, r.prefix))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let acorn_seeds_needed =
+        emit_loc && (ecmascript_lines_differ || acorn_seeds.iter().any(|seed| !seed.is_identity()));
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.
@@ -157,11 +192,9 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
         acorn: acorn_seeds_needed.then(|| AcornLines {
             // acorn's own table when it exists; otherwise the LF one, which the
             // classes-agree probe has just certified is byte-identical to it.
-            loc: LocationMapper {
-                tracker: acorn_tracker.as_ref().unwrap_or(&tracker),
-                map: &map,
-            },
+            loc: acorn_loc,
             regions: root.acorn_regions,
+            seeds: &acorn_seeds,
         }),
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
@@ -187,17 +220,25 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
 /// ⚠️ `loc` is **not** always acorn's own table. When the two line classes agree it
 /// is the Svelte (LF) one, which is then byte-identical — the route is still built
 /// because an annotation region's seed does not come from the class difference. So
-/// "this is `Some`" means *a seed may be non-identity*, never *the classes differ*.
+/// "this is `Some`" means *either* the classes differ *or* some seed re-bases
+/// something, and the two halves are separately exact: see `write_root_bytes_variant`
+/// for why neither can stand in for the other.
 #[derive(Clone, Copy)]
 struct AcornLines<'a> {
     /// The document's byte→UTF-16 map under **acorn's** line table (the
     /// ECMAScript class).
     loc: LocationMapper<'a>,
-    /// Every embedded acorn parse in this component, ascending and disjoint.
-    /// Each island's `loc` is acorn's, seeded once at the start of the parse
-    /// Svelte prepared for it, so `loc`'s answer has to be re-based onto that
-    /// parse: `Ctx::acorn_seed`.
+    /// Every embedded acorn parse in this component, ascending. Each island's
+    /// `loc` is acorn's, seeded once at the start of the parse Svelte prepared
+    /// for it, so `loc`'s answer has to be re-based onto that parse:
+    /// `Ctx::acorn_seed`.
     regions: &'a [internal::AcornRegion],
+    /// One seed per region, in the same order — computed once per document, not
+    /// once per island lookup. Parallel to `regions` rather than a field on it
+    /// because a region is a *parse fact* the parser records, where a seed is an
+    /// answer only the writer's line tables can produce, and only for the variant
+    /// that emits `loc` at all.
+    seeds: &'a [AcornSeed],
 }
 
 /// The per-document environment every writer function shares.
@@ -216,7 +257,8 @@ struct Ctx<'a> {
     /// The acorn-owned half of the wire, or `None` when no seed in this document
     /// can be non-identity — which is every source whose two line classes agree
     /// *and* that has no block-binding type annotation, so essentially every real
-    /// document. See [`AcornLines`].
+    /// document. Always `None` on the `no-locations` path, which emits nothing a
+    /// seed could re-base. See [`AcornLines`].
     acorn: Option<AcornLines<'a>>,
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
@@ -352,27 +394,38 @@ impl<'a> Ctx<'a> {
         env
     }
 
-    /// The line/column seed of the acorn parse `pos` belongs to — the last
-    /// region starting at or before it, since regions never nest or overlap.
+    /// The line/column seed of the acorn parse `pos` belongs to — the last region
+    /// starting at or before it. Where regions nest (a block pattern and its `: T`)
+    /// that is the inner parse, which is the one that lexed the position.
     ///
-    /// `AcornSeed::NONE` when there is no [`AcornLines`] at all (the two line
-    /// classes agree, so acorn's table IS the Svelte one and there is nothing to
-    /// re-base), and for a position ahead of every region.
+    /// `AcornSeed::NONE` when there is no [`AcornLines`] at all (every seed in this
+    /// document is the identity, so there is nothing to re-base), and for a position
+    /// ahead of every region.
     fn acorn_seed(&self, pos: u32) -> AcornSeed {
         let Some(acorn) = self.acorn else {
             return AcornSeed::NONE;
         };
-        let before = acorn.regions.partition_point(|r| r.lex_start <= pos);
-        let Some(region) = acorn.regions[..before].last() else {
+        let Some(i) = acorn
+            .regions
+            .partition_point(|r| r.lex_start <= pos)
+            .checked_sub(1)
+        else {
             return AcornSeed::NONE;
         };
-        AcornSeed::new(
-            self.loc.tracker,
-            acorn.loc,
-            region.origin,
-            region.lex_start,
-            region.prefix,
-        )
+        // The resolved parse must actually contain `pos`. Without this the lookup's
+        // failure mode is silent — a caller handing a position ahead of its own
+        // island resolves to the PREVIOUS parse, the wire stays well-formed, and
+        // only its lines move. Inclusive at the bound: an empty `<script>` records
+        // a zero-length region whose `Program` starts exactly at `end`.
+        debug_assert!(
+            pos <= acorn.regions[i].end,
+            "position {pos} resolved to the acorn parse over [{}, {}], which does not \
+             contain it — the caller passed a position ahead of its own island (see \
+             `Ctx::embed`), so this island would silently take the previous parse's seed",
+            acorn.regions[i].lex_start,
+            acorn.regions[i].end
+        );
+        acorn.seeds[i]
     }
 
     /// The shared inputs for a template comment-attach builder

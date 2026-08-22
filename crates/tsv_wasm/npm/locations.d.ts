@@ -21,9 +21,13 @@ export interface LocationOptions {
 	 * `\r`, U+2028 or U+2029: such a document carries two line counts (acorn's on
 	 * the nodes it parsed, `locate-character`'s on the rest) and the span-only
 	 * wire does not record which acorn parse a node came from. Parse those with
-	 * locations instead. The `reconstruct` forms throw for a second reason too: a
-	 * block binding whose `: T` is separated from it by a newline, whose annotation
-	 * is read by its own acorn parse. See `locations.js`.
+	 * locations instead. A second case throws for the same reason: a block binding
+	 * whose `: T` is separated from it by a newline, whose annotation is read by
+	 * its own acorn parse. That one needs the tree rather than the source, so
+	 * `reconstruct` scans for it up front and `create_locator().loc_of` asks it of
+	 * the node it is handed — the two never disagree about a document. See
+	 * `locations.js` for why the wire deliberately does not carry what would make
+	 * these derivable.
 	 */
 	language?: LocationLanguage;
 }

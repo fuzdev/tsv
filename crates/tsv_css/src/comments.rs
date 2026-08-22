@@ -146,6 +146,11 @@ pub(crate) fn pseudo_name_start(bytes: &[u8], span_start: u32) -> u32 {
 ///
 /// The one-juncture sibling of [`pseudo_name_start`], for the same selectors-4 rule
 /// ("between **any** of the components of a `<class-selector>`").
+///
+/// Only the wire writer needs it — the printer reaches the same juncture through
+/// [`pseudo_name_start`] — so it is `convert`-gated: `@fuzdev/tsv_format_wasm` builds
+/// without that feature, and an ungated item there is dead code in a size-bound artifact.
+#[cfg(feature = "convert")]
 pub(crate) fn class_name_start(bytes: &[u8], span_start: u32) -> u32 {
     let i = span_start as usize + 1; // past the `.`
     comment_run_end(bytes, i).unwrap_or(i) as u32

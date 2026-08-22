@@ -25,8 +25,10 @@
 //! spellings are deliberately not folded and *are* format-stable inside a verbatim region;
 //! they are pinned by
 //! `tests/fixtures/svelte/syntax/whitespace/line_terminators_comment_dedent`, whose
-//! `expected.json` the oracle generates. What stays here is the `<CR>` half, and the
-//! arrangement it forces: every expectation is transcribed from the live modern Svelte parser
+//! `expected.json` the oracle generates. What can live ONLY here is the `<CR>` half — the
+//! other four spellings stay in the tables below too, since a shape that dropped them would
+//! assert the class without ever running its null controls — and with them stays the
+//! arrangement `<CR>` forces: every expectation is transcribed from the live modern Svelte parser
 //! (`cargo run -p tsv_debug canonical_parse`) rather than regenerated, so it would go stale
 //! silently if `onComment` changed.
 //!

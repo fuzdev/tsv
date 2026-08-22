@@ -53,6 +53,7 @@ import {
 import { CORPUS_PARSE_COMPARED_MIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
+	type InjectKind,
 	subtract_baseline_diffs,
 	VARIANT_MARKER,
 	with_injected_variants
@@ -72,6 +73,7 @@ const CorpusCompareParseArgs = z.object({
 		.default(false)
 		.meta({ aliases: ['m'] }),
 	inject: z.boolean().default(false),
+	'inject-terminators': z.boolean().default(false),
 	'inject-limit': z.coerce.number().int().positive().default(DEFAULT_INJECT_LIMIT)
 });
 
@@ -753,7 +755,10 @@ Options:
                      Svelte tag/block head (see lib/wire_inject.ts). Off by default —
                      it multiplies canonical parses, and its findings are about spellings
                      no corpus contains rather than about the corpus
-  --inject-limit <n> Injected variants per file (default 12)
+  --inject-terminators  The same, injecting a lone CR / U+2028 / U+2029 anywhere in the
+                     document — the spellings on which the two line classes disagree.
+                     Composes with --inject; the per-file budget is split between them
+  --inject-limit <n> Injected variants per file, across all kinds (default 12)
   --verbose          Show each file as it's processed + per-file diff detail
   --json             Emit a single JSON report to stdout; human output → stderr
   --help             Show this help message
@@ -763,6 +768,7 @@ Examples:
   deno task corpus:compare:parse --all --multibyte-only
   deno task corpus:compare:parse ../zzz --filter typescript --limit 100
   deno task corpus:compare:parse tests/fixtures --filter svelte --inject
+  deno task corpus:compare:parse tests/fixtures --filter svelte --inject-terminators
   deno task corpus:compare:parse --all --json 2>/dev/null | jq '.stats.total'
 `);
 }
@@ -892,8 +898,16 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	if (filter_lang) console.log(`Filter: ${filter_lang} only`);
 	if (limit) console.log(`Limit: ${limit} files per language`);
 	if (multibyte_only) console.log('Mode: multibyte-only (offset-translation slice)');
-	if (args.inject) {
-		console.log(`Mode: +whitespace injection in Svelte heads (<=${args['inject-limit']}/file)`);
+	const inject_kinds: InjectKind[] = [
+		...(args.inject ? (['ws'] as const) : []),
+		...(args['inject-terminators'] ? (['terminators'] as const) : [])
+	];
+	const injecting = inject_kinds.length > 0;
+	if (injecting) {
+		console.log(
+			`Mode: +injection into Svelte inputs [${inject_kinds.join(', ')}] ` +
+				`(<=${args['inject-limit']}/file)`
+		);
 	}
 	console.log();
 
@@ -914,8 +928,12 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	let controls = 0;
 	let variants = 0;
 
-	const stream = args.inject
-		? with_injected_variants(loader.stream(verbose ? console.log : () => {}), args['inject-limit'])
+	const stream = injecting
+		? with_injected_variants(
+				loader.stream(verbose ? console.log : () => {}),
+				args['inject-limit'],
+				inject_kinds
+			)
 		: loader.stream(verbose ? console.log : () => {});
 
 	for await (const file of stream) {
@@ -930,7 +948,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		// be subtracted from its variants, and counted in neither the results nor the
 		// stats. Letting it into the table would blend two populations behind one
 		// percentage — the reading this tool's per-source disclosures exist to prevent.
-		const is_control = args.inject && !file.path.includes(VARIANT_MARKER);
+		const is_control = injecting && !file.path.includes(VARIANT_MARKER);
 		if (is_control) controls++;
 		else variants++;
 
@@ -993,10 +1011,12 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 
 		const all_documented = diffs.every((d) => d.documented !== null);
-		if (all_documented) {
-			lang_stats.documented++;
-		} else {
-			lang_stats.undocumented++;
+		if (!is_control) {
+			if (all_documented) {
+				lang_stats.documented++;
+			} else {
+				lang_stats.undocumented++;
+			}
 		}
 		lang_results.push({
 			path: file.path,
@@ -1016,7 +1036,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 	}
 
-	if (args.inject) {
+	if (injecting) {
 		// Re-grade every manufactured input against its own base: a divergence the base
 		// file already had is not the injection's doing. See `subtract_baseline_diffs`.
 		for (const lang of LANGUAGES) {
@@ -1025,6 +1045,11 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			const s = stats.get(lang)!;
 			s.undocumented = kept.filter((r) => r.status === 'undocumented').length;
 			s.documented = kept.filter((r) => r.status === 'documented').length;
+			// A variant whose every diff its base already had is no longer a finding, so it
+			// is an exact match for this run's question. `match` has to be re-derived rather
+			// than left as the raw count, or the table reports those variants as neither
+			// matched nor diverging and the exact-% reads far below the truth.
+			s.match = s.compared - s.documented - s.undocumented;
 		}
 	}
 
@@ -1038,7 +1063,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
-	const processed_detail = args.inject
+	const processed_detail = injecting
 		? `${counts} — ${variants} injected variants over ${controls} base controls`
 		: counts;
 	console.log(`\nProcessed: ${total_processed} files (${processed_detail})\n`);

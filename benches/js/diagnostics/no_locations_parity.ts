@@ -294,6 +294,9 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 		console.error(
 			`  name_loc: line/col exact ${t.name_loc_exact}, MISMATCH ${t.name_loc_mismatch}; name span exact ${t.name_span_exact}, MISMATCH ${t.name_span_mismatch}`
 		);
+		// Reported, not just tallied: this is the count the shipped helper REFUSES, so a
+		// corpus that grows one has to say so here rather than silently shrink `checked`.
+		console.error(`  refused up front (two line classes): ${t.two_line_classes}`);
 	}
 	if (t.mismatch > 0 || t.name_loc_mismatch > 0 || t.name_span_mismatch > 0) any_mismatch = true;
 }

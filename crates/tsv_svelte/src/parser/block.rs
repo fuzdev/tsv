@@ -1316,7 +1316,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // non-whitespace and keeps every terminator — so acorn counted the
             // ECMAScript class over the whole prefix, exactly as for the raw
             // template the expression islands get.
-            self.record_acorn_region(content_offset + head_start, PrefixLines::Ecmascript);
+            // The extent is the head slice itself — from the `<` or `(` through the
+            // matching `)` — not the wrapper the parse actually runs over, whose
+            // `function f` prefix sits at synthetic offsets outside the document.
+            self.record_acorn_region(
+                content_offset + head_start,
+                &content[head_start..=close_paren],
+                PrefixLines::Ecmascript,
+            );
             let program = tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena)?;
             self.expression_comments.extend_from_slice(program.comments);
             // The wrapper is literally a `function` declaration, so the match holds by

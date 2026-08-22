@@ -39,7 +39,7 @@ pub struct Root<'arena> {
     /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
     /// Every embedded acorn parse this component contains, ascending by
-    /// [`AcornRegion::lex_start`] and disjoint — see [`AcornRegion`].
+    /// [`AcornRegion::lex_start`] — see [`AcornRegion`].
     pub acorn_regions: &'arena [AcornRegion],
 }
 
@@ -54,12 +54,30 @@ pub struct Root<'arena> {
 /// them), and the root `comments` array is emitted outside the tree walk that
 /// would otherwise carry it.
 ///
-/// Regions never nest and never overlap, so "the region a position belongs to"
-/// is the last one starting at or before it.
+/// Regions are recorded in strict source order, so "the region a position belongs
+/// to" is the last one starting at or before it.
+///
+/// ⚠️ They **can nest**: a block pattern with a trailing `: T` is two parses, and
+/// the annotation's runs inside the pattern's (both were handed the same slice —
+/// `{:then v: T}` reads the whole thing in one `parse_pattern_with_comments` and
+/// the annotation region is recorded within it). The "last start at or before"
+/// rule is still the right answer there: the later start is the inner, more
+/// specific parse, which is the one that lexed the position.
 #[derive(Debug, Clone, Copy)]
 pub struct AcornRegion {
     /// First byte of the component acorn lexes for real.
     pub lex_start: u32,
+    /// One past the last byte of the slice this sub-parse was handed — the extent
+    /// a position resolving to this region must fall inside.
+    ///
+    /// Carried so the position→parse lookup can be **checked**. Without it the
+    /// lookup's failure mode is silent: a caller that passes a position ahead of
+    /// its own island (a container start, an enclosing tag's span) resolves to the
+    /// *previous* parse, the wire stays well-formed, and only its lines move. With
+    /// it, `Ctx::acorn_seed`'s `debug_assert` catches that in every test, fixture
+    /// run and audit. Inclusive at the bound — an empty `<script>` records a
+    /// zero-length region whose `Program` starts exactly at `end`.
+    pub end: u32,
     /// acorn's `startPos` for this parse. Behind `lex_start` only where Svelte
     /// *inserts* synthetic text there (`read_type_annotation`'s `_ as `), which
     /// acorn lexes in place of the bytes it covers.
@@ -81,14 +99,16 @@ impl AcornRegion {
     /// anything else means this is not an annotation at all and no region was
     /// recorded.
     ///
-    /// Stated once because two sides must agree on it and neither can check the
-    /// other: the parser RECORDS the annotation's region at this position, and
-    /// the wire writer LOOKS IT UP by it. A disagreement does not fail — the
-    /// lookup is "the last region starting at or before the position", so it
-    /// quietly resolves to the *pattern's* region instead and the annotation's
-    /// type nodes take the wrong parse's line seed. That is also why the lookup
-    /// cannot just pass the annotation's span start: it is behind `lex_start`,
-    /// and now by an author-controlled distance rather than exactly one byte.
+    /// Stated once because two sides must agree on it: the parser RECORDS the
+    /// annotation's region at this position, and the wire writer LOOKS IT UP by it.
+    /// A disagreement resolves to the *pattern's* region instead — the enclosing
+    /// parse, which nests this one — and the annotation's type nodes take the wrong
+    /// line seed. `AcornRegion::end` is what makes that loud rather than silent, but
+    /// only for a position that leaves the pattern's extent too; inside it the two
+    /// regions are indistinguishable to any check, which is why the derivation lives
+    /// here in one place rather than at each side. That is also why the lookup cannot
+    /// just pass the annotation's span start: it is behind `lex_start`, and now by an
+    /// author-controlled distance rather than exactly one byte.
     pub(crate) fn annotation_lex_start(source: &str, annotation_start: u32) -> u32 {
         // The colon is the first NON-WHITESPACE byte, so this steps over the run
         // rather than searching for the glyph. Not a stylistic choice: a `:` scan

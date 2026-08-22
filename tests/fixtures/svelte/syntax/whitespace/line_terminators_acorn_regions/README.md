@@ -32,6 +32,14 @@ terminator between that LF and the tag is counted by neither half: its `{b}`
 keeps the column the LF line start gives it while the *line* still carries every
 terminator from earlier in the document.
 
+The one preparation with no case here is the **bare** `{const …}` / `{let …}` tag —
+Svelte's `read_declaration` hands the whole statement to `parse_statement_at` over
+the raw template, so its prefix counts as ECMAScript exactly as a `{expr}` island's
+does, but it reaches that answer through a reader of its own. It is pinned by
+[`tests/acorn_loc_line_terminators.rs`](../../../../../acorn_loc_line_terminators.rs)
+instead. (Not to be confused with `{@const}`, whose row above is a *different* tag on
+different readers — `read_pattern` for its `id`, `read_expression` for its `init`.)
+
 A lone `<CR>` belongs to the same class but cannot be a fixture input — every
 parse-then-format entry point folds it to `<LF>` before parsing, so such a
 document is not the fixed point F1 requires. That half is pinned by

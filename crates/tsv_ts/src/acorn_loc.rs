@@ -124,6 +124,18 @@ impl AcornSeed {
         }
     }
 
+    /// Whether this seed leaves the tracker's answer alone — the question that
+    /// decides whether a document needs the re-seeding route at all.
+    ///
+    /// `first_line` is not consulted: with no lines to subtract and no columns to
+    /// add, the line it would have applied on is inert. So a computed seed over a
+    /// document that needs no re-basing compares equal in *behaviour* to
+    /// [`NONE`](Self::NONE) without having to equal it field-for-field.
+    #[inline]
+    pub const fn is_identity(self) -> bool {
+        self.line_delta == 0 && self.column_shift == 0
+    }
+
     /// acorn's position for one the ECMAScript tracker put at `pos`.
     ///
     /// The two halves are one call rather than two because the column rule reads

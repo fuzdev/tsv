@@ -645,19 +645,37 @@ array, which is emitted outside the tree walk that would otherwise carry it. The
 tracker is built **only** when the two classes actually differ, which
 `LocationTracker::new_with_map` reports out of the scan it already runs.
 
-⚠️ **"Do the two classes differ" is a strictly narrower question than "is every seed the
-identity", and only the second one gates the route.** Five of the six rows above seed from
-the class difference alone, so a document without a lone `<CR>` / `<LS>` / `<PS>` leaves
-them inert. The **annotation** row does not: acorn is entered five bytes behind the colon,
-on an `_ as ` that *overwrites* those bytes, so a plain `\n` the author wrote between a
-block binding and its `: T` is erased before acorn ever sees it, and the annotation's nodes
-stay on the *binding's* line. A seed is needed there on a pure-LF source.
+⚠️ **The route answers two questions, and each has its own exact condition.** They look
+like one and are not:
 
-So `tsv_svelte`'s writer activates the re-seeding route when the classes differ **or** some
-region has `origin != lex_start` — the latter being exactly the parses that begin behind
-where they lex, which today is that one row. When only the second holds it answers through
-the LF table, which the probe has just certified is byte-identical to acorn's, so no second
-table is built. Pinned by `tests/acorn_loc_line_terminators.rs`.
+1. **Which table** answers an acorn-owned position — acorn's ECMAScript one, or the Svelte
+   LF one. Exactly "the two classes differ": a terminator *inside* an island moves every
+   node after it whether or not any seed re-bases anything.
+2. **Whether a seed** re-bases that answer. Exactly "some seed is not the identity".
+
+Neither stands in for the other. Five of the six rows above seed from the class difference
+alone, so a document without a lone `<CR>` / `<LS>` / `<PS>` leaves them inert — question 2
+is `false` while question 1 may still be `true`. And the **annotation** row goes the other
+way: acorn is entered five bytes behind the colon, on an `_ as ` that *overwrites* those
+bytes, so a plain `\n` the author wrote between a block binding and its `: T` is erased
+before acorn ever sees it and the annotation's nodes stay on the *binding's* line — question
+2 is `true` on a pure-LF source where question 1 is `false`.
+
+`tsv_svelte`'s writer therefore computes the seeds (one per region, once per document) and
+activates the route when the classes differ **or** some seed is non-identity. Computing them
+is itself gated by the cheap *necessary* condition — the classes differ, or some region has
+`origin != lex_start`, which is exactly the parses that begin behind where they lex — so a
+document with a glued `{#each xs as e: T}`, whose seed is the identity, pays a filter and
+nothing more. When only question 2 holds the route answers through the LF table, which the
+probe has certified is byte-identical to acorn's, so no second table is built. Pinned by
+`tests/acorn_loc_line_terminators.rs`.
+
+The region a position belongs to is the last one starting at or before it; regions **can**
+nest (a block pattern's `: T` runs inside the pattern's own parse), where the later start is
+the inner parse and so the right answer. Each region carries the extent of the slice its
+sub-parse was handed, and the lookup asserts the resolved parse contains the position — the
+one failure mode here is otherwise silent, since a position resolved to the previous parse
+still emits a well-formed wire with only its lines moved.
 
 ### Source-Based Printing
 

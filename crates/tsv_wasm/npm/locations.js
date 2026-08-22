@@ -45,10 +45,22 @@
  * *overwrites* them — so a newline between the binding and its colon
  * (`{#each xs as e⏎: T}`) is erased before acorn sees it and the annotation's nodes stay on
  * the binding's line. That needs a per-parse seed, which the offsets cannot supply, so the
- * `reconstruct` forms throw on such a tree. It is checked against the AST rather than the
- * source (only a parse says where a block binding is), which is why this one fires from
- * `reconstruct` rather than from `create_locator`. Whitespace *without* a newline is fine:
- * the seed is then the identity.
+ * forms throw on such a tree. It is checked against the AST rather than the source (only a
+ * parse says where a block binding is), so `reconstruct` scans the whole tree up front while
+ * `create_locator().loc_of` asks it of the one node it was handed — both refuse the same
+ * document, so which entry point a consumer picks never changes the answer. Whitespace
+ * *without* a newline is fine: the seed is then the identity.
+ *
+ * **Why refuse rather than carry what is missing.** The span-only wire could ship the
+ * per-parse origins that make both cases derivable — they are a few dozen bytes per document
+ * against a `loc` on every node. It deliberately does not. Reconstructing them here would
+ * mean a second implementation, in JS, of a model that exists only to mirror upstream
+ * defects: acorn seeds `lineStart` with `lastIndexOf("\n", …)` while counting `curLine` over
+ * the full terminator class, and Svelte prepares acorn's input three different ways across
+ * five readers. That model moves when either upstream moves, nothing in `deno task check`
+ * would grade the JS copy against the Rust one, and the documents it buys back are a source
+ * with a lone CR and an annotation split by a newline — which is not even format-stable, so
+ * it survives only in unformatted source. Parsing those with `loc` is the better answer.
  *
  * **Svelte is otherwise approximate** — reconstruct where you have the source, but be
  * aware of two deliberate divergences from Svelte's own wire (this module does NOT
@@ -535,21 +547,32 @@ function refuse_seeded_annotation(node, source) {
 		for (const item of node) refuse_seeded_annotation(item, source);
 		return;
 	}
-	if (node.type === 'TSTypeAnnotation' && typeof node.start === 'number') {
-		let i = node.start;
-		let broken = false;
-		for (; i < source.length && /\s/.test(source[i]); i++) {
-			if (source.charCodeAt(i) === LF) broken = true;
-		}
-		if (broken) {
-			refuse(
-				'a block binding is separated from its `: T` by a newline, and Svelte reads that ' +
-					'annotation with a second acorn parse whose synthetic `_ as ` overwrites the break'
-			);
-		}
-	}
+	refuse_if_seeded_annotation(node, source);
 	for (const key of Object.keys(node)) {
 		if (key !== 'loc' && key !== 'name_loc') refuse_seeded_annotation(node[key], source);
+	}
+}
+
+/**
+ * The single-node half of {@link refuse_seeded_annotation}, so the two entry points ask the
+ * same question of the same node shape.
+ *
+ * `create_locator` needs it separately: it never walks a tree, so a caller doing
+ * `locator.loc_of(node)` on one of these annotations would otherwise get a quietly wrong
+ * line back where `reconstruct` throws — the same document, the same node, two answers.
+ * Whichever entry point a consumer picks, the refusal is the same.
+ */
+function refuse_if_seeded_annotation(node, source) {
+	if (node?.type !== 'TSTypeAnnotation' || typeof node.start !== 'number') return;
+	let broken = false;
+	for (let i = node.start; i < source.length && /\s/.test(source[i]); i++) {
+		if (source.charCodeAt(i) === LF) broken = true;
+	}
+	if (broken) {
+		refuse(
+			'a block binding is separated from its `: T` by a newline, and Svelte reads that ' +
+				'annotation with a second acorn parse whose synthetic `_ as ` overwrites the break'
+		);
 	}
 }
 
@@ -602,11 +625,16 @@ export function create_locator(source, opts) {
 		);
 	}
 	const starts = build_line_starts(source, rule_for(language));
+	const is_svelte = language === 'svelte';
 	return {
 		loc_of(node) {
 			if (!node || typeof node.start !== 'number' || typeof node.end !== 'number') {
 				return null;
 			}
+			// The second refusal, asked per node because this entry point has no tree to
+			// scan. Without it the two entry points disagree about one document: `reconstruct`
+			// throws and `loc_of` returns a line that is quietly off by one.
+			if (is_svelte) refuse_if_seeded_annotation(node, source);
 			return { start: loc_at(node.start, starts), end: loc_at(node.end, starts) };
 		},
 		reconstruct(ast) {

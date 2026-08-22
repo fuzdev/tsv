@@ -316,12 +316,16 @@ deno task corpus:compare:parse ../zzz --filter typescript --limit 100
 deno task corpus:compare:parse --all --json 2>/dev/null > report.json
 deno task corpus:compare:parse:run --all                # skip rebuild (freshness-guarded)
 
-# The WIRE-INJECTION audit: same comparison, MANUFACTURED inputs — whitespace injected
-# into every Svelte tag/block head (lib/wire_inject.ts), each variant graded against its
-# own base file so a deliberate divergence fixture contributes nothing. ⚠️ RED BY DESIGN,
-# a discovery tool like compile:fuzz. Full reference: ../../docs/audits.md §Wire-Injection
+# The WIRE-INJECTION audit: same comparison, MANUFACTURED inputs (lib/wire_inject.ts), each
+# variant graded against its own base file so a deliberate divergence fixture contributes
+# nothing. TWO families: `ws` widens whitespace inside Svelte tag/block heads; `terminators`
+# injects a lone CR / U+2028 / U+2029 anywhere — the spellings on which the two `loc` line
+# classes disagree, and the one axis no fixture and no real repo can reach.
+# ⚠️ RED BY DESIGN, a discovery tool like compile:fuzz.
+# Full reference: ../../docs/audits.md §Wire-Injection
 deno task wire:audit
-deno task corpus:compare:parse <path> --filter svelte --inject --inject-limit 6
+deno task wire:audit:terminators
+deno task corpus:compare:parse <path> --filter svelte --inject --inject-terminators --inject-limit 6
 ```
 
 Method: ASTs are **raw-diffed with no pre-diff normalization**; diffs are classified

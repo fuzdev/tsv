@@ -171,8 +171,9 @@ cargo run --profile corpus -p tsv_debug --features audits gap_audit ../zzz/src
 ## Wire-Injection Audit (`wire:audit`)
 
 ```bash
-deno task wire:audit          # tests/fixtures, Svelte only
-deno task corpus:compare:parse <path> --filter svelte --inject [--inject-limit N]
+deno task wire:audit                # whitespace in heads — tests/fixtures, Svelte only
+deno task wire:audit:terminators    # lone CR / U+2028 / U+2029 anywhere — same corpus
+deno task corpus:compare:parse <path> --filter svelte --inject [--inject-terminators] [--inject-limit N]
 ```
 
 **What it proves.** That tsv's parse **wire** still matches the canonical parser after
@@ -195,11 +196,29 @@ any spelling that put whitespace between a binding and its colon — invisible t
 fixtures and every real repo, because everyone writes `x: T`. The comparison catches
 both the instant such an input exists; this audit makes them exist.
 
-**What it perturbs.** Whitespace inside a head, at two kinds of position: the start of
-each existing whitespace run (does this construct measure from the token or from the
-gap?) and each `:` / `,` / `=` with nothing before it (does it assume the two are
-adjacent?). Heads are where tsv hand-rolls its scanning — head splitting,
-binding/annotation separation, delimiter finding — rather than delegating to acorn.
+**What it perturbs — two families, because there are two kinds of claim to break.**
+
+- **`ws`** — whitespace inside a head, at two kinds of position: the start of each
+  existing whitespace run (does this construct measure from the token or from the gap?)
+  and each `:` / `,` / `=` with nothing before it (does it assume the two are adjacent?).
+  Heads are where tsv hand-rolls its scanning — head splitting, binding/annotation
+  separation, delimiter finding — rather than delegating to acorn.
+- **`terminators`** — a lone `\r`, `<LS>` or `<PS>` at every whitespace-run start in the
+  document, head or not. These are exactly the spellings on which the two `loc` line
+  classes DISAGREE, and which class a node was counted under is decided *per acorn parse*
+  by what Svelte did to the prefix it handed acorn (three preparations across five
+  readers — [architecture.md §`loc` lines](./architecture.md#loc-lines-two-classes-one-per-acorn-parse)).
+  That model is mirror-knowledge held by hand at seven call sites in `tsv_svelte`'s
+  parser, and **nothing else grades it**: no fixture can carry a raw `<CR>` (every
+  parse-then-format entry point folds it, so such a document is not the fixed point F1
+  requires), and no real repo contains one. `\n` and `\r\n` are deliberately not injected
+  — both classes count them identically, so a variant carrying one tests nothing.
+  Document-wide rather than head-scoped because the axis is: a terminator matters in the
+  prefix acorn measured, in the run acorn *skipped*, and inside the island itself, and
+  only the first of those is ever in a head.
+
+Sites are sampled by even stride rather than taken as a prefix, so the per-file cap
+spreads across the document instead of piling into its first few lines.
 
 **Each variant is graded against its own base file.** A divergence the base already had
 is not the injection's doing, and `tests/fixtures` deliberately contains ~91
@@ -209,7 +228,8 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 
 **Blind spots.**
 
-- **Svelte heads only.** Nothing outside a head is perturbed, and TS/CSS are untouched.
+- **Svelte inputs only.** Standalone TS/CSS files are never perturbed (their `loc` has one
+  line class and no per-parse seed), and the `ws` family additionally reaches only heads.
 - **A base that already diverges at a signature masks a new divergence at that same
   signature** in its variants. A clean base is the better seed.
 - **A rejected variant is not a finding.** The oracle refusing an injection buckets as
@@ -221,11 +241,19 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 
 ⚠️ **Currently RED by design**, like `compile:fuzz` — a discovery tool with an open work
 list, not a regression gate, which is why it is not in `deno task check` (it also needs
-the canonical parser, so it is conformance-tier at best). Its standing finding: a `//`
-comment's extent is **clipped at a trimmed slice boundary** in the bounded-slice tag
-readers. `{@html expr // c ⏎}` ends the comment before the trailing space where acorn
-ends it after; `{expr // c ⏎}` and `<script>` both agree, so the divergence is the
-bounded readers' whitespace-trimmed slice, not the comment lexer.
+the canonical parser, so it is conformance-tier at best). Standing findings:
+
+- **`ws`** — a `//` comment's extent is **clipped at a trimmed slice boundary** in the
+  bounded-slice tag readers. `{@html expr // c ⏎}` ends the comment before the trailing
+  space where acorn ends it after; `{expr // c ⏎}` and `<script>` both agree, so the
+  divergence is the bounded readers' whitespace-trimmed slice, not the comment lexer.
+- **`terminators`** — tsv's CSS parser skips a **narrower whitespace class than
+  `parseCss` does** at a selector boundary. Svelte reaches every one of those through the
+  template parser's `allow_whitespace()`, which is JS `\s` (the 25-code-point set in
+  `tsv_svelte`'s `is_svelte_ws`); tsv skips the css-syntax-3 class, so `<style>⏎<LS>div {}`
+  yields a `TypeSelector` named `"<LS>div"` where `parseCss` yields `"div"`. `<PS>` and
+  `U+00A0` reproduce it identically, so the class — not the terminator — is the bug. It
+  dominates a terminator run by file count; read past it when triaging the rest.
 
 ## Blank-Line Injection Audit (`blanks:audit`)
 

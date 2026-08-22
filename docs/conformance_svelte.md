@@ -392,6 +392,31 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 - A **non-simple assignment target** — a call (`foo() = bar`, `foo() += 1`), a literal (`1 >>= 2`), or `this` (`this = x`). The production is `LeftHandSideExpression = AssignmentExpression`; the "is it assignable?" refinement (`AssignmentTargetType`) is an early error layered on top, which tsv defers, so all four parse and prettier formats all four. acorn enforces it (`Assigning to rvalue`). The deferral does **not** reach a no-declaration `for`-in/of head — that is a `LeftHandSideExpression` position but not an assignment context, so a non-simple target there stays a parse error in tsv as in prettier — [nonsimple_target](../tests/fixtures/typescript/expressions/assignment/nonsimple_target_svelte_divergence/)
 - A **shorthand property carrying an initializer** in an object *literal* — `({ a = 1 })`. `PropertyDefinition : CoverInitializedName` is a real production, present so `ObjectLiteral` can cover `ObjectAssignmentPattern`; the rejection is the early error layered on top ("It is a Syntax Error if any source text is matched by this production", [§13.2.5.1](https://tc39.es/ecma262/#sec-object-initializer-static-semantics-early-errors)), which tsv defers, so it parses as a `shorthand` `Property` whose `value` is an `AssignmentExpression`. acorn enforces it (`Shorthand property assignments are valid only in destructuring patterns`). Every *valid* spelling is refined to an `ObjectPattern` before it is printed, so the literal shape is reachable only here — which is why the property's comment seam had never been asked about it — [shorthand_initializer_name_comment](../tests/fixtures/typescript/expressions/objects/shorthand_initializer_name_comment_svelte_divergence/)
 
+**An optional member or parameter inside a block binding's type annotation** —
+`{#each xs as e: { a?: number }}`. Both parsers accept; the ASTs differ, and tsv's is the
+source's. Svelte reads a block binding's `: T` by tricking acorn into parsing a synthetic
+expression, and part of that trick **rewrites the remaining template**
+(`1-parse/read/context.js`, `read_type_annotation`):
+
+```js
+parser.template.slice(parser.index).replace(/\?\s*:/g, ':');
+```
+
+Its stated purpose is to stop acorn-TS reading a following parameter as a sequence
+expression, but the substitution lands in the very string acorn then measures positions
+in. So for any annotation containing a `?:`, Svelte loses `optional: true` (the `?` is
+gone before the parse) and reports every offset after it **one byte short** — its
+`TSPropertySignature` span slices to `a?: numbe`, a truncated token. The shortfall escapes
+the annotation, because the head reader measures from it: `TSTypeAnnotation.end` comes back
+one short of taking in the type literal's own `}`, the `{#each}` reader consumes that brace
+as the head's closer, and the block body's first `Text` node then begins on the head's real
+closing brace with a stray `}` in its `data`/`raw`. tsv parses the real source and emits the real thing. A function
+type's optional parameter (`{#each xs as e: (a?: number) => void}`) is the same rewrite.
+The adjacent-colon, `?`-free spelling every other fixture uses matches exactly — the
+regex finds nothing to substitute — which is why this stayed invisible until an injected
+input produced one ([audits.md §Wire-Injection](./audits.md#wire-injection-audit-wireaudit)) —
+[context_annotation_optional_member](../tests/fixtures/svelte/blocks/each/context_annotation_optional_member_svelte_divergence/)
+
 **A strict-mode-reserved word as a name** ([strict_reserved_name](../tests/fixtures/typescript/declarations/variable/strict_reserved_name_svelte_divergence/); the load-bearing parens that follow from it are [statement_head_paren](../tests/fixtures/typescript/statements/expression/statement_head_paren_svelte_divergence/)) — `implements`, `interface`, `let`, `package`, `private`, `protected`, `public`, `static`, `yield` are barred as names by a *single* bullet of ecma262 §sec-identifiers-static-semantics-early-errors, a Static Semantics early error tsv defers. So tsv parses all nine as names in every position — `var let = 1`, `function f(yield) {}`, `class implements {}`, `function f(private) {}`, `enum yield {}`, `private: for (;;) break private;`, `type T = X extends Y ? infer let : never` — as tsc's parser and prettier do, while acorn enforces the early error and rejects. Most of the list was always accepted, because tsv's lexer leaves those words as plain `Identifier`s; the holes were `let`/`yield` (keyword-lexed) and `implements`/`private`/`protected`/`public` (swallowed by a competing syntactic role), and both are artifacts of tokenization and lookahead rather than rules.
 
 The competing roles are resolved with tsc's own one-token lookaheads, so the word's real role still wins where it should. After `class`, `implements` opens a heritage clause iff an identifier-or-keyword follows (tsc's `isImplementsClause`), so `class implements {}` names the class while `export default class implements I {}` stays an anonymous class with heritage. In a parameter list, an accessibility keyword is a modifier iff a binding follows it on the same line (tsc's `canFollowModifier`) — the rule `readonly`/`override` already used — so `class C { constructor(private x) {} }` is a parameter property and `function f(private) {}` is a parameter *named* `private`. tsv deliberately does **not** copy tsc's error *recovery*: `class implements extends B {}` leaves the declaration nameless and stays rejected, which is also prettier's verdict.
@@ -949,6 +974,7 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 **Svelte template parser** — fix directly in Svelte:
 
 - each-`as` stale `loc.end` — TS-mode as-expression unwrap patches the expression's `end` offset but not `loc.end`
+- Block-annotation `?:` rewrite — `read_type_annotation`'s `.replace(/\?\s*:/g, ':')` edits the string acorn measures positions in, so an optional member in a block binding's `: T` loses `optional` and shifts every later offset one byte short (see §TypeScript Corrections)
 
 ### Comment Attachment Differences
 
