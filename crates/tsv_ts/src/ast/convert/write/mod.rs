@@ -184,8 +184,8 @@ pub fn write_pattern_embedded(
     env: EmbedWriter<'_>,
 ) {
     let mut ctx = Ctx::from_embed(env);
-    if let Some(ann) = block_pattern_annotation_span(expr) {
-        ctx.pattern_ann_span = ann;
+    if let Some(ann) = crate::pattern_type_annotation(expr) {
+        ctx.pattern_ann_span = ann.span;
     }
     match expr {
         internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => {
@@ -222,28 +222,6 @@ pub fn write_pattern_embedded(
         // can exist here.
         _ => expressions::write_expression(w, expr, &ctx),
     }
-}
-
-/// The span of a block pattern's own trailing `: T` — the `read_context`-synthesized
-/// `TSTypeAnnotation`, which Svelte reads with a **second** acorn parse
-/// (`read_type_annotation`).
-///
-/// The boundary between the two parses, and so the one every per-position rule
-/// that differs across them keys on: the annotation's `loc` is omitted (Svelte
-/// builds that node itself), its type nodes take no `(` column shift, and they
-/// carry the other parse's line seed. A block-pattern root is always an
-/// identifier or a destructure, so no other root shape can carry one.
-///
-/// `tsv_svelte` asks this to pick the annotation's [`AcornSeed`], which is why it
-/// is stated here once rather than matched at both writers.
-pub fn block_pattern_annotation_span(expr: &internal::Expression<'_>) -> Option<Span> {
-    match expr {
-        internal::Expression::ObjectPattern(o) => o.type_annotation.as_ref(),
-        internal::Expression::ArrayPattern(a) => a.type_annotation.as_ref(),
-        internal::Expression::Identifier(id) => id.type_annotation(),
-        _ => None,
-    }
-    .map(|ann| ann.span)
 }
 
 /// Emit the `Program` node.

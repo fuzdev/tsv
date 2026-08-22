@@ -594,6 +594,14 @@ pub fn attach_pattern_type_annotation<'arena>(
 /// hold it in three different places (an `Identifier` behind its `extra`, the two
 /// destructuring patterns in a field of their own). Callers wanting the binding's **end**
 /// take [`pattern_binding_end`] rather than reading `span.end` themselves.
+///
+/// Its **span start** is also the boundary between the two acorn parses Svelte's
+/// `read_pattern` runs — the pattern, then `read_type_annotation` for the `: T` — so
+/// every per-position rule that differs across them keys on it: the annotation's `loc`
+/// is omitted (Svelte builds that node itself), its type nodes take no `(` column shift,
+/// and they carry the other parse's line seed. That is why the wire writer and the Svelte
+/// parser both ask *this* function rather than matching the three kinds again; a block
+/// pattern's root is always an identifier or a destructure, so no other root can carry one.
 pub fn pattern_type_annotation<'a, 'arena>(
     pattern: &'a Expression<'arena>,
 ) -> Option<&'a TSTypeAnnotation<'arena>> {

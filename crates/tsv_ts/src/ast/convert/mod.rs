@@ -37,7 +37,7 @@ mod write;
 
 pub use write::{
     AttachedComment, CommentMode, EmbedWriter, ProgramLoc, ProgramWriter, SkeletonRecorder,
-    SkeletonTree, WriterComments, block_pattern_annotation_span, write_expression_embedded,
+    SkeletonTree, WriterComments, write_expression_embedded,
     write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
     write_program_json, write_variable_declaration_embedded,
 };

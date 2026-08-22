@@ -613,8 +613,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // the annotation to `parse_ts_type_annotation`, which records it there —
         // this arm is the one-sub-parse readers, `{:then}` / `{:catch}` /
         // `{@const}`.
-        if let Some(annotation) = tsv_ts::ast::convert::block_pattern_annotation_span(&pattern) {
-            self.record_annotation_acorn_region(annotation.start as usize);
+        if let Some(annotation) = tsv_ts::pattern_type_annotation(&pattern) {
+            self.record_annotation_acorn_region(annotation.span.start as usize);
         }
         // Canonical reads a destructure via a synthetic `(pattern = 1)` acorn
         // parse whose inserted `(` shifts the pattern's start line one column

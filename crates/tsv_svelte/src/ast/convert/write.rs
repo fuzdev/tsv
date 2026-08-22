@@ -67,9 +67,9 @@ use tsv_lang::{
     estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
-    CommentMode, EmbedWriter, ProgramLoc, ProgramWriter, Schema, block_pattern_annotation_span,
-    translate_column, write_expression_embedded, write_identifier_expression_with_character,
-    write_pattern_embedded, write_program_embedded, write_variable_declaration_embedded,
+    CommentMode, EmbedWriter, ProgramLoc, ProgramWriter, Schema, translate_column,
+    write_expression_embedded, write_identifier_expression_with_character, write_pattern_embedded,
+    write_program_embedded, write_variable_declaration_embedded,
 };
 
 use super::comment_attachment::{AttachInputs, get_comment_value, is_template_comment};
@@ -274,8 +274,8 @@ impl<'a> Ctx<'a> {
         expr: &tsv_ts::ast::internal::Expression<'_>,
     ) -> EmbedWriter<'a> {
         let mut env = self.embed(mode, expr.span().start);
-        if let Some(ann) = block_pattern_annotation_span(expr) {
-            env.acorn_annotation = self.acorn_seed(ann.start + 1);
+        if let Some(ann) = tsv_ts::pattern_type_annotation(expr) {
+            env.acorn_annotation = self.acorn_seed(ann.span.start + 1);
         }
         env
     }
