@@ -9,11 +9,14 @@
  * strings — so the two are drop-in swaps: this one is the fast native path,
  * that one the universal fallback (browsers + unsupported platforms). What is
  * absent here is only what a WASM engine needs and this one doesn't: `init()`
- * and `init_sync()` (nothing to initialize) and `wasm_module` (no compiled
- * module to hand a worker). `npm/cli.js` reads that absence twice: as the
- * signal to load this loader in its workers rather than the wasm `./worker`
- * entry, and as the signal to size its pool for an engine with no wasm tier-up
- * competing for cores — a wider pool, crossing over at fewer files.
+ * and `init_sync()` (nothing to initialize), `wasm_module` (no compiled
+ * module to hand a worker), and `reinstantiate()` (no instance to poison — a
+ * native stack overflow is a process-fatal SIGSEGV, not a recoverable trap).
+ * `npm/cli.js` reads that absence three ways: as the signal to load this
+ * loader in its workers rather than the wasm `./worker` entry, as the signal
+ * to size its pool for an engine with no wasm tier-up competing for cores — a
+ * wider pool, crossing over at fewer files — and as the signal that a trapped
+ * engine cannot be recovered (`recover_engine_suffix`, unreachable here).
  *
  * ESM, the same module system as `@fuzdev/tsv_wasm` — one dialect across tsv's
  * whole npm surface, which is what lets the shared `locations.js` and `cli.js`

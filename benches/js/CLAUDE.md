@@ -831,6 +831,18 @@ stale or missing. The build-first tasks rebuild first, so they pass for free.
 `BENCH_STALE_OK=1` downgrades a _stale_ artifact to a `⚠` warning (a _missing_ one
 stays fatal); see the module doc for why stale is a hard error by default.
 
+**The staged-package sibling: the npm test `:run` tasks abort too.**
+`test:npm[:parse|:all]:run` and `test:napi:npm:run` skip their builds for the same
+harness-iteration reason and carry the same trap — the incident was a pre-fix
+`tsv_cli` binary sitting staged in `crates/tsv_napi/pkg`, which `test:napi:npm:run`
+would have green-tested silently. `scripts/check_staged_freshness.ts` (imported at
+the top of both test suites) compares each staged artifact's mtime directly against
+the SOURCES that feed it — crate sources for the wasm bundle / addon / CLI binary,
+the patcher + staging scripts for generated entries, the shared `cli.js` /
+`locations.js` for the copies — which catches both lags at once (a `target/` build
+behind the sources, and a staged copy behind the build). Same `BENCH_STALE_OK=1`
+escape hatch, missing always fatal; the build-first tasks pass for free.
+
 **The build-side sibling: fresh builds SKIP.** The four wasm-pack bench build tasks
 (`build:wasm:deno`, `build:wasm:parse:deno`, `build:wasm:all:deno`,
 `build:wasm:all:nodejs`) ride `scripts/run_if_stale.ts`, which skips wasm-pack when
