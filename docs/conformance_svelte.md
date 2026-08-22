@@ -110,6 +110,28 @@ _relation_ between parses (the two spellings agree for tsv and disagree for
   pair reports it as a value mismatch, an extra, _or_ a missing field depending
   on which side's comment carries it.
 
+**Boundary whitespace is JS `\s`.** `parseCss` skips whitespace through the template
+parser's `allow_whitespace()`, which is spelled in JavaScript, so `<NBSP>`, every `Zs`,
+`<LS>`, `<PS>` and `<ZWNBSP>` separate tokens at a selector-list start, after a `,`, inside a
+`[`, after a combinator and after a `;` — while its `read_identifier` takes every code point
+≥ U+00A0 as identifier content. Which rule applies is decided by ORDER, and tsv mirrors that:
+the lexer's boundary class is [`tsv_lang::is_js_whitespace`], and the junctures where Svelte
+calls `read_identifier` with no skip in front of it — a name glued to its `.` / `#` / `:` /
+`|` / `@` sigil — re-read the run through `CssParser::read_glued_identifier`. `<NEL>`
+(U+0085) is `White_Space` to Rust and **not** JS `\s`, so it is whitespace to neither and
+`parseCss` rejects it wherever a name is read; tsv now does too. The **formatter** keeps every
+one of these characters (`preserved_boundary_ws`) rather than replacing the run with its own
+indentation — the AST mirrors Svelte, the printer emits the author's bytes, the same call the
+escaped-selector names make, and prettier keeps them too, so dropping one would read as
+`content_lost` to the corpus safety check. Pinned by
+[css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs); found by
+[wire:audit:terminators](./audits.md#wire-injection-audit-wireaudit). Four junctures still
+read the run as identifier content — a descendant combinator's `end`, a pseudo-argument
+list's `start`, a `<ZWNBSP>` leading a value, and the compound break after a `&` or `*`
+(the one that reaches a NAME, and the one whose fix has to land the break and the
+combinator that replaces it together — doing only the break turns both spellings into parse
+errors). They are enumerated and pinned in that test.
+
 ### CSS Parser Scope & Error Model
 
 **Goal: CSS-spec compliance. Near-term: match Svelte's `parseCss`.** tsv targets
@@ -119,6 +141,17 @@ CSS-spec conformance — grammar-correct _and_ implementing the spec's
 immediate, enforced goal is **parity with Svelte's `parseCss`** on the conformant
 subset: tsv is a drop-in replacement and Svelte's parser is the fixture baseline.
 Where the two goals conflict on conformant input, Svelte-parity wins for now.
+
+- **A declaration's property and value are RAW SCANS in `parseCss`, and identifier TOKENS in
+  tsv — a tracked gap.** `read_declaration` reads a property with `read_until(/[\s:]/)` and a
+  value with `read_value`, so *any* character that is neither JS-`\s` nor the delimiter is
+  content: canonical accepts `%top`, `!top`, `(top`, `1top`, `+top` and `<NEL>top` as property
+  names. tsv reads an identifier token there, so it either **silently truncates** the prefix
+  (`%top`, `!top`, `(top` all reach the wire as `top` — content loss the wire cannot show) or
+  **rejects** (`1top`, `+top`, `<NEL>top`). Closing it means giving the property and value
+  positions their own raw readers rather than the shared identifier token. Pinned as a
+  ratchet by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs), whose `<NEL>`
+  case is the one member this family shares with the whitespace class below.
 
 - **Current behavior is hard-fail; recovery is the target, not the design.**
   Today tsv **errors on the first invalid construct**, which aborts the whole
@@ -410,9 +443,14 @@ gone before the parse) and reports every offset after it **one byte short** — 
 the annotation, because the head reader measures from it: `TSTypeAnnotation.end` comes back
 one short of taking in the type literal's own `}`, the `{#each}` reader consumes that brace
 as the head's closer, and the block body's first `Text` node then begins on the head's real
-closing brace with a stray `}` in its `data`/`raw`. tsv parses the real source and emits the real thing. A function
-type's optional parameter (`{#each xs as e: (a?: number) => void}`) is the same rewrite.
-The adjacent-colon, `?`-free spelling every other fixture uses matches exactly — the
+closing brace with a stray `}` in its `data`/`raw`. tsv parses the real source and emits the real thing. The rewrite has a **second landing**:
+where the annotation is an object type its own `}` absorbs the one-byte slip and the document
+parses with a corrupted AST, but a **function type** has no absorbing token, so
+`{#each xs as e: (a?: number) => void}` makes the head reader run out of head and canonical
+**rejects** it (`expected_token`) where tsv parses it — an over-acceptance whose `?`-free
+control (`(a) => void`, accepted by both) is what attributes it to the `?:` rather than the
+arrow, pinned in
+[block_pattern_annotation_span.rs](../tests/block_pattern_annotation_span.rs). The adjacent-colon, `?`-free spelling every other fixture uses matches exactly — the
 regex finds nothing to substitute — which is why this stayed invisible until an injected
 input produced one ([audits.md §Wire-Injection](./audits.md#wire-injection-audit-wireaudit)) —
 [context_annotation_optional_member](../tests/fixtures/svelte/blocks/each/context_annotation_optional_member_svelte_divergence/)

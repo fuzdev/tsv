@@ -229,3 +229,39 @@ fn an_annotation_seed_survives_a_newline_the_as_insert_overwrites() {
         "with no second line class"
     );
 }
+
+/// **One tag, both line classes.** A `{@const}` declarator is read by *two* Svelte readers:
+/// its `id` by `read_pattern` (a blanked prefix, so LF-only) and its `init` by
+/// `read_expression` (the raw template, so the full ECMAScript class). So a single `<LS>`
+/// earlier in the document moves the `init` a line and leaves the `id` where it is — the two
+/// halves of one declarator land on different lines for the same authored position.
+///
+/// This is the sharpest statement of the whole model and the easiest thing for a "just route
+/// acorn's islands to an ECMAScript table" simplification to erase, since that would move
+/// both halves. Nothing else pins it: the fixture's `{@const}` sits in a document whose
+/// classes agree, where the split is invisible.
+#[test]
+fn a_const_tag_spans_both_line_classes_at_once() {
+    let src = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n\n<p>a\u{2028}b</p>\n\
+               {#each xs as e}\n\t{@const d = e}\n\t{d}\n{/each}\n";
+    let id = line_of(src, ".declaration.declarations[0].id.Identifier");
+    let init = line_of(src, ".declaration.declarations[0].init.Identifier");
+    assert_eq!(
+        id, 7,
+        "the id is `read_pattern`'s — LF only, so the <LS> does not count"
+    );
+    assert_eq!(
+        init, 8,
+        "the init is `read_expression`'s — the raw template, so the <LS> counts"
+    );
+
+    // The null control: with the `<LS>` spelled as a plain `\n` both readers count it, so the
+    // two halves land back on the SAME line — the one they are authored on. Without this a
+    // shape asserting only "they differ" would pass on a table that moved both.
+    let one_class = src.replace('\u{2028}', "\n");
+    assert_eq!(
+        line_of(&one_class, ".declaration.declarations[0].id.Identifier"),
+        line_of(&one_class, ".declaration.declarations[0].init.Identifier"),
+        "with one line class the two halves sit on the line they are authored on"
+    );
+}

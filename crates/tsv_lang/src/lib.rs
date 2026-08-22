@@ -35,6 +35,7 @@ mod sizing;
 pub mod source_scan;
 mod span;
 mod swar;
+mod whitespace;
 
 pub use comment::{
     ClassifiedComments, Comment, CommentPosition, classify_comment, classify_comment_fast,
@@ -54,3 +55,4 @@ pub use location::{ByteToCharMap, LocationMapper, LocationTracker, Position};
 pub use output::{OutputBuffer, write_indent};
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};
 pub use span::Span;
+pub use whitespace::is_js_whitespace;

@@ -234,6 +234,72 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.current_decoded = None;
     }
 
+    /// Byte length of the boundary whitespace run at the head of the current token, or `0`.
+    ///
+    /// The non-consuming half of [`skip_boundary_whitespace`](Self::skip_boundary_whitespace),
+    /// for the one caller that must **not** step the run: a compound's chain loop, where the
+    /// run ends the compound and then belongs to the gap the descendant combinator spans. Both
+    /// ask this so "is there a run here" and "step the run" cannot disagree about where it
+    /// starts.
+    pub(in crate::parser) fn boundary_run_len(&self) -> usize {
+        if self.current_kind != TokenKind::Identifier {
+            return 0;
+        }
+        self.source[self.current_start..self.current_end]
+            .chars()
+            .take_while(|c| crate::whitespace::is_boundary_only_whitespace(*c))
+            .map(char::len_utf8)
+            .sum()
+    }
+
+    /// Step over a **boundary whitespace run** the lexer could not see — `parseCss`'s
+    /// `allow_whitespace()`, which is JS `\s` ([`tsv_lang::is_js_whitespace`]) and therefore
+    /// includes every code point at or above U+00A0 that the lexer has just read as the head
+    /// of an identifier.
+    ///
+    /// The two readings are both right and only position separates them. `read_identifier`
+    /// takes `<NBSP>`, every `Zs`, `<LS>`, `<PS>` and `<ZWNBSP>` as identifier content —
+    /// correct inside a value (`css/values/boundary_nonascii_space_prettier_divergence` pins
+    /// exactly that) and correct for a name glued to its `.` / `#` / `:` / `|` / `@` sigil,
+    /// where Svelte calls `read_identifier` with no skip in front of it. At a **boundary** —
+    /// a selector-list start, after a `,`, inside a `[`, after a combinator, before a
+    /// declaration's property — the skip runs first and the same character is a separator.
+    /// Only the parser knows which it is at, which is why this lives here and not in the
+    /// lexer: putting the class there changed values and the BOM too.
+    ///
+    /// Called from the parser's own whitespace skips, so every juncture that already asks
+    /// "is there whitespace here" asks the whole question. Returns whether it moved, so a
+    /// caller tracking *whether whitespace was seen* — the descendant-combinator decision —
+    /// stays right.
+    ///
+    /// ⚠️ Deliberately blind to `<NEL>` (U+0085), which is `White_Space` to Rust and **not**
+    /// JS `\s`. The lexer still reads it as whitespace, so tsv accepts a selector Svelte
+    /// rejects; correcting that means giving a declaration's property and value their own raw
+    /// readers, since `<NEL>` is content there. Tracked with that family — see
+    /// [`tests/css_boundary_whitespace.rs`](../../../../tests/css_boundary_whitespace.rs).
+    pub(in crate::parser) fn skip_boundary_whitespace(&mut self) -> Result<bool, ParseError> {
+        let run = self.boundary_run_len();
+        if run == 0 {
+            return Ok(false);
+        }
+        let at = self.current_start + run;
+        // Any lookahead was lexed from past this token and is void once the cursor moves.
+        self.peek = None;
+        if at == self.current_end {
+            // The whole identifier was the run — there is no name here at all, so consume it
+            // and let the caller's loop ask again (an ASCII gap may follow, then another).
+            self.lexer.seek(at);
+            self.advance()?;
+            return Ok(true);
+        }
+        let token = self.lexer.token_at(at)?;
+        self.current_kind = token.kind;
+        self.current_start = token.start as usize;
+        self.current_end = token.end as usize;
+        self.current_decoded = self.decoded_to_arena();
+        Ok(true)
+    }
+
     /// Peek at the next token's kind without consuming it. Returns the kind by
     /// value (`TokenKind` is `Copy`) — like `tsv_ts`'s `peek_kind`, not a borrow of
     /// `self`. Result is cached so repeated peeks are efficient. (Named `peek_kind`,

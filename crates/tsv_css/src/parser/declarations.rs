@@ -93,6 +93,11 @@ pub(crate) fn parse_rule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested: bool,
 ) -> Result<CssRule<'arena>, ParseError> {
+    // Ahead of the capture: this offset becomes the rule's AND its prelude's `start`, both
+    // of which sit past a boundary whitespace run in `parseCss` (see
+    // `skip_boundary_whitespace`). The selector list skips again on its own — the two
+    // captures are separate and neither can be derived from the other.
+    parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start);
 
     // Nested rules use relative selectors (can start with combinators like `> .child`)
@@ -144,6 +149,10 @@ pub(crate) fn parse_rule<'arena>(
         }
 
         // Check if we're looking at a nested rule (CSS Nesting Module)
+        // A block child starts after `{` or `;`, both of which `parseCss` reaches through
+        // `allow_comment_or_whitespace` — so a non-ASCII JS-whitespace run here is a
+        // separator before the property name or selector, not the head of either.
+        parser.skip_boundary_whitespace()?;
         if is_nested_rule_start(parser)? {
             // Parse nested rule recursively (nested rules allow leading combinators)
             let nested_rule = parse_rule(parser, true)?;

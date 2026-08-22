@@ -40,5 +40,15 @@ The adjacent-colon spelling every other fixture uses is unaffected: without a
 identical, which is why this stayed invisible until an injected input produced
 it (see [audits.md §Wire-Injection](../../../../../../docs/audits.md#wire-injection-audit-wireaudit)).
 
+The same rewrite has a **second landing**. Here the type literal's own `}`
+absorbs the one-byte slip and the head still closes, so the document parses with
+a corrupted AST — what this fixture records. Give it a **function type** instead
+(`{#each xs as e: (a?: number) => void}`) and there is no absorbing token: the
+head reader runs out of head and canonical **rejects** with `expected_token`,
+while tsv, which rewrote nothing, parses it. The `?`-free `(a) => void` is
+accepted by both, which is what attributes the rejection to the `?:` rather than
+to the arrow. That landing is pinned in
+[`tests/block_pattern_annotation_span.rs`](../../../../../block_pattern_annotation_span.rs).
+
 See
 [conformance_svelte.md §TypeScript Corrections](../../../../../../docs/conformance_svelte.md#typescript-corrections).

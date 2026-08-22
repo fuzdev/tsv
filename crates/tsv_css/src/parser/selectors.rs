@@ -286,6 +286,10 @@ pub(crate) fn parse_relative_selector_list<'arena>(
 pub(crate) fn parse_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<ComplexSelector<'arena>, ParseError> {
+    // The list's own start is an `allow_comment_or_whitespace` juncture — before the first
+    // selector and after every `,` — and the skip must precede the capture, since this
+    // offset becomes the rule's, the prelude's and the selector's `start`.
+    parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start());
     let mut children = parser.bvec();
 
@@ -403,6 +407,11 @@ pub(crate) fn parse_explicit_combinator(
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
     parser.skip_whitespace()?;
 
+    // `parseCss` reaches this position through `allow_comment_or_whitespace` + the
+    // `allow_whitespace()` inside `read_combinator`, so a non-ASCII JS-whitespace run here
+    // belongs to the gap. It has to be stepped over BEFORE `combinator_start` is taken: that
+    // offset is both the descendant combinator's `end` and the next compound's start.
+    parser.skip_boundary_whitespace()?;
     let combinator_start = parser.span_pos(parser.current_start());
 
     if let Some(comb) = explicit_combinator_kind(parser.current_kind) {
@@ -571,6 +580,9 @@ fn parse_relative_selector<'arena>(
     combinator: Option<Combinator>,
     combinator_span: Option<Span>,
 ) -> Result<RelativeSelector<'arena>, ParseError> {
+    // Ahead of the capture below, which is this compound's `start` when no combinator
+    // precedes it — see `skip_boundary_whitespace`.
+    parser.skip_boundary_whitespace()?;
     // Start position is either the combinator start (if present) or the current selector start
     let start = combinator_span.map_or_else(
         || parser.base_offset() + parser.current_start(),
@@ -600,6 +612,14 @@ fn parse_relative_selector<'arena>(
             break;
         }
 
+        // ⚠️ A boundary whitespace run at the head of the next token IS whitespace to
+        // `parseCss`, so `&<NBSP>b` should end the compound here and read as a descendant.
+        // tsv keeps it in the compound instead — a tracked gap, and NOT a missing
+        // `parser.boundary_run_len() > 0` break: breaking here makes the caller expect a
+        // `{` where the selector continues, turning `&<NBSP>b` and `*<NBSP>b` into parse
+        // errors. The compound break and the combinator that must replace it have to land
+        // together. Pinned in `tests/css_boundary_whitespace.rs`.
+        //
         // Check if another simple selector follows (no whitespace, no combinator)
         if !is_simple_selector_chain(parser) {
             break;

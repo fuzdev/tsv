@@ -252,6 +252,12 @@ impl<'a> Printer<'a> {
             }
             let n = rel.selectors.len();
             for (j, simple) in rel.selectors.iter().enumerate() {
+                if j == 0 {
+                    let kept = self.preserved_boundary_ws(simple.span().start);
+                    if !kept.is_empty() {
+                        parts.push(d.text_pooled(kept));
+                    }
+                }
                 parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
             }
         }
@@ -261,6 +267,45 @@ impl<'a> Printer<'a> {
         } else {
             body
         }
+    }
+
+    /// The run of **non-ASCII whitespace** immediately before `start` — the characters the
+    /// parser skipped at a boundary and this printer would otherwise replace with its own
+    /// indentation, deleting them from the output.
+    ///
+    /// They are skipped because `parseCss` skips them (JS `\s` at every `allow_whitespace()`
+    /// juncture — see `tsv_lang::is_js_whitespace`), but that is a statement about the AST,
+    /// not a licence to drop source. prettier's CSS keeps every one of them inside the
+    /// following identifier, so deleting one is a content difference the corpus SAFETY check
+    /// reads as `content_lost` — its semantic-character count excludes only ASCII whitespace,
+    /// so a `<NBSP>` or `<LS>` is a character like any other. Same call the escaped-selector
+    /// names make: the AST mirrors Svelte, the printer emits the author's bytes.
+    ///
+    /// The scan stops at the first ASCII whitespace, which is what keeps it to the ambiguous
+    /// class: ordinary indentation is the printer's to regenerate, and a run mixing the two
+    /// contributes only its non-ASCII tail.
+    fn preserved_boundary_ws(&self, start: u32) -> &'a str {
+        let mut at = start as usize;
+        while at > 0 {
+            let prev = self.source[..at]
+                .chars()
+                .next_back()
+                .filter(|c| crate::whitespace::is_boundary_only_whitespace(*c));
+            match prev {
+                Some(c) => at -= c.len_utf8(),
+                None => break,
+            }
+        }
+        // ⚠️ A leading BOM is NOT preserved. `U+FEFF` is in JS `\s`, so a byte-order mark
+        // reaches this scan like any other member — but tsv strips BOMs by policy (a
+        // cataloged prettier divergence, `docs/conformance_prettier.md` §Whitespace: BOM
+        // Handling), and re-emitting it here would quietly undo that. The exclusion is
+        // anchored at offset 0 because that is what makes a `U+FEFF` a byte-order mark; one
+        // anywhere else is an ordinary character and is preserved with the rest.
+        if at == 0 && self.source.starts_with('\u{feff}') {
+            at = '\u{feff}'.len_utf8();
+        }
+        &self.source[at..start as usize]
     }
 
     /// Whether this complex selector carries a comment at a combinator boundary — any
@@ -372,6 +417,12 @@ impl<'a> Printer<'a> {
             let n = rel.selectors.len();
             for (j, simple) in rel.selectors.iter().enumerate() {
                 let sspan = simple.span();
+                if j == 0 {
+                    let kept = self.preserved_boundary_ws(sspan.start);
+                    if !kept.is_empty() {
+                        parts.push(d.text_pooled(kept));
+                    }
+                }
                 if j > 0 && has_comments_to_emit_in_range(self.comments, prev_end, sspan.start) {
                     // Glued compound-internal trivia: emit the source slice verbatim (no
                     // space normalization). The run is fully glued (the parser keeps a
@@ -524,6 +575,11 @@ impl<'a> Printer<'a> {
             );
         }
         let mut result = String::from("[");
+        // `[` is one of the `allow_whitespace()` junctures, so the name can be preceded by a
+        // skipped non-ASCII whitespace run the printer would otherwise drop — the same
+        // preservation the compound path applies (`preserved_boundary_ws`).
+        let leading = namespace_span.unwrap_or(name_span).start;
+        result.push_str(self.preserved_boundary_ws(leading));
         if let Some(ns) = namespace_span {
             result.push_str(ns.extract(self.source));
             result.push('|');

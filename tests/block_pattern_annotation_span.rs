@@ -111,3 +111,38 @@ fn an_adjacent_colon_leaves_the_two_conventions_agreeing() {
     let src = format!("{HEAD}{{#each xs as e: number}}\n\t{{e}}\n{{/each}}\n");
     assert_eq!(annotation_span(&src).0, only_offset(&src, "e:") + 1);
 }
+
+/// ⚠️ **RATCHET.** The `?:` rewrite has a **second landing**, and it is a rejection.
+///
+/// `read_type_annotation` sets `parser.index = expression.end`, an offset into the string it
+/// rewrote — so every `?:` in an annotation leaves that index one byte short. For an object
+/// type (`{ a?: number }`) the type literal's own `}` absorbs the slip and the head still
+/// closes, leaving a corrupted-but-accepted AST — the sibling fixture
+/// [context_annotation_optional_member](../tests/fixtures/svelte/blocks/each/context_annotation_optional_member_svelte_divergence/).
+/// A **function type** has no such absorbing token, so the head reader runs out of head and
+/// canonical fails with `expected_token` while tsv, which never rewrote anything, parses it.
+///
+/// The `?`-free spelling is the null control and it is what makes the attribution safe: it is
+/// not "function types in annotations" that canonical refuses — `(a) => void` and
+/// `() => void` are both accepted — it is precisely the one carrying a `?:`. A
+/// `_svelte_divergence` fixture cannot hold this (the canonical side produces no AST), so the
+/// claim lives here rather than as prose nothing checks.
+#[test]
+fn the_optional_marker_rewrite_also_lands_as_an_over_acceptance() {
+    let accepts = |annotation: &str| {
+        let src = format!("{HEAD}{{#each xs as e: {annotation}}}\n\t{{e}}\n{{/each}}\n");
+        let arena = bumpalo::Bump::new();
+        tsv_svelte::parse(&src, &arena).is_ok()
+    };
+    assert!(
+        accepts("(a?: number) => void"),
+        "canonical REJECTS this (`expected_token`) and tsv accepts it — if that changed, \
+         re-pin this ratchet and the catalog entry it names"
+    );
+    for control in ["(a) => void", "() => void"] {
+        assert!(
+            accepts(control),
+            "{control}: both sides accept this — the `?` is the trigger, not the arrow"
+        );
+    }
+}
