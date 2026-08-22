@@ -177,3 +177,22 @@ fn an_in_tag_comment_stays_on_locate_characters_lines() {
         [("\n", 3), ("\r\n", 3), ("\r", 2), ("\u{2028}", 2)],
     );
 }
+
+/// A bare `{const …}` / `{let …}` tag is the third reader on the raw template — Svelte's
+/// `read_declaration` hands the whole statement to `parse_statement_at` over
+/// `parser.template` itself, so the prefix counts as ECMAScript exactly as a `{expr}` island's
+/// does. Its own path through tsv is a different one (`parse_ts_statement`), which is what
+/// this covers that `a_template_expression_counts_the_prefix_under_the_ecmascript_class` does
+/// not: recording this reader as `PrefixLines::Lf` puts the lone-`\r` case a line early.
+///
+/// Not to be confused with `{@const}`, a different tag on different readers — its `id` is
+/// `read_pattern` (LF) and its `init` is `read_expression` (ECMAScript), so one declarator
+/// spans both classes.
+#[test]
+fn a_declaration_tag_counts_the_prefix_under_the_ecmascript_class() {
+    assert_each_terminator(
+        "<p>text1{T}text2</p>\n{const x = 1}\n",
+        ".declaration.VariableDeclaration",
+        [("\n", 3), ("\r\n", 3), ("\r", 3), ("\u{2028}", 3)],
+    );
+}

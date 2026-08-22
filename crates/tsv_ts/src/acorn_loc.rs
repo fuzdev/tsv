@@ -28,8 +28,8 @@ use tsv_lang::{LocationMapper, LocationTracker, Position};
 ///   only its LFs survived and acorn's line count over it is Svelte's own
 ///   (`<script>` content, `read_pattern` destructures, `read_type_annotation`).
 /// - [`Ecmascript`](Self::Ecmascript) — acorn got the raw template (every
-///   `read_expression` island, the `{@const}`/`{@let}` statement, and the snippet
-///   parameter list, whose `replace(/\S/g, ' ')` prelude keeps *all* whitespace),
+///   `read_expression` island, the bare `{const …}` / `{let …}` statement, and the
+///   snippet parameter list, whose `replace(/\S/g, ' ')` prelude keeps *all* whitespace),
 ///   so every ECMAScript terminator ahead of the region counted.
 #[derive(Clone, Copy, Debug)]
 pub enum PrefixLines {

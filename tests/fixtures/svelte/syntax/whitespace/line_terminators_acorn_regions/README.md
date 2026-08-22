@@ -15,8 +15,8 @@ point under both formatters.
 | --- | --- | --- |
 | `<script>` (`read_script`) | prefix blanked with `replace(/[^\n]/g, ' ')` + content | the `module` script's own nodes shift |
 | `{expr}`, an attribute value (`read_expression`) | the **raw** template | every one shifts, including for terminators in earlier islands |
-| `{@const}` (`parse_statement_at`) | the raw template | shifts |
-| a destructured `{#each … as { … }}` (`read_pattern`) | blanked prefix + `(pattern = 1)` | its own interior terminator shifts its nodes |
+| `{@const}`'s init (`read_expression`) | the raw template | shifts |
+| a pattern binding — `{@const}`'s id, a destructured `{#each … as { … }}` (`read_pattern`) | blanked prefix + `(pattern = 1)` | its own interior terminator shifts its nodes |
 | a trailing `: T` (`read_type_annotation`) | blanked prefix + `_ as ` + raw rest | same, and it is a *second* parse with its own seed |
 | `{#snippet}` parameters | prefix `replace(/\S/g, ' ')` — whitespace survives | behaves as the raw template does |
 

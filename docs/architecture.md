@@ -623,12 +623,17 @@ counter *once per parse*, and Svelte hands it a differently prepared string at e
 | --- | --- | --- |
 | `<script>` (`read_script`) | prefix blanked with `replace(/[^\n]/g, ' ')` + content | LF only |
 | `{expr}` / attribute values (`read_expression`) | the raw template | ECMAScript |
-| `{@const}` / `{@let}` (`parse_statement_at`) | the raw template | ECMAScript |
+| `{const …}` / `{let …}` (`read_declaration` → `parse_statement_at`) | the raw template | ECMAScript |
 | `{#snippet}` parameters | prefix `replace(/\S/g, ' ')` — whitespace survives | ECMAScript |
-| a destructured block binding (`read_pattern`) | blanked prefix + `(pattern = 1)` | LF only |
+| a pattern binding — `{@const}`'s `id`, a destructured block binding (`read_pattern`) | blanked prefix + `(pattern = 1)` | LF only |
 | a binding's trailing `: T` (`read_type_annotation`) | blanked prefix + `_ as ` + raw rest | LF only |
 
-and then, whatever the prefix, it *skips* `[lineStart, startPos)` outright — `lineStart` is
+Note that `{@const}` is **one tag spanning both classes**: Svelte reads its `id` with
+`read_pattern` and its `init` with `read_expression`, so the two halves of a single declarator
+carry different prefix counts. (The unprefixed `{const …}` / `{let …}` tags are a different
+construct on a different reader — one `parse_statement_at` over the raw template.)
+
+And then, whatever the prefix, acorn *skips* `[lineStart, startPos)` outright — `lineStart` is
 found with `lastIndexOf("\n", startPos - 1)`, so a non-LF terminator between that LF and the
 island is counted by neither half.
 
