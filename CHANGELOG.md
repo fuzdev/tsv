@@ -14,6 +14,16 @@ Each `## Unreleased` section must be non-empty and carry a
 <!-- bump: minor -->
 
 - fix: many formatting fixes and add some standing audits, clearing some to 0 like comment injection
+- fix: a WASM stack-overflow trap (~1,600 nesting levels) no longer poisons the engine —
+  one too-deep file is one error, not every file after it. New `reinstantiate()` export on
+  the WASM packages: a synchronous, no-recompile swap to a fresh instance (`free()` old
+  `IgnoreStack`s first); the `tsv` CLI calls it automatically
+  ([#886](https://github.com/fuzdev/tsv/pull/886))
+- fix: an explicit `--jobs` past `4 × logical CPUs` clamps with a warning, and a thread the
+  OS refuses narrows the pool instead of failing the run — both CLIs, native and JS
+  ([#883](https://github.com/fuzdev/tsv/pull/883), [#884](https://github.com/fuzdev/tsv/pull/884))
+- fix: formatted output is LF-only — every `<CR>`/`<CR><LF>` folds to `<LF>`,
+  verbatim-copied regions included ([#880](https://github.com/fuzdev/tsv/pull/880))
 - feat: publish native binaries, both CLI and JS lib — install `@fuzdev/tsv`
   (N-API addon plus the real native `tsv` CLI; `npx tsv` execs the binary), over
   `@fuzdev/tsv-<triple>` platform packages for Linux (x64 gnu and musl, arm64 gnu),

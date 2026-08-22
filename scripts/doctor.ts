@@ -375,7 +375,8 @@ for (const [path, task] of artifacts) {
 	else info(`${path} absent — ${task}`);
 }
 info(
-	'freshness (artifact vs source mtimes) is enforced at run time by lib/check_artifact_freshness.ts'
+	'freshness (artifact vs source mtimes) is enforced at run time by lib/check_artifact_freshness.ts' +
+		' (bench/corpus) and scripts/check_staged_freshness.ts (the staged npm/napi packages)'
 );
 info('Deno sidecar (fixtures/compare tooling): verify with `cargo run -p tsv_debug check`');
 

@@ -285,8 +285,8 @@ deno task publish                        # dry-run: validate everything, no muta
 deno task publish --wetrun --bump patch  # release: bump + publish + git finalize (--bump required, must match CHANGELOG marker)
 deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
 # Flags: --bump patch|minor|major, --no-check, --no-git
-deno task test:npm[:parse|:all]          # builds the npm package, then runs Node tests against it (:all includes CLI tests; `:run` suffix skips the rebuild)
-deno task test:napi:npm                  # stages the napi loader + host platform package, then runs Node tests against the packaged shape (`:run` skips the rebuild)
+deno task test:npm[:parse|:all]          # builds the npm package, then runs Node tests against it (:all includes CLI tests; `:run` suffix skips the rebuild — freshness-guarded, aborts on a stale staging)
+deno task test:napi:npm                  # stages the napi loader + host platform package, then runs Node tests against the packaged shape (`:run` skips the rebuild — freshness-guarded, aborts on a stale staging)
 deno task validate:artifacts             # tight wasm size bounds + Deno smoke of all built bundles (fails if nothing is built)
 ```
 

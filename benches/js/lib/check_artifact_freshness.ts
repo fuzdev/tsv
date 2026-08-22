@@ -57,11 +57,13 @@ import { current_runtime, wasm_target } from './runtime.ts';
  * `tsv_discover` edit never rebuilds the FFI (it's not in its dependency
  * graph), so the guard could never clear on a rebuild.
  *
- * Exported (with `WASM_CRATES` + `newest_source_mtime`) for
- * `scripts/run_if_stale.ts`, the build-side sibling — the two sides must agree
- * on what "the sources" are. Deliberately excludes the dev-tooling crates
- * (`tsv_debug`, `tsv_cli`): they don't feed the measured artifacts, and
+ * Exported (with `WASM_CRATES` + `newest_source_mtime`) for the two guard
+ * siblings — `scripts/run_if_stale.ts` (build-side skip) and
+ * `scripts/check_staged_freshness.ts` (staged-package abort) — so every side
+ * agrees on what "the sources" are. Deliberately excludes the dev-tooling
+ * crates (`tsv_debug`, `tsv_cli`): they don't feed the measured artifacts, and
  * including them would force wasm rebuilds on every fixture-workflow edit.
+ * (The staged guard's CLI-binary check names `tsv_cli` itself where it needs it.)
  */
 export const CORE_CRATES = ['tsv_lang', 'tsv_arena', 'tsv_html', 'tsv_ts', 'tsv_css', 'tsv_svelte'];
 
@@ -70,8 +72,8 @@ export const CORE_CRATES = ['tsv_lang', 'tsv_arena', 'tsv_html', 'tsv_ts', 'tsv_
  * itself plus `tsv_ignore` + `tsv_discover` (the `IgnoreStack` export, which
  * only the WASM artifact links among the measured bindings — `tsv_ffi` /
  * `tsv_napi` link neither). Used as the WASM check's `binding_crates` AND by
- * `scripts/run_if_stale.ts`, imported by both so the run-side guard and the
- * build-side skip can't drift on what feeds the bundle.
+ * `scripts/run_if_stale.ts` + `scripts/check_staged_freshness.ts`, imported by
+ * all three so no guard can drift on what feeds the bundle.
  */
 export const WASM_CRATES = ['tsv_wasm', 'tsv_ignore', 'tsv_discover'];
 
@@ -113,8 +115,9 @@ interface StaleArtifact {
 	source_ms?: number;
 }
 
-/** Format an mtime as a compact local `MM-DD HH:MM` stamp for messages. */
-function fmt_mtime(ms: number): string {
+/** Format an mtime as a compact local `MM-DD HH:MM` stamp for messages.
+ * Exported for `scripts/check_staged_freshness.ts`, whose messages match. */
+export function fmt_mtime(ms: number): string {
 	const d = new Date(ms);
 	const p = (n: number): string => String(n).padStart(2, '0');
 	return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
