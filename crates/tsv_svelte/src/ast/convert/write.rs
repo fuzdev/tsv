@@ -107,6 +107,10 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
         LocationTracker::new_with_map(source)
     } else {
         let (tracker, map) = LocationTracker::new_map_only(source);
+        // NOT a claim that the two classes agree — this path emits no `loc` at
+        // all, so the question is never asked and acorn's table would have no
+        // reader. A source with a lone CR reaches here reporting `false`, and
+        // that is correct for what the flag gates below, not for its name.
         (tracker, map, false)
     };
 
@@ -228,9 +232,32 @@ impl<'a> Ctx<'a> {
     /// selects each `<script>`'s schema in `write_script`), so a `{expr}` tag,
     /// an attribute or directive value, a `{@const}` and a `{#snippet}` body all
     /// carry vanilla acorn's wire quirks in a non-TS component.
+    ///
+    /// ⚠️ `pos` must be the **island's own start** — the position that resolves to
+    /// the island's own region. `acorn_seed` takes the last region starting at or
+    /// before it, so any position ahead of the island (a container start, an
+    /// enclosing tag's span) resolves to the *previous* parse and silently seeds
+    /// the island from it. Nothing fails: the wire stays well-formed and only its
+    /// lines move, and only on a document that has acorn's table at all. Prefer
+    /// [`embed_expr`](Self::embed_expr), which derives `pos` from the node and so
+    /// cannot be handed the wrong one; this by-position form is for the callers
+    /// whose island is not an `Expression` — today just `write_declaration_tag`'s
+    /// `{const …}` / `{let …}` `VariableDeclaration`.
     #[inline]
     fn embed(&self, mode: CommentMode<'a>, pos: u32) -> EmbedWriter<'a> {
         self.embed_under(mode, self.acorn_loc(), self.acorn_seed(pos))
+    }
+
+    /// The same for an expression island, keyed on the **node** rather than a
+    /// position — the form every `write_expression_embedded` call should take,
+    /// since the only correct `pos` is the one derived here. See [`embed`](Self::embed).
+    #[inline]
+    fn embed_expr(
+        &self,
+        mode: CommentMode<'a>,
+        expr: &tsv_ts::ast::internal::Expression<'_>,
+    ) -> EmbedWriter<'a> {
+        self.embed(mode, expr.span().start)
     }
 
     /// The same, for an island Svelte builds **itself** with `locate-character`
@@ -289,7 +316,7 @@ impl<'a> Ctx<'a> {
         mode: CommentMode<'a>,
         expr: &tsv_ts::ast::internal::Expression<'_>,
     ) -> EmbedWriter<'a> {
-        let mut env = self.embed(mode, expr.span().start);
+        let mut env = self.embed_expr(mode, expr);
         if let Some(ann) = tsv_ts::pattern_type_annotation(expr) {
             env.acorn_annotation =
                 self.acorn_seed(internal::AcornRegion::annotation_lex_start(ann.span.start));
@@ -542,14 +569,10 @@ fn write_generic_island(
 ) {
     if ctx.any_comment_in(container_start, range_end) {
         let wc = build_expression_writer_comments(expr, ctx.attach(), container_start, range_end);
-        write_expression_embedded(
-            w,
-            expr,
-            ctx.embed(CommentMode::Emit(&wc), expr.span().start),
-        );
+        write_expression_embedded(w, expr, ctx.embed_expr(CommentMode::Emit(&wc), expr));
         wc.debug_assert_consumed();
     } else {
-        write_expression_embedded(w, expr, ctx.embed(CommentMode::Off, expr.span().start));
+        write_expression_embedded(w, expr, ctx.embed_expr(CommentMode::Off, expr));
     }
 }
 
@@ -988,12 +1011,12 @@ fn write_snippet_parameters(
             None,
         );
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(w, p, ctx.embed(CommentMode::Emit(&wc), p.span().start));
+            write_expression_embedded(w, p, ctx.embed_expr(CommentMode::Emit(&wc), p));
         });
         wc.debug_assert_consumed();
     } else {
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(w, p, ctx.embed(CommentMode::Off, p.span().start));
+            write_expression_embedded(w, p, ctx.embed_expr(CommentMode::Off, p));
         });
     }
 }
@@ -1080,7 +1103,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
             Some(Span::new(first.span().start, last.span().end)),
         );
         write_array(w, identifiers, |w, id| {
-            write_expression_embedded(w, id, ctx.embed(CommentMode::Emit(&wc), id.span().start));
+            write_expression_embedded(w, id, ctx.embed_expr(CommentMode::Emit(&wc), id));
         });
         wc.debug_assert_consumed();
     } else {
@@ -1194,7 +1217,7 @@ fn write_const_declaration(
     );
     write_pattern_embedded(w, &tag.id, ctx.embed_pattern(mode, &tag.id));
     w.raw(",\"init\":");
-    write_expression_embedded(w, &tag.init, ctx.embed(mode, tag.init.span().start));
+    write_expression_embedded(w, &tag.init, ctx.embed_expr(mode, &tag.init));
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
@@ -1886,7 +1909,7 @@ fn write_custom_element_field(
                     write_expression_embedded(
                         w,
                         shadow_expr,
-                        ctx.embed(CommentMode::Off, shadow_expr.span().start),
+                        ctx.embed_expr(CommentMode::Off, shadow_expr),
                     );
                 }
                 _ => {}
@@ -1898,7 +1921,7 @@ fn write_custom_element_field(
                 write_expression_embedded(
                     w,
                     extend_expr,
-                    ctx.embed(CommentMode::Off, extend_expr.span().start),
+                    ctx.embed_expr(CommentMode::Off, extend_expr),
                 );
             }
             w.raw("}");

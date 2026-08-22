@@ -668,15 +668,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Svelte reads it with a second parse over `blanked_prefix + "_ as " +
     /// rest`, entered at `a = parser.index - "_ as ".len()` with `parser.index`
     /// just past the `:` — so acorn seeds five bytes behind the colon and starts
-    /// lexing real source again one past it.
+    /// lexing real source again one past it. Those five bytes are the ones the
+    /// synthetic `_ as ` overwrites, which is why `origin` may sit mid-token: the
+    /// seed only reads the source *behind* it.
+    ///
+    /// The step back cannot underflow — an annotation colon is always inside a
+    /// block or tag head, and every head that reaches here spends more than five
+    /// bytes ahead of the colon. The shortest is `{@const x:`, whose colon sits at
+    /// offset 9; `{:then v:` / `{:catch e:` are shorter heads but never stand
+    /// alone, and `{#each … as x:` is longer still.
     fn record_annotation_acorn_region(&mut self, colon: usize) {
         const AS_INSERT_LEN: usize = "_ as ".len();
         let lex_start = internal::AcornRegion::annotation_lex_start(colon as u32) as usize;
-        self.record_acorn_region_at(
-            lex_start,
-            lex_start.saturating_sub(AS_INSERT_LEN),
-            PrefixLines::Lf,
+        debug_assert!(
+            lex_start >= AS_INSERT_LEN,
+            "an annotation colon at {colon} leaves no room for Svelte's synthetic \
+             `_ as `, so this is not a block-pattern annotation at all"
         );
+        self.record_acorn_region_at(lex_start, lex_start - AS_INSERT_LEN, PrefixLines::Lf);
     }
 
     /// The explicit form, for the two regions whose parse does **not** begin at
