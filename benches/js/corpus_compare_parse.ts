@@ -52,13 +52,29 @@ import {
 } from './lib/compare_cli.ts';
 import { CORPUS_PARSE_COMPARED_MIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
+import {
+	type InjectKind,
+	subtract_baseline_diffs,
+	VARIANT_MARKER,
+	with_injected_variants
+} from './lib/wire_inject.ts';
+
+/**
+ * Injected variants per file. The cap is a blast-radius bound, not a coverage target: a
+ * head-dense document would otherwise dominate a run, and every variant costs a canonical
+ * parse. Raise it with `--inject-limit` when narrowing to a subtree.
+ */
+const DEFAULT_INJECT_LIMIT = 12;
 
 const CorpusCompareParseArgs = z.object({
 	...COMPARE_BASE_ARG_FIELDS,
 	'multibyte-only': z
 		.boolean()
 		.default(false)
-		.meta({ aliases: ['m'] })
+		.meta({ aliases: ['m'] }),
+	inject: z.boolean().default(false),
+	'inject-terminators': z.boolean().default(false),
+	'inject-limit': z.coerce.number().int().positive().default(DEFAULT_INJECT_LIMIT)
 });
 
 /** Per-file diff cap — collection stops here and the file is flagged truncated. */
@@ -735,6 +751,14 @@ Options:
   --filter <lang>    Only compare files of this language (svelte, typescript, css)
   --limit <n>        Limit to first n files per language
   --multibyte-only   Only compare files with non-ASCII source (the offset-translation slice)
+  --inject           Also compare MANUFACTURED inputs: whitespace injected inside every
+                     Svelte tag/block head (see lib/wire_inject.ts). Off by default —
+                     it multiplies canonical parses, and its findings are about spellings
+                     no corpus contains rather than about the corpus
+  --inject-terminators  The same, injecting a lone CR / U+2028 / U+2029 anywhere in the
+                     document — the spellings on which the two line classes disagree.
+                     Composes with --inject; the per-file budget is split between them
+  --inject-limit <n> Injected variants per file, across all kinds (default 12)
   --verbose          Show each file as it's processed + per-file diff detail
   --json             Emit a single JSON report to stdout; human output → stderr
   --help             Show this help message
@@ -743,6 +767,8 @@ Examples:
   deno task corpus:compare:parse --all
   deno task corpus:compare:parse --all --multibyte-only
   deno task corpus:compare:parse ../zzz --filter typescript --limit 100
+  deno task corpus:compare:parse tests/fixtures --filter svelte --inject
+  deno task corpus:compare:parse tests/fixtures --filter svelte --inject-terminators
   deno task corpus:compare:parse --all --json 2>/dev/null | jq '.stats.total'
 `);
 }
@@ -872,6 +898,17 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	if (filter_lang) console.log(`Filter: ${filter_lang} only`);
 	if (limit) console.log(`Limit: ${limit} files per language`);
 	if (multibyte_only) console.log('Mode: multibyte-only (offset-translation slice)');
+	const inject_kinds: InjectKind[] = [
+		...(args.inject ? (['ws'] as const) : []),
+		...(args['inject-terminators'] ? (['terminators'] as const) : [])
+	];
+	const injecting = inject_kinds.length > 0;
+	if (injecting) {
+		console.log(
+			`Mode: +injection into Svelte inputs [${inject_kinds.join(', ')}] ` +
+				`(<=${args['inject-limit']}/file)`
+		);
+	}
 	console.log();
 
 	const loader = create_compare_loader(use_all_repos, base_path);
@@ -886,8 +923,20 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	}
 
 	const lang_counts: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
+	// Inject-mode split of `lang_counts`: the base files parsed only to seed the
+	// subtraction, and the manufactured inputs the run is actually about.
+	let controls = 0;
+	let variants = 0;
 
-	for await (const file of loader.stream(verbose ? console.log : () => {})) {
+	const stream = injecting
+		? with_injected_variants(
+				loader.stream(verbose ? console.log : () => {}),
+				args['inject-limit'],
+				inject_kinds
+			)
+		: loader.stream(verbose ? console.log : () => {});
+
+	for await (const file of stream) {
 		const lang = file.language;
 		if (filter_lang && lang !== filter_lang) continue;
 		const multibyte = has_non_ascii(file.content);
@@ -895,9 +944,17 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		if (limit && lang_counts[lang] >= limit) continue;
 		lang_counts[lang]++;
 
+		// In inject mode a base file is a CONTROL: it is parsed so its own divergences can
+		// be subtracted from its variants, and counted in neither the results nor the
+		// stats. Letting it into the table would blend two populations behind one
+		// percentage — the reading this tool's per-source disclosures exist to prevent.
+		const is_control = injecting && !file.path.includes(VARIANT_MARKER);
+		if (is_control) controls++;
+		else variants++;
+
 		const lang_stats = stats.get(lang)!;
 		const lang_results = results.get(lang)!;
-		lang_stats.total++;
+		if (!is_control) lang_stats.total++;
 
 		if (verbose) console.log(`  ${file.path}`);
 
@@ -924,7 +981,9 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		if (tsv_error || canonical_error) {
 			const status =
 				tsv_error && canonical_error ? 'both_error' : tsv_error ? 'tsv_error' : 'canonical_error';
-			lang_stats[`${status}s` as 'both_errors' | 'tsv_errors' | 'canonical_errors']++;
+			if (!is_control) {
+				lang_stats[`${status}s` as 'both_errors' | 'tsv_errors' | 'canonical_errors']++;
+			}
 			lang_results.push({
 				path: file.path,
 				bytes: file.bytes,
@@ -937,23 +996,27 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			continue;
 		}
 
-		lang_stats.compared++;
-		if (multibyte) lang_stats.multibyte++;
+		if (!is_control) {
+			lang_stats.compared++;
+			if (multibyte) lang_stats.multibyte++;
+		}
 
 		const { diffs, truncated } = diff_asts(ours, canonical_ast, {
 			source: file.content,
 			canonical_root: canonical_ast
 		});
 		if (diffs.length === 0) {
-			lang_stats.match++;
+			if (!is_control) lang_stats.match++;
 			continue; // exact matches are counted, not stored
 		}
 
 		const all_documented = diffs.every((d) => d.documented !== null);
-		if (all_documented) {
-			lang_stats.documented++;
-		} else {
-			lang_stats.undocumented++;
+		if (!is_control) {
+			if (all_documented) {
+				lang_stats.documented++;
+			} else {
+				lang_stats.undocumented++;
+			}
 		}
 		lang_results.push({
 			path: file.path,
@@ -973,6 +1036,34 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 	}
 
+	if (injecting) {
+		// Re-grade every manufactured input against its own base: a divergence — or a parse
+		// failure — the base file already had is not the injection's doing. See
+		// `subtract_baseline_diffs`.
+		for (const lang of LANGUAGES) {
+			const kept = subtract_baseline_diffs(results.get(lang)!);
+			results.set(lang, kept);
+			const s = stats.get(lang)!;
+			const count = (status: string) => kept.filter((r) => r.status === status).length;
+			s.undocumented = count('undocumented');
+			s.documented = count('documented');
+			// A variant whose every diff its base already had is no longer a finding, so it
+			// is an exact match for this run's question. `match` has to be re-derived rather
+			// than left as the raw count, or the table reports those variants as neither
+			// matched nor diverging and the exact-% reads far below the truth.
+			s.match = s.compared - s.documented - s.undocumented;
+			// The tsv-side rejections likewise, which the raw count gets backwards on this
+			// corpus: `tests/fixtures` holds ~593 `input_invalid_*` files plus the
+			// `tsv_rejects` set, and each fails in every variant derived from it while its
+			// own base is excluded as a control — so the raw number reports inherited
+			// failures as injected ones. What survives here is an injection that turned an
+			// accepted document into a rejected one. The other two stay raw: neither is a
+			// finding, and "parse-fail skipped" is the right home for a manufactured input
+			// the oracle refused.
+			s.tsv_errors = count('tsv_error');
+		}
+	}
+
 	const total_processed = Object.values(lang_counts).reduce((a, b) => a + b, 0);
 	if (total_processed === 0) {
 		// An empty scope is a failed comparison run, not a pass — an existing-but-
@@ -983,7 +1074,10 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
-	console.log(`\nProcessed: ${total_processed} files (${counts})\n`);
+	const processed_detail = injecting
+		? `${counts} — ${variants} injected variants over ${controls} base controls`
+		: counts;
+	console.log(`\nProcessed: ${total_processed} files (${processed_detail})\n`);
 
 	// Per-language results table
 	console.log('Results (AST deep-diff vs canonical):');

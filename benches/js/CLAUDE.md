@@ -315,6 +315,17 @@ deno task corpus:compare:parse --all --multibyte-only   # offset-translation sli
 deno task corpus:compare:parse ../zzz --filter typescript --limit 100
 deno task corpus:compare:parse --all --json 2>/dev/null > report.json
 deno task corpus:compare:parse:run --all                # skip rebuild (freshness-guarded)
+
+# The WIRE-INJECTION audit: same comparison, MANUFACTURED inputs (lib/wire_inject.ts), each
+# variant graded against its own base file so a deliberate divergence fixture contributes
+# nothing. TWO families: `ws` widens whitespace inside Svelte tag/block heads; `terminators`
+# injects a lone CR / U+2028 / U+2029 anywhere — the spellings on which the two `loc` line
+# classes disagree, and the one axis no fixture and no real repo can reach.
+# ⚠️ RED BY DESIGN, a discovery tool like compile:fuzz.
+# Full reference: ../../docs/audits.md §Wire-Injection
+deno task wire:audit
+deno task wire:audit:terminators
+deno task corpus:compare:parse <path> --filter svelte --inject --inject-terminators --inject-limit 6
 ```
 
 Method: ASTs are **raw-diffed with no pre-diff normalization**; diffs are classified
@@ -1284,7 +1295,7 @@ Six live here but are documented above: the parse-conformance gates
 | `css_over_acceptance.ts` | the `parse/css` sibling of the row below — per-tool accepts over the files `svelte/compiler`'s `parseCss` rejects, computed live from the conformance corpus (no harvest cache: nothing else consumes the list). Its reason to exist is sharper than the TS one's, because CSS is the surface that CANNOT filter to valid inputs — `parseCss` accepts malformed CSS and rejects valid modern CSS it doesn't implement, so filtering would drop files tsv also fails. The reject count is PINNED (`CSS_REJECTS_PIN`), which is what makes the reference row's grammar moving visible instead of silently reshaping the published coverage. The `svelte/compiler` row must read 0 (it built the list) | `css:over-acceptance` |
 | `ts_repo_over_acceptance.ts` | per-tool OVER-ACCEPTANCE over the tsc corpus — the files tsc's own PARSER rejects (`.cache/ts_repo_rejects.json`). The axis coverage structurally cannot show: coverage counts accepts, so it can only reward permissiveness, and every conformance corpus is therefore filtered to VALID inputs. Read inverted (lower is better) and as a PROFILE, not a gate — a deferred early error is a documented tsv posture, and the per-file gate on tsv alone is `conformance:ts-repo`. The `tsc` row must read 0 (it built the list); anything else fails the run as a stale cache | `ts-repo:over-acceptance` |
 | `biome_oxfmt_diff.ts` | 4-way formatter differential (tsv vs prettier vs biome-wasm vs oxfmt) so a tsv-vs-prettier divergence can be bucketed *tsv alone* (candidate bug) vs *tsv + another agree* (candidate sanctioned divergence). Prettier is routed through the **typescript** parser, never babel | — |
-| `no_locations_parity.ts` | proves the `no-locations` wire is losslessly reconstructible (TS exact; two Svelte non-derivable cases classified, not failed). The reference reconstruction a consumer would use | — |
+| `no_locations_parity.ts` | proves the `no-locations` wire is losslessly reconstructible (TS exact; two Svelte non-derivable cases classified, not failed, and the two-line-class sources the shipped helper refuses counted and skipped). The reference reconstruction a consumer would use | — |
 | `reconstruct_vs_materialize.ts` | its **perf** sibling: is it faster to materialize `loc` in Rust or reconstruct it in JS? (Finding: reconstruct wins.) Feeds the committed report's consumer-side note | — |
 | `wasm_json_probe.ts` | splits parse cost into pure-parse vs materialization for native + WASM, isolating JS-side `JSON.parse` | — |
 | `wasm_format_probe.ts` | WASM **format** wall-time A/B at single-digit-% resolution (paired discipline: interleaved pairs, in-run A/A noise floor, byte-identity gate) | — |

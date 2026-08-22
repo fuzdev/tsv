@@ -26,6 +26,7 @@
 
 use super::super::internal;
 use super::{Schema, bigint_to_decimal};
+use crate::acorn_loc::AcornSeed;
 use tsv_lang::{LocationMapper, Position, Span};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
@@ -68,7 +69,16 @@ pub fn write_program_json(
     schema: Schema,
     locations: bool,
 ) -> Vec<u8> {
-    let ctx = Ctx::new(source, loc, schema, CommentMode::Off, locations);
+    let ctx = Ctx::new(
+        source,
+        loc,
+        schema,
+        CommentMode::Off,
+        locations,
+        // Standalone TypeScript: this parse IS acorn's, seeded at offset 0, so
+        // the tracker's answer is already the emitted one.
+        AcornSeed::NONE,
+    );
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     write_program(&mut w, program, &ctx);
     w.into_bytes()
@@ -175,16 +185,7 @@ pub fn write_pattern_embedded(
     env: EmbedWriter<'_>,
 ) {
     let mut ctx = Ctx::from_embed(env);
-    // The pattern root's own annotation is the `read_context`-synthesized one
-    // whose `loc` is omitted (a block-pattern root is always an identifier or a
-    // destructure, so no other root shape can carry one).
-    let top_annotation = match expr {
-        internal::Expression::ObjectPattern(o) => o.type_annotation.as_ref(),
-        internal::Expression::ArrayPattern(a) => a.type_annotation.as_ref(),
-        internal::Expression::Identifier(id) => id.type_annotation(),
-        _ => None,
-    };
-    if let Some(ann) = top_annotation {
+    if let Some(ann) = crate::pattern_type_annotation(expr) {
         ctx.pattern_ann_span = ann.span;
     }
     match expr {
@@ -193,7 +194,12 @@ pub fn write_pattern_embedded(
             // Only affects column output, so skip the line lookup entirely on the
             // no-locations path (where it would only hit the stub `[0]` table).
             if env.emit_loc {
-                let line = env.loc.pos_and_position(expr.span().start).1.line;
+                // The bump's line is the EMITTED one — `pattern_line` is compared
+                // against a re-seeded line in `emitted_position`.
+                let line = env
+                    .acorn
+                    .position(env.loc.pos_and_position(expr.span().start).1)
+                    .line;
                 if line > 1 {
                     ctx.pattern_line = line;
                 }
@@ -248,18 +254,23 @@ fn write_program(w: &mut JsonWriter, program: &internal::Program<'_>, ctx: &Ctx<
 pub fn write_program_embedded(
     w: &mut JsonWriter,
     program: &internal::Program<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    schema: Schema,
-    program_loc: ProgramLoc,
-    comments: CommentMode<'_>,
+    env: ProgramWriter<'_>,
 ) {
+    let ProgramWriter {
+        source,
+        loc,
+        schema,
+        program_loc,
+        comments,
+        acorn,
+    } = env;
     let ctx = Ctx::new(
         source,
         loc,
         schema,
         comments,
         matches!(program_loc, ProgramLoc::Emit(..)),
+        acorn,
     );
     record_open("Program", program.span, &ctx);
     w.raw("{\"type\":\"Program\",\"start\":");
@@ -322,13 +333,12 @@ pub enum ProgramLoc {
 /// mapper, comment role, `loc`-emission flag, and parser variant each one
 /// funnels into a `Ctx`.
 ///
-/// Bundled into one `Copy` value (all fields are `Copy` — two references, an
-/// enum, two bools) so the call sites stop re-threading the same arguments.
-/// It is an entry-boundary convenience only: each writer destructures it into a
-/// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx` exactly
-/// as before — the fused char-space emission never sees it, so this is output-
-/// and hot-path-neutral. (`write_program_embedded` stays out of this set: it
-/// carries `Schema` + `ProgramLoc`, and its `loc` flag lives in `ProgramLoc`.)
+/// Bundled into one `Copy` value (every field is `Copy` — two references, an
+/// enum, two bools, two seeds) so the call sites stop re-threading the same
+/// arguments. It is an entry-boundary value: each writer destructures it into a
+/// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx`, so it
+/// is copied once per island rather than once per node. `ProgramWriter` is its
+/// sibling for a `<script>`'s `Program`, and says there why that one is separate.
 #[derive(Clone, Copy)]
 pub struct EmbedWriter<'a> {
     pub source: &'a str,
@@ -339,6 +349,33 @@ pub struct EmbedWriter<'a> {
     /// component-global, so an island carries the same variant as the
     /// component's `<script>` blocks.
     pub vanilla_acorn: bool,
+    /// The acorn parse this island's `loc` came from — see `Ctx::acorn`.
+    pub acorn: AcornSeed,
+    /// The block pattern's trailing `: T` — see `Ctx::acorn_annotation`. Only
+    /// `write_pattern_embedded` can reach it, so every other entry leaves it
+    /// `AcornSeed::NONE`.
+    pub acorn_annotation: AcornSeed,
+}
+
+/// The per-document inputs `write_program_embedded` takes — `EmbedWriter`'s
+/// sibling for a `<script>`'s `Program`.
+///
+/// It is a separate bundle rather than a seventh `EmbedWriter` field for two
+/// reasons the `Program` writer alone has: it carries the `Schema` (from which
+/// the parser variant is *derived*, not passed), and its `loc`-emission flag
+/// lives inside `ProgramLoc` rather than beside it, so the "no `loc` but a
+/// meaningful override" state stays unrepresentable. `acorn_annotation` has no
+/// meaning here either — only a block pattern can carry a second parse.
+#[derive(Clone, Copy)]
+pub struct ProgramWriter<'a> {
+    pub source: &'a str,
+    pub loc: LocationMapper<'a>,
+    pub schema: Schema,
+    pub program_loc: ProgramLoc,
+    pub comments: CommentMode<'a>,
+    /// The `<script>`'s own acorn parse — see `Ctx::acorn`. The `Program`'s own
+    /// `loc` is Svelte's (it arrives in `program_loc`); this seeds its **body**.
+    pub acorn: AcornSeed,
 }
 
 /// The per-document environment every writer function shares (`source` and the
@@ -389,6 +426,23 @@ pub(super) struct Ctx<'a> {
     /// or directive value, `{@const}`, a `{#snippet}` body — carries the same
     /// variant, and reaches this field through `EmbedWriter`.
     pub(super) vanilla_acorn: bool,
+    /// The acorn parse whose line/column seed this island's `loc` is emitted
+    /// against ([`AcornSeed`]).
+    ///
+    /// The `loc` on an embedded node is acorn's, and acorn seeded its line
+    /// counter once at the start of the parse Svelte prepared for *this* island
+    /// — so the ECMAScript tracker's answer has to be re-based onto it. Inert
+    /// (`AcornSeed::NONE`) for standalone TypeScript, which IS that parse, and for
+    /// essentially every Svelte document — though not, as it reads, for exactly the
+    /// ones whose two line classes agree: see `tsv_svelte`'s `AcornLines` for the
+    /// annotation parse that needs a seed on a plain-LF source.
+    pub(super) acorn: AcornSeed,
+    /// The block pattern's trailing `: T`: Svelte reads it with a **second**
+    /// acorn parse (`read_type_annotation`'s `_ as ` trick), so it carries its
+    /// own seed, used at every offset past `pattern_ann_span.start` — the same
+    /// boundary that stops the `+1` column bump, and for the same reason.
+    /// Inert with the bump: `pattern_ann_span.start == u32::MAX`.
+    pub(super) acorn_annotation: AcornSeed,
     /// Whether to emit the per-node `loc` object (line/column). `true` for the
     /// default acorn/svelte drop-in wire; `false` for the opt-in `no-locations`
     /// variant (`start`/`end` offsets only — `loc` is derivable from them plus
@@ -413,6 +467,7 @@ impl<'a> Ctx<'a> {
         schema: Schema,
         comments: CommentMode<'a>,
         emit_loc: bool,
+        acorn: AcornSeed,
     ) -> Self {
         Ctx {
             source,
@@ -421,6 +476,8 @@ impl<'a> Ctx<'a> {
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments,
             vanilla_acorn: schema.is_svelte_script(),
+            acorn,
+            acorn_annotation: AcornSeed::NONE,
             emit_loc,
         }
     }
@@ -439,6 +496,8 @@ impl<'a> Ctx<'a> {
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments: env.comments,
             vanilla_acorn: env.vanilla_acorn,
+            acorn: env.acorn,
+            acorn_annotation: env.acorn_annotation,
             emit_loc: env.emit_loc,
         }
     }
@@ -459,24 +518,30 @@ pub(super) fn close_node(w: &mut JsonWriter, node_type: &'static str, span: Span
     w.raw("}");
 }
 
-/// Apply the block-pattern `+1`-column adjustment: a node's `loc` column is
-/// bumped by one on `ctx.pattern_line` only (inert when `pattern_line == 0`,
-/// which never equals a real 1-based line).
+/// The emitted position for one endpoint: the tracker's answer re-seeded onto
+/// the acorn parse that produced this node, then the block-pattern `+1`-column
+/// bump.
 ///
-/// The bump reproduces the synthetic `(`-wrapper Svelte's `read_pattern` parses
-/// the pattern under — so it applies only to nodes that came from THAT parse. A
-/// trailing `: T` is read by a *second*, separately-padded parse with no inserted
-/// `(` (`read_type_annotation`), so its type nodes keep their true columns:
-/// `offset` past the annotation's start is left alone. The bound is inclusive —
-/// the pattern's own `loc.end` sits exactly on the annotation's start — and inert
-/// without one (`pattern_ann_span.start == u32::MAX`).
+/// **One boundary answers both questions.** A block pattern's trailing `: T` is a
+/// *second* acorn parse (`read_type_annotation`'s `_ as ` trick), so it carries
+/// its own line seed — and, inserting no `(`, none of the pattern's column shift.
+/// The bound is inclusive on the pattern's side: its own `loc.end` sits exactly on
+/// the annotation's start. Both halves are inert without one
+/// (`pattern_ann_span.start == u32::MAX`, `pattern_line == 0` — which never equals
+/// a real 1-based line — and `AcornSeed::NONE` is the identity).
 #[inline]
-pub(super) fn adjusted_column(ctx: &Ctx<'_>, offset: u32, line: usize, column: usize) -> usize {
-    if line == ctx.pattern_line && offset <= ctx.pattern_ann_span.start {
-        column + 1
+pub(super) fn emitted_position(ctx: &Ctx<'_>, offset: u32, pos: Position) -> Position {
+    let in_pattern = offset <= ctx.pattern_ann_span.start;
+    let seed = if in_pattern {
+        ctx.acorn
     } else {
-        column
+        ctx.acorn_annotation
+    };
+    let mut pos = seed.position(pos);
+    if in_pattern && pos.line == ctx.pattern_line {
+        pos.column += 1;
     }
+    pos
 }
 
 /// Emit a node with no fields beyond the universal prefix (`ThisExpression`,
@@ -552,6 +617,8 @@ pub(super) fn node_header_wide_end(
         return;
     }
     let ((start_pos, start), (_, end)) = ctx.loc.span_positions(span.start, span.end);
+    let start = emitted_position(ctx, span.start, start);
+    let end = emitted_position(ctx, span.end, end);
     w.raw(",\"start\":");
     w.u32(start_pos);
     w.raw(",\"end\":");
@@ -559,11 +626,11 @@ pub(super) fn node_header_wide_end(
     w.raw(",\"loc\":{\"start\":{\"line\":");
     w.usize(start.line);
     w.raw(",\"column\":");
-    w.usize(adjusted_column(ctx, span.start, start.line, start.column));
+    w.usize(start.column);
     w.raw("},\"end\":{\"line\":");
     w.usize(end.line);
     w.raw(",\"column\":");
-    w.usize(adjusted_column(ctx, span.end, end.line, end.column));
+    w.usize(end.column);
     w.raw("}}");
 }
 
@@ -615,6 +682,8 @@ fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &
         return;
     }
     let ((start_pos, start), (end_pos, end)) = ctx.loc.span_positions(span.start, span.end);
+    let start = emitted_position(ctx, span.start, start);
+    let end = emitted_position(ctx, span.end, end);
     w.stage_raw(",\"start\":");
     w.stage_u32(start_pos);
     w.stage_raw(",\"end\":");
@@ -622,7 +691,7 @@ fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &
     w.stage_raw(",\"loc\":{\"start\":{\"line\":");
     w.stage_usize(start.line);
     w.stage_raw(",\"column\":");
-    w.stage_usize(adjusted_column(ctx, span.start, start.line, start.column));
+    w.stage_usize(start.column);
     if CHARACTER {
         w.stage_raw(",\"character\":");
         w.stage_u32(start_pos);
@@ -630,7 +699,7 @@ fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &
     w.stage_raw("},\"end\":{\"line\":");
     w.stage_usize(end.line);
     w.stage_raw(",\"column\":");
-    w.stage_usize(adjusted_column(ctx, span.end, end.line, end.column));
+    w.stage_usize(end.column);
     if CHARACTER {
         w.stage_raw(",\"character\":");
         w.stage_u32(end_pos);

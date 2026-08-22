@@ -15,6 +15,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Swallow](#line-comment-swallow-audit-swallowaudit) | `swallow:audit` | `//` line comment followed by content on one output line (silent content loss) | `deno task check`; `audit:corpus` (real code) |
 | [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check` |
 | [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops — and `//` swallows — in gaps no fixture covers | `deno task check` (ratchet) |
+| [Wire injection](#wire-injection-audit-wireaudit) | `wire:audit` | a WIRE divergence from the canonical parser that only a spelling no corpus contains reveals — the parse-side sibling of gap injection | on demand (⚠️ red by design) |
 | [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run — plus the blank-DROP absorb pin (a new kind of silently-eaten blank) | `deno task check` (ratchet) |
 | [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet) |
 | [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet) |
@@ -166,6 +167,105 @@ cargo run --profile corpus -p tsv_debug --features audits gap_audit ../zzz/src
 ```
 
 `deno task gaps:audit:update` regenerates the snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); it refuses a narrowed run.
+
+## Wire-Injection Audit (`wire:audit`)
+
+```bash
+deno task wire:audit                # whitespace in heads — tests/fixtures, Svelte only
+deno task wire:audit:terminators    # lone CR / U+2028 / U+2029 anywhere — same corpus
+deno task corpus:compare:parse <path> --filter svelte --inject [--inject-terminators] [--inject-limit N]
+```
+
+**What it proves.** That tsv's parse **wire** still matches the canonical parser after
+whitespace is injected into a Svelte tag or block head — `{#…}`, `{:…}`, `{@…}`. Each
+manufactured input is graded against the real external oracle (`svelte.parse`), through
+the same deep-diff and documented-divergence classifier `corpus:compare:parse` uses.
+
+**Why it exists — the shape of the hole it fills.** Every other injection or fuzz audit
+in this repo grades a *formatter-side, self-referential* property: gap and blank
+injection check formatting, the fuzzer checks no-panic + idempotency + structural
+reparse, round-trip checks that output reparses. The wire-vs-canonical comparison is the
+opposite — a genuine external oracle — but it only ever ran over inputs someone had
+already **written**: committed fixtures and real repos. Nothing manufactured an input
+and graded the resulting *wire*.
+
+A hand-rolled scan can therefore be confidently wrong about a spelling no document
+contains. Both block-annotation bugs lived exactly there: the line seed a `: T`'s own
+acorn parse needs, and the offset that annotation is anchored at, were each wrong for
+any spelling that put whitespace between a binding and its colon — invisible to 9441
+fixtures and every real repo, because everyone writes `x: T`. The comparison catches
+both the instant such an input exists; this audit makes them exist.
+
+**What it perturbs — two families, because there are two kinds of claim to break.**
+
+- **`ws`** — whitespace inside a head, at two kinds of position: the start of each
+  existing whitespace run (does this construct measure from the token or from the gap?)
+  and each `:` / `,` / `=` with nothing before it (does it assume the two are adjacent?).
+  Heads are where tsv hand-rolls its scanning — head splitting, binding/annotation
+  separation, delimiter finding — rather than delegating to acorn.
+- **`terminators`** — a lone `\r`, `<LS>` or `<PS>` at every whitespace-run start in the
+  document, head or not. These are exactly the spellings on which the two `loc` line
+  classes DISAGREE, and which class a node was counted under is decided *per acorn parse*
+  by what Svelte did to the prefix it handed acorn (three preparations across five
+  readers — [architecture.md §`loc` lines](./architecture.md#loc-lines-two-classes-one-per-acorn-parse)).
+  That model is mirror-knowledge held by hand at seven call sites in `tsv_svelte`'s
+  parser, and **nothing else grades it**: no fixture can carry a raw `<CR>` (every
+  parse-then-format entry point folds it, so such a document is not the fixed point F1
+  requires), and no real repo contains one. `\n` and `\r\n` are deliberately not injected
+  — both classes count them identically, so a variant carrying one tests nothing.
+  Document-wide rather than head-scoped because the axis is: a terminator matters in the
+  prefix acorn measured, in the run acorn *skipped*, and inside the island itself, and
+  only the first of those is ever in a head.
+
+Sites are sampled by even stride rather than taken as a prefix, so the per-file cap
+spreads across the document instead of piling into its first few lines.
+
+**Each variant is graded against its own base file.** A divergence the base already had
+is not the injection's doing, and `tests/fixtures` deliberately contains ~91
+`_svelte_divergence` fixtures whose whole purpose is to differ from canonical. The base
+files are controls and are dropped; only the delta is reported. Subtraction is by diff
+*signature*, since an injection shifts every offset after it.
+
+**Blind spots.**
+
+- **Svelte inputs only.** Standalone TS/CSS files are never perturbed (their `loc` has one
+  line class and no per-parse seed), and the `ws` family additionally reaches only heads.
+- **A base that already diverges at a signature masks a new divergence at that same
+  signature** in its variants. A clean base is the better seed.
+- **A variant the ORACLE rejects is not a finding.** It buckets as `canonical_error` and is
+  skipped, so an over-acceptance introduced by an injection is not graded here. The mirror
+  case IS graded: a variant **tsv** rejects where its base parsed is kept as a finding, with
+  its `#inj:` label, since an injection-introduced over-rejection carries no diffs to be
+  found by (196 of them on `tests/fixtures` under `terminators` today, against 577 before
+  the inherited ones — every `input_invalid_*` fixture's — were subtracted out).
+- **The head scan is approximate** — it counts braces without tracking strings or
+  comments, so a head containing `'}'` ends early. That costs sites; it cannot
+  manufacture a wrong finding.
+
+⚠️ **Currently RED by design**, like `compile:fuzz` — a discovery tool with an open work
+list, not a regression gate, which is why it is not in `deno task check` (it also needs
+the canonical parser, so it is conformance-tier at best). Standing findings:
+
+- **`ws`** — a `//` comment's extent is **clipped at a trimmed slice boundary** in the
+  bounded-slice tag readers. `{@html expr // c ⏎}` ends the comment before the trailing
+  space where acorn ends it after; `{expr // c ⏎}` and `<script>` both agree, so the
+  divergence is the bounded readers' whitespace-trimmed slice, not the comment lexer.
+- **`terminators`**, by file count over `tests/fixtures` — three groups, none of them a
+  line-*class* question despite the family that surfaced them:
+  - an attribute's `end` and its `value` **shape** when a JS-`\s` code point sits right
+    after its `{…}` (`<div onclick={…}<LS>>`): tsv absorbs the character into the attribute
+    and turns `value` into an array, where canonical ends the attribute before it (84 / 76
+    files);
+  - a `{@debug}` identifier's `loc` line and column under a **lone `<CR>`** (54 / 51 files);
+  - the selector-span residue this audit's own CSS finding left behind — a descendant
+    combinator's `end` and the compound break, enumerated and pinned in
+    [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs) (52 / 38 files).
+
+  The boundary-whitespace **class** finding this list used to lead with is closed: the CSS
+  parser now steps the whole `allow_whitespace()` run (`CssParser::skip_boundary_whitespace`,
+  called at every `allow_comment_or_whitespace` juncture — the stylesheet body, a style
+  rule's block and an at-rule's, plus the selector-internal ones), and the printer puts the
+  non-ASCII members back. See [conformance_svelte.md §Boundary whitespace](./conformance_svelte.md).
 
 ## Blank-Line Injection Audit (`blanks:audit`)
 

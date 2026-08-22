@@ -4,6 +4,7 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
 use crate::whitespace::{skip_svelte_ws, svelte_ws_width_at};
+use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
@@ -182,6 +183,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // the style node via `write_css_comments`, matching where parseCss puts them —
         // so they are never merged into `Root.comments`.
 
+        // Recorded in read order, which is source order — the wire writer
+        // binary-searches this by position (`SvelteParser::record_acorn_region_at`
+        // asserts the order at each push). Already in the arena, so handing it over
+        // is a move; the empty replacement it leaves behind allocates nothing.
+        let acorn_regions = std::mem::replace(&mut self.acorn_regions, BumpVec::new_in(self.arena))
+            .into_bump_slice();
+
         Ok(Root {
             fragment,
             instance,
@@ -189,6 +197,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             css,
             options,
             comments,
+            acorn_regions,
         })
     }
 

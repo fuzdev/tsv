@@ -47,6 +47,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Parse content with TypeScript parser (base offset); the embedded
         // program shares this document's arena.
+        //
+        // Svelte's `read_script` hands acorn the whole prefix blanked with
+        // `replace(/[^\n]/g, ' ')` and then the content verbatim, so acorn LEXES
+        // its way here from offset 0 — counting the prefix's LFs and none of its
+        // other terminators, and counting every terminator in the content
+        // itself, this leading whitespace included.
+        self.record_acorn_region_at(
+            content_start,
+            content_start,
+            content_start + content.len(),
+            PrefixLines::Lf,
+        );
         let program = tsv_ts::parse_embedded(content, content_start, self.arena)?;
 
         // Reposition the lexer to the closing `</script>` tag (resumes at `<`) and

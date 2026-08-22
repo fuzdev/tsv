@@ -61,8 +61,7 @@ impl ByteToCharMap {
         if source.is_ascii() {
             return Self::identity();
         }
-        let mut no_lines = Vec::new();
-        build_map(source, &mut no_lines, LineRule::None)
+        build_map(source, &mut LineScan::map_only(), LineRule::None)
     }
 
     /// The identity map: every byte offset translates to itself.
@@ -114,6 +113,58 @@ enum LineRule {
     None,
     Lf,
     Ecmascript,
+}
+
+/// What a line-rule scan produces: the line starts, and — under [`LineRule::Lf`]
+/// only — whether an ECMAScript-rule scan of the same source would have drawn
+/// different lines (a lone CR, U+2028, or U+2029; CRLF is one ECMAScript break
+/// holding one LF, so it never counts).
+///
+/// The two travel as **one** out-param because the flag is a fact the starts
+/// scan discovers, not an independent output: it costs no extra pass precisely
+/// because `next_ecmascript_terminator` already loads the `\r` positions the LF
+/// rule discards, and a caller holding the starts without it has silently
+/// dropped half of what the scan found. The `None` and `Ecmascript` rules leave
+/// it `false`.
+///
+/// The constructors carry the leading-`0` precondition the builders rely on, so
+/// it is a type state rather than a doc comment — which is why there is no
+/// `Default`: the derived one would seed no line 1 while collecting starts, the
+/// single state the builders cannot produce a correct table from.
+struct LineScan {
+    starts: Vec<u32>,
+    ecmascript_differs: bool,
+}
+
+impl LineScan {
+    /// A scan that collects line starts, seeded with line 1's — byte 0.
+    fn lines() -> Self {
+        Self {
+            starts: vec![0],
+            ecmascript_differs: false,
+        }
+    }
+
+    /// A scan that collects no line data at all ([`LineRule::None`]).
+    fn map_only() -> Self {
+        Self {
+            starts: Vec::new(),
+            ecmascript_differs: false,
+        }
+    }
+
+    /// An unseeded scan, for the unit tests that grade a single ASCII *run*
+    /// against a reference scan of that same run — where a line-1 start the
+    /// reference never emits would be the only difference.
+    ///
+    /// Deliberately spelled as `map_only`'s alias rather than as its own literal:
+    /// the two are the same VALUE and differ only in what the caller is claiming,
+    /// and writing the fields twice would let one drift while both names still
+    /// compiled.
+    #[cfg(test)]
+    fn bare() -> Self {
+        Self::map_only()
+    }
 }
 
 /// One delta-table element width. `u8` is what a sparse-multibyte source needs;
@@ -188,13 +239,13 @@ fn next_non_ascii(bytes: &[u8], from: usize) -> usize {
 /// byte-level one the all-ASCII fast path uses, shared verbatim rather than
 /// re-derived). Only the multibyte characters themselves are handled per byte.
 ///
-/// Returns `Err(Outgrown)` — leaving `deltas` and `line_starts` correct and
-/// complete up to that point, for the wide continuation to pick up — if the
-/// next character's deltas would not fit `T`.
+/// Returns `Err(Outgrown)` — leaving `deltas` and `lines` correct and complete
+/// up to that point, for the wide continuation to pick up — if the next
+/// character's deltas would not fit `T`.
 fn build_deltas<T: DeltaElem>(
     source: &str,
     deltas: &mut Vec<T>,
-    line_starts: &mut Vec<u32>,
+    lines: &mut LineScan,
     from: usize,
     mut delta: u32,
     line_rule: LineRule,
@@ -206,9 +257,9 @@ fn build_deltas<T: DeltaElem>(
         let run_end = next_non_ascii(bytes, i);
         if run_end > i {
             match line_rule {
-                LineRule::Lf => ascii_lf_line_starts_into(&bytes[i..run_end], i, line_starts),
+                LineRule::Lf => ascii_lf_line_starts_into(&bytes[i..run_end], i, lines),
                 LineRule::Ecmascript => {
-                    ascii_ecmascript_line_starts_into(&bytes[i..run_end], i, line_starts);
+                    ascii_ecmascript_line_starts_into(&bytes[i..run_end], i, lines);
                 }
                 LineRule::None => {}
             }
@@ -243,13 +294,14 @@ fn build_deltas<T: DeltaElem>(
                 deltas.push(T::from_delta(delta + 2));
                 delta += 2;
                 // U+2028 / U+2029 are line terminators under the ECMAScript
-                // rule only, and are the sole multibyte ones (E2 80 A8/A9).
-                if line_rule == LineRule::Ecmascript
-                    && lead == 0xE2
-                    && bytes[i + 1] == 0x80
-                    && matches!(bytes[i + 2], 0xA8 | 0xA9)
-                {
-                    line_starts.push((i + 3) as u32);
+                // rule only, and are the sole multibyte ones (E2 80 A8/A9) —
+                // so under the LF rule they are exactly what the probe reports.
+                if lead == 0xE2 && bytes[i + 1] == 0x80 && matches!(bytes[i + 2], 0xA8 | 0xA9) {
+                    match line_rule {
+                        LineRule::Ecmascript => lines.starts.push((i + 3) as u32),
+                        LineRule::Lf => lines.ecmascript_differs = true,
+                        LineRule::None => {}
+                    }
                 }
                 i += 3;
             }
@@ -285,12 +337,12 @@ fn utf8_len(lead: u8) -> usize {
 
 /// Build the delta table for a source known to contain a multibyte character,
 /// narrowing to `u8` when the source's deltas fit — which is every source whose
-/// multibyte characters are sparse. `line_starts` must already hold its leading
-/// `0` unless `line_rule` is `None`.
-fn build_map(source: &str, line_starts: &mut Vec<u32>, line_rule: LineRule) -> ByteToCharMap {
+/// multibyte characters are sparse. `lines` must match `line_rule`:
+/// [`LineScan::lines`] for the two collecting rules, [`LineScan::map_only`] for
+/// [`LineRule::None`].
+fn build_map(source: &str, lines: &mut LineScan, line_rule: LineRule) -> ByteToCharMap {
     let mut narrow: Vec<u8> = Vec::with_capacity(source.len() + 1);
-    let Err(outgrown) = build_deltas::<u8>(source, &mut narrow, line_starts, 0, 0, line_rule)
-    else {
+    let Err(outgrown) = build_deltas::<u8>(source, &mut narrow, lines, 0, 0, line_rule) else {
         return ByteToCharMap {
             deltas: u8::into_deltas(narrow),
         };
@@ -308,7 +360,7 @@ fn build_map(source: &str, line_starts: &mut Vec<u32>, line_rule: LineRule) -> B
     let _ = build_deltas::<u32>(
         source,
         &mut wide,
-        line_starts,
+        lines,
         outgrown.at,
         outgrown.delta,
         line_rule,
@@ -504,8 +556,11 @@ impl LocationTracker {
     /// U+2028, U+2029) — acorn's rule, applied everywhere including inside
     /// string literals. Used for standalone TypeScript locations.
     ///
-    /// Production callers use the fused `new_ecmascript_with_map`; this
-    /// survives as its differential test oracle.
+    /// The unfused builder, for the one caller that wants acorn's line table
+    /// and *not* a second byte→char map: a Svelte document whose two line
+    /// classes disagree already holds the map (a line rule never affects it),
+    /// so `new_ecmascript_with_map`'s second return would be discarded. It is
+    /// also `new_ecmascript_with_map`'s differential test oracle.
     pub fn new_ecmascript(source: &str) -> Self {
         if source.is_ascii() {
             return Self::with_line_starts(ascii_ecmascript_line_starts(source.as_bytes()));
@@ -546,9 +601,9 @@ impl LocationTracker {
             );
         }
 
-        let mut line_starts = vec![0];
-        let map = build_map(source, &mut line_starts, LineRule::Ecmascript);
-        (Self::with_line_starts(line_starts), map)
+        let mut lines = LineScan::lines();
+        let map = build_map(source, &mut lines, LineRule::Ecmascript);
+        (Self::with_line_starts(lines.starts), map)
     }
 
     /// Build the LF-only tracker (Svelte's `locate-character` convention — only
@@ -556,17 +611,33 @@ impl LocationTracker {
     /// one source scan. The Svelte sibling of `new_ecmascript_with_map`, for the
     /// wire-JSON writer's fused char-space emission over the Svelte spine.
     /// Byte-identical to `new(source)` + `ByteToCharMap::new(source)`.
-    pub fn new_with_map(source: &str) -> (Self, ByteToCharMap) {
-        if source.is_ascii() {
-            return (
-                Self::with_line_starts(ascii_lf_line_starts(source.as_bytes())),
-                ByteToCharMap::identity(),
-            );
-        }
-
-        let mut line_starts = vec![0];
-        let map = build_map(source, &mut line_starts, LineRule::Lf);
-        (Self::with_line_starts(line_starts), map)
+    ///
+    /// The third return is `ecmascript_lines_differ`: whether the source holds a
+    /// terminator the **ECMAScript** class counts and this one does not — a lone
+    /// CR, U+2028, or U+2029. `false` means [`new_ecmascript`](Self::new_ecmascript)
+    /// over the same source would build a byte-identical table (CRLF is one
+    /// ECMAScript break holding one LF, so it never counts), which is what lets
+    /// the Svelte writer skip acorn's second table on essentially every real
+    /// document. Detected in this same scan, so it costs no extra pass.
+    ///
+    /// ⚠️ It answers about the TABLES, not about whether every `tsv_ts::AcornSeed`
+    /// is inert: a seed can be non-identity on a source this reports `false` for
+    /// (an acorn parse entered behind where it starts lexing counts lines the
+    /// author wrote and acorn never saw). A caller gating the whole re-seeding
+    /// route on this alone has drawn the boundary too tight.
+    pub fn new_with_map(source: &str) -> (Self, ByteToCharMap, bool) {
+        let mut lines = LineScan::lines();
+        let map = if source.is_ascii() {
+            ascii_lf_line_starts_into(source.as_bytes(), 0, &mut lines);
+            ByteToCharMap::identity()
+        } else {
+            build_map(source, &mut lines, LineRule::Lf)
+        };
+        (
+            Self::with_line_starts(lines.starts),
+            map,
+            lines.ecmascript_differs,
+        )
     }
 
     /// A line-data-free tracker: only the byte→char `map` half of a
@@ -743,51 +814,28 @@ impl LocationTracker {
     }
 }
 
-/// LF-only line starts for ASCII-only source (Svelte's `locate-character`
-/// convention: only `\n` starts a line — no CR/CRLF fusing).
-fn ascii_lf_line_starts(bytes: &[u8]) -> Vec<u32> {
-    let mut line_starts = vec![0];
-    ascii_lf_line_starts_into(bytes, 0, &mut line_starts);
-    line_starts
-}
-
 /// ECMAScript-rule line starts for ASCII-only source: no U+2028/U+2029
 /// possible, so line terminators are single bytes with CRLF fusing.
 fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<u32> {
-    let mut line_starts = vec![0];
-    ascii_ecmascript_line_starts_into(bytes, 0, &mut line_starts);
-    line_starts
+    let mut lines = LineScan::lines();
+    ascii_ecmascript_line_starts_into(bytes, 0, &mut lines);
+    lines.starts
 }
 
-/// Index of the first `\n` at or after `from`, or `bytes.len()`.
+/// Index of the first `\n` **or** `\r` at or after `from`, or `bytes.len()`.
 ///
 /// The line-scan sibling of [`next_non_ascii`], and the same word-at-a-time
 /// shape for the same reason: line terminators are sparse (~1 per 30–40 source
 /// bytes), so a per-byte compare spends nearly all of its work confirming
 /// misses. `from_le_bytes` puts byte 0 in the low lane, so the lowest set bit is
 /// the earliest match.
-#[inline]
-fn next_lf(bytes: &[u8], from: usize) -> usize {
-    let mut i = from;
-    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
-        let hits = zero_lanes(u64::from_le_bytes(*chunk) ^ splat(b'\n'));
-        if hits != 0 {
-            return i + (hits.trailing_zeros() / 8) as usize;
-        }
-        i += 8;
-    }
-    while i < bytes.len() && bytes[i] != b'\n' {
-        i += 1;
-    }
-    i
-}
-
-/// Index of the first `\n` **or** `\r` at or after `from`, or `bytes.len()`.
 ///
 /// Both needles are tested against the same loaded word, so the source is read
 /// **once** — two independent single-needle passes would double the memory
 /// traffic to save one `xor`/`sub`/`andn` triple per word, the wrong trade on a
-/// multi-megabyte source.
+/// multi-megabyte source. That is also why the LF-only scan shares it rather
+/// than searching `\n` alone: it wants the `\r` positions anyway, to report
+/// whether the ECMAScript rule would draw different lines.
 #[inline]
 fn next_ecmascript_terminator(bytes: &[u8], from: usize) -> usize {
     let mut i = from;
@@ -807,23 +855,41 @@ fn next_ecmascript_terminator(bytes: &[u8], from: usize) -> usize {
     i
 }
 
-/// Append the LF-only line starts of an ASCII run to `line_starts`, offset by
-/// the run's `base` position in the source.
+/// Append the LF-only line starts of an ASCII run to `lines`, offset by the
+/// run's `base` position in the source, and set its `ecmascript_differs` if the
+/// run holds a terminator only the ECMAScript class counts (here, a lone CR).
 ///
 /// The multibyte builder splits the source into ASCII runs at its multibyte
 /// characters, so each run's line scan is exactly the all-ASCII one — shared
 /// with the fast path rather than re-derived. A run boundary can never split a
-/// line terminator: every terminator this rule recognizes is one ASCII byte.
-fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<u32>) {
-    let mut i = next_lf(bytes, 0);
+/// terminator this scan reads — the LFs it collects are one ASCII byte, and the
+/// CRLF pair it probes for cannot straddle one either, since a run only ends at
+/// a non-ASCII byte and `\n` is not one. So a `\r` at the end of a run is a lone
+/// CR, exactly as this reads it.
+///
+/// The scan looks for `\r` alongside `\n` — both needles ride one loaded word
+/// (see [`next_ecmascript_terminator`]), so the probe costs no extra pass and no
+/// extra memory traffic. It is what lets `tsv_svelte` skip building acorn's
+/// second line table on every document that does not need one; see
+/// `tsv_ts::AcornSeed`.
+fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
+    let mut i = next_ecmascript_terminator(bytes, 0);
     while i < bytes.len() {
-        line_starts.push((base + i + 1) as u32);
-        i = next_lf(bytes, i + 1);
+        if bytes[i] == b'\r' {
+            // CRLF is one ECMAScript break holding one LF, so it leaves the two
+            // classes agreeing; a *lone* CR is the divergence this reports.
+            lines.ecmascript_differs |= bytes.get(i + 1) != Some(&b'\n');
+        } else {
+            lines.starts.push((base + i + 1) as u32);
+        }
+        i = next_ecmascript_terminator(bytes, i + 1);
     }
 }
 
-/// Append the ECMAScript-rule line starts of an ASCII run to `line_starts`,
-/// offset by the run's `base` position in the source.
+/// Append the ECMAScript-rule line starts of an ASCII run to `lines`, offset by
+/// the run's `base` position in the source. This rule counts the whole class, so
+/// it never has an `ecmascript_differs` to report — it takes the same
+/// [`LineScan`] as its LF sibling so the builder's two arms read alike.
 ///
 /// A CRLF pair can never straddle a run boundary — a run only ends at a
 /// non-ASCII byte, which `\n` is not — so a `\r` at the end of a run is a lone
@@ -833,14 +899,14 @@ fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<u3
 /// and a lone `\r` both start the next line at `i + 1`, and CRLF is the same
 /// after stepping `i` onto its `\n`. So the only per-byte work left is the CRLF
 /// test, run once per line instead of once per byte.
-fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<u32>) {
+fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
     let mut i = next_ecmascript_terminator(bytes, 0);
     while i < bytes.len() {
         // CRLF counts as a single line terminator.
         if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
             i += 1;
         }
-        line_starts.push((base + i + 1) as u32);
+        lines.starts.push((base + i + 1) as u32);
         i = next_ecmascript_terminator(bytes, i + 1);
     }
 }
@@ -888,7 +954,14 @@ mod tests {
 
         let plain = ByteToCharMap::new(source);
         let (ecma_tracker, ecma_map) = LocationTracker::new_ecmascript_with_map(source);
-        let (lf_tracker, lf_map) = LocationTracker::new_with_map(source);
+        let (lf_tracker, lf_map, ecmascript_lines_differ) = LocationTracker::new_with_map(source);
+        // The probe's meaning, stated as the identity it exists to predict: the
+        // two rules disagree on this source exactly when their tables do.
+        assert_eq!(
+            ecmascript_lines_differ,
+            ecma_tracker.line_starts != lf_tracker.line_starts,
+            "ecmascript_lines_differ must equal `the two line tables differ`"
+        );
         let (_, map_only) = LocationTracker::new_map_only(source);
 
         let maps = [
@@ -1108,16 +1181,25 @@ mod tests {
                     bytes.extend_from_slice(b"yy");
                     let label = format!("{bytes:?}");
 
-                    let mut lf = Vec::new();
+                    let mut lf = LineScan::bare();
                     ascii_lf_line_starts_into(&bytes, 100, &mut lf);
-                    assert_eq!(lf, reference_lf_line_starts(&bytes, 100), "lf {label}");
+                    assert_eq!(
+                        lf.starts,
+                        reference_lf_line_starts(&bytes, 100),
+                        "lf {label}"
+                    );
 
-                    let mut es = Vec::new();
+                    let mut es = LineScan::bare();
                     ascii_ecmascript_line_starts_into(&bytes, 100, &mut es);
                     assert_eq!(
-                        es,
+                        es.starts,
                         reference_ecmascript_line_starts(&bytes, 100),
                         "ecmascript {label}"
+                    );
+                    assert_eq!(
+                        lf.ecmascript_differs,
+                        es.starts != lf.starts,
+                        "ecmascript-differs probe {label}"
                     );
                 }
             }
@@ -1143,16 +1225,25 @@ mod tests {
                     _ => b'a',
                 });
             }
-            let mut lf = Vec::new();
+            let mut lf = LineScan::bare();
             ascii_lf_line_starts_into(&bytes, 0, &mut lf);
-            assert_eq!(lf, reference_lf_line_starts(&bytes, 0), "lf case {case}");
+            assert_eq!(
+                lf.starts,
+                reference_lf_line_starts(&bytes, 0),
+                "lf case {case}"
+            );
 
-            let mut es = Vec::new();
+            let mut es = LineScan::bare();
             ascii_ecmascript_line_starts_into(&bytes, 0, &mut es);
             assert_eq!(
-                es,
+                es.starts,
                 reference_ecmascript_line_starts(&bytes, 0),
                 "ecmascript case {case}"
+            );
+            assert_eq!(
+                lf.ecmascript_differs,
+                es.starts != lf.starts,
+                "ecmascript-differs probe case {case}"
             );
         }
     }

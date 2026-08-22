@@ -602,6 +602,81 @@ and ECMAScript normalizes `<CR>` and `<CR><LF>` to `<LF>` in both TV and TRV. `<
 `<PS>` are deliberately untouched — ECMAScript keeps each as itself, and HTML and CSS read
 them as ordinary characters.
 
+### `loc` lines: two classes, one per acorn parse
+
+The fold above is about the bytes tsv *writes*. The counting question is separate, and the
+Svelte wire answers it two ways at once, because Svelte's parser does.
+
+Svelte's own positions come from `locate-character`, which opens a line at `\n` and nothing
+else — the template spine, `name_loc`, the CSS `loc`, a `<script>`'s `Program` `loc` (which
+`read_script` re-stamps after the parse), and the identifiers `read_identifier` builds
+(recognizable in the wire by the `character` field beside `line`/`column`). Everything acorn
+parses carries acorn's `loc`, and acorn's is the ECMAScript class: `\n`, `\r`, `\r\n`, `<LS>`,
+`<PS>`. Since `format` folds `<CR>` and `<LS>`/`<PS>` are vanishingly rare in real code, the two
+agree on essentially every document — but where they disagree, a single table is a whole class
+of silently-off positions.
+
+**It is not "route acorn's islands to an ECMAScript table" either.** acorn seeds its line
+counter *once per parse*, and Svelte hands it a differently prepared string at every island:
+
+| island | source acorn receives | prefix counts as |
+| --- | --- | --- |
+| `<script>` (`read_script`) | prefix blanked with `replace(/[^\n]/g, ' ')` + content | LF only |
+| `{expr}` / attribute values (`read_expression`) | the raw template | ECMAScript |
+| `{const …}` / `{let …}` (`read_declaration` → `parse_statement_at`) | the raw template | ECMAScript |
+| `{#snippet}` parameters | prefix `replace(/\S/g, ' ')` — whitespace survives | ECMAScript |
+| a pattern binding — `{@const}`'s `id`, a destructured block binding (`read_pattern`) | blanked prefix + `(pattern = 1)` | LF only |
+| a binding's trailing `: T` (`read_type_annotation`) | blanked prefix + `_ as ` + raw rest | LF only |
+
+Note that `{@const}` is **one tag spanning both classes**: Svelte reads its `id` with
+`read_pattern` and its `init` with `read_expression`, so the two halves of a single declarator
+carry different prefix counts. (The unprefixed `{const …}` / `{let …}` tags are a different
+construct on a different reader — one `parse_statement_at` over the raw template.)
+
+And then, whatever the prefix, acorn *skips* `[lineStart, startPos)` outright — `lineStart` is
+found with `lastIndexOf("\n", startPos - 1)`, so a non-LF terminator between that LF and the
+island is counted by neither half.
+
+`tsv_ts::AcornSeed` carries that per-parse difference as two constants over the
+ECMAScript-rule tracker's answer (lines to subtract, columns to add on the region's first
+line), and `tsv_svelte`'s parser records the parse start of every island in
+`Root::acorn_regions` so the writer can rebuild the seed — including for the root `comments`
+array, which is emitted outside the tree walk that would otherwise carry it. The second
+tracker is built **only** when the two classes actually differ, which
+`LocationTracker::new_with_map` reports out of the scan it already runs.
+
+⚠️ **The route answers two questions, and each has its own exact condition.** They look
+like one and are not:
+
+1. **Which table** answers an acorn-owned position — acorn's ECMAScript one, or the Svelte
+   LF one. Exactly "the two classes differ": a terminator *inside* an island moves every
+   node after it whether or not any seed re-bases anything.
+2. **Whether a seed** re-bases that answer. Exactly "some seed is not the identity".
+
+Neither stands in for the other. Five of the six rows above seed from the class difference
+alone, so a document without a lone `<CR>` / `<LS>` / `<PS>` leaves them inert — question 2
+is `false` while question 1 may still be `true`. And the **annotation** row goes the other
+way: acorn is entered five bytes behind the colon, on an `_ as ` that *overwrites* those
+bytes, so a plain `\n` the author wrote between a block binding and its `: T` is erased
+before acorn ever sees it and the annotation's nodes stay on the *binding's* line — question
+2 is `true` on a pure-LF source where question 1 is `false`.
+
+`tsv_svelte`'s writer therefore computes the seeds (one per region, once per document) and
+activates the route when the classes differ **or** some seed is non-identity. Computing them
+is itself gated by the cheap *necessary* condition — the classes differ, or some region has
+`origin != lex_start`, which is exactly the parses that begin behind where they lex — so a
+document with a glued `{#each xs as e: T}`, whose seed is the identity, pays a filter and
+nothing more. When only question 2 holds the route answers through the LF table, which the
+probe has certified is byte-identical to acorn's, so no second table is built. Pinned by
+`tests/acorn_loc_line_terminators.rs`.
+
+The region a position belongs to is the last one starting at or before it; regions **can**
+nest (a block pattern's `: T` runs inside the pattern's own parse), where the later start is
+the inner parse and so the right answer. Each region carries the extent of the slice its
+sub-parse was handed, and the lookup asserts the resolved parse contains the position — the
+one failure mode here is otherwise silent, since a position resolved to the previous parse
+still emits a well-formed wire with only its lines moved.
+
 ### Source-Based Printing
 
 All printers accept `source: &str` to preserve escape sequences:

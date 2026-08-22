@@ -252,6 +252,12 @@ impl<'a> Printer<'a> {
             }
             let n = rel.selectors.len();
             for (j, simple) in rel.selectors.iter().enumerate() {
+                if j == 0 {
+                    let kept = self.preserved_boundary_ws(simple.span().start);
+                    if !kept.is_empty() {
+                        parts.push(d.text_pooled(kept));
+                    }
+                }
                 parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
             }
         }
@@ -261,6 +267,57 @@ impl<'a> Printer<'a> {
         } else {
             body
         }
+    }
+
+    /// The tail of the boundary whitespace run before `start` that this printer must emit
+    /// verbatim: everything from its first **non-ASCII** member on.
+    ///
+    /// The parser skipped the whole run because `parseCss` skips it (JS `\s` at every
+    /// `allow_whitespace()` juncture — see `tsv_lang::is_js_whitespace`), but that is a
+    /// statement about the AST, not a licence to drop source. Deleting one of those
+    /// characters is a content difference the corpus SAFETY check reads as `content_lost` —
+    /// its semantic-character count excludes only ASCII whitespace, so a `<NBSP>` or `<LS>` is
+    /// a character like any other. Same call the escaped-selector names make: the AST mirrors
+    /// Svelte, the printer emits the author's bytes.
+    ///
+    /// ⚠️ The run is scanned back over **both** classes and emitted from the first non-ASCII
+    /// member — not scanned back over the non-ASCII class alone. The two differ exactly on a
+    /// mixed run, and only the first is prettier's answer: `<NBSP><SP>div` keeps `<NBSP><SP>`
+    /// there, where a non-ASCII-only scan stops on the space, finds nothing, and DELETES the
+    /// `<NBSP>`. What the ASCII *head* of the run contributes is indentation, which the
+    /// printer regenerates — so it is dropped, while an interior one rides along inside the
+    /// slice as the author spelled it. prettier respells that interior run as a single space
+    /// (`<NBSP><TAB><NBSP>div` → `<NBSP><SP><NBSP>div`); tsv keeps the bytes, which is a
+    /// whitespace-SPELLING difference with no content at stake, in a run no authored
+    /// stylesheet contains. Pinned in `tests/css_boundary_whitespace.rs`.
+    fn preserved_boundary_ws(&self, start: u32) -> &'a str {
+        let start = start as usize;
+        let mut run_start = start;
+        while run_start > 0 {
+            let prev = self.source[..run_start]
+                .chars()
+                .next_back()
+                .filter(|c| crate::whitespace::is_boundary_whitespace(*c));
+            match prev {
+                Some(c) => run_start -= c.len_utf8(),
+                None => break,
+            }
+        }
+        // ⚠️ A leading BOM is NOT preserved. `U+FEFF` is in JS `\s`, so a byte-order mark
+        // reaches this scan like any other member — but tsv strips BOMs by policy (a
+        // cataloged prettier divergence, `docs/conformance_prettier.md` §Whitespace: BOM
+        // Handling), and re-emitting it here would quietly undo that. The exclusion is
+        // anchored at offset 0 because that is what makes a `U+FEFF` a byte-order mark; one
+        // anywhere else is an ordinary character and is preserved with the rest — including a
+        // second one later in this same run, which the forward scan below still reaches.
+        if run_start == 0 && self.source.starts_with('\u{feff}') {
+            run_start = '\u{feff}'.len_utf8();
+        }
+        let kept = self.source[run_start..start]
+            .char_indices()
+            .find(|(_, c)| crate::whitespace::is_boundary_only_whitespace(*c))
+            .map_or(start, |(i, _)| run_start + i);
+        &self.source[kept..start]
     }
 
     /// Whether this complex selector carries a comment at a combinator boundary — any
@@ -372,6 +429,12 @@ impl<'a> Printer<'a> {
             let n = rel.selectors.len();
             for (j, simple) in rel.selectors.iter().enumerate() {
                 let sspan = simple.span();
+                if j == 0 {
+                    let kept = self.preserved_boundary_ws(sspan.start);
+                    if !kept.is_empty() {
+                        parts.push(d.text_pooled(kept));
+                    }
+                }
                 if j > 0 && has_comments_to_emit_in_range(self.comments, prev_end, sspan.start) {
                     // Glued compound-internal trivia: emit the source slice verbatim (no
                     // space normalization). The run is fully glued (the parser keeps a
@@ -524,6 +587,11 @@ impl<'a> Printer<'a> {
             );
         }
         let mut result = String::from("[");
+        // `[` is one of the `allow_whitespace()` junctures, so the name can be preceded by a
+        // skipped non-ASCII whitespace run the printer would otherwise drop — the same
+        // preservation the compound path applies (`preserved_boundary_ws`).
+        let leading = namespace_span.unwrap_or(name_span).start;
+        result.push_str(self.preserved_boundary_ws(leading));
         if let Some(ns) = namespace_span {
             result.push_str(ns.extract(self.source));
             result.push('|');
