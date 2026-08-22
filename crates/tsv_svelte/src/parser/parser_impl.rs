@@ -591,7 +591,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
-        self.record_annotation_acorn_region(base_offset);
+        // The COLON's offset: this reader splits the head itself and parses the annotation
+        // from there, where the `{:then}`/`{:catch}`/`{@const}` arm hands the annotation's
+        // own start. Both reach the same `lex_start` — see `record_annotation_acorn_region`.
+        self.record_annotation_acorn_region(base_offset as u32);
         let (ta, comments) =
             tsv_ts::parse_type_annotation_partial(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);
@@ -615,7 +618,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // this arm is the one-sub-parse readers, `{:then}` / `{:catch}` /
         // `{@const}`.
         if let Some(annotation) = tsv_ts::pattern_type_annotation(&pattern) {
-            self.record_annotation_acorn_region(annotation.span.start as usize);
+            self.record_annotation_acorn_region(annotation.span.start);
         }
         // Canonical reads a destructure via a synthetic `(pattern = 1)` acorn
         // parse whose inserted `(` shifts the pattern's start line one column
@@ -662,8 +665,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.record_acorn_region_at(at, at, prefix);
     }
 
-    /// Record the acorn parse of a block pattern's trailing `: T`, whose `:` is
-    /// at `colon`.
+    /// Record the acorn parse of a block pattern's trailing `: T`, given any position
+    /// `at` that reaches the `:` over whitespace alone — the annotation's own span start
+    /// (which is anchored at the *binding's* end) or the colon itself. Its two callers
+    /// hand it each of those, and `annotation_lex_start` steps the run either way.
     ///
     /// Svelte reads it with a second parse over `blanked_prefix + "_ as " +
     /// rest`, entered at `a = parser.index - "_ as ".len()` with `parser.index`
@@ -677,13 +682,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// bytes ahead of the colon. The shortest is `{@const x:`, whose colon sits at
     /// offset 9; `{:then v:` / `{:catch e:` are shorter heads but never stand
     /// alone, and `{#each … as x:` is longer still.
-    fn record_annotation_acorn_region(&mut self, colon: usize) {
+    fn record_annotation_acorn_region(&mut self, at: u32) {
         const AS_INSERT_LEN: usize = "_ as ".len();
-        let lex_start = internal::AcornRegion::annotation_lex_start(colon as u32) as usize;
+        let lex_start = internal::AcornRegion::annotation_lex_start(self.source, at) as usize;
         debug_assert!(
             lex_start >= AS_INSERT_LEN,
-            "an annotation colon at {colon} leaves no room for Svelte's synthetic \
-             `_ as `, so this is not a block-pattern annotation at all"
+            "an annotation at {at} leaves no room for Svelte's synthetic `_ as `, so this \
+             is not a block-pattern annotation at all"
         );
         self.record_acorn_region_at(lex_start, lex_start - AS_INSERT_LEN, PrefixLines::Lf);
     }

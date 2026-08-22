@@ -71,18 +71,33 @@ pub struct AcornRegion {
 
 impl AcornRegion {
     /// Where the second acorn parse of a block pattern's trailing `: T` begins
-    /// lexing real bytes, given the `:` at `colon` — one past it.
+    /// lexing real bytes — one past the `:`, found from the annotation's own
+    /// span start.
+    ///
+    /// The annotation is anchored at the **binding's** end, not at the colon
+    /// (`tsv_ts::attach_pattern_type_annotation`), so the two differ by whatever
+    /// whitespace the author left between them. Only whitespace can be there:
+    /// Svelte reaches the colon with `allow_whitespace()` + `eat(':')`, so
+    /// anything else means this is not an annotation at all and no region was
+    /// recorded.
     ///
     /// Stated once because two sides must agree on it and neither can check the
     /// other: the parser RECORDS the annotation's region at this position, and
     /// the wire writer LOOKS IT UP by it. A disagreement does not fail — the
     /// lookup is "the last region starting at or before the position", so it
     /// quietly resolves to the *pattern's* region instead and the annotation's
-    /// type nodes take the wrong parse's line seed. `colon` itself is behind
-    /// `lex_start`, which is exactly why the lookup cannot just pass the
-    /// annotation's own span start.
-    pub(crate) fn annotation_lex_start(colon: u32) -> u32 {
-        colon + 1
+    /// type nodes take the wrong parse's line seed. That is also why the lookup
+    /// cannot just pass the annotation's span start: it is behind `lex_start`,
+    /// and now by an author-controlled distance rather than exactly one byte.
+    pub(crate) fn annotation_lex_start(source: &str, annotation_start: u32) -> u32 {
+        // The colon is the first NON-WHITESPACE byte, so this steps over the run
+        // rather than searching for the glyph. Not a stylistic choice: a `:` scan
+        // is not a discriminator here — it finds one wherever it looks, including
+        // far down the document, so on any position that is not in fact an
+        // annotation's gap it returns a confidently wrong answer instead of a
+        // recognizable one. `skip_svelte_ws` is Svelte's own `allow_whitespace()`,
+        // the same step `read_type_annotation` takes to reach the colon.
+        crate::whitespace::skip_svelte_ws(source, annotation_start as usize) as u32 + 1
     }
 }
 

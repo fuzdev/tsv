@@ -694,7 +694,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 				refused++;
 				assert.throws(
 					() => node_entry.reconstruct_locations(span_only, source, { language: 'svelte' }),
-					/lone CR, U\+2028, or U\+2029/,
+					/cannot reconstruct `loc`/,
 					`${file.slice(repo_root.length + 1)}: expected the two-line-class refusal`
 				);
 				continue;

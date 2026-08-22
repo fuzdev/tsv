@@ -344,8 +344,10 @@ impl<'a> Ctx<'a> {
     ) -> EmbedWriter<'a> {
         let mut env = self.embed_expr(mode, expr);
         if let Some(ann) = tsv_ts::pattern_type_annotation(expr) {
-            env.acorn_annotation =
-                self.acorn_seed(internal::AcornRegion::annotation_lex_start(ann.span.start));
+            env.acorn_annotation = self.acorn_seed(internal::AcornRegion::annotation_lex_start(
+                self.source,
+                ann.span.start,
+            ));
         }
         env
     }

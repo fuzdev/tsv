@@ -213,6 +213,7 @@ deno task razor:audit                # print-width RAZOR SWEEP: pads a text word
 deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar — NOT in check; release-gated leg of `deno task conformance`)
 deno task idempotency:sweep          # F1 idempotency sweep over the real-code corpus (minutes — NOT in check; conformance cadence)
 deno task audit:corpus               # the standing content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
+deno task wire:audit                 # WIRE-INJECTION: whitespace injected into every Svelte tag/block head, the resulting wire graded against the canonical parser — the parse-side sibling of gaps/blanks, which grade the formatter. Each variant is graded against its OWN base, so a deliberate divergence fixture contributes nothing. ⚠️ RED BY DESIGN (a discovery tool, like compile:fuzz); needs the canonical parser, so NOT in check
 deno task compile:corpus:compare     # compile-parity wide net over real repos + Svelte suites (sidecar, on demand; ./docs/compile_tooling.md)
 deno task compile:validation         # validation-suite RATCHET over Svelte's compiler-errors + validator suites (sidecar, on demand; :update re-pins, never a MISMATCH; ./docs/compile_validation_ratchet.md)
 deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool, currently RED by design (sidecar, on demand; ./docs/compile_tooling.md)

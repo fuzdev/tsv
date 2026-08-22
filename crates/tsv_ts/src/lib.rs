@@ -561,9 +561,25 @@ pub fn parse_pattern_with_comments<'arena>(
 /// **errors** rather than dropping.
 pub fn attach_pattern_type_annotation<'arena>(
     pattern: &mut Expression<'arena>,
-    ta: TSTypeAnnotation<'arena>,
+    mut ta: TSTypeAnnotation<'arena>,
     arena: &'arena bumpalo::Bump,
 ) -> Result<()> {
+    // Re-anchor the annotation at the BINDING's end, which is where Svelte starts it:
+    // `read_type_annotation` takes `const start = parser.index` *before* its
+    // `allow_whitespace()`, so whatever the author put between the binding and the `:`
+    // belongs to the annotation's span.
+    //
+    // This is a **Svelte-only** convention and it lives here, at the attach point only the
+    // two block readers call, precisely because the shared type parser must NOT do it:
+    // acorn-typescript anchors its own `TSTypeAnnotation` at the colon
+    // (`function f(a : number)` opens the node at the `:`), and `parse_type_annotation`
+    // matches it there for every ordinary TS position.
+    //
+    // The two anchors coincide whenever the colon is glued to the binding — which is every
+    // fixture in the tree and essentially all real code — so this line is load-bearing only
+    // on the spellings that separate them. `pattern` is still the bare binding here: both
+    // callers parse the annotation separately and attach it after.
+    ta.span.start = pattern.span().end;
     match pattern {
         Expression::Identifier(id) => {
             // Re-bind the identifier's binding extra with the parsed type

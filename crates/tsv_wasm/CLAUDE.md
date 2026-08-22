@@ -242,7 +242,7 @@ pushed into the host-element pass explicitly);
 source holding a lone CR, U+2028 or U+2029 carries two line counts — acorn's on the nodes
 it parsed, `locate-character`'s on the rest — and which one a node takes is not a function
 of its offsets, so every entry point throws rather than returning quietly-wrong lines
-(parse those with `loc`; see [docs/architecture.md §`loc` lines](../../docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse)).
+(parse those with `loc`; see [docs/architecture.md §`loc` lines](../../docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse)). The `reconstruct` forms carry a second refusal on the same principle — a block binding whose `: T` sits behind a newline, whose annotation acorn reads under a seed the offsets cannot supply — checked against the tree rather than the source, since only a parse says where a block binding is.
 It rides every package that parses —
 `@fuzdev/tsv_parse_wasm`, `@fuzdev/tsv_wasm`, and the native `@fuzdev/tsv` loader
 (`build_napi_packages.ts` stages it there) — it operates on the
