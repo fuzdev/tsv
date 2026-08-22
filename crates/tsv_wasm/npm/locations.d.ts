@@ -16,6 +16,12 @@ export interface LocationOptions {
 	 * ECMAScript LineTerminators; `svelte` uses LF-only; `css` makes
 	 * `reconstruct` a no-op. `reconstruct_locations` infers this from the AST
 	 * root when omitted.
+	 *
+	 * Under `svelte`, every entry point **throws** when the source holds a lone
+	 * `\r`, U+2028 or U+2029: such a document carries two line counts (acorn's on
+	 * the nodes it parsed, `locate-character`'s on the rest) and the span-only
+	 * wire does not record which acorn parse a node came from. Parse those with
+	 * locations instead. See `locations.js`.
 	 */
 	language?: LocationLanguage;
 }

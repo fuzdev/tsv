@@ -622,7 +622,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	// Self-oracle by construction: it grades `reconstruct(no-loc) == full wire`, so it
 	// proves reconstruction fidelity, NOT conformance to Svelte. The conformance oracle is
 	// `deno task corpus:compare:parse` plus the root Rust span tests.
-	it('reconstructs every .svelte fixture, modulo the two documented quirks', () => {
+	it('reconstructs every .svelte fixture, or refuses it for two line classes', () => {
 		const roots = [join(repo_root, 'tests/fixtures'), join(repo_root, 'tests/fixtures_compile')];
 		const files: Array<string> = [];
 		const collect = (dir: string): void => {
@@ -639,6 +639,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		let compared = 0;
 		let character_locs = 0;
 		let scanned = 0;
+		let refused = 0;
 
 		const compare = (recon: any, full: any, file: string): void => {
 			if (Array.isArray(full)) {
@@ -684,12 +685,27 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			} catch {
 				continue; // a fixture tsv rejects on purpose (input_invalid_*, tsv_rejects)
 			}
+			// A source whose two line classes disagree (a lone CR, U+2028, U+2029) is
+			// refused by construction: its acorn-parsed nodes carry acorn's line count and
+			// the span-only wire does not say which parse each came from. Assert the
+			// refusal rather than skipping, so the reconstruction's own precondition is
+			// under test and not merely asserted in a doc comment.
+			if (/\r(?!\n)|[\u2028\u2029]/.test(source)) {
+				refused++;
+				assert.throws(
+					() => node_entry.reconstruct_locations(span_only, source, { language: 'svelte' }),
+					/lone CR, U\+2028, or U\+2029/,
+					`${file.slice(repo_root.length + 1)}: expected the two-line-class refusal`
+				);
+				continue;
+			}
 			scanned++;
 			const recon = node_entry.reconstruct_locations(span_only, source, { language: 'svelte' });
 			compare(recon, full, file.slice(repo_root.length + 1));
 		}
 
 		assert.ok(scanned > 500, `expected to parse most fixtures, parsed ${scanned}`);
+		assert.ok(refused > 0, 'expected the fixture corpus to hold a two-line-class source');
 		assert.ok(compared > 10_000, `expected a broad comparison, made ${compared}`);
 		assert.ok(character_locs > 0, 'expected some character-bearing locs (in-tag comments)');
 		assert.deepEqual(findings.slice(0, 10), [], `${findings.length} undocumented mismatches`);

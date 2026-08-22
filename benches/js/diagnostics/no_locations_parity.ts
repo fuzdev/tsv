@@ -71,6 +71,8 @@ function loc_at(offset: number, starts: number[]): { line: number; column: numbe
 }
 
 interface Tally {
+	/** Svelte sources refused up front: their two line classes disagree (see `TWO_LINE_CLASSES`). */
+	two_line_classes: number;
 	exact: number;
 	pattern_quirk: number;
 	script_override: number;
@@ -80,6 +82,16 @@ interface Tally {
 	name_span_exact: number;
 	name_span_mismatch: number;
 }
+
+/**
+ * A terminator the ECMAScript class counts and the LF class does not — a lone `\r`,
+ * U+2028 or U+2029 (`\r\n` is one ECMAScript break holding one LF, so the classes agree
+ * over it). A Svelte source holding one carries TWO line counts — acorn's on the nodes it
+ * parsed, `locate-character`'s on the rest — and which one a node takes is not a function
+ * of its offsets, so the wire is genuinely not reconstructible there. Re-derived rather
+ * than imported, like everything else here: this file is the independent oracle.
+ */
+const TWO_LINE_CLASSES = /\r(?!\n)|[\u2028\u2029]/;
 
 // The Svelte name span is derivable from the node's own start/end + type, so the
 // no-locations wire keeps `name_loc` recoverable too. Re-derived here rather than
@@ -238,6 +250,7 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 	const rule: LineRule = language === 'svelte' ? 'lf' : 'ecmascript';
 	const is_svelte = language === 'svelte';
 	const t: Tally = {
+		two_line_classes: 0,
 		exact: 0,
 		pattern_quirk: 0,
 		script_override: 0,
@@ -249,6 +262,13 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 	};
 	let checked = 0;
 	for (const f of by_lang[language] ?? []) {
+		// Not a mismatch and not a quirk — a source no offset-keyed reconstruction can
+		// serve, which the shipped helper refuses outright. Counted so a corpus that grows
+		// one says so instead of silently shrinking the sample.
+		if (is_svelte && TWO_LINE_CLASSES.test(f.content)) {
+			t.two_line_classes++;
+			continue;
+		}
 		let full: unknown;
 		try {
 			full = native.parse(f.content, language);

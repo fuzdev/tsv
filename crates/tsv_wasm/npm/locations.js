@@ -28,8 +28,20 @@
  * placed after `start`/`end`, so an object consumer — or `deepEqual` — sees
  * identical data, but a re-serialized tree won't byte-match the wire's key order.)
  *
- * **Svelte is approximate** — reconstruct where you have the source, but be aware
- * of two deliberate divergences from Svelte's own wire (this module does NOT
+ * **Svelte needs one line class, and refuses when the source has two.** A Svelte
+ * document's `loc`s are LF-only (Svelte's `locate-character`) *except* on the nodes
+ * acorn parsed, which carry acorn's ECMAScript line count — seeded once per embedded
+ * parse, over whatever prefix Svelte prepared for it. The two classes agree unless the
+ * source holds a lone `\r`, U+2028 or U+2029 (a `\r\n` is one ECMAScript break holding
+ * one LF, so it never counts), and where they disagree the span-only wire does not carry
+ * what would be needed to tell the classes apart: which acorn parse a node came from is
+ * not a function of its offsets. So `create_locator` — and both entry points through it —
+ * **throws** on such a source rather than returning lines that are quietly wrong for
+ * every acorn-owned node. Parse with `loc` (the default) for those documents. Everything
+ * else reconstructs as described below.
+ *
+ * **Svelte is otherwise approximate** — reconstruct where you have the source, but be
+ * aware of two deliberate divergences from Svelte's own wire (this module does NOT
  * replicate Svelte's parser quirks):
  * - The `<script>`/`<style>` `Program` `loc` is Svelte's *tag-position* override
  *   (`read_script`), not the content offset the node's `start`/`end` carry, so the
@@ -79,14 +91,29 @@ const PARAGRAPH_SEPARATOR = 0x2029;
 /**
  * The line-terminator rule for a language. TypeScript/JS follow ECMAScript
  * LineTerminators (`\n`, `\r`, `\r\n` as one, U+2028, U+2029); Svelte uses
- * LF-only across the whole document (incl. embedded `<script>`/`{expr}`),
- * matching the Svelte parser's locate-character convention.
+ * LF-only, matching the Svelte parser's locate-character convention.
+ *
+ * One rule per document is only enough for Svelte because `create_locator` has
+ * already refused any source whose acorn-owned nodes would need the other one —
+ * see `has_ecmascript_only_terminator` and the module doc.
  * @param {string} language
  * @returns {'ecmascript' | 'lf'}
  */
 function rule_for(language) {
 	return language === 'svelte' ? 'lf' : 'ecmascript';
 }
+
+/**
+ * A terminator the ECMAScript class counts and the LF class does not — a lone `\r`,
+ * U+2028, or U+2029. `\r\n` is one ECMAScript break holding one LF, so the two classes
+ * agree over it and the negative lookahead is what keeps it out.
+ *
+ * The JS twin of the Rust probe `LocationTracker::new_with_map` returns (which is what
+ * decides, on the emitting side, whether a second line table is built at all), and it must
+ * keep answering the same question: a source this says `false` about is one where every
+ * acorn seed is the identity and a single LF table reproduces the whole Svelte wire.
+ */
+const ECMASCRIPT_ONLY_TERMINATOR = /\r(?!\n)|[\u2028\u2029]/;
 
 /**
  * Line-start offsets (UTF-16 units); the rightmost start `<=` an offset gives its
@@ -491,6 +518,14 @@ function reconstruct_in(ast, starts, source, language) {
  */
 export function create_locator(source, opts) {
 	const language = opts?.language ?? 'typescript';
+	if (language === 'svelte' && ECMASCRIPT_ONLY_TERMINATOR.test(source)) {
+		throw new Error(
+			'tsv: cannot reconstruct `loc` for a Svelte source containing a lone CR, U+2028, ' +
+				'or U+2029 — its acorn-parsed nodes carry a different line count from the rest of ' +
+				'the document, and the span-only wire does not record which acorn parse each node ' +
+				'came from. Parse this document with locations (the default) instead.'
+		);
+	}
 	const starts = build_line_starts(source, rule_for(language));
 	return {
 		loc_of(node) {

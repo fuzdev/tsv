@@ -196,3 +196,27 @@ fn a_declaration_tag_counts_the_prefix_under_the_ecmascript_class() {
         [("\n", 3), ("\r\n", 3), ("\r", 3), ("\u{2028}", 3)],
     );
 }
+
+/// A block binding's trailing `: T` is a **second** acorn parse, and Svelte enters it five
+/// bytes behind the colon on a synthetic `_ as ` that **overwrites** them
+/// (`read_type_annotation`). So a newline the author wrote between the binding and its colon
+/// is erased before acorn ever sees it, and the annotation's nodes stay on the *binding's*
+/// line — `number` below is authored on line 7 and reported on line 6.
+///
+/// This is the one region whose seed is non-identity for a reason that has nothing to do
+/// with the two line **classes**: a plain `\n` inside that five-byte window is enough, and
+/// it is the only region whose parse `origin` sits behind where it starts lexing. So the
+/// answer must not depend on whether the document *also* carries a lone CR / `<LS>` /
+/// `<PS>` — which is exactly the pair asserted here, since a gate keyed on the line classes
+/// alone skips the second case.
+#[test]
+fn an_annotation_seed_survives_a_newline_the_as_insert_overwrites() {
+    const PATH: &str = ".context.typeAnnotation.typeAnnotation.TSNumberKeyword";
+    let head = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n\n";
+    // `number` is authored on line 7 in both, and acorn reports line 6 in both.
+    let with_second_class =
+        format!("{head}<p>a\u{2028}b</p>\n{{#each xs as e\n\t: number}}\n\t{{e}}\n{{/each}}\n");
+    let one_class_only = format!("{head}<p>ab</p>\n{{#each xs as e\n\t: number}}\n\t{{e}}\n{{/each}}\n");
+    assert_eq!(line_of(&with_second_class, PATH), 6, "with a <LS> in the document");
+    assert_eq!(line_of(&one_class_only, PATH), 6, "with no second line class");
+}
