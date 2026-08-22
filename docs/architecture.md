@@ -643,9 +643,21 @@ line), and `tsv_svelte`'s parser records the parse start of every island in
 `Root::acorn_regions` so the writer can rebuild the seed — including for the root `comments`
 array, which is emitted outside the tree walk that would otherwise carry it. The second
 tracker is built **only** when the two classes actually differ, which
-`LocationTracker::new_with_map` reports out of the scan it already runs: no lone `<CR>`, `<LS>`
-or `<PS>` in the source means every seed is the identity and the whole route collapses to the
-LF one.
+`LocationTracker::new_with_map` reports out of the scan it already runs.
+
+⚠️ **"Do the two classes differ" is a strictly narrower question than "is every seed the
+identity", and only the second one gates the route.** Five of the six rows above seed from
+the class difference alone, so a document without a lone `<CR>` / `<LS>` / `<PS>` leaves
+them inert. The **annotation** row does not: acorn is entered five bytes behind the colon,
+on an `_ as ` that *overwrites* those bytes, so a plain `\n` the author wrote between a
+block binding and its `: T` is erased before acorn ever sees it, and the annotation's nodes
+stay on the *binding's* line. A seed is needed there on a pure-LF source.
+
+So `tsv_svelte`'s writer activates the re-seeding route when the classes differ **or** some
+region has `origin != lex_start` — the latter being exactly the parses that begin behind
+where they lex, which today is that one row. When only the second holds it answers through
+the LF table, which the probe has just certified is byte-identical to acorn's, so no second
+table is built. Pinned by `tests/acorn_loc_line_terminators.rs`.
 
 ### Source-Based Printing
 

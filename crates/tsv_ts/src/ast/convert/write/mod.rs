@@ -432,9 +432,10 @@ pub(super) struct Ctx<'a> {
     /// The `loc` on an embedded node is acorn's, and acorn seeded its line
     /// counter once at the start of the parse Svelte prepared for *this* island
     /// — so the ECMAScript tracker's answer has to be re-based onto it. Inert
-    /// (`AcornSeed::NONE`) for standalone TypeScript, which IS that parse, and
-    /// for every Svelte document whose two line classes agree — which is every
-    /// one without a lone CR, U+2028 or U+2029 in it.
+    /// (`AcornSeed::NONE`) for standalone TypeScript, which IS that parse, and for
+    /// essentially every Svelte document — though not, as it reads, for exactly the
+    /// ones whose two line classes agree: see `tsv_svelte`'s `AcornLines` for the
+    /// annotation parse that needs a seed on a plain-LF source.
     pub(super) acorn: AcornSeed,
     /// The block pattern's trailing `: T`: Svelte reads it with a **second**
     /// acorn parse (`read_type_annotation`'s `_ as ` trick), so it carries its

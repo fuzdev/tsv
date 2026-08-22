@@ -213,9 +213,10 @@ struct Ctx<'a> {
     /// spine, `name_loc`, the CSS `loc`, the `Program`'s own `loc`, and the
     /// `character`-bearing identifiers Svelte's `read_identifier` builds.
     loc: LocationMapper<'a>,
-    /// The acorn-owned half of the wire, or `None` when the two line classes
-    /// agree — which is every source without a lone CR, U+2028 or U+2029, so
-    /// essentially every real document. See [`AcornLines`].
+    /// The acorn-owned half of the wire, or `None` when no seed in this document
+    /// can be non-identity — which is every source whose two line classes agree
+    /// *and* that has no block-binding type annotation, so essentially every real
+    /// document. See [`AcornLines`].
     acorn: Option<AcornLines<'a>>,
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).

@@ -612,9 +612,14 @@ impl LocationTracker {
     /// CR, U+2028, or U+2029. `false` means [`new_ecmascript`](Self::new_ecmascript)
     /// over the same source would build a byte-identical table (CRLF is one
     /// ECMAScript break holding one LF, so it never counts), which is what lets
-    /// the Svelte writer skip acorn's second table — and every `tsv_ts::AcornSeed`
-    /// that reads it — on essentially every real document. Detected in this same
-    /// scan, so it costs no extra pass.
+    /// the Svelte writer skip acorn's second table on essentially every real
+    /// document. Detected in this same scan, so it costs no extra pass.
+    ///
+    /// ⚠️ It answers about the TABLES, not about whether every `tsv_ts::AcornSeed`
+    /// is inert: a seed can be non-identity on a source this reports `false` for
+    /// (an acorn parse entered behind where it starts lexing counts lines the
+    /// author wrote and acorn never saw). A caller gating the whole re-seeding
+    /// route on this alone has drawn the boundary too tight.
     pub fn new_with_map(source: &str) -> (Self, ByteToCharMap, bool) {
         let mut lines = LineScan::lines();
         let map = if source.is_ascii() {

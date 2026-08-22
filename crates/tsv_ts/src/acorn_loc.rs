@@ -54,9 +54,12 @@ pub enum PrefixLines {
 /// which it skips over entirely. This carries that difference as two constants
 /// applied to the tracker's answer, plus the line they apply on.
 ///
-/// [`NONE`](Self::NONE) is the identity, and is what every non-Svelte writer —
-/// and every Svelte document whose two line classes agree, which is essentially
-/// all of them (see `LocationTracker::new_with_map`) — emits under.
+/// [`NONE`](Self::NONE) is the identity, and is what every non-Svelte writer emits
+/// under. A Svelte document reaches it too on essentially every real source — but
+/// "the two line classes agree" is **not** the whole condition, because a parse
+/// entered *behind* where it starts lexing (Svelte's `read_type_annotation`, whose
+/// synthetic `_ as ` overwrites the bytes it covers) counts a line the author wrote
+/// and acorn never saw, on a plain-LF source. See `tsv_svelte`'s `AcornLines`.
 ///
 /// The three fields are `u32` for the same reason [`Span`](tsv_lang::Span) is:
 /// each is bounded by the source length, which the parsers already refuse past
