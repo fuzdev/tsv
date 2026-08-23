@@ -698,7 +698,7 @@ pub(super) fn matching_angle_close(bytes: &[u8], mut pos: usize) -> Option<usize
 /// templates, and comments are opaque, like `matching_angle_close` (and like it,
 /// no regex skip — a `)` inside a regex parameter default could close early,
 /// which only fails toward the shift/comparison reading).
-fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usize> {
+pub(super) fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usize> {
     // paren, bracket, brace
     let target = match bytes.get(open)? {
         b'(' => 0,
