@@ -256,11 +256,15 @@ fixtures: `lang` outranks `type` whatever their source order (prettier's
 absent — [lang_priority](../tests/fixtures/svelte/attributes/lang_priority/); the value is
 the *decoded* text — [lang_entity](../tests/fixtures/svelte/attributes/lang_entity/).
 
-One rough edge stays open by choice: a nested body in a *formattable* language whose
-content fails its parse (`<div><style>$c: red;</style></div>`) keeps the old glued raw
-fallback rather than a freeze shape. Prettier's own behavior there is its degraded
-error-swallow path (the plugin logs the embedded parse error and resolves with the body
-verbatim), which is no oracle to pin against; no real corpus file reaches it.
+One rough edge stays open by choice, and the fallback arm it lives in catches two cases: a
+nested body in a *formattable* language whose content **fails its parse**
+(`<div><style>$c: red;</style></div>`), and one that parses but **formats to empty**
+(`<div><script>;</script></div>`) — both keep the old glued raw fallback rather than a
+freeze shape. The no-oracle argument covers only the first: prettier's behavior on a parse
+failure is its degraded error-swallow path (the plugin logs the embedded parse error and
+resolves with the body verbatim), which is no oracle to pin against. The formats-to-empty
+half *does* have one — prettier opens the tag pair around a blank line — so that half is
+fixturable; neither case is reached by any real corpus file.
 
 ## Svelte: Inline content block-style
 

@@ -601,31 +601,51 @@ impl<'a> Printer<'a> {
     }
 
     /// The statement-side analog of [`Self::value_head_frozen_span`]: a head that introduces
-    /// ONE statement, clause or body behind a delimiter of its own — an `if`'s `)`→consequent
-    /// and `else`→alternate gaps, a `label:`→body gap, the `}`→`catch` / `}`→`finally` gap,
-    /// and a class head's →`{` gap. An alone-on-line directive there freezes the whole thing,
-    /// and `ordinary` — the caller's own builder, taken lazily so a directive-free document
-    /// never pays for the frozen path's setup — supplies the unfrozen doc.
+    /// ONE statement behind a delimiter of its own — an `if`'s `)`→consequent and
+    /// `else`→alternate gaps, and every loop's header→body gap (`while`, do-while, all three
+    /// `for` spellings, block and non-block bodies alike). An alone-on-line directive there
+    /// freezes the body whole, and `ordinary` — the caller's own builder, taken lazily so a
+    /// directive-free document never pays for the frozen path's setup — supplies the
+    /// unfrozen doc.
     ///
-    /// The frozen slice is that node's own span, so the introducing delimiter stays
-    /// parent-owned: a `case` label rides inside its own frozen case, and a class name and
-    /// `extends` clause stay outside the frozen body. Unlike the value heads there is no
-    /// paren shell to re-synthesize — a statement is never parenthesized by the printer — so
-    /// the emission is the plain [`Self::build_frozen_node_doc`].
+    /// The frozen slice is the body statement's own span, so the introducing delimiter stays
+    /// parent-owned. Unlike the value heads there is no paren shell to re-synthesize — a
+    /// statement is never parenthesized by the printer — and the emission is
+    /// [`Self::build_frozen_statement_doc`], so a frozen body whose kind owes a `;` (a bare
+    /// `break` / `continue` / `debugger` relying on ASI) gets it restored, exactly as at the
+    /// statement-list seams. The `export default` declaration VALUES take the span-shaped
+    /// sibling ([`Self::build_declaration_value_head_doc`]) instead — those kinds never owe
+    /// one.
     ///
     /// A head whose ordinary layout would pull the gap's comment onto the head's line must
     /// ask this BEFORE choosing that layout and keep the directive's own line when it fires:
     /// a head-trailing placement is inert under the floor, so the relocated form would lose
-    /// the freeze on the second pass (the labeled-body and class-body heads, and the
-    /// switch-case block hug).
+    /// the freeze on the second pass.
     #[inline]
     pub(in crate::printer) fn build_statement_head_doc(
         &self,
         gap_start: u32,
-        body: Span,
+        stmt: &internal::Statement<'_>,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
-        match self.gap_frozen_span(gap_start, body) {
+        match self.gap_frozen_span(gap_start, stmt.span()) {
+            Some(_) => self.build_frozen_statement_doc(stmt),
+            None => ordinary(),
+        }
+    }
+
+    /// [`Self::build_statement_head_doc`] for a head whose value is SPAN-shaped rather than
+    /// a `Statement` — the `export default` declaration values (function / declare-function
+    /// / class / interface), none of which ever owes a `;`, so the emission is the plain
+    /// [`Self::build_frozen_node_doc`] over the slice.
+    #[inline]
+    pub(in crate::printer) fn build_declaration_value_head_doc(
+        &self,
+        gap_start: u32,
+        value: Span,
+        ordinary: impl FnOnce() -> DocId,
+    ) -> DocId {
+        match self.gap_frozen_span(gap_start, value) {
             Some(frozen) => self.build_frozen_node_doc(frozen),
             None => ordinary(),
         }
@@ -762,6 +782,68 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn build_frozen_node_doc(&self, frozen: Span) -> DocId {
         self.prepend_owned_leading_comment_at(frozen.start, self.build_frozen_span_doc(frozen))
+    }
+
+    /// [`Self::build_frozen_node_doc`] for a frozen STATEMENT — a list member, a header's
+    /// body ([`Self::build_statement_head_doc`]), a labeled statement's body, or an
+    /// `export`ed declaration — plus the one terminator rule the span alone can't carry: a
+    /// frozen statement whose kind always takes a `;` — and whose author relied on ASI, so
+    /// the slice doesn't end with one — emits the `;` prettier emits. Prettier's slice for
+    /// these kinds ends BEFORE any authored `;` (its `locEnd` override stops at the last
+    /// declarator / the keyword / the label) and `shouldIgnoredNodePrintSemicolon`
+    /// unconditionally re-appends it; tsv's slice keeps an authored `;`, so the append
+    /// fires only when it is missing. Without it the freeze swallows the terminator ASI
+    /// supplied, and the NEXT statement's printed form can fabricate a leading `(` that
+    /// re-binds the pair into one broken statement (`const a = x` + `y => 1` →
+    /// `x(y) => 1`) — output that does not reparse. Pinned by the
+    /// `typescript/syntax/asi/prettier_ignore_semicolon*` family (list, case-consequent,
+    /// header-body and `export`-head spellings).
+    ///
+    /// The kind set is prettier's exactly: `VariableDeclaration`, `break` / `continue` /
+    /// `debugger`, and an `if` / loop / label whose TAIL statement is one of those
+    /// ([`Self::frozen_statement_kind_takes_semicolon`]). The content-end family
+    /// (`ExpressionStatement`, the whole-`export` list positions, `return` / `throw` /
+    /// do-while) is deliberately not in it: prettier re-appends there only when the source
+    /// carried a `;` — which tsv's slice already keeps — and gives the ASI spellings no
+    /// `;` at all.
+    // TODO: the ASI `ExpressionStatement` and list-position `export` spellings still
+    // freeze terminator-less on both sides, and prettier's own output does not reparse
+    // there — that half wants a deliberate divergence rule + fixture of its own.
+    pub(in crate::printer) fn build_frozen_statement_doc(
+        &self,
+        stmt: &internal::Statement<'_>,
+    ) -> DocId {
+        let frozen = stmt.span();
+        let doc = self.build_frozen_node_doc(frozen);
+        if Self::frozen_statement_kind_takes_semicolon(stmt)
+            && !frozen.extract(self.source).ends_with(';')
+        {
+            let d = self.d();
+            return d.concat(&[doc, d.text(";")]);
+        }
+        doc
+    }
+
+    /// Whether a frozen statement's kind unconditionally ends in a `;` — prettier's
+    /// `shouldIgnoredNodePrintSemicolon`, minus its content-end arm (see
+    /// [`Self::build_frozen_statement_doc`]). A header kind resolves through its TAIL
+    /// statement the way prettier does: the statement's terminator is its tail's.
+    fn frozen_statement_kind_takes_semicolon(mut stmt: &internal::Statement<'_>) -> bool {
+        loop {
+            stmt = match stmt {
+                internal::Statement::VariableDeclaration(_)
+                | internal::Statement::BreakStatement(_)
+                | internal::Statement::ContinueStatement(_)
+                | internal::Statement::DebuggerStatement(_) => return true,
+                internal::Statement::IfStatement(s) => s.alternate.unwrap_or(s.consequent),
+                internal::Statement::ForStatement(s) => s.body,
+                internal::Statement::ForInStatement(s) => s.body,
+                internal::Statement::ForOfStatement(s) => s.body,
+                internal::Statement::WhileStatement(s) => s.body,
+                internal::Statement::LabeledStatement(s) => s.body,
+                _ => return false,
+            };
+        }
     }
 
     /// [`Self::build_frozen_node_doc`] minus the must-break — the claim, over a slice whose

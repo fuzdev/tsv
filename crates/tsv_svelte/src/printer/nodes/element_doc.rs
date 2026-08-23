@@ -1110,12 +1110,16 @@ impl<'a> Printer<'a> {
                 d.concat(&[opening_tag, indented, d.hardline(), closing_tag])
             }
             _ => {
-                // Fallback: preserve raw content if parsing fails. Reachable only for a
-                // FORMATTABLE-lang body (css/ts/absent) whose content doesn't parse — a
-                // frozen body froze before the parse above.
-                // TODO: route through the freeze emitter for a cleaner shape? Prettier's
-                // behavior here is its degraded error-swallow path (no clean oracle to pin
-                // a fixture against), so the glued raw shape stays for now — see
+                // Fallback: preserve raw content. Reachable only for a FORMATTABLE-lang
+                // body (css/ts/absent) — a frozen body froze before the parse above — and
+                // it catches TWO cases, not one: a body whose content doesn't parse
+                // (`None`), and a body that parses but formats to EMPTY (`Some` whose trim
+                // is empty — `<script>;</script>`, guarded out by the arm above).
+                // TODO: route through the freeze emitter for a cleaner shape? For the
+                // parse-fail half prettier has only its degraded error-swallow path (no
+                // clean oracle to pin a fixture against); the formats-to-empty half DOES
+                // have one — prettier opens the pair around a blank line where this arm
+                // glues the raw one-liner — see
                 // docs/conformance_prettier_svelte.md §Foreign-language embedded bodies.
                 d.concat(&[opening_tag, d.text_pooled(&content), closing_tag])
             }
