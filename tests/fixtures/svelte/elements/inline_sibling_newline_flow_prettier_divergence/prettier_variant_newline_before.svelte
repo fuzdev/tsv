@@ -5,7 +5,8 @@
 	newline does still decide is the element's own layout: a newline anywhere in the content keeps
 	the element multiline (want air, author multiline), so these converge on the multiline form
 	rather than collapsing onto one line. Prettier holds a distinct stable form for each authoring.
-	Covers an inline element, a component, an expression tag and a render tag. The controls pin
+	Covers an inline element, a component, and all three tag kinds — an expression tag, a render
+	tag and an `{@html}` tag, which the flow predicate answers alike. The controls pin
 	what does not flow: a control-flow block, whose width is not fixed (packing a run of them
 	overflows the line, and the overflow is paid by expanding their bodies); the fully hugged
 	authoring, which stays hugged; a comment, which keeps its authored line; a blank line, which
@@ -29,6 +30,10 @@
 <p>
 	text1
 	{@render fn()} text2 text3
+</p>
+<p>
+	text1
+	{@html expr} text2 text3
 </p>
 
 <!-- control: a control-flow block keeps its authored line — packing a run of them onto one
