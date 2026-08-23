@@ -552,7 +552,7 @@ pub(crate) fn extract_property_name(
     // property name except as a comment start (an escaped one is written `\2f\2a`), so
     // the gate can only skip work, never change the branch taken.
     if has_block_comment && let Some(comment_start) = property_part.find("/*") {
-        let before_comment = property_part[..comment_start].trim();
+        let before_comment = trim_property_part(&property_part[..comment_start]);
 
         // Collect EVERY comment in the property→colon gap, not just the first: a
         // declaration may carry two or more (`color /* a */ /* b */ :`), and this
@@ -567,7 +567,7 @@ pub(crate) fn extract_property_name(
             // whole reconstruction rather than being taken as reaching end-of-input.
             let Some(comment_end) = crate::comments::comment_end_checked(rest.as_bytes(), 0) else {
                 // Malformed comment (no closing `*/`) - just trim the whole part.
-                return Cow::Borrowed(property_part.trim());
+                return Cow::Borrowed(trim_property_part(property_part));
             };
             comments.push(&rest[..comment_end]);
             rest = &rest[comment_end..];
@@ -585,13 +585,29 @@ pub(crate) fn extract_property_name(
         // terminator. That whitespace is part of the identifier token, so prettier
         // keeps it before the `:` (`\41 : red`); any extra whitespace is still trimmed
         // (`color : red` → `color: red`).
-        let bare = property_part.trim();
-        if property_part.ends_with(char::is_whitespace) && ends_with_hex_escape(bare) {
+        let bare = trim_property_part(property_part);
+        if property_part.ends_with(crate::whitespace::is_boundary_whitespace)
+            && ends_with_hex_escape(bare)
+        {
             Cow::Owned(format!("{bare} "))
         } else {
             Cow::Borrowed(bare)
         }
     }
+}
+
+/// [`str::trim`] over the class the printer's boundary claim scans back across.
+///
+/// ⚠️ **Not `str::trim`**, whose class is Unicode `White_Space` — which excludes `U+FEFF`,
+/// while JS `\s` (and so `parseCss`'s own `.trim()` of the raw property text) includes it.
+/// The gap this trims is also the gap `Printer::preserved_boundary_ws` re-emits from, and the
+/// two have to agree on where the name ends or the character belongs to both: `color<ZWNBSP>:`
+/// kept the run inside the name AND restored it beside it, doubling the run on every pass
+/// (`1 → 2 → 4 → …`) — a non-idempotency no fixture can carry and no ratchet was watching.
+/// `is_boundary_whitespace` is the class that scan uses, so asking it here is what makes the
+/// two halves one answer.
+fn trim_property_part(property_part: &str) -> &str {
+    property_part.trim_matches(crate::whitespace::is_boundary_whitespace)
 }
 
 /// Canonicalize a property name's case: standard CSS property names are ASCII

@@ -38,12 +38,30 @@ pub(crate) fn is_css_whitespace(c: char) -> bool {
 /// to its `read_identifier` — the ambiguous class, and the exact run a token boundary skips
 /// and the printer puts back.
 ///
-/// The two sides are one fact asked from opposite directions:
-/// `CssParser::skip_boundary_whitespace` decides what the AST does **not** contain, and
-/// `Printer::preserved_boundary_ws` decides what the output must still carry. Spelling it
-/// twice is a drift hazard with two silent failure modes — a printer that restores less than
-/// the parser skipped deletes source, and one that restores more duplicates it — so both ask
-/// this.
+/// The two sides are one fact asked from opposite directions: the parser decides what the AST
+/// does **not** contain (`CssParser::skip_boundary_whitespace`, and its comment-looping twin
+/// `skip_boundary_whitespace_registering_comments`), and the printer decides what the output
+/// must still carry. Spelling it twice is a drift hazard with two silent failure modes — a
+/// printer that restores less than the parser skipped deletes source, and one that restores
+/// more duplicates it — so every one of them asks *this* rather than re-deriving a class.
+///
+/// ⚠️ **A skip and a preservation are one change.** Adding a juncture to the parser without
+/// the matching restore turns a graceful over-rejection into content loss, which is the worse
+/// trade; both failure modes above have been live. The printer has two shapes of restore
+/// because the junctures have two shapes of anchor, and which one applies is a property of
+/// what follows the run:
+///
+/// - `Printer::preserved_boundary_ws` — a BACKWARD scan from the node that follows the run,
+///   for a gap that ends at a name (a compound, an explicit combinator). It takes a FLOOR,
+///   because a run glued to the previous identifier is already inside that name's span and an
+///   unbounded scan emits it a second time.
+/// - `Printer::boundary_ws_in_gap` — a FORWARD collection over a gap that ends at a
+///   STRUCTURAL token instead (`,`, `{`, `)`, `]`, an attribute value), which has no node to
+///   anchor on and may hold comments the printer emits separately.
+///
+/// Both live in `printer/boundary_ws.rs`, with the whole model — the partition between them,
+/// where a claim is emitted, and the residue — in that module's own doc, for the same reason
+/// this class is named once.
 ///
 /// It is JS `\s` minus its ASCII members: an ASCII space really is a separator on both sides
 /// of `parseCss`, so it is the printer's to regenerate as indentation, not to preserve
@@ -75,4 +93,21 @@ pub(crate) fn is_boundary_only_whitespace(c: char) -> bool {
 #[inline]
 pub(crate) fn is_boundary_whitespace(c: char) -> bool {
     tsv_lang::is_js_whitespace(c) || c.is_whitespace()
+}
+
+/// Byte length of the [`is_boundary_only_whitespace`] run at the head of `text`, or `0`.
+///
+/// The one measurement of "how much of this identifier token is really the run
+/// `allow_whitespace()` would have stepped", asked by the parser three ways: to decide
+/// whether a run stands here (`CssParser::boundary_run_len`), to step past one
+/// (`CssParser::skip_boundary_whitespace`'s lookaheads), and to tell a glued compound
+/// continuation from a boundary (`compound_continues_across_comments`). They are one
+/// question, so they are one function — a `starts_with` spelling beside a `take_while` one
+/// is how two of the three come to disagree about a mixed run.
+#[inline]
+pub(crate) fn boundary_prefix_len(text: &str) -> usize {
+    text.chars()
+        .take_while(|c| is_boundary_only_whitespace(*c))
+        .map(char::len_utf8)
+        .sum()
 }

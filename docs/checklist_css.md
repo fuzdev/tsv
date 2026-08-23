@@ -110,7 +110,8 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
 - Surrogate pair handling
 - An escape's payload is content, not padding — a trailing escaped whitespace survives trimming and line-wrapping in every position (`width: 50px\ ;`, `url(x\ )`, `@layer a\ ;`, `.a\ , .b`), so the backslash never strands onto the following delimiter. Prettier corrupts these into forms that no longer parse; see [conformance_prettier_css.md §CSS: Values](conformance_prettier_css.md#css-values) and [§CSS: At-Rules](conformance_prettier_css.md#css-at-rules)
 - A hex escape's optional whitespace terminator belongs to the escape and is absorbed exactly once (`\41 2px` is the single ident `A2px`, never `A` + `2px`)
-- Non-CSS whitespace is value content, not separator — an NBSP or U+3000 in a value or selector survives verbatim (`.a<NBSP>, .b` keeps its class name)
+- Non-CSS whitespace is value content, not separator — an NBSP or U+3000 in a **value** survives verbatim, and so does one glued to a selector NAME (`.a<NBSP>, .b` keeps its class name: `read_identifier` reaches it first)
+- …but the same code point at a selector **boundary** is a separator, because `parseCss` reaches it through `allow_whitespace()` (JS `\s`) instead — a selector-list start, each `,`, the compound break, a combinator's gaps, a pseudo-argument list's start and its `)`, and the attribute selector's interior. It leaves the AST there and the printer re-emits the bytes at every one of those junctures, so nothing is lost either way (two positions still drop it — the stylesheet's trailing whitespace and a comment-bearing property→colon gap — ratcheted in that test). Which reader wins is decided by ORDER, never by the class: [conformance_svelte.md §Boundary whitespace](conformance_svelte.md), pinned by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs)
 
 ---
 

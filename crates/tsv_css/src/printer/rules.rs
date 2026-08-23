@@ -42,6 +42,14 @@ impl<'a> Printer<'a> {
             start_index += 1; // Skip this comment when processing declarations
         }
 
+        // A boundary run the parser skipped between the prelude and the `{` has no node to
+        // ride out on — see `boundary_ws_in_gap`. Emitted flush against the brace, which the
+        // block separator then follows.
+        let kept = self.boundary_ws_in_gap(rule.selector.span.end, rule.block_span.start);
+        if !kept.is_empty() {
+            self.write(&kept);
+        }
+
         self.write_block_open();
 
         // Format declarations and comments with indentation, via the shared
@@ -52,6 +60,7 @@ impl<'a> Printer<'a> {
         self.indent_level -= 1;
 
         self.write_indent();
+        self.write_block_tail_boundary_ws(rule.declarations, rule.block_span);
         self.write("}");
     }
 }
