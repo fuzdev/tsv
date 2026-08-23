@@ -9,15 +9,21 @@
 	const a4 = p < nullµ ? q : r > s;
 	const a5 = p < true$ ? q : r > s;
 
-	// The same claim where it BITES. Past the would-be closing `>`, a template tag
-	// or a parenthesized operand does not start an expression — the one follow
-	// token the closing-`>` scan accepts — so a false keyword match commits to type
-	// arguments here and then fails on the `?`. The lines above stay comparisons
-	// under a byte-level word boundary too; only these do not.
+	// The same claim where the token past the would-be closing `>` does not start
+	// an expression (a template tag, a parenthesized sequence) — the shapes only
+	// the type-argument lookahead's own follow-token filter keeps as comparisons.
 	const a6 = p < string$ ? q : r > `t`;
 	const a7 = p < stringµ ? q : r > `t`;
 	const a8 = p < string$ ? q : r > (t, u);
 	const a9 = p < null$ - 1 > `t`;
+
+	// An OPERATOR keyword's dispatch still differs from the identifier arm's (an
+	// atom's no longer does — both take the same follow-token filter), so an
+	// operator lookalike is where a broken word boundary would bite: matched as
+	// `keyof`/`unique`, the `-` would read as a type operand and commit to type
+	// arguments, making each line a parse error instead of a comparison.
+	const c1 = p < keyof$ - 1 > `t`;
+	const c2 = p < uniqueµ - 1 > (t, u);
 
 	// The bare keyword still opens them.
 	const b1 = fn<string>();
