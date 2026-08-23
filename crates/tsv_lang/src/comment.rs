@@ -1,4 +1,6 @@
 // Shared comment type and utilities used across languages
+use std::borrow::Cow;
+
 use crate::Span;
 use crate::printing;
 use crate::source_scan::{self, has_newline_after_position, has_newline_before_position};
@@ -103,6 +105,39 @@ impl Comment {
     #[inline]
     pub fn content<'s>(&self, source: &'s str) -> &'s str {
         self.content_span.extract(source)
+    }
+
+    /// The comment's **wire** `value`: [`Comment::content`] with Svelte's acorn
+    /// indentation stripping applied.
+    ///
+    /// For a multi-line block comment, Svelte's *acorn* `onComment` handler dedents the
+    /// content by the comment's line indentation (see
+    /// `svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js`). This applies **only
+    /// to comments acorn parses** — `<script>` bodies and template expressions — not to
+    /// comments Svelte's own template reader collects (in-tag `//` / `/* */` between
+    /// attributes), which keep their raw content. [`Comment::emit_character_field`]
+    /// distinguishes the two: it is set for template-open-tag-shape comments (the
+    /// template-reader ones) and cleared for acorn-shape ones, so the dedent is gated on
+    /// `!emit_character_field`.
+    ///
+    /// Returns a `Cow` so the common single-line / verbatim case borrows its content slice
+    /// — only the acorn multi-line block dedent path (rare) allocates.
+    ///
+    /// It lives here rather than in a writer because **two** crates emit it: `tsv_svelte`
+    /// for the root `comments` array, and `tsv_ts`'s online comment attach for every
+    /// `leadingComments` / `trailingComments` entry.
+    #[must_use]
+    pub fn wire_value<'s>(&self, source: &'s str) -> Cow<'s, str> {
+        let content = self.content(source);
+        if self.is_block && self.multiline && !self.emit_character_field {
+            Cow::Owned(printing::strip_comment_indentation(
+                source,
+                content,
+                self.span.start,
+            ))
+        } else {
+            Cow::Borrowed(content)
+        }
     }
 }
 

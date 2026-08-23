@@ -325,7 +325,7 @@ pub(super) fn write_block_statement(
 ) {
     node_header(w, "BlockStatement", block.span, ctx);
     w.raw(",\"body\":");
-    write_array(w, block.body, |w, s| write_statement(w, s, ctx));
+    super::write_body_array(w, block.body, ctx, |w, s| write_statement(w, s, ctx));
     close_node(w, "BlockStatement", block.span, ctx);
 }
 

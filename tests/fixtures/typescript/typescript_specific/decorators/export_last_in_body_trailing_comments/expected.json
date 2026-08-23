@@ -1,0 +1,280 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 303,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A decorator-first `export` is the last statement in the Program body, and its",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " wire node starts at `export` while the statement starts at the `@` — the",
+			"start": 102,
+			"end": 177,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing run after it still attaches to the export, not to the Program.",
+			"start": 179,
+			"end": 253,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t1",
+			"start": 280,
+			"end": 285,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t2",
+			"start": 287,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 302,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 293,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 261,
+					"end": 278,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 18
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 255,
+						"end": 278,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 18
+							}
+						},
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 255,
+								"end": 259,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 1
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 256,
+									"end": 259,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 274,
+							"end": 275,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 14
+								},
+								"end": {
+									"line": 6,
+									"column": 15
+								}
+							},
+							"name": "C"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 276,
+							"end": 278,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 16
+								},
+								"end": {
+									"line": 6,
+									"column": 18
+								}
+							},
+							"body": []
+						}
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A decorator-first `export` is the last statement in the Program body, and its",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " wire node starts at `export` while the statement starts at the `@` — the",
+							"start": 102,
+							"end": 177
+						},
+						{
+							"type": "Line",
+							"value": " trailing run after it still attaches to the export, not to the Program.",
+							"start": 179,
+							"end": 253
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " t1",
+							"start": 280,
+							"end": 285
+						},
+						{
+							"type": "Line",
+							"value": " t2",
+							"start": 287,
+							"end": 292
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

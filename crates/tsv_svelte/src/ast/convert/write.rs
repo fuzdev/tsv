@@ -27,33 +27,32 @@
 //! - **Generic template expressions** (`{expr}`, block tests, directive
 //!   expressions, …) emit fused via `tsv_ts`'s `write_expression_embedded`. When
 //!   a template comment lands inside the expression's window (the
-//!   `any_comment_in` pre-check), the comment
-//!   assignments are precomputed into a per-node `WriterComments` map and the
-//!   expression fuses with `CommentMode::Emit`, emitting each
-//!   node's `leadingComments`/`trailingComments` at its close.
+//!   `any_comment_in` pre-check), the expression fuses with
+//!   `CommentMode::Attach` — acorn's attach runs online off that emit's own node
+//!   opens and closes, and each node emits its
+//!   `leadingComments`/`trailingComments` at its close.
 //! - **Snippet names / parameters** fuse the same way (with `character`
 //!   injection / the shared one-queue list attach, matching canonical's single
 //!   acorn parse of the list — multi-identifier `{@debug}` rides the same path).
 //! - **`{@const}` / `{const}` / `{let}` declarations** fuse their
 //!   `VariableDeclaration` structure (the `{@const}` declaration `end` is always
 //!   `tag.span.end - 1`, Svelte's `parser.index - 1`); when the document has a
-//!   template comment the init/declaration subtree carries a `WriterComments` map.
+//!   template comment the init/declaration subtree runs its own attach.
 //! - **`<script>` content** always fuses via `write_program_embedded`: an
 //!   eligible script (`lang="ts"` ∧ no script comments ∧ no preceding HTML
-//!   comment) with no map; an ineligible one (a plain non-`lang="ts"` script, one
+//!   comment) with no attach at all; an ineligible one (a plain non-`lang="ts"` script, one
 //!   with comments, or one with a preceding HTML comment) with the schema-driven
-//!   `options: null` quirk and, when it has comments, a `WriterComments` map (the
-//!   acorn attach precomputed over a byte-space skeleton, the preceding HTML
-//!   comment prepended to the `Program`'s `leadingComments`).
+//!   `options: null` quirk and, when it has comments, an online attach (the
+//!   preceding HTML comment prepended to the `Program`'s `leadingComments`).
 //!
-//! **The comment map** (`ast/convert/special.rs`'s `build_*_writer_comments`,
-//! `tsv_ts`'s `WriterComments`): the comment-attach paths never build a
-//! `serde_json::Value` at all. Each island records its wire tree during its own
-//! byte-space skeleton emit (`SkeletonRecorder`), runs the shared acorn attach
-//! DFS over the recorded tree, and folds the assignments into a span-keyed map
-//! the fused writer consults at each node's close — so attached comments
-//! serialize *last* within a node exactly as acorn's appended keys place them,
-//! regardless of child-visit order.
+//! **The comment attach** (`ast/convert/comment_attachment.rs`'s `attach_*`, `tsv_ts`'s
+//! `CommentAttach`) runs **online**, off this one emission: acorn assigns a
+//! node's leading comments at node *entry* and its trailing ones after its
+//! children, which are exactly the writer's `node_header` and `close_node`, and
+//! the wire emits both lists at the close. So there is no second pass, no
+//! recorded tree and no per-node map — attached comments serialize *last*
+//! within a node exactly as acorn's appended keys place them, and the walk's
+//! child-visit order IS the emitted field order.
 //!
 //! **Byte-identity**: the wire JSON is a faithful emission of the Svelte
 //! parser's JSON (its acorn `<script>` shape plus `parseCss` `<style>` shape) —
@@ -68,18 +67,16 @@ use tsv_lang::{
 };
 use tsv_ts::AcornSeed;
 use tsv_ts::ast::convert::{
-    CommentMode, EmbedWriter, ProgramLoc, ProgramWriter, Schema, translate_column,
+    CommentAttach, CommentMode, EmbedWriter, ProgramLoc, ProgramWriter, Schema, translate_column,
     write_expression_embedded, write_identifier_expression_with_character, write_pattern_embedded,
     write_program_embedded, write_variable_declaration_embedded,
 };
 
-use super::comment_attachment::{AttachInputs, get_comment_value, is_template_comment};
-use super::special::{
-    bool_option, build_const_tag_writer_comments, build_declaration_tag_writer_comments,
-    build_expression_list_writer_comments, build_expression_writer_comments,
-    build_pattern_island_writer_comments, build_script_writer_comments, component_is_typescript,
-    find_option_values, pattern_comment_window, text_value,
+use super::comment_attachment::{
+    AttachInputs, attach_binding_pattern, attach_const_tag_init, attach_expression,
+    attach_expression_list, attach_script, is_template_comment, pattern_comment_window,
 };
+use super::special::{bool_option, component_is_typescript, find_option_values, text_value};
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
 ///
@@ -432,21 +429,23 @@ impl<'a> Ctx<'a> {
         acorn.seeds[i]
     }
 
-    /// The shared inputs for a template comment-attach builder
-    /// (`build_*_writer_comments`) — this document's template comments, source,
-    /// byte-offset tracker, and parser variant.
+    /// The shared inputs for a template island's comment attach
+    /// (`ast/convert/comment_attachment.rs`'s `attach_*`) — this document's
+    /// template comments and source.
+    ///
+    /// It carries no parser variant and no tracker: the attach runs online off
+    /// the one emission, so there is no second pass to configure and no way for
+    /// two passes to disagree.
     #[inline]
-    fn attach(&self) -> AttachInputs<'a> {
+    fn attach_inputs(&self) -> AttachInputs<'a> {
         AttachInputs {
             template_comments: self.comments,
             source: self.source,
-            tracker: self.loc.tracker,
-            vanilla_acorn: !self.component_is_ts,
         }
     }
 
-    /// A copy of this context with no template comments — for subtrees the
-    /// template attach passes never visit (`<script>`/`<style>`/`<svelte:options>`
+    /// A copy of this context with no template comments — for subtrees no
+    /// template island attach ever reaches (`<script>`/`<style>`/`<svelte:options>`
     /// tag attributes), so their embedded expressions always fuse comment-free.
     #[inline]
     fn without_comments(&self) -> Ctx<'a> {
@@ -457,7 +456,7 @@ impl<'a> Ctx<'a> {
     }
 
     /// Superset pre-check: does any template comment *start* in `[start, end)`?
-    /// A miss means the expression stays fused (no skeleton, no attach).
+    /// A miss means the expression fuses with no attach at all.
     ///
     /// `self.comments` is sorted ascending by `span.start`, so the first comment
     /// at/after `start` (binary search) starting before `end` settles the query.
@@ -468,9 +467,9 @@ impl<'a> Ctx<'a> {
     }
 }
 
-/// Start position of a fragment's first node — the range-end tightener the
-/// attach passes use so a sibling expression context (`{:else if}`) doesn't
-/// bleed into a block's own expression window.
+/// Start position of a fragment's first node — the range-end tightener an island
+/// attach uses so a sibling expression context (`{:else if}`) doesn't bleed into a
+/// block's own expression window.
 #[inline]
 fn fragment_first_start(fragment: &internal::Fragment<'_>) -> Option<u32> {
     fragment.nodes.first().map(|n| n.span().start)
@@ -603,10 +602,10 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
         w.raw(",\"end\":");
         w.u32(end_char);
         w.raw(",\"value\":");
-        w.string(&get_comment_value(comment, ctx.source));
+        w.string(&comment.wire_value(ctx.source));
     } else {
         w.raw("\",\"value\":");
-        w.string(&get_comment_value(comment, ctx.source));
+        w.string(&comment.wire_value(ctx.source));
         w.raw(",\"start\":");
         w.u32(start_char);
         w.raw(",\"end\":");
@@ -682,9 +681,13 @@ fn write_fragment_node(w: &mut JsonWriter, node: &internal::FragmentNode<'_>, ct
     }
 }
 
-/// A generic template expression island: fused when comment-free, else the
-/// comment-bearing path — precompute a `WriterComments` map off a byte-space
-/// skeleton (`build_expression_writer_comments`), then fuse-emit with it.
+/// A generic template expression island: fused when comment-free, else with the
+/// island's online attach driving `leadingComments` / `trailingComments` off this
+/// emit's own node opens and closes (`attach_expression`).
+///
+/// The attach is anchored on `expr`'s own span end — where the PARSE ended, which
+/// for a JSDoc cast is past its `)` and so is not the emitted root's end; see
+/// `attach_expression`.
 ///
 /// Call this directly only for a window that is **deliberately asymmetric** — a block head,
 /// whose attach runs from the `{#` to the end of its clause rather than to the expression's
@@ -698,9 +701,13 @@ fn write_generic_island(
     ctx: &Ctx<'_>,
 ) {
     if ctx.any_comment_in(container_start, range_end) {
-        let wc = build_expression_writer_comments(expr, ctx.attach(), container_start, range_end);
-        write_expression_embedded(w, expr, ctx.embed_expr(CommentMode::Emit(&wc), expr));
-        wc.debug_assert_consumed();
+        let attach = attach_expression(
+            ctx.attach_inputs(),
+            container_start,
+            expr.span().end,
+            range_end,
+        );
+        write_expression_embedded(w, expr, ctx.embed_expr(attach.mode(), expr));
     } else {
         write_expression_embedded(w, expr, ctx.embed_expr(CommentMode::Off, expr));
     }
@@ -1100,8 +1107,8 @@ fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, c
 
 /// The snippet name identifier — Svelte injects `character` into its `loc`. A
 /// leading comment (`{#snippet /* c */ name(…)}`) can attach, so the
-/// comment-bearing case precomputes a `WriterComments` map (skeleton + attach)
-/// and fuse-emits with it; the comment-free common case fuses directly.
+/// comment-bearing case runs the island's online attach; the comment-free common
+/// case fuses directly.
 fn write_snippet_name(
     w: &mut JsonWriter,
     expr: &tsv_ts::ast::internal::Expression<'_>,
@@ -1110,26 +1117,22 @@ fn write_snippet_name(
     ctx: &Ctx<'_>,
 ) {
     if ctx.any_comment_in(container_start, range_end) {
-        // The injected `character` lives in the identifier's `loc` and doesn't
-        // affect the attach walk (span/type keyed), so the skeleton builds
-        // without it and the fused emit adds it.
-        let wc = build_expression_writer_comments(expr, ctx.attach(), container_start, range_end);
-        write_identifier_expression_with_character(
-            w,
-            expr,
-            ctx.embed_locator(CommentMode::Emit(&wc)),
+        let attach = attach_expression(
+            ctx.attach_inputs(),
+            container_start,
+            expr.span().end,
+            range_end,
         );
-        wc.debug_assert_consumed();
+        write_identifier_expression_with_character(w, expr, ctx.embed_locator(attach.mode()));
     } else {
         write_identifier_expression_with_character(w, expr, ctx.embed_locator(CommentMode::Off));
     }
 }
 
-/// Snippet parameters. Comment-free (the common case): each fuses. Otherwise a
-/// `WriterComments` map is precomputed off a byte-space skeleton via the shared
-/// list attach (`attach_expression_list` — one queue, each inter-parameter
-/// comment claimed once per acorn's same-line rule), then each parameter
-/// fuse-emits with it. No wrapper-end suppression: canonical parses the list in
+/// Snippet parameters. Comment-free (the common case): each fuses. Otherwise the
+/// whole list shares ONE attach (`attach_expression_list` — one queue, each
+/// inter-parameter comment claimed once per acorn's same-line rule) and every
+/// parameter emits through it. No wrapper-end suppression: canonical parses the list in
 /// a function context whose wrapper ends past every param.
 fn write_snippet_parameters(
     w: &mut JsonWriter,
@@ -1139,17 +1142,10 @@ fn write_snippet_parameters(
     ctx: &Ctx<'_>,
 ) {
     if !parameters.is_empty() && ctx.any_comment_in(container_start, range_end) {
-        let wc = build_expression_list_writer_comments(
-            parameters,
-            ctx.attach(),
-            container_start,
-            range_end,
-            None,
-        );
+        let attach = attach_expression_list(ctx.attach_inputs(), container_start, range_end, None);
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(w, p, ctx.embed_expr(CommentMode::Emit(&wc), p));
+            write_expression_embedded(w, p, ctx.embed_expr(attach.mode(), p));
         });
-        wc.debug_assert_consumed();
     } else {
         write_array(w, parameters, |w, p| {
             write_expression_embedded(w, p, ctx.embed_expr(CommentMode::Off, p));
@@ -1231,17 +1227,15 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
     if let [first, .., last] = identifiers
         && ctx.any_comment_in(tag.span.start, tag.span.end)
     {
-        let wc = build_expression_list_writer_comments(
-            identifiers,
-            ctx.attach(),
+        let attach = attach_expression_list(
+            ctx.attach_inputs(),
             tag.span.start,
             tag.span.end,
             Some(Span::new(first.span().start, last.span().end)),
         );
         write_array(w, identifiers, |w, id| {
-            write_expression_embedded(w, id, ctx.embed_expr(CommentMode::Emit(&wc), id));
+            write_expression_embedded(w, id, ctx.embed_expr(attach.mode(), id));
         });
-        wc.debug_assert_consumed();
     } else {
         write_array(w, identifiers, |w, id| {
             write_braced_island(w, id, tag.span, ctx);
@@ -1257,10 +1251,10 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
 /// `{@`), declarator `end = parser.index` after `read_expression` (see
 /// `const_declarator_end`), declaration `end = tag.span.end - 1`
 /// (`parser.index - 1`, the byte before the closing `}`). The comment-free
-/// document fuses directly; a document with template comments precomputes a
-/// `WriterComments` map covering both the id pattern and the init (canonical
-/// runs a comment attach per acorn parse — `read_pattern`'s synthetic
-/// `(pattern = 1)` and `read_expression`'s init) and fuse-emits with it.
+/// document fuses directly; a document with template comments builds TWO attaches,
+/// one per canonical acorn parse — `read_pattern`'s synthetic `(pattern = 1)` for
+/// the id and `read_expression`'s for the init — so a comment in one window can
+/// never reach the other's tree.
 fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -1272,23 +1266,32 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
     let decl_end = ctx.pos(tag.span.end - 1);
     let declarator_end = ctx.pos(const_declarator_end(tag, ctx));
     // Scoped comment pre-check: a comment attaching to this tag necessarily starts
-    // inside its span, so no comment in `[tag.span.start, tag.span.end)` means the
-    // attach map would be empty — fuse directly (Off ≡ Emit(empty)).
+    // inside its span, so no comment in `[tag.span.start, tag.span.end)` means both
+    // attach queues would be empty — fuse directly (Off ≡ an empty queue).
     if !ctx.any_comment_in(tag.span.start, tag.span.end) {
-        write_const_declaration(w, tag, decl_end, declarator_end, CommentMode::Off, ctx);
-    } else {
-        // The document has template comments: precompute the init-subtree
-        // attach map (comments attach to the init only).
-        let wc = build_const_tag_writer_comments(tag, ctx.attach());
         write_const_declaration(
             w,
             tag,
             decl_end,
             declarator_end,
-            CommentMode::Emit(&wc),
+            CommentMode::Off,
+            CommentMode::Off,
             ctx,
         );
-        wc.debug_assert_consumed();
+    } else {
+        // The document has template comments: the tag's TWO acorn parses take
+        // two attaches, split at the end of the binding (see `attach_const_tag_init`).
+        let id_attach = attach_binding_pattern(&tag.id, ctx.attach_inputs());
+        let init_attach = attach_const_tag_init(tag, ctx.attach_inputs());
+        write_const_declaration(
+            w,
+            tag,
+            decl_end,
+            declarator_end,
+            id_attach.mode(),
+            init_attach.mode(),
+            ctx,
+        );
     }
     w.raw("}");
 }
@@ -1338,22 +1341,26 @@ fn const_declarator_end(tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
 
 /// Emit a `{@const}`'s hand-built `VariableDeclaration`. `decl_end` is the
 /// already-mapped declaration `end` (`tag.span.end - 1`) and `declarator_end`
-/// the already-mapped declarator `end` (`const_declarator_end`); an `Emit`
-/// mode feeds the id/init subtrees' fused per-node attach.
+/// the already-mapped declarator `end` (`const_declarator_end`).
+///
+/// The id and the init take **separate** attaches because canonical runs them as
+/// two acorn parses with two comment sets — a single one would let a comment in
+/// the id's window reach the init's tree (see `attach_const_tag_init`).
 fn write_const_declaration(
     w: &mut JsonWriter,
     tag: &internal::ConstTag<'_>,
     decl_end: u32,
     declarator_end: u32,
-    mode: CommentMode<'_>,
+    id_mode: CommentMode<'_>,
+    init_mode: CommentMode<'_>,
     ctx: &Ctx<'_>,
 ) {
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(w, &tag.id, ctx.embed_pattern(mode, &tag.id));
+    write_pattern_embedded(w, &tag.id, ctx.embed_pattern(id_mode, &tag.id));
     w.raw(",\"init\":");
-    write_expression_embedded(w, &tag.init, ctx.embed_expr(mode, &tag.init));
+    write_expression_embedded(w, &tag.init, ctx.embed_expr(init_mode, &tag.init));
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
@@ -1370,9 +1377,11 @@ fn write_const_declaration(
 /// The `declaration` is a real TS `VariableDeclaration`, emitted with its own
 /// span `end` in both states (canonical keeps acorn's end for DeclarationTag —
 /// unlike `ConstTag`, no `-1` rewrite). The comment-free document fuses via
-/// `write_variable_declaration_embedded`; a comment-bearing one precomputes the
-/// island's `WriterComments` (`attach_declaration_tag_declaration` attaches
-/// across the whole tree).
+/// `write_variable_declaration_embedded`; a comment-bearing one runs the island's
+/// online attach over the whole tag, so comments attach across the **whole**
+/// `VariableDeclaration` tree (every declarator and its id/init) per acorn's
+/// recursive attachment — attaching only to the first init left a comment leading
+/// a later declarator (`{let a = 1, /* c */ b}`) unattached.
 fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DeclarationTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -1380,7 +1389,7 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"declaration\":");
     // Scoped comment pre-check (see `write_const_tag`): no comment inside this
-    // tag's span means the attach map is empty, so fuse directly.
+    // tag's span means the attach queue is empty, so fuse directly.
     if !ctx.any_comment_in(tag.span.start, tag.span.end) {
         write_variable_declaration_embedded(
             w,
@@ -1388,18 +1397,17 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             ctx.embed(CommentMode::Off, tag.declaration.span.start),
         );
     } else {
-        let wc = build_declaration_tag_writer_comments(
-            &tag.declaration,
-            ctx.attach(),
+        let attach = attach_expression(
+            ctx.attach_inputs(),
             tag.span.start,
+            tag.declaration.span.end,
             tag.span.end,
         );
         write_variable_declaration_embedded(
             w,
             &tag.declaration,
-            ctx.embed(CommentMode::Emit(&wc), tag.declaration.span.start),
+            ctx.embed(attach.mode(), tag.declaration.span.start),
         );
-        wc.debug_assert_consumed();
     }
     w.raw("}");
 }
@@ -1741,7 +1749,8 @@ fn write_style_sheet(
 }
 
 /// A `<script>` block. `content` always fuses via `write_program_embedded`; the
-/// schema and (when needed) a per-node comment map handle the acorn quirks:
+/// schema and (when needed) the island's online comment attach handle the acorn
+/// quirks:
 ///
 /// - **Schema**: `lang="ts"` → `Schema::Acorn`; a plain `<script>` →
 ///   `Schema::SvelteScript` (omit `importKind`/`exportKind="value"`, always emit
@@ -1749,9 +1758,8 @@ fn write_style_sheet(
 ///   `Ctx::vanilla_acorn` in `tsv_ts`, which the expression islands reach
 ///   through `Ctx::embed` instead).
 /// - **Comments**: a script whose `Program` carries comments (its own or a
-///   preceding HTML comment) precomputes acorn's leading/trailing assignments
-///   into a `WriterComments` map (`build_script_writer_comments`); the common
-///   comment-free case fuses with no map.
+///   preceding HTML comment) runs acorn's leading/trailing attach online off this
+///   emit (`attach_script`); the common comment-free case fuses without one.
 ///
 /// The `loc` uses the Svelte tag-line override (final char-space positions); the
 /// spine and attributes fuse regardless.
@@ -1779,35 +1787,25 @@ fn write_script(
         Schema::SvelteScript
     };
     // A script whose `Program` carries comments (its own or a preceding HTML
-    // comment) needs acorn's leading/trailing attach — precomputed into a
-    // per-node map the fused writer consults at each close. The common case (no
-    // comments) fuses with no map (`options: null` still comes from the schema).
-    let writer_comments = if script.content.comments.is_empty() && html_leading_comment.is_none() {
+    // comment) needs acorn's leading/trailing attach, which runs online off this
+    // emit's own node opens and closes. The common case (no comments) fuses with
+    // no attach at all (`options: null` still comes from the schema).
+    let attach = if script.content.comments.is_empty() && html_leading_comment.is_none() {
         None
     } else {
-        Some(build_script_writer_comments(
-            script,
-            ctx.source,
-            ctx.loc.tracker,
-            html_leading_comment,
-            schema,
-        ))
+        Some(attach_script(script, ctx.source, html_leading_comment))
     };
-    let mode = match &writer_comments {
-        Some(wc) => CommentMode::Emit(wc),
-        None => CommentMode::Off,
-    };
+    let mode = attach
+        .as_ref()
+        .map_or(CommentMode::Off, CommentAttach::mode);
     write_script_program_fused(w, script, ctx, schema, mode);
-    if let Some(wc) = &writer_comments {
-        wc.debug_assert_consumed();
-    }
     w.raw(",\"attributes\":");
     write_value_attributes(w, script.attributes, ctx);
     w.raw("}");
 }
 
 /// Fuse a script's `Program`, reproducing Svelte's tag-line `loc` override in
-/// final char space (threading the schema and optional per-node comment map).
+/// final char space (threading the schema and the island's comment mode).
 ///
 /// Svelte overrides the byte-space `Program.loc` to `locator(<script> tag
 /// start)` and `locator(</script> end)` — `{line, column}` of the tag's own
@@ -2107,11 +2105,11 @@ fn write_value_attributes(
 /// Patterns DO collect comments — `parse_ts_pattern` and, for `{#each}`, the
 /// separately-read `parse_ts_type_annotation` both extend `expression_comments`
 /// — and canonical attaches each one to its adjacent node inside the pattern
-/// subtree, so a comment-bearing binding precomputes the same window
-/// `{@const}`'s id takes (`build_pattern_island_writer_comments`) and fuses with
-/// it. The pre-check is the window itself rather than the enclosing block's
-/// span: a comment attaching here necessarily starts inside the binding, and
-/// asking wider would only build a map every lookup misses.
+/// subtree, so a comment-bearing binding attaches over the same window
+/// `{@const}`'s id takes (`attach_binding_pattern`). The pre-check is the window
+/// itself rather than the enclosing block's span: a comment attaching here
+/// necessarily starts inside the binding, and asking wider would only build an
+/// attach with nothing in its queue.
 fn write_pattern_island(
     w: &mut JsonWriter,
     expr: &tsv_ts::ast::internal::Expression<'_>,
@@ -2122,9 +2120,8 @@ fn write_pattern_island(
         write_pattern_embedded(w, expr, ctx.embed_pattern(CommentMode::Off, expr));
         return;
     }
-    let wc = build_pattern_island_writer_comments(expr, ctx.attach());
-    write_pattern_embedded(w, expr, ctx.embed_pattern(CommentMode::Emit(&wc), expr));
-    wc.debug_assert_consumed();
+    let attach = attach_binding_pattern(expr, ctx.attach_inputs());
+    write_pattern_embedded(w, expr, ctx.embed_pattern(attach.mode(), expr));
 }
 
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s

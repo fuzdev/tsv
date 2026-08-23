@@ -24,7 +24,7 @@ pub(super) fn write_type_annotation(
     if type_annotation.span == ctx.pattern_ann_span {
         // `{type, start, end, typeAnnotation}` — no `loc` (the block-pattern quirk).
         let span = type_annotation.span;
-        super::record_open("TSTypeAnnotation", span, ctx);
+        super::attach_open("TSTypeAnnotation", span, ctx);
         w.raw("{\"type\":\"TSTypeAnnotation\",\"start\":");
         w.u32(ctx.loc.pos(span.start));
         w.raw(",\"end\":");
