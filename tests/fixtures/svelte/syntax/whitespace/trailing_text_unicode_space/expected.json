@@ -1,0 +1,65 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 412,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 391,
+				"data": "\n\tA document's trailing text is trimmed with Svelte's own class, JS `\\s`. U+0085 NEL is\n\tNOT in it, so it survives as the last Text node and both formatters keep it; the JS\n\t`\\s` members padding it after are dropped (see unformatted_trailing_unicode_space,\n\tunformatted_trailing_spaces). Rust's `White_Space` is the wrong class in both\n\tdirections here — it has NEL and lacks U+FEFF.\n"
+			},
+			{
+				"type": "Text",
+				"start": 391,
+				"end": 392,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 392,
+				"end": 409,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 393
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 396
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 397,
+							"end": 403,
+							"raw": "block1",
+							"data": "block1"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 409,
+				"end": 411,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

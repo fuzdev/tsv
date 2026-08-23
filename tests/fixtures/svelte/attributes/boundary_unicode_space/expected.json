@@ -1,0 +1,206 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 616,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 528,
+				"data": "\n\tA JS `\\s` character after an attribute's value ENDS the attribute — Svelte's\n\t`regex_invalid_unquoted_attribute_value` spells that class as `\\s`, so every\n\tnon-ASCII member separates too (see unformatted_boundary_nbsp and\n\tunformatted_boundary_ideographic). Two symptoms, one per element: absorbing it\n\tbefore another attribute makes the head unparseable, and absorbing it before\n\t`>` turns the expression value into a quoted string. The brace-interior\n\tquestion is its sibling (see attributes/interior_unicode_space).\n"
+			},
+			{
+				"type": "Text",
+				"start": 528,
+				"end": 529,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 529,
+				"end": 583,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 530
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 533
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 534,
+						"end": 551,
+						"name": "onclick",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 5,
+								"character": 534
+							},
+							"end": {
+								"line": 10,
+								"column": 12,
+								"character": 541
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 542,
+							"end": 551,
+							"expression": {
+								"type": "Identifier",
+								"start": 543,
+								"end": 550,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 14
+									},
+									"end": {
+										"line": 10,
+										"column": 21
+									}
+								},
+								"name": "handler"
+							}
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 552,
+						"end": 569,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 23,
+								"character": 552
+							},
+							"end": {
+								"line": 10,
+								"column": 32,
+								"character": 561
+							}
+						},
+						"value": [
+							{
+								"start": 563,
+								"end": 568,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 570,
+						"end": 576,
+						"name": "hidden",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 41,
+								"character": 570
+							},
+							"end": {
+								"line": 10,
+								"column": 47,
+								"character": 576
+							}
+						},
+						"value": true
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 583,
+				"end": 584,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 584,
+				"end": 615,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 585
+					},
+					"end": {
+						"line": 11,
+						"column": 5,
+						"character": 589
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 590,
+						"end": 607,
+						"name": "onclick",
+						"name_loc": {
+							"start": {
+								"line": 11,
+								"column": 6,
+								"character": 590
+							},
+							"end": {
+								"line": 11,
+								"column": 13,
+								"character": 597
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 598,
+							"end": 607,
+							"expression": {
+								"type": "Identifier",
+								"start": 599,
+								"end": 606,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 15
+									},
+									"end": {
+										"line": 11,
+										"column": 22
+									}
+								},
+								"name": "handler"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

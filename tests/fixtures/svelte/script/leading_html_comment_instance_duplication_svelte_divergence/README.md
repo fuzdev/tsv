@@ -4,9 +4,17 @@ A leading HTML comment (`<!-- @component … -->`, the component/module doc
 comment) before a `<script module>` + instance `<script>` pair is attached by
 Svelte to **both** the module Program *and* the instance Program
 (`module.content.leadingComments` **and** `instance.content.leadingComments`) —
-the comment is duplicated across the two script roots. (With no module script,
-there is a single instance Program and tsv matches Svelte; the divergence only
-appears once a second script gives the comment a second root to be copied onto.)
+the comment is duplicated across the two script roots. (With a single lifted root there is nothing to copy onto and tsv
+matches Svelte.)
+
+The second root need not be a **script**: a lifted `<script>` / `<style>` is
+never appended to the fragment, so canonical's backwards walk steps over one as
+if it were absent, and `<!-- c --><script/><style/>` puts the comment on the
+instance *and* on the stylesheet (as does the reverse order). tsv stops at the
+hole a lifted tag leaves between two fragment nodes, so the nearest root keeps
+it in every arrangement — pinned as controls in
+[svelte_preceding_comment.rs](../../../../svelte_preceding_comment.rs), beside
+the gap-class rule that shares the same reader.
 
 **tsv attaches the comment once, to the nearest script Program** — the module
 Program — and does not copy it onto the instance Program (`expected_ours.json`

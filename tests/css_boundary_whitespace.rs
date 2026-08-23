@@ -45,7 +45,7 @@
 //! silently if `parseCss` changed.
 //!
 //! **Residue, deliberately not closed here.** The junctures above are the ones the wire
-//! audit surfaced and this fix covers; four more still read the run as identifier content,
+//! audit surfaced and this fix covers; three more still read the run as identifier content,
 //! all of them span- or structure-level rather than name-level, and none reachable from
 //! authored CSS:
 //!
@@ -56,9 +56,13 @@
 //!   capture: the chain loop has to break AND the combinator that replaces the break has to
 //!   materialize, and doing only the first turns both spellings into parse errors (measured —
 //!   see the note at that loop in `parser/selectors.rs`);
-//! - a pseudo-class argument list's own `start` (`:is(<NBSP>b)`);
-//! - a `<ZWNBSP>` leading a declaration VALUE, which `read_value` drops and tsv keeps —
-//!   the mirror image of the value fixture this class deliberately leaves alone.
+//! - a pseudo-class argument list's own `start` (`:is(<NBSP>b)`).
+//!
+//! A fourth — a `<ZWNBSP>` leading or trailing a declaration VALUE — is CLOSED, and its
+//! assertion moved down into the parity test: the wire's own trims are JS `\s` now
+//! (`ast/convert/mod.rs`'s `trim_wire*`, mirroring `read_value`'s `value.trim()`), where
+//! they used to be `str::trim` — which kept a `<ZWNBSP>` `read_value` drops and deleted a
+//! `<NEL>` it keeps.
 
 use serde_json::Value;
 
@@ -305,12 +309,32 @@ fn next_line_is_a_tracked_gap_in_both_directions() {
         "NEL before a property: canonical keeps it as part of the name and tsv drops it — if that \
          changed, re-pin this ratchet; wire held {named:?}"
     );
+
+    // A hex escape's OPTIONAL TERMINATOR is `read_identifier`'s `(\r\n|\s)?` — a JS regex, so
+    // `<NEL>` does not fill it and the identifier ends at the escape. Canonical REJECTS the
+    // whole thing (the `<NEL>` that follows is not an identifier code point either), so this
+    // is the same over-acceptance as above and pinned the same way; what it adds is that the
+    // SHAPE is now the one the right class produces. Asked here because it is the one place
+    // the terminator's class is observable on its own: the wire's half-decode
+    // (`raw_selector_name`) is the second reader of that same rule, and the `<ZWNBSP>` witness
+    // that grades BOTH readers together is a fixture
+    // (`svelte/style/escape_terminator_unicode_space`), which this shape cannot be.
+    let named = named_nodes(&component("<style>.a\\41\u{85}b { color: red; }</style>"));
+    assert!(
+        named.iter().any(|(_, name)| name == "aA"),
+        "NEL after a hex escape must not fill the terminator slot: the name ends at the escape \
+         (`aA`), and the character reaches the lexer's own whitespace class as the separate \
+         gap this test pins. Absorbed instead, it reads `aA<NEL>b` — one name, one class \
+         wrong; wire held {named:?}"
+    );
 }
 
-/// ⚠️ **RATCHET for the residue.** Four junctures still read a boundary run as identifier
-/// content. They are enumerated in this module's doc; asserted here so "documented but
-/// unchecked" cannot quietly become "documented and wrong" — a prose-only gap is exactly the
-/// kind that outlives the code it describes.
+/// ⚠️ **RATCHET for the residue.** Three junctures still read a boundary run as identifier
+/// content. They are enumerated in this module's doc, and **all three** are asserted here so
+/// "documented but unchecked" cannot quietly become "documented and wrong" — a prose-only gap
+/// is exactly the kind that outlives the code it describes, and the count in this sentence is
+/// the one thing a reader checks it against, so a juncture closed without an assertion removed
+/// leaves the doc claiming a gap that is gone.
 ///
 /// Each is span- or structure-level rather than name-level, which is why the fix above landed
 /// without them: the selector NAMES already agree at every juncture.
@@ -359,35 +383,127 @@ fn the_remaining_junctures_are_a_tracked_gap() {
         );
     }
 
-    // A `<ZWNBSP>` leading a declaration VALUE: `read_value` drops it, tsv keeps it. The
-    // mirror image of the value fixture this class deliberately leaves alone, and the reason
-    // the boundary skip stops at the colon.
-    // (`named_nodes` reports a Declaration by `property`; this one needs its `value`, so it
-    // reads the field directly rather than through the shared collector.)
-    let arena = bumpalo::Bump::new();
-    let src = component("<style>a { color:\u{feff}red; }</style>");
-    let ast = tsv_svelte::parse(&src, &arena).expect("component should parse");
-    let json = tsv_svelte::convert_ast_json(&ast, &src);
-    let mut values = Vec::new();
-    fn walk_values(node: &Value, out: &mut Vec<String>) {
-        match node {
-            Value::Object(fields) => {
-                if fields.get("type").and_then(Value::as_str) == Some("Declaration")
-                    && let Some(v) = fields.get("value").and_then(Value::as_str)
-                {
-                    out.push(v.to_owned());
-                }
-                fields.values().for_each(|v| walk_values(v, out));
-            }
-            Value::Array(items) => items.iter().for_each(|i| walk_values(i, out)),
-            _ => {}
-        }
-    }
-    walk_values(&json, &mut values);
+    // A pseudo-class argument list's own `start`: tsv opens the inner list ON the run,
+    // canonical one character past it. The third juncture, and the one the two assertions
+    // above cannot reach — the inner selector's NAME is `b` on both sides, and the outer
+    // list's `start` is the rule's, untouched. Its `end` agrees too, so only the opening
+    // offset moves.
+    let src = component("<style>:is(\u{a0}b) { color: red; }</style>");
+    let run_start = utf16_offset_of(&src, "\u{a0}b");
     assert_eq!(
-        values,
-        vec!["\u{feff}red".to_owned()],
-        "tsv keeps the ZWNBSP in the value; canonical's `read_value` drops it (`'red'`)"
+        selector_list_starts(&src),
+        vec![utf16_offset_of(&src, ":is("), run_start],
+        "the argument list still opens ON the run; canonical opens it at {} — wire held {:?}",
+        run_start + 1,
+        selector_list_starts(&src)
+    );
+}
+
+/// A declaration's own boundary trims are `read_value`'s `value.trim()` / `value.trimStart()`
+/// and `read_declaration`'s `\s`-terminated property read — JS `\s`, so each drops a
+/// `<ZWNBSP>` and keeps a `<NEL>`. Both directions, since `str::trim` (which these used to be)
+/// gets each one wrong the other way: it kept the `<ZWNBSP>` and deleted the `<NEL>`, so a
+/// single-witness test would have graded a half-fix as done.
+///
+/// **Every arm, because they are one rule reached six ways.** `strip_css_comments_inner` owns
+/// the trim, and three shortcuts stand in for it where nothing needs stripping — the
+/// no-`/*` fast path, `split_declaration_svelte_compat`'s two arms, and `write_declaration`'s
+/// no-comment value. A shortcut on a different class is the shortcut silently disagreeing
+/// with what it shortcuts, so each is driven by an input that reaches only it: a bare
+/// declaration, one whose comment sits in the property gap, and one whose comment sits in
+/// the value.
+///
+/// Wire claims, deliberately, not format ones. The `<NEL>` half never reaches the printer —
+/// the value's own token ends at it in the lexer, which is the separate raw-scan gap
+/// `next_line_is_a_tracked_gap_in_both_directions` pins.
+#[test]
+fn a_declarations_boundary_trims_are_the_js_class() {
+    let value_of = |style: &str| {
+        let arena = bumpalo::Bump::new();
+        let src = component(style);
+        let ast = tsv_svelte::parse(&src, &arena).expect("component should parse");
+        let json = tsv_svelte::convert_ast_json(&ast, &src);
+        let mut values = Vec::new();
+        fn walk_values(node: &Value, out: &mut Vec<String>) {
+            match node {
+                Value::Object(fields) => {
+                    if fields.get("type").and_then(Value::as_str) == Some("Declaration")
+                        && let Some(v) = fields.get("value").and_then(Value::as_str)
+                    {
+                        out.push(v.to_owned());
+                    }
+                    fields.values().for_each(|v| walk_values(v, out));
+                }
+                Value::Array(items) => items.iter().for_each(|i| walk_values(i, out)),
+                _ => {}
+            }
+        }
+        walk_values(&json, &mut values);
+        values
+    };
+
+    // `<ZWNBSP>` is JS `\s`, so the trim takes it off either end — once per arm.
+    //
+    // A comment in the PROPERTY gap makes the declaration comment-bearing without putting a
+    // `/*` in the value, which is the only way to reach the strip's no-`/*` fast path; a
+    // comment in the VALUE reaches the owned path's own two trims. The `value` a
+    // property-gap comment produces carries the comment and the colon, per the Svelte quirk
+    // `split_declaration_svelte_compat` reproduces — so the claim there is the trailing end.
+    for (style, expected) in [
+        ("<style>a { color:\u{feff}red; }</style>", "red"),
+        ("<style>a { color: red\u{feff}; }</style>", "red"),
+        ("<style>a { color /* c */: red\u{feff}; }</style>", ": red"),
+        (
+            "<style>a { color:\u{feff}/* c */red\u{feff}; }</style>",
+            "red",
+        ),
+        // A comment ahead of the PROPERTY leaves the quirk's `before_comment` empty, so the
+        // split falls to its normal arm and hands the strip a value with no `/*` in it —
+        // the one input that reaches the strip's no-comment fast path.
+        ("<style>a { /* c */color: red\u{feff}; }</style>", "red"),
+        // …and one GLUED to the property reaches the quirk arm's own trim, which decides
+        // where the property name ends.
+        ("<style>a { color\u{feff}/* c */: red; }</style>", ": red"),
+    ] {
+        assert_eq!(
+            value_of(style),
+            vec![expected.to_owned()],
+            "ZWNBSP: {style}"
+        );
+    }
+
+    // `<NEL>` is not, so it stays — the null control a `char::is_whitespace` trim fails.
+    assert_eq!(
+        value_of("<style>a { color: red\u{85}; }</style>"),
+        vec!["red\u{85}".to_owned()],
+        "NEL is not JS `\\s`, so `read_value` keeps it in the value"
+    );
+
+    // The PROPERTY side is the same rule read by `read_declaration`, which stops the name at
+    // the first `\s` and then `allow_whitespace()`s — so a `<ZWNBSP>` never reaches the name
+    // and a `<NEL>` is part of it.
+    let property_of = |style: &str| {
+        named_nodes(&component(style))
+            .into_iter()
+            .filter(|(ty, _)| ty == "Declaration")
+            .map(|(_, name)| name)
+            .collect::<Vec<_>>()
+    };
+    for style in [
+        "<style>a { color\u{feff}: red; }</style>",
+        // The quirk arm's own property trim, same claim one path over.
+        "<style>a { color\u{feff}/* c */: red; }</style>",
+    ] {
+        assert_eq!(
+            property_of(style),
+            vec!["color".to_owned()],
+            "ZWNBSP is `\\s`, so it is not part of the property name: {style}"
+        );
+    }
+    assert_eq!(
+        property_of("<style>a { color\u{85}: red; }</style>"),
+        vec!["color\u{85}".to_owned()],
+        "NEL is not `\\s`, so it IS part of the property name"
     );
 }
 
@@ -398,9 +514,10 @@ fn utf16_offset_of(src: &str, needle: &str) -> u64 {
     src[..byte].encode_utf16().count() as u64
 }
 
-/// The `start` of the one `SelectorList` in the wire — the offset a rule, its prelude and its
-/// first complex selector all share, and the one a name-level assertion cannot see.
-fn selector_list_start(src: &str) -> u64 {
+/// Every `SelectorList` `start` in the wire, in emission order — a rule's own list first, then
+/// any a pseudo-class argument opens. The offset a rule, its prelude and its first complex
+/// selector all share, and the one a name-level assertion cannot see.
+fn selector_list_starts(src: &str) -> Vec<u64> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
     let json = tsv_svelte::convert_ast_json(&ast, src);
@@ -418,7 +535,12 @@ fn selector_list_start(src: &str) -> u64 {
         }
     }
     walk(&json, &mut found);
-    match found.as_slice() {
+    found
+}
+
+/// [`selector_list_starts`] where the source is known to hold exactly one list.
+fn selector_list_start(src: &str) -> u64 {
+    match selector_list_starts(src).as_slice() {
         [one] => *one,
         other => panic!("expected exactly one SelectorList, found {}", other.len()),
     }

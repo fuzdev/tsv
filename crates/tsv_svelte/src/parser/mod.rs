@@ -3,7 +3,7 @@
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
-use crate::whitespace::{skip_svelte_ws, svelte_ws_width_at};
+use crate::whitespace::{is_svelte_ws, skip_svelte_ws, svelte_ws_width_at};
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 use tsv_lang::{ParseError, Span};
@@ -150,9 +150,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Capture any trailing text after the last element
         // Svelte's behavior: skip trailing whitespace entirely
+        //
+        // ⚠️ [`is_svelte_ws`] — the JS `\s` Svelte's own reader asks — NOT `str::trim_end`,
+        // whose Unicode `White_Space` set disagrees in BOTH directions and so got both
+        // witnesses wrong at once: it TRIMS U+0085 NEL, which is not `\s`, dropping the
+        // trailing `Text` node canonical emits; and it KEEPS U+FEFF, which is, emitting a
+        // node canonical does not (and printing the character where prettier deletes it).
         if self.current_start > last_end {
             let trailing_text = &self.source[last_end..self.current_start];
-            let trimmed = trailing_text.trim_end();
+            let trimmed = trailing_text.trim_end_matches(is_svelte_ws);
             if !trimmed.is_empty() {
                 // Only capture up to the end of non-whitespace content
                 let end_pos = last_end + trimmed.len();

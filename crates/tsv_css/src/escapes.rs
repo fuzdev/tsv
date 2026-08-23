@@ -81,8 +81,9 @@ fn ends_with_open_escape(text: &str) -> bool {
 /// §4.3.7's final branch escapes *any* code point, so an escape's payload is not restricted
 /// to whitespace at all — `\<NBSP>` is a perfectly good escape. But this predicate only ever
 /// sees a character the trim was about to *eat*, and that trim removes **CSS** whitespace
-/// only (§4.2). Of those five, a newline is the one shape §4.3.4 excludes from starting an
-/// escape — leaving exactly the space and the tab.
+/// only ([`is_css_whitespace`]'s five — §4.2's three plus the `<CR>` and form feed §3.3 would
+/// have folded away). Of those five, a newline is the one shape §4.3.4 excludes from starting
+/// an escape — leaving exactly the space and the tab.
 ///
 /// So an NBSP payload needs no rescue here: it is content the trim never touches.
 fn is_escapable_whitespace(c: char) -> bool {
@@ -109,7 +110,8 @@ fn is_escapable_whitespace(c: char) -> bool {
 /// structure.
 ///
 /// A CRLF terminator is taken as the `\r` only, leaving the `\n` outside the escape. That
-/// is one code point short of §4.2's preprocessing (which folds CRLF to a single newline),
+/// is one code point short of §3.3's input preprocessing (which folds CRLF to a single
+/// newline; tsv does not run it — see [`is_css_whitespace`]),
 /// but harmless rather than merely tolerable: the leftover `\n` is then ordinary
 /// whitespace, and every consumer of this function normalizes a whitespace run to one
 /// space, so `\41<CR><LF>2px` still emits `\41 2px` — the same ident `A2px`, which
@@ -141,8 +143,8 @@ pub(crate) fn escape_len(s: &str, i: usize) -> Option<usize> {
 ///
 /// Two rules, and the first is the one that makes the second small.
 ///
-/// **Trim only CSS whitespace** (§4.2: tab, newline, form feed, carriage return, space —
-/// ASCII, and exactly what [`is_css_whitespace`] answers). `str::trim_end` follows Unicode
+/// **Trim only CSS whitespace** (tab, newline, form feed, carriage return, space — ASCII, and
+/// exactly what [`is_css_whitespace`] answers; §4.2 plus the two §3.3 folds, see there). `str::trim_end` follows Unicode
 /// `White_Space`, which would also strip NBSP, U+3000 and friends — and those are ordinary
 /// **content** to CSS: `parseCss` and prettier both keep them inside the token, so eating
 /// one silently renames a class (`.a<NBSP>, .b` → `.a,`) or rewrites a value

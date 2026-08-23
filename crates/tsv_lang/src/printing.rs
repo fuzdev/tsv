@@ -5,6 +5,7 @@
 
 use crate::escapes::swap_quote_escaping;
 use crate::swar::{splat, zero_lanes};
+use crate::whitespace::is_js_whitespace;
 use std::borrow::Cow;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthChar;
@@ -886,6 +887,14 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
 /// buffer is materialized, so classification never heap-allocates. Returns
 /// `false` for single-line content. Mirrors prettier's `isIndentableBlockComment`.
 ///
+/// ⚠️ The leading trim is [`is_js_whitespace`], because prettier's is
+/// `line.trimStart()[0] === "*"` — `String.prototype.trimStart`, the JS `\s` class. Rust's
+/// `str::trim_start` is `White_Space`, which disagrees at exactly the two witnesses and so
+/// flipped the CLASSIFICATION in both directions: a `<ZWNBSP>*`-prefixed line reads as
+/// `*`-aligned to prettier (which reindents the comment) but not to Rust, and a
+/// `<NEL>*`-prefixed line the other way — and the two answers print through entirely
+/// different emitters (reindented vs preserved verbatim), so the whole comment moves.
+///
 /// # Example
 /// ```
 /// use tsv_lang::printing::is_indentable_block_comment;
@@ -911,13 +920,13 @@ pub fn is_indentable_block_comment<'s>(mut lines: impl Iterator<Item = &'s str>)
     };
     for next in lines {
         // A successor exists, so `prev` is a middle line: it must be `*`-prefixed.
-        if !prev.trim_start().starts_with('*') {
+        if !prev.trim_start_matches(is_js_whitespace).starts_with('*') {
             return false;
         }
         prev = next;
     }
     // The last line qualifies when empty or `*`-prefixed.
-    let last = prev.trim_start();
+    let last = prev.trim_start_matches(is_js_whitespace);
     last.is_empty() || last.starts_with('*')
 }
 

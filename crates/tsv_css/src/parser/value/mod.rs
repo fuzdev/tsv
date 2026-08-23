@@ -79,7 +79,7 @@ pub fn parse_value_from_source<'arena>(
 /// common case answers from two byte comparisons and never walks the text.
 ///
 /// The trim is [`trim_start_css`] / [`trim_end_preserving_escape`], **not**
-/// `str::trim`: CSS whitespace is the five ASCII characters of §4.2, so NBSP and
+/// `str::trim`: CSS whitespace is [`is_css_whitespace`](crate::whitespace::is_css_whitespace)'s five ASCII characters, so NBSP and
 /// U+3000 are value *content* (`str::trim` would eat them), and the trailing
 /// whitespace a `\` escape owns is content too — `50px\ ;` must keep its escaped
 /// space or the backslash strands onto the `;` and the output stops parsing.
@@ -278,13 +278,13 @@ mod value_span_tests {
         }
     }
 
-    /// Only the five ASCII characters of §4.2 are whitespace to CSS. Everything
-    /// else at a boundary is value **content** and keeps its span — which is also
-    /// what lets the fast path settle a non-ASCII byte outright.
+    /// Only [`is_css_whitespace`](crate::whitespace::is_css_whitespace)'s five ASCII characters are whitespace to CSS.
+    /// Everything else at a boundary is value **content** and keeps its span — which
+    /// is also what lets the fast path settle a non-ASCII byte outright.
     ///
     /// The vertical tab is the sharp edge: `char::is_whitespace` accepts it (so
     /// `str::trim` would eat it) and so does the *lexer*'s `is_ascii_css_whitespace`
-    /// (which matches `parseCss`), but this trim is §4.2 and must not.
+    /// (which matches `parseCss`), but this trim is the CSS class and must not.
     #[test]
     fn non_css_whitespace_is_content() {
         for (source, span) in [

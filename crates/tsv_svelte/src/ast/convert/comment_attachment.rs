@@ -13,6 +13,7 @@
 // anywhere on this path (the retired emit→`from_slice`→mutate→collect
 // round-trip cost O(script wire size) per comment-bearing island).
 
+use crate::whitespace::svelte_ws_width_at;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 
@@ -586,8 +587,17 @@ pub(super) fn attach_expression_list(
 /// their closing-brace scan (unterminated → no `}` found → parse error);
 /// block tags hand their content to the TS parser, whose one-token lookahead
 /// lexes all trivia after the expression and hard-errors on an unterminated
-/// block comment. This scanner's trivia set (` \t\r\n` + JS comments) is a
-/// subset of the lexer's, so it can never walk past that validated region.
+/// block comment. This scanner's trivia set is the lexer's own
+/// ([`is_svelte_ws`](crate::whitespace::is_svelte_ws) + JS comments) rather than a proper
+/// subset of it, so it can never walk past that validated region either.
+///
+/// ⚠️ The whitespace class is [`is_svelte_ws`](crate::whitespace::is_svelte_ws) — acorn's,
+/// which this mimics — and NOT the
+/// ASCII `b' ' | b'\t' | b'\r' | b'\n'` byte match it used to be. A non-ASCII JS `\s`
+/// between an expression and its trailing comment (`{expr<NBSP>/* c */}`) ended the scan
+/// early, so the comment lost the `trailingComments` attachment canonical emits — and the
+/// root `comments` array lost it too. Stepping by the character's WIDTH is what keeps the
+/// non-ASCII arm on a character boundary.
 fn scan_past_trailing_comments(source: &str, start: u32, limit: u32) -> u32 {
     let bytes = source.as_bytes();
     let mut pos = start as usize;
@@ -595,18 +605,20 @@ fn scan_past_trailing_comments(source: &str, start: u32, limit: u32) -> u32 {
     let mut last_comment_end = start;
 
     while pos < limit {
-        match bytes[pos] {
-            b' ' | b'\t' | b'\r' | b'\n' => {
-                pos += 1;
+        // The crate's own scanning form of `is_svelte_ws` — it dispatches on the raw byte
+        // and pays a decode only on the non-ASCII branch, as the lexer's cursor does, and
+        // hands back the WIDTH so the step lands on a character boundary.
+        if let Some(width) = svelte_ws_width_at(source, pos) {
+            pos += width;
+            continue;
+        }
+        match skip_comment(bytes, pos, bytes.len()) {
+            Some(next) => {
+                pos = next;
+                last_comment_end = pos as u32;
             }
-            _ => match skip_comment(bytes, pos, bytes.len()) {
-                Some(next) => {
-                    pos = next;
-                    last_comment_end = pos as u32;
-                }
-                // Non-whitespace, non-comment — stop scanning
-                None => break,
-            },
+            // Non-whitespace, non-comment — stop scanning
+            None => break,
         }
     }
 
@@ -639,6 +651,69 @@ mod tests {
             .first()?
             .get("value")?
             .as_str()
+    }
+
+    /// Parse a whole component and return the public JSON AST.
+    fn convert_component(source: &str) -> Value {
+        let arena = bumpalo::Bump::new();
+        #[allow(clippy::expect_used)]
+        let root = crate::parse(source, &arena).expect("parse");
+        crate::convert_ast_json(&root, source)
+    }
+
+    /// `scan_past_trailing_comments` mimics acorn's post-expression token scan, so its
+    /// whitespace class has to be acorn's — JS `\s`, not the ASCII bytes it once matched.
+    ///
+    /// Not a fixture: the format side of an expression-tag comment is governed by tsv's
+    /// (deliberate) comment-PRESERVATION divergence — prettier deletes the comment outright
+    /// — so no format claim can carry this, exactly as with the lone-`<CR>` half of the
+    /// `loc` model. Every expectation below is transcribed from `canonical_parse`.
+    ///
+    /// One case per class boundary: an ASCII gap (the control) and the four non-ASCII
+    /// members the byte match missed. U+0085 NEL is the NULL CONTROL and is asserted
+    /// separately below — it is Unicode `White_Space` but NOT JS `\s`, so widening to
+    /// Rust's class instead of Svelte's would have swept it in.
+    #[test]
+    fn expression_tag_trailing_comment_attaches_across_any_js_whitespace() {
+        for (label, gap) in [
+            ("space", " "),
+            ("nbsp U+00A0", "\u{a0}"),
+            ("zwnbsp U+FEFF", "\u{feff}"),
+            ("ideographic U+3000", "\u{3000}"),
+            ("line separator U+2028", "\u{2028}"),
+        ] {
+            let ast = convert_component(&format!("<div>{{expr{gap}/* c */}}</div>"));
+            let expression = &ast["fragment"]["nodes"][0]["fragment"]["nodes"][0]["expression"];
+            assert_eq!(expression["name"], "expr", "{label}: expression tag shape");
+            let trailing = expression
+                .get("trailingComments")
+                .and_then(|c| c.as_array())
+                .and_then(|c| c.first())
+                .and_then(|c| c.get("value"))
+                .and_then(|v| v.as_str());
+            assert_eq!(
+                trailing,
+                Some(" c "),
+                "{label}: trailingComments attachment"
+            );
+            let root_comments = ast["comments"].as_array().map_or(0, Vec::len);
+            assert_eq!(root_comments, 1, "{label}: root `comments` array");
+        }
+    }
+
+    /// The null control for the test above: U+0085 NEL is Unicode `White_Space` but not JS
+    /// `\s`, so it is not a gap acorn crosses — it is not valid there at all, and BOTH
+    /// parsers reject the document (verified against `canonical_parse`). A fix that reached
+    /// for `char::is_whitespace` rather than Svelte's own class would be indistinguishable
+    /// from the correct one without this case.
+    #[test]
+    fn expression_tag_nel_gap_is_rejected_not_crossed() {
+        let arena = bumpalo::Bump::new();
+        let source = "<div>{expr\u{85}/* c */}</div>";
+        assert!(
+            crate::parse(source, &arena).is_err(),
+            "U+0085 is not JS `\\s`, so it cannot open a gap acorn scans across"
+        );
     }
 
     // For `new Foo< // c\n A, B>(x)`, acorn (`parseNew` sets `callee`,

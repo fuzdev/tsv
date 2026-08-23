@@ -1346,9 +1346,35 @@ impl EmbeddedLang {
 /// Trim a decoded `lang` / `type` value and strip its `text/` prefix, keeping the borrow when
 /// the decode kept one. Both narrowings are sub-slices, so the owned arm re-owns the remainder
 /// rather than the whole value — reached only by an entity-bearing attribute.
+///
+/// ⚠️ **The trim is tsv's own, not a transcription** — prettier's `getLangAttribute` does not
+/// trim at all (it is `getAttributeTextValue('lang') || …('type')` plus the same `^text/`
+/// strip) and compares the raw value against an exact five-name **denylist**. Only the
+/// *decode* is prettier's. The trim is a cataloged divergence, docs/conformance_prettier_svelte.md
+/// §Foreign-language embedded bodies, "Untrimmed `lang` routing".
+///
+/// ⚠️ Its class is therefore the **union** of JS `\s` and Rust's `White_Space`, wider than
+/// either — and this is the one whitespace read in the crate where "which oracle does this
+/// mirror" is the wrong question, because it mirrors none. tsv's list is an **allowlist** and
+/// the trim is what lands a padded name on it, so a WIDER class can only ever move a name
+/// *toward* formatting; no denylist entry carries whitespace, so no widening can make tsv
+/// format a body prettier freezes. Both single-class spellings give a witness away, in
+/// opposite directions, and each was a `<style>` body frozen where prettier formats:
+/// `str::trim` lacks U+FEFF (`lang="<ZWNBSP>css"`), and
+/// [`is_svelte_ws`](crate::whitespace::is_svelte_ws) alone lacks U+0085
+/// (`lang="<NEL>css"`). The union closes both; `attributes/lang_unicode_space` carries them
+/// side by side.
+///
+/// (The wire's `lang` question is a different reader on the RAW bytes — `script_lang` — and
+/// stays separate; `attributes/lang_entity` holds both answers.)
 fn narrow_lang_value(value: Cow<'_, str>) -> Cow<'_, str> {
+    /// The padding a `lang` name may carry: JS `\s` ∪ Rust's `White_Space`. See above — the
+    /// two disagree at U+FEFF and U+0085, and only the union keeps both off the name.
+    fn is_lang_pad(c: char) -> bool {
+        crate::whitespace::is_svelte_ws(c) || c.is_whitespace()
+    }
     fn narrow(raw: &str) -> &str {
-        let lang = raw.trim();
+        let lang = raw.trim_matches(is_lang_pad);
         lang.strip_prefix("text/").unwrap_or(lang)
     }
     match value {

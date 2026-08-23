@@ -6,8 +6,10 @@
 
 use super::Printer;
 use crate::ast::internal;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::is_js_whitespace;
 use tsv_lang::printing;
 
 /// Slice one line out of a comment body by its `(start, end)` byte range — an
@@ -15,6 +17,30 @@ use tsv_lang::printing;
 #[inline]
 fn line_slice(content: &str, (start, end): (u32, u32)) -> &str {
     &content[start as usize..end as usize]
+}
+
+/// The trailing-trim class every comment emitter here shares.
+///
+/// ⚠️ [`is_js_whitespace`], **not** `str::trim_end`: prettier trims comment text with
+/// `String.prototype.trim*` (`printComment`, `printIndentableBlockComment`), which is the JS
+/// `\s` class. Rust's `White_Space` disagrees at exactly two code points and got both wrong —
+/// it **deletes a U+0085** prettier keeps (a character removed from the author's comment) and
+/// **keeps a U+FEFF** prettier deletes. See [`is_js_whitespace`].
+#[inline]
+fn trim_comment_end(line: &str) -> &str {
+    line.trim_end_matches(is_js_whitespace)
+}
+
+/// The leading half of [`trim_comment_end`], same class and same reason.
+#[inline]
+fn trim_comment_start(line: &str) -> &str {
+    line.trim_start_matches(is_js_whitespace)
+}
+
+/// Both halves — prettier's `line.trim()` on an indentable comment's interior line.
+#[inline]
+fn trim_comment(line: &str) -> &str {
+    line.trim_matches(is_js_whitespace)
 }
 
 impl<'a> Printer<'a> {
@@ -51,15 +77,13 @@ impl<'a> Printer<'a> {
                     self.build_preserved_block_comment_doc(content, &line_spans)
                 }
             }
-        } else if comment.span.start == 0 && content.starts_with("#!") {
-            // Hashbang comment: #!/usr/bin/env node (no // prefix). The span is
-            // verbatim (content includes the #! prefix). Like a line comment it
-            // runs to end-of-line, so tag it for the swallow check.
-            d.line_comment_source_span(comment.span, self.source)
         } else {
-            // Line comment: // content. The full span is verbatim `//…`. Tagged
-            // for the swallow check (runs to EOL).
-            d.line_comment_source_span(comment.span, self.source)
+            // Line comment (`//…`) or hashbang (`#!…`, which carries no `//` prefix and can
+            // only sit at byte 0). Both are verbatim source spans and both run to end of
+            // line, so both are tagged for the swallow check and both take the same
+            // trailing trim — prettier's `isLineComment` covers the hashbang types too, so
+            // one arm answers for both rather than two arms that must be kept identical.
+            d.line_comment_source_span(self.line_comment_span(comment), self.source)
         };
 
         // The single comment-emission seam in this crate — every leading / trailing / gap
@@ -71,6 +95,26 @@ impl<'a> Printer<'a> {
         d.tag_comment_doc(doc, comment.span, self.source);
 
         doc
+    }
+
+    /// A line-like comment's span with its trailing whitespace cut off.
+    ///
+    /// prettier's `printComment` emits `originalText.slice(locStart, locEnd).trimEnd()` for
+    /// every comment that runs to end of line (`//` and `#!` alike), so the trim is part of
+    /// the comment's text, not of the layout.
+    ///
+    /// ⚠️ It cannot be left to the renderer's own line-end trim
+    /// (`tsv_lang`'s `doc/arena_render.rs`), which is `[' ', '\t']` — prettier's doc-printer
+    /// `trim`, correctly mirrored, and a *narrower* class on purpose. Every other JS `\s`
+    /// member (NBSP, U+FEFF, a form feed, the U+2000 family) passed straight through it and
+    /// rode out in tsv's output where prettier deletes it. Trimming the SPAN rather than the
+    /// text keeps the emit allocation-free; the ledger still tags the comment's full span.
+    fn line_comment_span(&self, comment: &internal::Comment) -> Span {
+        let text = comment.span.extract(self.source);
+        Span {
+            start: comment.span.start,
+            end: comment.span.start + trim_comment_end(text).len() as u32,
+        }
     }
 
     /// Build a multi-line *indentable* block comment (JSDoc `/** … */` and
@@ -108,16 +152,16 @@ impl<'a> Printer<'a> {
         let mut body = d.pool_writer();
         body.reserve(content.len() + line_spans.len() + 4);
         body.push_str("/*");
-        body.push_str(line(first).trim_end());
+        body.push_str(trim_comment_end(line(first)));
         for span in middle {
             body.push('\n');
             body.push(' ');
-            body.push_str(line(span).trim());
+            body.push_str(trim_comment(line(span)));
         }
         // The last line (before `*/`) keeps trailing content via `trim_start`.
         body.push('\n');
         body.push(' ');
-        body.push_str(line(last).trim_start());
+        body.push_str(trim_comment_start(line(last)));
         body.push_str("*/");
 
         body.finish_multiline_text()
@@ -143,26 +187,38 @@ impl<'a> Printer<'a> {
         // ≥2 lines: `build_comment_doc` only routes newline-containing content
         // here, with `line_spans` holding each line's byte range in `content`.
         #[allow(clippy::unreachable)] // content retains the newline ⇒ split yields ≥2 lines
-        let [first, middle @ .., last] = line_spans else {
+        let Some((first, rest)) = line_spans.split_first() else {
             unreachable!("multi-line comment");
         };
+        // `split_first` only refuses an EMPTY slice, where the `[first, .., last]` pattern this
+        // replaced also refused a ONE-line one — so the ≥2 half of the invariant is asserted
+        // rather than pattern-enforced. A one-line slice would print a correct `/*…*/` here and
+        // hide the routing bug that produced it.
+        debug_assert!(!rest.is_empty(), "multi-line comment has ≥2 lines");
         let line = |span: &(u32, u32)| line_slice(content, *span);
 
         // Frame directly: the `/*<first>` opener, each continuation line preserved
         // verbatim at its authored column via a `literalline` (no context indent),
-        // then the `*/` closer. Trailing whitespace is trimmed on each interior
-        // line (matches prettier); the final line keeps its content before `*/`.
-        let mut docs = DocBuf::with_capacity((middle.len() + 1) * 2 + 2);
+        // then the `*/` closer.
+        //
+        // ⚠️ **No trim anywhere** — verbatim means verbatim. prettier's non-indentable arm
+        // is `["/*", replaceEndOfLine(comment.value), "*/"]`, which touches nothing, and its
+        // renderer (like tsv's) skips its line-end trim behind a LITERAL newline, so an
+        // author's trailing space inside such a comment survives on both sides. Trimming
+        // here edited the author's bytes on the one path whose whole contract is not to.
+        //
+        // That is also why the LAST line needs no arm of its own: it is emitted exactly as
+        // every other continuation line is. Its indentable twin above still splits three
+        // ways, because there the three positions really do take three different trims.
+        let mut docs = DocBuf::with_capacity(rest.len() * 2 + 2);
         let mut opener = d.pool_writer();
         opener.push_str("/*");
-        opener.push_str(line(first).trim_end());
+        opener.push_str(line(first));
         docs.push(opener.finish_text());
-        for span in middle {
+        for span in rest {
             docs.push(d.literalline());
-            docs.push(d.text_pooled(line(span).trim_end()));
+            docs.push(d.text_pooled(line(span)));
         }
-        docs.push(d.literalline());
-        docs.push(d.text_pooled(line(last)));
         docs.push(d.text("*/"));
         d.concat(&docs)
     }

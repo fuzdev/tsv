@@ -199,6 +199,14 @@ export function terminator_sites(source: string): number[] {
  * asks is how a terminator interacts with islands *throughout* a document. Striding costs
  * nothing and is deterministic (no `Math.random`, which the repo's harnesses avoid so a
  * finding reproduces from its label alone).
+ *
+ * ⚠️ **A strided run is a SAMPLE, and the stride divisor is the file's own site count** —
+ * so an edit anywhere in a file redraws which of its sites get probed, including in text the
+ * edit never touched. That is why a capped run's finding set cannot be ratcheted: measured
+ * over `tests/fixtures`, a one-line coverage extension to a single unrelated fixture retired
+ * 12 of the terminator family's 194 finding signatures while every underlying bug stood.
+ * A census (`limit <= 0`) has no divisor and no such motion. See
+ * [audits.md §Wire-Injection Audit](../../../docs/audits.md).
  */
 function stride_sample(sites: number[], count: number): number[] {
 	if (sites.length <= count) return sites;
@@ -212,6 +220,15 @@ function stride_sample(sites: number[], count: number): number[] {
  * so a site-dense document cannot dominate a run. The budget is split evenly across the
  * requested kinds, so asking for both does not halve either one's reach into the file.
  *
+ * **`limit <= 0` is a CENSUS** — every site, no cap. That is the only mode whose finding set
+ * is a function of the corpus rather than of the stride, and therefore the only one a run can
+ * be graded against over time: a census is monotone under a fixture addition (a new file can
+ * only add sites) where a capped run redraws its sample on every edit (see `stride_sample`).
+ * Whether a family can afford one is a per-family fact about site density, not a preference —
+ * over `tests/fixtures` the `ws` heads hold ~11k sites (a census is seconds) while the
+ * document-wide `terminators` sites number ~629k (minutes), which is why only the first is
+ * run as one.
+ *
  * Each carries a `path` of `<original>#inj:<kind>@<offset>+<escaped insert>` — the label the
  * comparison reports and groups by, so a finding names the exact perturbation that produced
  * it and can be reproduced by hand from the report alone.
@@ -223,7 +240,10 @@ export function inject_variants(
 ): SourceFile[] {
 	if (file.language !== 'svelte' || kinds.length === 0) return [];
 	const out: SourceFile[] = [];
-	const per_kind = Math.max(1, Math.floor(limit / kinds.length));
+	// `Infinity` rather than a large sentinel: it flows through the stride, the budget and the
+	// per-insert ceiling below as the identity, so the census needs no second code path to
+	// drift from the capped one.
+	const per_kind = limit <= 0 ? Infinity : Math.max(1, Math.floor(limit / kinds.length));
 	for (const kind of kinds) {
 		const inserts = INSERTS[kind];
 		const all_sites =

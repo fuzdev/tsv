@@ -41,12 +41,12 @@
 //!   `{/if}`/`{@html}` sigil + keyword is stepped over before the expression
 //!   scan so the `/` of a block close tag is never mistaken for a regex.
 //!
-//! **Normalization is a `<CR>` fold plus a per-line trim** (ASCII `[ \t]`,
-//! deliberately not Unicode — an NBSP or form feed at a line edge is content,
-//! and a class one character too wide would let the census vouch for a formatter
-//! that dropped it). Multi-line block comments legitimately re-indent under
-//! formatting, and tsv's output is LF-only so a `<CR>` is a line break on the
-//! output side; no other interior rewrite is sanctioned, so everything else
+//! **Normalization is a `<CR>` fold plus the line-edge trim the PRINTER is
+//! licensed to make, and no more** — which is a different trim per comment kind,
+//! because prettier's `printComment` is. A line comment (and the hashbang) is
+//! emitted `.trimEnd()`-ed; an INDENTABLE block is reindented and its lines
+//! trimmed; every other block — single-line, or multi-line and non-indentable —
+//! is emitted verbatim and gets no trim at all. Anything the printer may not do
 //! compares byte-exact. See `normalize_interior`.
 //!
 //! The consumer is `census_audit` (`deno task census:audit`), which formats each
@@ -125,14 +125,25 @@ pub(crate) fn comment_census(source: &str, parser: ParserType) -> CensusMultiset
     out
 }
 
-/// Per-line ASCII trim of a comment interior — the census's ONE normalization.
+/// The line-edge trim a comment interior is licensed to lose — the census's ONE
+/// normalization, and it is **kind-aware**, because the printer is.
 ///
-/// Multi-line block comments legitimately re-indent (leading whitespace) and the
-/// printer strips trailing line whitespace; both are line-edge rewrites, so each
-/// line is trimmed of `[ \t]` and everything interior stays byte-exact. The class
-/// is deliberately ASCII-narrow: an NBSP, form feed, or ideographic space at a
-/// line edge is CONTENT, and trimming it would blind the census to exactly the
-/// kind of rewrite it exists to catch.
+/// The rule is prettier's `printComment` transcribed, since that is what tsv mirrors:
+///
+/// | kind | what the printer emits | trimmed here |
+/// | --- | --- | --- |
+/// | line / hashbang | `originalText.slice(…).trimEnd()` | trailing, JS `\s` |
+/// | block, INDENTABLE | reindented, each line trimmed | per line, JS `\s` |
+/// | block, anything else | verbatim (`replaceEndOfLine(value)`) | nothing |
+///
+/// ⚠️ The class is **[`tsv_lang::is_js_whitespace`], not ASCII `[ \t]` and not Rust's
+/// `White_Space`** — because the trims it models are JS `String.prototype.trim*` calls.
+/// It used to be ASCII-narrow on the argument that an NBSP at a line edge is CONTENT; at a
+/// line comment's end and inside an indentable block that is no longer true (prettier
+/// deletes it there, and so does tsv), so the census read a sanctioned trim as a rewrite.
+/// The narrowness that argument was protecting is kept where it is still true, by giving
+/// the verbatim kinds **no trim at all** — which is stricter than the old blanket
+/// `[ \t]`, not looser.
 ///
 /// The `<CR>` fold comes FIRST, and is the FORMAT PATH's own
 /// ([`tsv_lang::printing::normalize_carriage_returns`]) rather than a second copy, so the
@@ -145,23 +156,38 @@ pub(crate) fn comment_census(source: &str, parser: ParserType) -> CensusMultiset
 /// deliberately NOT folded: the formatter does not fold them either, so folding here would
 /// make `a<LS>b` and `a<LF>b` compare equal and blind the census to a real rewrite. `\r`
 /// left the trim class in the same step — after the fold there is none left to trim.
-fn normalize_interior(raw: &str) -> String {
+fn normalize_interior(kind: CensusKind, raw: &str) -> String {
     let raw = tsv_lang::printing::normalize_carriage_returns(raw);
-    let mut out = String::with_capacity(raw.len());
-    for (i, line) in raw.split('\n').enumerate() {
-        if i > 0 {
-            out.push('\n');
+    match kind {
+        // Runs to end of line, so it has exactly one edge the printer touches.
+        CensusKind::Line => raw.trim_end_matches(tsv_lang::is_js_whitespace).to_owned(),
+        // A Svelte `<!-- … -->` is a template NODE, emitted verbatim by both formatters —
+        // interior columns and trailing spaces included (measured; the only thing that moves
+        // is the opener's own indent, which is outside the interior).
+        CensusKind::Html => raw.into_owned(),
+        // Only the `*`-aligned form reindents; every other block is copied verbatim, so a
+        // line edge there is content and stays byte-exact.
+        CensusKind::Block if !tsv_lang::printing::is_indentable_block_comment(raw.split('\n')) => {
+            raw.into_owned()
         }
-        out.push_str(line.trim_matches([' ', '\t']));
+        CensusKind::Block => {
+            let mut out = String::with_capacity(raw.len());
+            for (i, line) in raw.split('\n').enumerate() {
+                if i > 0 {
+                    out.push('\n');
+                }
+                out.push_str(line.trim_matches(tsv_lang::is_js_whitespace));
+            }
+            out
+        }
     }
-    out
 }
 
 fn record(out: &mut CensusMultiset, bucket: CensusBucket, kind: CensusKind, raw: &str) {
     let entry = CensusEntry {
         bucket,
         kind,
-        content: normalize_interior(raw),
+        content: normalize_interior(kind, raw),
     };
     *out.entry(entry).or_insert(0) += 1;
 }
@@ -810,8 +836,8 @@ mod tests {
         assert_eq!(
             ts("// a\nconst x = 1; /* b */\n"),
             vec![
-                (CensusBucket::Ts, CensusKind::Line, "a".into(), 1),
-                (CensusBucket::Ts, CensusKind::Block, "b".into(), 1),
+                (CensusBucket::Ts, CensusKind::Line, " a".into(), 1),
+                (CensusBucket::Ts, CensusKind::Block, " b ".into(), 1),
             ]
         );
     }
@@ -820,7 +846,7 @@ mod tests {
     fn ts_duplicate_contents_count() {
         assert_eq!(
             ts("// a\n// a\n"),
-            vec![(CensusBucket::Ts, CensusKind::Line, "a".into(), 2)]
+            vec![(CensusBucket::Ts, CensusKind::Line, " a".into(), 2)]
         );
     }
 
@@ -832,14 +858,14 @@ mod tests {
         assert_eq!(
             ts("const t = `a ${x /* yes */} b // no`; // yes\n"),
             vec![
-                (CensusBucket::Ts, CensusKind::Line, "yes".into(), 1),
-                (CensusBucket::Ts, CensusKind::Block, "yes".into(), 1),
+                (CensusBucket::Ts, CensusKind::Line, " yes".into(), 1),
+                (CensusBucket::Ts, CensusKind::Block, " yes ".into(), 1),
             ]
         );
         // Nested interpolations resume correctly.
         assert_eq!(
             ts("const t = `${`inner ${y /* c */}`} // no`;"),
-            vec![(CensusBucket::Ts, CensusKind::Block, "c".into(), 1)]
+            vec![(CensusBucket::Ts, CensusKind::Block, " c ".into(), 1)]
         );
     }
 
@@ -848,12 +874,12 @@ mod tests {
         // `/a[/*]b/` holds a comment-opener lookalike inside a class.
         assert_eq!(
             ts("const re = /a[/*]b\\//; // real\n"),
-            vec![(CensusBucket::Ts, CensusKind::Line, "real".into(), 1)]
+            vec![(CensusBucket::Ts, CensusKind::Line, " real".into(), 1)]
         );
         // After a value, `/` is division and the comment is real.
         assert_eq!(
             ts("const x = a / b; // real\n"),
-            vec![(CensusBucket::Ts, CensusKind::Line, "real".into(), 1)]
+            vec![(CensusBucket::Ts, CensusKind::Line, " real".into(), 1)]
         );
         // After a regex-preceding keyword, regex; its `//` is body, not comment.
         assert!(ts("return /a\\/\\/b/;").is_empty());
@@ -867,8 +893,8 @@ mod tests {
         assert_eq!(
             ts("// a\u{2028}const x = 1; // b\u{2029}const y = 2;"),
             vec![
-                (CensusBucket::Ts, CensusKind::Line, "a".into(), 1),
-                (CensusBucket::Ts, CensusKind::Line, "b".into(), 1),
+                (CensusBucket::Ts, CensusKind::Line, " a".into(), 1),
+                (CensusBucket::Ts, CensusKind::Line, " b".into(), 1),
             ]
         );
         assert_eq!(
@@ -890,23 +916,37 @@ mod tests {
         );
     }
 
+    /// The normalization is exactly the printer's licence, per kind — so each arm is graded
+    /// by a pair that differs only in what that arm may drop, and by the neighbouring kind
+    /// that may not drop the same thing.
     #[test]
-    fn interior_normalization_is_per_line_ascii_trim() {
-        // A re-indented multi-line block compares equal…
-        let a = comment_census("/**\n * x\n */", ParserType::TypeScript);
-        let b = comment_census("/**\n\t\t * x\n\t\t */", ParserType::TypeScript);
-        assert_eq!(a, b);
-        // …but an NBSP at a line edge is content, not trimmable whitespace.
-        let c = comment_census("/* x\u{a0} */", ParserType::TypeScript);
-        let d = comment_census("/* x */", ParserType::TypeScript);
-        assert_ne!(c, d);
+    fn interior_normalization_is_the_printers_licence_per_kind() {
+        let ts = |src: &str| comment_census(src, ParserType::TypeScript);
+
+        // INDENTABLE block: reindents, so a line edge is not content…
+        assert_eq!(ts("/**\n * x\n */"), ts("/**\n\t\t * x\n\t\t */"));
+        // …including the non-ASCII members of the class the printer trims with.
+        assert_eq!(ts("/**\n * x\u{a0}\n */"), ts("/**\n * x\n */"));
+
+        // Any OTHER block is emitted verbatim, so every line edge IS content — the narrowness
+        // the old blanket ASCII trim gave away.
+        assert_ne!(ts("/* x\u{a0} */"), ts("/* x */"));
+        assert_ne!(ts("/* x  */"), ts("/* x */"));
+        assert_ne!(ts("/*\n a \n b */"), ts("/*\n a\n b */"));
+
+        // LINE comment: `printComment` trims its one edge, JS `\s` and no wider — so a
+        // trailing NBSP goes and a trailing NEL, which is not `\s`, stays.
+        assert_eq!(ts("// x\u{a0}\n"), ts("// x\n"));
+        assert_ne!(ts("// x\u{85}\n"), ts("// x\n"));
+        // …and the leading edge is content there, since nothing trims it.
+        assert_ne!(ts("//  x\n"), ts("// x\n"));
     }
 
     #[test]
     fn css_comments_strings_urls() {
         assert_eq!(
             census("a { color: red; /* c */ }", ParserType::Css),
-            vec![(CensusBucket::Css, CensusKind::Block, "c".into(), 1)]
+            vec![(CensusBucket::Css, CensusKind::Block, " c ".into(), 1)]
         );
         assert!(census("a { content: '/* no */'; }", ParserType::Css).is_empty());
         // An unquoted url token is opaque…
@@ -915,7 +955,7 @@ mod tests {
         // whose surroundings are scanned.
         assert_eq!(
             census("a { background: url('/*a*/') /* c */; }", ParserType::Css),
-            vec![(CensusBucket::Css, CensusKind::Block, "c".into(), 1)]
+            vec![(CensusBucket::Css, CensusKind::Block, " c ".into(), 1)]
         );
     }
 
@@ -926,7 +966,7 @@ mod tests {
         assert!(census("<!-- a { color: red; /* hidden */ } -->", ParserType::Css).is_empty());
         assert_eq!(
             census("<!-- x -->\na { /* kept */ }", ParserType::Css),
-            vec![(CensusBucket::Css, CensusKind::Block, "kept".into(), 1)]
+            vec![(CensusBucket::Css, CensusKind::Block, " kept ".into(), 1)]
         );
     }
 
@@ -936,10 +976,10 @@ mod tests {
         assert_eq!(
             census(src, ParserType::Svelte),
             vec![
-                (CensusBucket::Ts, CensusKind::Line, "js".into(), 1),
-                (CensusBucket::Ts, CensusKind::Block, "expr".into(), 1),
-                (CensusBucket::Css, CensusKind::Block, "css".into(), 1),
-                (CensusBucket::Template, CensusKind::Html, "tpl".into(), 1),
+                (CensusBucket::Ts, CensusKind::Line, " js".into(), 1),
+                (CensusBucket::Ts, CensusKind::Block, " expr ".into(), 1),
+                (CensusBucket::Css, CensusKind::Block, " css ".into(), 1),
+                (CensusBucket::Template, CensusKind::Html, " tpl ".into(), 1),
             ]
         );
     }
@@ -963,8 +1003,13 @@ mod tests {
         assert_eq!(
             census(src, ParserType::Svelte),
             vec![
-                (CensusBucket::Ts, CensusKind::Block, "c1".into(), 1),
-                (CensusBucket::Template, CensusKind::Html, "after".into(), 1),
+                (CensusBucket::Ts, CensusKind::Block, " c1 ".into(), 1),
+                (
+                    CensusBucket::Template,
+                    CensusKind::Html,
+                    " after ".into(),
+                    1
+                ),
             ]
         );
     }
@@ -975,15 +1020,15 @@ mod tests {
         assert_eq!(
             census("<p>{/* c */ x}</p><!-- t -->", ParserType::Svelte),
             vec![
-                (CensusBucket::Ts, CensusKind::Block, "c".into(), 1),
-                (CensusBucket::Template, CensusKind::Html, "t".into(), 1),
+                (CensusBucket::Ts, CensusKind::Block, " c ".into(), 1),
+                (CensusBucket::Template, CensusKind::Html, " t ".into(), 1),
             ]
         );
         // `{/re/.test(x)}` heads with a regex, whose body is opaque — and the
         // scan must not swallow the document after it.
         assert_eq!(
             census("<p>{/a[/*]/.test(x)}</p><!-- t -->", ParserType::Svelte),
-            vec![(CensusBucket::Template, CensusKind::Html, "t".into(), 1)]
+            vec![(CensusBucket::Template, CensusKind::Html, " t ".into(), 1)]
         );
     }
 
@@ -993,9 +1038,9 @@ mod tests {
         assert_eq!(
             census(src, ParserType::Svelte),
             vec![
-                (CensusBucket::Ts, CensusKind::Block, "c".into(), 1),
-                (CensusBucket::Ts, CensusKind::Block, "d".into(), 1),
-                (CensusBucket::Ts, CensusKind::Block, "e".into(), 1),
+                (CensusBucket::Ts, CensusKind::Block, " c ".into(), 1),
+                (CensusBucket::Ts, CensusKind::Block, " d ".into(), 1),
+                (CensusBucket::Ts, CensusKind::Block, " e ".into(), 1),
             ]
         );
     }

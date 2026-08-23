@@ -1,0 +1,247 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 1024,
+		"end": 1076,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 1031,
+				"end": 1042,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 7,
+						"character": 1031
+					},
+					"end": {
+						"line": 20,
+						"column": 11,
+						"character": 1035
+					}
+				},
+				"value": [
+					{
+						"start": 1037,
+						"end": 1041,
+						"type": "Text",
+						"raw": "﻿css",
+						"data": "﻿css"
+					}
+				]
+			}
+		],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1045,
+					"end": 1048,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1045,
+							"end": 1048,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 1045,
+											"end": 1048
+										}
+									],
+									"start": 1045,
+									"end": 1048
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1049,
+					"end": 1067,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1053,
+							"end": 1063,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 1045,
+				"end": 1067
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 1043,
+			"end": 1068,
+			"styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+			"comment": {
+				"type": "Comment",
+				"start": 45,
+				"end": 1022,
+				"data": "\n\tThe `lang` the PRINTER reads is trimmed with a class WIDER than either of the crate's\n\town - JS `\\s` UNION Rust's `White_Space` - because tsv's formattable list is an\n\tallowlist that the trim feeds, so a wider class can only ever route a name toward\n\tFORMATTING. Either class alone gives one witness away and freezes a body prettier\n\tformats: JS `\\s` keeps a U+0085 NEL (the `<script>` above) and `str::trim` keeps a\n\tU+FEFF (the `<style>` below), so both sit here and either single-class spelling fails\n\tone of them. Only unformatted_lang_unicode_space can tell a freeze from a format - an\n\talready-formatted body reads the same either way. The trim is tsv's own; prettier does\n\tnot trim, it just fails to match its five-name denylist, so the two agree here by two\n\tdifferent routes and the trim's own divergence is `elements/template_lang_trim`.\n\tSibling questions: `attributes/lang_entity` (the raw wire reader vs this decoded one)\n\tand `attributes/lang_priority`.\n"
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1077,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 43,
+				"end": 45,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 45,
+				"end": 1022,
+				"data": "\n\tThe `lang` the PRINTER reads is trimmed with a class WIDER than either of the crate's\n\town - JS `\\s` UNION Rust's `White_Space` - because tsv's formattable list is an\n\tallowlist that the trim feeds, so a wider class can only ever route a name toward\n\tFORMATTING. Either class alone gives one witness away and freezes a body prettier\n\tformats: JS `\\s` keeps a U+0085 NEL (the `<script>` above) and `str::trim` keeps a\n\tU+FEFF (the `<style>` below), so both sit here and either single-class spelling fails\n\tone of them. Only unformatted_lang_unicode_space can tell a freeze from a format - an\n\talready-formatted body reads the same either way. The trim is tsv's own; prettier does\n\tnot trim, it just fails to match its five-name denylist, so the two agree here by two\n\tdifferent routes and the trim's own divergence is `elements/template_lang_trim`.\n\tSibling questions: `attributes/lang_entity` (the raw wire reader vs this decoded one)\n\tand `attributes/lang_priority`.\n"
+			},
+			{
+				"type": "Text",
+				"start": 1022,
+				"end": 1024,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 43,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 19,
+			"end": 34,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 21,
+					"end": 33,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 27,
+							"end": 32,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 27,
+								"end": 28,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 31,
+								"end": 32,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 18,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 17,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

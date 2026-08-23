@@ -321,6 +321,11 @@ deno task corpus:compare:parse:run --all                # skip rebuild (freshnes
 # nothing. TWO families: `ws` widens whitespace inside Svelte tag/block heads; `terminators`
 # injects a lone CR / U+2028 / U+2029 anywhere — the spellings on which the two `loc` line
 # classes disagree, and the one axis no fixture and no real repo can reach.
+# They differ in COVERAGE because they differ in site density: ws is a CENSUS
+# (--inject-limit 0, ~11k sites, ~17 s); terminators is a 5.9% strided SAMPLE of ~629k sites
+# (a census there is ~9 min). Only a census is gradeable — a sample's stride divisor is the
+# file's own site count, so a fixture edit redraws it (measured: one unrelated one-line edit
+# retired 12 of terminators' 194 finding signatures with every bug intact).
 # ⚠️ RED BY DESIGN, a discovery tool like compile:fuzz.
 # Full reference: ../../docs/audits.md §Wire-Injection
 deno task wire:audit

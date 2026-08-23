@@ -1089,16 +1089,27 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             };
 
         loop {
-            // Terminator regex: `/>` or one of whitespace " ' = < > `
+            // Terminator regex: `/>` or one of `\s` " ' = < > `
             // (`/>` only past the value start — a leading `/` is value, not close).
-            let terminated = match bytes.get(pos).copied() {
-                None => true,
-                Some(b'/') => pos > start && bytes.get(pos + 1) == Some(&b'>'),
-                Some(
-                    b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' | b'"' | b'\'' | b'=' | b'<' | b'>'
-                    | b'`',
-                ) => true,
-                Some(_) => false,
+            //
+            // ⚠️ A `char` question, not a byte one, exactly like `is_attr_name_terminator`
+            // and the static twin's `[^>\s]+` run: the `\s` arm is Unicode
+            // ([`is_svelte_ws`]), so the whole ASCII-byte spelling this used to carry
+            // (`b' ' | b'\t' | b'\n' | b'\r' | b'\x0C'`) was too NARROW by twenty of the
+            // class's twenty-five code points — every non-ASCII member, plus the VT it
+            // spelled its ASCII half without. One fell to the non-terminator arm and was absorbed
+            // into the value — which both changed the wire (`value` became an array where
+            // canonical ends the attribute) and made the printer re-emit an expression
+            // attribute as a QUOTED one, output `svelte compile` rejects. Stepping by
+            // `width` is what keeps `char_at` on a character boundary.
+            let Some((c, width)) = char_at(src, pos) else {
+                flush_text(&mut parts, text_start, pos);
+                break;
+            };
+            let terminated = match c {
+                '/' => pos > start && bytes.get(pos + 1) == Some(&b'>'),
+                '"' | '\'' | '=' | '<' | '>' | '`' => true,
+                _ => is_svelte_ws(c),
             };
             if terminated {
                 flush_text(&mut parts, text_start, pos);
@@ -1106,7 +1117,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
 
             // An `{expr}` chunk starts a new part.
-            if bytes[pos] == b'{' {
+            if c == '{' {
                 flush_text(&mut parts, text_start, pos);
                 // Parse the `{expr}` without disturbing the lexer (it handles nested
                 // braces, strings, comments, and regex that a raw byte scan cannot);
@@ -1118,7 +1129,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 continue;
             }
 
-            pos += 1;
+            pos += width;
         }
 
         if pos == start {
