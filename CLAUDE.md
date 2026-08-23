@@ -294,7 +294,7 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 
 `scripts/validate_artifacts.ts` holds deliberately tight (~±8%) size bounds — a legitimate binary size change fails the publish until the constants are updated, keeping size moves visible and intentional.
 
-**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained. Any PR changing the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must also update the `.d.ts`. Drift is caught by `deno task check:ast-types` (part of `deno task check`). Per-field checklist: ./crates/tsv_wasm/CLAUDE.md §TS type maintenance.
+**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained. Any PR changing the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must also update the `.d.ts`. Drift is caught by `deno task check:ast-types` (part of `deno task check`), which asks three things: the curated `tsv parse` samples still type (the live writer), every `type` discriminant the fixture corpus produces is declared or explicitly opaque, and a computed minimal cover of the corpus's committed `expected*.json` — every gradable field slot (`ParentType.key -> ChildType`) — types against the `.d.ts`. That last arm grades the file against the **canonical** wire rather than tsv's own, and composes with `fixtures_tests` (which pins `tsv == expected.json`) to cover every position tsv emits. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc`), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS type maintenance.
 
 ### Corpus Comparison
 
