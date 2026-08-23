@@ -35,7 +35,7 @@
 use super::super::internal;
 use super::{
     WireComment, convert_prelude_to_string, raw_selector_name, selector_contains_invalid,
-    split_declaration_svelte_compat, strip_css_comments_collecting,
+    split_declaration_svelte_compat, strip_css_comments_collecting, trim_wire_end, trim_wire_start,
 };
 use std::borrow::Cow;
 use tsv_lang::{ByteToCharMap, JsonWriter, Span, write_array, write_or_null};
@@ -380,7 +380,10 @@ fn split_declaration<'a>(
         split_declaration_svelte_compat(decl_source, colon)
     } else {
         // Common: no comments anywhere → split at the recorded colon. No re-scans.
-        (&decl_source[..colon], decl_source[colon + 1..].trim_start())
+        (
+            &decl_source[..colon],
+            trim_wire_start(&decl_source[colon + 1..]),
+        )
     };
     DeclarationSplit {
         end: end as u32,
@@ -411,7 +414,7 @@ fn write_declaration(
     } else {
         // Nothing to strip, so the strip reduces to the trim it ends with — and
         // the front is already trimmed.
-        Cow::Borrowed(split.value.trim_end())
+        Cow::Borrowed(trim_wire_end(split.value))
     };
 
     w.raw("{\"type\":\"Declaration\",\"start\":");
@@ -419,7 +422,7 @@ fn write_declaration(
     w.raw(",\"end\":");
     w.u32(ctx.pos(split.end));
     w.raw(",\"property\":");
-    w.string(split.property.trim_end());
+    w.string(trim_wire_end(split.property));
     w.raw(",\"value\":");
     w.string(&value);
     w.raw("}");

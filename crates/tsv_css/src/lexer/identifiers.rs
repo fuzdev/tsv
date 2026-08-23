@@ -224,22 +224,35 @@ pub(crate) fn decode_unicode_escape(source: &str, pos: &mut usize) -> Result<cha
 
     // Skip the hex escape's optional whitespace terminator.
     //
-    // **Unicode-wide, deliberately** — and NOT `whitespace::is_css_whitespace`. The oracle
-    // for the LEXER is Svelte's `parseCss`, whose `read_identifier` matches the terminator
-    // with `/\\[0-9a-fA-F]{1,6}(\r\n|\s)?/` (`1-parse/read/style.js`), and JS `\s` is the
-    // Unicode `White_Space` set — so a VT (U+000B) or NBSP after a hex escape terminates it
-    // there. `char::is_whitespace` is exactly that set; ASCII-only would leave the VT and
-    // NBSP inside the identifier, moving the **token boundary** and re-parsing
+    // **JS `\s`, deliberately** — and NOT `whitespace::is_css_whitespace`. The oracle for the
+    // LEXER is Svelte's `parseCss`, whose `read_identifier` matches the terminator with
+    // `/\\[0-9a-fA-F]{1,6}(\r\n|\s)?/` (`1-parse/read/style.js`) — a JS regex, so a VT
+    // (U+000B) or NBSP after a hex escape terminates it there. ASCII-only would leave the VT
+    // and NBSP inside the identifier, moving the **token boundary** and re-parsing
     // `.a\41<VT>b` as `aA` + descendant + `b` (and over-rejecting `[a=b\41<VT>c]`).
+    //
+    // ⚠️ And NOT `char::is_whitespace` either, which is what this used to say JS `\s` *was*.
+    // The two differ at exactly two code points and this site got both wrong: `.a\41<ZWNBSP>b`
+    // is `aAb` to `parseCss` (U+FEFF is `\s`, so it is eaten as the terminator) and was
+    // `aA<ZWNBSP>b` here — a WIRE divergence, and a different selector — while `.a\41<NEL>b`
+    // is a `css_expected_identifier` REJECTION there (U+0085 is not `\s`) and was accepted
+    // here as `aAb`.
     //
     // This is a different rule from `escapes::escape_len`, and deliberately so: that one is
     // a *printer-side value scanner* whose job is "how far does this escape reach when I
     // rewrite a value", answering to css-syntax-3; this one is *tokenization*, answering to
-    // `parseCss`, and its boundaries become wire spans the AST oracle compares. The rest of
-    // this lexer is Unicode-wide for the same reason (`skip_whitespace`, `consume_url_token`),
-    // as is the wire writer's `raw_selector_name`.
+    // `parseCss`, and its boundaries become wire spans the AST oracle compares. The wire
+    // writer's `raw_selector_name` is the SECOND reader of this same rule and asks this same
+    // class, which is what keeps the wire agreeing with the span it was cut from.
+    //
+    // The lexer's two other non-ASCII whitespace reads are NOT this rule and are still on
+    // `char::is_whitespace`: `skip_whitespace`'s non-ASCII arm, which only `<NEL>` can reach
+    // (every code point at or above U+00A0 is an identifier code point here) and which is the
+    // tracked gap pinned in tests/css_boundary_whitespace.rs; and `url_arg_is_quoted`, which
+    // forks a url-token per css-syntax-3 §4.3.6 — a grammar `parseCss` has no counterpart for,
+    // so its class answers to nothing named here.
     if let Some(ch) = source[*pos..].chars().next()
-        && ch.is_whitespace()
+        && tsv_lang::is_js_whitespace(ch)
     {
         *pos += ch.len_utf8();
     }

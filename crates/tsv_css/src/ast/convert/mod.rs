@@ -29,10 +29,45 @@
 use super::internal;
 use std::borrow::Cow;
 use tsv_lang::Span;
+use tsv_lang::is_js_whitespace;
 
 mod write;
 pub(crate) use write::write_stylesheet_file_bytes;
 pub use write::{CssComments, write_css_children, write_css_comments};
+
+/// Trim a wire STRING the way `parseCss` does.
+///
+/// ⚠️ [`is_js_whitespace`], **not** `str::trim`: every trim on this path mirrors a JS
+/// `.trim()` / `.trimStart()` in Svelte's `read_value` / `read_attribute_value`
+/// (`1-parse/read/style.js`), which is the JS `\s` class. Rust's `White_Space` **deletes a
+/// U+0085** `parseCss` keeps and **keeps a U+FEFF** it deletes — `color: red<NEL>` came back
+/// through the wire as `red`, a character of the author's declaration gone, and the printer
+/// then emitted the shortened value.
+///
+/// ⚠️ Not `is_css_whitespace` either. That one is ASCII-only (css-syntax-3 §4.2) and is the
+/// right class for value *separation* and value-text *collapsing* — a different question one
+/// layer down. Here the oracle is a JS `.trim()` and nothing else.
+///
+/// The three spellings exist so a call site names which end it trims; they are one rule, and
+/// [`strip_css_comments_inner`]'s trim and the no-comment fast paths that stand in for it
+/// (`write_declaration`, [`split_declaration_svelte_compat`]) must all ask the same one — a
+/// fast path on a different class is the shortcut silently disagreeing with what it shortcuts.
+#[inline]
+fn trim_wire(s: &str) -> &str {
+    s.trim_matches(is_js_whitespace)
+}
+
+/// The leading half of [`trim_wire`], same class and same reason.
+#[inline]
+pub(super) fn trim_wire_start(s: &str) -> &str {
+    s.trim_start_matches(is_js_whitespace)
+}
+
+/// The trailing half of [`trim_wire`], same class and same reason.
+#[inline]
+pub(super) fn trim_wire_end(s: &str) -> &str {
+    s.trim_end_matches(is_js_whitespace)
+}
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.
 ///
@@ -63,11 +98,11 @@ pub(super) fn split_declaration_svelte_compat(decl_source: &str, colon_pos: usiz
     if let Some(comment_idx) = before_colon.find("/*") {
         // Only apply quirk if there's actual property content before the comment
         let before_comment = &before_colon[..comment_idx];
-        if !before_comment.trim().is_empty() {
+        if !trim_wire(before_comment).is_empty() {
             // SVELTE QUIRK: Comment between property and colon
             // Property = just the text before the comment (trimmed)
             // Value = comment + colon + actual value (everything from comment onward)
-            let property = before_comment.trim();
+            let property = trim_wire(before_comment);
             let value = &decl_source[comment_idx..];
             return (property, value);
         }
@@ -75,7 +110,7 @@ pub(super) fn split_declaration_svelte_compat(decl_source: &str, colon_pos: usiz
 
     // Normal case: split at colon
     let property = &decl_source[..colon_pos];
-    let value = decl_source[colon_pos + 1..].trim_start();
+    let value = trim_wire_start(&decl_source[colon_pos + 1..]);
     (property, value)
 }
 
@@ -84,6 +119,14 @@ pub(super) fn split_declaration_svelte_compat(decl_source: &str, colon_pos: usiz
 /// Matches Svelte 5.55+ behavior for Declaration `value` and Atrule `prelude` strings:
 /// comments are stripped in place (surrounding whitespace preserved), then the result
 /// is trimmed.
+///
+/// ⚠️ The trim is [`is_js_whitespace`], because the oracle's is `value.trim()` /
+/// `value.trimStart()` in `read_value` (`1-parse/read/style.js`) — JS `\s`. Rust's
+/// `str::trim` is `White_Space`, which **deletes a U+0085** `parseCss` keeps: `color:
+/// red<NEL>` came back through the wire as `red`, a character of the author's declaration
+/// gone, and the printer then emitted the shortened value. Not `is_css_whitespace`
+/// either — that one is ASCII-only and is the right class for value *separation*, a
+/// different question one layer down; here the oracle is a JS `.trim()` and nothing else.
 ///
 /// String- and url()-aware: `/*` sequences inside `"..."`, `'...'`, or `url(...)` are
 /// treated as content, not comments. Unterminated comments are left intact (parse
@@ -128,7 +171,7 @@ fn strip_css_comments_inner<'a>(
     // either way, so those rare inputs fall to the owned path; correctness is
     // unaffected — the owned path records only what it actually strips.)
     if !input.contains("/*") {
-        return Cow::Borrowed(input.trim());
+        return Cow::Borrowed(trim_wire(input));
     }
     let mut out = String::with_capacity(input.len());
     // `(byte offset in `out`, source span)` per stripped comment. The offset is the
@@ -171,8 +214,8 @@ fn strip_css_comments_inner<'a>(
     }
     // Trim in place — truncate trailing whitespace, then drain leading — instead of
     // `out.trim().to_string()`, which copied the whole (already-owned) buffer again.
-    let end = out.trim_end().len();
-    let leading = out.len() - out.trim_start().len();
+    let end = trim_wire_end(&out).len();
+    let leading = out.len() - trim_wire_start(&out).len();
     if let Some(sink) = sink {
         // Svelte re-bases each captured position on the trimmed value by subtracting
         // the leading whitespace (clamped at zero, since a comment can sit ahead of
@@ -327,13 +370,19 @@ pub(super) fn raw_selector_name(source: &str, span: Span, prefix_len: usize) -> 
                     _ => break,
                 }
             }
-            // Optional single whitespace terminator (Svelte: `(\r\n|\s)?`)
+            // Optional single whitespace terminator (Svelte: `(\r\n|\s)?`).
+            //
+            // ⚠️ [`is_js_whitespace`] — that `\s` is a JS regex class, **not**
+            // `char::is_whitespace`. This is the SECOND reader of the terminator rule (the
+            // lexer's `read_identifier` is the first, and decides the token BOUNDARY), so
+            // the two must ask the same class or the wire disagrees with the span it was cut
+            // from: `.a\41<ZWNBSP>b` is `aAb` to `parseCss` and `.a\41<NEL>b` is a rejection.
             if chars.peek() == Some(&'\r') {
                 chars.next();
                 if chars.peek() == Some(&'\n') {
                     chars.next();
                 }
-            } else if chars.peek().is_some_and(|c| c.is_whitespace()) {
+            } else if chars.peek().copied().is_some_and(is_js_whitespace) {
                 chars.next();
             }
             // Surrogate/overflow codepoints are unrepresentable in Rust strings —

@@ -191,24 +191,34 @@ declaration's property, an at-rule's `@`, a comment's `/*` — **at a block's ta
 drop the run: the stylesheet's own trailing whitespace (the outermost gap has no following
 construct, and a Svelte `<style>` host trims the island's tail before writing it), and a run
 inside a **comment-bearing** property→colon gap, where the property name is reconstructed from
-its parts and the gap's whitespace normalizes with it. One member of the class is also a LINE
-TERMINATOR to tsv's shared line table but not to CSS (`<LS>`, `<PS>`), so preserving it beside
-a regenerated newline read as a blank line on the next pass; the CSS printer's blank-line
-question confirms the table's answer against css-syntax-3 §3.3's own class.
+its parts and the gap's whitespace normalizes with it. Two members of the class are also LINE
+TERMINATORS to tsv's shared line table (`<LS>`, `<PS>`), so preserving one beside a
+regenerated newline read as a blank line on the next pass; the CSS printer's blank-line
+question confirms the table's answer against a class that stops at `<LF>` / `<CR>`. ⚠️ That
+confirm is prettier's `isNextLineEmpty` transcribed — positional, and `<FF>`-terminated — not
+css-syntax-3 §3.3, whose `<FF>`-is-a-newline rule reads like the obvious authority and is the
+wrong oracle for a cosmetic blank line; the `<LS>` / `<PS>` exclusion is its one deliberate
+departure, cataloged in
+[conformance_prettier_css.md](./conformance_prettier_css.md).
 
 Pinned by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs); found by
-[wire:audit:terminators](./audits.md#wire-injection-audit-wireaudit). Three things still
-disagree, none of them a skip juncture — each is a *reader* whose own whitespace class is
+[wire:audit:terminators](./audits.md#wire-injection-audit-wireaudit). Two things still
+disagree, neither of them a skip juncture — each is a *reader* whose own whitespace class is
 narrower than the one `parseCss` uses in the same place, so closing them changes what a token
 spans rather than where a skip goes: a **trailing** run inside an attribute selector's value
-or case flag (`[a=b<NBSP>]`, `[a=b<NBSP>i]`, `[a=b i<NBSP>]`), the **An+B scanner's** ASCII
+or case flag (`[a=b<NBSP>]`, `[a=b<NBSP>i]`, `[a=b i<NBSP>]`), and the **An+B scanner's** ASCII
 class where `REGEX_NTH_OF` is a JS regex (`:nth-child(2n<NBSP>)` and its tail gaps — one
-scanner serving two grammars, so both oracles must be given their own class together), and a
-`<ZWNBSP>` leading a declaration value. A fourth is the declaration-vs-rule byte scan's own
-ASCII class: `a { color <NBSP>: red }` and `a { color /* c */<NBSP>: red }` are declarations to
+scanner serving two grammars, so both oracles must be given their own class together). A third
+is the declaration-vs-rule byte scan's own ASCII class: `a { color <NBSP>: red }` and `a { color /* c */<NBSP>: red }` are declarations to
 `parseCss` (which reads the property raw and trims it) and parse errors to tsv, because the
 scan stops on the run and the token lookahead behind it reads it as the identifier that should
-have been the `:`. They are enumerated and pinned in that test.
+have been the `:`. They are enumerated and pinned in that test. A `<ZWNBSP>` leading or trailing a declaration VALUE was a
+fourth and is closed: the wire's own trims are JS `\s` now (`ast/convert/mod.rs`'s
+`trim_wire_start` / `trim_wire_end`, mirroring `read_value`'s `value.trim()`) where they used
+to be `str::trim`, which kept a `<ZWNBSP>` `read_value` drops and deleted a `<NEL>` it keeps.
+The printer's property→colon trim is the same seam read from the other side and took the same
+correction (`trim_property_part`); a class that moves on only one of them is the doubling bug
+above.
 
 ### CSS Parser Scope & Error Model
 
@@ -1113,7 +1123,7 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 - **`{@const}` with a type annotation duplicates every comment from the `:` to the tag close.** Svelte's `read_type_annotation` tricks acorn into parsing the annotation by building `_ as <annotation> = <init>`; that parse is an `AssignmentExpression`, so the reader's own "gets mangled — fix it" branch **re-parses** the slice up to the `=`. The first parse is discarded, but its `onComment` has already pushed everything it scanned into the shared `root.comments`, and the two real parses then push their own copies — order [pass 1: all, pass 2: annotation region, pass 3: init region]. `add_comments` re-filters the *whole accumulated* array rather than its own parse's pushes, so the duplicates are attached as well. The trigger is the annotation's **presence**, not a comment's position: an *init* comment is doubled too when the binding carries an annotation, and listed once when it does not. tsv parses the annotation as part of the binding, once, so each comment exists once and attaches once; the formatter matches prettier on every shape.
   - [const_annotation_comment_svelte_divergence](../tests/fixtures/svelte/tags/const/const_annotation_comment_svelte_divergence/)
 
-- **Leading HTML comment duplicated onto the instance script.** A leading fragment HTML comment (`<!-- @component … -->`) before a `<script module>` + instance `<script>` pair is attached to *both* the module Program and the instance Program. tsv attaches it once, to the nearest (module) script Program; the comment is also a `Comment` node in the fragment in both parsers, so nothing is lost. (With no module script there is a single instance Program and tsv matches Svelte — the divergence needs a second script root to be copied onto.)
+- **Leading HTML comment duplicated onto every later lifted root.** A leading fragment HTML comment (`<!-- @component … -->`) before a `<script module>` + instance `<script>` pair is attached to *both* the module Program and the instance Program. tsv attaches it once, to the nearest (module) script Program; the comment is also a `Comment` node in the fragment in both parsers, so nothing is lost. The mechanism is that a lifted `<script>` / `<style>` is never appended to the fragment, so canonical's backwards walk (`1-parse/state/element.js`) steps over one as if it were absent — which means a **`<style>` is a second root too**, in both directions: `<!-- c --><script/><style/>` gives canonical the comment on the instance *and* on the stylesheet, and `<!-- c --><style/><script/>` likewise. tsv stops the walk at the hole the lifted tag leaves between two fragment nodes, so the nearest root keeps it in every arrangement. (With a single lifted root there is nothing to copy onto and tsv matches Svelte.) The three arrangements are pinned as controls in [svelte_preceding_comment.rs](../tests/svelte_preceding_comment.rs), which also pins the gap-class rule this stance shares a reader with.
   - [leading_html_comment_instance_duplication_svelte_divergence](../tests/fixtures/svelte/script/leading_html_comment_instance_duplication_svelte_divergence/)
 
 - **Template-expression comment before a parenthesized subexpression.** Svelte's `parse_expression_at` sets acorn's `preserveParens: true`, so a leading comment before a parenthesized subexpression attaches to the synthetic `ParenthesizedExpression`; Svelte's subsequent `remove_parens` discards that wrapper and its `leadingComments`, leaving the comment only in the root `comments` array. tsv (which has no `ParenthesizedExpression` node, matching Svelte's *final* shape) attaches it to the inner expression. This is template-only — a plain `<script>` parse does not set `preserveParens`, so the same comment attaches in both parsers there. The common real-world trigger is a JSDoc cast `/** @type {T} */ (expr)`.
@@ -1242,27 +1252,31 @@ The **character class** that decides all of this is `internal::is_collapsible_ws
 
 **Reference**: `svelte/packages/svelte/src/compiler/phases/3-transform/utils.js` (`clean_nodes`), `phases/patterns.js` (the whitespace regexes)
 
-#### Source `trimEnd` — a known parse-time divergence
+#### Source `trimEnd` — one parse-time whitespace decision, and it agrees
 
-One whitespace decision *is* made at parse time, and tsv currently gets its character
-class wrong. Svelte's parser opens with `this.template = template.trimEnd()`
-(`phases/1-parse/index.js`) — JavaScript's `trimEnd`, i.e. ECMAScript
-`WhiteSpace` ∪ `LineTerminator`. tsv's counterpart (`parser/mod.rs`, the trailing-text
-capture) uses Rust's `str::trim_end`, i.e. the Unicode `White_Space` property. The two
-classes differ at exactly two code points, one in each direction:
+One whitespace decision *is* made at parse time. Svelte's parser opens with
+`this.template = template.trimEnd()` (`phases/1-parse/index.js`) — JavaScript's `trimEnd`,
+i.e. ECMAScript `WhiteSpace` ∪ `LineTerminator`. tsv's counterpart (`parser/mod.rs`, the
+trailing-text capture) asks the same class, through `whitespace::is_svelte_ws`. It is **not**
+a divergence, and is recorded here because reaching for Rust's `str::trim_end` there is the
+obvious thing to do and was wrong in **both** directions at once:
 
-| Trailing code point | JS `trimEnd` | Rust `trim_end` | Effect |
+| Trailing code point | JS `trimEnd` | Rust `trim_end` | What Rust's class did |
 | --- | --- | --- | --- |
-| `U+FEFF` (`<ZWNBSP>`) | strips | keeps | tsv emits a trailing `Text` node Svelte does not |
-| `U+0085` (`<NEL>`) | keeps | strips | Svelte emits a trailing `Text` node tsv does not |
+| `U+FEFF` (`<ZWNBSP>`) | strips | keeps | tsv emitted a trailing `Text` node Svelte does not |
+| `U+0085` (`<NEL>`) | keeps | strips | tsv dropped the trailing `Text` node Svelte emits |
 
-Every other separator (`U+00A0`, `U+2000`, `U+202F`, `U+3000`, `U+180E`, `U+200B`) is in
-both classes or in neither, so it round-trips. The divergence is trailing-position-only —
-a leading or interior occurrence, and any occurrence inside an element, is unaffected.
+Every other separator (`U+00A0`, `U+2000`, `U+202F`, `U+3000`, `U+180E`, `U+200B`) is in both
+classes or in neither, so it round-trips — which is why a single-witness test would have
+graded a half-fix as done. Both directions are pinned by
+[syntax/whitespace/trailing_text_unicode_space](../tests/fixtures/svelte/syntax/whitespace/trailing_text_unicode_space/),
+whose `input` ends in a `<NEL>` that survives as a `Text` node and whose variants pad it with
+JS-`\s` members that do not. The trimming is trailing-position-only — a leading or interior
+occurrence, and any occurrence inside an element, is unaffected either way.
 
-This is a **bug, not a sanctioned divergence**: it changes the drop-in parse AST and
-propagates into compiled output. The fix is to match the JS class rather than Rust's, and
-it wants a `_svelte_divergence`-shaped fixture pinning both directions.
+The class question generalizes past this site: `tsv_svelte`'s
+[`whitespace.rs`](../crates/tsv_svelte/src/whitespace.rs) module doc carries the crate's rule
+and the other four sites where the same reach was the whole bug.
 
 ---
 

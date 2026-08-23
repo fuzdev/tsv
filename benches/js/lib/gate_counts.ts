@@ -484,7 +484,18 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// decided. A/B'd against a worktree holding this branch's code minus the arrow change,
 	// over the whole corpus: this file is the ONLY mover in any bucket, and `safety` /
 	// `errors` / `expected_errors` are byte-identical file-for-file.
-	typescript: 104,
+	//
+	// 104 → 103 (the comment trim's whitespace class): `js/comments/trailing_space.js` leaves
+	// for **match**. A comment's trailing trim is prettier's `String.prototype.trim*` — JS
+	// `\s` — where tsv spelled it `str::trim_end`, whose Unicode `White_Space` disagrees at
+	// exactly two code points and gets both wrong: it deletes a `<NEL>` prettier keeps and
+	// keeps a `<ZWNBSP>` prettier deletes. Measured by diffing the `unknown` lists across the
+	// change rather than by the count: this file is the ONLY mover in any bucket, nothing
+	// arrived in `unknown`, and `partial` / `safety` / `errors` / `expected_errors` are
+	// byte-identical file-for-file. (Same class as the CSS-side trims that moved in the same
+	// round — the wire's `trim_wire*` and the printer's `trim_property_part` — which move no
+	// count here because no corpus file carries one.)
+	typescript: 103,
 	css: 23
 };
 

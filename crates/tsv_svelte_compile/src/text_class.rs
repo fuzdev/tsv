@@ -17,15 +17,22 @@
 //! A source scan whose whitespace notion is the HOST language's rather than the
 //! target language's is a recurring defect in this crate, so the class lives
 //! here once rather than being re-derived per scan.
+//!
+//! ⚠️ It is not this crate's defect, and the two traps above are restated here only
+//! because a reader of a scan lands here first. The workspace-wide index — every
+//! whitespace class in tsv, which oracle each answers to, the reads that answer to
+//! none, and the crates the trap has been found in — is the module doc on `tsv_lang`'s
+//! `whitespace.rs`, beside the shared predicate this file re-exports. Read that before
+//! adding a class here.
 
 /// ECMAScript `WhiteSpace` ∪ `LineTerminator` — the class JavaScript's `\s` matches.
 ///
-/// Re-exported from [`tsv_lang`] rather than enumerated here: three crates in this workspace
+/// Re-exported from [`tsv_lang`] rather than enumerated here: five crates in this workspace
 /// need the same 25 code points ([`tsv_svelte`]'s tokenizer class, the class `parseCss` skips
-/// at its `allow_whitespace()` junctures, and this crate's source scans), and each had
-/// written its own copy with its own restatement of the two traps above. One definition means
-/// one exhaustive per-code-point test — which this copy never had — and no way for the three
-/// to drift.
+/// at its `allow_whitespace()` junctures, `tsv_lang`'s own directive and comment readers,
+/// `tsv_ts`'s comment renderer, and this crate's source scans), and each had written its own
+/// copy with its own restatement of the two traps above. One definition means one exhaustive
+/// per-code-point test — which this copy never had — and no way for them to drift.
 pub(crate) use tsv_lang::is_js_whitespace;
 
 /// `String.prototype.trim` — strips a leading and trailing [`is_js_whitespace`]
