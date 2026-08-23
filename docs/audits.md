@@ -25,7 +25,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
-| [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit | `deno task check` |
+| [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; commit drift (warn) | `deno task conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check` |
@@ -753,8 +753,11 @@ world the other `check` audits use, so it adds a short compile of its own.
 ## Wire-Type Drift Check (`check:ast-types`)
 
 ```bash
-# scripts/check_ast_types.ts — `tsv parse` a curated sample set, embed each JSON
-# output as a typed literal in a generated TS file, `deno check` it.
+# scripts/check_ast_types.ts — three arms over crates/tsv_wasm/types/tsv_ast.d.ts:
+# (A) `tsv parse` a curated sample set, (B) assert every wire discriminant the fixture
+# corpus produces is declared, (C) type a computed cover of the corpus against the .d.ts.
+# A and C share one generated file and one `deno check`. ~20 s when the generated content
+# changes (nearly all arm C); an unchanged rerun hits deno's check cache at ~4.5 s.
 deno task check:ast-types
 ```
 
@@ -766,14 +769,83 @@ both directions of drift: a field the converter emits that the `.d.ts` lacks ("m
 known properties"), and a field the `.d.ts` requires that the converter does not emit
 ("Property 'X' is missing"). Renames and value-type changes fall out the same way.
 
-**Blind spots.** Coverage is the sample list, and it is small **by design** — each sample costs
-a parse invocation, so the goal is structural coverage, not fixture-style exhaustiveness. A
-node no sample reaches can drift freely; the per-field checklist in
+**Three arms, because "does it drift" and "is anything ungraded" are different questions.**
+
+- **A — writer conformance.** The curated `tsv parse` samples. Grades the LIVE writer, so it is
+  the arm that fails the moment a `write_*` changes.
+- **B — wire-type coverage.** Every `type` discriminant present in the committed fixture wire
+  must be declared, or listed in the script's `OPAQUE_WIRE_TYPES` — the CSS node vocabulary,
+  which `StyleSheet.children` types as `unknown[]` by design, plus one non-node: `Boolean`, a
+  DATA key inside the evaluated `<svelte:options customElement>` props config that the
+  text-level scan cannot tell from a discriminator. A set difference over
+  text — no type-checking, and the widest reach of the three. A stale opaque entry also fails,
+  so the list cannot quietly outlive its reason.
+- **C — fixture-corpus conformance.** Arm A over inputs nobody curated: a computed minimal cover
+  of the corpus's `expected*.json`, typed against the same `.d.ts`. Stronger than arm A in two
+  ways, not merely wider — the committed `expected.json` is the CANONICAL parser's output
+  (`fixtures_update_parsed` regenerates it), so this arm grades the `.d.ts` against the ORACLE
+  rather than against tsv's own opinion; and its inputs are the whole tree.
+  `expected_ours.json` wins where a fixture declares a parser divergence.
+
+⚠️ **The cover's target is the field SLOT — `ParentType.key -> ChildType` — and getting that
+unit right is the whole design of arm C.** Excess-property *and* value-type checking fire per
+(interface, key, value shape), so a cover is exactly as strong as the unit it spans. This was
+wrong twice, both times caught by canarying against a known-real bug rather than by reasoning:
+
+| cover unit | files | found | missed |
+| --- | --- | --- | --- |
+| node **type** | 99 | — | a wrong `TSInterfaceDeclaration.extends` (the node was reached via a class `implements` clause, the position never) |
+| **position** (`Parent.key`) | 267 | that one | a loc-less `TSTypeAnnotation` on block bindings, two attachment hosts, a `TSExpressionWithTypeArguments.expression` that is a `TSQualifiedName` — each a position already covered by some *other* value shape |
+| **slot** (`Parent.key->Child`) | 770 | all of them | — |
+
+The cost was measured before choosing: ~1 s for positions against ~19 s for slots, on a `check`
+whose total is minutes and whose cost is dominated by build configuration rather than audit
+code. Two things keep the price honest. Slots inside an OPAQUE region (parent or child named in
+`OPAQUE_WIRE_TYPES`) are excluded from the cover target — they type against `unknown`, so
+covering them graded nothing (2893 → 2636 slots, 770 → 698 files, ~20 s). And the figures are
+CACHE-MISS costs: `deno check` caches by content, so the full price is paid exactly when the
+`.d.ts` or a covered `expected*.json` changed — the commits where the arm has fresh work — and
+in cold-cache CI, while an unchanged rerun costs ~4.5 s. Reverting is a one-line change in
+`wire_field_slots`; the trade it buys is precisely the class of bug this gate exists for. Same
+lesson one level up from the one that motivated arm B, and then again one level up from that.
+
+**Arm C composes with `fixtures_tests`, and that is where its reach over *tsv* comes from.**
+Arm C never runs tsv's parser — it types the **committed** `expected*.json`. What makes that a
+statement about tsv is the other gate: `cargo test --test fixtures_tests` holds tsv's parse
+equal to `expected.json` for every fixture. Compose the two and every field position tsv emits
+over the corpus is typed, with neither gate doing both jobs. Two consequences worth stating
+because they are easy to forget in either direction: arm C **cannot catch a parser bug** (that
+is `fixtures_tests`' remit, and a parser regression leaves arm C perfectly green), and the
+composition is only as strong as its weaker link — a narrowed `fixtures_tests`, or an
+`expected.json` gone stale against the live oracle, breaks the conclusion about *tsv* while arm
+C keeps reporting truthfully about the `.d.ts`. Oracle freshness is
+[`conformance`'s](../CLAUDE.md#corpus-comparison) job, as always.
+
+**Blind spots.**
+
+- **A position under an `unknown`-typed field is not graded** — arm B covers only the *names*
+  under it. Five such fields remain, and the shape of the list is the point: three are the CSS
+  tree below the stylesheet root (`StyleSheet.children` / `.attributes`,
+  `StyleSheetFile.children`), opaque by an explicit decision; the other two are single nodes
+  (a regex `value`, which acorn itself emits as `{}`, and `<svelte:options customElement>`,
+  which the corpus samples four times). Everything else is typed. Widening one is how a region
+  gets *behind* the gate rather than merely inside it — `Script.content` was the big one, and
+  typing it (`unknown` → `Program`) is what put the `<script>` side of all ~4200 `.svelte`
+  fixtures under arm C at all.
+- **It asks only whether the two sides AGREE on a shape arm A reaches** — never whether that
+  shape is the one acorn / `parseCss` / Svelte actually produce. Arm C narrows this a long way
+  by grading the committed oracle wire, but the parse conformance gates remain the authority.
+- **Arm B is a NAME check over raw text** — two failure shapes follow, both live in the corpus
+  and both absorbed deliberately: a discriminant declared for an unrelated reason counts
+  (`AttachedComment`'s `'Line' | 'Block'` covers the CSS `Block` node's name for free — which
+  is why `Block` is listed opaque anyway), and a DATA key spelled `"type"` reads as a
+  discriminant (`Boolean`, the `customElement` config entry above). Arm C is what walks the
+  typed paths; a reachability-scoped name check would remove the first shape and is a candidate
+  follow-up.
+
+The per-field checklist in
 [crates/tsv_wasm/CLAUDE.md §TS Type Maintenance](../crates/tsv_wasm/CLAUDE.md#ts-type-maintenance)
-is what carries a writer change, and this gate is the backstop for the fields a sample happens
-to touch. Add one when an uncovered node regresses. It also asks only whether the two sides
-AGREE — never whether the shape they agree on is the one acorn / `parseCss` / Svelte actually
-produce, which is the parse conformance gates' remit.
+is what carries a writer change; this gate is the backstop.
 
 ## Canonical-Pin Agreement Audit (`pins:audit`)
 

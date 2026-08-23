@@ -14,6 +14,13 @@
  * Field names are exactly the keys the writer emits. A field emitted only
  * conditionally (`if let Some(..)` / `if flag`) is optional (`T?`); a field
  * always emitted with a `null` fallback (`write_or_null`) is `T | null`.
+ *
+ * **Completeness contract**: this file is verified exactly as far as the test corpus
+ * reaches — `scripts/check_ast_types.ts` types the curated samples and the committed fixture
+ * wire against it (every `type` discriminant, every gradable field slot). A claim narrower
+ * than the field's name suggests (a tuple length, a literal union, `never[]`) is a checked
+ * statement about that corpus, not a spec guarantee; on a construct no fixture exercises,
+ * trust the wire over this file and add the fixture.
  */
 
 //
@@ -34,8 +41,36 @@ export interface SourceLocation {
 	end: Position;
 }
 
+/**
+ * A comment acorn attached to a node, as an appended object key.
+ *
+ * **Svelte only.** `parse_typescript` and `parse_css` never emit these — the attachment
+ * pass is Svelte's (`phases/1-parse/acorn.js`'s `add_comments`), which tsv mirrors, so
+ * they appear on the nodes of a component's `<script>` and template-expression islands
+ * and nowhere else.
+ */
+export interface AttachedComment {
+	type: 'Line' | 'Block';
+	value: string;
+	/** Present on every attachment except the `Program`-level run Svelte builds itself. */
+	start?: number;
+	/** See `start`. */
+	end?: number;
+}
+
+/**
+ * The optional comment keys any acorn-produced node may carry in the Svelte wire.
+ * Intersected into the node unions rather than repeated on ~190 interfaces — the
+ * attachment DFS can reach essentially every acorn node type, so listing hosts would be a
+ * list that goes stale rather than a statement of the rule.
+ */
+export interface AcornCommentAttachment {
+	leadingComments?: AttachedComment[];
+	trailingComments?: AttachedComment[];
+}
+
 /** Decorator applied to a class or class member: `@expression`. */
-export interface Decorator {
+export interface Decorator extends AcornCommentAttachment {
 	type: 'Decorator';
 	start: number;
 	end: number;
@@ -47,7 +82,7 @@ export interface Decorator {
  * Literal value: string, number, boolean, null, or BigInt.
  * Numeric values with no fractional part serialize as integers.
  */
-export interface Literal {
+export interface Literal extends AcornCommentAttachment {
 	type: 'Literal';
 	start: number;
 	end: number;
@@ -59,7 +94,7 @@ export interface Literal {
 }
 
 /** Identifier name (variable, parameter, property name, etc.). */
-export interface Identifier {
+export interface Identifier extends AcornCommentAttachment {
 	type: 'Identifier';
 	start: number;
 	end: number;
@@ -68,7 +103,7 @@ export interface Identifier {
 	/** Optional parameter marker (`x?`). Omitted from JSON when false. */
 	optional?: boolean;
 	/** Omitted from JSON when absent. */
-	typeAnnotation?: TSTypeAnnotation;
+	typeAnnotation?: TSTypeAnnotation | SvelteBlockTypeAnnotation;
 	/** Decorators on this parameter. Omitted from JSON when empty. */
 	decorators?: Decorator[];
 }
@@ -90,7 +125,7 @@ export interface PrivateIdentifier {
  * `importKind`/`exportKind` may be omitted). The resulting shape is a
  * subset of this interface; no extra fields are added.
  */
-export interface Program {
+export interface Program extends AcornCommentAttachment {
 	type: 'Program';
 	start: number;
 	end: number;
@@ -103,7 +138,7 @@ export interface Program {
 // TypeScript AST — statements
 //
 
-export type Statement =
+export type Statement = (
 	| ExpressionStatement
 	| VariableDeclaration
 	| TSTypeAliasDeclaration
@@ -135,7 +170,9 @@ export type Statement =
 	| ContinueStatement
 	| LabeledStatement
 	| EmptyStatement
-	| DebuggerStatement;
+	| DebuggerStatement
+) &
+	AcornCommentAttachment;
 
 export interface ExpressionStatement {
 	type: 'ExpressionStatement';
@@ -147,7 +184,7 @@ export interface ExpressionStatement {
 	directive?: string;
 }
 
-export interface BlockStatement {
+export interface BlockStatement extends AcornCommentAttachment {
 	type: 'BlockStatement';
 	start: number;
 	end: number;
@@ -155,7 +192,7 @@ export interface BlockStatement {
 	body: Statement[];
 }
 
-export interface FunctionDeclaration {
+export interface FunctionDeclaration extends AcornCommentAttachment {
 	type: 'FunctionDeclaration';
 	start: number;
 	end: number;
@@ -251,7 +288,7 @@ export interface SwitchStatement {
 	cases: SwitchCase[];
 }
 
-export interface SwitchCase {
+export interface SwitchCase extends AcornCommentAttachment {
 	type: 'SwitchCase';
 	start: number;
 	end: number;
@@ -270,7 +307,7 @@ export interface TryStatement {
 	finalizer: BlockStatement | null;
 }
 
-export interface CatchClause {
+export interface CatchClause extends AcornCommentAttachment {
 	type: 'CatchClause';
 	start: number;
 	end: number;
@@ -326,7 +363,7 @@ export interface DebuggerStatement {
 	loc: SourceLocation;
 }
 
-export interface VariableDeclaration {
+export interface VariableDeclaration extends AcornCommentAttachment {
 	type: 'VariableDeclaration';
 	start: number;
 	end: number;
@@ -337,7 +374,7 @@ export interface VariableDeclaration {
 	declare?: boolean;
 }
 
-export interface VariableDeclarator {
+export interface VariableDeclarator extends AcornCommentAttachment {
 	type: 'VariableDeclarator';
 	start: number;
 	end: number;
@@ -352,7 +389,7 @@ export interface VariableDeclarator {
 // TypeScript AST — expressions
 //
 
-export type Expression =
+export type Expression = (
 	| Literal
 	| Identifier
 	| PrivateIdentifier
@@ -361,6 +398,7 @@ export type Expression =
 	| UnaryExpression
 	| UpdateExpression
 	| BinaryExpression
+	| LogicalExpression
 	| CallExpression
 	| NewExpression
 	| MemberExpression
@@ -391,7 +429,9 @@ export type Expression =
 	| MetaProperty
 	| TSParameterProperty
 	| ParenthesizedExpression
-	| ChainExpression;
+	| ChainExpression
+) &
+	AcornCommentAttachment;
 
 export interface ObjectExpression {
 	type: 'ObjectExpression';
@@ -434,6 +474,22 @@ export interface UpdateExpression {
 
 export interface BinaryExpression {
 	type: 'BinaryExpression';
+	start: number;
+	end: number;
+	loc: SourceLocation;
+	left: Expression;
+	operator: string;
+	right: Expression;
+}
+
+/**
+ * `a && b`, `a || b`, `a ?? b`. Structurally identical to `BinaryExpression` — one
+ * writer emits both, splitting on the operator alone (`write_expression`'s
+ * `BinaryExpression` arm) — but ESTree gives the short-circuiting operators their own
+ * node type, so the discriminator differs and consumers narrowing on `type` need both.
+ */
+export interface LogicalExpression {
+	type: 'LogicalExpression';
 	start: number;
 	end: number;
 	loc: SourceLocation;
@@ -548,7 +604,7 @@ export interface ArrowFunctionExpression {
 
 export type ArrowFunctionBody = Expression | BlockStatement;
 
-export interface SpreadElement {
+export interface SpreadElement extends AcornCommentAttachment {
 	type: 'SpreadElement';
 	start: number;
 	end: number;
@@ -565,7 +621,7 @@ export interface TemplateLiteral {
 	quasis: TemplateElement[];
 }
 
-export interface TemplateElement {
+export interface TemplateElement extends AcornCommentAttachment {
 	type: 'TemplateElement';
 	start: number;
 	end: number;
@@ -676,7 +732,7 @@ export interface AssignmentExpression {
 }
 
 /** Object property (also used inside object patterns). */
-export interface Property {
+export interface Property extends AcornCommentAttachment {
 	type: 'Property';
 	start: number;
 	end: number;
@@ -773,7 +829,7 @@ export interface ClassExpression {
 	body: ClassBody;
 }
 
-export interface ClassBody {
+export interface ClassBody extends AcornCommentAttachment {
 	type: 'ClassBody';
 	start: number;
 	end: number;
@@ -792,7 +848,7 @@ export interface StaticBlock {
 	body: Statement[];
 }
 
-export interface MethodDefinition {
+export interface MethodDefinition extends AcornCommentAttachment {
 	type: 'MethodDefinition';
 	start: number;
 	end: number;
@@ -828,7 +884,7 @@ export interface TSDeclareMethod {
 	returnType?: TSTypeAnnotation;
 }
 
-export interface PropertyDefinition {
+export interface PropertyDefinition extends AcornCommentAttachment {
 	type: 'PropertyDefinition';
 	start: number;
 	end: number;
@@ -849,7 +905,7 @@ export interface PropertyDefinition {
 	value: Expression | null;
 }
 
-export interface FunctionExpression {
+export interface FunctionExpression extends AcornCommentAttachment {
 	type: 'FunctionExpression';
 	start: number;
 	end: number;
@@ -864,13 +920,15 @@ export interface FunctionExpression {
 	body: BlockStatement;
 }
 
-/** `implements Foo<T>` clause member. */
-export interface TSExpressionWithTypeArguments {
+/** `implements Foo<T>` clause member, and `interface A extends Foo<T>` heritage. */
+export interface TSExpressionWithTypeArguments extends AcornCommentAttachment {
 	type: 'TSExpressionWithTypeArguments';
 	start: number;
 	end: number;
 	loc: SourceLocation;
-	expression: Expression;
+	/** A dotted heritage name (`implements A.B`, `extends A.B`) is a `TSQualifiedName`, so
+	 * this is the entity-name union rather than a general expression. */
+	expression: TSEntityName;
 	typeParameters?: TSTypeParameterInstantiation;
 }
 
@@ -899,7 +957,7 @@ export interface ObjectPattern {
 	loc: SourceLocation;
 	properties: ObjectPatternProperty[];
 	optional?: boolean;
-	typeAnnotation?: TSTypeAnnotation;
+	typeAnnotation?: TSTypeAnnotation | SvelteBlockTypeAnnotation;
 	/** Parameter decorators (`@dec { a }: T`) — only in a parameter position. */
 	decorators?: Decorator[];
 }
@@ -913,7 +971,7 @@ export interface ArrayPattern {
 	loc: SourceLocation;
 	elements: (Expression | null)[];
 	optional?: boolean;
-	typeAnnotation?: TSTypeAnnotation;
+	typeAnnotation?: TSTypeAnnotation | SvelteBlockTypeAnnotation;
 	/** Parameter decorators (`@dec [a]: T`) — only in a parameter position. */
 	decorators?: Decorator[];
 }
@@ -929,7 +987,7 @@ export interface AssignmentPattern {
 	decorators?: Decorator[];
 }
 
-export interface RestElement {
+export interface RestElement extends AcornCommentAttachment {
 	type: 'RestElement';
 	start: number;
 	end: number;
@@ -944,27 +1002,22 @@ export interface RestElement {
 // TypeScript AST — declarations
 //
 
-export interface TSInterfaceDeclaration {
+export interface TSInterfaceDeclaration extends AcornCommentAttachment {
 	type: 'TSInterfaceDeclaration';
 	start: number;
 	end: number;
 	loc: SourceLocation;
 	id: Identifier;
 	typeParameters?: TSTypeParameterDeclaration;
-	/** Omitted from JSON when empty. */
-	extends?: TSInterfaceHeritage[];
+	/**
+	 * Omitted from JSON when empty. The heritage node is the same
+	 * `TSExpressionWithTypeArguments` a class `implements` clause carries — acorn-typescript
+	 * emits one node type for both positions.
+	 */
+	extends?: TSExpressionWithTypeArguments[];
 	body: TSInterfaceBody;
 	/** Omitted from JSON when false. */
 	declare?: boolean;
-}
-
-export interface TSInterfaceHeritage {
-	type: 'TSInterfaceHeritage';
-	start: number;
-	end: number;
-	loc: SourceLocation;
-	expression: TSEntityName;
-	typeParameters?: TSTypeParameterInstantiation;
 }
 
 /** `declare function foo(): void` or overload signature. */
@@ -997,7 +1050,7 @@ export interface TSEnumDeclaration {
 	members: TSEnumMember[];
 }
 
-export interface TSEnumMember {
+export interface TSEnumMember extends AcornCommentAttachment {
 	type: 'TSEnumMember';
 	start: number;
 	end: number;
@@ -1027,7 +1080,7 @@ export type TSModuleName = Identifier | Literal;
 
 export type TSModuleDeclarationBody = TSModuleBlock | TSModuleDeclaration;
 
-export interface TSModuleBlock {
+export interface TSModuleBlock extends AcornCommentAttachment {
 	type: 'TSModuleBlock';
 	start: number;
 	end: number;
@@ -1105,7 +1158,7 @@ export interface TSNamespaceExportDeclaration {
 	id: Identifier;
 }
 
-export interface ExportSpecifier {
+export interface ExportSpecifier extends AcornCommentAttachment {
 	type: 'ExportSpecifier';
 	start: number;
 	end: number;
@@ -1134,7 +1187,7 @@ export interface ImportDeclaration {
 export type ImportSpecifier =
 	ImportDefaultSpecifier | ImportNamedSpecifier | ImportNamespaceSpecifier;
 
-export interface ImportDefaultSpecifier {
+export interface ImportDefaultSpecifier extends AcornCommentAttachment {
 	type: 'ImportDefaultSpecifier';
 	start: number;
 	end: number;
@@ -1142,7 +1195,7 @@ export interface ImportDefaultSpecifier {
 	local: Identifier;
 }
 
-export interface ImportNamedSpecifier {
+export interface ImportNamedSpecifier extends AcornCommentAttachment {
 	/** Acorn names named imports `"ImportSpecifier"` (no `Named` prefix). */
 	type: 'ImportSpecifier';
 	start: number;
@@ -1154,7 +1207,7 @@ export interface ImportNamedSpecifier {
 	importKind?: string;
 }
 
-export interface ImportNamespaceSpecifier {
+export interface ImportNamespaceSpecifier extends AcornCommentAttachment {
 	type: 'ImportNamespaceSpecifier';
 	start: number;
 	end: number;
@@ -1162,7 +1215,7 @@ export interface ImportNamespaceSpecifier {
 	local: Identifier;
 }
 
-export interface ImportAttribute {
+export interface ImportAttribute extends AcornCommentAttachment {
 	type: 'ImportAttribute';
 	start: number;
 	end: number;
@@ -1186,7 +1239,7 @@ export interface TSImportEqualsDeclaration {
 
 export type TSModuleReference = TSExternalModuleReference | TSEntityName;
 
-export interface TSExternalModuleReference {
+export interface TSExternalModuleReference extends AcornCommentAttachment {
 	type: 'TSExternalModuleReference';
 	start: number;
 	end: number;
@@ -1198,15 +1251,34 @@ export interface TSExternalModuleReference {
 // TypeScript AST — types
 //
 
+/**
+ * The type annotation Svelte builds for a BLOCK BINDING (`{#each xs as x: T}`,
+ * `{:then v: T}`): `read_type_annotation` constructs the wrapper itself, so it carries **no
+ * `loc`** — the same Svelte-built family as `SvelteShorthandIdentifier` and
+ * `SvelteConstDeclaration`. Its `typeAnnotation` is an ordinary acorn type node with an
+ * ordinary `loc`. Only the three pattern positions can hold one.
+ */
+export interface SvelteBlockTypeAnnotation {
+	type: 'TSTypeAnnotation';
+	start: number;
+	end: number;
+	typeAnnotation: TSType;
+}
+
 export interface TSTypeAnnotation {
 	type: 'TSTypeAnnotation';
 	start: number;
 	end: number;
 	loc: SourceLocation;
+	/** See `AcornCommentAttachment` — a wrapper node, not a union member, so it carries the
+	 * attachment keys itself. */
+	leadingComments?: AttachedComment[];
+	/** See `leadingComments`. */
+	trailingComments?: AttachedComment[];
 	typeAnnotation: TSType;
 }
 
-export type TSType =
+export type TSType = (
 	| TSNumberKeyword
 	| TSStringKeyword
 	| TSBooleanKeyword
@@ -1240,7 +1312,9 @@ export type TSType =
 	| TSOptionalType
 	| TSNamedTupleMember
 	| TSInferType
-	| TSThisType;
+	| TSThisType
+) &
+	AcornCommentAttachment;
 
 export interface TSArrayType {
 	type: 'TSArrayType';
@@ -1381,7 +1455,7 @@ export interface TemplateLiteralType {
 /** `Foo` or `Foo.Bar.Baz`. */
 export type TSEntityName = Identifier | TSQualifiedName;
 
-export interface TSQualifiedName {
+export interface TSQualifiedName extends AcornCommentAttachment {
 	type: 'TSQualifiedName';
 	start: number;
 	end: number;
@@ -1391,7 +1465,7 @@ export interface TSQualifiedName {
 }
 
 /** `<T, U>` in call/instantiation position. */
-export interface TSTypeParameterInstantiation {
+export interface TSTypeParameterInstantiation extends AcornCommentAttachment {
 	type: 'TSTypeParameterInstantiation';
 	start: number;
 	end: number;
@@ -1400,7 +1474,7 @@ export interface TSTypeParameterInstantiation {
 }
 
 /** `<T extends U = V>` in declaration position. */
-export interface TSTypeParameterDeclaration {
+export interface TSTypeParameterDeclaration extends AcornCommentAttachment {
 	type: 'TSTypeParameterDeclaration';
 	start: number;
 	end: number;
@@ -1414,7 +1488,7 @@ export interface TSTypeParameterExtra {
 }
 
 /** Single type parameter with optional modifiers (`const`, `in`, `out`). */
-export interface TSTypeParameter {
+export interface TSTypeParameter extends AcornCommentAttachment {
 	type: 'TSTypeParameter';
 	start: number;
 	end: number;
@@ -1435,14 +1509,16 @@ export interface TSTypeParameter {
 	default?: TSType;
 }
 
-export type TSTypeElement =
+export type TSTypeElement = (
 	| TSPropertySignature
 	| TSMethodSignature
 	| TSCallSignatureDeclaration
 	| TSConstructSignatureDeclaration
-	| TSIndexSignature;
+	| TSIndexSignature
+) &
+	AcornCommentAttachment;
 
-export interface TSInterfaceBody {
+export interface TSInterfaceBody extends AcornCommentAttachment {
 	type: 'TSInterfaceBody';
 	start: number;
 	end: number;
@@ -1507,7 +1583,7 @@ export interface TSConstructSignatureDeclaration {
 }
 
 /** `[key: string]: T`. */
-export interface TSIndexSignature {
+export interface TSIndexSignature extends AcornCommentAttachment {
 	type: 'TSIndexSignature';
 	start: number;
 	end: number;
@@ -1628,7 +1704,7 @@ export interface TSInferType {
 }
 
 /** `this` in type position. */
-export interface TSThisType {
+export interface TSThisType extends AcornCommentAttachment {
 	type: 'TSThisType';
 	start: number;
 	end: number;
@@ -1675,21 +1751,18 @@ export interface TSMappedType {
 	end: number;
 	loc: SourceLocation;
 	readonly?: TSMappedTypeModifier;
-	typeParameter: TSMappedTypeParameter;
+	/**
+	 * The `K in T` binder. Same `TSTypeParameter` a declaration's `<…>` list carries —
+	 * acorn-typescript emits one node type for both positions — with `constraint` holding
+	 * the `in` operand and the modifier keys (`const`/`in`/`out`) and `default` unreachable
+	 * here.
+	 */
+	typeParameter: TSTypeParameter;
 	/** Key remapping: `as NewK`. */
 	nameType: TSType | null;
 	optional?: TSMappedTypeModifier;
 	/** The value type — omitted entirely when absent (`{ [K in T] }`). */
 	typeAnnotation?: TSType;
-}
-
-export interface TSMappedTypeParameter {
-	type: 'TSMappedTypeParameter';
-	start: number;
-	end: number;
-	loc: SourceLocation;
-	name: string;
-	constraint?: TSType;
 }
 
 /** Mapped-type modifier: `true`, `"+"`, or `"-"`. */
@@ -1788,7 +1861,8 @@ export interface StyleContent {
 	start: number;
 	end: number;
 	styles: string;
-	comment: unknown | null;
+	/** A leading block comment ahead of the stylesheet body; `null` when absent. */
+	comment: Comment | null;
 }
 
 //
@@ -1810,13 +1884,18 @@ export interface NamePosition {
 /** Root node of a `.svelte` file. */
 export interface Root {
 	css: StyleSheet | null;
-	js: unknown[];
+	/**
+	 * Legacy Svelte-4 field. Always `[]` — `never[]` states that as a checked claim rather
+	 * than a comment, so the day something populates it the wire-type gate says so instead of
+	 * quietly widening.
+	 */
+	js: never[];
 	start: number;
 	end: number;
 	type: 'Root';
 	fragment: Fragment;
 	options: SvelteOptions | null;
-	comments: unknown[];
+	comments: RootComment[];
 	instance?: Script;
 	module?: Script;
 }
@@ -1842,6 +1921,19 @@ export type FragmentNode =
 	| DeclarationTag
 	| DebugTag
 	| RenderTag;
+
+/**
+ * A document-level comment on `Root`. Heterogeneous by design: `Line` / `Block` for the
+ * JS-side comments Svelte hoists here, `CSSComment` for the ones its CSS parser produced.
+ * Unlike `AttachedComment` these always carry positions and a `loc`.
+ */
+export interface RootComment {
+	type: 'Line' | 'Block' | 'CSSComment';
+	value: string;
+	start: number;
+	end: number;
+	loc: SourceLocation;
+}
 
 /** HTML comment in template: `<!-- content -->`. */
 export interface Comment {
@@ -1869,17 +1961,51 @@ export interface Element {
  * `<svelte:boundary>`, and `<title>` inside `<svelte:head>`.
  */
 export interface SpecialElement {
-	type: string;
+	/**
+	 * The closed set `internal::SpecialElementKind::node_type` emits — spelled as a literal
+	 * union rather than `string` so consumers narrow on it, and so the wire-type coverage
+	 * arm of `scripts/check_ast_types.ts` can see these names declared.
+	 */
+	type:
+		| 'SvelteHead'
+		| 'SvelteWindow'
+		| 'SvelteBody'
+		| 'SvelteDocument'
+		| 'SvelteElement'
+		| 'SvelteComponent'
+		| 'SvelteSelf'
+		| 'SlotElement'
+		| 'SvelteFragment'
+		| 'SvelteBoundary'
+		| 'TitleElement';
 	start: number;
 	end: number;
 	name: string;
 	name_loc: NameLocation;
 	attributes: AttributeNode[];
 	fragment: Fragment;
-	/** Dynamic tag for `<svelte:element this={tag}>`. */
-	tag?: unknown;
+	/**
+	 * The `this` binding of `<svelte:element>`: an `Expression` for `this={tag}`, or a
+	 * `SvelteFusedLiteral` for the plain-string `this="div"` — the two forms serialize
+	 * differently, which is why this is not simply `Expression`.
+	 */
+	tag?: Expression | SvelteFusedLiteral;
 	/** Component expression for `<svelte:component this={Component}>`. */
 	expression?: Expression;
+}
+
+/**
+ * Svelte's own literal node, distinct from acorn's `Literal`: it carries **no `loc`**, and
+ * `raw` is Svelte's re-quoted form rather than the author's bytes (`this="div"` emits
+ * `raw: "'div'"`). Emitted where Svelte fuses a plain-string binding into a literal instead
+ * of parsing it as an expression — today only `<svelte:element this="div">`.
+ */
+export interface SvelteFusedLiteral {
+	type: 'Literal';
+	value: string;
+	raw: string;
+	start: number;
+	end: number;
 }
 
 /** `<svelte:options runes={true} />`. */
@@ -1903,7 +2029,12 @@ export interface Attribute {
 	end: number;
 	name: string;
 	name_loc: NameLocation;
-	value?: unknown;
+	/**
+	 * `true` for a valueless attribute (`hidden`); a single `ExpressionTag` for a bare
+	 * `a={x}`; otherwise the attribute-value SEQUENCE — one `AttributeText` for a plain
+	 * quoted value, text and tag parts interleaved for `a="x{y}z"`.
+	 */
+	value?: true | ExpressionTag | AttributeValue[];
 }
 
 /** `{@attach ...}` (Svelte 5.29+). */
@@ -1940,8 +2071,13 @@ export interface BindDirective {
 	type: 'BindDirective';
 	name: string;
 	name_loc: NameLocation;
-	/** Shorthand and explicit forms produce different field orderings; emitted as raw JSON. */
-	expression: unknown;
+	/**
+	 * The bound target — an `Identifier` or `MemberExpression`, or the `SequenceExpression`
+	 * of a function binding (`bind:x={get, set}`). The SHORTHAND form (`bind:value`) has no
+	 * expression to parse, so Svelte builds the identifier itself and it carries no `loc`:
+	 * `SvelteShorthandIdentifier`.
+	 */
+	expression: Expression | SvelteShorthandIdentifier;
 	modifiers: string[];
 }
 
@@ -1952,8 +2088,22 @@ export interface ClassDirective {
 	type: 'ClassDirective';
 	name: string;
 	name_loc: NameLocation;
-	expression: unknown;
+	/** The shorthand form (`class:active`) yields a `SvelteShorthandIdentifier`. */
+	expression: Expression | SvelteShorthandIdentifier;
 	modifiers: string[];
+}
+
+/**
+ * The identifier Svelte builds for a SHORTHAND `bind:` / `class:` directive, where the
+ * directive name IS the expression. Distinct from acorn's `Identifier` in carrying **no
+ * `loc`** (nothing parsed it), which is why the directive positions are a union rather than
+ * plain `Expression`.
+ */
+export interface SvelteShorthandIdentifier {
+	start: number;
+	end: number;
+	type: 'Identifier';
+	name: string;
 }
 
 /** `style:color={value}`. */
@@ -1964,8 +2114,8 @@ export interface StyleDirective {
 	name: string;
 	name_loc: NameLocation;
 	modifiers: string[];
-	/** `true | ExpressionTag | (Text | ExpressionTag)[]`. */
-	value: unknown;
+	/** The same attribute-value sequence shape as `Attribute.value`. */
+	value: true | ExpressionTag | AttributeValue[];
 }
 
 /** `use:action={params}`. */
@@ -2063,9 +2213,9 @@ export interface ExpressionTag {
 /**
  * Svelte `<script>` block.
  *
- * `content` is a `Program`-shaped JSON value with `leadingComments` /
- * `trailingComments` injected onto its nodes; the exact comment shape is
- * not currently mirrored in this file.
+ * `content` is a `Program`, with `leadingComments` / `trailingComments`
+ * (`AttachedComment`) injected onto its nodes by Svelte's acorn pass — see
+ * `AcornCommentAttachment`, which is what lets this be typed rather than `unknown`.
  */
 export interface Script {
 	type: 'Script';
@@ -2073,7 +2223,7 @@ export interface Script {
 	end: number;
 	/** `"default"` or `"module"`. */
 	context: string;
-	content: unknown;
+	content: Program;
 	attributes: AttributeNode[];
 }
 
@@ -2095,8 +2245,12 @@ export interface EachBlock {
 	end: number;
 	expression: Expression;
 	body: Fragment;
-	/** `null` when no `as` clause. */
-	context: unknown;
+	/**
+	 * The `as` binding pattern; `null` when there is no `as` clause. A pattern position is
+	 * typed `Expression` here for the same reason acorn reuses expression nodes for
+	 * patterns — see `FunctionDeclaration.params`.
+	 */
+	context: Expression | null;
 	index?: string;
 	key?: Expression;
 	fallback?: Fragment;
@@ -2108,8 +2262,10 @@ export interface AwaitBlock {
 	start: number;
 	end: number;
 	expression: Expression;
-	value: unknown;
-	error: unknown;
+	/** The `{:then x}` binding pattern; `null` when the clause binds nothing. */
+	value: Expression | null;
+	/** The `{:catch e}` binding pattern; `null` when the clause binds nothing. */
+	error: Expression | null;
 	pending: Fragment | null;
 	then: Fragment | null;
 	catch: Fragment | null;
@@ -2146,28 +2302,51 @@ export interface HtmlTag {
 /**
  * `{@const x = expr}`.
  *
- * `declaration` is a `VariableDeclaration`-shaped value with a single
- * declarator, emitted as raw JSON.
  */
 export interface ConstTag {
 	type: 'ConstTag';
 	start: number;
 	end: number;
-	declaration: unknown;
+	declaration: SvelteConstDeclaration;
+}
+
+/**
+ * The declaration a `{@const}` carries. **Not** the acorn `VariableDeclaration` a `<script>`
+ * body holds: Svelte builds this wrapper itself, so neither it nor its declarator carries
+ * `loc` — while the `id` inside does, from Svelte's own reader (so that `loc` has
+ * `character`), and `init` is an ordinary acorn expression with an ordinary `loc`. Always
+ * `const`, always exactly one declarator, both enforced by the type.
+ */
+export interface SvelteConstDeclaration {
+	type: 'VariableDeclaration';
+	kind: 'const';
+	declarations: [SvelteConstDeclarator];
+	start: number;
+	end: number;
+}
+
+/** The single declarator of a `{@const}` — see `SvelteConstDeclaration` for why no `loc`. */
+export interface SvelteConstDeclarator {
+	type: 'VariableDeclarator';
+	id: Expression;
+	init: Expression;
+	start: number;
+	end: number;
 }
 
 /**
  * `{const x = expr}` / `{let x = expr}` / `{let x}` — the bare declaration tags
  * (no `@`).
  *
- * `declaration` is a `VariableDeclaration`-shaped value (`kind` is `const` or
- * `let`) with a single declarator, emitted as raw JSON.
+ * `declaration` is an ordinary acorn `VariableDeclaration` — `loc` and all — with `kind`
+ * `const` or `let`. Unlike `{@const}` it may carry MORE THAN ONE declarator
+ * (`{let x, y, z}`), and a `let` declarator may have a `null` `init`.
  */
 export interface DeclarationTag {
 	type: 'DeclarationTag';
 	start: number;
 	end: number;
-	declaration: unknown;
+	declaration: VariableDeclaration;
 }
 
 /** `{@debug a, b, c}`. */
