@@ -398,7 +398,7 @@ pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
                 0 => break,
                 len => pos += len,
             },
-            _ => break,
+            ScanByte::Maybe | ScanByte::Out => break,
         }
     }
     pos
@@ -487,25 +487,36 @@ mod tests {
     // The lookahead scanners decide identifier bytes from the `[u8; 256]` tables rather
     // than the OR-chain they were written as. The tables are const-derived from that
     // chain, so this grades the lookup against a plain re-spelling of the predicate —
-    // the guard against a table and its documented membership drifting. The `Maybe`
-    // leads are excluded here and graded per code point below; a byte test cannot
-    // answer for them, which is the point of the third state.
+    // the guard against a table and its documented membership drifting.
+    //
+    // Every entry is graded as a whole `ScanByte`, never as its `== In` projection: the
+    // two *resolved* states are exactly the ones a byte test cannot answer for — a
+    // `Maybe` lead (graded per code point below) and an `Escape` backslash (graded by
+    // `identifier_scan_crosses_a_unicode_escape_by_its_own_width`) — and both project to
+    // "not `In`" the same way `Out` does, so a projection would let either collapse back
+    // to `Out` unnoticed. That is the drift this test exists to catch.
     #[test]
     fn lookahead_id_luts_match_the_predicates_they_replace() {
         for b in 0..=u8::MAX {
-            if is_es_whitespace_lead(b) {
-                assert_eq!(LOOKAHEAD_ID_START_LUT[b as usize], ScanByte::Maybe);
-                assert_eq!(LOOKAHEAD_ID_CONTINUE_LUT[b as usize], ScanByte::Maybe);
-                continue;
-            }
+            let verdict = |member: bool| {
+                if is_es_whitespace_lead(b) {
+                    ScanByte::Maybe
+                } else if b == b'\\' {
+                    ScanByte::Escape
+                } else if member {
+                    ScanByte::In
+                } else {
+                    ScanByte::Out
+                }
+            };
             assert_eq!(
-                LOOKAHEAD_ID_START_LUT[b as usize] == ScanByte::In,
-                b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127,
+                LOOKAHEAD_ID_START_LUT[b as usize],
+                verdict(b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127),
                 "id_start mismatch at byte {b:#x}"
             );
             assert_eq!(
-                LOOKAHEAD_ID_CONTINUE_LUT[b as usize] == ScanByte::In,
-                b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127,
+                LOOKAHEAD_ID_CONTINUE_LUT[b as usize],
+                verdict(b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127),
                 "id_continue mismatch at byte {b:#x}"
             );
         }

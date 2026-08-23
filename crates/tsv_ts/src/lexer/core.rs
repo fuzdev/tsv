@@ -85,8 +85,13 @@ pub(crate) fn unicode_escape_len_at(bytes: &[u8], pos: usize) -> usize {
 /// `char` and keeps the length. They must not restate the shape: a lookahead that reads an
 /// escape the lexer does not (or stops short of one it does) mis-classifies the construct it
 /// is looking at, which is how an escaped name came to be an identifier here and not one
-/// there. Takes bytes rather than `&str` so both callers can share it without a re-slice.
-pub(crate) fn try_decode_unicode_escape(bytes: &[u8], start: usize) -> Option<(char, usize)> {
+/// there. Takes bytes rather than `&str` so both callers can share it without a re-slice —
+/// the lexer passes its own cached `Lexer::bytes`, the scans the slice they already hold.
+///
+/// Stays private: the crate-visible surface is [`unicode_escape_len_at`] alone, so a caller
+/// outside this module cannot reach for the decoded `char` and re-derive an identifier-class
+/// verdict beside the lexer's.
+fn try_decode_unicode_escape(bytes: &[u8], start: usize) -> Option<(char, usize)> {
     // Need at least \u
     if start + 2 > bytes.len() || bytes[start] != b'\\' || bytes[start + 1] != b'u' {
         return None;
@@ -133,11 +138,13 @@ pub(crate) fn try_decode_unicode_escape(bytes: &[u8], start: usize) -> Option<(c
         if after_u + 4 > bytes.len() {
             return None;
         }
-        for i in 0..4 {
-            if !bytes[after_u + i].is_ascii_hexdigit() {
-                return None;
-            }
-        }
+        // `to_digit` IS the hex validation — a non-hex byte, ASCII or not, yields `None` and
+        // returns — so a separate `is_ascii_hexdigit` pass would only restate it. The braced
+        // branch above keeps its own pass for two reasons this fixed-width one has neither of:
+        // it BOUNDS the `}` search (a stray `\u{` in arbitrary source would otherwise scan to
+        // the next `}` anywhere in the file — this is called at every `\` a lookahead crosses),
+        // and its accumulation stops once the value is past the cap, so the digits after that
+        // point reach no `to_digit` of their own.
         let mut code: u32 = 0;
         for &b in &bytes[after_u..after_u + 4] {
             code = code * 16 + (b as char).to_digit(16)?;
@@ -418,9 +425,7 @@ impl<'a> Lexer<'a> {
         // Handle first character (already validated as valid identifier start)
         if first_char == '\\' {
             // First char is a unicode escape
-            if let Some((ch, len)) =
-                try_decode_unicode_escape(self.source.as_bytes(), self.position)
-            {
+            if let Some((ch, len)) = try_decode_unicode_escape(self.bytes, self.position) {
                 if !is_id_start(ch) {
                     return Err(lex_err(
                         format!("Invalid identifier start character from unicode escape: '{ch}'"),
@@ -460,9 +465,7 @@ impl<'a> Lexer<'a> {
             match self.cur_byte() {
                 Some(b'\\') => {
                     // Potential unicode escape in identifier
-                    if let Some((ch, len)) =
-                        try_decode_unicode_escape(self.source.as_bytes(), self.position)
-                    {
+                    if let Some((ch, len)) = try_decode_unicode_escape(self.bytes, self.position) {
                         if !is_id_continue(ch) {
                             // Not a valid identifier continue char, stop here
                             break;
@@ -964,8 +967,7 @@ impl<'a> Lexer<'a> {
             // Unicode escape at start of identifier: \u0066oo → foo
             Some(b'\\') => {
                 // Check if this is a valid unicode escape that decodes to an identifier start
-                if let Some((ch, _)) =
-                    try_decode_unicode_escape(self.source.as_bytes(), self.position)
+                if let Some((ch, _)) = try_decode_unicode_escape(self.bytes, self.position)
                     && is_id_start(ch)
                 {
                     return self.scan_identifier_into('\\', dst);
