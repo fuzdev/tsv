@@ -406,13 +406,20 @@ impl<'a> CommentAttach<'a> {
 ///
 /// Skipped while unwinding — the corpus tools format under `catch_unwind` and report a
 /// panic rather than aborting, which a panicking `Drop` would take away from them.
+///
+/// The whole impl is `#[cfg(debug_assertions)]`, not just the assert inside it: a
+/// release build then has no drop glue for `CommentAttach` at all, rather than a
+/// per-island TLS read and `RefCell` borrow whose only result is discarded. Same
+/// reason [`Frame::node_type`] is `#[cfg]`-gated — "this exists for the assert" is
+/// structural where it can be, not a comment someone has to believe.
+#[cfg(debug_assertions)]
 impl Drop for CommentAttach<'_> {
     fn drop(&mut self) {
         if std::thread::panicking() {
             return;
         }
         let st = self.state.borrow();
-        debug_assert!(
+        assert!(
             st.frames.is_empty() && st.attached.is_empty(),
             "an island finished with {} unclosed node(s) and {} unemitted comment(s)",
             st.frames.len(),

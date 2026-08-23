@@ -571,27 +571,25 @@ pub(super) fn attach_open(node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     }
 }
 
-/// Tell the online attach that the **next** node to open is its parent's last
-/// `body`/`elements`/`properties` entry — acorn's `is_last_in_body`, which a
-/// child needs at its own close and so cannot derive for itself. Inert in every
-/// other mode.
-///
-/// It marks the element as it is EMITTED rather than naming it by span at the
-/// container's open, because a statement's internal span is not always its wire
-/// node's — see [`CommentAttach::mark_last_body_element`].
-#[inline]
-pub(super) fn attach_mark_body_last(ctx: &Ctx<'_>) {
-    if let CommentMode::Attach(attach) = ctx.comments {
-        attach.mark_last_body_element();
-    }
-}
-
-/// [`write_array`] over a container's `body` / `elements` / `properties`, marking
-/// the last element for the online comment attach ([`attach_mark_body_last`]).
+/// [`write_array`] over a container's `body` / `elements` / `properties`, telling
+/// the online attach which element is its parent's last — acorn's
+/// `is_last_in_body`, which a child needs at its own close and so cannot derive
+/// for itself ([`CommentAttach::mark_last_body_element`], which says why it is a
+/// MARK on the element as EMITTED rather than a span read at the container's
+/// open).
 ///
 /// The three plain-slice containers — `Program`, `BlockStatement`,
 /// `ObjectExpression` — share it; `ArrayExpression`'s elements can be holes and
 /// take [`write_body_array_holes`].
+///
+/// The mode test is hoisted out of the loop rather than asked per element, so an
+/// ordinary emission — which has no last element to mark — takes the bare
+/// [`write_array`], with no index to carry and no per-element compare, and asks
+/// the mode once per container instead of once per last element. Measured
+/// **flat** on the wire-write wall (`json_profile` over three real `src` trees,
+/// interleaved rounds), at **−536 B `.text`**; it is here as hygiene — the same
+/// "one never-taken compare, and only where one is needed" shape as
+/// [`attach_open`] — not as a win.
 #[inline]
 pub(super) fn write_body_array<'a, T: 'a>(
     w: &mut JsonWriter,
@@ -599,10 +597,14 @@ pub(super) fn write_body_array<'a, T: 'a>(
     ctx: &Ctx<'_>,
     mut emit: impl FnMut(&mut JsonWriter, &'a T),
 ) {
+    let CommentMode::Attach(attach) = ctx.comments else {
+        write_array(w, items, |w, item| emit(w, item));
+        return;
+    };
     let len = items.len();
     write_array(w, items.iter().enumerate(), |w, (i, item)| {
         if i + 1 == len {
-            attach_mark_body_last(ctx);
+            attach.mark_last_body_element();
         }
         emit(w, item);
     });
@@ -615,6 +617,8 @@ pub(super) fn write_body_array<'a, T: 'a>(
 /// index holds `null`, which is no node. Marking only a `Some` last element is
 /// exactly that rule. (`write_expression_holes` is the unmarked twin, for
 /// `ArrayPattern` — a type acorn's `is_last_in_body` test does not name.)
+///
+/// The mode test is hoisted as in [`write_body_array`], for the same reason.
 #[inline]
 pub(super) fn write_body_array_holes<'a, T: 'a>(
     w: &mut JsonWriter,
@@ -622,11 +626,18 @@ pub(super) fn write_body_array_holes<'a, T: 'a>(
     ctx: &Ctx<'_>,
     mut emit: impl FnMut(&mut JsonWriter, &'a T),
 ) {
+    let CommentMode::Attach(attach) = ctx.comments else {
+        write_array(w, items, |w, item| match item {
+            Some(item) => emit(w, item),
+            None => w.null(),
+        });
+        return;
+    };
     let len = items.len();
     write_array(w, items.iter().enumerate(), |w, (i, item)| match item {
         Some(item) => {
             if i + 1 == len {
-                attach_mark_body_last(ctx);
+                attach.mark_last_body_element();
             }
             emit(w, item);
         }
