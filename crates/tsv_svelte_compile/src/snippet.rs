@@ -483,7 +483,7 @@ impl<'s> Collector<'s> {
     fn each_block(&mut self, block: &EachBlock<'_>) {
         self.expr(&block.expression);
         if let Some(key) = &block.key {
-            self.expr(key);
+            self.expr(&key.expression);
         }
         if let Some(context) = &block.context {
             self.bind_pattern(context);

@@ -104,7 +104,7 @@ fn refuse_each_key_without_as(each: &EachBlock<'_>, source: &str) -> Result<(), 
     if each.context.is_some() {
         return Ok(());
     }
-    let keyed = match key {
+    let keyed = match &key.expression {
         Expression::Identifier(id) => match (each.index, plain_identifier_name(id, source)) {
             (Some(index), Some(name)) => index != name,
             // No index, or an escaped key name this port can't compare — keyed.

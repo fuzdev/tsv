@@ -45,3 +45,6 @@
 <!-- line comment: a // runs to end of line, so the pattern tail drops to the next line (no swallow) -->
 {#each items as {q =// c
 1}}<div>{q}</div>{/each}
+
+<!-- keyed each: the pattern's comment stays in the pattern, never on the (key) -->
+{#each items as {j/* c */},i (j)}<div>{j}{i}</div>{/each}

@@ -247,24 +247,18 @@ fn each_binding_separator(s: &str, s_offset: usize, arena: &Bump) -> EachHeadSpl
     }
 }
 
-/// Return type for parse_each_binding: (context, index, key_expr, key_span, consumed_end).
+/// Return type for parse_each_binding: (context, index, key, consumed_end).
 /// `consumed_end` is the absolute source offset just past the last token the binding
 /// consumed — the caller rejects any non-whitespace between it and the closing `}`.
 type EachBindingResult<'arena> = (
     Expression<'arena>,
     Option<&'arena str>,
-    Option<Expression<'arena>>,
-    Option<Span>,
+    Option<EachKey<'arena>>,
     usize,
 );
 
-/// Return type for parse_index_and_key_after_context: (index, key_expr, key_span, consumed_end).
-type IndexAndKeyResult<'arena> = (
-    Option<&'arena str>,
-    Option<Expression<'arena>>,
-    Option<Span>,
-    usize,
-);
+/// Return type for parse_index_and_key_after_context: (index, key, consumed_end).
+type IndexAndKeyResult<'arena> = (Option<&'arena str>, Option<EachKey<'arena>>, usize);
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a control flow block starting with {#
@@ -507,11 +501,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
         };
 
-        let (context, index, key, key_span, binding_end) = match binding {
+        let (context, index, key, binding_end) = match binding {
             Some((binding_str, binding_offset)) => {
-                let (ctx, idx, k, k_span, b_end) =
-                    self.parse_each_binding(binding_str, binding_offset)?;
-                (Some(ctx), idx, k, k_span, b_end)
+                let (ctx, idx, k, b_end) = self.parse_each_binding(binding_str, binding_offset)?;
+                (Some(ctx), idx, k, b_end)
             }
             None => {
                 // No binding: the remainder is the optional `, index` and/or `(key)` —
@@ -532,9 +525,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // item}`, which Svelte accepts — still resolves to the binding.)
                 let semantic_end = expression.span().end as usize;
                 let after_semantic = &content[semantic_end - content_offset..];
-                let (idx, k, k_span, b_end) =
+                let (idx, k, b_end) =
                     self.parse_index_and_key_after_context(after_semantic, semantic_end)?;
-                (None, idx, k, k_span, b_end)
+                (None, idx, k, b_end)
             }
         };
 
@@ -570,7 +563,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             context,
             index,
             key,
-            key_span,
             body,
             fallback,
             span: Span {
@@ -592,7 +584,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// The TS parser stops at top-level commas, so `{ a, b }, i` parses `{ a, b }` and leaves `, i`.
     ///
-    /// Returns (context, index, key, key_span) where key_span includes the parentheses.
+    /// Returns (context, index, key); the key carries the span of its parentheses.
     fn parse_each_binding(
         &mut self,
         binding: &str,
@@ -612,10 +604,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse remaining: ", index" and/or "(key)"
         let consumed = pattern_end - adjusted_offset;
         let remaining = &trimmed[consumed..];
-        let (index, key, key_span, consumed_end) =
+        let (index, key, consumed_end) =
             self.parse_index_and_key_after_context(remaining, pattern_end)?;
 
-        Ok((context, index, key, key_span, consumed_end))
+        Ok((context, index, key, consumed_end))
     }
 
     /// Parse a context pattern: identifier or destructuring pattern, each with an
@@ -629,10 +621,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// here, after the pattern, rather than by handing the whole remainder to the
     /// expression parser.
     ///
-    /// `tsv_ts::attach_pattern_type_annotation` owns the per-kind span convention
-    /// (an identifier's span stays on the bare name; a destructuring pattern's
-    /// extends over its annotation) — one definition, so the two Svelte block
-    /// readers can't drift.
+    /// `tsv_ts::attach_pattern_type_annotation` owns the span convention — one
+    /// definition, so the two Svelte block readers can't drift. It leaves the span
+    /// on the **bare** binding for every kind (only a destructuring pattern's wire
+    /// `end` widens at emit time — the one kind whose byte range and `loc` genuinely
+    /// disagree; an annotated identifier stays bare on the wire too, per Svelte's
+    /// `read_pattern`), so `pattern.span().end` is the bare end and
+    /// `tsv_ts::pattern_binding_end` the end past any annotation. A reader that
+    /// needs the gap between them — the trailing-comment gates — must ask for both.
     fn parse_context_pattern(
         &mut self,
         input: &str,
@@ -704,7 +700,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse ", index" and/or "(key)" after the context pattern
     ///
-    /// Returns (index, key_expression, key_span) where key_span includes the parentheses.
+    /// Returns (index, key); the key carries the span of its parentheses.
     fn parse_index_and_key_after_context(
         &mut self,
         remaining: &str,
@@ -745,7 +741,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `)` inside a string/comment in the key can't end it early, and any trailing
         // junk after the real `)` is left for the caller's trailing check (not swallowed).
         let rest_trimmed = rest.trim_start_matches(is_svelte_ws);
-        let (key, key_span) = if rest_trimmed.starts_with('(') {
+        let key = if rest_trimmed.starts_with('(') {
             let key_ws = rest.len() - rest_trimmed.len();
             let paren_start = rest_offset + key_ws; // absolute offset of '('
             let close = match_bracket(
@@ -764,15 +760,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 key_offset + (key_str.len() - key_str.trim_start_matches(is_svelte_ws).len()),
             )?;
             // Span includes the parentheses: from '(' to after ')'.
-            let span_start = paren_start as u32;
-            let span_end = (paren_start + close + 1) as u32;
-            consumed_end = span_end as usize;
-            (Some(key_expr), Some(Span::new(span_start, span_end)))
+            let span = Span::new(paren_start as u32, (paren_start + close + 1) as u32);
+            consumed_end = span.end as usize;
+            Some(EachKey {
+                expression: key_expr,
+                span,
+            })
         } else {
-            (None, None)
+            None
         };
 
-        Ok((index, key, key_span, consumed_end))
+        Ok((index, key, consumed_end))
     }
 
     /// Parse an await block: {#await expression}...{:then value}...{:catch error}...{/await}
@@ -1088,15 +1086,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse a `{#await}` `then`/`catch` binding pattern (the value/error), rejecting a
-    /// comment immediately BEFORE the pattern or BETWEEN the pattern and its `:`/`}`.
+    /// comment immediately BEFORE the pattern or BETWEEN the binding and its `}`.
     /// Svelte reads these with `read_pattern` — acorn at the current index, having skipped
     /// only whitespace — so a comment before the pattern fails ("Expected identifier or
-    /// destructure pattern") and the following `eat()` rejects one between the pattern and
+    /// destructure pattern") and the following `eat()` rejects one between the binding and
     /// the next token. A comment INSIDE a destructure (`{ a /* c */ }`) or INSIDE the type
     /// annotation (`value: /* c */ number`) stays valid — it's acorn trivia within the
     /// pattern/type. tsv's `parse_ts_pattern` is comment-tolerant (it would relocate or drop
     /// a surrounding comment), so this gate restores Svelte's strictness. `region_offset` is
     /// the absolute source offset of `region[0]`.
+    ///
+    /// ⚠️ An annotation gives the region **two** edges and the gate needs both. A bare-span
+    /// reading alone sees the `:` first, calls the whole tail an annotation, and lets
+    /// `{:then a: A /* c */}` through — accepted where canonical rejects, with the comment
+    /// silently eaten by the sub-parse's lookahead. A `pattern_binding_end` reading alone
+    /// steps past the `:` and re-opens `{:then a /* c */: A}`, which the bare reading had
+    /// covered. Both, for every kind. The `{#each}` and `{@const}` readers gate the same
+    /// two edges, `{#each}` by bounding the pattern before it parses the annotation.
     fn parse_await_value_pattern(
         &mut self,
         region: &str,
@@ -1122,15 +1128,25 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         if span.start as usize != value_start {
             return Err(self.error_expected_at("identifier or destructure pattern", value_start));
         }
-        // Comment right after the pattern, before its `:`/`}`. The leftover may legitimately
-        // be a `: type` annotation (kept), so we reject only when it *starts* with a comment —
-        // a comment INSIDE the type (`value: /* c */ number`) leaves `:` first and is allowed.
-        let after = span.end as usize - value_start; // index into `trimmed`
-        let tail = trimmed[after..].trim_start_matches(is_svelte_ws);
-        if tail.starts_with("/*") || tail.starts_with("//") {
-            return Err(
-                self.error_expected_at("identifier or destructure pattern", span.end as usize)
-            );
+        // TWO gaps in this region can hold a comment canonical rejects, one on each side of
+        // the annotation, and neither reading covers the other: after the BARE pattern,
+        // before its `:`/`}` (`then a /* c */: A`), and after the whole BINDING, before its
+        // `}` (`then a: A /* c */`). Each is a legitimate leftover otherwise — a `: type`
+        // annotation, or nothing — so the reject is only on a tail that *starts* with a
+        // comment; one INSIDE the type (`value: /* c */ number`) leaves `:` first and is
+        // allowed. The two ends coincide for an unannotated binding.
+        //
+        // The bare end is the pattern node's own span for EVERY kind — `attach_pattern_type_
+        // annotation` leaves the span on the bare binding; only a destructuring pattern's
+        // wire `end` widens, at emit time — so only the far end needs `pattern_binding_end`.
+        for edge in [
+            span.end as usize,
+            tsv_ts::pattern_binding_end(&pattern) as usize,
+        ] {
+            let tail = trimmed[edge - value_start..].trim_start_matches(is_svelte_ws);
+            if tail.starts_with("/*") || tail.starts_with("//") {
+                return Err(self.error_expected_at("identifier or destructure pattern", edge));
+            }
         }
         Ok(pattern)
     }

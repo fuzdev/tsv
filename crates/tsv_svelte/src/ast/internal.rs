@@ -205,14 +205,28 @@ pub struct EachBlock<'arena> {
     pub expression: Expression<'arena>,
     pub context: Option<Expression<'arena>>, // Pattern (identifier or destructuring), None if no `as`
     pub index: Option<&'arena str>,
-    pub key: Option<Expression<'arena>>,
-    /// Span of the key including parentheses `(key)` for comment lookup
-    pub key_span: Option<Span>,
+    pub key: Option<EachKey<'arena>>,
     pub body: Fragment<'arena>,
     pub fallback: Option<Fragment<'arena>>,
     pub span: Span,
     /// Span of the opening tag `{#each ... }` for comment lookup
     pub opening_tag_span: Span,
+}
+
+/// An `{#each}` key (`{#each … (key)}`) together with the span of the parentheses
+/// that hold it.
+///
+/// One field rather than two `Option`s that must covary: every reader needs the
+/// parens to locate the expression (the printer's embed offsets, the wire writer's
+/// comment-attach window), and a reader that could hold the expression without
+/// them had to invent a fallback for a state the parser never produces — three of
+/// them did, and one silently widened its comment window back over the binding
+/// pattern.
+#[derive(Debug, Clone)]
+pub struct EachKey<'arena> {
+    pub expression: Expression<'arena>,
+    /// Span of the key INCLUDING its parentheses — `(` through past `)`.
+    pub span: Span,
 }
 
 /// Svelte AwaitBlock - promise handling

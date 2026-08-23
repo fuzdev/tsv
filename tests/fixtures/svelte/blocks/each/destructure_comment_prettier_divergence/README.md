@@ -1,4 +1,4 @@
-# destructure_comment_svelte_prettier_divergence
+# destructure_comment_prettier_divergence
 
 A comment placed **inside** a `{#each … as PATTERN}` destructuring binding pattern is
 preserved where the author wrote it. prettier-plugin-svelte silently drops it.
@@ -18,16 +18,12 @@ a value or before a nested object/array **pattern** (`{ u = /* c */ { v: 1 } }`,
 the brace/bracket node, so the piece's own builder is the only thing that can print it). These are the same canonical
 positions tsv preserves for a regular TypeScript destructure (`const { a = /* c */ 1 } = x`).
 
-## Svelte divergence (parser)
-
-The binding pattern is parsed by acorn (the each `context`), which attaches the comment
-to the adjacent AST node as `leadingComments` / `trailingComments`. tsv uses its detached
-comment model — every comment lives once in the root `comments` array, never duplicated
-onto nodes — so `expected_ours.json` omits those attachments that `expected_svelte.json`
-carries. The set of distinct comments is identical and `ast_diff` confirms semantic
-equivalence; the formatter (which locates comments by position) is unaffected. Same family
-as the other acorn comment-attachment divergences. See
-[conformance_svelte.md §Comment Attachment Differences](../../../../../../docs/conformance_svelte.md#comment-attachment-differences).
+The wire is a **parser match**: canonical parses the binding pattern with its own acorn
+parse and attaches each interior comment to the adjacent node as `leadingComments` /
+`trailingComments`, and tsv reproduces that attachment from the same window (the
+`{@const}` binding shares the builder). The keyed case pins the window's near edge — a
+pattern comment belongs to the pattern, never to the `(key)` expression that follows it,
+whose own parse begins at the `(`.
 
 ## Prettier divergence (formatter)
 
@@ -38,5 +34,6 @@ comment-blind path and drops them. See
 
 ## Related
 
-- [destructure_comment](../../await/destructure_comment_svelte_prettier_divergence/) — same divergence for `{#await … then}` / `{:then}` / `{:catch}` patterns
+- [destructure_comment](../../await/destructure_comment_prettier_divergence/) — same divergence for `{#await … then}` / `{:then}` / `{:catch}` patterns
+- [context_annotation_comment](../context_annotation_comment_prettier_divergence/) — the same verdict one token later, inside the binding's type annotation
 - [expr_trailing](../../../syntax/comments/expr_trailing_prettier_divergence/) — same drop-vs-preserve family for trailing comments in template expressions

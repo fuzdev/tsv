@@ -101,6 +101,62 @@ pub(super) fn build_expression_writer_comments(
     out
 }
 
+/// Build the per-node comment map for a comment-bearing **binding pattern** —
+/// the `{#each … as ctx}` context, the `{:then value}` / `{:catch error}`
+/// bindings, and the `{@const}` id, which reach it through
+/// [`build_const_tag_writer_comments`].
+///
+/// The window is the binding's own, and it runs to the end of the ANNOTATION
+/// where one follows: canonical parses a destructure as a synthetic
+/// `(pattern = 1)` acorn expression and its trailing `: T` as a second parse,
+/// and a comment inside either attaches within the pattern subtree. Deriving
+/// the end from the root node instead collapses it to the bare binding — an
+/// annotated *identifier*'s span stops at the name — and every annotation
+/// comment attaches nowhere. The start is the binding's, never the enclosing
+/// head's: canonical filters each parse's comments to `start >= index`, where
+/// `index` is where *that* parse began, so a `{#each}` key's own parse (which
+/// begins at its `(`) must not see a comment written back in the pattern.
+pub(super) fn build_pattern_island_writer_comments(
+    pattern: &tsv_ts::ast::internal::Expression<'_>,
+    attach: AttachInputs<'_>,
+) -> WriterComments {
+    let mut out = WriterComments::default();
+    fold_pattern_window(pattern, attach, &mut out);
+    out
+}
+
+/// The region a binding pattern's comments come from — its own start through the
+/// end of its annotation, if it has one.
+///
+/// One definition because two callers must agree on it exactly: the writer's cheap
+/// "is there anything here at all" pre-check and this module's attach filter. A
+/// pre-check narrower than the filter silently DROPS a comment (the map is never
+/// built, and nothing else emits it); a wider one only wastes a build. Stating the
+/// region twice is how the two drift.
+pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::internal::Expression<'_>) -> Span {
+    Span::new(pattern.span().start, tsv_ts::pattern_binding_end(pattern))
+}
+
+/// [`build_pattern_island_writer_comments`]'s body, folding into a caller-owned
+/// map so `{@const}` can add its init window to the same one.
+fn fold_pattern_window(
+    pattern: &tsv_ts::ast::internal::Expression<'_>,
+    attach: AttachInputs<'_>,
+    out: &mut WriterComments,
+) {
+    let window = pattern_comment_window(pattern);
+    let tree = expression_skeleton(pattern, attach);
+    try_attach_comments_to_node_ending_at(
+        &tree,
+        tree.roots()[0],
+        window.end,
+        attach,
+        window.start,
+        window.end,
+        out,
+    );
+}
+
 /// Build the per-node comment map for a comment-bearing `{@const id = init}`.
 ///
 /// Canonical Svelte runs **two** acorn parses, each with its own comment
@@ -112,31 +168,18 @@ pub(super) fn build_expression_writer_comments(
 /// the `=` are a canonical parse error, so the two windows partition the tag.
 /// The `VariableDeclaration`/`VariableDeclarator` envelope carries no comments
 /// and is reproduced at emit time.
+///
+/// The id window is the shared binding-pattern one
+/// ([`build_pattern_island_writer_comments`]) — the same window the `{#each}` /
+/// `{:then}` / `{:catch}` bindings take, which is what makes the two windows
+/// here split at the end of the BINDING rather than of its bare name.
 pub(super) fn build_const_tag_writer_comments(
     tag: &internal::ConstTag<'_>,
     attach: AttachInputs<'_>,
 ) -> WriterComments {
-    let id_span = tag.id.span();
-    // The two windows split at the end of the BINDING, past its `: T` — Svelte's
-    // `read_pattern` parses the annotation, so a comment inside it belongs to the pattern
-    // window and attaches within the annotation subtree. Splitting on the bare span hands
-    // the annotation to the init window instead.
-    let binding_end = tsv_ts::pattern_binding_end(&tag.id);
+    let binding_end = pattern_comment_window(&tag.id).end;
     let mut out = WriterComments::default();
-    let id_tree = expression_skeleton(&tag.id, attach);
-    // The pattern window's parse ran through the annotation, but an annotated
-    // block binding's root span stops at the bare name, so the end is handed in
-    // rather than read off the root — otherwise the window collapses to the name
-    // and an annotation comment attaches nowhere.
-    try_attach_comments_to_node_ending_at(
-        &id_tree,
-        id_tree.roots()[0],
-        binding_end,
-        attach,
-        id_span.start,
-        binding_end,
-        &mut out,
-    );
+    fold_pattern_window(&tag.id, attach, &mut out);
     let init_tree = expression_skeleton(&tag.init, attach);
     try_attach_comments_to_node(
         &init_tree,

@@ -562,18 +562,7 @@ impl<'a> Printer<'a> {
         if let Some(key) = &block.key {
             // The `(` carries no trailing space, and the dangle is suppressed here, so the
             // key's freeze verdict changes nothing about this layout.
-            let key_doc = if let Some(key_span) = block.key_span {
-                self.build_expression_doc_for_block(
-                    key,
-                    key_span.start + 1,
-                    key_span.end - 1,
-                    1,
-                    false,
-                )
-                .doc
-            } else {
-                self.build_ts_expression_doc_cannot_hang(key)
-            };
+            let key_doc = self.build_each_key_expr(key, false).doc;
             opening.push(d.text(" ("));
             opening.push(key_doc);
             opening.push(d.text(")"));

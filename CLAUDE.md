@@ -321,7 +321,7 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (ALL 
 deno task conformance                  # pre-release aggregate: preflights pins:audit:checkouts +
 # fixtures:validate + compile:fixtures:validate (the ORACLE-FRESHNESS legs — `check` runs only each tree's
 # sidecar-free slice, which grades tsv against the committed file and so cannot see the oracle itself moving;
-# only a run that re-formats through prettier can, ~17 s for all 4227 parser/formatter fixtures), then the three
+# only a run that re-formats through prettier can, ~17 s for all 4288 parser/formatter fixtures), then the three
 # gates above + corpus:compare:parse --all +
 # corpus:compare:format --all in ONE process (benches/js/conformance.ts; oracles load once, fail-fast, FFI built once),
 # then render:audit over the version-pinned checkouts (a subprocess — drives its own sidecar). The format leg's prettier
