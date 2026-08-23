@@ -1,4 +1,4 @@
-# destructure_computed_key_jsdoc_cast_prettier_divergence
+# destructure_computed_key_jsdoc_cast_svelte_prettier_divergence
 
 An **own-line JSDoc cast comment in an `{#each … as}` binding pattern's computed key**:
 
@@ -21,6 +21,19 @@ comment-blind path and **drops the cast comment and its parens outright**
 semantic change. tsv normalizes the `unformatted_ours_own_line.svelte` and
 `unformatted_ours_break.svelte` authorings to `input.svelte` in one pass.
 
+
+## Svelte divergence (parser)
+
+The cast comment leads a **parenthesized** subexpression, and Svelte's
+`parse_expression_at` sets acorn's `preserveParens: true` — so canonical attaches it to the
+synthetic `ParenthesizedExpression` and then `remove_parens` discards that wrapper, taking
+the `leadingComments` with it. tsv has no `ParenthesizedExpression` node (it matches
+Svelte's *final* shape), so the comment attaches to the inner expression that survives.
+The same stance tsv takes at every other comment-bearing island — see
+[conformance_svelte.md §Comment Attachment Differences](../../../../../../docs/conformance_svelte.md#comment-attachment-differences),
+whose `remove_parens` entry catalogs the family. The distinct-comment set is identical
+(the comment is in the root `comments` array on both sides) and the formatter, which
+locates comments by position, is unaffected.
 
 ## Reason
 

@@ -50,4 +50,4 @@ and [conformance_prettier.md §Comment Position Philosophy](../../../../../../do
 
 - [type_assertion_top_level](../type_assertion_top_level/) — the comment-free chained-`as` head shapes
 - [type_assertion](../type_assertion/) — an assertion nested inside a call argument, where no re-parse is needed
-- [context_annotation_comment](../context_annotation_comment_svelte_prettier_divergence/) — the binding's type annotation, the other separately-parsed region of this head
+- [context_annotation_comment](../context_annotation_comment_prettier_divergence/) — the binding's type annotation, the other separately-parsed region of this head

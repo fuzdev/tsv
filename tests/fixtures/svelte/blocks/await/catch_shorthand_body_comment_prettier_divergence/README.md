@@ -14,7 +14,7 @@ authoring of the same components, which tsv normalizes to it. The two differ onl
 **where the head shorthand's binding pattern lives in source** — inside the head, or in a
 `{:then}` clause after the body that prints last — which is the whole distinction this
 fixture exists to hold: the awaited expression's comment range stops at the pattern
-([destructure_comment](../destructure_comment_svelte_prettier_divergence/) pins why), and
+([destructure_comment](../destructure_comment_prettier_divergence/) pins why), and
 a pattern outside the head would make that range span the earlier section's body, so the
 range is bounded at the head's own `}` as well.
 
@@ -38,5 +38,5 @@ cataloged in
 ## Related
 
 - [expr_trailing](../../../syntax/comments/expr_trailing_prettier_divergence/) — the drop-vs-preserve rule for trailing comments in template expressions, across every `{…}` context
-- [destructure_comment](../destructure_comment_svelte_prettier_divergence/) — the binding-pattern positions of the same heads
+- [destructure_comment](../destructure_comment_prettier_divergence/) — the binding-pattern positions of the same heads
 - [then_shorthand_catch](../then_shorthand_catch/) — the comment-free re-order this fixture's authoring pair is built on

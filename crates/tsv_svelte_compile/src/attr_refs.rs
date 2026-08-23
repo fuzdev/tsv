@@ -143,7 +143,11 @@ fn each_node_item<'a, 'arena>(
         }
         FragmentNode::EachBlock(block) => {
             expr(&block.expression)?;
-            for e in block.context.iter().chain(block.key.iter()) {
+            for e in block
+                .context
+                .iter()
+                .chain(block.key.iter().map(|k| &k.expression))
+            {
                 expr(e)?;
             }
             each_template_item(&block.body, f)?;
