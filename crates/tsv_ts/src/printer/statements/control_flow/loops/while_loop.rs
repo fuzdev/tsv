@@ -31,7 +31,7 @@ impl<'a> Printer<'a> {
             // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
             // block comments stay inline, line comments become trailing.
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-            parts.push(self.build_statement_head_doc(paren_end, block.span, || {
+            parts.push(self.build_statement_head_doc(paren_end, stmt.body, || {
                 self.build_block_statement_doc(block)
             }));
             d.group(d.concat(&parts))
@@ -45,7 +45,7 @@ impl<'a> Printer<'a> {
             // - When flat: line becomes space -> `while (cond) a;`
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
             let body_start = stmt.body.span().start;
-            let body_doc = self.build_statement_head_doc(paren_end, stmt.body.span(), || {
+            let body_doc = self.build_statement_head_doc(paren_end, stmt.body, || {
                 // `adjustClause` wraps the body in one indent in every arm; nothing
                 // continues on the tail's line, so the tail falls through to whatever
                 // flushes the while's own position.
@@ -75,7 +75,7 @@ impl<'a> Printer<'a> {
         let body_ctx = ctx.clause_body(true, gap_breaks_body);
         // A loop body collapses its empty block form (`do {} while (cond)`) — unless an
         // own-line directive in the `do`→body gap freezes it.
-        let body_doc = self.build_statement_head_doc(do_end, stmt.body.span(), || {
+        let body_doc = self.build_statement_head_doc(do_end, stmt.body, || {
             self.build_collapsing_body_doc(stmt.body, body_ctx)
         });
 

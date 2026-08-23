@@ -499,7 +499,7 @@ impl<'a> Printer<'a> {
             // node heads it, so it rides inside the doc the slice replaces and the leading
             // run above skips it (docs/comments.md hazard 1).
             if body_has_comments && self.member_gap_frozen(prev_end, stmt_start) {
-                body_parts.push(self.build_frozen_node_doc(stmt.span()));
+                body_parts.push(self.build_frozen_statement_doc(stmt));
             } else {
                 body_parts.push(self.build_statement_doc(
                     stmt,
