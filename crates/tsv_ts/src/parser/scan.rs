@@ -5,7 +5,9 @@
 
 use std::borrow::Cow;
 
-use crate::lexer::{is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace};
+use crate::lexer::{
+    is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace, unicode_escape_len_at,
+};
 
 /// 256-entry lookup table for the lookahead whitespace class. `In` is its ASCII half —
 /// `<SP>`, `<TAB>`, `<VT>`, `<FF>` from `WhiteSpace` plus `<LF>`, `<CR>` from
@@ -15,9 +17,11 @@ use crate::lexer::{is_es_line_terminator, is_es_line_terminator_at, is_es_whites
 ///
 /// One table rather than a `bool` half plus a separate lead test, so
 /// [`skip_whitespace`] and [`skip_identifier`] ask their byte the same way: one load,
-/// one three-way verdict. The two scans classify the same bytes for opposite purposes —
+/// one verdict. The two scans classify the same bytes for opposite purposes —
 /// what ends a name is what a gap is made of — so a byte that is `Maybe` here is `Maybe`
-/// there, by construction.
+/// there, by construction. `ScanByte::Escape` is the one state this table never emits:
+/// a `\` opens an identifier character but is whitespace under no production, so it is
+/// `Out` here and a name-run opener there.
 const LOOKAHEAD_WS_LUT: [ScanByte; 256] = {
     let mut t = [ScanByte::Out; 256];
     let mut i = 0;
@@ -73,7 +77,9 @@ pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
                 0 => break,
                 len => pos += len,
             },
-            ScanByte::Out => break,
+            // Unreachable: this table never emits `Escape` (see its doc). A `\` arrives
+            // as `Out`, and either way the whitespace run ends here.
+            ScanByte::Out | ScanByte::Escape => break,
         }
     }
     pos
@@ -185,21 +191,32 @@ pub(super) fn skip_whitespace_and_comments(bytes: &[u8], mut pos: usize) -> usiz
 /// so LLVM emits the full arithmetic chain, and it orders the common case (a letter)
 /// *last*, behind the `> 127`, `$`, `_` and digit tests.
 ///
-/// ⚠️ **"Almost" every byte `> 127`, and the exception is the whole reason these are
-/// tables of [`ScanByte`] rather than of `bool`.** A lookahead asks the identifier classes
-/// two different questions — *step over this name* and *does the word end here?* — and
-/// the second is a WORD BOUNDARY, where reading a non-ASCII whitespace character as
+/// ⚠️ **"Almost" every byte `> 127`, and the exception is one of the two reasons these
+/// are tables of [`ScanByte`] rather than of `bool`.** A lookahead asks the identifier
+/// classes two different questions — *step over this name* and *does the word end here?* —
+/// and the second is a WORD BOUNDARY, where reading a non-ASCII whitespace character as
 /// "the identifier continues" merges a keyword into its neighbour. A byte test cannot
 /// settle it: `0xC2` leads both `<NBSP>` (`c2 a0`) and ordinary identifier characters
 /// (`µ` is `c2 b5`), so the five lead bytes that can begin ECMAScript whitespace are
 /// entered as [`ScanByte::Maybe`] and resolved by [`non_ascii_es_whitespace_len_at`]
 /// against the same productions [`skip_whitespace`] crosses.
+///
+/// ⚠️ **The other is that an identifier character need not be a character at all.** A
+/// `UnicodeEscapeSequence` spells one out of ASCII punctuation the lexer already
+/// understands — `\u0054` is the name `T` — so a `\` is
+/// [`ScanByte::Escape`] in BOTH tables, resolved by the lexer's own
+/// [`unicode_escape_len_at`] rather than by a shape test of this file's own. Reading it
+/// as `Out` ends a name that has not ended, and that answer is wrong in both directions at
+/// once: the *step* question stops short of the name (a type-argument head then looks like
+/// no head at all), while the *boundary* question reports a word ending where an escape
+/// continues it, so `keyof\u0041` — the single name `keyofA` — answers to
+/// [`is_word_at`] as the `keyof` operator.
 const LOOKAHEAD_ID_START_LUT: [ScanByte; 256] = build_id_lut(false);
 const LOOKAHEAD_ID_CONTINUE_LUT: [ScanByte; 256] = build_id_lut(true);
 
 /// What a byte contributes to a lookahead scan — of an identifier, or of a whitespace
-/// run. An enum rather than a `u8` sentinel so the verdict arms are exhaustive: a fourth
-/// state could not be added and silently fall into someone's `_`.
+/// run. An enum rather than a `u8` sentinel so the verdict arms are exhaustive: a new
+/// state cannot be added and silently fall into someone's `_`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ScanByte {
     /// The run ends at this byte.
@@ -209,6 +226,16 @@ enum ScanByte {
     /// A UTF-8 lead byte that begins EITHER an ECMAScript whitespace character or an
     /// ordinary non-ASCII identifier character — only the bytes after it can say which.
     Maybe,
+    /// A `\`, which in the identifier classes opens a `UnicodeEscapeSequence` — the one
+    /// identifier character spelled out of ASCII punctuation. Resolved by the LEXER's own
+    /// [`unicode_escape_len_at`], so the scan admits exactly the escapes the lexer does;
+    /// one it rejects ends the run.
+    ///
+    /// Produced by the two identifier tables only. [`LOOKAHEAD_WS_LUT`] never emits it —
+    /// a `\` is not whitespace under any production — so [`skip_whitespace`]'s arm for it
+    /// is unreachable and simply ends the run, which keeps `Maybe` meaning exactly what
+    /// it means in the identifier tables and preserves the invariant documented there.
+    Escape,
 }
 
 /// Build one of the two tables above. `continuing` picks the `ID_Continue` membership
@@ -227,6 +254,12 @@ const fn build_id_lut(continuing: bool) -> [ScanByte; 256] {
             };
         t[i] = if is_es_whitespace_lead(b) {
             ScanByte::Maybe
+        } else if b == b'\\' {
+            // A `UnicodeEscapeSequence` is an identifier character in BOTH classes: the
+            // spec admits one wherever an `IdentifierStart` or `IdentifierPart` may
+            // appear, so `\u0054` heads a name and `keyof\u0041` is ONE name
+            // (`keyofA`), not the keyword followed by another.
+            ScanByte::Escape
         } else if b > 127 || ascii_member {
             ScanByte::In
         } else {
@@ -275,14 +308,15 @@ fn identifier_continues_at(bytes: &[u8], pos: usize) -> bool {
     id_class_holds(&LOOKAHEAD_ID_CONTINUE_LUT, bytes, pos)
 }
 
-/// The shared body of the two predicates above: one table load, and a decode only at the
-/// [`ScanByte::Maybe`] leads.
+/// The shared body of the two predicates above: one table load, and a second look only at
+/// the [`ScanByte::Maybe`] leads and at a [`ScanByte::Escape`] backslash.
 #[inline]
 fn id_class_holds(lut: &[ScanByte; 256], bytes: &[u8], pos: usize) -> bool {
     match bytes.get(pos) {
         Some(&b) => match lut[b as usize] {
             ScanByte::In => true,
             ScanByte::Maybe => non_ascii_es_whitespace_len_at(bytes, pos) == 0,
+            ScanByte::Escape => unicode_escape_len_at(bytes, pos) != 0,
             ScanByte::Out => false,
         },
         None => false,
@@ -294,9 +328,11 @@ fn id_class_holds(lut: &[ScanByte; 256], bytes: &[u8], pos: usize) -> bool {
 ///
 /// A bare `starts_with` is the trap this exists to close: what follows the word decides
 /// whether a lookahead is looking at a keyword or at an ordinary identifier that happens
-/// to share its opening bytes. That "what follows" is a *character*, not a byte — a
-/// keyword followed by `<NBSP>` is still the keyword — so the boundary test goes through
-/// [`identifier_continues_at`].
+/// to share its opening bytes. That "what follows" is an identifier *character*, not a
+/// byte, and it can be spelled two ways neither a byte test nor a `starts_with` sees: a
+/// keyword followed by `<NBSP>` is still the keyword, while `keyof\u0041` is
+/// the single name `keyofA` and no keyword at all. Both are why the boundary test goes
+/// through [`identifier_continues_at`].
 #[inline]
 pub(super) fn is_word_at(bytes: &[u8], pos: usize, word: &[u8]) -> bool {
     bytes[pos..].starts_with(word) && !identifier_continues_at(bytes, pos + word.len())
@@ -346,13 +382,23 @@ pub(super) fn skip_numeric_literal(bytes: &[u8], pos: usize) -> usize {
 /// calling [`identifier_continues_at`]: the fast arm stays one L1 load and one compare
 /// per byte, and the decode is reached only at the [`ScanByte::Maybe`] leads — in practice
 /// once per call, on the byte that ends the run.
+///
+/// A [`ScanByte::Escape`] backslash advances by the escape's OWN width, never by one:
+/// stepping a byte at a time would walk into the escape's `u`/hex tail and read it as
+/// ordinary name bytes, which happens to land in the same place for a well-formed escape
+/// and does not for a malformed one — and a malformed escape must end the run, since no
+/// token occupies those bytes.
 #[inline]
 pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
     while pos < bytes.len() {
         match LOOKAHEAD_ID_CONTINUE_LUT[bytes[pos] as usize] {
             ScanByte::In => pos += 1,
             ScanByte::Maybe if non_ascii_es_whitespace_len_at(bytes, pos) == 0 => pos += 1,
-            _ => break,
+            ScanByte::Escape => match unicode_escape_len_at(bytes, pos) {
+                0 => break,
+                len => pos += len,
+            },
+            ScanByte::Maybe | ScanByte::Out => break,
         }
     }
     pos
@@ -441,25 +487,36 @@ mod tests {
     // The lookahead scanners decide identifier bytes from the `[u8; 256]` tables rather
     // than the OR-chain they were written as. The tables are const-derived from that
     // chain, so this grades the lookup against a plain re-spelling of the predicate —
-    // the guard against a table and its documented membership drifting. The `Maybe`
-    // leads are excluded here and graded per code point below; a byte test cannot
-    // answer for them, which is the point of the third state.
+    // the guard against a table and its documented membership drifting.
+    //
+    // Every entry is graded as a whole `ScanByte`, never as its `== In` projection: the
+    // two *resolved* states are exactly the ones a byte test cannot answer for — a
+    // `Maybe` lead (graded per code point below) and an `Escape` backslash (graded by
+    // `identifier_scan_crosses_a_unicode_escape_by_its_own_width`) — and both project to
+    // "not `In`" the same way `Out` does, so a projection would let either collapse back
+    // to `Out` unnoticed. That is the drift this test exists to catch.
     #[test]
     fn lookahead_id_luts_match_the_predicates_they_replace() {
         for b in 0..=u8::MAX {
-            if is_es_whitespace_lead(b) {
-                assert_eq!(LOOKAHEAD_ID_START_LUT[b as usize], ScanByte::Maybe);
-                assert_eq!(LOOKAHEAD_ID_CONTINUE_LUT[b as usize], ScanByte::Maybe);
-                continue;
-            }
+            let verdict = |member: bool| {
+                if is_es_whitespace_lead(b) {
+                    ScanByte::Maybe
+                } else if b == b'\\' {
+                    ScanByte::Escape
+                } else if member {
+                    ScanByte::In
+                } else {
+                    ScanByte::Out
+                }
+            };
             assert_eq!(
-                LOOKAHEAD_ID_START_LUT[b as usize] == ScanByte::In,
-                b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127,
+                LOOKAHEAD_ID_START_LUT[b as usize],
+                verdict(b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127),
                 "id_start mismatch at byte {b:#x}"
             );
             assert_eq!(
-                LOOKAHEAD_ID_CONTINUE_LUT[b as usize] == ScanByte::In,
-                b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127,
+                LOOKAHEAD_ID_CONTINUE_LUT[b as usize],
+                verdict(b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127),
                 "id_continue mismatch at byte {b:#x}"
             );
         }
@@ -601,6 +658,76 @@ mod tests {
                 "U+{cp:04X} left the cursor off the next token"
             );
         }
+    }
+
+    /// The escape spelling of an identifier character, graded at the two questions the
+    /// tables answer — *does a name start here* and *how wide is it* — plus the word
+    /// boundary that falls out of the second.
+    ///
+    /// The REJECTING rows are what this exists for: no fixture can reach them. A malformed
+    /// escape makes the file a lexer error either way, so an `input_invalid_*` fixture
+    /// rejects whatever the scan does; what changes is only where the scan leaves the
+    /// cursor. Admitting a bare `\u` unvalidated walks [`skip_identifier`] into the
+    /// escape's own tail and reports a name ending inside bytes no token occupies, so the
+    /// follow-token check that decides a `<` then reads the wrong token entirely.
+    ///
+    /// They also pin the agreement itself: the resolver is the LEXER's, so a value past
+    /// `U+10FFFF` and a lone surrogate — neither an identifier character — end the run
+    /// here exactly as they end a name there. A shape-only test of this file's own would
+    /// call both of those names and drift the two apart again.
+    #[test]
+    fn identifier_scan_crosses_a_unicode_escape_by_its_own_width() {
+        // (source, the escape's byte length at 0 — `0` where none starts there)
+        let cases: &[(&str, usize)] = &[
+            ("\\u0054", 6),
+            ("\\uFFFF", 6),
+            ("\\u0030", 6), // a digit: the escape's VALUE is deliberately not judged
+            ("\\u{54}", 6),
+            ("\\u{102A7}", 9),
+            ("\\u{0000000000000042}", 20), // the braced form caps the value, not the digit count
+            ("\\u054", 0),                 // three hex digits, then EOF
+            ("\\u054 ", 0),                // three hex digits, then a non-hex byte
+            ("\\uZZZZ", 0),
+            ("\\u{}", 0),   // the braced form needs at least one digit
+            ("\\u{54", 0),  // unterminated
+            ("\\uD800", 0), // a lone surrogate is no identifier character
+            ("\\u{D800}", 0),
+            ("\\u{110000}", 0), // past U+10FFFF
+            ("\\x0054", 0),     // \x is a string escape, never an identifier one
+            ("\\", 0),
+        ];
+        for &(src, len) in cases {
+            let bytes = src.as_bytes();
+            let admitted = len != 0;
+            assert_eq!(
+                unicode_escape_len_at(bytes, 0),
+                len,
+                "escape length at {src:?}"
+            );
+            assert_eq!(
+                identifier_starts_at(bytes, 0),
+                admitted,
+                "identifier start at {src:?}"
+            );
+            assert_eq!(
+                identifier_continues_at(bytes, 0),
+                admitted,
+                "identifier continue at {src:?}"
+            );
+            // A well-formed escape is crossed whole; a malformed one ends the run AT the
+            // backslash rather than somewhere inside its tail.
+            assert_eq!(skip_identifier(bytes, 0), len, "skip_identifier at {src:?}");
+        }
+
+        // An escape composes with the rest of a name like any other identifier character…
+        assert_eq!(skip_identifier(b"\\u0054foo", 0), 9);
+        assert_eq!(skip_identifier(b"x\\u0054y", 0), 8);
+
+        // …and the word boundary falls out of that: `keyof\u0041` is the single name
+        // `keyofA`, while a malformed escape continues nothing and leaves the keyword.
+        assert!(!is_word_at(b"keyof\\u0041", 0, b"keyof"));
+        assert!(is_word_at(b"keyof\\", 0, b"keyof"));
+        assert!(is_word_at(b"keyof x", 0, b"keyof"));
     }
 
     /// The whitespace table, graded the same way as the identifier ones: each entry

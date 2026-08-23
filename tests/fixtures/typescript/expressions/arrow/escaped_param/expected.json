@@ -1,0 +1,847 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 528,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A unicode escape is an identifier character, so an escaped name is a single",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " arrow parameter. Prettier decodes the escape and parenthesizes the",
+			"start": 100,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " parameter, so the frozen rows below are where the escaped spelling survives.",
+			"start": 171,
+			"end": 250,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 252,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 297,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 343,
+			"end": 361,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The decoded, parenthesized spellings those normalize to.",
+			"start": 390,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 60
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 527,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 272,
+					"end": 295,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 278,
+							"end": 294,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 278,
+								"end": 280,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 283,
+								"end": 294,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 23
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 283,
+										"end": 289,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 12
+											},
+											"end": {
+												"line": 6,
+												"column": 18
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 293,
+									"end": 294,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 22
+										},
+										"end": {
+											"line": 6,
+											"column": 23
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A unicode escape is an identifier character, so an escaped name is a single",
+							"start": 20,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " arrow parameter. Prettier decodes the escape and parenthesizes the",
+							"start": 100,
+							"end": 169
+						},
+						{
+							"type": "Line",
+							"value": " parameter, so the frozen rows below are where the escaped spelling survives.",
+							"start": 171,
+							"end": 250
+						},
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 252,
+							"end": 270
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 317,
+					"end": 341,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 323,
+							"end": 340,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 323,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 9
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 328,
+								"end": 340,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 12
+									},
+									"end": {
+										"line": 8,
+										"column": 24
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 328,
+										"end": 335,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 12
+											},
+											"end": {
+												"line": 8,
+												"column": 19
+											}
+										},
+										"name": "xy"
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 339,
+									"end": 340,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 23
+										},
+										"end": {
+											"line": 8,
+											"column": 24
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 297,
+							"end": 315
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 363,
+					"end": 387,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 369,
+							"end": 386,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 369,
+								"end": 371,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"name": "a3"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 374,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 12
+									},
+									"end": {
+										"line": 10,
+										"column": 24
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 374,
+										"end": 381,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 12
+											},
+											"end": {
+												"line": 10,
+												"column": 19
+											}
+										},
+										"name": "xx"
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 385,
+									"end": 386,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 23
+										},
+										"end": {
+											"line": 10,
+											"column": 24
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 343,
+							"end": 361
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 451,
+					"end": 471,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 457,
+							"end": 470,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 457,
+								"end": 459,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 9
+									}
+								},
+								"name": "b1"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 462,
+								"end": 470,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 12
+									},
+									"end": {
+										"line": 13,
+										"column": 20
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 463,
+										"end": 464,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 13
+											},
+											"end": {
+												"line": 13,
+												"column": 14
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 469,
+									"end": 470,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 19
+										},
+										"end": {
+											"line": 13,
+											"column": 20
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The decoded, parenthesized spellings those normalize to.",
+							"start": 390,
+							"end": 449
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 473,
+					"end": 494,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 22
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 479,
+							"end": 493,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 21
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 479,
+								"end": 481,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"name": "b2"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 484,
+								"end": 493,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 12
+									},
+									"end": {
+										"line": 14,
+										"column": 21
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 485,
+										"end": 487,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 13
+											},
+											"end": {
+												"line": 14,
+												"column": 15
+											}
+										},
+										"name": "xy"
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 492,
+									"end": 493,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 20
+										},
+										"end": {
+											"line": 14,
+											"column": 21
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 496,
+					"end": 517,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 22
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 502,
+							"end": 516,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 21
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 502,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 9
+									}
+								},
+								"name": "b3"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 507,
+								"end": 516,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 12
+									},
+									"end": {
+										"line": 15,
+										"column": 21
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 508,
+										"end": 510,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 13
+											},
+											"end": {
+												"line": 15,
+												"column": 15
+											}
+										},
+										"name": "xx"
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 515,
+									"end": 516,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 20
+										},
+										"end": {
+											"line": 15,
+											"column": 21
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
