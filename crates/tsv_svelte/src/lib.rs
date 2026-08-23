@@ -130,10 +130,11 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// embedded template expressions and `<script>` content via `tsv_ts`'s
 /// embedded writers, `<style>` children via `tsv_css`'s `write_css_children` —
 /// emits final char-space positions directly. Comment-bearing islands
-/// (template expressions with comments, comment-carrying `<script>`s) first
-/// precompute a span-keyed `WriterComments` map off a byte-space skeleton
-/// (`ast/convert/special.rs`), which the fused emit consults at each node's
-/// close. This is the hot path for the FFI parse binding and the
+/// (template expressions with comments, comment-carrying `<script>`s) run
+/// acorn's attach **online** off this same emit's node opens and closes
+/// (`ast/convert/comment_attachment.rs` declares each island's window), so each node emits
+/// its own `leadingComments` / `trailingComments` at its close — no second
+/// pass and no per-node map. This is the hot path for the FFI parse binding and the
 /// CLI's compact output — the bytes are valid UTF-8 by construction (every
 /// emitted byte is a source slice or ASCII fragment), and byte-oriented
 /// consumers skip the O(output) validation a `String` requires.

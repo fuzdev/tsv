@@ -440,7 +440,7 @@ compiles until a fixture reaches it. The wire-type gate's fixture-cover arm is w
 holds the distinction, and it found all four.
 
 ⚠️ **Comment attachment is a Svelte-only wire fact with a modelling rule.**
-`leadingComments` / `trailingComments` (`AttachedComment`) are appended by
+`leadingComments` / `trailingComments` (`AttachedComment[]`) are appended by
 Svelte's acorn pass, never by `parse_typescript` / `parse_css`, and the
 attachment DFS reaches essentially every acorn node. They are therefore
 declared once as `AcornCommentAttachment` and applied two ways, which

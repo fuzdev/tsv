@@ -2,9 +2,11 @@
 //!
 //! The writer (`write.rs`) emits the compact wire JSON directly from the
 //! internal Svelte AST in one walk, never materializing a typed public tree.
-//! `special.rs` and `comment_attachment.rs` provide the byte-space skeleton +
-//! acorn comment-attach machinery it composes for the comment-bearing
-//! `<script>` / template-expression islands.
+//! `comment_attachment.rs` declares what each comment-bearing `<script>` /
+//! template-expression island hands `tsv_ts`'s `CommentAttach` — its comment
+//! window plus what acorn's walk reads about a root — which that one walk then
+//! drives from its own node opens and closes. `special.rs` holds the
+//! `<svelte:options>` readers and the component-global TypeScript decision.
 
 mod comment_attachment;
 mod special;

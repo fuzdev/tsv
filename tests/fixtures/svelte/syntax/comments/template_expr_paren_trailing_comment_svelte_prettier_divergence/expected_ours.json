@@ -1,0 +1,480 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 208,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 53,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 42,
+						"name": "title",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 10,
+								"character": 10
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 11,
+							"end": 42,
+							"expression": {
+								"type": "Identifier",
+								"start": 30,
+								"end": 31,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 30
+									},
+									"end": {
+										"line": 1,
+										"column": 31
+									}
+								},
+								"name": "x",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 12,
+										"end": 28
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t1 ",
+										"start": 33,
+										"end": 41
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 43,
+							"end": 47,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 53,
+				"end": 55,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 55,
+				"end": 98,
+				"test": {
+					"type": "Identifier",
+					"start": 78,
+					"end": 79,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 23
+						},
+						"end": {
+							"line": 3,
+							"column": 24
+						}
+					},
+					"name": "x",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* @type {B} ",
+							"start": 60,
+							"end": 76
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t2 ",
+							"start": 81,
+							"end": 89
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 90,
+							"end": 93,
+							"raw": "yes",
+							"data": "yes"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 98,
+				"end": 100,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 100,
+				"end": 137,
+				"expression": {
+					"type": "Identifier",
+					"start": 125,
+					"end": 126,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 25
+						},
+						"end": {
+							"line": 5,
+							"column": 26
+						}
+					},
+					"name": "x",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* @type {C} ",
+							"start": 107,
+							"end": 123
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t3 ",
+							"start": 128,
+							"end": 136
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 137,
+				"end": 139,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 139,
+				"end": 207,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 140
+					},
+					"end": {
+						"line": 7,
+						"column": 7,
+						"character": 146
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 147,
+						"end": 195,
+						"name": "onclick",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 8,
+								"character": 147
+							},
+							"end": {
+								"line": 7,
+								"column": 15,
+								"character": 154
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 155,
+							"end": 195,
+							"expression": {
+								"type": "ArrowFunctionExpression",
+								"start": 156,
+								"end": 194,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 17
+									},
+									"end": {
+										"line": 7,
+										"column": 55
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 162,
+									"end": 194,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 23
+										},
+										"end": {
+											"line": 7,
+											"column": 55
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 162,
+										"end": 163,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 23
+											},
+											"end": {
+												"line": 7,
+												"column": 24
+											}
+										},
+										"name": "f"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 182,
+											"end": 183,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 43
+												},
+												"end": {
+													"line": 7,
+													"column": 44
+												}
+											},
+											"name": "e",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": "* @type {D} ",
+													"start": 164,
+													"end": 180
+												}
+											],
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " t4 ",
+													"start": 185,
+													"end": 193
+												}
+											]
+										}
+									],
+									"optional": false
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 196,
+							"end": 198,
+							"raw": "go",
+							"data": "go"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 12,
+			"end": 28,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 12
+				},
+				"end": {
+					"line": 1,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t1 ",
+			"start": 33,
+			"end": 41,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 33
+				},
+				"end": {
+					"line": 1,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {B} ",
+			"start": 60,
+			"end": 76,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 5
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t2 ",
+			"start": 81,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 26
+				},
+				"end": {
+					"line": 3,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {C} ",
+			"start": 107,
+			"end": 123,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 7
+				},
+				"end": {
+					"line": 5,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t3 ",
+			"start": 128,
+			"end": 136,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 28
+				},
+				"end": {
+					"line": 5,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {D} ",
+			"start": 164,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 25
+				},
+				"end": {
+					"line": 7,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t4 ",
+			"start": 185,
+			"end": 193,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 46
+				},
+				"end": {
+					"line": 7,
+					"column": 54
+				}
+			}
+		}
+	]
+}

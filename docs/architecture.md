@@ -184,13 +184,14 @@ stays byte-identical. Each writer is a faithful emission of the acorn /
 canonical parser's `expected.json` on every fixture (including the multibyte
 and template-comment ones that exercise the fused offset translation and
 island-scoped comment attach). tsv_svelte's template-expression comments
-(outside `<script>`) fuse via an island-scoped attach pass: each
-comment-bearing island's wire node tree is recorded structurally during a
-byte-space skeleton emit (`SkeletonRecorder` — open/close events from the
-writer itself, never a re-parse of the emitted bytes), the shared acorn
-attach walks the recorded tree, and the assignments fold into a span-keyed
-map the fused writer consults at each node's close, so `leadingComments` /
-`trailingComments` serialize in place. `<script>` content, block patterns,
+(outside `<script>`) fuse via an island-scoped attach that runs **online**,
+off the writer's own node opens and closes (`tsv_ts`'s `CommentAttach`):
+acorn assigns a node's leading comments at node entry and its trailing ones
+after its children, which are exactly the two moments the writer already has,
+and the wire emits both lists at the close — so there is no second pass, no
+recorded tree, and no per-node map. `leadingComments` / `trailingComments`
+serialize in place, and the walk's child-visit order is acorn's *by
+construction*, since it IS the emitted field order. `<script>` content, block patterns,
 `{@const}`/`{const}`/`{let}` declarations, and `<svelte:options>` fuse the
 same way, and embedded `<style>` children fuse via `tsv_css`'s
 `write_css_children`.

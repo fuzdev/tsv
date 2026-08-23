@@ -14,8 +14,7 @@
 //! every consumer stays order-free.** A `HashMap`'s *iteration order* depends
 //! on the hasher; its `get`/`insert`/`contains`/`clear` semantics do not. Nearly
 //! every table in the tree is used only through the latter set; the exceptions
-//! each neutralize the order at the iteration site —
-//! `WriterComments::debug_assert_consumed` is an order-independent `all`, and
+//! each neutralize the order at the iteration site:
 //! `tsv_check`'s two iterating tables sort before consuming, each on a *total*
 //! order so no tie can fall back to the map's (its symbol tables by
 //! first-declaration span then name, its flow-label scratch by `FlowNodeId`). ⚠️ A
@@ -201,8 +200,10 @@ mod tests {
 
     #[test]
     fn tuple_keys_are_distinguished() {
-        // `(u32, u32)` span keys: the writer's comment map. A hasher that
-        // folded the pair into one word would collide `(a, b)` with `(b, a)`.
+        // The tuple-key path, live in the doc arena's `share_map_scratch`
+        // (`(usize, u8)`) and `tsv_check`'s address map (`(usize, NodeKind)`);
+        // `(u32, u32)` stands in for the class. A hasher that folded the pair
+        // into one word would collide `(a, b)` with `(b, a)`.
         let mut fx: FxHashMap<(u32, u32), u32> = FxHashMap::default();
         for a in 0..64u32 {
             for b in 0..64u32 {
