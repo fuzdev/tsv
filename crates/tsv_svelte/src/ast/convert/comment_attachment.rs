@@ -1,541 +1,167 @@
-// Comment attachment for converted JSON ASTs
+// Comment-attach support for the Svelte wire's acorn islands.
 //
-// The acorn comment-attachment DFS (`CommentAttachmentContext`,
-// `attach_comments_recursively`) attaches leading/trailing comments to script
-// Program JSON, matching `add_comments` in
-// svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js.
+// Svelte attaches an island's comments with acorn's leading/trailing DFS
+// (`add_comments` in svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js).
+// tsv runs that attach **online**, off the wire writer's own node opens and
+// closes — `tsv_ts`'s `CommentAttach` is the state machine, and this module is
+// what an island hands it (`tsv_ts`'s `IslandComments`): the comment WINDOW —
+// which of the document's comments that island's canonical parse would have
+// collected — plus what acorn's walk reads about a ROOT, which the emit stack
+// cannot supply because a root has no frame below it.
 //
-// The walk runs over the `SkeletonTree` the writer records during an island's
-// byte-space skeleton emit (`ast/convert/special.rs`'s
-// `build_*_writer_comments`) — the exact wire node tree, synthetic wrappers
-// included — and its assignments feed the span-keyed `WriterComments` map the
-// fused writer consults at emit time. No `serde_json::Value` is materialized
-// anywhere on this path (the retired emit→`from_slice`→mutate→collect
-// round-trip cost O(script wire size) per comment-bearing island).
+// One `attach_*` builder per island kind, over the window primitives below.
+// There is no second pass and no per-node map: the node that opens is the node
+// acorn's walk would have entered, in the order the wire emits it. See
+// `tsv_ts`'s `ast/convert/write/comments.rs`.
 
+use crate::ast::internal;
 use crate::whitespace::svelte_ws_width_at;
-use std::borrow::Cow;
-use std::collections::VecDeque;
 
-use tsv_lang::{Comment, LocationTracker, Span, printing, source_scan::skip_comment};
-use tsv_ts::ast::convert::{AttachedComment, SkeletonTree, WriterComments};
+use tsv_lang::{Comment, Span, source_scan::skip_comment};
+use tsv_ts::ast::convert::{CommentAttach, IslandComments};
 
-/// The inputs every template comment-attach builder (`ast/convert/special.rs`'s
-/// `build_*_writer_comments`) and every attach entry point below
-/// share: the template comments to place, the source text, the byte-offset
-/// tracker its byte-space skeleton pass runs under, and the parser variant that
-/// pass emits under. Bundled so the call sites — and
-/// `build_expression_list_writer_comments`, which would otherwise trip
-/// `too_many_arguments` — thread one value instead of the same four.
-/// (`build_script_writer_comments` is not in the set: it attaches the script's
-/// *own* comments, not the template set, and is schema-driven.)
+/// The inputs every island's comment-attach builder (the `attach_*` fns below)
+/// shares: the document's template comments and its source.
+///
+/// (`attach_script` is not in the set: it attaches the script's *own* comments,
+/// not the template set.)
 #[derive(Clone, Copy)]
 pub(super) struct AttachInputs<'a> {
     pub(super) template_comments: &'a [&'a Comment],
     pub(super) source: &'a str,
-    pub(super) tracker: &'a LocationTracker,
-    /// The skeleton pass's parser variant — see `tsv_ts`'s `Ctx::vanilla_acorn`.
-    /// It must match the fused emit's, since the recorded tree is what keys the
-    /// per-node comment map the emit then consults.
-    pub(super) vanilla_acorn: bool,
 }
 
-/// Context for the comment attachment process.
+/// The attach for a comment-bearing island whose canonical parse is ONE acorn
+/// parse ending in a trailing-comment scan — the shape shared by every island
+/// below, which is why one builder serves them all:
 ///
-/// Holds a mutable queue of comments (sorted by position) that gets consumed
-/// during the DFS walk, matching acorn's algorithm from:
-/// svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js — plus the
-/// per-node assignments the walk produces, in first-touch order.
-pub(super) struct CommentAttachmentContext<'a, 's> {
-    /// Comment queue sorted by start position. Comments are shifted from the
-    /// front as they get attached to nodes during the DFS walk.
-    comments: VecDeque<&'a Comment>,
-    /// Full source string for slice checks (trailing comment whitespace detection)
-    source: &'s str,
-    /// Per-node assignments, in first-touch order (which, for two nodes
-    /// sharing a span and type, matches their close order — the consume-once
-    /// contract of `WriterComments`).
-    nodes: Vec<NodeAssignments<'a>>,
-    /// Last-touched `(node, idx)` into `nodes`, a one-entry cache for the
-    /// dominant call shape: several consecutive `assign` calls to the *same*
-    /// node (a node with stacked leading comments, or comments trailing the
-    /// root at EOF). New entries push to the tail while the lookup scans from
-    /// the front, so re-finding a just-touched entry is an O(N) rescan and a
-    /// comment-dense island pays O(N²); the cache makes each repeat O(1).
-    /// Sound because `nodes` is strictly find-or-insert (one entry per node)
-    /// and never removes or reorders an entry, so a cached idx stays valid and
-    /// equals what a fresh `position` scan would return.
-    last: Option<(u32, usize)>,
-}
-
-/// One node's accumulated comment assignments.
-struct NodeAssignments<'a> {
-    node: u32,
-    leading: Vec<&'a Comment>,
-    trailing: Vec<&'a Comment>,
-    /// The node's first assignment was trailing, so its `trailingComments`
-    /// key precedes `leadingComments` in the wire (acorn appends object keys
-    /// on first touch — a root that gets fallback trailing comments and then
-    /// the preceding-HTML leading comment serializes trailing first).
-    trailing_first: bool,
-}
-
-impl<'a, 's> CommentAttachmentContext<'a, 's> {
-    pub(super) fn new(comments: VecDeque<&'a Comment>, source: &'s str) -> Self {
-        Self {
-            comments,
-            source,
-            nodes: Vec::new(),
-            last: None,
-        }
-    }
-
-    /// Record one comment assignment (matching the `Value` walk's
-    /// `leadingComments`/`trailingComments` key insertion).
-    fn assign(&mut self, node: u32, trailing: bool, comment: &'a Comment) {
-        let idx = if let Some((last_node, last_idx)) = self.last
-            && last_node == node
-        {
-            // Consecutive assign to the same node — reuse the resolved index
-            // rather than rescanning the tail-growing `nodes` from the front.
-            last_idx
-        } else {
-            match self.nodes.iter().position(|n| n.node == node) {
-                Some(idx) => idx,
-                None => {
-                    self.nodes.push(NodeAssignments {
-                        node,
-                        leading: Vec::new(),
-                        trailing: Vec::new(),
-                        trailing_first: trailing,
-                    });
-                    self.nodes.len() - 1
-                }
-            }
-        };
-        self.last = Some((node, idx));
-        let entry = &mut self.nodes[idx];
-        if trailing {
-            entry.trailing.push(comment);
-        } else {
-            entry.leading.push(comment);
-        }
-    }
-
-    /// Fold the assignments into a `WriterComments` map. `html_leading`
-    /// prepends the preceding-HTML `Line` comment (Svelte's positionless
-    /// `{type: "Line", value}`) to the given node's `leadingComments` — in
-    /// front of any attached leading comments, after the fact, so a node
-    /// whose first attach touch was trailing keeps `trailingComments` first.
-    pub(super) fn into_writer_comments(
-        self,
-        tree: &SkeletonTree,
-        html_leading: Option<(u32, &str)>,
-        out: &mut WriterComments,
-    ) {
-        let mut html_leading = html_leading;
-        for entry in &self.nodes {
-            let mut leading: Vec<AttachedComment> = entry
-                .leading
-                .iter()
-                .map(|c| attached_comment(c, self.source))
-                .collect();
-            if let Some((node, value)) = html_leading
-                && node == entry.node
-            {
-                leading.insert(0, html_attached_comment(value));
-                html_leading = None;
-            }
-            out.insert_node(
-                tree.node_type(entry.node),
-                tree.start(entry.node),
-                tree.end(entry.node),
-                leading,
-                entry
-                    .trailing
-                    .iter()
-                    .map(|c| attached_comment(c, self.source))
-                    .collect(),
-                entry.trailing_first,
-            );
-        }
-        // The HTML comment's node received no attached comments — it still
-        // carries the synthetic leading comment.
-        if let Some((node, value)) = html_leading {
-            out.insert_node(
-                tree.node_type(node),
-                tree.start(node),
-                tree.end(node),
-                vec![html_attached_comment(value)],
-                Vec::new(),
-                false,
-            );
-        }
-    }
-}
-
-/// An ordinary attached comment (byte positions; value via `get_comment_value`).
-fn attached_comment(comment: &Comment, source: &str) -> AttachedComment {
-    AttachedComment {
-        is_block: comment.is_block,
-        value: get_comment_value(comment, source).into_owned(),
-        span: Some((comment.span.start, comment.span.end)),
-    }
-}
-
-/// The synthetic preceding-HTML `Line` comment (no positions).
-fn html_attached_comment(value: &str) -> AttachedComment {
-    AttachedComment {
-        is_block: false,
-        value: value.to_string(),
-        span: None,
-    }
-}
-
-/// Attach comments to all nodes in a skeleton tree using acorn's DFS queue
-/// algorithm.
+/// - a template expression (`{expr}`, block test, directive expression,
+///   `{@debug}` id, spread, `<svelte:element>` tag / `<svelte:component>`
+///   expression, snippet name), via `write_generic_island` / `write_snippet_name`
+/// - a `{@const}`'s **init**, through [`attach_const_tag_init`], which supplies
+///   the binding's end as the window start
+/// - a `{const …}` / `{let …}` **declaration tag**, whose canonical parse is
+///   `parse_statement_at` rather than `parse_expression_at`. Only the parse
+///   ENTRY POINT differs; `add_comments` is the same call on the same shape, so
+///   the whole `VariableDeclaration` tree (every declarator and its id/init)
+///   attaches through this one window. Hence "expression" in the name is the
+///   common case, not the contract.
 ///
-/// Matches the behavior of `add_comments` in:
-/// svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js
+/// The window runs from the container's start (canonical filters each parse's
+/// comments to `start >= index`, where `index` is where *that* parse began) to
+/// the end of the trailing-comment run acorn scans past after the parsed region.
+/// Leftovers trail the root, as acorn's own post-walk special case does.
 ///
-/// Algorithm:
-/// 1. Comments are sorted by position in a queue (VecDeque)
-/// 2. DFS walk visits every AST node
-/// 3. At each node: consume leading comments (before node.start) from queue front
-/// 4. Recurse into children (which consume their own comments from the queue)
-/// 5. After recursion: check for trailing comments based on context
-/// 6. Remaining comments after full walk → trailing on root
-pub(super) fn attach_comments_recursively(
-    tree: &SkeletonTree,
-    root: u32,
-    ctx: &mut CommentAttachmentContext<'_, '_>,
-) {
-    if ctx.comments.is_empty() {
-        return;
-    }
-
-    // DFS walk with parent tracking
-    walk_node(tree, root, None, ctx);
-
-    // Special case: Trailing comments after the root node
-    // See acorn.js: "Special case: Trailing comments after the root node"
-    if !ctx.comments.is_empty()
-        && (ctx.comments[0].span.start >= tree.end(root) || tree.node_type(root) == "Program")
-    {
-        while let Some(comment) = ctx.comments.pop_front() {
-            ctx.assign(root, true, comment);
-        }
-    }
-}
-
-/// Extracted parent context for comment attachment decisions.
+/// ⚠️ **`parse_end` is where the PARSE ended, not where the emitted root node
+/// ends** — the two differ wherever tsv discards a wrapper acorn kept. A JSDoc
+/// cast is the live case: `parse_expression_at` runs with `preserveParens: true`,
+/// so acorn's root for `/** @type {T} */ (x)` is a `ParenthesizedExpression`
+/// ending after the `)`, and its own post-expression token scan starts there.
+/// Anchoring the scan at the emitted root (the *inner* expression, which stops
+/// short of the `)`) kills it on that `)` instead, so every comment past it is
+/// filtered out before the walk ever runs — canonical attaches it to the inner
+/// node (the `)` is in acorn's own `/^[,) \t]*$/` trailing gap class) and tsv
+/// had nowhere to put it. `internal::JsdocCast`'s span covers the parens, which
+/// is what makes the caller's expression the right anchor.
 ///
-/// Only what `walk_node` needs from its parent:
-/// - `end`: for the `node.end != parent.end` guard
-/// - `last_body_start`: start position of the last element in body/elements/properties
-///   (None if the parent isn't BlockStatement/Program/ArrayExpression/ObjectExpression,
-///   or if the relevant array is empty — or ends in an `ArrayExpression` hole)
-struct ParentInfo {
-    end: u32,
-    last_body_start: Option<u32>,
-}
-
-/// Extract parent info from a skeleton node.
-///
-/// The four container types' body/elements/properties array is each type's
-/// only node-valued key, so its last element is the node's last recorded
-/// child — except an `ArrayExpression` whose trailing element is a hole
-/// (`[a,,]`): the `Value` walk read the array's last entry (`null`, no
-/// `start`), which the recorder captures as the `last_elem_hole` flag.
-fn extract_parent_info(tree: &SkeletonTree, node: u32) -> ParentInfo {
-    let last_body_start = match tree.node_type(node) {
-        "BlockStatement" | "Program" | "ObjectExpression" => tree.last_child_start(node),
-        "ArrayExpression" => {
-            if tree.last_elem_hole(node) {
-                None
-            } else {
-                tree.last_child_start(node)
-            }
-        }
-        _ => None,
-    };
-    ParentInfo {
-        end: tree.end(node),
-        last_body_start,
-    }
-}
-
-/// DFS walk a single AST node, consuming comments from the queue
-///
-/// This is the core of acorn's `_` handler in the walk.
-/// `parent_info` provides extracted parent context for trailing comment decisions.
-///
-/// Two of the `Value` walk's per-node guards are structural here: the skeleton
-/// tree contains no `Block`/`Line` comment objects (a `Record` pass never
-/// emits comments), and every recorded node carries `start`/`end`.
-fn walk_node(
-    tree: &SkeletonTree,
-    node: u32,
-    parent_info: Option<&ParentInfo>,
-    ctx: &mut CommentAttachmentContext<'_, '_>,
-) {
-    let n_start = tree.start(node);
-    let n_end = tree.end(node);
-
-    // --- Leading comments: consume from queue while comment.start < node.start ---
-    while ctx
-        .comments
-        .front()
-        .is_some_and(|front| front.span.start < n_start)
-    {
-        let Some(comment) = ctx.comments.pop_front() else {
-            break;
-        };
-        ctx.assign(node, false, comment);
-    }
-
-    // --- Recurse into children (next()) ---
-    recurse_children(tree, node, ctx);
-
-    // --- Trailing comments: check after recursion ---
-    if ctx.comments.is_empty() {
-        return;
-    }
-
-    // Guard: skip if node.end === parent.end (prevents double-attachment)
-    // See acorn.js: "if (parent === undefined || node.end !== parent.end)"
-    let parent_end_val = parent_info.map(|p| p.end);
-    if let Some(p_end) = parent_end_val
-        && n_end == p_end
-    {
-        return;
-    }
-
-    let first_comment_start = ctx.comments[0].span.start;
-
-    // Check is_last_in_body: node is last element in parent's body/elements/properties
-    // See acorn.js lines 162-168
-    let is_last_in_body = parent_info
-        .and_then(|p| p.last_body_start)
-        .is_some_and(|last_start| last_start == n_start);
-
-    if is_last_in_body {
-        // Last node in body: attach multiple trailing comments (can span newlines)
-        // Stop at parent boundary
-        while let Some(c_start) = ctx.comments.front().map(|c| c.span.start) {
-            if let Some(p_end) = parent_end_val
-                && c_start >= p_end
-            {
-                break;
-            }
-            let Some(comment) = ctx.comments.pop_front() else {
-                break;
-            };
-            ctx.assign(node, true, comment);
-        }
-    } else if n_end <= first_comment_start {
-        // Not last in body: attach at most ONE trailing comment on same line
-        // Regex: /^[,) \t]*$/
-        let slice = &ctx.source[n_end as usize..first_comment_start as usize];
-        if slice.chars().all(|c| matches!(c, ',' | ')' | ' ' | '\t'))
-            && let Some(comment) = ctx.comments.pop_front()
-        {
-            ctx.assign(node, true, comment);
-        }
-    }
-}
-
-/// Recurse into all child nodes of a given node, in acorn's property
-/// iteration order (zimmerframe's `for key in node` — JS property insertion
-/// order).
-///
-/// The recorded child order — the wire field order — already *is* acorn's
-/// insertion order for every construct the writer emits (the writer's field
-/// order reproduces each parser path's assignment order: SwitchCase
-/// `consequent` before `test`, LabeledStatement `body` before `label`,
-/// MethodDefinition/PropertyDefinition `key` → `typeParameters`/
-/// `typeAnnotation` → `value` → `decorators`, NewExpression `callee` →
-/// `typeArguments` → `arguments`, CallExpression `arguments` before
-/// `typeArguments`), with ONE exception: the generic-async arrow
-/// (`async <T>(…) => …`), whose wire order puts `typeParameters` first and
-/// `returnType` after `params` — but acorn's arrow paths insert `returnType`
-/// before `params`, and `tsTryParseGenericAsyncArrowFunction`'s
-/// `typeParameters` walk last (the plain-arrow `<T>(…)` graft already emits
-/// last, needing no reorder). So the walk visits
-/// `[returnType?, params…, body, typeParameters]` for that shape.
-fn recurse_children(tree: &SkeletonTree, node: u32, ctx: &mut CommentAttachmentContext<'_, '_>) {
-    // Extract parent info BEFORE walking children (the Value walk computed it
-    // before mutating the node).
-    let parent_info = extract_parent_info(tree, node);
-
-    let generic_async_arrow = tree.node_type(node) == "ArrowFunctionExpression"
-        && tree
-            .children(node)
-            .next()
-            .is_some_and(|first| tree.node_type(first) == "TSTypeParameterDeclaration");
-
-    if generic_async_arrow {
-        // Wire order [typeParameters, params…, returnType?, body] → visit order
-        // [typeParameters, returnType?, params…, body]: acorn's
-        // `tsTryParseGenericAsyncArrowFunction` assigns `typeParameters` first (which
-        // is why the writer emits it first), but `parseArrowExpression` stamps
-        // `returnType` on the fresh node before parsing the parameters. The
-        // returnType is the arrow's unique direct TSTypeAnnotation child (a param's
-        // own annotation nests inside the param).
-        //
-        // The `typeParameters`-first half is load-bearing for the `async`→`<T>` gap:
-        // a comment there precedes both the type parameters and the first parameter,
-        // so whichever is visited first claims it as leading, and the canonical parser
-        // attaches it to `typeParameters`.
-        let children: Vec<u32> = tree.children(node).collect();
-        let return_type = children[1..]
-            .iter()
-            .copied()
-            .find(|&c| tree.node_type(c) == "TSTypeAnnotation");
-        walk_node(tree, children[0], Some(&parent_info), ctx);
-        if let Some(rt) = return_type {
-            walk_node(tree, rt, Some(&parent_info), ctx);
-        }
-        for &child in &children[1..] {
-            if Some(child) != return_type {
-                walk_node(tree, child, Some(&parent_info), ctx);
-            }
-        }
-    } else {
-        for child in tree.children(node) {
-            walk_node(tree, child, Some(&parent_info), ctx);
-        }
-    }
-}
-
-/// Get comment value with indentation stripping applied (Svelte compatibility)
-///
-/// For a multi-line block comment, Svelte's *acorn* `onComment` handler dedents the content by
-/// the comment's line indentation (see
-/// `svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js:115-124`). This applies **only to
-/// comments acorn parses** — `<script>` bodies and template expressions — not to comments Svelte's
-/// own template reader collects (in-tag `//` / `/* */` between attributes), which keep their raw
-/// content. `emit_character_field` distinguishes the two: it's set for template-open-tag-shape
-/// comments (the template-reader ones) and cleared for acorn-shape comments, so the dedent is
-/// gated on `!emit_character_field`.
-///
-/// `pub(super)` so the wire-JSON writer emits the `value` field directly (no
-/// intermediate allocation).
-///
-/// Returns `Cow` so the common single-line / verbatim case borrows its content
-/// slice — only the acorn multi-line block dedent path (rare) allocates.
-pub(super) fn get_comment_value<'s>(comment: &Comment, source: &'s str) -> Cow<'s, str> {
-    let content = comment.content(source);
-    if comment.is_block && comment.multiline && !comment.emit_character_field {
-        Cow::Owned(printing::strip_comment_indentation(
-            source,
-            content,
-            comment.span.start,
-        ))
-    } else {
-        Cow::Borrowed(content)
-    }
-}
-
-/// Whether a comment lies outside every `<script>` content span — i.e., it's a
-/// template expression comment that the attachment passes may move into the
-/// JSON tree.
-pub(super) fn is_template_comment(comment: &Comment, script_spans: &[(u32, u32)]) -> bool {
-    !script_spans
-        .iter()
-        .any(|&(s, e)| comment.span.start >= s && comment.span.end <= e)
-}
-
-/// The template comments inside an attach window `[start, end]`, as the
-/// position-ordered queue the DFS consumes.
-fn window_queue<'a>(
-    template_comments: &[&'a Comment],
-    start: u32,
-    end: u32,
-) -> VecDeque<&'a Comment> {
-    template_comments
-        .iter()
-        .copied()
-        .filter(|c| c.span.start >= start && c.span.end <= end)
-        .collect()
-}
-
-/// Try to attach comments to a template expression skeleton, folding the
-/// assignments into `out`.
-///
-/// Filters template comments to those that would be collected during acorn's
-/// `parse_expression_at`. This includes:
-/// - Comments from `container_start` up to and including the expression
-/// - Comments immediately after the expression (trailing), up to the next
-///   non-whitespace, non-comment token (acorn scans ahead during parsing)
-///
-/// The `container_start` is the Svelte node's start (e.g., ExpressionTag start).
-/// The `container_end` bounds the maximum extent for trailing comment scanning.
-pub(super) fn try_attach_comments_to_node(
-    tree: &SkeletonTree,
-    root: u32,
-    attach: AttachInputs<'_>,
+/// A **bare** grouping paren is the residual: tsv discards those at parse time and
+/// keeps no span, so `{(x) /* c */}` still loses the attachment. It is not
+/// format-stable (tsv and prettier both print `{x /* c */}`), so the shape cannot
+/// be fixtured — see [conformance_svelte.md](../../../../../docs/conformance_svelte.md)
+/// §Comment Attachment Differences.
+pub(super) fn attach_expression<'a>(
+    attach: AttachInputs<'a>,
     container_start: u32,
-    container_end: u32,
-    out: &mut WriterComments,
-) {
-    try_attach_comments_to_node_ending_at(
-        tree,
-        root,
-        tree.end(root),
-        attach,
-        container_start,
-        container_end,
-        out,
-    );
+    parse_end: u32,
+    range_end: u32,
+) -> CommentAttach<'a> {
+    let window_end = scan_past_trailing_comments(attach.source, parse_end, range_end);
+    CommentAttach::new(
+        attach.source,
+        IslandComments {
+            queue: window_queue(attach.template_comments, container_start, window_end),
+            root_parent_end: None,
+            root_fallback: true,
+            html_leading: None,
+        },
+    )
 }
 
-/// [`try_attach_comments_to_node`] with the parsed region's end given explicitly
-/// rather than read off the root node's span.
+/// The attach for a comment-bearing **block binding pattern** — the `{#each … as ctx}`
+/// context, the `{:then value}` / `{:catch error}` bindings, and the `{@const}`
+/// id, which takes it directly (see [`attach_const_tag_init`] for that split).
 ///
-/// The two differ wherever the root's span **stops short of what the parse
-/// covered**. A Svelte block binding is the case that matters: its annotation is
-/// a sibling, not a tail, so an annotated `a1: T`'s root `Identifier` ends at
-/// `a1` while the parse ran through `T` (see `tsv_ts::pattern_binding_end`).
-/// Deriving the window from the root there collapses it to the bare name, and
-/// the trailing scan cannot recover it — the scan stops dead on the `:` — so
-/// every comment inside the annotation is filtered out before the walk and
-/// attaches nowhere.
-pub(super) fn try_attach_comments_to_node_ending_at(
-    tree: &SkeletonTree,
-    root: u32,
-    expr_end: u32,
-    attach: AttachInputs<'_>,
-    container_start: u32,
-    container_end: u32,
-    out: &mut WriterComments,
-) {
-    let source = attach.source;
-    // Compute the effective end of the expression's parsing window.
-    // Acorn scans ahead after the expression looking for the next token,
-    // encountering (and collecting) any comments along the way.
-    // We scan source from expr.end, skipping whitespace and comments,
-    // to find where acorn would stop.
-    let effective_end = scan_past_trailing_comments(source, expr_end, container_end);
-
-    // Filter comments within [container_start, effective_end)
-    let comment_queue = window_queue(attach.template_comments, container_start, effective_end);
-    if comment_queue.is_empty() {
-        return;
-    }
-
-    let mut ctx = CommentAttachmentContext::new(comment_queue, source);
-    attach_comments_recursively(tree, root, &mut ctx);
-    ctx.into_writer_comments(tree, None, out);
+/// The window is the binding's own, and it runs to the end of the ANNOTATION
+/// where one follows: canonical parses a destructure as a synthetic
+/// `(pattern = 1)` acorn expression and its trailing `: T` as a second parse,
+/// and a comment inside either attaches within the pattern subtree. Deriving
+/// the end from the root node instead collapses it to the bare binding — an
+/// annotated *identifier*'s span stops at the name — and every annotation
+/// comment attaches nowhere. The start is the binding's, never the enclosing
+/// head's: canonical filters each parse's comments to `start >= index`, where
+/// `index` is where *that* parse began, so a `{#each}` key's own parse (which
+/// begins at its `(`) must not see a comment written back in the pattern.
+///
+/// The window is fully known up front, so no trailing scan: its end IS the
+/// container bound, which leaves acorn's scan nowhere to run.
+pub(super) fn attach_binding_pattern<'a>(
+    pattern: &tsv_ts::ast::internal::Expression<'_>,
+    attach: AttachInputs<'a>,
+) -> CommentAttach<'a> {
+    let window = pattern_comment_window(pattern);
+    CommentAttach::new(
+        attach.source,
+        IslandComments {
+            queue: window_queue(attach.template_comments, window.start, window.end),
+            root_parent_end: None,
+            root_fallback: true,
+            html_leading: None,
+        },
+    )
 }
 
-/// Attach comments across an expression list that canonical Svelte parses in
-/// ONE acorn parse — snippet parameters (a function-parameter context) and
-/// multi-identifier `{@debug}` (a `SequenceExpression`): one shared comment
-/// queue walked sequentially through each item (the tree's roots), so an
-/// inter-item comment lands exactly where acorn's single-parse walk puts it —
-/// a same-line `[,) \t]*` gap trails the *preceding* item; anything else leads
-/// the *following* item.
+/// The region a binding pattern's comments come from — its own start through the
+/// end of its annotation, if it has one.
+///
+/// One definition because two callers must agree on it exactly: the writer's cheap
+/// "is there anything here at all" pre-check and this module's attach filter. A
+/// pre-check narrower than the filter silently DROPS a comment (the attach is never
+/// built, and nothing else emits it); a wider one only wastes a build. Stating the
+/// region twice is how the two drift.
+pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::internal::Expression<'_>) -> Span {
+    Span::new(pattern.span().start, tsv_ts::pattern_binding_end(pattern))
+}
+
+/// The `{@const id = init}` INIT attach — the second of the tag's two windows.
+///
+/// Canonical Svelte runs **two** acorn parses, each with its own comment
+/// attach: `read_pattern` parses a destructure id as a synthetic
+/// `(pattern = 1)` expression (so an id-internal comment attaches inside the
+/// pattern subtree — e.g. a destructure default's literal), and
+/// `read_expression` parses the init (comments from after the id through the
+/// tag close attach in the init subtree). Comments *between* the pattern and
+/// the `=` are a canonical parse error, so the two windows partition the tag.
+/// The `VariableDeclaration`/`VariableDeclarator` envelope carries no comments
+/// and is reproduced at emit time.
+///
+/// The id window is the shared binding-pattern one ([`attach_binding_pattern`])
+/// — the same window the `{#each}` / `{:then}` / `{:catch}` bindings take,
+/// which is what makes the two windows here split at the end of the BINDING
+/// rather than of its bare name.
+pub(super) fn attach_const_tag_init<'a>(
+    tag: &internal::ConstTag<'_>,
+    attach: AttachInputs<'a>,
+) -> CommentAttach<'a> {
+    let binding_end = pattern_comment_window(&tag.id).end;
+    attach_expression(attach, binding_end, tag.init.span().end, tag.span.end)
+}
+
+/// The attach for a comment-bearing expression LIST that canonical Svelte parses
+/// in ONE acorn parse — `{#snippet}` parameters (a function-parameter context)
+/// and multi-identifier `{@debug}` (a `SequenceExpression`). One shared queue
+/// walked through each item in turn, so an inter-item comment lands exactly
+/// where acorn's single-parse walk puts it: a same-line `[,) \t]*` gap trails the
+/// *preceding* item, anything else leads the *following* one.
 ///
 /// `wrapper` is the discarded parse wrapper's own span — `{@debug}`'s
 /// `SequenceExpression`, which spans first identifier to last; `None` for
@@ -545,40 +171,93 @@ pub(super) fn try_attach_comments_to_node_ending_at(
 /// identifier never claims a trailing comment), and its `start` bounds the
 /// queue, so the leading run *before* the list — which acorn hands to the
 /// wrapper, the outermost node opening after it — reaches no identifier. Both
-/// leftovers stay unattached and still emit in the root `comments` array. (A
-/// single-identifier `{@debug}` has no wrapper — the identifier is the parse
-/// root itself — so it takes the `try_attach_comments_to_node` path with its
-/// root-fallback trailing, and its leading run does attach.)
-pub(super) fn attach_expression_list(
-    tree: &SkeletonTree,
-    template_comments: &[&Comment],
-    source: &str,
-    c_start: u32,
+/// leftovers stay unattached (no root fallback) and still emit in the root
+/// `comments` array. (A single-identifier `{@debug}` has no wrapper — the
+/// identifier is the parse root itself — so it takes [`attach_expression`] with
+/// its root-fallback trailing, and its leading run does attach.)
+pub(super) fn attach_expression_list<'a>(
+    attach: AttachInputs<'a>,
+    container_start: u32,
     range_end: u32,
     wrapper: Option<Span>,
-    out: &mut WriterComments,
-) {
-    let queue_start = wrapper.map_or(c_start, |w| w.start);
-    let comment_queue = window_queue(template_comments, queue_start, range_end);
-    if comment_queue.is_empty() {
-        return;
-    }
-    let mut ctx = CommentAttachmentContext::new(comment_queue, source);
-    let parent = wrapper.map(|w| ParentInfo {
-        end: w.end,
-        last_body_start: None,
-    });
-    for &root in tree.roots() {
-        walk_node(tree, root, parent.as_ref(), &mut ctx);
-    }
-    ctx.into_writer_comments(tree, None, out);
+) -> CommentAttach<'a> {
+    let queue_start = wrapper.map_or(container_start, |w| w.start);
+    CommentAttach::new(
+        attach.source,
+        IslandComments {
+            queue: window_queue(attach.template_comments, queue_start, range_end),
+            root_parent_end: wrapper.map(|w| w.end),
+            root_fallback: false,
+            html_leading: None,
+        },
+    )
 }
 
-/// Scan source after an expression's end to find the effective end of comment collection
+/// The attach for a comment-bearing (or preceding-HTML) `<script>` `Program`.
+///
+/// The queue is the script's own comments — the whole set, since acorn parsed
+/// the whole body — and the preceding HTML comment rides along as the
+/// `Program`'s first `leadingComments` entry (Svelte's positionless
+/// `{type: "Line", value}` shape). The `options: null` non-TS quirk is
+/// reproduced at emit time (schema-driven), so it never perturbs the walk.
+pub(super) fn attach_script<'a>(
+    script: &internal::Script<'a>,
+    source: &'a str,
+    html_leading_comment: Option<&internal::HtmlComment>,
+) -> CommentAttach<'a> {
+    CommentAttach::new(
+        source,
+        IslandComments {
+            queue: script.content.comments.iter().collect(),
+            root_parent_end: None,
+            root_fallback: true,
+            html_leading: html_leading_comment.map(|c| c.content(source)),
+        },
+    )
+}
+
+/// Whether a comment lies outside every `<script>` content span — i.e., it's a
+/// template expression comment that the attach passes may move into the JSON tree.
+pub(super) fn is_template_comment(comment: &Comment, script_spans: &[(u32, u32)]) -> bool {
+    !script_spans
+        .iter()
+        .any(|&(s, e)| comment.span.start >= s && comment.span.end <= e)
+}
+
+/// The template comments inside an attach window `[start, end]`, as the
+/// position-ordered queue the attach consumes.
+///
+/// The window is settled here, before the attach is built — `end` is already the
+/// end of the parse's trailing-comment run where one is scanned for
+/// ([`scan_past_trailing_comments`]), and the container bound where the island's
+/// own bounds settle it outright (a binding pattern, an expression list).
+///
+/// `template_comments` is sorted ascending by `span.start` — the same fact the
+/// writer's `Ctx::any_comment_in` pre-check binary-searches on — so the window is
+/// a contiguous run: seek its first member, then walk while `span.start` stays
+/// inside. The `span.end` bound still filters per candidate, because a comment
+/// may start inside the window and run past its end.
+fn window_queue<'a>(template_comments: &[&'a Comment], start: u32, end: u32) -> Vec<&'a Comment> {
+    let first = template_comments.partition_point(|c| c.span.start < start);
+    template_comments[first..]
+        .iter()
+        .copied()
+        .take_while(|c| c.span.start <= end)
+        .filter(|c| c.span.end <= end)
+        .collect()
+}
+
+/// Scan source after an expression's end to find the effective end of comment collection.
 ///
 /// Acorn's token scanner reads past whitespace and comments when looking for the next token.
 /// This function mimics that: starting at `pos`, skip whitespace and block/line comments,
 /// and return the position after the last skipped comment. If no comments are found, returns `pos`.
+///
+/// Called once per island by [`attach_expression`],
+/// which settles the whole comment window before building the attach. It starts where the
+/// **parse** ended, which is not the emitted root node's end wherever tsv discards a
+/// wrapper acorn kept — a JSDoc cast emits its inner expression, whose end stops short of
+/// the cast's closing paren, and anchoring here would kill the scan on that `)`.
 ///
 /// `skip_comment` is passed `bytes.len()` (not `limit`) as its bound, and its
 /// past-`end` return on an unterminated block comment is unreachable here:

@@ -125,3 +125,51 @@ fn svelte_const_tag_and_snippet() {
         "{#snippet row(name)}\n\t{@const upper = name.toUpperCase()}\n\t<td>{upper}</td>\n{/snippet}",
     );
 }
+
+/// The **comment-attach** path, which the cases above never reach: a
+/// `leadingComments` / `trailingComments` list is emitted only for a
+/// comment-bearing Svelte island, and its per-node assignment is driven by the
+/// writer's own node opens (`attach_open`) rather than by anything `loc`-shaped.
+///
+/// ⭐ That independence is what these cases gate, and nothing else does. The
+/// attach walks the emit, so an `attach_open` that ever became conditional on
+/// `emit_loc` would silently stop opening nodes in *this* variant only —
+/// comments would re-attach to whatever node opened next, and every other gate
+/// would stay green, because they all run with `loc` on. Mutation-tested:
+/// gating `attach_open` on `ctx.emit_loc` passes the whole workspace suite
+/// without these.
+#[test]
+fn svelte_script_attached_comments() {
+    // Leading + trailing on a statement, and a comment inside a nested block —
+    // the `is_last_in_body` widening the attach reads off the emit.
+    assert_svelte(
+        "<script lang=\"ts\">\n\t// lead\n\tconst a: number = 1; /* t */\n\tfunction f() {\n\t\tg(); // inner\n\t}\n</script>",
+    );
+}
+
+#[test]
+fn svelte_preceding_html_comment_attached() {
+    // The positionless `{type: "Line", value}` Svelte prepends to the `<script>`
+    // `Program`'s `leadingComments` — the one attached comment with no span.
+    assert_svelte("<!-- @component doc -->\n<script>let x = 1;</script>");
+}
+
+#[test]
+fn svelte_template_island_attached_comments() {
+    // A template expression island: leading and trailing on the same node.
+    assert_svelte("<div>{/* l */ value /* t */}</div>");
+}
+
+#[test]
+fn svelte_pattern_island_attached_comments() {
+    // A block binding pattern and a `{@const}` id — the two islands whose window
+    // runs to the end of the binding rather than of the root node.
+    assert_svelte("{#each items as { a = /* c */ 1 }}<li>x</li>{/each}");
+    assert_svelte("{@const { a = /* c */ 1 } = o}");
+}
+
+#[test]
+fn svelte_expression_list_island_attached_comments() {
+    // A `{#snippet}` parameter list — one shared queue across several roots.
+    assert_svelte("{#snippet s(a, /* c */ b)}x{/snippet}");
+}
