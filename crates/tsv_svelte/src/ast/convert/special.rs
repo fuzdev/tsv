@@ -12,7 +12,7 @@ use crate::ast::internal;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use tsv_lang::{
-    Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
+    Comment, JsonWriter, LocationMapper, LocationTracker, Span, estimated_json_capacity,
 };
 use tsv_ts::AcornSeed;
 use tsv_ts::ast::convert::{
@@ -30,11 +30,20 @@ use super::comment_attachment::{
 /// skeleton bytes are discarded — only the recorded tree is used — so the
 /// buffer never needs the whole document's capacity).
 ///
-/// TODO: the Record pass still writes the full skeleton bytes into this
-/// discarded buffer (the residual floor of a comment-bearing island's build
-/// cost). Eliminating it needs either a null-sink `JsonWriter` mode (a branch
-/// in the hot write path) or a monomorphized recording-only walk (duplicates
-/// the writer — wasm bloat); neither is a clear win at the current cost.
+/// ⚠️ **The discarded bytes are not where a comment-bearing island's cost is.**
+/// Measured on real Svelte app code (413 components from four repos, ~50–80% of
+/// which carry a comment-bearing island), the whole Record pass — this emit plus
+/// the attach walk — is **32% of the wire-write phase**, and it decomposes:
+/// `loc` emission ≈**24%** of that, the emit's traversal + remaining bytes +
+/// recorder ≈**52%**, the attach walk + map build ≈**25%**. Only the *byte*
+/// writing inside that middle share is what a null sink or a recording-only
+/// walk could remove, and it is **~14%** of the pass. So a null-sink `JsonWriter` mode loses outright: the branch it puts in
+/// the hot write path costs **+2.4%** of the write phase on TypeScript, where
+/// there is no skeleton at all, against a **−2.1%** net on comment-dense Svelte.
+/// A monomorphized recording-only walk avoids that branch but duplicates the
+/// `tsv_ts` writer into the parse WASM bundle for the same ~4.5% ceiling.
+/// The `loc` share is gone (see [`skeleton_env`]); the rest is reachable only by
+/// fusing the attach into the emit — one pass, no recorded tree, no map.
 fn skeleton_writer(island_span: Span) -> JsonWriter {
     JsonWriter::with_capacity(estimated_json_capacity(
         (island_span.end - island_span.start) as usize,
@@ -43,17 +52,37 @@ fn skeleton_writer(island_span: Span) -> JsonWriter {
 
 /// The `EmbedWriter` a byte-space skeleton pass hands to a `tsv_ts` embedded
 /// writer: identity map (comment-attach spans line up in byte space), the
-/// `Record` role, and `emit_loc: true` — the skeleton bytes are discarded, only
-/// the recorded tree is used, so the emitted `loc` is irrelevant. The parser
-/// variant is **not** irrelevant, and comes from the same component-global fact
-/// the fused emit uses: the tree recorded here keys the map that emit consults,
-/// so a variant that disagreed would key it off a shape nothing emits.
+/// `Record` role, and `emit_loc: false`.
+///
+/// ⚠️ **`emit_loc` is off because the recorder never sees a `loc`.** The tree is
+/// built from `(type, span)` open/close events alone, and every `record_open`
+/// site in `tsv_ts` fires *before* its header branches on `emit_loc` — so the
+/// recorded tree is identical either way, while the line/column resolution the
+/// `loc` costs is pure discarded work. It is the single largest share of the
+/// skeleton emit: **−7.6% of the whole Svelte wire-write phase** on real app
+/// code (−6.9% wall, gated and rotated; exactly 0 on a TypeScript null control),
+/// for a byte-identical wire over 13,401 files. It is **−9.5% on the
+/// `no-locations` wire**, which is the tell: that product resolves no `loc` at
+/// all, so the skeleton was the *only* thing computing one. Don't turn it back on to "match
+/// the fused emit" — matching it is precisely what the recorded tree does not
+/// need.
+///
+/// ⭐ And turning it off is what makes that independence **gated**: with the
+/// skeleton running `loc`-free, a `record_open` that ever became conditional on
+/// `emit_loc` stops firing, the recorded tree loses those nodes, and comments
+/// attach to the wrong ones — the fixture corpus goes red immediately.
+/// Mutation-tested both ways (`node_header_impl`'s `record_open` wrapped in
+/// `if ctx.emit_loc`): red here, **green** with the skeleton emitting `loc`,
+/// where the hazard is invisible because the branch is always taken. The parser variant is **not** in that class, and comes from the same
+/// component-global fact the fused emit uses: the tree recorded here keys the
+/// map that emit consults, so a variant that disagreed would key it off a shape
+/// nothing emits.
 fn skeleton_env<'a>(attach: AttachInputs<'a>, recorder: &'a SkeletonRecorder) -> EmbedWriter<'a> {
     EmbedWriter {
         source: attach.source,
         loc: LocationMapper::identity(attach.tracker),
         comments: CommentMode::Record(recorder),
-        emit_loc: true,
+        emit_loc: false,
         vanilla_acorn: attach.vanilla_acorn,
         // Same reason as `loc`: the emitted positions are discarded.
         acorn: AcornSeed::NONE,
@@ -267,9 +296,8 @@ pub(super) fn build_script_writer_comments(
     html_leading_comment: Option<&internal::HtmlComment>,
     schema: Schema,
 ) -> WriterComments {
-    // Byte-space skeleton (identity map). `loc` is unused by attach — a dummy
-    // override suffices; the final fused emit supplies the real tag-line `loc`.
-    let dummy = Position { line: 1, column: 0 };
+    // Byte-space skeleton (identity map), `loc`-free — the final fused emit
+    // supplies the real tag-line `loc`.
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(script.content.span);
     write_program_embedded(
@@ -279,9 +307,10 @@ pub(super) fn build_script_writer_comments(
             source,
             loc: LocationMapper::identity(tracker),
             schema,
-            // Skeleton pass: bytes discarded, loc irrelevant — same reason the
-            // seed below is the identity.
-            program_loc: ProgramLoc::Emit(dummy, dummy),
+            // Skeleton pass: the recorder reads spans, never `loc` — and `Omit`
+            // is what carries that down to every node in the `Program` (it sets
+            // `Ctx::emit_loc`), the same reason the seed below is the identity.
+            program_loc: ProgramLoc::Omit,
             comments: CommentMode::Record(&recorder),
             acorn: AcornSeed::NONE,
         },
