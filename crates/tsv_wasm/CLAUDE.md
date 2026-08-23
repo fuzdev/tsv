@@ -252,9 +252,17 @@ re-exports the functions from index.js/browser.js/index.d.ts (directly, with no
 init guard — it never touches WASM). Its correctness is gated by the package Node
 tests (`scripts/test_npm.ts`); at corpus scale,
 `benches/js/diagnostics/no_locations_parity.ts` proves the reconstruction *rules*
-(deliberately re-derived, the independent oracle) while
+(deliberately re-derived, so a transcription slip in the shipped helper shows) while
 `benches/js/diagnostics/reconstruct_vs_materialize.ts` is the diagnostic that runs
 the shipped helper itself.
+
+⚠️ **The re-derivation is an independent IMPLEMENTATION, not an independent oracle.** Both
+sides of that comparison come from tsv — the loc-bearing wire, and a JS transcription of
+`tsv_lang::LocationTracker`'s rules — so what it grades is the transcription, never the model
+both sides share. A `loc` model that is wrong makes both halves wrong the same way and the
+check stays green; the same mirror then reports red against a *corrected* model, which reads
+as a regression and is not one. The canonical parser's own `loc` is available in the same
+harness, and is the reference that would make this an oracle.
 
 **`.d.ts` export-name constraint.** `index.d.ts` re-exports both `tsv_ast.d.ts`
 (`export type *`) and `locations.d.ts` (`export *`), so a name exported by BOTH is
@@ -392,13 +400,55 @@ Maintenance checklist when a writer's emitted shape changes:
    untranslated positions on multibyte sources.
 6. Run `cargo test --workspace` and `deno task check:ast-types`.
 
-`deno task check:ast-types` (also part of `deno task check`) invokes
-`tsv parse` on a curated set of source snippets, embeds each JSON
-output as a typed literal against `tsv_ast.d.ts`, and runs `deno check`.
-TypeScript's excess-property checking catches both directions of drift:
-missing/added fields and discriminator-string mismatches. Extend
-`scripts/check_ast_types.ts`'s `samples` array when a previously
-uncovered AST node regresses.
+`deno task check:ast-types` (also part of `deno task check`) runs three arms
+against `tsv_ast.d.ts`, described in full at
+[docs/audits.md §Wire-Type Drift Check](../../docs/audits.md#wire-type-drift-check-checkast-types):
+**(A)** `tsv parse` on a curated set of source snippets, each JSON output
+embedded as a typed literal and `deno check`ed — TypeScript's
+excess-property checking catches both directions of drift, missing/added
+fields and discriminator-string mismatches; **(B)** every `type`
+discriminant the fixture corpus produces must be declared here or be
+deliberately opaque (the CSS node vocabulary plus the `customElement`
+config-data `type:` key); **(C)** a computed minimal
+cover of the corpus's committed `expected*.json` — every field SLOT
+(`ParentType.key -> ChildType`), in as few files as possible — typed the
+same way. Arm C grades this file against the CANONICAL parser's output
+rather than against tsv's own, since `expected.json` is what
+`fixtures_update_parsed` regenerates from Svelte / acorn-typescript /
+`parseCss`.
+
+Extend the `samples` array when a shape wants stating explicitly; arms B
+and C need no maintenance — they follow the fixture tree. A `.d.ts` field
+typed `unknown` is invisible to arm C, so widening one (as `Script.content`
+was, from `unknown` to `Program`) is what puts a region behind the gate.
+
+⚠️ **A node SVELTE builds is not the acorn node of the same `type`, and the tell is
+`loc`.** Where Svelte constructs a node instead of handing the text to acorn, the
+result carries the acorn discriminator but a different field set — so it needs its
+own interface rather than reuse, and a position holding either takes a union. The
+four in the wire today, each with its own type:
+
+| position | shape | why |
+| --- | --- | --- |
+| shorthand `bind:x` / `class:x` `expression` | `SvelteShorthandIdentifier` | the directive name IS the expression; nothing parsed it, so **no `loc`** |
+| `<svelte:element this="div">` `tag` | `SvelteFusedLiteral` | no `loc`, and `raw` is Svelte's re-quoted form, not the author's bytes |
+| `{@const}` `declaration` | `SvelteConstDeclaration` / `…Declarator` | Svelte builds the wrapper: no `loc` on either, though the `id` inside has one (from Svelte's own reader, so its `loc` carries `character`) |
+| `{const}` / `{let}` `declaration` | the ordinary acorn `VariableDeclaration` | parsed, so `loc` throughout — and unlike `{@const}` it may carry MORE THAN ONE declarator |
+
+The inverse mistake is just as easy: typing one of these as its acorn namesake
+compiles until a fixture reaches it. The wire-type gate's fixture-cover arm is what
+holds the distinction, and it found all four.
+
+⚠️ **Comment attachment is a Svelte-only wire fact with a modelling rule.**
+`leadingComments` / `trailingComments` (`AttachedComment`) are appended by
+Svelte's acorn pass, never by `parse_typescript` / `parse_css`, and the
+attachment DFS reaches essentially every acorn node. They are therefore
+declared once as `AcornCommentAttachment` and applied two ways, which
+between them cover every acorn node: **intersected** into the node unions
+(`Expression`, `Statement`, `TSType`, `TSTypeElement`), and **extended**
+by the acorn interfaces that positions reference directly by name
+(`Identifier`, `Property`, `BlockStatement`, `SwitchCase`, …). A new acorn
+node reachable only by name needs the `extends`; the gate is what says so.
 
 `Schema::Acorn` vs `Schema::SvelteScript` deltas the writer emits
 require dual updates.
