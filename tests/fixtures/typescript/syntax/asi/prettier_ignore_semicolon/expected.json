@@ -1,0 +1,389 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 154,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 20,
+			"end": 38,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 69,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 109,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 153,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 40,
+					"end": 54,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 46,
+							"end": 53,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 46,
+								"end": 47,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 52,
+								"end": 53,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"name": "x"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 20,
+							"end": 38
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 57,
+					"end": 66,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "ArrowFunctionExpression",
+						"start": 57,
+						"end": 65,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 9
+							}
+						},
+						"id": null,
+						"expression": true,
+						"generator": false,
+						"async": false,
+						"params": [
+							{
+								"type": "Identifier",
+								"start": 58,
+								"end": 59,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "y"
+							}
+						],
+						"body": {
+							"type": "Literal",
+							"start": 64,
+							"end": 65,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 8
+								},
+								"end": {
+									"line": 5,
+									"column": 9
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						}
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 89,
+					"end": 106,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 18
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 99,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 11
+							},
+							"end": {
+								"line": 8,
+								"column": 12
+							}
+						},
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 104,
+						"end": 106,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 16
+							},
+							"end": {
+								"line": 8,
+								"column": 18
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 69,
+							"end": 87
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 129,
+					"end": 143,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 135,
+							"end": 142,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 135,
+								"end": 136,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 141,
+								"end": 142,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 13
+									},
+									"end": {
+										"line": 11,
+										"column": 14
+									}
+								},
+								"name": "z"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 109,
+							"end": 127
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -607,8 +607,11 @@ impl<'a> Printer<'a> {
 
                 stmt_parts.push(match frozen {
                     // The freeze emitter claims the glued block comment the statement
-                    // owns — the leading run above skips it (docs/comments.md hazard 1).
-                    Some(span) => self.build_frozen_node_doc(span),
+                    // owns — the leading run above skips it (docs/comments.md hazard 1) —
+                    // and restores the `;` an ASI-reliant statement kind owes
+                    // ([`Printer::build_frozen_statement_doc`]; the span it freezes is
+                    // `stmt.span()`, which is what `gap_frozen_span` returned).
+                    Some(_) => self.build_frozen_statement_doc(stmt),
                     None => self.build_statement_doc(stmt, StatementContext::OTHER_LIST),
                 });
                 stmt_parts.extend(trailing);

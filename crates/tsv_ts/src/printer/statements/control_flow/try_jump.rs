@@ -286,15 +286,17 @@ impl<'a> Printer<'a> {
 
         // Build the `: body` tail (including any colon→body comments).
         let mut tail_parts: DocBuf = smallvec![];
-        if let Some(frozen) = self.gap_frozen_span(colon_end, stmt.body.span()) {
+        if self.gap_frozen_span(colon_end, stmt.body.span()).is_some() {
             // An own-line directive in the `:`→body gap freezes the body. The inline
             // emission below would trail the run on the label's line (`lll: // c`), an
             // inert placement that loses the freeze on the second pass, so route through
             // the own-line-preserving header→body emitter instead — the declaration-header
             // rule of `conformance_prettier_ignore.md` §On module and declarator lists.
+            // The statement-aware emitter restores the `;` an ASI-reliant body owes
+            // ([`Printer::build_frozen_statement_doc`]).
             tail_parts.push(d.text(":"));
             self.push_header_to_body_gap(&mut tail_parts, colon_end, body_start);
-            tail_parts.push(self.build_frozen_node_doc(frozen));
+            tail_parts.push(self.build_frozen_statement_doc(stmt.body));
         } else if self.has_comments_to_emit_between(colon_end, body_start) {
             // The run is pinned to the `:` line (prettier hoists it above the whole labeled
             // statement instead — the sanctioned position divergence), but its INTERNAL

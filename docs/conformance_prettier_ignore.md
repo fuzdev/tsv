@@ -846,7 +846,9 @@ merely redundant tsv drops them and the directive leads the statement, matching 
   [export_declaration_line_comment](../tests/fixtures/typescript/syntax/comments/export_declaration_line_comment_prettier_divergence/) —
   [named head](../tests/fixtures/typescript/modules/exports/named_declaration_prettier_ignore_head_prettier_divergence/),
   [default head](../tests/fixtures/typescript/modules/exports/default_declaration_prettier_ignore_head_prettier_divergence/),
-  [`export =` head](../tests/fixtures/typescript/modules/exports/export_equals_prettier_ignore_head_prettier_divergence/)
+  [`export =` head](../tests/fixtures/typescript/modules/exports/export_equals_prettier_ignore_head_prettier_divergence/),
+  [ASI `;` restored at the named head](../tests/fixtures/typescript/syntax/asi/prettier_ignore_semicolon_export_prettier_divergence/)
+  (the semicolon itself matches prettier — only the placement diverges)
 - **Paren-kept expression statement** — ◆comment_preservation ◆prettier_bug — prettier hoists
   the directive out before the `(` and glues the frozen slice back inside parens on one line.
   On the leftmost-token case it also drops the shell, emitting `{ bbb:  2 }.ccc;`, which does

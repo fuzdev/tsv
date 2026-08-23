@@ -1188,14 +1188,29 @@ Backslash doubling and unicode-escape duplication are inherited "for free" by ex
   u128 cast. Pinned by
   [literals/numeric/edge_cases](../tests/fixtures/typescript/expressions/literals/numeric/edge_cases/)
   (`hexBeyondSafe`/`octBeyondSafe`).
-- LF-only line tracking in Svelte contexts — Svelte's `locate-character`
-  counts only `\n` as a line start, so `LocationTracker::new` does too for
-  Svelte template/CSS/embedded-script locations. Standalone TypeScript uses
-  `LocationTracker::new_ecmascript` (LF, CR, CRLF, U+2028, U+2029 — acorn's
-  `LineTerminator` set, applied even inside string literals). The same file
-  content can therefore carry different `loc` values by context — pinned by
+- Two `loc` line classes in the Svelte wire, routed per node origin —
+  Svelte's model is mixed, so tsv's is. What Svelte's own parser positions via
+  `locate-character` counts only `\n` as a line start, and tsv's
+  `LocationTracker::new_with_map` does too for those positions: the template
+  spine, `name_loc`, CSS locations, a `<script>`'s own `Program` `loc`, and the
+  `character`-bearing identifiers. Everything **acorn** parses — `<script>`
+  bodies, expression islands, and the root `comments` array — carries acorn's
+  `loc`, and acorn's line class is the ECMAScript one (LF, CR, CRLF, U+2028,
+  U+2029, applied even inside string literals), seeded once per embedded parse
+  over whatever prefix Svelte prepared for that island (`tsv_ts::AcornSeed` +
+  `Root::acorn_regions`). Standalone TypeScript is all-acorn
+  (`LocationTracker::new_ecmascript`). The same file content can therefore
+  carry different `loc` values by context — and, inside a `.svelte` file, by
+  node origin. Model + the per-island seeding table:
+  [architecture.md §`loc` lines](architecture.md#loc-lines-two-classes-one-per-acorn-parse).
+  Pinned by
   [syntax/unicode_line_terminators](../tests/fixtures/typescript/syntax/unicode_line_terminators/)
-  (`.ts` deliberately; see `INTENTIONAL_TS` in `ts_fixture_audit`).
+  (`.ts` deliberately; see `INTENTIONAL_TS` in `ts_fixture_audit`) for the
+  standalone class, and for the mixed wire by
+  [svelte/syntax/whitespace/line_terminators_comment_dedent](../tests/fixtures/svelte/syntax/whitespace/line_terminators_comment_dedent/)
+  and
+  [svelte/syntax/whitespace/line_terminators_acorn_regions](../tests/fixtures/svelte/syntax/whitespace/line_terminators_acorn_regions/)
+  (`tests/acorn_loc_line_terminators.rs` covers the `<CR>` half).
 
 Compat behaviors live in the **conversion layer** wherever possible: the
 internal AST stays clean and semantic, and quirks apply only when generating
@@ -1203,7 +1218,9 @@ Svelte-compatible JSON. Two exceptions sit deeper by design: the radix
 digit-fold runs in the parser (the internal numeric value is the folded one —
 formatting reads raw source, and every JSON consumer wants acorn's value, so
 a spec-rounded internal value would have no consumer), and line tracking is a
-per-context tracker choice rather than a conversion step.
+per-node-origin route — the parser records where each acorn parse began, and
+the writer answers each position from the emitting node's own class — rather
+than a per-field quirk.
 
 **At-rule preludes — source-extracted at the boundary.** The public `Atrule.prelude` is reproduced from the raw source span (`strip_css_comments(span.extract(source))`) for every prelude shape — the structured `@import`/`@scope`/`@supports`/`@container`, raw `@media`, and the raw path (`@layer`, `@keyframes`, `@namespace`, `@page`, …) — so it stays byte-for-byte with Svelte's verbatim string even on non-canonical whitespace (`@layer a , b` → `a , b`; `@namespace url(  x  )` → `url(  x  )`). The parser still builds a _normalized_ prelude string, but it is now printer-facing only: the formatter consumes it, the public AST does not. (`@media` normalizes its query; `@namespace` is value-normalized to match postcss; other raw at-rules keep the prelude verbatim — all only on the formatter side.) The internal-vs-public split is therefore complete for preludes.
 

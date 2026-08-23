@@ -139,7 +139,10 @@ impl<'a> Printer<'a> {
             // `declaration` is always a declaration form (never an
             // ExpressionStatement), so `in_program_or_block` is never consulted here.
             let continuation = match frozen {
-                Some(span) => self.build_frozen_node_doc(span),
+                // The frozen span is the declaration's own; the statement-aware emitter
+                // restores the `;` an ASI-reliant `export const` owes, exactly as at the
+                // statement-list seams ([`Printer::build_frozen_statement_doc`]).
+                Some(_) => self.build_frozen_statement_doc(declaration),
                 None => self.build_statement_doc(declaration, StatementContext::PROGRAM_OR_BLOCK),
             };
             let tail = self.build_keyword_to_name_continuation(
@@ -411,7 +414,7 @@ impl<'a> Printer<'a> {
     ///
     /// An own-line directive in that gap freezes the value whole (Rule A). A DECLARATION
     /// value's whole doc is the slice, so each form asks the shared statement head
-    /// ([`Printer::build_statement_head_doc`]); an EXPRESSION value keeps its `;`, its
+    /// ([`Printer::build_declaration_value_head_doc`]); an EXPRESSION value keeps its `;`, its
     /// trailing comments and the `export default (…)` clarity parens outside the freeze, so
     /// only the expression's own doc is swapped.
     fn build_export_default_value_doc(
@@ -483,21 +486,19 @@ impl<'a> Printer<'a> {
                 d.concat(&parts)
             }
             internal::ExportDefaultValue::FunctionDeclaration(func) => self
-                .build_statement_head_doc(keyword_end, value_span, || {
+                .build_declaration_value_head_doc(keyword_end, value_span, || {
                     self.build_function_declaration_doc(func)
                 }),
-            internal::ExportDefaultValue::TSDeclareFunction(func) => {
-                self.build_statement_head_doc(keyword_end, value_span, || {
+            internal::ExportDefaultValue::TSDeclareFunction(func) => self
+                .build_declaration_value_head_doc(keyword_end, value_span, || {
                     self.build_declare_function_doc(func, None)
-                })
-            }
-            internal::ExportDefaultValue::ClassDeclaration(class) => {
-                self.build_statement_head_doc(keyword_end, value_span, || {
+                }),
+            internal::ExportDefaultValue::ClassDeclaration(class) => self
+                .build_declaration_value_head_doc(keyword_end, value_span, || {
                     self.build_class_declaration_doc(class)
-                })
-            }
+                }),
             internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => self
-                .build_statement_head_doc(keyword_end, value_span, || {
+                .build_declaration_value_head_doc(keyword_end, value_span, || {
                     self.build_interface_declaration_doc(iface)
                 }),
         }

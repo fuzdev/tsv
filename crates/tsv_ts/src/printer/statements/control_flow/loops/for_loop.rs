@@ -167,9 +167,8 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         let body_start = body.span().start;
-        let body_doc = self.build_statement_head_doc(paren_end, body.span(), || {
-            self.build_statement_doc(body, body_ctx)
-        });
+        let body_doc = self
+            .build_statement_head_doc(paren_end, body, || self.build_statement_doc(body, body_ctx));
 
         if !self.has_comments_to_emit_between(paren_end, body_start) {
             parts.push(d.text(")"));
@@ -242,7 +241,7 @@ impl<'a> Printer<'a> {
                 d.text(" "),
                 self.build_statement_head_doc(
                     self.get_for_header_end(stmt, parens),
-                    block.span,
+                    stmt.body,
                     || self.build_block_statement_doc(block),
                 ),
             ])
@@ -256,7 +255,7 @@ impl<'a> Printer<'a> {
             // width-only overflow keeps the header flat (matching Prettier).
             let body_doc = self.build_statement_head_doc(
                 self.get_for_header_end(stmt, parens),
-                stmt.body.span(),
+                stmt.body,
                 // `adjustClause` wraps the body in one indent; nothing continues on
                 // the tail's line.
                 || self.build_statement_doc(stmt.body, ctx.clause_body(false, true)),
@@ -1510,7 +1509,7 @@ impl<'a> Printer<'a> {
         let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
         if let Statement::BlockStatement(block) = body {
             self.append_close_paren_with_comments(parts, paren_end, block.span.start);
-            parts.push(self.build_statement_head_doc(paren_end, block.span, || {
+            parts.push(self.build_statement_head_doc(paren_end, body, || {
                 self.build_block_statement_expand_empty_doc(block)
             }));
         } else if matches!(body, Statement::EmptyStatement(_)) {
@@ -1617,7 +1616,7 @@ impl<'a> Printer<'a> {
             let is_block_body = matches!(stmt.body, Statement::BlockStatement(_));
             // A C-style `for` collapses its empty block body (`for (…) {}`) — unless an
             // own-line directive in the `)`→body gap freezes it.
-            let body_doc = self.build_statement_head_doc(header_end, stmt.body.span(), || {
+            let body_doc = self.build_statement_head_doc(header_end, stmt.body, || {
                 // Every arm below that prints a non-block body wraps it in one indent
                 // (`adjustClause`); nothing continues on the tail's line.
                 self.build_collapsing_body_doc(stmt.body, ctx.clause_body(false, true))

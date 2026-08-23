@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
         body: &Statement<'_>,
         body_ctx: StatementContext,
     ) -> DocId {
-        self.build_statement_head_doc(gap_start, body.span(), || {
+        self.build_statement_head_doc(gap_start, body, || {
             self.build_branch_statement_doc(body, body_ctx)
         })
     }
