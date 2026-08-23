@@ -40,20 +40,19 @@ mod expressions;
 mod functions;
 mod modules;
 mod patterns;
-mod skeleton;
 mod statements;
 mod types;
 
-pub use comments::{AttachedComment, WriterComments};
+pub use comments::{CommentAttach, IslandComments};
 use declarations::{write_decorator, write_type_parameter_declaration};
-pub use skeleton::{SkeletonRecorder, SkeletonTree};
 use statements::{write_statement, write_variable_declaration};
 use types::{write_type_annotation, write_type_parameter_instantiation};
 
 /// Convert an internal `Program` straight to its compact wire-JSON bytes.
 ///
 /// One AST walk, no intermediate tree. The mapper decides the offset space:
-/// identity → byte space (the embedded byte-space skeletons `tsv_svelte` builds),
+/// identity → byte space (`tsv_svelte`'s embedded islands, whose spans are already
+/// host-file byte offsets),
 /// real map → UTF-16 code units (the shipped char-space wire).
 ///
 /// Returns `Vec<u8>` rather than `String`: every emitted byte comes from `&str`
@@ -90,10 +89,10 @@ pub fn write_program_json(
 /// `LocationMapper` (spans are host-file coordinates); with a real map it emits
 /// final char-space positions directly.
 ///
-/// `comments` is the pass's comment role: `Emit` for the fused form of a
-/// comment-bearing template expression island (each node emits its attached
-/// leading/trailing comments at its close), `Record` for the byte-space
-/// skeleton pass that builds an island's comment map.
+/// `comments` is this emission's comment role: `Attach` for a comment-bearing
+/// template expression island, where acorn's leading/trailing attach runs
+/// online off this emit's own node opens and closes and each node emits its
+/// assigned comments at its close; `Off` for every ordinary emission.
 #[inline]
 pub fn write_expression_embedded(
     w: &mut JsonWriter,
@@ -123,8 +122,8 @@ pub fn write_variable_declaration_embedded(
 /// shorthand attribute (`{name}`) and snippet name. The `character` is injected
 /// only on a top-level `Identifier`, so any other expression emits exactly as
 /// `write_expression_embedded` (character a no-op). No type-annotation-`loc`
-/// stripping (unlike a block pattern). `comments` is `Emit` for the fused form
-/// of a comment-bearing snippet name (`{#snippet /* c */ name(…)}`), where a
+/// stripping (unlike a block pattern). `comments` is `Attach` for a
+/// comment-bearing snippet name (`{#snippet /* c */ name(…)}`), where a
 /// leading comment attaches to the `Identifier`.
 #[inline]
 pub fn write_identifier_expression_with_character(
@@ -174,10 +173,10 @@ fn write_identifier_expression_with_character_in(
 ///   only — the one Svelte's `read_context` synthesizes itself (no `loc`);
 ///   annotations nested inside it come from the acorn parse and keep `loc`.
 ///
-/// `comments` is `Emit` for the fused form of a comment-carrying destructure
-/// pattern (`{@const { b = /* c */ 1 } = expr}`): canonical parses it as a
-/// synthetic `(pattern = 1)` acorn expression whose comment attach covers the
-/// pattern subtree, and attached comments emit at each node's close.
+/// `comments` is `Attach` for a comment-carrying destructure pattern
+/// (`{@const { b = /* c */ 1 } = expr}`): canonical parses it as a synthetic
+/// `(pattern = 1)` acorn expression whose comment attach covers the pattern
+/// subtree, and attached comments emit at each node's close.
 #[inline]
 pub fn write_pattern_embedded(
     w: &mut JsonWriter,
@@ -230,7 +229,7 @@ pub fn write_pattern_embedded(
 fn write_program(w: &mut JsonWriter, program: &internal::Program<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Program", program.span, ctx);
     w.raw(",\"body\":");
-    write_array(w, program.body, |w, s| write_statement(w, s, ctx));
+    write_body_array(w, program.body, ctx, |w, s| write_statement(w, s, ctx));
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
     close_node(w, "Program", program.span, ctx);
@@ -272,7 +271,7 @@ pub fn write_program_embedded(
         matches!(program_loc, ProgramLoc::Emit(..)),
         acorn,
     );
-    record_open("Program", program.span, &ctx);
+    attach_open("Program", program.span, &ctx);
     w.raw("{\"type\":\"Program\",\"start\":");
     w.u32(loc.pos(program.span.start));
     w.raw(",\"end\":");
@@ -289,26 +288,23 @@ pub fn write_program_embedded(
         w.raw("}}");
     }
     w.raw(",\"body\":");
-    write_array(w, program.body, |w, s| write_statement(w, s, &ctx));
+    write_body_array(w, program.body, &ctx, |w, s| write_statement(w, s, &ctx));
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
     close_node(w, "Program", program.span, &ctx);
 }
 
-/// The comment role of one emission pass (Svelte comment-attach paths).
+/// The comment role of an emission (the Svelte comment-attach paths).
 ///
 /// `Off` for every ordinary emission — the hot path pays one never-taken
-/// discriminant compare per node open and close. `Emit` is the fused pass of a
-/// comment-bearing island: each node close consults the precomputed
-/// `WriterComments` map. `Record` is the byte-space skeleton pass that
-/// *builds* that map's input: each node open/close is reported to the
-/// `SkeletonRecorder`, which reconstructs the wire tree for the comment-attach
-/// walk (no re-parse of the emitted bytes).
+/// discriminant compare per node open and close. `Attach` is a comment-bearing
+/// island: acorn's leading/trailing attach runs **online**, driven by this
+/// emit's own node opens and closes, and each node emits the comments it was
+/// assigned at its own close (see [`CommentAttach`]).
 #[derive(Clone, Copy)]
 pub enum CommentMode<'a> {
     Off,
-    Emit(&'a WriterComments),
-    Record(&'a SkeletonRecorder),
+    Attach(&'a CommentAttach<'a>),
 }
 
 /// The embedded `Program` node's `loc` source (see `write_program_embedded`).
@@ -503,17 +499,15 @@ impl<'a> Ctx<'a> {
     }
 }
 
-/// Close a node object: emit any attached `leadingComments`/`trailingComments`
-/// (fused) for this node's byte span + type, then the closing `}`. The type and
-/// span mirror the node's own `node_header` call. `CommentMode::Off` (every
-/// ordinary emission) makes this exactly `w.raw("}")` after one never-taken
-/// branch.
+/// Close a node object: run this node's online comment attach — which emits any
+/// `leadingComments`/`trailingComments` it was assigned — then the closing `}`.
+/// The type and span mirror the node's own `node_header` call.
+/// `CommentMode::Off` (every ordinary emission) makes this exactly
+/// `w.raw("}")` after one never-taken branch.
 #[inline]
 pub(super) fn close_node(w: &mut JsonWriter, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
-    match ctx.comments {
-        CommentMode::Off => {}
-        CommentMode::Emit(wc) => wc.emit(w, node_type, span.start, span.end, ctx.loc),
-        CommentMode::Record(rec) => rec.close(node_type, span),
+    if let CommentMode::Attach(attach) = ctx.comments {
+        attach.close_and_emit(w, node_type, span, ctx.loc);
     }
     w.raw("}");
 }
@@ -557,16 +551,87 @@ pub(super) fn write_bare_node(
     close_node(w, node_type, span, ctx);
 }
 
-/// Report a node open to the skeleton recorder (`CommentMode::Record` only —
-/// one never-taken compare for every ordinary emission). `node_header` calls
-/// this; the hand-written header sites (the embedded `Program`, the
-/// name-first identifier, the `loc`-less block-pattern `TSTypeAnnotation`)
-/// call it directly so every wire node reaches the recorder.
+/// Report a node open to the online comment attach (`CommentMode::Attach` only
+/// — one never-taken compare for every ordinary emission), which shifts this
+/// node's leading comments off the queue. `node_header` calls this; the
+/// hand-written header sites (the embedded `Program`, the name-first
+/// `Identifier`, the `loc`-less block-pattern `TSTypeAnnotation`) call it
+/// directly so every wire node reaches the attach.
+///
+/// ⚠️ **Never gate this on `ctx.emit_loc`.** The attach is driven by node opens
+/// and knows nothing about line/column, so a node skipped here in the
+/// `no-locations` variant re-binds its comments to whatever opens next — in that
+/// variant only, which every `loc`-emitting gate is blind to. Pinned by
+/// `tests/no_locations.rs`'s comment-attach cases (mutation-tested: without them
+/// the whole workspace suite passes with the gate added).
 #[inline]
-pub(super) fn record_open(node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
-    if let CommentMode::Record(rec) = ctx.comments {
-        rec.open(node_type, span);
+pub(super) fn attach_open(node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
+    if let CommentMode::Attach(attach) = ctx.comments {
+        attach.open(node_type, span);
     }
+}
+
+/// Tell the online attach that the **next** node to open is its parent's last
+/// `body`/`elements`/`properties` entry — acorn's `is_last_in_body`, which a
+/// child needs at its own close and so cannot derive for itself. Inert in every
+/// other mode.
+///
+/// It marks the element as it is EMITTED rather than naming it by span at the
+/// container's open, because a statement's internal span is not always its wire
+/// node's — see [`CommentAttach::mark_last_body_element`].
+#[inline]
+pub(super) fn attach_mark_body_last(ctx: &Ctx<'_>) {
+    if let CommentMode::Attach(attach) = ctx.comments {
+        attach.mark_last_body_element();
+    }
+}
+
+/// [`write_array`] over a container's `body` / `elements` / `properties`, marking
+/// the last element for the online comment attach ([`attach_mark_body_last`]).
+///
+/// The three plain-slice containers — `Program`, `BlockStatement`,
+/// `ObjectExpression` — share it; `ArrayExpression`'s elements can be holes and
+/// take [`write_body_array_holes`].
+#[inline]
+pub(super) fn write_body_array<'a, T: 'a>(
+    w: &mut JsonWriter,
+    items: &'a [T],
+    ctx: &Ctx<'_>,
+    mut emit: impl FnMut(&mut JsonWriter, &'a T),
+) {
+    let len = items.len();
+    write_array(w, items.iter().enumerate(), |w, (i, item)| {
+        if i + 1 == len {
+            attach_mark_body_last(ctx);
+        }
+        emit(w, item);
+    });
+}
+
+/// [`write_body_array`] for `ArrayExpression`, whose `elements` may hold `null`.
+///
+/// A **trailing hole** (`[a,,]`) leaves the array with no last-in-body element at
+/// all: acorn tests `elements.indexOf(node) === elements.length - 1`, and that last
+/// index holds `null`, which is no node. Marking only a `Some` last element is
+/// exactly that rule. (`write_expression_holes` is the unmarked twin, for
+/// `ArrayPattern` — a type acorn's `is_last_in_body` test does not name.)
+#[inline]
+pub(super) fn write_body_array_holes<'a, T: 'a>(
+    w: &mut JsonWriter,
+    items: &'a [Option<T>],
+    ctx: &Ctx<'_>,
+    mut emit: impl FnMut(&mut JsonWriter, &'a T),
+) {
+    let len = items.len();
+    write_array(w, items.iter().enumerate(), |w, (i, item)| match item {
+        Some(item) => {
+            if i + 1 == len {
+                attach_mark_body_last(ctx);
+            }
+            emit(w, item);
+        }
+        None => w.null(),
+    });
 }
 
 /// Emit the universal node prefix: `{"type":"X","start":N,"end":N,"loc":{…}`.
@@ -605,7 +670,7 @@ pub(super) fn node_header_wide_end(
     ctx: &Ctx<'_>,
 ) {
     let wire_end = wire_end.max(span.end);
-    record_open(node_type, span, ctx);
+    attach_open(node_type, span, ctx);
     w.raw("{\"type\":\"");
     w.raw(node_type);
     w.raw("\"");
@@ -654,7 +719,7 @@ fn node_header_impl<const CHARACTER: bool>(
             .all(|b| b != b'"' && b != b'\\' && b >= 0x20),
         "node type must be escape-free: {node_type:?}"
     );
-    record_open(node_type, span, ctx);
+    attach_open(node_type, span, ctx);
     w.stage_begin();
     w.stage_raw("{\"type\":\"");
     w.stage_raw(node_type);
@@ -920,7 +985,7 @@ pub(super) fn write_identifier_parts_with_character(
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
-    record_open("Identifier", span, ctx);
+    attach_open("Identifier", span, ctx);
     w.raw("{\"type\":\"Identifier\",\"name\":");
     write_name(w, name, span.start, ctx);
     // `name` is escape-sensitive and precedes the positions, so it can't join

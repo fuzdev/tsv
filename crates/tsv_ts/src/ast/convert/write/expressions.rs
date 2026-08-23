@@ -78,8 +78,10 @@ pub(super) fn write_expressions<'a, 'arena: 'a>(
     write_array(w, items, |w, e| write_expression(w, e, ctx));
 }
 
-/// Emit a JSON array of hole-carrying elements (`[a, , b]` — `None` is
-/// `null`), shared by array expressions and array patterns.
+/// Emit a JSON array of hole-carrying elements (`[a, , b]` — `None` is `null`).
+///
+/// `ArrayPattern` only: `ArrayExpression` takes `write_body_array_holes`, which is
+/// this plus the last-in-body mark acorn's trailing rule reads.
 fn write_expression_holes<'a, 'arena: 'a>(
     w: &mut JsonWriter,
     items: impl IntoIterator<Item = &'a Option<internal::Expression<'arena>>>,
@@ -149,20 +151,17 @@ pub(super) fn write_expression_inner(
         internal::Expression::ObjectExpression(obj) => {
             node_header(w, "ObjectExpression", obj.span, ctx);
             w.raw(",\"properties\":");
-            write_array(w, obj.properties, |w, p| write_object_property(w, p, ctx));
+            super::write_body_array(w, obj.properties, ctx, |w, p| {
+                write_object_property(w, p, ctx);
+            });
             close_node(w, "ObjectExpression", obj.span, ctx);
         }
         internal::Expression::ArrayExpression(arr) => {
             node_header(w, "ArrayExpression", arr.span, ctx);
             w.raw(",\"elements\":");
-            write_expression_holes(w, arr.elements, ctx);
-            // A trailing hole (`[a,,]`) means acorn's last-in-body trailing
-            // window never fires for the elements — flag it for the skeleton.
-            if let super::CommentMode::Record(rec) = ctx.comments
-                && matches!(arr.elements.last(), Some(None))
-            {
-                rec.flag_last_elem_hole();
-            }
+            super::write_body_array_holes(w, arr.elements, ctx, |w, e| {
+                write_expression(w, e, ctx);
+            });
             close_node(w, "ArrayExpression", arr.span, ctx);
         }
         internal::Expression::UnaryExpression(unary) => {
