@@ -52,7 +52,8 @@ export interface SourceLocation {
 export interface AttachedComment {
 	type: 'Line' | 'Block';
 	value: string;
-	/** Present on every attachment except the `Program`-level run Svelte builds itself. */
+	/** Present on every attachment except the leading run Svelte builds on `Program` itself
+	 * — the corpus's only start/end-less attachment position. */
 	start?: number;
 	/** See `start`. */
 	end?: number;

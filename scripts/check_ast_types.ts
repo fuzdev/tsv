@@ -263,8 +263,10 @@ const FIXTURES_ROOT = 'tests/fixtures';
 const DTS_PATH = 'crates/tsv_wasm/types/tsv_ast.d.ts';
 
 /**
- * Root interface per fixture input kind. A fixture whose input name is not here is skipped
- * with a warning rather than guessed at — a new input kind should be a deliberate edit.
+ * Root interface per fixture input kind. A fixture whose input name is not here FAILS the
+ * gate rather than being guessed at or warn-skipped — a warning inside a green gate is
+ * invisible, and an unknown kind would otherwise exit arms B and C silently. A new input
+ * kind is a deliberate one-line edit here.
  */
 const ROOT_TYPE: Record<string, Sample['type']> = {
 	'input.svelte': 'Root',
@@ -386,6 +388,8 @@ function wire_field_slots(json: unknown): Set<string> {
 	const out = new Set<string>();
 	const shape = (v: unknown): string => {
 		if (v === null || typeof v !== 'object') return '#scalar';
+		// An array nested directly in an array also grades '#scalar' — no wire position holds
+		// one today (checked over the corpus), so the conflation is unreachable, not a choice.
 		if (Array.isArray(v)) return '#scalar';
 		const t = (v as Record<string, unknown>).type;
 		return typeof t === 'string' ? t : '#obj';
@@ -436,7 +440,11 @@ async function collect_fixture_wires(): Promise<FixtureWire[]> {
 		if (pick && input) {
 			const root = ROOT_TYPE[input];
 			if (!root) {
-				console.warn(`  ⚠ unknown fixture input kind, skipped: ${dir}/${input}`);
+				console.error(
+					`Unknown fixture input kind: ${dir}/${input} — add it to ROOT_TYPE so arms B and C` +
+						` grade it; skipping would silently shrink the corpus.`
+				);
+				Deno.exit(1);
 			} else {
 				const path = `${dir}/${pick}`;
 				const text = await Deno.readTextFile(path);
