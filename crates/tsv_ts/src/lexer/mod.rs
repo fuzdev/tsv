@@ -14,5 +14,7 @@ use tsv_lang::lex_err;
 
 // Re-export public API
 pub use core::Lexer;
-pub(crate) use core::{is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace};
+pub(crate) use core::{
+    is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace, unicode_escape_len_at,
+};
 pub use token::{KeywordKind, Token, TokenKind};

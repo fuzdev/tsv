@@ -58,13 +58,35 @@ const fn is_ascii_id_continue(b: u8) -> bool {
     ID_CONTINUE_LUT[b as usize]
 }
 
+/// The byte length of the `UnicodeEscapeSequence` beginning at `bytes[pos]`, or `0` when none
+/// does — the length-only view of [`try_decode_unicode_escape`], for the parser's lookahead
+/// byte scans, which need to step over an escaped name without caring what it decodes to.
+///
+/// Deliberately the lexer's own predicate rather than a shape test of its own: an escape the
+/// lexer rejects (a value past `U+10FFFF`, a lone surrogate — neither is an identifier
+/// character) must end a lookahead's name run too, or the scan reports a name the lexer will
+/// not produce. What it does NOT judge is the decoded character's `ID_Start` / `ID_Continue`
+/// class, matching the lookahead tables' standing looseness about every byte `> 127`.
+#[inline]
+pub(crate) fn unicode_escape_len_at(bytes: &[u8], pos: usize) -> usize {
+    match try_decode_unicode_escape(bytes, pos) {
+        Some((_, len)) => len,
+        None => 0,
+    }
+}
+
 /// Try to decode a unicode escape sequence at the given position.
 /// Returns Some((decoded_char, bytes_consumed)) if valid, None otherwise.
 ///
 /// Handles both `\uXXXX` (4-digit) and `\u{X...}` (braced) formats.
-fn try_decode_unicode_escape(source: &str, start: usize) -> Option<(char, usize)> {
-    let bytes = source.as_bytes();
-
+///
+/// The **one** answer to "is there an escape here, and how far does it run" — the parser's
+/// lookahead byte scans ask it through [`unicode_escape_len_at`], which drops the decoded
+/// `char` and keeps the length. They must not restate the shape: a lookahead that reads an
+/// escape the lexer does not (or stops short of one it does) mis-classifies the construct it
+/// is looking at, which is how an escaped name came to be an identifier here and not one
+/// there. Takes bytes rather than `&str` so both callers can share it without a re-slice.
+pub(crate) fn try_decode_unicode_escape(bytes: &[u8], start: usize) -> Option<(char, usize)> {
     // Need at least \u
     if start + 2 > bytes.len() || bytes[start] != b'\\' || bytes[start + 1] != b'u' {
         return None;
@@ -116,9 +138,11 @@ fn try_decode_unicode_escape(source: &str, start: usize) -> Option<(char, usize)
                 return None;
             }
         }
-        let hex = &source[after_u..after_u + 4];
-        let code = u16::from_str_radix(hex, 16).ok()?;
-        let ch = char::from_u32(code as u32)?;
+        let mut code: u32 = 0;
+        for &b in &bytes[after_u..after_u + 4] {
+            code = code * 16 + (b as char).to_digit(16)?;
+        }
+        let ch = char::from_u32(code)?;
         Some((ch, 6)) // \uXXXX is 6 bytes
     }
 }
@@ -394,7 +418,9 @@ impl<'a> Lexer<'a> {
         // Handle first character (already validated as valid identifier start)
         if first_char == '\\' {
             // First char is a unicode escape
-            if let Some((ch, len)) = try_decode_unicode_escape(self.source, self.position) {
+            if let Some((ch, len)) =
+                try_decode_unicode_escape(self.source.as_bytes(), self.position)
+            {
                 if !is_id_start(ch) {
                     return Err(lex_err(
                         format!("Invalid identifier start character from unicode escape: '{ch}'"),
@@ -434,7 +460,9 @@ impl<'a> Lexer<'a> {
             match self.cur_byte() {
                 Some(b'\\') => {
                     // Potential unicode escape in identifier
-                    if let Some((ch, len)) = try_decode_unicode_escape(self.source, self.position) {
+                    if let Some((ch, len)) =
+                        try_decode_unicode_escape(self.source.as_bytes(), self.position)
+                    {
                         if !is_id_continue(ch) {
                             // Not a valid identifier continue char, stop here
                             break;
@@ -936,7 +964,8 @@ impl<'a> Lexer<'a> {
             // Unicode escape at start of identifier: \u0066oo → foo
             Some(b'\\') => {
                 // Check if this is a valid unicode escape that decodes to an identifier start
-                if let Some((ch, _)) = try_decode_unicode_escape(self.source, self.position)
+                if let Some((ch, _)) =
+                    try_decode_unicode_escape(self.source.as_bytes(), self.position)
                     && is_id_start(ch)
                 {
                     return self.scan_identifier_into('\\', dst);
