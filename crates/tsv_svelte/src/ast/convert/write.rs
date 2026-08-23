@@ -77,7 +77,8 @@ use super::comment_attachment::{AttachInputs, get_comment_value, is_template_com
 use super::special::{
     bool_option, build_const_tag_writer_comments, build_declaration_tag_writer_comments,
     build_expression_list_writer_comments, build_expression_writer_comments,
-    build_script_writer_comments, component_is_typescript, find_option_values, text_value,
+    build_pattern_island_writer_comments, build_script_writer_comments, component_is_typescript,
+    find_option_values, pattern_comment_window, text_value,
 };
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
@@ -980,8 +981,9 @@ fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'
     w.raw("}");
 }
 
-/// Emits an `EachBlock` node. `context` is a pattern island (patterns never
-/// collect comments); `index`/`key`/`fallback` are skip-if-none.
+/// Emits an `EachBlock` node. `context` is a pattern island
+/// ([`write_pattern_island`] carries any binding/annotation comments);
+/// `index`/`key`/`fallback` are skip-if-none.
 fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"EachBlock\",\"start\":");
     w.u32(ctx.pos(block.span.start));
@@ -1002,7 +1004,12 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
     }
     if let Some(key) = &block.key {
         w.raw(",\"key\":");
-        write_generic_island(w, key, block.span.start, range_end, ctx);
+        // The key's window opens at its own `(`, not at the block's `{#` — canonical
+        // filters each parse's comments to `start >= index`, and the key's
+        // `read_expression` begins after the paren (only whitespace can sit between).
+        // Anchored on the head, this window reaches back over the CONTEXT PATTERN and
+        // claims a comment written inside it, which the pattern island also attaches.
+        write_generic_island(w, &key.expression, key.span.start, range_end, ctx);
     }
     if let Some(fallback) = &block.fallback {
         w.raw(",\"fallback\":");
@@ -2096,13 +2103,28 @@ fn write_value_attributes(
 /// A block pattern (`{#each … as ctx}`, `{:then value}`/`{:catch error}`):
 /// emitted fused via `tsv_ts`'s `write_pattern_embedded` (the `+1`-column /
 /// `character` / stripped-type-annotation-`loc` quirks in final char space).
-/// Patterns never collect comments, so there is no attach.
+///
+/// Patterns DO collect comments — `parse_ts_pattern` and, for `{#each}`, the
+/// separately-read `parse_ts_type_annotation` both extend `expression_comments`
+/// — and canonical attaches each one to its adjacent node inside the pattern
+/// subtree, so a comment-bearing binding precomputes the same window
+/// `{@const}`'s id takes (`build_pattern_island_writer_comments`) and fuses with
+/// it. The pre-check is the window itself rather than the enclosing block's
+/// span: a comment attaching here necessarily starts inside the binding, and
+/// asking wider would only build a map every lookup misses.
 fn write_pattern_island(
     w: &mut JsonWriter,
     expr: &tsv_ts::ast::internal::Expression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_pattern_embedded(w, expr, ctx.embed_pattern(CommentMode::Off, expr));
+    let window = pattern_comment_window(expr);
+    if !ctx.any_comment_in(window.start, window.end) {
+        write_pattern_embedded(w, expr, ctx.embed_pattern(CommentMode::Off, expr));
+        return;
+    }
+    let wc = build_pattern_island_writer_comments(expr, ctx.attach());
+    write_pattern_embedded(w, expr, ctx.embed_pattern(CommentMode::Emit(&wc), expr));
+    wc.debug_assert_consumed();
 }
 
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s

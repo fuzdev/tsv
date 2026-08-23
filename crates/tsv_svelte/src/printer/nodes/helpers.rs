@@ -4,7 +4,7 @@
 // builders shared by the block and tag builders, and source position tracking
 // used in inline run grouping and multiline formatting decisions.
 
-use crate::ast::internal::{EachBlock, FragmentNode};
+use crate::ast::internal::{EachBlock, EachKey, FragmentNode};
 use crate::printer::{HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
@@ -757,8 +757,8 @@ impl<'a> Printer<'a> {
     /// is `in_multiline_context` (always false inside a whitespace-sensitive element).
     ///
     /// Wraps [`Printer::build_expression_doc_for_block`] for the standard block heads; the
-    /// parenthesized `{#each (key)}` offset is derived from `key_span`, not `open`, so those
-    /// call `build_expression_doc_for_block` directly.
+    /// parenthesized `{#each (key)}` offsets are derived from the key's own paren span, not
+    /// `open` — [`Printer::build_each_key_expr`] is that twin.
     pub(super) fn build_block_head_expr(
         &self,
         open: &'static str,
@@ -772,6 +772,22 @@ impl<'a> Printer<'a> {
             opening_tag_span.start + open.len() as u32,
             comment_end,
             open.len(),
+            wrapping,
+        )
+    }
+
+    /// The `{#each (key)}` twin of [`Printer::build_block_head_expr`]: the key expression
+    /// sits inside parens the head assembles itself, so both offsets come from the key's
+    /// own paren span rather than an opening literal — the comment scan covers the paren
+    /// interior and the width offset is the `(` alone. One statement of that arithmetic
+    /// for the two each-key layouts (the block builder and the whitespace-sensitive
+    /// element's inline form).
+    pub(super) fn build_each_key_expr(&self, key: &EachKey<'_>, wrapping: bool) -> HeadExpr {
+        self.build_expression_doc_for_block(
+            &key.expression,
+            key.span.start + 1, // after "("
+            key.span.end - 1,   // before ")"
+            1,                  // "(" = 1 char (key is inside parens)
             wrapping,
         )
     }

@@ -1539,7 +1539,7 @@ fn walk_if_block(block: &IfBlock<'_>, nc: &mut Nc<'_>) {
 fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
     walk_expr(&block.expression, nc);
     if let Some(key) = &block.key {
-        walk_expr(key, nc);
+        walk_expr(&key.expression, nc);
     }
     // The context binding is `kind: 'each'` in the oracle (`phases/scope.js:1244`),
     // so writing to it inside the block is `each_item_invalid_assignment`. Scoped

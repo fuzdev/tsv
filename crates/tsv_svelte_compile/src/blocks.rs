@@ -647,7 +647,7 @@ pub(crate) fn emit_each_block<'arena>(
     // (`{#each xs as x (k as string)}`) never reaches output and needs no erasure.
     // The guard walk carries its own TypeScript-unwrap arms for exactly this.
     if let Some(key) = &each.key {
-        guard_dropped(env, key)?;
+        guard_dropped(env, &key.expression)?;
     }
     // The context pattern IS borrowed into the emitted `let CTX = each_array[IDX]`
     // — a template borrow point (`{#each xs as x: T}`).

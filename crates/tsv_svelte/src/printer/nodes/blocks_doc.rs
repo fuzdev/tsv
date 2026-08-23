@@ -879,9 +879,8 @@ impl<'a> Printer<'a> {
     /// (`⏎)}`), unless the key's expression already ends on a dedented closer
     /// ([`ends_at_base_closer`]), which puts both on its line (`))}`).
     ///
-    /// Three shapes decline that and take the plain prefixed-head assembly instead:
+    /// Two shapes decline that and take the plain prefixed-head assembly instead:
     ///
-    /// - **No `key_span`** — nothing locates the parens, so there is no head to assemble.
     /// - **A frozen key** — its content is a verbatim slice that already begins with its own
     ///   hardline, so the `)` break is unconditional rather than a width verdict. It is also
     ///   the one shape that can meet `can_wrap == false` (an `{#each}` behind a breakable
@@ -904,24 +903,18 @@ impl<'a> Printer<'a> {
         in_multiline_context: bool,
     ) -> Option<DocId> {
         let key = block.key.as_ref()?;
-        // The key expression is inside parens, so the offset accounts for that.
-        let Some(key_span) = block.key_span else {
-            // No `key_span`: build the doc directly (still a braced head — the key parens
-            // hug, so a leading cast reflows).
-            return Some(self.build_ts_expression_doc_cannot_hang(key));
-        };
-        let key_head = self.build_expression_doc_for_block(
-            key,
-            key_span.start + 1, // after "("
-            key_span.end - 1,   // before ")"
-            1,                  // "(" = 1 char (key is inside parens)
-            allow_wrapping || in_multiline_context,
-        );
+        let key_head = self.build_each_key_expr(key, allow_wrapping || in_multiline_context);
         if key_head.frozen || block.context.is_none() {
             return Some(self.build_prefixed_head_doc("(", key_head, ")"));
         }
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        Some(self.build_block_head("(", key, key_head, HeadCloser::EachKey, can_wrap))
+        Some(self.build_block_head(
+            "(",
+            &key.expression,
+            key_head,
+            HeadCloser::EachKey,
+            can_wrap,
+        ))
     }
 
     /// Build each block doc with full context (multiline + preceding content).
