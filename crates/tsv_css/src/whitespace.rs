@@ -1,8 +1,16 @@
 // CSS whitespace classification, shared by the value parser (separation) and the
 // printer (value-text normalization) so both agree on what counts as whitespace.
 
-/// CSS whitespace is ASCII-only — tab, line feed, form feed, carriage return, and
-/// space (css-syntax-3 §4.2).
+/// CSS whitespace is ASCII-only — tab, line feed, form feed, carriage return, and space.
+///
+/// ⚠️ **Five, where css-syntax-3 §4.2 defines three.** §4.2 is *newline* (which it fixes at
+/// U+000A alone), tab and space; carriage return and form feed are absent from it **because
+/// §3.3's input preprocessing has already folded them to U+000A** by the time tokenization
+/// runs. tsv does not run that preprocessing — `parse` takes the author's bytes so its offsets
+/// stay a drop-in contract with `parseCss` — which puts the two folded code points back on this
+/// predicate's plate. Reading §4.2 on its own and narrowing this to `[' ', '\t', '\n']` is
+/// therefore a plausible-looking change that stops every value scanner on a `<CR>` or a form
+/// feed. The rule is §4.2 **plus** §3.3, and `is_ascii_whitespace` is exactly that union.
 ///
 /// ⚠️ **Not the class the lexer skips at a token boundary**, which is JS `\s`
 /// ([`tsv_lang::is_js_whitespace`]) because that is what `parseCss`'s `allow_whitespace()`

@@ -1,0 +1,177 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 739,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 670,
+				"data": "\n\tA multi-line block comment that is NOT `*`-aligned is emitted VERBATIM by both\n\tformatters - prettier's non-indentable arm is `['/*', replaceEndOfLine(value), '*/']`,\n\twhich touches nothing, and both doc printers skip their line-end trim behind a LITERAL\n\tnewline. So the TRAILING SPACES on the comment's first two interior lines below are the\n\tclaim, and they are invisible: reflowing this file by hand, or trimming the preserved\n\tarm 'for tidiness', destroys the fixture rather than failing it. Its indentable twin\n\ttrims every line and is `comments/block_indentable_unicode_space`; the line comment's\n\town trailing trim is `comments/trailing_unicode_space`.\n"
+			},
+			{
+				"type": "Text",
+				"start": 670,
+				"end": 671,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " a   \n  b   \n  c ",
+			"start": 691,
+			"end": 714,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 671,
+		"end": 738,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 689,
+			"end": 729,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 716,
+					"end": 728,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 722,
+							"end": 727,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 722,
+								"end": 723,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 726,
+								"end": 727,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " a   \n  b   \n  c ",
+							"start": 691,
+							"end": 714
+						}
+					]
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": "\n\tA multi-line block comment that is NOT `*`-aligned is emitted VERBATIM by both\n\tformatters - prettier's non-indentable arm is `['/*', replaceEndOfLine(value), '*/']`,\n\twhich touches nothing, and both doc printers skip their line-end trim behind a LITERAL\n\tnewline. So the TRAILING SPACES on the comment's first two interior lines below are the\n\tclaim, and they are invisible: reflowing this file by hand, or trimming the preserved\n\tarm 'for tidiness', destroys the fixture rather than failing it. Its indentable twin\n\ttrims every line and is `comments/block_indentable_unicode_space`; the line comment's\n\town trailing trim is `comments/trailing_unicode_space`.\n"
+				}
+			]
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 679,
+				"end": 688,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 8,
+						"character": 679
+					},
+					"end": {
+						"line": 11,
+						"column": 12,
+						"character": 683
+					}
+				},
+				"value": [
+					{
+						"start": 685,
+						"end": 687,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

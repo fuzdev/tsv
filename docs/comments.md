@@ -89,6 +89,50 @@ Prettier, oxfmt and biome all get the paren binding wrong — see [conformance_p
 
 The content is **not stored owned** — comment text is a pure delimiter-stripped sub-slice of source, so `Comment` holds a `content_span` and recovers the text on demand via `Comment::content(source) -> &str` (`source` must be the host document the spans were recorded against); every field is `Copy`, no `String` per comment. `multiline` is precomputed so the multi-line-block expansion checks (`has_multiline_block_comments_on_page_in_range` and the printers) read an O(1), source-free flag instead of re-scanning content. The full comment span includes its delimiters (`//` / `/* */` / a `#!` hashbang, whose content includes the `#!`); the lexer is the single owner of those widths.
 
+## The comment's TEXT: three kinds, three trims, and one of them is NO trim
+
+Everything above is about *where* a comment goes. What its bytes look like on the way out is a
+separate rule, it is **per comment KIND**, and it is prettier's `printComment` transcribed —
+`tsv_ts::printer::comments::render` is the single place it lives:
+
+| kind | emitted as | trim |
+| --- | --- | --- |
+| line `//`, hashbang `#!` | verbatim source span | trailing only |
+| block, **indentable** (`*`-aligned) | reindented to context | each line, both ends |
+| block, anything else (single-line, or multi-line non-indentable) | verbatim | **none** |
+
+Three things about this are load-bearing and each has been a bug:
+
+- **The class is JS `\s`** (`tsv_lang::is_js_whitespace`), because every trim it models is a
+  `String.prototype.trim*` call. Rust's `str::trim*` is `White_Space`, which disagrees in both
+  directions, so it *deleted* a U+0085 prettier keeps — a character removed from the author's
+  comment — and *kept* a U+FEFF prettier deletes. See `tsv_lang`'s `whitespace.rs` module doc.
+- **The line comment's trim cannot be left to the renderer.** `doc/arena_render.rs` trims line
+  ends with `[' ', '\t']` — prettier's doc-printer `trim`, correctly mirrored and deliberately
+  narrower — so every other `\s` member (NBSP, U+FEFF, a form feed, the U+2000 family) rode
+  straight through it into tsv's output. It is applied to the **span** rather than the text
+  (`Printer::line_comment_span`), which keeps the emit allocation-free; the print-once ledger
+  still tags the comment's full span.
+- **The verbatim arm means verbatim.** prettier's non-indentable arm is
+  `["/*", replaceEndOfLine(comment.value), "*/"]`, which touches nothing, and both renderers
+  skip their line-end trim behind a LITERAL newline — so an author's trailing space inside such
+  a comment survives on both sides. Trimming there edited the author's bytes on the one path
+  whose whole contract is not to. It is also why that builder has no special last-line arm:
+  every continuation line is emitted identically, unlike its indentable twin, whose three
+  positions really do take three different trims.
+
+⚠️ **Svelte's own two comment emitters answer this differently, on purpose.** A template
+`<!-- … -->` and a JS comment in *attribute* position (`Printer::js_comment_text_doc`) are
+verbatim whole-span slices with no trim at all, because prettier's Svelte plugin keeps them
+verbatim at every payload rather than routing them through `printComment`. A leading or
+trailing JS comment on an expression *does* route through `tsv_ts::build_comment_doc` and takes
+the table above. Don't unify them.
+
+The **census** audit (`deno task census:audit`) is the gate on all of this, and it normalizes
+input and output by exactly this table — so widening a trim here without widening the census's
+makes a sanctioned trim read as a rewrite, and narrowing one without narrowing the census's
+makes a real rewrite invisible. [audits.md §Comment-Census Audit](./audits.md#comment-census-audit-censusaudit) carries the blind spots.
+
 ## Printer strategy
 
 Range-based lookup via `comments_to_emit_in_range(prev_end, node_start)` (and its on-page / in-source siblings above). Source string for context (same-line detection, blank line preservation). Tradeoff: simple/efficient AST matching Prettier's model, but printer must manually track `prev_end` positions; edge cases (e.g., arrow function comments) require careful span math.

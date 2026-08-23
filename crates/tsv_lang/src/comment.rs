@@ -2,6 +2,7 @@
 use crate::Span;
 use crate::printing;
 use crate::source_scan::{self, has_newline_after_position, has_newline_before_position};
+use crate::whitespace::is_js_whitespace;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy)]
@@ -138,11 +139,26 @@ pub fn is_indentable_block(source: &str, comment: &Comment) -> bool {
 // language printer (the comment types differ across crates, so the shared atom
 // operates on the trimmed text).
 
+/// Trim a comment's text the way the oracle does.
+///
+/// ⚠️ [`is_js_whitespace`], **not** `str::trim`: prettier recognizes its directive with
+/// `comment.value.trim()` (`is-prettier-ignore-comment.js`, `language-css/print/sequence.js`,
+/// `language-html/utilities`), and `String.prototype.trim` is the JS `\s` class. Rust's
+/// `White_Space` disagrees in both directions and so got both witnesses wrong at once:
+/// `prettier-ignore<ZWNBSP>` is a directive prettier HONORS that tsv formatted straight
+/// through, and `prettier-ignore<NEL>` is one prettier IGNORES that tsv froze — a region
+/// silently frozen or silently reflowed, in all three languages at once, since every printer
+/// routes here.
+#[inline]
+fn directive_text(content: &str) -> &str {
+    content.trim_matches(is_js_whitespace)
+}
+
 /// Whether `content` is a `format-ignore` / `prettier-ignore` directive — emit
 /// the following construct as raw source instead of formatting it.
 #[inline]
 pub fn is_format_ignore_directive(content: &str) -> bool {
-    matches!(content.trim(), "format-ignore" | "prettier-ignore")
+    matches!(directive_text(content), "format-ignore" | "prettier-ignore")
 }
 
 /// Whether `comment` is a format-ignore directive that HONORS — the recognizer above
@@ -175,7 +191,7 @@ pub fn directive_alone_on_line(source: &str, comment: &Comment) -> bool {
 #[inline]
 pub fn is_format_ignore_range_start(content: &str) -> bool {
     matches!(
-        content.trim(),
+        directive_text(content),
         "format-ignore-start" | "prettier-ignore-start"
     )
 }
@@ -184,7 +200,10 @@ pub fn is_format_ignore_range_start(content: &str) -> bool {
 /// `prettier-ignore-end`). See `is_format_ignore_range_start`.
 #[inline]
 pub fn is_format_ignore_range_end(content: &str) -> bool {
-    matches!(content.trim(), "format-ignore-end" | "prettier-ignore-end")
+    matches!(
+        directive_text(content),
+        "format-ignore-end" | "prettier-ignore-end"
+    )
 }
 
 //
