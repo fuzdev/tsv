@@ -5,11 +5,16 @@
 // `TextChildContext` carrying the caller-side facts — and content words pack
 // into fill docs that break greedily at collapsible whitespace. The sibling
 // walk in `fragment_doc.rs` constructs the context and dispatches here.
+//
+// It is a dispatcher over two handlers, because the two text kinds are two
+// questions: `handle_separator_text_child` (a whitespace-only node IS the gap
+// between its neighbours) and `handle_content_text_child` (a content text owns
+// a fill, and the questions are about its own two boundary runs).
 
 use super::element_doc::MultilineCause;
 use super::fragment_doc::text_starts_with_linebreak;
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{FragmentNode, is_collapsible_ws_char, split_collapsible_ws};
+use crate::ast::internal::{FragmentNode, Text, is_collapsible_ws_char, split_collapsible_ws};
 use crate::printer::Printer;
 use smallvec::SmallVec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -79,7 +84,7 @@ pub(super) struct TextChildContext {
     pub(super) run_has_prose: bool,
     /// The first and last index in `trimmed_nodes` that the whitespace rules see — the fragment's
     /// content bounds once every HOISTED node is skipped
-    /// ([`FragmentNode::content_bounds`]). `handle_text_child`'s `is_first` / `is_last` are
+    /// ([`FragmentNode::content_bounds`]). `handle_content_text_child`'s `is_first` / `is_last` are
     /// `i <= .0` / `i >= .1` rather than `i == 0` / `i + 1 == len`, so a text with only hoisted
     /// nodes between it and the edge trims its run — the compiler deletes that run, since it lifts
     /// those nodes out before it trims.
@@ -91,8 +96,8 @@ pub(super) struct TextChildContext {
     /// ([`Printer::glued_comment_run_text`]), already built as one doc by the caller and **not**
     /// pushed as a sibling — this handler fuses it into the fill's first item instead, so the unit
     /// is unbreakable by construction. `None` for every other text child. See the `glued_lead`
-    /// comment in [`Printer::handle_text_child`] for why a comment prefix is fused where every
-    /// other glued predecessor is flagged.
+    /// comment in [`Printer::handle_content_text_child`] for why a comment prefix is fused where
+    /// every other glued predecessor is flagged.
     ///
     /// Carries the run's **head index** beside the doc because fusing moves the unit's leading
     /// boundary: the break point in front of the unit is the one in front of the *comment*, not the
@@ -130,6 +135,21 @@ impl<'a> Printer<'a> {
     /// Takes `trimmed_nodes` + the node index `i` (the same shape as `handle_block_child`)
     /// and derives every sibling-kind fact internally, rather than receiving them as a long
     /// list of positional bools. `trimmed_nodes[i]` must be a `FragmentNode::Text`.
+    ///
+    /// ⚠️ **The two text kinds are two different questions, and each has its own handler.** A
+    /// whitespace-only node **is** the separator between its two neighbours, and every rule that
+    /// reaches it is about that gap ([`Self::handle_separator_text_child`]). A content text
+    /// **owns a `fill`**, and its rules are about the two boundary runs on its own edges plus the
+    /// words between them ([`Self::handle_content_text_child`]). They share exactly this dispatch
+    /// and the `handle_whitespace_of_prev_text` reset; nothing flows from one to the other.
+    ///
+    /// Each handler derives the sibling-kind facts it actually asks about, and the sets differ —
+    /// a separator asks `next_is_inline_el` / `next_is_component` / `next_is_block_el`, which the
+    /// content path never reads, and the content path asks `content_bounds` / `glued_prefix` /
+    /// `prev_sibling_head`, which a separator never reads. Since a separator is the commonest node
+    /// in a fragment, keeping the sets apart is what keeps its per-node cost to the handful of
+    /// predicates it uses. Everything either handler derives is a pure function of `trimmed_nodes`
+    /// and `i`, so where it is computed is a cost question only.
     pub(super) fn handle_text_child(
         &self,
         trimmed_nodes: &[FragmentNode<'_>],
@@ -138,25 +158,53 @@ impl<'a> Printer<'a> {
         child_docs: &mut DocBuf,
         handle_whitespace_of_prev_text: &mut bool,
     ) {
-        let TextChildContext {
-            cause,
-            run_has_prose,
-            content_bounds,
-            glued_prefix,
-            prev_sibling_head,
-        } = ctx;
-        let multiline = cause.is_multiline();
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
             return;
         };
-        // Sibling-kind facts, derived from the node's position in `trimmed_nodes`.
-        //
-        // ⚠️ Only the facts the WHITESPACE-ONLY arm reads are computed here; the rest are
-        // computed past that arm's `return`, where the content-text path begins. A separator is
-        // the commonest node in a fragment, so the split keeps its per-node cost to the handful
-        // of predicates it actually asks — and it is the whole reason the two groups are apart.
-        // Everything in both groups is a pure function of `trimmed_nodes` and `i`, so where it
-        // sits is a cost question only.
+        *handle_whitespace_of_prev_text = false;
+        if text.is_collapsible_ws_only {
+            self.handle_separator_text_child(
+                trimmed_nodes,
+                i,
+                text,
+                ctx,
+                child_docs,
+                handle_whitespace_of_prev_text,
+            );
+        } else {
+            self.handle_content_text_child(
+                trimmed_nodes,
+                i,
+                text,
+                ctx,
+                child_docs,
+                handle_whitespace_of_prev_text,
+            );
+        }
+    }
+
+    /// A **whitespace-only** text child: the node IS the separator between its two neighbours,
+    /// never a fragment boundary (those are skipped by `build_nodes_doc_trimmed`).
+    ///
+    /// Dispatched from [`Self::handle_text_child`], which owns the doc for why the two text kinds
+    /// are two handlers. `text` is `trimmed_nodes[i]`, already known collapsible-whitespace-only.
+    fn handle_separator_text_child(
+        &self,
+        trimmed_nodes: &[FragmentNode<'_>],
+        i: usize,
+        text: &Text,
+        ctx: TextChildContext,
+        child_docs: &mut DocBuf,
+        handle_whitespace_of_prev_text: &mut bool,
+    ) {
+        let TextChildContext {
+            cause,
+            run_has_prose,
+            ..
+        } = ctx;
+        let multiline = cause.is_multiline();
+        // Sibling-kind facts, derived from the node's position in `trimmed_nodes` — this
+        // handler's set; the content path derives its own overlapping one.
         let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
         let next_node = trimmed_nodes.get(i + 1);
         // A declaration tag on either side owns its own line ([`Self::is_own_line_declaration`]),
@@ -193,197 +241,242 @@ impl<'a> Printer<'a> {
         let prev_is_block_el = prev_node.is_some_and(|n| self.is_block_element_node(n));
 
         let d = self.d();
-        *handle_whitespace_of_prev_text = false;
 
-        if text.is_collapsible_ws_only {
-            // Whitespace-only text node (never at a fragment boundary — those are skipped
-            // by `build_nodes_doc_trimmed`).
+        // Whitespace-only text node (never at a fragment boundary — those are skipped
+        // by `build_nodes_doc_trimmed`).
+        //
+        // The sibling-newline flow rule ([`Self::sibling_newline_flows`]) at its
+        // standalone-separator site: this node sits between two *non-text* siblings and carries
+        // no prose of its own, so it flows only when its inline RUN holds some
+        // (`run_has_prose`, computed once per run by the caller). That gate is the rule's
+        // boundary and it is structural rather than mechanical — flowing means *reflowing into
+        // a text fill*, and a run with no content text has none. Its newlines are then the
+        // author's only structure (a vertical list of siblings), and collapsing them packs
+        // independent items onto one line — which, for a short list, cascades into the parent
+        // element's own hug decision, an F1 break. See the standalone-separator paragraph in
+        // [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
+        //
+        // Both spellings of a *flowing* separator — an authored space and an authored single
+        // newline — must land on the same doc, or the pair diverges (and, once the formatter
+        // emits one of them, flip-flops). So the test is spelling-independent, and the
+        // multiline arm's newline case re-spells itself as the space rather than emitting a
+        // parallel form.
+        //
+        // ⚠️ **Asked once, ahead of the multiline split, because both arms below need this
+        // same answer.** The question is about the RUN and its two neighbours; nothing in it
+        // depends on WHY the container went multiline. A conjunct on the cause would be dead in
+        // the arm the `!multiline` test already selected, and wrong as a narrowing: the flow
+        // rule's other two call sites — a content text's leading and trailing runs — carry no
+        // cause gate at all, so a container-keyed one half-applies the rule. Within a single
+        // run the boundaries touching a text node would flow while the one between two adjacent
+        // siblings did not, and `text1 <span>a</span>⏎<span>b</span> text2` would come out
+        // broken in a line that fits — a form neither formatter produces. A rule keyed on the
+        // CONTAINER cannot be right at one of its boundaries and wrong at the next.
+        //
+        // Flowing converges a tag pair onto one line where prettier splits it — a deliberate
+        // divergence in the same family as the rest of this rule, pinned by
+        // `elements/inline_adjacent_sibling_newline_flow_prettier_divergence`.
+        let separator_flows = run_has_prose
+            && self.neighbour_newline_flows(prev_node)
+            && self.neighbour_newline_flows(next_node);
+        if !multiline {
+            // Before a tag the separator is a bare collapsible break — a space while
+            // the fragment fits, a newline once it breaks — exactly as the multiline
+            // arm below emits it. `group([line, tag])` (the inline-element form) would
+            // instead decide the separator on its own width, independently of whether
+            // the parent broke: a compact `<small>{a} {b}</small>` that overflows would
+            // pack `{a} {b}` onto the block-style content line, while the same document
+            // authored across lines splits them. That makes the layout follow the
+            // content-boundary whitespace — which is render-free under Svelte 5, and
+            // which tsv *injects* when it converts an authoring to block-style, so the
+            // emitted form would reflow on the next pass.
             //
-            // The sibling-newline flow rule ([`Self::sibling_newline_flows`]) at its
-            // standalone-separator site: this node sits between two *non-text* siblings and carries
-            // no prose of its own, so it flows only when its inline RUN holds some
-            // (`run_has_prose`, computed once per run by the caller). That gate is the rule's
-            // boundary and it is structural rather than mechanical — flowing means *reflowing into
-            // a text fill*, and a run with no content text has none. Its newlines are then the
-            // author's only structure (a vertical list of siblings), and collapsing them packs
-            // independent items onto one line — which, for a short list, cascades into the parent
-            // element's own hug decision, an F1 break. See the standalone-separator paragraph in
-            // [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
+            // An inline ELEMENT or component keeps `group([line, el])` deliberately: it
+            // carries its own tags, so the group is what lets a wide element drop to its
+            // own line whole instead of breaking its tag in place, and both formatters
+            // settle on a stable (if authoring-dependent) form there — the sanctioned
+            // Tier-2 element-expansion class, not this bug. A tag has no such structure
+            // to protect, so the bare break is strictly better.
             //
-            // Both spellings of a *flowing* separator — an authored space and an authored single
-            // newline — must land on the same doc, or the pair diverges (and, once the formatter
-            // emits one of them, flip-flops). So the test is spelling-independent, and the
-            // multiline arm's newline case re-spells itself as the space rather than emitting a
-            // parallel form.
+            // ⚠️ A FLOWING run is the exception, and it is the same question the multiline
+            // arm's `next_is_tag && separator_flows` case asks — asked here so one run's
+            // interior does not depend on WHY its element went multiline. A width-broken
+            // element and a newline-authored one lay the same prose run out identically:
+            // both defer to the next sibling's per-width `group([line, tag])`, so the run
+            // packs. Without this the two modes hold contradictory interior policies — the
+            // bare `line` resolves all-or-nothing with the parent group, which is already
+            // broken whenever the element overflowed, so every separator in the run breaks
+            // while the newline-authored twin packs. That difference is invisible while the
+            // reflowable-fill suppression keeps the authored form out of the multiline arm,
+            // and becomes a two-pass cycle the moment it doesn't
+            // (`inline_content_spaced_tags_tail_long`).
             //
-            // ⚠️ **Asked once, ahead of the multiline split, because both arms below need this
-            // same answer.** The question is about the RUN and its two neighbours; nothing in it
-            // depends on WHY the container went multiline. A conjunct on the cause would be dead in
-            // the arm the `!multiline` test already selected, and wrong as a narrowing: the flow
-            // rule's other two call sites — a content text's leading and trailing runs — carry no
-            // cause gate at all, so a container-keyed one half-applies the rule. Within a single
-            // run the boundaries touching a text node would flow while the one between two adjacent
-            // siblings did not, and `text1 <span>a</span>⏎<span>b</span> text2` would come out
-            // broken in a line that fits — a form neither formatter produces. A rule keyed on the
-            // CONTAINER cannot be right at one of its boundaries and wrong at the next.
-            //
-            // Flowing converges a tag pair onto one line where prettier splits it — a deliberate
-            // divergence in the same family as the rest of this rule, pinned by
-            // `elements/inline_adjacent_sibling_newline_flow_prettier_divergence`.
-            let separator_flows = run_has_prose
-                && self.neighbour_newline_flows(prev_node)
-                && self.neighbour_newline_flows(next_node);
-            if !multiline {
-                // Before a tag the separator is a bare collapsible break — a space while
-                // the fragment fits, a newline once it breaks — exactly as the multiline
-                // arm below emits it. `group([line, tag])` (the inline-element form) would
-                // instead decide the separator on its own width, independently of whether
-                // the parent broke: a compact `<small>{a} {b}</small>` that overflows would
-                // pack `{a} {b}` onto the block-style content line, while the same document
-                // authored across lines splits them. That makes the layout follow the
-                // content-boundary whitespace — which is render-free under Svelte 5, and
-                // which tsv *injects* when it converts an authoring to block-style, so the
-                // emitted form would reflow on the next pass.
-                //
-                // An inline ELEMENT or component keeps `group([line, el])` deliberately: it
-                // carries its own tags, so the group is what lets a wide element drop to its
-                // own line whole instead of breaking its tag in place, and both formatters
-                // settle on a stable (if authoring-dependent) form there — the sanctioned
-                // Tier-2 element-expansion class, not this bug. A tag has no such structure
-                // to protect, so the bare break is strictly better.
-                //
-                // ⚠️ A FLOWING run is the exception, and it is the same question the multiline
-                // arm's `next_is_tag && separator_flows` case asks — asked here so one run's
-                // interior does not depend on WHY its element went multiline. A width-broken
-                // element and a newline-authored one lay the same prose run out identically:
-                // both defer to the next sibling's per-width `group([line, tag])`, so the run
-                // packs. Without this the two modes hold contradictory interior policies — the
-                // bare `line` resolves all-or-nothing with the parent group, which is already
-                // broken whenever the element overflowed, so every separator in the run breaks
-                // while the newline-authored twin packs. That difference is invisible while the
-                // reflowable-fill suppression keeps the authored form out of the multiline arm,
-                // and becomes a two-pass cycle the moment it doesn't
-                // (`inline_content_spaced_tags_tail_long`).
-                //
-                // ⚠️ A **component** follower is the other exception, and it is that same parity
-                // read the other way round: the multiline arm below never wraps one — its
-                // `trim_to_collapsible` excludes components on purpose (a space-separated
-                // component sibling breaks to its own line, which is prettier's answer too), so
-                // the separator falls through to a bare `line` there. Wrapping it *here* gave one
-                // prose run two interiors again, and this half is the one that packs: a preceding
-                // sibling that renders multiline leaves the closing tag at a short column, the
-                // wrap's per-width break then fits the component after it, and the emitted
-                // container boundary newline makes the NEXT pass read `SourceBreaks` and split the
-                // pair back apart — a two-pass cycle whose first form is also a prettier
-                // divergence ([`Printer::next_is_component`]).
-                if (next_is_tag && !separator_flows) || next_is_component {
-                    child_docs.push(d.line());
-                } else {
-                    // Defer the separator to the next sibling, which leads with it. NOT only "the
-                    // next inline element": every follower this arm does not emit for reads the
-                    // flag, and each answers with the [`LeadBoundary`] its own kind calls for — the
-                    // wrap for an inline element or component that owns a fill, a bare `line` for a
-                    // run-ending comment / `{@debug}`. A follower whose arm ignored the flag simply
-                    // deleted the space, which is why the reader set has to stay total.
-                    *handle_whitespace_of_prev_text = true;
-                }
-                return;
-            }
-            // A separator beside a declaration tag that owns its line: the run is render-free (the
-            // tag hoists out of the fragment), and the break is THIS node's to emit — the tag
-            // breaks only across a directly adjacent sibling, so exactly one line lands here
-            // however either side spelled it. An authored blank line survives as the second.
-            if prev_owns_line || next_owns_line {
-                if text.newline_count >= 2 {
-                    child_docs.push(d.hardline());
-                }
-                child_docs.push(d.hardline());
-                return;
-            }
-            // Multiline middle whitespace-only text — mirror prettier-plugin-svelte's
-            // `handleTextChild` (`index.ts:1308`) + `splitTextToDocs` (`:1353`). The boundary is
-            // *trimmed* to a collapsible break — emitted by the next sibling (an inline element's
-            // `group([line, …])`, a block element's `handle_block_child` softline) — only when
-            // prettier would trim it:
-            // - next is an inline element AND the text does NOT end with a linebreak
-            //   (`!isTextNodeEndingWithLinebreak`), i.e. a pure space separator; OR
-            // - next is a block element AND the text is NOT a blank line
-            //   (`!isTextNodeEndingWithLinebreak(_, 2)`).
-            // Otherwise the node is printed via `splitTextToDocs`: a newline → `hardline`, a blank
-            // line (2+ newlines) → preserved blank `[hardline, hardline]`, a pure space → bare
-            // `line` (space when the fragment fits, newline when the parent breaks — what lets a
-            // space-separated `{/if} {x}` drop once the `{#if}` forces the parent multiline). A
-            // newline before an *inline element* therefore breaks (matching prettier and path 1),
-            // rather than collapsing as it did before this convergence.
-            //
-            let newline_count = text.newline_count as usize;
-            // A flowing separator collapses here rather than pinning its authored line — the shared
-            // `separator_flows` answer above, which is deliberately blind to the container's
-            // multiline cause.
-            //
-            // Collapsing it cannot cost the arm that chose it: this separator is *interior* to the
-            // content, so removing its break cannot touch the element's own BOUNDARY newlines,
-            // which are what the multiline decision reads. (The period-2 cycle that argument rules
-            // out is real where it does reach the boundary — the next pass would take the inline
-            // arm, whose `next_is_tag` case emits a bare `line`, all-or-nothing with the
-            // already-broken parent group, and split the run apart again.) Both spellings converge,
-            // for element and tag siblings alike, and `authoring:audit` is the standing guard.
-            // `elements/inline_content_spaced_tags_tail_long` reaches the SAME interior through the
-            // non-multiline arm above (a width-broken element), which is what keeps one prose run
-            // from having two layouts depending on why its element expanded.
-            let ws_flows = newline_count == 1 && separator_flows;
-            // The rule's own claim, applied literally: a flowing single newline IS the space
-            // separator, differently spelled. So it takes the space arm verbatim rather than a
-            // parallel one — same doc, same layout, and idempotency by construction. Emitting a
-            // *different* collapsible form here (`group([line, el])` where the space emits a bare
-            // `line`) is what made the first attempt flip-flop: pass 1 wrote a newline that pass 2
-            // then re-read as flowable and collapsed.
-            let newline_count = if ws_flows { 0 } else { newline_count };
-            let trim_to_collapsible = (next_is_inline_el && newline_count == 0)
-                || (next_is_block_el && newline_count < 2);
-            if trim_to_collapsible {
-                // prettier: `handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`. When the
-                // previous sibling is a block element its own `handle_block_child` already supplies
-                // the separating break, so the next inline element is NOT wrapped in
-                // `group([line, el])` (which would strand a leading space after the block's break).
-                // `handle_whitespace_of_prev_text` signals the trimmed boundary to the *next*
-                // sibling. For a next **block** element it must stay set so the block's
-                // `handle_block_child` emits its `break_before` (tsv keeps the text node intact,
-                // unlike prettier which trims it, so the flag IS the "boundary was trimmed" signal).
-                // For a next **inline** element it follows prettier's
-                // `handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`: when the previous
-                // sibling is a block, its own `handle_block_child` already supplies the break, so the
-                // inline element is NOT wrapped in `group([line, el])` (which would strand a leading
-                // space after the block's break — `block_before_inline`).
-                *handle_whitespace_of_prev_text = !next_is_inline_el || !prev_is_block_el;
-            } else if newline_count >= 1 {
-                if newline_count >= 2 {
-                    child_docs.push(d.hardline());
-                }
-                child_docs.push(d.hardline());
-            } else if next_is_tag && separator_flows {
-                // A flowing separator before a TAG. `trim_to_collapsible` above covers only a next
-                // inline *element*, so without this arm the boundary would fall to the bare `line`
-                // below — which resolves all-or-nothing with the parent group, and the parent is
-                // already broken whenever the fragment is multiline. The whole run would then hard-
-                // break while the one boundary owned by a content text's fill flowed: the mixed
-                // layout this rule exists to remove, just relocated from elements to tags. Deferring
-                // to the next sibling gives the tag the same per-width `group([line, tag])` an inline
-                // element gets, so the run reflows as one.
-                //
-                // Gated on `separator_flows` — NOT on `next_is_tag` alone. A plain authored space
-                // before a tag keeps the bare `line`: its neighbour may be a **comment**, whose own
-                // line is authorship (`<!-- c -->` `{expr}` must not weld — `root_expressions_spaced`),
-                // and the flow predicate is exactly what excludes it.
-                *handle_whitespace_of_prev_text = true;
-            } else {
+            // ⚠️ A **component** follower is the other exception, and it is that same parity
+            // read the other way round: the multiline arm below never wraps one — its
+            // `trim_to_collapsible` excludes components on purpose (a space-separated
+            // component sibling breaks to its own line, which is prettier's answer too), so
+            // the separator falls through to a bare `line` there. Wrapping it *here* gave one
+            // prose run two interiors again, and this half is the one that packs: a preceding
+            // sibling that renders multiline leaves the closing tag at a short column, the
+            // wrap's per-width break then fits the component after it, and the emitted
+            // container boundary newline makes the NEXT pass read `SourceBreaks` and split the
+            // pair back apart — a two-pass cycle whose first form is also a prettier
+            // divergence ([`Printer::next_is_component`]).
+            if (next_is_tag && !separator_flows) || next_is_component {
                 child_docs.push(d.line());
+            } else {
+                // Defer the separator to the next sibling, which leads with it. NOT only "the
+                // next inline element": every follower this arm does not emit for reads the
+                // flag, and each answers with the [`LeadBoundary`] its own kind calls for — the
+                // wrap for an inline element or component that owns a fill, a bare `line` for a
+                // run-ending comment / `{@debug}`. A follower whose arm ignored the flag simply
+                // deleted the space, which is why the reader set has to stay total.
+                *handle_whitespace_of_prev_text = true;
             }
             return;
         }
+        // A separator beside a declaration tag that owns its line: the run is render-free (the
+        // tag hoists out of the fragment), and the break is THIS node's to emit — the tag
+        // breaks only across a directly adjacent sibling, so exactly one line lands here
+        // however either side spelled it. An authored blank line survives as the second.
+        if prev_owns_line || next_owns_line {
+            if text.newline_count >= 2 {
+                child_docs.push(d.hardline());
+            }
+            child_docs.push(d.hardline());
+            return;
+        }
+        // Multiline middle whitespace-only text — mirror prettier-plugin-svelte's
+        // `handleTextChild` (`index.ts:1308`) + `splitTextToDocs` (`:1353`). The boundary is
+        // *trimmed* to a collapsible break — emitted by the next sibling (an inline element's
+        // `group([line, …])`, a block element's `handle_block_child` softline) — only when
+        // prettier would trim it:
+        // - next is an inline element AND the text does NOT end with a linebreak
+        //   (`!isTextNodeEndingWithLinebreak`), i.e. a pure space separator; OR
+        // - next is a block element AND the text is NOT a blank line
+        //   (`!isTextNodeEndingWithLinebreak(_, 2)`).
+        // Otherwise the node is printed via `splitTextToDocs`: a newline → `hardline`, a blank
+        // line (2+ newlines) → preserved blank `[hardline, hardline]`, a pure space → bare
+        // `line` (space when the fragment fits, newline when the parent breaks — what lets a
+        // space-separated `{/if} {x}` drop once the `{#if}` forces the parent multiline). A
+        // newline before an *inline element* therefore breaks (matching prettier and path 1),
+        // rather than collapsing as it did before this convergence.
+        //
+        let newline_count = text.newline_count as usize;
+        // A flowing separator collapses here rather than pinning its authored line — the shared
+        // `separator_flows` answer above, which is deliberately blind to the container's
+        // multiline cause.
+        //
+        // Collapsing it cannot cost the arm that chose it: this separator is *interior* to the
+        // content, so removing its break cannot touch the element's own BOUNDARY newlines,
+        // which are what the multiline decision reads. (The period-2 cycle that argument rules
+        // out is real where it does reach the boundary — the next pass would take the inline
+        // arm, whose `next_is_tag` case emits a bare `line`, all-or-nothing with the
+        // already-broken parent group, and split the run apart again.) Both spellings converge,
+        // for element and tag siblings alike, and `authoring:audit` is the standing guard.
+        // `elements/inline_content_spaced_tags_tail_long` reaches the SAME interior through the
+        // non-multiline arm above (a width-broken element), which is what keeps one prose run
+        // from having two layouts depending on why its element expanded.
+        let ws_flows = newline_count == 1 && separator_flows;
+        // The rule's own claim, applied literally: a flowing single newline IS the space
+        // separator, differently spelled. So it takes the space arm verbatim rather than a
+        // parallel one — same doc, same layout, and idempotency by construction. Emitting a
+        // *different* collapsible form here (`group([line, el])` where the space emits a bare
+        // `line`) is what made the first attempt flip-flop: pass 1 wrote a newline that pass 2
+        // then re-read as flowable and collapsed.
+        let newline_count = if ws_flows { 0 } else { newline_count };
+        let trim_to_collapsible =
+            (next_is_inline_el && newline_count == 0) || (next_is_block_el && newline_count < 2);
+        if trim_to_collapsible {
+            // prettier: `handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`. When the
+            // previous sibling is a block element its own `handle_block_child` already supplies
+            // the separating break, so the next inline element is NOT wrapped in
+            // `group([line, el])` (which would strand a leading space after the block's break).
+            // `handle_whitespace_of_prev_text` signals the trimmed boundary to the *next*
+            // sibling. For a next **block** element it must stay set so the block's
+            // `handle_block_child` emits its `break_before` (tsv keeps the text node intact,
+            // unlike prettier which trims it, so the flag IS the "boundary was trimmed" signal).
+            // For a next **inline** element it follows prettier's
+            // `handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`: when the previous
+            // sibling is a block, its own `handle_block_child` already supplies the break, so the
+            // inline element is NOT wrapped in `group([line, el])` (which would strand a leading
+            // space after the block's break — `block_before_inline`).
+            *handle_whitespace_of_prev_text = !next_is_inline_el || !prev_is_block_el;
+        } else if newline_count >= 1 {
+            if newline_count >= 2 {
+                child_docs.push(d.hardline());
+            }
+            child_docs.push(d.hardline());
+        } else if next_is_tag && separator_flows {
+            // A flowing separator before a TAG. `trim_to_collapsible` above covers only a next
+            // inline *element*, so without this arm the boundary would fall to the bare `line`
+            // below — which resolves all-or-nothing with the parent group, and the parent is
+            // already broken whenever the fragment is multiline. The whole run would then hard-
+            // break while the one boundary owned by a content text's fill flowed: the mixed
+            // layout this rule exists to remove, just relocated from elements to tags. Deferring
+            // to the next sibling gives the tag the same per-width `group([line, tag])` an inline
+            // element gets, so the run reflows as one.
+            //
+            // Gated on `separator_flows` — NOT on `next_is_tag` alone. A plain authored space
+            // before a tag keeps the bare `line`: its neighbour may be a **comment**, whose own
+            // line is authorship (`<!-- c -->` `{expr}` must not weld — `root_expressions_spaced`),
+            // and the flow predicate is exactly what excludes it.
+            *handle_whitespace_of_prev_text = true;
+        } else {
+            child_docs.push(d.line());
+        }
+    }
 
-        // The content-text half's own sibling-kind facts — the second group described at the top
-        // of this function, reached only past the whitespace-only arm's `return`.
+    /// A **content** text child: the node owns a `fill`, and its rules are about the two boundary
+    /// runs on its own edges plus the words between them.
+    ///
+    /// Dispatched from [`Self::handle_text_child`], which owns the doc for why the two text kinds
+    /// are two handlers. `text` is `trimmed_nodes[i]`, already known NOT to be
+    /// collapsible-whitespace-only.
+    fn handle_content_text_child(
+        &self,
+        trimmed_nodes: &[FragmentNode<'_>],
+        i: usize,
+        text: &Text,
+        ctx: TextChildContext,
+        child_docs: &mut DocBuf,
+        handle_whitespace_of_prev_text: &mut bool,
+    ) {
+        let TextChildContext {
+            cause,
+            content_bounds,
+            glued_prefix,
+            prev_sibling_head,
+            ..
+        } = ctx;
+        let multiline = cause.is_multiline();
+        // Sibling-kind facts, derived from the node's position in `trimmed_nodes` — this
+        // handler's set; the separator path derives its own overlapping one.
+        let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
+        let next_node = trimmed_nodes.get(i + 1);
+        // A declaration tag on either side owns its own line ([`Self::is_own_line_declaration`]),
+        // and the run between it and this text is render-free — the tag hoists out of the fragment,
+        // so that run is an edge run whichever side of the tag it sits on. This text therefore
+        // trims it and prints no boundary of its own; the line comes from the tag (for a content
+        // text) or from this node (for a whitespace-only separator, whose arm is the tag's other
+        // side). An authored blank line still survives, as everywhere else.
+        let prev_owns_line = i
+            .checked_sub(1)
+            .is_some_and(|j| self.is_own_line_declaration(trimmed_nodes, j));
+        let next_owns_line =
+            i + 1 < trimmed_nodes.len() && self.is_own_line_declaration(trimmed_nodes, i + 1);
+        let next_is_tag = next_node.is_some_and(Self::is_tag_node);
+        // Whether the *previous* sibling is a block element — prettier trims a boundary
+        // whitespace adjacent to a block but does NOT then wrap the next inline element in
+        // `group([line, el])` (`handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`),
+        // because the block's own `handle_block_child` already supplies the break; wrapping
+        // would add a stray leading space after that break.
+        let prev_is_block_el = prev_node.is_some_and(|n| self.is_block_element_node(n));
+
+        let d = self.d();
+
+        // The content-text half's own position facts.
+        //
         //
         // "First"/"last" is asked of the nodes the whitespace rules actually see, so a HOISTED
         // sibling (`{@const}` / `{const}` / `{let}` / `{@debug}` / `{#snippet}` / `<title>`) does not stand
@@ -1003,7 +1096,7 @@ impl<'a> Printer<'a> {
     /// Rejoin a popped inline element with the trailing text `build_tail` builds around it,
     /// keeping the element's **leading** boundary outside that tail.
     ///
-    /// `handle_text_child` pops the previous sibling to rejoin it with the text that follows, and
+    /// `handle_content_text_child` pops the previous sibling to rejoin it with the text that follows, and
     /// the popped doc is either the bare element or `push_inline_child_doc`'s inline-sibling wrap
     /// `group([line, X])` — the collapsible boundary to the sibling before it. Two boundaries then
     /// meet on one element, and they are **independent decisions**: the leading one asks whether
@@ -1063,7 +1156,7 @@ impl<'a> Printer<'a> {
     /// closing `>` stays intact while the words pack greedily after it. A wide element whose
     /// content overflows wraps within print width and dangles its closing `>` on a low column;
     /// the trailing text then packs after it. Used by the inline/trimmed text path
-    /// ([`Self::handle_text_child`]) when an inline element is the **last** child before trailing
+    /// ([`Self::handle_content_text_child`]) when an inline element is the **last** child before trailing
     /// text — the only position that folds. A non-terminal text run (one followed by another
     /// flowing element) is never folded here: packing it onto the dangled `>` line is
     /// non-convergent, pinned by

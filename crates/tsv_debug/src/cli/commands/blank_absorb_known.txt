@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 525
+# shapes: 526
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -364,6 +364,7 @@
 (SvelteElement, attributes→tag)
 (SvelteElement, tag→$)
 (SvelteElement, tag→attributes)
+(SvelteElement, tag→fragment)
 (SwitchCase, ^→$)
 (SwitchCase, ^→consequent)
 (SwitchCase, ^→test)

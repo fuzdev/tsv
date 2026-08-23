@@ -35,7 +35,7 @@ pub(super) enum LeadBoundary {
     /// `{@debug}`: a **bare** collapsible `line`, a space while the parent group is flat and a
     /// newline once it breaks. The block arm spells its own answer the same way
     /// ([`Printer::handle_block_child`]'s `sep()`), and so does the separator site itself for a
-    /// tag follower ([`Printer::handle_text_child`]'s `next_is_tag` case).
+    /// tag follower ([`Printer::handle_separator_text_child`]'s `next_is_tag` case).
     ///
     /// ⚠️ **Not [`Self::Spaced`]** — the group form decides the separator on its OWN width,
     /// independently of whether the parent broke, and these followers own no fill to be measured
@@ -188,7 +188,7 @@ impl<'a> Printer<'a> {
         // `prev_sibling_head`.
         let mut sibling_head = 0usize;
         // Inline-run prose cursor for the sibling-newline flow rule at its standalone-separator
-        // site (`handle_text_child`'s whitespace-only arm). Runs partition `trimmed_nodes`, so
+        // site (`handle_separator_text_child`). Runs partition `trimmed_nodes`, so
         // advancing the cursor here — at the TOP of the body, ahead of every `continue` — visits
         // each node once and keeps the total cost O(n). Reading it at the separator instead would
         // rescan per separator, and a mid-run `continue` (a glued run skips its tail) would leave
