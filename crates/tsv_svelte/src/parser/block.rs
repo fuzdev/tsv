@@ -43,6 +43,22 @@ fn strip_head_keyword<'s>(rest: &'s str, keyword: &str) -> Option<&'s str> {
     (value.len() < after_kw.len()).then_some(value)
 }
 
+/// The words of a `{:...}` continuation run, split on [`is_svelte_ws`] — Svelte's class,
+/// not Rust's.
+///
+/// ⚠️ NOT `str::split_whitespace`, which splits on `char::is_whitespace` (Unicode
+/// White_Space). That set lacks **U+FEFF**, so it welds `else<ZWNBSP>if` into a single word
+/// and loses the `{:else if}` match that [`SvelteParser::continuation_keyword_at`]'s own cut
+/// just took care to preserve — the two would then disagree about where a word ends, which is
+/// the bug the shared class exists to rule out. It also *adds* U+0085 NEL, which Svelte reads
+/// as junk rather than as a separator.
+///
+/// Empty pieces are dropped so a run of separators (`{:else  if}`) yields two words, matching
+/// `split_whitespace`'s one useful property.
+fn continuation_words(keyword: &str) -> impl Iterator<Item = &str> {
+    keyword.split(is_svelte_ws).filter(|w| !w.is_empty())
+}
+
 /// [`strip_head_keyword`], plus the **head-final** form the keyword-with-no-value case
 /// needs: `{#await p then}` names its clause and stops, so nothing follows the keyword for
 /// the required whitespace run to be found in.
@@ -329,7 +345,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // words allocation-free (the old `.take(2).join(" ")` normalized
             // "else  if" -> "else if" only to compare against these two forms).
             let keyword = self.continuation_keyword_at(self.current_end);
-            let mut words = keyword.split_whitespace();
+            let mut words = continuation_words(keyword);
             let first = words.next();
             let second = words.next();
             let is_else_if = first == Some("else") && second == Some("if");
@@ -924,9 +940,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         if !self.check(TokenKind::BlockContinue) {
             return Ok(());
         }
-        let mut words = self
-            .continuation_keyword_at(self.current_end)
-            .split_whitespace();
+        let mut words = continuation_words(self.continuation_keyword_at(self.current_end));
         if words.next() != Some("else") {
             return Ok(());
         }
@@ -991,13 +1005,28 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn continuation_keyword_at(&self, pos: usize) -> &'a str {
         let remaining = &self.source[pos..];
         let end = remaining
-            .find(|c: char| !c.is_alphabetic() && c != ' ')
+            .find(|c: char| !c.is_alphabetic() && !is_svelte_ws(c))
             .unwrap_or(remaining.len());
-        // `str::trim` rather than the [`is_svelte_ws`] the rest of this file uses, and the
-        // one place that is right: the run was cut at the first char that is neither
-        // alphabetic nor a SPACE, so the only trimmable member either class can see here is
-        // that space. The two predicates cannot disagree on a slice they both reduce to.
-        remaining[..end].trim()
+        // [`is_svelte_ws`] on BOTH the cut and the trim, and they must stay the same class:
+        // the cut decides which characters are inside the run, so a trim answering a
+        // different question would either leave a member in or take a non-member out.
+        //
+        // ⚠️ The cut used to be `c != ' '` — a LITERAL SPACE — which made this the narrowest
+        // whitespace class in the parser and broke the two-word `{:else if}` in both
+        // directions at once. A separator Svelte's `allow_whitespace` crosses but a space
+        // isn't (a tab, a NEWLINE, or any non-ASCII JS `\s`) ended the run at `else`, so
+        // `{:else⏎if x}` read as a plain `{:else}` and the `if x` then failed the head's `}`
+        // — an OVER-REJECTION of a wrapped else-if, the one spelling here a human actually
+        // writes. The same cut swallowed junk in the other direction: `{:else⇥junk}` also
+        // reduced to `else`, so `{#each}`'s exact `== "else"` test took the branch and
+        // ACCEPTED a head canonical rejects, where `{:else junk}` (space) was correctly
+        // refused. One class, both bugs.
+        //
+        // ⚠️ Not `char::is_whitespace` / `str::trim` either — that is Rust's White_Space,
+        // which disagrees with JS `\s` in both directions (it has U+0085 NEL, it lacks
+        // U+FEFF). NEL must stay OUTSIDE the run so it reads as trailing junk, exactly as
+        // canonical treats it.
+        remaining[..end].trim_matches(is_svelte_ws)
     }
 
     /// Strip a leading block/tag keyword, enforcing the whitespace Svelte

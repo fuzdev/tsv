@@ -217,8 +217,46 @@ both the instant such an input exists; this audit makes them exist.
   prefix acorn measured, in the run acorn *skipped*, and inside the island itself, and
   only the first of those is ever in a head.
 
-Sites are sampled by even stride rather than taken as a prefix, so the per-file cap
-spreads across the document instead of piling into its first few lines.
+  ⚠️ **It grades a second axis nothing else does, and its best yield so far came from that
+  one**: U+2028 / U+2029 are also members of **JS `\s`**, so this family is the standing
+  probe for whether a Svelte reader asks the right WHITESPACE CLASS — the `ws` family cannot
+  be (its inserts are ASCII). **Four of the five** `tsv_svelte` readers that were found asking
+  a Rust whitespace class were found *by this family* — one of them turning valid Svelte into
+  output `svelte compile` rejects — for 19 of the 27 signature groups it has ever retired. (The
+  fifth, the printer's `lang` read, is out of its reach: only a U+FEFF exhibits it, and this
+  family injects a CR and the two line separators.) Point it at any new reader, and pair a
+  finding with U+0085 NEL — Rust-whitespace but not JS `\s` — as the null control.
+
+**Coverage differs per family, and that is the whole design.** `ws` is head-scoped —
+~11,049 sites over `tests/fixtures` — so it runs as a **CENSUS** (`--inject-limit 0`,
+every site, ~17 s for 22,098 variants). `terminators` is document-wide — ~628,852 sites
+— so a census would cost ~9 minutes and it stays a strided **SAMPLE** (the default
+`--inject-limit 12`, which reaches 5.9% of its sites in 111,669 variants, ~33 s). Where a
+run is sampled, sites are taken by even stride rather than as a prefix, so the per-file
+cap spreads across the document instead of piling into its first few lines.
+
+⚠️ **A sampled family cannot be RATCHETED, and the reason is the stride, not the key.**
+The obvious pin — the diff signature, which is already computed and already the grouping
+key — is stable in itself; what is not stable is *which sites a run probes*. The stride
+divisor is the file's own site count, so an edit anywhere in a file redraws its whole
+sample, including in text the edit never touched. Measured over `tests/fixtures`: adding
+one member to one type-literal fixture — a routine coverage extension, unrelated to
+anything the family grades — moved that file's probed offsets from `[7, 37, 77, 106]` to
+`[7, 44, 82, 118]` and retired **12 of the terminator family's then-194 finding signatures**
+as stale, with every underlying divergence intact. (194 is the reading that measurement was
+taken against, kept because it is the evidence; the family's standing count is the 175
+above.) A ratchet would have hard-failed and been
+"fixed" by re-pinning, which is the rot [gap_audit.md](./gap_audit.md) designs against
+("a gate that fails per added fixture would just get turned off"). The exposure is
+structural, not incidental: **96 of those 194 signatures are produced by a single base
+fixture each, and 17 files carry all 96** (one alone carries 18).
+
+A census has no divisor and no such motion — the same edit moved the `ws` census by
+**zero** signatures — and it is monotone under a fixture addition, since a new file can
+only add sites. So the rule is: **census ⇒ gradeable; sample ⇒ discovery only.** Making
+`ws` a census was not merely a stability win, either — the sampled form found 3
+undocumented files where the census finds **25** (7 signature groups vs 19), all of them
+the one comment-extent bug below. The sample was hiding 8x its own findings.
 
 **Each variant is graded against its own base file.** A divergence the base already had
 is not the injection's doing, and `tests/fixtures` deliberately contains ~91
@@ -246,22 +284,35 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 list, not a regression gate, which is why it is not in `deno task check` (it also needs
 the canonical parser, so it is conformance-tier at best). Standing findings:
 
-- **`ws`** — a `//` comment's extent is **clipped at a trimmed slice boundary** in the
-  bounded-slice tag readers. `{@html expr // c ⏎}` ends the comment before the trailing
-  space where acorn ends it after; `{expr // c ⏎}` and `<script>` both agree, so the
-  divergence is the bounded readers' whitespace-trimmed slice, not the comment lexer.
-- **`terminators`**, by file count over `tests/fixtures` — three groups, none of them a
-  line-*class* question despite the family that surfaced them:
-  - an attribute's `end` and its `value` **shape** when a JS-`\s` code point sits right
-    after its `{…}` (`<div onclick={…}<LS>>`): tsv absorbs the character into the attribute
-    and turns `value` into an array, where canonical ends the attribute before it (84 / 76
-    files);
+- **`ws`** (census: 25 files / 19 signature groups) — **one bug in every one of them**: a
+  `//` comment's extent is **clipped at a trimmed slice boundary** in the bounded-slice tag
+  readers. `{@html expr // c ⏎}` ends the comment before the trailing space where acorn ends
+  it after; `{expr // c ⏎}` and `<script>` both agree, so the divergence is the bounded
+  readers' whitespace-trimmed slice, not the comment lexer. Because the family is a census
+  and its whole finding set is this one bug, closing it takes the run to zero — which makes
+  `ws` a candidate to become a **green gate at zero**, not a ratchet: there would be nothing
+  left to pin. (Its 83 tsv-side rejections are a separate triage list, tier-4 by the release
+  bar and routed to the 0.4 over-rejection sweep.)
+- **`terminators`** (sampled: 277 files / 175 signature groups), by file count over
+  `tests/fixtures` — two groups, neither of them a line-*class* question despite the family
+  that surfaced them:
   - a `{@debug}` identifier's `loc` line and column under a **lone `<CR>`** (54 / 51 files);
   - the selector-span residue this audit's own CSS finding left behind — a descendant
     combinator's `end` and the compound break, enumerated and pinned in
     [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs) (52 / 38 files).
 
-  The boundary-whitespace **class** finding this list used to lead with is closed: the CSS
+  The **attribute** finding this list used to lead with is closed, and it was never a
+  terminator question — the unquoted-attribute-value terminator spelled Svelte's `\s` as a raw
+  BYTE match, so all nineteen non-ASCII members of the class (and the VT its ASCII half
+  omitted) were absorbed into the value
+  (turning an expression attribute into a quoted string `svelte compile` rejects). It was one
+  of FIVE sites in `tsv_svelte` reading a Rust whitespace class where Svelte's JS `\s` was
+  meant; the crate's discipline is now stated at the top of
+  [whitespace.rs](../crates/tsv_svelte/src/whitespace.rs). Closing them took the family from
+  409 files / 194 signature groups to 277 / 175 (19 groups closed, **0 new**) and its
+  tsv-side over-rejections from 196 to 158.
+
+  The boundary-whitespace **class** finding this list led with before that is also closed: the CSS
   parser now steps the whole `allow_whitespace()` run (`CssParser::skip_boundary_whitespace`,
   called at every `allow_comment_or_whitespace` juncture — the stylesheet body, a style
   rule's block and an at-rule's, plus the selector-internal ones), and the printer puts the
@@ -363,7 +414,7 @@ Why it needs its own gate: every other comment instrument reads a channel the pa
 
 ```bash
 # census_audit - format each pristine seed, lex comment trivia from BOTH raw sides with
-# self-contained scanners (audit/census.rs), and compare per-line-trimmed interior
+# self-contained scanners (audit/census.rs), and compare normalized interior
 # multisets per language bucket: `ts` (TS-family files, <script> islands, template
 # {expressions}), `css` (.css files, <style> islands), `template` (Svelte <!-- -->).
 # MISSING = dropped comment; EXTRA = duplicated/fabricated one; a merge or interior
@@ -384,7 +435,7 @@ cargo run --profile corpus -p tsv_debug --features audits census_audit ../zzz/sr
 # own that class).
 ```
 
-**The scanners** (`audit/census.rs`) are deliberately self-contained rather than driving the product lexers: TS comment *extents* depend on parser context (a regex body is opaque only because the parser said "regex here"), so a raw `next_token` loop mis-lexes real code — and an instrument sharing the product lexer's extent rules would inherit its bugs. TS handles strings, template literals (interpolation stack included), and regexes via the classic previous-token heuristic; CSS handles strings and unquoted `url()` opacity; Svelte is a lexical mode machine — `<script>`/`<style>` raw-text islands bounded by the first matching close tag (exactly Svelte's own rule, so a `</script>` inside a JS string bounds identically), `{...}` expressions in text, attribute, and quoted-attribute-value position, block sigils stepped over so `{/if}` is never a regex head. Interiors normalize by **per-line ASCII trim only** (`[ \t\r]` — multi-line blocks legitimately re-indent; NBSP/form feed at a line edge is content and stays significant).
+**The scanners** (`audit/census.rs`) are deliberately self-contained rather than driving the product lexers: TS comment *extents* depend on parser context (a regex body is opaque only because the parser said "regex here"), so a raw `next_token` loop mis-lexes real code — and an instrument sharing the product lexer's extent rules would inherit its bugs. TS handles strings, template literals (interpolation stack included), and regexes via the classic previous-token heuristic; CSS handles strings and unquoted `url()` opacity; Svelte is a lexical mode machine — `<script>`/`<style>` raw-text islands bounded by the first matching close tag (exactly Svelte's own rule, so a `</script>` inside a JS string bounds identically), `{...}` expressions in text, attribute, and quoted-attribute-value position, block sigils stepped over so `{/if}` is never a regex head. Interiors normalize by **exactly the line-edge trim the printer is licensed to make, which is a different trim per comment KIND** — prettier's `printComment` transcribed, since that is what tsv mirrors: a line comment (and the hashbang) is emitted `.trimEnd()`-ed, so its trailing edge is trimmed; an *indentable* block (`*`-aligned) reindents, so each of its lines is trimmed both ends; and every other block — single-line, or multi-line and non-indentable — plus a Svelte `<!-- … -->` is emitted verbatim and gets **no trim at all**, so every line edge there is content. The class is JS `\s` (`tsv_lang::is_js_whitespace`), because the trims it models are `String.prototype.trim*` calls; a `<CR>` fold runs first, through the format path's own `normalize_carriage_returns`.
 
 **Where the yield is.** Over `tests/fixtures` the gate is a cheap standing tripwire; the discovery arm is external corpora. Its first sweep over the prettier suites found a live `as const` **code swallow** (`(1 // comment⏎) as const;` → `1 // comment as const;` — the code after the paren pulled into the comment) plus four line-comment **merge** sites (`// a⏎// b` → `// a // b`, the second comment demoted to text) — all invisible to every other standing gate. Point it at real code after any parser/printer comment change.
 
@@ -394,6 +445,9 @@ cargo run --profile corpus -p tsv_debug --features audits census_audit ../zzz/sr
 - **Same-content cancellation.** A dropped `// x` plus a fabricated identical `// x` elsewhere in the same file nets zero, the same net-zero blindness `fabrication:audit` documents.
 - **Instrument-symmetry residue.** The scanners misread rare shapes (a regex after `)`, post-`}` division) — but they misread input and output with the same eyes, so the phantoms cancel. A false positive needs the formatter to rewrite text the scanner misreads *differently* across the two sides; none observed over tests/fixtures, zzz, svelte src, or the prettier suites.
 - **As-authored only.** Like every pristine audit, a drop in a gap no corpus file puts a comment in stays invisible — `gaps:audit` is the injection arm for that class (with the ledger, not the census, as its oracle).
+- **The kind-aware trim is per KIND, not per BUCKET.** `is_indentable_block_comment` has exactly one printer *emitter* behind it — `tsv_ts`'s `build_comment_doc` (its other callers, via `tsv_lang::is_indentable_block`, are layout gates that reindent nothing) — so the reindent licence the Block arm grants belongs to the TS printer alone. A `*`-aligned comment in the **css** bucket gets it too, where the CSS printer in fact emits every comment verbatim (conformance_prettier_css.md §CSS: Comments, "the comment interior stays verbatim"). Nothing rewrites there today, so this hides no live bug; it is why a future CSS comment re-indent would land silently.
+- **The Svelte scanner's own attribute terminator is ASCII.** `scan_svelte_tag`'s unquoted-value run stops at `[ \t\n\r>{]`, where Svelte's `regex_invalid_unquoted_attribute_value` spells that class as JS `\s` — so a comment after a non-ASCII-separated unquoted value (`<div a=x<NBSP>/* c */>`) is read as part of the value and never counted. Symmetric, so it cannot false-positive; it is a blind spot at exactly the spellings the parser's own terminator was fixed for. The scanners are deliberately self-contained (above), so the fix is a deliberate one, not a share.
+- **An indentable block's first and last lines are over-trimmed.** prettier trims line 0's trailing edge and the last line's leading edge only, and so does tsv's emitter — but the census trims both ends of every line, so a rewrite of line 0's *leading* run or the last line's *trailing* run balances.
 
 `deno task census:audit:update` regenerates the snapshot after fixing a pinned loss site (or pinning a newly found one); it refuses a narrowed run.
 

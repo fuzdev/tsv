@@ -62,7 +62,9 @@ import {
 /**
  * Injected variants per file. The cap is a blast-radius bound, not a coverage target: a
  * head-dense document would otherwise dominate a run, and every variant costs a canonical
- * parse. Raise it with `--inject-limit` when narrowing to a subtree.
+ * parse. Raise it with `--inject-limit` when narrowing to a subtree, or pass
+ * `--inject-limit 0` for a CENSUS — every site, which is what `wire:audit` runs and what
+ * makes its finding set stable enough to grade (see `lib/wire_inject.ts`).
  */
 const DEFAULT_INJECT_LIMIT = 12;
 
@@ -74,7 +76,7 @@ const CorpusCompareParseArgs = z.object({
 		.meta({ aliases: ['m'] }),
 	inject: z.boolean().default(false),
 	'inject-terminators': z.boolean().default(false),
-	'inject-limit': z.coerce.number().int().positive().default(DEFAULT_INJECT_LIMIT)
+	'inject-limit': z.coerce.number().int().nonnegative().default(DEFAULT_INJECT_LIMIT)
 });
 
 /** Per-file diff cap — collection stops here and the file is flagged truncated. */
@@ -758,7 +760,9 @@ Options:
   --inject-terminators  The same, injecting a lone CR / U+2028 / U+2029 anywhere in the
                      document — the spellings on which the two line classes disagree.
                      Composes with --inject; the per-file budget is split between them
-  --inject-limit <n> Injected variants per file, across all kinds (default 12)
+  --inject-limit <n> Injected variants per file, across all kinds (default 12).
+                     0 = CENSUS: every site, no cap — the only mode whose finding set is
+                     stable across fixture edits, and what wire:audit runs
   --verbose          Show each file as it's processed + per-file diff detail
   --json             Emit a single JSON report to stdout; human output → stderr
   --help             Show this help message
@@ -906,7 +910,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	if (injecting) {
 		console.log(
 			`Mode: +injection into Svelte inputs [${inject_kinds.join(', ')}] ` +
-				`(<=${args['inject-limit']}/file)`
+				(args['inject-limit'] > 0 ? `(<=${args['inject-limit']}/file)` : '(CENSUS: every site)')
 		);
 	}
 	console.log();

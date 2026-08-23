@@ -1,4 +1,67 @@
-// The ECMAScript `\s` CharSet, shared by every reader whose oracle is spelled in JavaScript.
+//! # The workspace's whitespace discipline
+//!
+//! "Is this whitespace?" has **three** answers in tsv, and which one a site wants follows from
+//! the ORACLE it mirrors, never from the language the code is written in:
+//!
+//! | the site mirrors | class | asked by |
+//! | --- | --- | --- |
+//! | anything spelled in JavaScript — Svelte's parser, `parseCss`, prettier's `.trim()` | [`is_js_whitespace`] | `tsv_svelte`'s `is_svelte_ws`; `tsv_css`'s wire trims and escape terminators; this crate's directive + comment readers; `tsv_ts`'s comment renderer |
+//! | css-syntax-3 tokenization (§4.2 **plus** §3.3, see there) | `tsv_css`'s `is_css_whitespace` (ASCII-only, five) | CSS value separation, value-text collapsing |
+//! | "may a formatter respell this without changing what RENDERS" | `tsv_svelte`'s `is_collapsible_ws` (`[ \t\n\r]`) | the Svelte printer's text/fill |
+//!
+//! A fourth, narrower one is not a class but a transcription: prettier's own cursor scans
+//! (`skipSpaces`, and its doc-printer's line-end `trim`) are literally `[' ', '\t']`, so the
+//! byte matches that mirror them in `source_scan` and `doc/arena_render.rs` are right to be
+//! ASCII-narrow and must not be widened to any of the above.
+//!
+//! And a **union** — `is_js_whitespace(c) || c.is_whitespace()`, i.e. JS `\s` plus U+0085 — is
+//! the right answer at two sites, neither of which the table can place, because neither
+//! mirrors an oracle:
+//!
+//! - `tsv_css`'s `is_boundary_whitespace`: the run `skip_boundary_whitespace` steps. The CSS
+//!   lexer reads a `<NEL>` as whitespace where `parseCss` rejects it, so the union is what
+//!   makes the printer's backward scan preserve exactly what the parser skipped, tracked gap
+//!   included. Mirrors tsv's OWN over-acceptance, deliberately.
+//! - `tsv_svelte`'s `narrow_lang_value`: tsv's formattable-`lang` list is an ALLOWLIST the
+//!   trim feeds, so widening can only route a name toward formatting, while either class alone
+//!   freezes a body prettier formats (JS `\s` keeps a U+0085, `str::trim` keeps a U+FEFF).
+//!
+//! They stay **two predicates with two arguments**, and folding them into one shared "union
+//! whitespace" would be the bug the `is_tag_name_terminator` / `is_attr_name_terminator` split
+//! exists to prevent: the expression agreeing is not the question agreeing, and the next
+//! change to either site would be made against the wrong one. Where a site mirrors nothing,
+//! ask which DIRECTION an error runs in, not which oracle it copies.
+//!
+//! ⚠️ **Rust's own whitespace is none of them, and reaching for it is the recurring bug.**
+//! `str::trim*`, `str::split_whitespace` and `char::is_whitespace` are Unicode `White_Space`,
+//! which disagrees with JS `\s` in BOTH directions — it **lacks U+FEFF** and **adds U+0085
+//! NEL** — while `u8::is_ascii_whitespace` and a hand-written `b' ' | b'\t' | …` are narrower
+//! still, missing every non-ASCII member. Both witnesses are asserted below, and each has been
+//! the whole bug on its own; a fix graded against only one of them grades a half-fix as done.
+//!
+//! ⚠️ The `Zs` half of this set is **Unicode-version-dependent** (ECMA-262 mandates the latest
+//! Unicode, and U+180E left `Zs` in Unicode 6.3 — spec.html's own §Additions and Changes note
+//! says so), while the exhaustive test below grades against *Svelte's* hand-written copy. So a
+//! future `Zs` addition would leave tsv and Svelte stale together with the test still green.
+//! Checked externally against UCD 15.1: the 17 `Zs` code points are exactly the enumeration
+//! here, so the set is right against the SPEC and not merely against the oracle.
+//!
+//! It has been found in **four** crates, so a site's crate is no evidence either way. The
+//! parser-side family lives in `tsv_svelte`'s own `whitespace.rs`; the rest:
+//!
+//! - the `format-ignore` / `prettier-ignore` recognizers (`comment.rs`) trimmed with
+//!   `str::trim`, so `prettier-ignore<ZWNBSP>` was a directive prettier HONORS that tsv
+//!   formatted through, and `prettier-ignore<NEL>` one prettier IGNORES that tsv froze — in
+//!   all three languages at once, since every printer routes there;
+//! - `is_indentable_block_comment` (`printing.rs`) classified on `str::trim_start`, and its
+//!   two answers print through entirely different emitters, so either witness moved the whole
+//!   comment;
+//! - `tsv_ts`'s comment renderer trimmed each interior line with Rust's class, **deleting a
+//!   U+0085** prettier keeps, and had no trim at all where prettier applies one (a line
+//!   comment's `trimEnd`);
+//! - `tsv_css`'s wire trims mirror `read_value`'s `value.trim()`, and its hex-escape
+//!   terminator mirrors `read_identifier`'s `(\r\n|\s)?` — a JS regex, which the comment
+//!   there had equated with `char::is_whitespace`.
 
 /// Whether `c` is whitespace to a **JavaScript regular expression's `\s`**.
 ///
@@ -6,12 +69,16 @@
 /// productions: `<TAB>`, `<VT>`, `<FF>`, `<ZWNBSP>` and every code point in general category
 /// `Space_Separator` (`Zs`), plus `<LF>`, `<CR>`, `<LS>` and `<PS>` — 25 in total.
 ///
-/// It lives here rather than in one language crate because **two** of them need it and
-/// neither can reach the other: `tsv_svelte`'s tokenizer class *is* this set (Svelte spells
-/// every whitespace question in JavaScript — see that crate's `is_svelte_ws`), and so is the
-/// class `parseCss` skips at its `allow_whitespace()` junctures, which `tsv_css` must match
-/// (`tsv_css` is a *dependency* of `tsv_svelte`, so it cannot borrow the predicate from it).
-/// One definition, one exhaustive test, no drift.
+/// It lives here rather than in one language crate because **five** crates need it and no
+/// language crate can serve them all: `tsv_svelte`'s tokenizer class *is* this set (Svelte
+/// spells every whitespace question in JavaScript — see that crate's `is_svelte_ws`), and so
+/// is the class `parseCss` skips at its `allow_whitespace()` junctures, which `tsv_css` must
+/// match — and `tsv_css` is a *dependency* of `tsv_svelte`, so it cannot borrow the predicate
+/// from it. Since then this crate's own directive and comment readers, `tsv_ts`'s comment
+/// renderer, `tsv_css`'s wire trims, and `tsv_svelte_compile`'s source scans (which re-export
+/// it as `text_class::is_js_whitespace`) have joined them, each after writing its own copy
+/// with its own restatement of the two traps below. One definition, one exhaustive test, no
+/// drift.
 ///
 /// ⚠️ **Not Rust's `char::is_whitespace()`**, which is the Unicode `White_Space` property.
 /// The two are both 25 code points and differ in *both* directions, so neither is a superset

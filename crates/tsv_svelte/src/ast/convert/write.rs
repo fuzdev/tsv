@@ -487,25 +487,70 @@ fn preceded_by_quote(source: &str, pos: u32) -> bool {
     )
 }
 
+/// The leading HTML comment a lifted `<script>` / `<style>` at `tag_start` carries — a
+/// script's `content.leadingComments`, a stylesheet's `content.comment`. One reader for all
+/// three roots, because Svelte decides all three the same way.
+///
+/// Svelte's own rule (`1-parse/state/element.js`) walks `current.fragment.nodes` **backwards**
+/// from the tag: a `Comment` wins, a `Text` whose `data` is `.trim()`-empty is stepped over,
+/// anything else stops the walk. This mirrors it, with the two things that expression really
+/// says spelled out — and both were wrong when it was a scan over the raw source between the
+/// comment and the tag:
+///
+/// - ⚠️ **The class is JS `\s`** ([`is_svelte_ws`]), because
+///   `data.trim()` is `String.prototype.trim`. `str::trim` is Rust's `White_Space`, which
+///   disagrees in both directions and so got both witnesses wrong at once: a `<ZWNBSP>` gap
+///   (JS whitespace) blocked an attachment canonical makes, and a `<NEL>` gap (not JS
+///   whitespace) allowed one canonical does not.
+/// - ⚠️ **It is the Text node's DECODED `data`, not the source bytes.** `<!-- c -->&nbsp;`
+///   is one whitespace character to Svelte and six content characters to a raw scan, so an
+///   entity-spelled gap lost the attachment. `Text::data` is the same decode the wire emits.
+///
+/// ⚠️ **The contiguity check is the one deliberate difference from Svelte, and it is load
+/// bearing.** A lifted `<script>` / `<style>` is never appended to the fragment, so Svelte's
+/// walk crosses one as if it were not there and attaches the same comment to *every* root that
+/// follows it. tsv attaches it once, to the nearest — the cataloged anti-duplication stance
+/// (docs/conformance_svelte.md §Comment Attachment Differences). A lifted tag is exactly a
+/// **hole between two fragment nodes**, so requiring each step to end where the next begins
+/// expresses the stance without a second concept: with no lifted tag in the gap the nodes are
+/// contiguous and this is Svelte's loop unchanged. Pinned in both directions by
+/// tests/svelte_preceding_comment.rs, whose controls fail if a future rewrite reproduces the
+/// walk faithfully and reopens the duplication.
+fn preceding_comment<'a>(
+    root: &'a internal::Root<'_>,
+    tag_start: u32,
+    source: &str,
+) -> Option<&'a internal::HtmlComment> {
+    let mut expected_end = tag_start;
+    for node in root.fragment.nodes.iter().rev() {
+        let span = node.span();
+        // Nodes after the tag did not exist when Svelte's walk ran (it runs mid-parse, off
+        // the fragment built so far), so they are skipped rather than allowed to stop it.
+        if span.start >= tag_start {
+            continue;
+        }
+        if span.end != expected_end {
+            break;
+        }
+        match node {
+            internal::FragmentNode::Comment(comment) => return Some(comment),
+            internal::FragmentNode::Text(text)
+                if text.data(source).trim_matches(is_svelte_ws).is_empty() =>
+            {
+                expected_end = span.start;
+            }
+            _ => break,
+        }
+    }
+    None
+}
+
 /// Emit the `Root` node. Field order:
 /// `css, js, start, end, type, fragment, options, comments, [instance], [module]`.
 fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
     let source = ctx.source;
 
-    // Helper: HTML comment immediately preceding a tag (whitespace-only between).
-    let find_preceding_comment = |tag_start: u32| -> Option<&internal::HtmlComment> {
-        root.fragment.nodes.iter().find_map(|node| {
-            if let internal::FragmentNode::Comment(comment) = node
-                && comment.span.end <= tag_start
-            {
-                let between = &source[comment.span.end as usize..tag_start as usize];
-                if between.trim().is_empty() {
-                    return Some(comment);
-                }
-            }
-            None
-        })
-    };
+    let find_preceding_comment = |tag_start: u32| preceding_comment(root, tag_start, source);
 
     w.raw("{\"css\":");
     write_or_null(w, root.css.as_ref(), |w, style| {

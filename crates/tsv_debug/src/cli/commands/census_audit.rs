@@ -420,9 +420,9 @@ mod tests {
         assert_eq!(
             rendered,
             vec![
-                ("a".to_string(), "MISSING", 2, 1),
-                ("b".to_string(), "MISSING", 1, 0),
-                ("c".to_string(), "EXTRA", 0, 1),
+                (" a".to_string(), "MISSING", 2, 1),
+                (" b".to_string(), "MISSING", 1, 0),
+                (" c".to_string(), "EXTRA", 0, 1),
             ]
         );
         assert!(diff_censuses(&input, &input).is_empty());
