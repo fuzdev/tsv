@@ -297,9 +297,10 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   `tests/fixtures` — two groups, neither of them a line-*class* question despite the family
   that surfaced them:
   - a `{@debug}` identifier's `loc` line and column under a **lone `<CR>`** (54 / 51 files);
-  - the selector-span residue this audit's own CSS finding left behind — a descendant
-    combinator's `end` and the compound break, enumerated and pinned in
-    [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs) (52 / 38 files).
+  - the An+B residue the CSS finding left behind — `REGEX_NTH_OF` is a JS regex and tsv's
+    An+B scanner is ASCII, so a `<LS>`/`<PS>` in an `:nth-*()` argument diverges; enumerated
+    and pinned in [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs)
+    (4 files, down from 52 / 38 / 20).
 
   The **attribute** finding this list used to lead with is closed, and it was never a
   terminator question — the unquoted-attribute-value terminator spelled Svelte's `\s` as a raw
@@ -312,11 +313,19 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   409 files / 194 signature groups to 277 / 175 (19 groups closed, **0 new**) and its
   tsv-side over-rejections from 196 to 158.
 
-  The boundary-whitespace **class** finding this list led with before that is also closed: the CSS
-  parser now steps the whole `allow_whitespace()` run (`CssParser::skip_boundary_whitespace`,
-  called at every `allow_comment_or_whitespace` juncture — the stylesheet body, a style
-  rule's block and an at-rule's, plus the selector-internal ones), and the printer puts the
-  non-ASCII members back. See [conformance_svelte.md §Boundary whitespace](./conformance_svelte.md).
+  The boundary-whitespace **class** finding this list led with before that is also closed, and
+  so is the selector-span residue that followed it: the CSS parser steps the whole
+  `allow_whitespace()` run (`CssParser::skip_boundary_whitespace`, and its
+  comment-looping twin `skip_boundary_whitespace_registering_comments`) at every juncture
+  `parseCss` has one — the stylesheet body, a style rule's block and an at-rule's, the
+  selector-internal ones, the compound break, a pseudo-argument list's start and its `)`, and
+  the attribute selector's interior — and the printer puts the non-ASCII members back at every
+  selector juncture, at every rebuilt block-child head, and at a block's tail
+  (`preserved_boundary_ws` / `boundary_ws_in_gap`, which partition each gap between them).
+  Two printer positions still drop the run — the stylesheet's trailing whitespace and a
+  comment-bearing property→colon gap — ratcheted in
+  [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs). See
+  [conformance_svelte.md §Boundary whitespace](./conformance_svelte.md).
 
 ## Blank-Line Injection Audit (`blanks:audit`)
 

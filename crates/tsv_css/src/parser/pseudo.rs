@@ -249,7 +249,7 @@ fn finish_selector_list_args<'arena>(
     args_start: usize,
     selectors: SelectorList<'arena>,
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
-    parser.skip_whitespace_registering_comments()?;
+    parser.skip_boundary_whitespace_registering_comments()?;
     let end = parser.expect_and_capture(TokenKind::RightParen)?;
     Ok((
         Some(PseudoClassArgs::SelectorList {
@@ -272,7 +272,7 @@ fn parse_part_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
-    parser.skip_whitespace_registering_comments()?;
+    parser.skip_boundary_whitespace_registering_comments()?;
 
     let mut idents = parser.bvec();
     // Per-ident spans, parallel to `idents`, so the printer can find comments in
@@ -294,7 +294,7 @@ fn parse_part_args<'arena>(
         });
         parser.advance()?;
 
-        parser.skip_whitespace_registering_comments()?;
+        parser.skip_boundary_whitespace_registering_comments()?;
     }
 
     if idents.is_empty() {
@@ -341,7 +341,7 @@ fn parse_selector_list_args<'arena>(
     grammar: SelectorListGrammar,
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
     // Register a leading comment (`:is(/* c */ .a)`) so the printer interleaves it.
-    parser.skip_whitespace_registering_comments()?;
+    parser.skip_boundary_whitespace_registering_comments()?;
 
     let selector_list = match grammar {
         SelectorListGrammar::Relative => parse_relative_selector_list(parser)?,
@@ -375,7 +375,7 @@ fn parse_nth_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
-    parser.skip_whitespace_registering_comments()?;
+    parser.skip_boundary_whitespace_registering_comments()?;
     let anb_start = parser.current_start;
 
     // Not a clean `<an+b> [of S]?`: parse as an ordinary complex-selector-list (like
@@ -430,7 +430,7 @@ fn parse_nth_args<'arena>(
     // a bare `<number>`/`<an+b>` term in `S` (`2n of 123`) reads as an `Nth` simple
     // selector rather than an unexpected `<number>`/`<dimension>` token.
     let of_selector = if found_of {
-        parser.skip_whitespace_registering_comments()?;
+        parser.skip_boundary_whitespace_registering_comments()?;
         Some(with_pseudo_args(parser, |p| {
             parse_complex_selector_list(p)
         })?)
@@ -438,7 +438,7 @@ fn parse_nth_args<'arena>(
         None
     };
 
-    parser.skip_whitespace_registering_comments()?;
+    parser.skip_boundary_whitespace_registering_comments()?;
     // The internal span extends to `)` so the printer's `comments_to_emit_in_range` lookup
     // still finds a trailing gap comment (`:nth-child(2n /* c */)`). The wire `end`
     // is trimmed to the last content token at convert time (`write_pseudo_class_args`),
@@ -472,7 +472,7 @@ fn parse_unknown_args<'arena>(
     // Register leading/trailing gap comments (`:current(/* c */ .a)`); the
     // built `SelectorList` args share `:is()`'s printer arm, which already
     // interleaves them, so this path is parser-only.
-    parser.skip_whitespace_registering_comments()?;
+    parser.skip_boundary_whitespace_registering_comments()?;
 
     // Try to parse as a selector list (complex selectors, strict parsing)
     match parse_complex_selector_list(parser) {

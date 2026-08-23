@@ -128,6 +128,14 @@ impl<'a> ConditionKind<'a> {
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
     pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule<'_>) {
+        // A block child's own `allow_comment_or_whitespace` juncture: the run before the `@`
+        // was skipped by the parser and this head is rebuilt from parts, so nothing else can
+        // carry it. A rule child gets the same claim from its selector's first compound
+        // (`preserved_boundary_ws`) — this is the at-rule spelling of it, and the reason
+        // `<NBSP>div {}` and `<NBSP>@media {}` no longer disagree. Unfloored on purpose: a
+        // backward scan stops at the first non-whitespace byte, so the enclosing `{` / `}` /
+        // `;` / `>` bounds it without the caller passing one.
+        self.write_head_boundary_ws(atrule.span.start);
         self.write("@");
         // At-rule names are ASCII case-insensitive; lowercase for output (`@MEDIA`
         // → `@media`), matching prettier. Emit from the name's *source* span, not the
@@ -341,6 +349,7 @@ impl<'a> Printer<'a> {
             // newline here, and the closing `}` is written at the outer indent.
             // Prettier renders an empty at-rule block as `{\n}` (no blank line inside).
             self.write_indent();
+            self.write_block_tail_boundary_ws(block.children, block.span);
             self.write("}");
         } else {
             self.write(";");
@@ -626,15 +635,44 @@ impl<'a> Printer<'a> {
             d.concat(&segments)
         };
 
-        // The leading comments before the first part (after the optional name).
+        // The leading comments before the first part (after the optional name) — and the
+        // boundary run of that same gap, which is the ONE gap of a condition prelude the
+        // printer regenerates rather than carrying inside a part's own text
+        // (`@supports <NBSP>(a: b)`, `@container name <NBSP>(…)`). Flush against the part,
+        // after the comments, like every other claim; see `printer/boundary_ws.rs`.
         let leading_first = |part: &internal::ConditionPart<'_>| -> DocId {
             let leading = name_end_pos
                 .map(|start| self.comment_blocks_in_range(start, part.span.start))
                 .unwrap_or_default();
-            if leading.is_empty() {
+            // The run reaches PAST the part's own span start: a condition part opens on
+            // whatever token the lexer produced, and a boundary run at the head of the
+            // prelude IS that token (`@supports <NBSP>(a: b)` opens the part on the run, not
+            // on the `(`). So the sweep runs from the name's end to the part's first real
+            // byte, which `skip_gap_trivia` finds with the boundary class the parser skipped
+            // by — one range covering both the gap before the part and the trivia inside it.
+            let kept = name_end_pos
+                .map(|start| {
+                    self.boundary_ws_in_gap(
+                        start,
+                        super::boundary_ws::skip_gap_trivia(
+                            self.source,
+                            part.span.start,
+                            part.span.end,
+                        ),
+                    )
+                })
+                .unwrap_or_default();
+            if leading.is_empty() && kept.is_empty() {
                 content_doc(part)
+            } else if leading.is_empty() {
+                d.concat(&[d.text_pooled(&kept), content_doc(part)])
             } else {
-                d.concat(&[d.text_pooled(&leading), d.text(" "), content_doc(part)])
+                d.concat(&[
+                    d.text_pooled(&leading),
+                    d.text(" "),
+                    d.text_pooled(&kept),
+                    content_doc(part),
+                ])
             }
         };
 
@@ -688,6 +726,16 @@ impl<'a> Printer<'a> {
             if !after.is_empty() {
                 chunk.push(d.text_pooled(&after));
                 chunk.push(d.text(" "));
+            }
+            // This part's own head run, exactly as `leading_first` claims the first part's —
+            // bounded at the part's span so it can never reach back over the connector, whose
+            // side of the gap rides out in the separator above.
+            let kept = self.boundary_ws_in_gap(
+                part.span.start,
+                super::boundary_ws::skip_gap_trivia(self.source, part.span.start, part.span.end),
+            );
+            if !kept.is_empty() {
+                chunk.push(d.text_pooled(&kept));
             }
             chunk.push(content_doc(part));
             fill_parts.push(d.concat(&chunk));

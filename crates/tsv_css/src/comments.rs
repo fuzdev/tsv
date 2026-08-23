@@ -156,6 +156,46 @@ pub(crate) fn class_name_start(bytes: &[u8], span_start: u32) -> u32 {
     comment_run_end(bytes, i).unwrap_or(i) as u32
 }
 
+/// Advance past a declaration's post-value TAIL — whitespace, block comments, `!important` —
+/// to its `;`/`}` terminator, returning that index (or `bytes.len()`).
+///
+/// Mirrors Svelte's `read_declaration`: `read_value` returns with the scan index AT the
+/// terminator and the declaration's `end` is taken there — so trailing whitespace and
+/// comments after the value (and after `!important`) sit inside the declaration extent.
+/// Only whitespace, comments, and the `!important` tail can occur between the parsed
+/// value's end and the terminator, so a flat byte walk is safe (no string/url content).
+///
+/// ⚠️ **That safety argument is the whole contract — do not point this at a region
+/// that can hold content.** It is blind to strings and `url()`, unlike Svelte's own
+/// `read_value`, so over an at-rule PRELUDE it stops at the first `;`/`}` inside one
+/// (`@import url("a;b.css") /* c */;`) and silently truncates. The prelude's ends come from
+/// the parser instead (`write.rs`'s `collect_prelude_comments`).
+///
+/// Its two callers are the same question from the two sides of the crate — the wire writer's
+/// declaration extent and the printer's `end_after_semicolon`, which needs the gap AFTER a
+/// declaration to start where the declaration's text really stops. That is why it lives here
+/// rather than in `ast::convert`: the printer cannot see that module (it is behind the
+/// `convert` feature, off in the format-only WASM build), and the alternative was a second
+/// spelling of a scan whose whole value is that there is one. ⚠️ The printer's INTERNAL
+/// declaration span can end before `!important` where the wire's does not, so a caller that
+/// assumes the span already reaches the `;` is right for every shape but that one — which is
+/// how a positional blank-line rule came to read `!important;` as the start of its gap and
+/// drop the author's blank line.
+pub(crate) fn scan_to_terminator(source: &str, from: usize) -> usize {
+    let bytes = source.as_bytes();
+    let mut i = from;
+    while i < bytes.len() {
+        match bytes[i] {
+            b';' | b'}' => break,
+            b'/' if is_comment_start(bytes, i) => {
+                i = comment_end(bytes, i);
+            }
+            _ => i += 1,
+        }
+    }
+    i
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -6,6 +6,8 @@
 //
 // - **mod.rs** (this file): Orchestration - core Printer, top-level node printing, and
 //   the shared block-body routine (`print_css_block_children`, used by rules + at-rules)
+// - **boundary_ws.rs**: Boundary-whitespace preservation — the printer half of the run the
+//   parser skips at every `allow_whitespace()` juncture (used by every module below)
 // - **selectors.rs**: Selector printing (reusable across rules and at-rules)
 // - **rules.rs**: CSS rule printing (selector + block structure)
 // - **declarations.rs**: Declaration printing + wrapping logic
@@ -21,6 +23,7 @@
 // 5. **Hierarchy-Following**: Module structure mirrors CSS spec (rules → declarations → values)
 
 mod atrules;
+mod boundary_ws;
 mod declarations;
 mod rules;
 mod selectors;
@@ -106,15 +109,56 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if two positions are on the same line (O(log n) binary search)
+    ///
+    /// Deliberately the shared (ECMAScript) class, unlike
+    /// [`Self::has_blank_line_between`]: this one decides whether a comment TRAILS a node,
+    /// where the wider reading is the conservative one (the comment gets its own line) and
+    /// nothing is regenerated beside it. It is also a RANGE question where prettier's
+    /// `hasNewline` is positional (`skipSpaces(" \t")`, then one terminator), and the two can
+    /// only disagree when something outside `" \t"` sits between the node and the newline —
+    /// an input prettier's own CSS parser **rejects** (`a { color: red;<NBSP>⏎ /* c */ }` →
+    /// `CssSyntaxError: Unknown word`). There is no oracle to match there, which is why this
+    /// stays a range question and the blank-line rule does not.
     #[inline]
     pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
         printing::is_same_line_fast(self.line_breaks, prev_end, curr_start)
     }
 
-    /// Check if there's a blank line (2+ newlines) between two positions (O(log n) binary search)
-    #[inline]
+    /// Is there a blank line between two positions? — O(log n) binary search over the shared
+    /// table, then confirmed against the **formatter oracle's** rule.
+    ///
+    /// ⚠️ The oracle here is prettier, not css-syntax-3. A blank line is cosmetic, so the
+    /// question is "what does the printer that owns this decision do", and prettier's answer
+    /// is `isNextLineEmpty` (`src/utilities/is-next-line-empty.js`), which is **positional and
+    /// not a count**: skip `,; \t`, take **one** terminator, skip `" \t"`, require a second.
+    /// Its terminator class is `\n` / `\r` / `\r\n` / `<LS>` / `<PS>`, and `<FF>` is in
+    /// neither that class nor the `" \t"` it skips between the two. So a form feed **ends the
+    /// search** rather than counting: `}\n<FF>\n{` is one line to prettier, where css-syntax-3
+    /// §3.3 (which folds `<FF>` to `<LF>` in input preprocessing) would call it two.
+    /// [`css_blank_line_between`] is that rule, and reading §3.3 into it instead was the whole
+    /// of tsv's disagreement with prettier over ASCII gaps — three shapes, all of them a
+    /// `<FF>` standing between two newlines.
+    ///
+    /// ⚠️ `<LS>` / `<PS>` are the one place tsv cannot follow, and the reason the class is
+    /// re-derived rather than read off the shared table. The printer **preserves** a boundary
+    /// run's non-ASCII members into its output (see `preserved_boundary_ws`) while
+    /// regenerating the line break beside them, so an authored `a {…}<LS>b {…}` — one line
+    /// break either way — comes back as `}\n<LS>b`, which a class holding `<LS>` then counts
+    /// as TWO and turns into a blank line on the *next* pass. The document formats two ways:
+    /// an F1 violation, and one no fixture can carry (no fixture holds a raw `<LS>`).
+    /// Counting them is prettier's answer and tsv declines it — a cataloged divergence, see
+    /// [conformance_prettier_css.md](../../../../docs/conformance_prettier_css.md) §CSS:
+    /// Comments and whitespace.
+    ///
+    /// Excluding `<LS>` / `<PS>` is also what makes the fast gate SOUND rather than
+    /// accidentally right: `{<LF>, <CR>, <CR><LF>}` really is a subset of the shared table's
+    /// ECMAScript class, so no terminator pair here can hide from it, and the byte scan runs
+    /// only where the table already found two. `is_same_line` deliberately keeps the shared
+    /// class: it decides whether a comment TRAILS a node, where the wider reading is the
+    /// conservative one (its own line) and nothing is regenerated beside it.
     pub(crate) fn has_blank_line_between(&self, prev_end: u32, curr_start: u32) -> bool {
         printing::has_blank_line_between_fast(self.line_breaks, prev_end, curr_start)
+            && css_blank_line_between(self.source, prev_end, curr_start)
     }
 
     /// Check if a declaration has value comments (comments inside the value, not property name)
@@ -559,6 +603,7 @@ impl<'a> Printer<'a> {
             if starts_line {
                 self.write_indent();
             }
+            self.write_head_boundary_ws(comment.span.start);
             self.print_css_comment(comment);
             last_end = comment.span.end;
             *comment_idx += 1;
@@ -596,6 +641,7 @@ impl<'a> Printer<'a> {
             }
 
             self.write(" ");
+            self.write_head_boundary_ws(comment.span.start);
             self.print_css_comment(comment);
             last_end = comment.span.end;
             *comment_idx += 1;
@@ -640,6 +686,7 @@ impl<'a> Printer<'a> {
 
             // Leading indent for this top-level trailing comment (no-op standalone).
             self.write_indent();
+            self.write_head_boundary_ws(comment.span.start);
             self.print_css_comment(comment);
             last_end = comment.span.end;
             *comment_idx += 1;
@@ -775,6 +822,7 @@ impl<'a> Printer<'a> {
             && self.is_same_line(last_end, next_comment.span.start)
         {
             self.write(" ");
+            self.write_head_boundary_ws(next_comment.span.start);
             self.print_css_comment(next_comment);
             last_end = next_comment.span.end;
             consumed += 1;
@@ -878,6 +926,7 @@ impl<'a> Printer<'a> {
                         format_ignore_next = true;
                     }
                     self.write_indent();
+                    self.write_head_boundary_ws(comment.span.start);
                     self.print_css_comment(comment);
                     self.write("\n");
                 }
@@ -907,21 +956,28 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Find the position after the `;` following a declaration's span end.
+    /// Where a declaration's text really ends: one past its `;`, or its span end when there
+    /// is none (a block's last child, terminated by the `}`).
     ///
-    /// Declaration spans don't include the trailing `;`. In unformatted source,
-    /// the `;` may be on a separate line, adding extra newlines to the gap.
-    /// This scans forward past whitespace to find and skip the `;`.
+    /// A declaration's internal span stops at its parsed VALUE, so the `;` is outside it —
+    /// and so is everything Svelte's `read_declaration` counts as the declaration's tail:
+    /// whitespace, block comments, and `!important`. The gap this end opens is the one
+    /// [`Self::has_blank_line_between`] reads, and that reader is positional, so a tail left
+    /// inside the gap is not skipped over but *answered on* — `color: red !important;` handed
+    /// it a gap beginning ` !important;` and lost the author's blank line, on real code.
+    ///
+    /// ⚠️ Hence [`crate::comments::scan_to_terminator`] rather than a whitespace loop: it is
+    /// the one definition of that tail, shared with the wire writer's declaration extent. Its
+    /// contract is exactly this region — see the ⚠️ there before pointing it anywhere else.
+    /// Only a `;` is stepped past; a `}` terminator belongs to the enclosing block, not to
+    /// this child.
     fn end_after_semicolon(&self, span_end: u32) -> u32 {
-        let start = span_end as usize;
-        for (i, &b) in self.source.as_bytes().iter().enumerate().skip(start) {
-            match b {
-                b';' => return (i + 1) as u32,
-                b' ' | b'\t' | b'\n' | b'\r' => continue,
-                _ => break,
-            }
+        let at = crate::comments::scan_to_terminator(self.source, span_end as usize);
+        if self.source.as_bytes().get(at) == Some(&b';') {
+            (at + 1) as u32
+        } else {
+            span_end
         }
-        span_end
     }
 
     /// Check if there's a blank line before a block child, accounting for the
@@ -942,6 +998,67 @@ impl<'a> Printer<'a> {
             prev_end
         };
         self.has_blank_line_between(effective_end, curr_start)
+    }
+}
+
+/// Does `[from, to)` open a blank line? — prettier's `isNextLineEmpty`, in bytes.
+///
+/// The confirming half of [`Printer::has_blank_line_between`], and a transcription rather than
+/// a re-derivation: prettier's `src/utilities/is-next-line-empty.js` skips `,; \t`
+/// (`skipToLineEnd`, which subsumes its `skipSpaces` loop once comments are out of the
+/// picture), takes **one** terminator (`skipNewline`), then asks `hasNewline` — `skipSpaces`
+/// over `" \t"` and one more terminator. Two things fall out of the shape that a count gets
+/// wrong, and both were live:
+///
+/// - a character in **neither** set ENDS the search rather than being stepped over, so a
+///   `<FF>` between two newlines is not a blank line (`}\n<FF>\n{`), and neither is one
+///   *before* them (`}<FF>\n\n{`);
+/// - the two terminators must be the FIRST two things the walk meets, so a count over the
+///   whole gap can answer `true` where the walk stops early.
+///
+/// ⚠️ The terminator class here is prettier's **minus `<LS>` / `<PS>`** — see
+/// [`Printer::has_blank_line_between`] for why counting those would fabricate a blank line on
+/// the next pass. `<CR>` cannot actually reach this scan (every parse-then-format entry folds
+/// it first, `tsv_lang::printing::normalize_carriage_returns`); it is spelled anyway so the
+/// class reads as the oracle's, with one documented exclusion rather than two undocumented
+/// ones. Byte-wise on purpose: every member is a single ASCII byte, so no UTF-8 decode is
+/// needed and a multi-byte `<LS>` cannot be mistaken for one.
+///
+/// Comments never reach here either — prettier's walk skips them because a node's own span can
+/// be followed by a trailing `//`-style comment, where CSS makes every comment a child of its
+/// own, so the gap between two children is whitespace and separators alone.
+fn css_blank_line_between(source: &str, from: u32, to: u32) -> bool {
+    let Some(gap) = source
+        .as_bytes()
+        .get(from as usize..(to as usize).min(source.len()))
+    else {
+        return false;
+    };
+    // `skipToLineEnd` — the separators a child's own span can leave behind (a declaration's
+    // `;`, a selector list's `,`) plus the spaces prettier's loop folds into the same step.
+    let mut i = 0;
+    while matches!(gap.get(i), Some(b',' | b';' | b' ' | b'\t')) {
+        i += 1;
+    }
+    let Some(first) = css_terminator_len(gap, i) else {
+        return false;
+    };
+    i += first;
+    // `hasNewline`'s own `skipSpaces` — `" \t"` ONLY, which is what makes a `<FF>` here an
+    // answer rather than a step.
+    while matches!(gap.get(i), Some(b' ' | b'\t')) {
+        i += 1;
+    }
+    css_terminator_len(gap, i).is_some()
+}
+
+/// The length of the line terminator at `gap[i]`, or `None` — prettier's `skipNewline` over
+/// the class [`css_blank_line_between`] documents, with `<CR><LF>` taken as one.
+fn css_terminator_len(gap: &[u8], i: usize) -> Option<usize> {
+    match gap.get(i)? {
+        b'\n' => Some(1),
+        b'\r' => Some(if gap.get(i + 1) == Some(&b'\n') { 2 } else { 1 }),
+        _ => None,
     }
 }
 

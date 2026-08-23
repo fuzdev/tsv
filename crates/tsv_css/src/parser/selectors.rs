@@ -17,10 +17,15 @@ use tsv_lang::{ParseError, Span};
 /// old raw-source selector seam. Not needed by `parse_forgiving_selector_list`, whose
 /// terminator is `)` (not `{`); it registers comments unconditionally before its comma check.
 fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), ParseError> {
+    // Both halves are boundary-aware, and for the same reason: `read_selector_list` reaches
+    // its `,` through one `allow_comment_or_whitespace`, so a `<NBSP>` between the comment
+    // and the comma is trivia. A plain lookahead saw an identifier there and declined, and a
+    // plain skip then left the run standing where the `,` was due — `a /* c */<NBSP>, b`
+    // rejected on input canonical accepts.
     if matches!(&parser.current_kind, TokenKind::Comment)
-        && parser.peek_past_whitespace()? == TokenKind::Comma
+        && parser.peek_past_boundary_whitespace()? == TokenKind::Comma
     {
-        parser.skip_whitespace_registering_comments()?;
+        parser.skip_boundary_whitespace_registering_comments()?;
     }
     Ok(())
 }
@@ -41,6 +46,14 @@ fn parse_selector_list_with<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     parse_item: fn(&mut CssParser<'_, 'arena>) -> Result<ComplexSelector<'arena>, ParseError>,
 ) -> Result<SelectorList<'arena>, ParseError> {
+    // `read_selector_list` opens with `allow_comment_or_whitespace` and takes its `start`
+    // only after it, so the list opens on the NAME. `parse_complex_selector` skips the same
+    // run a moment later, which is why every name already agrees — but the list's own
+    // `start` is captured HERE, and a run still standing at this point moves it (and, inside
+    // a pseudo-class argument, the `args.start` the wire reads off it). At the stylesheet
+    // level the run is long gone (`skip_html_comment_markers` ran in the body loop); in a
+    // pseudo-class argument nothing has stepped it yet, so this skip is load-bearing.
+    parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start());
     let mut selectors = parser.bvec();
 
@@ -61,7 +74,10 @@ fn parse_selector_list_with<'arena>(
             break;
         }
         parser.advance()?; // consume comma
-        parser.skip_whitespace_registering_comments()?; // register after-comma comments
+        // `read_selector_list`'s post-`,` `allow_comment_or_whitespace`; boundary-aware so a
+        // run behind a registered comment is stepped too (the `skip_html_comment_markers`
+        // below steps only one that leads).
+        parser.skip_boundary_whitespace_registering_comments()?;
         parser.skip_html_comment_markers()?;
         let sel = parse_item(parser)?;
         end = sel.span.end;
@@ -120,6 +136,10 @@ pub(crate) fn parse_complex_selector_list<'arena>(
 pub(crate) fn parse_forgiving_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
+    // The list's own `start`, past the boundary run — see `parse_selector_list_with`, whose
+    // capture this mirrors. `:is()`/`:where()` reach here straight from the `(`, so this is
+    // the only skip standing between the run and the `args.start` the wire emits.
+    parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start());
     let mut selectors = parser.bvec();
 
@@ -145,11 +165,14 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
 
         // Check for comma (more selectors) or end of list. Register comments so the
         // printer can interleave them (forgiving lists carry leading/comma/trailing
-        // comments inside `:is()`/`:where()`).
-        parser.skip_whitespace_registering_comments()?;
+        // comments inside `:is()`/`:where()`). Both gaps are one
+        // `allow_comment_or_whitespace` to `read_selector_list`, so both step the boundary
+        // run behind whatever comments they register — a run left standing before the `,`
+        // ended the list early and DROPPED every selector after it.
+        parser.skip_boundary_whitespace_registering_comments()?;
         if parser.check(TokenKind::Comma) {
             parser.advance()?; // consume comma
-            parser.skip_whitespace_registering_comments()?;
+            parser.skip_boundary_whitespace_registering_comments()?;
         } else {
             // End of list (hit right paren or other terminator)
             break;
@@ -437,7 +460,12 @@ pub(crate) fn parse_combinator(
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
     // Capture position before skipping whitespace for descendant combinator
     let whitespace_start = parser.span_pos(parser.current_start());
-    parser.skip_whitespace()?;
+    // `read_combinator` opens with `allow_whitespace()`, so the gap is the whole boundary
+    // run: this is the step the compound break above hands off to. Skipping only the
+    // whitespace TOKENS left `combinator_start` sitting on a run the lexer had read as an
+    // identifier, so no descendant was recognized at all (`&<NBSP>b` stayed one compound)
+    // and, where one was, its `end` stopped short of the name (`a <NBSP>b`).
+    parser.skip_boundary_whitespace()?;
 
     // A comment in the combinator gap is inter-token trivia — no token, not even
     // whitespace (css-syntax-3): register
@@ -448,7 +476,11 @@ pub(crate) fn parse_combinator(
     let had_gap_comment =
         matches!(&parser.current_kind, TokenKind::Comment) && comment_continues_selector(parser)?;
     if had_gap_comment {
-        parser.skip_whitespace_registering_comments()?;
+        // Boundary-aware, to agree with the lookahead that just predicted it: the run behind
+        // the comment is part of the same `allow_comment_or_whitespace`, and `combinator_start`
+        // is captured right below — it is both the descendant combinator's `end` and the next
+        // compound's start.
+        parser.skip_boundary_whitespace_registering_comments()?;
     }
 
     let combinator_start = parser.span_pos(parser.current_start());
@@ -488,15 +520,16 @@ pub(crate) fn parse_combinator(
     Ok(result)
 }
 
-/// Skip whitespace after a just-consumed explicit combinator symbol, registering any
+/// Skip the trivia after a just-consumed explicit combinator symbol, registering any
 /// gap comment that follows it (`div > /* c */ p`, `:has(> /* c */ img)`) so the
-/// printer can re-emit it. The leading `skip_whitespace` also covers the no-comment
-/// case. Shared by `parse_combinator` and `parse_explicit_combinator`.
+/// printer can re-emit it. Shared by `parse_combinator` and `parse_explicit_combinator`.
 fn skip_combinator_gap(parser: &mut CssParser<'_, '_>) -> Result<(), ParseError> {
-    parser.skip_whitespace()?;
-    if matches!(&parser.current_kind, TokenKind::Comment) {
-        parser.skip_whitespace_registering_comments()?;
-    }
+    // The boundary loop, because this is `read_combinator`'s second `allow_whitespace()` and
+    // `parseCss` reaches the comment through the same `allow_comment_or_whitespace` as every
+    // other juncture: a plain skip leaves a run standing where the comment is due, the comment
+    // arm never fires, and `a > <NBSP>/* c */ b` is REJECTED on input canonical accepts. One
+    // call does both halves and loops, so a run on either side of the comment is stepped.
+    parser.skip_boundary_whitespace_registering_comments()?;
     Ok(())
 }
 
@@ -544,9 +577,14 @@ fn pseudo_arg_terminal_nth(parser: &CssParser<'_, '_>) -> bool {
 /// complex selector continues (`div /* c */ p`, `i /* c */ > em`) — or a trailing
 /// comment before `{`/`,`/`)` that the caller captures (a rule's pre-brace comment, or
 /// a pseudo-arg list's trailing comment). Assumes the current token is a `Comment`; the
-/// lookahead is non-destructive (`peek_past_whitespace` skips comments + whitespace).
+/// lookahead is non-destructive.
+///
+/// The lookahead is the **boundary** one, because the skip it predicts is: the gap is one
+/// `allow_comment_or_whitespace` to `parseCss`, so a `<NBSP>` behind the comment is trivia
+/// and not the identifier the lexer read. Asking `peek_past_whitespace` here saw a selector
+/// start in the run itself and called `a /* c */<NBSP>{` a descendant combinator.
 fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
-    let after = parser.peek_past_whitespace()?;
+    let after = parser.peek_past_boundary_whitespace()?;
     Ok(is_selector_start_kind(after) || is_explicit_combinator_kind(after))
 }
 
@@ -559,15 +597,28 @@ fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseE
 /// after it, ends the compound (the combinator loop then reads the gap). This is
 /// the multi-comment generalization of a single `peek_kind` — one lookahead can't
 /// see past a *second* glued comment. Non-destructive.
+///
+/// ⚠️ "Whitespace" here is the **boundary** class, not the `Whitespace` token alone: an
+/// identifier whose head is a JS-`\s` run is a run `parseCss` would have skipped before the
+/// token started, so it ends the compound exactly as a space does. Reading it as a glued
+/// selector start instead kept `.a/* c */<NBSP>{` in the compound and minted a second simple
+/// selector out of the run itself. The sibling reading of the same question is
+/// `comment_continues_selector`, and the two have to agree.
 fn compound_continues_across_comments(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
-    let mut lexer = Lexer::at_offset(
-        &parser.source()[parser.current_end..],
-        parser.base_offset() + parser.current_end,
-    );
+    let remaining = &parser.source()[parser.current_end..];
+    let mut lexer = Lexer::at_offset(remaining, parser.base_offset() + parser.current_end);
     loop {
-        match lexer.next_token()?.kind {
+        let token = lexer.next_token()?;
+        match token.kind {
             TokenKind::Comment => continue,
             TokenKind::Whitespace => return Ok(false),
+            TokenKind::Identifier
+                if crate::whitespace::boundary_prefix_len(
+                    &remaining[token.start as usize..token.end as usize],
+                ) > 0 =>
+            {
+                return Ok(false);
+            }
             kind => return Ok(is_selector_start_kind(kind)),
         }
     }
@@ -611,14 +662,20 @@ fn parse_relative_selector<'arena>(
             break;
         }
 
-        // ⚠️ A boundary whitespace run at the head of the next token IS whitespace to
-        // `parseCss`, so `&<NBSP>b` should end the compound here and read as a descendant.
-        // tsv keeps it in the compound instead — a tracked gap, and NOT a missing
-        // `parser.boundary_run_len() > 0` break: breaking here makes the caller expect a
-        // `{` where the selector continues, turning `&<NBSP>b` and `*<NBSP>b` into parse
-        // errors. The compound break and the combinator that must replace it have to land
-        // together. Pinned in `tests/css_boundary_whitespace.rs`.
-        //
+        // A boundary whitespace run at the head of the next token IS whitespace to
+        // `parseCss` — `read_selector` runs `allow_comment_or_whitespace` after every simple
+        // selector — so it ends the compound however the lexer read it. The break is only
+        // half the rule and was long held back for the other half: on its own it makes the
+        // caller expect a `{` where the selector continues, turning `&<NBSP>b` and `*<NBSP>b`
+        // into parse errors. `parse_combinator` supplies the other half — it steps the same
+        // run and reports the descendant combinator that replaces the break — so the two
+        // must stay together. The run reaches here after every simple selector that is not
+        // itself an identifier (`&`, `*`, a `)`, a `]`, a `%`); an identifier's own trailing
+        // run was swallowed by `read_identifier` on both sides and never gets this far.
+        if parser.boundary_run_len() > 0 {
+            break;
+        }
+
         // Check if another simple selector follows (no whitespace, no combinator)
         if !is_simple_selector_chain(parser) {
             break;

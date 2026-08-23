@@ -43,11 +43,8 @@ mod strings;
 pub mod token;
 
 use comments::read_comment;
-pub(crate) use identifiers::IDENT_CONTINUE_LUT;
-use identifiers::{
-    is_ascii_identifier_start, is_identifier_start, is_non_ascii_identifier_codepoint,
-    read_identifier,
-};
+pub(crate) use identifiers::{IDENT_CONTINUE_LUT, is_non_ascii_identifier_codepoint};
+use identifiers::{is_ascii_identifier_start, is_identifier_start, read_identifier};
 use numbers::read_number;
 use strings::read_string;
 pub(crate) use strings::string_end;
@@ -231,12 +228,20 @@ impl<'a> Lexer<'a> {
     ///
     /// It exists because the two readings of a code point ≥ U+00A0 disagree and only position
     /// resolves them: inside a value or glued to a name it is identifier content, which is
-    /// what the dispatch above assumes, and at a boundary it is a separator. Routed through
-    /// the same `read_identifier` the ordinary dispatch uses, so the re-read is
-    /// byte-identical to what the dispatch would have produced from that offset.
+    /// what the dispatch above assumes, and at a boundary it is a separator.
+    ///
+    /// ⚠️ Routed through the **whole dispatch**, not through `read_identifier` alone. The run
+    /// was consumed as the head of an identifier, but what follows it need not be one: a
+    /// `<NBSP>` glues to a digit as readily as to a letter, so `{<NBSP>0%` lexes as one
+    /// identifier and the byte past the run opens a `<percentage-token>`. Re-reading that as
+    /// an identifier yields a token the ordinary dispatch would never have produced —
+    /// `parseCss` reaches the same byte through `allow_whitespace()` and then takes its
+    /// `REGEX_PERCENTAGE` arm — and the keyframe stop became a parse error. The remainder
+    /// can never be whitespace or a comment (the identifier lexer would not have consumed
+    /// one), so the extra arms only add the readings this position really has.
     pub(crate) fn token_at(&mut self, at: usize) -> Result<Token, ParseError> {
         self.seek(at);
-        self.read_identifier().map_err(|err| self.host_err(err))
+        self.next_token()
     }
 
     /// Lex an identifier, stashing any decoded escape value out-of-band in the

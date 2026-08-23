@@ -22,10 +22,11 @@ pub(crate) fn parse_attribute_selector<'arena>(
     start: usize,
 ) -> Result<SimpleSelector<'arena>, ParseError> {
     parser.expect(TokenKind::LeftBracket)?;
-    parser.skip_whitespace_registering_comments()?;
     // `[` is its own `allow_whitespace()` juncture (`read_selector`'s attribute arm skips
-    // before the name), so the run belongs to neither the bracket nor the name.
-    parser.skip_boundary_whitespace()?;
+    // before the name), so the run belongs to neither the bracket nor the name. Looped with
+    // the comment arm, since a run may sit on either side of a comment tsv admits here and
+    // `parseCss` does not.
+    parser.skip_boundary_whitespace_registering_comments()?;
 
     // Parse namespace prefix (optional):
     // - [ns|attr] - namespace prefix "ns"
@@ -66,8 +67,12 @@ pub(crate) fn parse_attribute_selector<'arena>(
             end: parser.span_pos(parser.current_end),
         };
         parser.advance()?;
-        // Whitespace here is legal only under the `|=` reading — see the ⚠️ above.
-        let space_before_pipe = parser.skip_whitespace_registering_comments()?;
+        // Whitespace here is legal only under the `|=` reading — see the ⚠️ above. The
+        // boundary skip, because `read_selector`'s `allow_whitespace()` after the name is one
+        // run however its members are spelled: a run GLUED to the name was swallowed by
+        // `read_identifier` on both sides and never reaches here, but `[a <NBSP>]` puts it in
+        // a token of its own, where the plain skip left it standing and it read as a matcher.
+        let space_before_pipe = parser.skip_boundary_whitespace_registering_comments()?;
 
         // Check if this is a namespace prefix (identifier|identifier)
         // vs dash-match operator (identifier|=value)
@@ -90,7 +95,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
                 // and return early. The identifier before `|=` is the attribute name —
                 // use its captured span (the namespace reading was a false start).
                 parser.advance()?; // consume =
-                parser.skip_whitespace_registering_comments()?;
+                // `read_selector`'s `allow_whitespace()` before `read_attribute_value`.
+                parser.skip_boundary_whitespace_registering_comments()?;
 
                 // Parse value (identifier or string)
                 let value_span = parse_attribute_value(parser)?;
@@ -160,7 +166,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
         end: parser.span_pos(parser.current_end),
     };
     parser.advance()?;
-    parser.skip_whitespace_registering_comments()?;
+    // `read_selector`'s `allow_whitespace()` after the name — see the no-namespace twin above.
+    parser.skip_boundary_whitespace_registering_comments()?;
 
     let (matcher, value_span) = parse_attribute_matcher_and_value(parser)?;
     let flags = parse_attribute_flags(parser)?;
@@ -191,7 +198,10 @@ fn parse_attribute_matcher_and_value(
         Ok((None, None)) // Just [attr]
     } else {
         let matcher = parse_attribute_matcher(parser)?;
-        parser.skip_whitespace_registering_comments()?;
+        // `read_selector`'s `allow_whitespace()` between `<attr-matcher>` and value — and a
+        // boundary one, since a run here would otherwise open the value token and ride into
+        // `value` (`[a=<NBSP>b]` → `"\u{a0}b"`, where `read_attribute_value` trims it off).
+        parser.skip_boundary_whitespace_registering_comments()?;
         let value = parse_attribute_value(parser)?;
         Ok((Some(matcher), value))
     }
@@ -210,7 +220,9 @@ fn parse_attribute_flags<'arena>(
         let flag = parser.alloc_str_in(parser.current_value());
         if flag.eq_ignore_ascii_case("i") || flag.eq_ignore_ascii_case("s") {
             parser.advance()?;
-            parser.skip_whitespace_registering_comments()?;
+            // `read_selector`'s `allow_whitespace()` between the flags and `]`; a run left
+            // standing here is where the `]` is due, so `[a=b i<NBSP>]` REJECTED.
+            parser.skip_boundary_whitespace_registering_comments()?;
             Ok(Some(flag)) // Preserve original case
         } else {
             Ok(None)
@@ -235,7 +247,11 @@ fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>,
         }
     };
     parser.advance()?;
-    parser.skip_whitespace_registering_comments()?;
+    // `read_selector`'s `allow_whitespace()` between the value and the flags — the run is a
+    // separator on both sides of `parseCss` (`read_attribute_value` also stops on it, since
+    // its `REGEX_CLOSING_BRACKET` is JS `\s`), so `[a='b'<NBSP>]` and `[a='b'<NBSP>i]`
+    // REJECTED on input canonical accepts.
+    parser.skip_boundary_whitespace_registering_comments()?;
     Ok(Some(span))
 }
 

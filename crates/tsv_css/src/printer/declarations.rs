@@ -342,6 +342,14 @@ impl<'a> Printer<'a> {
     pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write_indent();
 
+        // The block-child juncture's boundary run (`a {<NBSP>color: red }`,
+        // `color: red;<NBSP>top: 0`), which the parser skipped and this rebuilt head would
+        // otherwise drop — the declaration spelling of the claim a rule child gets from its
+        // selector and an at-rule from its `@`. Flush against the property, past the indent
+        // this printer regenerates; the backward scan settles on the first non-whitespace
+        // byte, which is the `{` or the previous declaration's `;`.
+        self.write_head_boundary_ws(decl.span.start);
+
         // Extract property name from source to preserve escape sequences, then
         // lowercase it (property names are ASCII case-insensitive; prettier
         // lowercases — custom properties and escaped/comment-bearing names are
@@ -355,6 +363,21 @@ impl<'a> Printer<'a> {
             ),
         );
         self.write(&property_normalized);
+
+        // The property→colon gap's own run (`color<NBSP>: red`). Not an
+        // `allow_whitespace()` juncture — `parseCss` reads the property raw and `.trim()`s
+        // it, and JS's trim takes every one of these code points, so both parsers agree the
+        // name is `color` — but the byte is still the author's, and this head is rebuilt from
+        // the trimmed name. Floored inside the declaration so the scan cannot leave it, and
+        // ASCII-trimmed like the combinator's: the separator that follows is regenerated, so
+        // keeping the author's space before the colon would print one this formatter never
+        // writes.
+        let kept = self
+            .preserved_boundary_ws(decl.span.start, decl.span.start + decl.colon_pos() as u32)
+            .trim_end_matches(|c: char| c.is_ascii_whitespace());
+        if !kept.is_empty() {
+            self.write(kept);
+        }
 
         // A property carrying a block comment (`color /* c */`) takes a space before
         // the colon in tsv's normalized form (`color /* c */ : value`; fixture

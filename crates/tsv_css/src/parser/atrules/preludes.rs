@@ -506,14 +506,23 @@ fn parse_condition_part<'arena>(
     // content used to be: only the first and last segments can carry any, and both
     // are `Text` whenever a selector segment is present — the function name opens
     // the part and its `)` closes it.
+    //
+    // ⚠️ The trim's class is `is_boundary_whitespace`, **not** `str::trim`'s Unicode
+    // `White_Space` — which excludes `U+FEFF`, where JS `\s` includes it. This gap is also
+    // the one `build_condition_query_doc` restores a boundary run into, and the two have to
+    // agree on where the part's text begins or the character belongs to both: a
+    // `@container name <ZWNBSP>(a: b)` kept it inside the segment AND beside it, doubling the
+    // run on every pass. Same lesson as the declaration's property→colon trim
+    // (`trim_property_part`) — a printer-facing trim beside a boundary claim owes the claim's
+    // class.
     if !part_buf.is_empty() {
         segments.push(ConditionSegment::Text(parser.alloc_str_in(&part_buf)));
     }
     if let Some(ConditionSegment::Text(first)) = segments.first_mut() {
-        *first = first.trim_start();
+        *first = first.trim_start_matches(crate::whitespace::is_boundary_whitespace);
     }
     if let Some(ConditionSegment::Text(last)) = segments.last_mut() {
-        *last = last.trim_end();
+        *last = last.trim_end_matches(crate::whitespace::is_boundary_whitespace);
     }
     let is_empty = segments
         .iter()

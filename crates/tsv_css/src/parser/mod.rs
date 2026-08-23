@@ -238,18 +238,16 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     ///
     /// The non-consuming half of [`skip_boundary_whitespace`](Self::skip_boundary_whitespace),
     /// split out so that loop reads as "measure the run, then step it" rather than doing both
-    /// in one expression. Private: the compound chain loop is the caller that would want the
-    /// measurement alone, and it deliberately does not break on a run yet — see the note at
-    /// that loop in `parser/selectors.rs`.
-    fn boundary_run_len(&self) -> usize {
+    /// in one expression. The compound chain loop in `parser/selectors.rs` is the other
+    /// caller: `read_selector` runs `allow_comment_or_whitespace` after **every** simple
+    /// selector, so a run standing here ends the compound, and that loop needs the
+    /// measurement without the step (the step is `parse_combinator`'s, which turns the same
+    /// run into the descendant combinator that replaces the break).
+    pub(in crate::parser) fn boundary_run_len(&self) -> usize {
         if self.current_kind != TokenKind::Identifier {
             return 0;
         }
-        self.source[self.current_start..self.current_end]
-            .chars()
-            .take_while(|c| crate::whitespace::is_boundary_only_whitespace(*c))
-            .map(char::len_utf8)
-            .sum()
+        crate::whitespace::boundary_prefix_len(&self.source[self.current_start..self.current_end])
     }
 
     /// Step over `parseCss`'s `allow_whitespace()` — whose class is JS `\s`
@@ -261,11 +259,31 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// takes `<NBSP>`, every `Zs`, `<LS>`, `<PS>` and `<ZWNBSP>` as identifier content —
     /// correct inside a value (`css/values/boundary_nonascii_space_prettier_divergence` pins
     /// exactly that) and correct for a name glued to its `.` / `#` / `:` / `|` / `@` sigil,
-    /// where Svelte calls `read_identifier` with no skip in front of it. At a **boundary** —
-    /// a selector-list start, after a `,`, inside a `[`, after a combinator, before a
-    /// declaration's property — the skip runs first and the same character is a separator.
-    /// Only the parser knows which it is at, which is why this lives here and not in the
-    /// lexer: putting the class there changed values and the BOM too.
+    /// or to the END of a name (`[a<NBSP>]`, `.a<NBSP>b` — one name on both sides), where
+    /// Svelte reaches `read_identifier` with no skip in front of it. At a **boundary** the
+    /// skip runs first and the same character is a separator. Only the parser knows which it
+    /// is at, which is why this lives here and not in the lexer: putting the class there
+    /// changed values and the BOM too.
+    ///
+    /// The boundaries are one per position `parseCss`'s two skips occupy, and the callers are
+    /// the enumeration: a selector-list start and each `,` (`parser/selectors.rs`), each child
+    /// of a stylesheet / style-rule / at-rule block (via `skip_html_comment_markers` and
+    /// `parse_block_comment`), the **compound break** after every simple selector and a
+    /// combinator's two gaps — the one before its symbol and the one after it, comments
+    /// included (`parse_combinator` / `parse_explicit_combinator` / `skip_combinator_gap`) —
+    /// a pseudo-argument list's start and its `)` (`parser/pseudo.rs`), and the attribute
+    /// selector's `[`, name, matcher→value, value→flags and flags→`]` gaps
+    /// (`parser/attributes.rs`). A declaration's property and value are NOT among them —
+    /// `parseCss` scans both raw, so the run is content there.
+    ///
+    /// Each of those is also a position the PRINTER owes the run back at — see
+    /// `Printer::gap_boundary_ws` and `Printer::write_head_boundary_ws`. Adding a caller here
+    /// without adding the restore there trades a graceful over-rejection for content loss.
+    ///
+    /// ⚠️ The compound break is the one boundary that also needs a *replacement*:
+    /// `read_selector` ends the compound and `read_combinator` turns the same run into a
+    /// descendant combinator, so the break and the combinator have to land together — doing
+    /// only the break makes `&<NBSP>b` and `*<NBSP>b` parse errors.
     ///
     /// This is the **whole** `allow_whitespace()`, not the non-ASCII half: it skips ordinary
     /// whitespace tokens too, and loops, because a boundary run is one run however its
@@ -298,7 +316,10 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             // Any lookahead was lexed from past this token and is void once the cursor moves.
             self.peek = None;
             if at != self.current_end {
-                // A name follows the run inside this same token: re-read from past it.
+                // A token follows the run inside this same token: re-read from past it.
+                // `token_at` runs the WHOLE dispatch, not `read_identifier` — the run glues to
+                // a digit as readily as to a letter, so `{<NBSP>0%` must come back a
+                // `<percentage-token>` and not an identifier.
                 let token = self.lexer.token_at(at)?;
                 self.current_kind = token.kind;
                 self.current_start = token.start as usize;
@@ -310,6 +331,43 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             // and ask again from the top: the two classes can alternate any number of times
             // inside one run, and the loop's own leading skip is what steps the ASCII half.
             self.lexer.seek(at);
+            self.advance()?;
+        }
+    }
+
+    /// The whole of `parseCss`'s `allow_comment_or_whitespace` bar its `<!--` arm: step the
+    /// boundary run, register a `/* */` comment, and go round again.
+    ///
+    /// [`skip_boundary_whitespace`](Self::skip_boundary_whitespace) deliberately stops **on**
+    /// a comment, leaving each juncture's own arm to decide that comment's disposition. Where
+    /// the disposition is simply *register it for the printer*, that arm is this loop, and
+    /// spelling it as `skip_boundary_whitespace` + a one-shot
+    /// `skip_whitespace_registering_comments` is the bug: the plain skip past the comment
+    /// cannot step a boundary run, so a run **behind** a comment stands where a name, a `,`
+    /// or a `{` is due. `a /* c */<NBSP>, b` and `a /* c */<NBSP>{` were parse errors on input
+    /// canonical accepts, and `:is(b /* c */<NBSP>)` silently DROPPED its selector — the
+    /// juncture is one run of trivia to `parseCss`, however its whitespace and comments
+    /// interleave, so the reader has to loop like it does.
+    ///
+    /// The `<!--` arm stays with [`skip_html_comment_markers`](Self::skip_html_comment_markers),
+    /// which is a superset of this at the three junctures that admit a legacy marker.
+    ///
+    /// Returns whether whitespace was among what it skipped — the boundary-aware reading of
+    /// the same question [`skip_whitespace_registering_comments`](Self::skip_whitespace_registering_comments)
+    /// answers, and the right one for the caller that asks it (the attribute selector's
+    /// name→`|` gap): the run is `allow_whitespace()` material there too, so `[svg <NBSP>|a]`
+    /// separates a `<wq-name>`'s components exactly as `[svg |a]` does.
+    pub(in crate::parser) fn skip_boundary_whitespace_registering_comments(
+        &mut self,
+    ) -> Result<bool, ParseError> {
+        let mut saw_whitespace = false;
+        loop {
+            saw_whitespace |= self.check(TokenKind::Whitespace) || self.boundary_run_len() > 0;
+            self.skip_boundary_whitespace()?;
+            if !matches!(&self.current_kind, TokenKind::Comment) {
+                return Ok(saw_whitespace);
+            }
+            self.register_current_comment();
             self.advance()?;
         }
     }
@@ -330,7 +388,14 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
     /// Peek past whitespace and comments to find the next significant token.
     /// This creates a temporary lexer to look ahead without modifying parser state.
-    /// Used for disambiguating declarations vs nested rules.
+    ///
+    /// Its one caller is the declaration-vs-nested-rule disambiguation (`decl_scan`), and that
+    /// is the whole of its scope: `parseCss` reads a declaration's property and value with raw
+    /// scans, so a boundary run is CONTENT there and this lookahead is right to see the
+    /// identifier the lexer built. A lookahead that predicts a *skip* must instead be
+    /// [`peek_past_boundary_whitespace`](Self::peek_past_boundary_whitespace) — a class
+    /// narrower than the skip it predicts mis-reads the run as a token, which is how
+    /// `a /* c */<NBSP>{` came to be classified as a descendant combinator.
     pub(crate) fn peek_past_whitespace(&self) -> Result<TokenKind, ParseError> {
         self.peek_past(true)
     }
@@ -354,6 +419,49 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             return Ok(next);
         }
         self.peek_past(false)
+    }
+
+    /// Peek past a run of trivia as `allow_comment_or_whitespace` sees it — comments,
+    /// whitespace tokens, **and** the boundary run hiding at the head of an identifier — to
+    /// the kind of the next real token.
+    ///
+    /// The boundary-aware twin of [`Self::peek_past_whitespace`], for the two selector
+    /// lookaheads that ask "what does this gap lead to?" and act on the answer: whether a
+    /// gap comment continues the selector, and whether a comment sits before a `,`. Both
+    /// were reading a `<NBSP>` behind a comment as an identifier — a selector start, a
+    /// non-comma — and so classified `a /* c */<NBSP>{` as a descendant combinator and
+    /// `a /* c */<NBSP>, b` as a list that had ended. A lookahead whose whitespace class is
+    /// narrower than the skip it predicts is the same defect as one wider than the lexer's.
+    ///
+    /// Deliberately NOT what `decl_scan`'s declaration-vs-rule lookahead uses: `parseCss`
+    /// reads a declaration's property and value with raw scans, so the run there is content,
+    /// not trivia.
+    pub(crate) fn peek_past_boundary_whitespace(&self) -> Result<TokenKind, ParseError> {
+        let remaining = &self.source()[self.current_end..];
+        let mut temp_lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end);
+        loop {
+            let token = temp_lexer.next_token()?;
+            match &token.kind {
+                TokenKind::Comment | TokenKind::Whitespace => continue,
+                TokenKind::Identifier => {
+                    let text = &remaining[token.start as usize..token.end as usize];
+                    let run = crate::whitespace::boundary_prefix_len(text);
+                    if run == 0 {
+                        return Ok(token.kind);
+                    }
+                    let at = token.start as usize + run;
+                    if at == token.end as usize {
+                        // The whole identifier was run; the trivia may continue past it.
+                        temp_lexer.seek(at);
+                        continue;
+                    }
+                    // A real token starts inside this one, and it cannot itself be trivia
+                    // (the identifier lexer would not have consumed whitespace or a `/*`).
+                    return Ok(temp_lexer.token_at(at)?.kind);
+                }
+                _ => return Ok(token.kind),
+            }
+        }
     }
 
     /// The lookahead both `peek_past_*` spell: a temporary lexer from the current token's
@@ -460,11 +568,18 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// `skip_whitespace_and_comments`, this preserves the comments rather than dropping
     /// them.
     ///
-    /// Returns whether a `<whitespace-token>` was among what it skipped. The attribute
-    /// selector's name→`|` gap is the caller that needs it: the same gap is
-    /// spacing-safe when the `|` turns out to open an `<attr-matcher>` (`[attr |= 'v']`)
-    /// and whitespace-forbidden when it separates a `<wq-name>` (`[svg |attr]`), and
-    /// which it is isn't known until the token *after* the `|` is in hand.
+    /// ⚠️ **Not the one to reach for at a SELECTOR juncture** — an at-rule prelude is a raw
+    /// scan to `parseCss` (`read_value`), so the boundary class does not apply there, which is
+    /// what leaves this variant a legitimate spelling rather than a leftover. Its callers are
+    /// now exactly the at-rule preludes (`parser/atrules/preludes.rs`), and a new caller
+    /// anywhere else is the question this warning exists for. Where
+    /// `parseCss` would have run an `allow_whitespace()` first, the run has to be stepped
+    /// too: use
+    /// [`skip_boundary_whitespace_registering_comments`](Self::skip_boundary_whitespace_registering_comments),
+    /// which is this loop plus that step and answers the same `bool`.
+    ///
+    /// Returns whether a `<whitespace-token>` was among what it skipped — the boundary twin
+    /// generalizes that answer to "whitespace at this juncture", boundary members included.
     pub(crate) fn skip_whitespace_registering_comments(&mut self) -> Result<bool, ParseError> {
         let mut saw_whitespace = false;
         loop {
@@ -614,10 +729,19 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
     /// Parse the current comment token into a `Comment` and advance past it.
     /// Caller must verify `current_kind` is `TokenKind::Comment` before calling.
+    ///
+    /// The three callers — a rule's pre-`{` run, a style-rule block's children, an at-rule
+    /// block's — are all `allow_comment_or_whitespace` junctures, and each is a LOOP whose
+    /// next turn re-asks the same question. So the trailing skip is the boundary one: it is
+    /// the second half of `parseCss`'s own loop body (`read_comment` then
+    /// `allow_whitespace()`), and a plain skip there leaves a run **behind** the comment
+    /// standing where the `{` or the next child is due — `a /* c */<NBSP>{` was a parse
+    /// error. Ordering is safe: this runs with the comment already consumed and pushed, and
+    /// stops on the NEXT one, which is the caller's arm to take.
     pub(crate) fn parse_block_comment(&mut self) -> Result<Comment, ParseError> {
         let comment = self.build_current_comment();
         self.advance()?;
-        self.skip_whitespace()?;
+        self.skip_boundary_whitespace()?;
         Ok(comment)
     }
 

@@ -34,9 +34,8 @@
 
 use super::super::internal;
 use super::{
-    WireComment, convert_prelude_to_string, raw_selector_name, scan_to_terminator,
-    selector_contains_invalid, split_declaration_svelte_compat, strip_css_comments_collecting,
-    trim_wire_end, trim_wire_start,
+    WireComment, convert_prelude_to_string, raw_selector_name, selector_contains_invalid,
+    split_declaration_svelte_compat, strip_css_comments_collecting, trim_wire_end, trim_wire_start,
 };
 use std::borrow::Cow;
 use tsv_lang::{ByteToCharMap, JsonWriter, Span, write_array, write_or_null};
@@ -372,7 +371,7 @@ fn split_declaration<'a>(
     let content_end = decl
         .important_end
         .map_or(decl.span.end, |e| e.max(decl.span.end));
-    let end = scan_to_terminator(source, content_end as usize);
+    let end = crate::comments::scan_to_terminator(source, content_end as usize);
     let decl_source = &source[decl.span.start as usize..end];
     let colon = decl.colon_pos();
     let (property, value) = if decl.has_block_comment {
