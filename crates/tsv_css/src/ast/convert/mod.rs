@@ -249,35 +249,6 @@ fn starts_with_url_open(s: &str) -> bool {
         && bytes[3] == b'('
 }
 
-/// Advance past whitespace and block comments to the `;`/`}` terminator, returning its index.
-///
-/// Mirrors Svelte's `read_declaration`: `read_value` returns with the scan index AT the
-/// terminator and the declaration's `end` is taken there — so trailing whitespace and
-/// comments after the value (and after `!important`) sit inside the declaration extent.
-/// Only whitespace, comments, and the `!important` tail can occur between the parsed
-/// value's end and the terminator, so a flat byte walk is safe (no string/url content).
-///
-/// ⚠️ **That safety argument is the whole contract — do not point this at a region
-/// that can hold content.** It is blind to strings and `url()`, unlike Svelte's own
-/// `read_value`, so over an at-rule PRELUDE it stops at the first `;`/`}` inside one
-/// (`@import url("a;b.css") /* c */;`) and silently truncates. The prelude's ends come
-/// from the parser instead (`write.rs`'s `collect_prelude_comments`); the one caller
-/// here is the declaration's post-value tail this function is written for.
-pub(super) fn scan_to_terminator(source: &str, from: usize) -> usize {
-    let bytes = source.as_bytes();
-    let mut i = from;
-    while i < bytes.len() {
-        match bytes[i] {
-            b';' | b'}' => break,
-            b'/' if crate::comments::is_comment_start(bytes, i) => {
-                i = crate::comments::comment_end(bytes, i);
-            }
-            _ => i += 1,
-        }
-    }
-    i
-}
-
 /// Convert PreludeValue to string representation for the public AST.
 ///
 /// Svelte 5.55.x strips `/* ... */` block comments from at-rule preludes (surrounding
