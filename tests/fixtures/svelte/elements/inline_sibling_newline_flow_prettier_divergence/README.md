@@ -28,9 +28,15 @@ pins, and it turns the large majority of `authoring_audit`'s `content-leading` /
 
 ## Cases
 
-An inline element, a component, an expression tag, a render tag and a control-flow block, each
-in the converged multiline form, with the three isolated authorings (newline before / after /
-both) as `prettier_variant_*` files.
+An inline element, a component, all three tag kinds (an expression tag, a render tag and an
+`{@html}` tag — one predicate arm each, and the flow rule answers them alike) and a
+control-flow block, each in the converged multiline form, with the three isolated authorings
+(newline before / after / both) as `prettier_variant_*` files.
+
+The remaining sibling kind — a `svelte:*` special element, whose classification the rule asks
+the same question of — is pinned by
+[special_element_newline_flow](../special_element_newline_flow_prettier_divergence/), which
+cannot live here: its block half is root-only.
 
 ## Controls — what does NOT flow
 

@@ -300,7 +300,7 @@ impl ThisClaim {
 /// [`Self::SourceBreaks`] decision is one tsv's **own output** rewrites, since converging an
 /// authoring to block-style adds or removes exactly those newlines. A layout keyed on it can
 /// therefore be re-decided on the next pass; a layout keyed on [`Self::Structural`] cannot.
-/// [`Printer::handle_text_child`]'s sibling-newline flow rule is the consumer.
+/// [`Printer::handle_separator_text_child`]'s sibling-newline flow rule is the consumer.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum MultilineCause {
     /// Not multiline: the content collapses to one line, and width alone decides the layout.

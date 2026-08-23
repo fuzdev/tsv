@@ -1,0 +1,786 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1912,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 1211,
+				"data": "\n\tThe sibling-newline flow rule across CONTAINER KINDS. The rule is asked of the RUN — is there\n\tprose for a fill to pack? — never of the container holding it, so an inline element, a block\n\telement and a component lay one run out identically. No other fixture in this family varies\n\tthe container to say so: nearly all put the run in a BLOCK container, and the one inline\n\tcontainer that carries a flowing run reaches multiline past a 99-char attribute line\n\t(inline_attrs_multiline_content), where the kind is confounded with the attribute wrap. An\n\tinline container reaches the multiline form by a different boundary rule (both-or-neither,\n\trather than the block's leading boundary alone), so it is where a container-keyed rule would\n\tshow. The `svelte:*` pair covers the fourth kind on both arities — a SpecialElement projects\n\tonto the same analysis a regular element does, and that projection is what the pair pins.\n\tBoth boundaries carry air in every case, so each element stays multiline and only the interior\n\tseparator flows. The control is a prose-free run in an inline container: with no fill to reflow\n\tinto, its authored lines are the author's only structure and both formatters keep them.\n"
+			},
+			{
+				"type": "Text",
+				"start": 1211,
+				"end": 1213,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1213,
+				"end": 1236,
+				"data": " inline element "
+			},
+			{
+				"type": "Text",
+				"start": 1236,
+				"end": 1237,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1237,
+				"end": 1280,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 1238
+					},
+					"end": {
+						"line": 18,
+						"column": 7,
+						"character": 1244
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1245,
+							"end": 1247,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 1247,
+							"end": 1256,
+							"name": "Comp1",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 2,
+									"character": 1248
+								},
+								"end": {
+									"line": 19,
+									"column": 7,
+									"character": 1253
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1256,
+							"end": 1263,
+							"raw": " text1 ",
+							"data": " text1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1263,
+							"end": 1270,
+							"expression": {
+								"type": "Identifier",
+								"start": 1264,
+								"end": 1269,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 18
+									},
+									"end": {
+										"line": 19,
+										"column": 23
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1270,
+							"end": 1271,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1280,
+				"end": 1282,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1282,
+				"end": 1323,
+				"name": "label",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 1,
+						"character": 1283
+					},
+					"end": {
+						"line": 22,
+						"column": 6,
+						"character": 1288
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1289,
+							"end": 1291,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 1291,
+							"end": 1300,
+							"name": "Comp1",
+							"name_loc": {
+								"start": {
+									"line": 23,
+									"column": 2,
+									"character": 1292
+								},
+								"end": {
+									"line": 23,
+									"column": 7,
+									"character": 1297
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1300,
+							"end": 1307,
+							"raw": " text1 ",
+							"data": " text1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1307,
+							"end": 1314,
+							"expression": {
+								"type": "Identifier",
+								"start": 1308,
+								"end": 1313,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 18
+									},
+									"end": {
+										"line": 23,
+										"column": 23
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1314,
+							"end": 1315,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1323,
+				"end": 1325,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1325,
+				"end": 1378,
+				"data": " block element: the same run, the same answer "
+			},
+			{
+				"type": "Text",
+				"start": 1378,
+				"end": 1379,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1379,
+				"end": 1412,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 27,
+						"column": 1,
+						"character": 1380
+					},
+					"end": {
+						"line": 27,
+						"column": 2,
+						"character": 1381
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1382,
+							"end": 1384,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 1384,
+							"end": 1393,
+							"name": "Comp1",
+							"name_loc": {
+								"start": {
+									"line": 28,
+									"column": 2,
+									"character": 1385
+								},
+								"end": {
+									"line": 28,
+									"column": 7,
+									"character": 1390
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1393,
+							"end": 1400,
+							"raw": " text1 ",
+							"data": " text1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1400,
+							"end": 1407,
+							"expression": {
+								"type": "Identifier",
+								"start": 1401,
+								"end": 1406,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 18
+									},
+									"end": {
+										"line": 28,
+										"column": 23
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1407,
+							"end": 1408,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1412,
+				"end": 1414,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1414,
+				"end": 1442,
+				"data": " component: the same "
+			},
+			{
+				"type": "Text",
+				"start": 1442,
+				"end": 1443,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 1443,
+				"end": 1484,
+				"name": "Comp2",
+				"name_loc": {
+					"start": {
+						"line": 32,
+						"column": 1,
+						"character": 1444
+					},
+					"end": {
+						"line": 32,
+						"column": 6,
+						"character": 1449
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1450,
+							"end": 1452,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 1452,
+							"end": 1461,
+							"name": "Comp1",
+							"name_loc": {
+								"start": {
+									"line": 33,
+									"column": 2,
+									"character": 1453
+								},
+								"end": {
+									"line": 33,
+									"column": 7,
+									"character": 1458
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1461,
+							"end": 1468,
+							"raw": " text1 ",
+							"data": " text1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1468,
+							"end": 1475,
+							"expression": {
+								"type": "Identifier",
+								"start": 1469,
+								"end": 1474,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 18
+									},
+									"end": {
+										"line": 33,
+										"column": 23
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1475,
+							"end": 1476,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1484,
+				"end": 1486,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1486,
+				"end": 1570,
+				"data": " special element, inline-classified: the `svelte:*` projection answers alike "
+			},
+			{
+				"type": "Text",
+				"start": 1570,
+				"end": 1571,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 1571,
+				"end": 1641,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 37,
+						"column": 1,
+						"character": 1572
+					},
+					"end": {
+						"line": 37,
+						"column": 15,
+						"character": 1586
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1598,
+							"end": 1600,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 1600,
+							"end": 1609,
+							"name": "Comp1",
+							"name_loc": {
+								"start": {
+									"line": 38,
+									"column": 2,
+									"character": 1601
+								},
+								"end": {
+									"line": 38,
+									"column": 7,
+									"character": 1606
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1609,
+							"end": 1616,
+							"raw": " text1 ",
+							"data": " text1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1616,
+							"end": 1623,
+							"expression": {
+								"type": "Identifier",
+								"start": 1617,
+								"end": 1622,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 18
+									},
+									"end": {
+										"line": 38,
+										"column": 23
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1623,
+							"end": 1624,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 1593,
+					"end": 1596,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 22
+						},
+						"end": {
+							"line": 37,
+							"column": 25
+						}
+					},
+					"name": "tag"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1641,
+				"end": 1643,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1643,
+				"end": 1724,
+				"data": " special element, block-classified: the same, on the other boundary arity "
+			},
+			{
+				"type": "Text",
+				"start": 1724,
+				"end": 1725,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 1725,
+				"end": 1778,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 42,
+						"column": 1,
+						"character": 1726
+					},
+					"end": {
+						"line": 42,
+						"column": 12,
+						"character": 1737
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1738,
+							"end": 1740,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 1740,
+							"end": 1749,
+							"name": "Comp1",
+							"name_loc": {
+								"start": {
+									"line": 43,
+									"column": 2,
+									"character": 1741
+								},
+								"end": {
+									"line": 43,
+									"column": 7,
+									"character": 1746
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1749,
+							"end": 1756,
+							"raw": " text1 ",
+							"data": " text1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1756,
+							"end": 1763,
+							"expression": {
+								"type": "Identifier",
+								"start": 1757,
+								"end": 1762,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 18
+									},
+									"end": {
+										"line": 43,
+										"column": 23
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1763,
+							"end": 1764,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1778,
+				"end": 1780,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1780,
+				"end": 1872,
+				"data": " control: a prose-free run has no fill, so its authored lines are structure and stay "
+			},
+			{
+				"type": "Text",
+				"start": 1872,
+				"end": 1873,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1873,
+				"end": 1911,
+				"name": "button",
+				"name_loc": {
+					"start": {
+						"line": 47,
+						"column": 1,
+						"character": 1874
+					},
+					"end": {
+						"line": 47,
+						"column": 7,
+						"character": 1880
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1881,
+							"end": 1883,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 1883,
+							"end": 1892,
+							"name": "Comp1",
+							"name_loc": {
+								"start": {
+									"line": 48,
+									"column": 2,
+									"character": 1884
+								},
+								"end": {
+									"line": 48,
+									"column": 7,
+									"character": 1889
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1892,
+							"end": 1894,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1894,
+							"end": 1901,
+							"expression": {
+								"type": "Identifier",
+								"start": 1895,
+								"end": 1900,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 2
+									},
+									"end": {
+										"line": 49,
+										"column": 7
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1901,
+							"end": 1902,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
