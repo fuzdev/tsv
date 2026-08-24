@@ -160,10 +160,10 @@ Things the published numbers measure that aren't quite what they look like.
   corpus's "easy" subset (`BENCH_MODE=union` audits what it hides). test262 files
   are parsed at the goal test262 **declares** (`SourceFile.goal`, from the
   harvest's per-file `module` flag → `module`, else strict `script`): tsv routes
-  through its goal-aware bindings (native `*_with_goal`, WASM `goal` parse
-  option), acorn takes `sourceType: goal`, oxc an explicit `sourceType` — so a
-  script-goal `await`-identifier test is scored valid against every tool rather
-  than counted as a module-goal failure. (Before this, everything parsed at
+  through its bindings' goal argument (FFI a `u32` code, N-API a trailing goal
+  string, WASM the `goal` parse option), acorn takes `sourceType: goal`, oxc an
+  explicit `sourceType` — so a script-goal `await`-identifier test is scored valid
+  against every tool rather than counted as a module-goal failure. (Before this, everything parsed at
   module goal and those tests depressed tsv's and acorn's TS coverage alike;
   oxc's filename inference hid it, making tsv read ~2 files behind on a goal
   artifact.) Only the conformance-coverage preflight is goal-aware — the perf

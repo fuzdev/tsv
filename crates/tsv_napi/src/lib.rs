@@ -31,9 +31,38 @@ use napi_derive::napi;
 use napi::bindgen_prelude::{Either, Undefined};
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
+// The goal-axis macros come from the same crate, so the three bindings share ONE
+// definition of which languages have a goal rather than three hand-synced copies.
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::{goal_allowed, parse_ast};
+
+/// Decode the optional goal argument (`"script"` / `"module"`; omitted or
+/// `undefined` means `"module"`).
+///
+/// `allowed` is the language's goal axis ([`goal_allowed!`]). A goal against a
+/// language that has none is an **error**, not a silent Module: Svelte hard-wires
+/// `Module` and CSS has no goal, so a caller passing one asked for something that
+/// cannot be honored and must be told — the same stance `tsv_wasm`'s
+/// `read_options` takes when it rejects the `goal` key outright.
+#[cfg(any(feature = "parse", feature = "format"))]
+fn napi_goal(goal: Option<String>, allowed: bool) -> napi::Result<tsv_ts::Goal> {
+    let Some(goal) = goal else {
+        return Ok(tsv_ts::Goal::Module);
+    };
+    if !allowed {
+        return Err(napi::Error::from_reason(
+            "option 'goal' is only supported for TypeScript".to_string(),
+        ));
+    }
+    tsv_ts::Goal::from_source_type(&goal).ok_or_else(|| {
+        napi::Error::from_reason(format!(
+            "invalid goal '{goal}' (expected 'script' or 'module')"
+        ))
+    })
+}
 
 /// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` N-API
 /// functions for one language module. The `js_name` literals keep the JS export
@@ -45,9 +74,9 @@ use tsv_arena::with_doc_arena;
 // these are uniform across svelte/typescript/css — no per-language arity split.
 #[cfg(feature = "parse")]
 macro_rules! parse_convert {
-    ($lang:ident, $conv:ident, $source:expr) => {
+    ($goalness:ident, $lang:ident, $conv:ident, $source:expr, $goal:expr) => {
         with_ast_arena(|arena| {
-            let ast = $lang::parse($source, arena)
+            let ast = parse_ast!($goalness, $lang, $source, $goal, arena)
                 .map_err(|e| napi::Error::from_reason(e.to_string()))?;
             Ok($lang::$conv(&ast, $source))
         })
@@ -56,9 +85,9 @@ macro_rules! parse_convert {
 
 #[cfg(feature = "parse")]
 macro_rules! parse_internal {
-    ($lang:ident, $source:expr) => {
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {
         with_ast_arena(|arena| {
-            let ast = $lang::parse($source, arena)
+            let ast = parse_ast!($goalness, $lang, $source, $goal, arena)
                 .map_err(|e| napi::Error::from_reason(e.to_string()))?;
             std::hint::black_box(&ast);
             Ok(())
@@ -68,15 +97,15 @@ macro_rules! parse_internal {
 
 #[cfg(feature = "format")]
 macro_rules! parse_format {
-    ($lang:ident, $source:expr) => {{
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {{
         // The format path's line-terminator fold, ahead of the parse — see
         // `tsv_lang::printing::normalize_carriage_returns`. `parse_convert!` deliberately
         // skips it: the wire's offsets are a drop-in contract over the author's own bytes.
         let normalized = tsv_lang::printing::normalize_carriage_returns($source);
         let source = normalized.as_ref();
         with_ast_arena(|arena| {
-            let ast =
-                $lang::parse(source, arena).map_err(|e| napi::Error::from_reason(e.to_string()))?;
+            let ast = parse_ast!($goalness, $lang, source, $goal, arena)
+                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
             Ok(with_doc_arena(|doc_arena| {
                 $lang::format_in(&ast, source, doc_arena)
             }))
@@ -84,8 +113,23 @@ macro_rules! parse_format {
     }};
 }
 
+// One export per (language, operation), each taking the same `(source, goal?)`
+// arguments. The `$goalness` axis decides only whether a goal ARGUMENT is
+// accepted, never the arity: there is no goalless twin of a goal-aware export to
+// drift from it, and the `@fuzdev/tsv` loader hands every export the same bag.
+//
+// At Script goal `await` is an ordinary identifier and `import`/`export`/
+// `import.meta` are syntax errors. See `tsv parse --goal` and
+// `tsv_ts::parse_with_goal`.
+//
+// `tsv_ffi` spells the same axis as a `u32` goal code and `tsv_wasm` as one key
+// of a per-call options bag (`format_typescript(src, {goal})`); each binding's
+// own `lang_bindings!` reads the SAME `parse_ast!` / `goal_allowed!` pair out of
+// `tsv_arena`, so which languages have a goal axis is one fact in one place
+// rather than three that agree today.
 macro_rules! lang_bindings {
     (
+        $goalness:ident,
         $lang:ident,
         $parse_fn:ident, $parse_js:literal,
         $parse_no_loc_fn:ident, $parse_no_loc_js:literal,
@@ -95,16 +139,24 @@ macro_rules! lang_bindings {
         /// Parse source code and return its public JSON AST as a string.
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_js, catch_unwind)]
-        pub fn $parse_fn(source: String) -> napi::Result<String> {
-            parse_convert!($lang, convert_ast_json_string, &source)
+        pub fn $parse_fn(source: String, goal: Option<String>) -> napi::Result<String> {
+            let goal = napi_goal(goal, goal_allowed!($goalness))?;
+            parse_convert!($goalness, $lang, convert_ast_json_string, &source, goal)
         }
 
         /// Parse source and return its JSON AST string **without** per-node `loc`
         /// (the span-only `no-locations` wire). CSS is identical to `$parse_fn`.
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_no_loc_js, catch_unwind)]
-        pub fn $parse_no_loc_fn(source: String) -> napi::Result<String> {
-            parse_convert!($lang, convert_ast_json_string_no_locations, &source)
+        pub fn $parse_no_loc_fn(source: String, goal: Option<String>) -> napi::Result<String> {
+            let goal = napi_goal(goal, goal_allowed!($goalness))?;
+            parse_convert!(
+                $goalness,
+                $lang,
+                convert_ast_json_string_no_locations,
+                &source,
+                goal
+            )
         }
 
         /// Parse source to the internal AST only (no conversion, no
@@ -112,20 +164,24 @@ macro_rules! lang_bindings {
         /// parse can't be optimized away.
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_internal_js, catch_unwind)]
-        pub fn $parse_internal_fn(source: String) -> napi::Result<()> {
-            parse_internal!($lang, &source)
+        pub fn $parse_internal_fn(source: String, goal: Option<String>) -> napi::Result<()> {
+            let goal = napi_goal(goal, goal_allowed!($goalness))?;
+            parse_internal!($goalness, $lang, &source, goal)
         }
 
-        /// Format source code and return the formatted string.
+        /// Format source code and return the formatted string. The goal shapes
+        /// only the parse the formatter runs; formatting is non-configurable.
         #[cfg(feature = "format")]
         #[napi(js_name = $format_js, catch_unwind)]
-        pub fn $format_fn(source: String) -> napi::Result<String> {
-            parse_format!($lang, &source)
+        pub fn $format_fn(source: String, goal: Option<String>) -> napi::Result<String> {
+            let goal = napi_goal(goal, goal_allowed!($goalness))?;
+            parse_format!($goalness, $lang, &source, goal)
         }
     };
 }
 
 lang_bindings!(
+    nogoal,
     tsv_svelte,
     parse_svelte,
     "parse_svelte",
@@ -137,6 +193,7 @@ lang_bindings!(
     "format_svelte"
 );
 lang_bindings!(
+    goal,
     tsv_ts,
     parse_typescript,
     "parse_typescript",
@@ -148,6 +205,7 @@ lang_bindings!(
     "format_typescript"
 );
 lang_bindings!(
+    nogoal,
     tsv_css,
     parse_css,
     "parse_css",
@@ -158,91 +216,6 @@ lang_bindings!(
     format_css,
     "format_css"
 );
-
-//
-// Goal-aware TypeScript parse (script vs module)
-//
-// The parse goal is TypeScript-only (Svelte `<script>` is always a module; CSS
-// has no goal), so these live outside `lang_bindings!` rather than threading a
-// meaningless goal through svelte/css. The goalless `parse_typescript*` exports
-// remain the `Module` default; these mirror them against an explicit goal string
-// (`"script"` / `"module"`). At Script goal, `await` is an ordinary identifier
-// and `import`/`export`/`import.meta` are syntax errors. See `tsv parse --goal`
-// and `tsv_ts::parse_with_goal`.
-//
-// `tsv_wasm` doesn't share this SHAPE: there the goal is one key of a per-call
-// options bag threaded through its own `lang_bindings!`. Coverage matches,
-// though — `format_typescript_with_goal` below is the flat counterpart of
-// `tsv_wasm`'s `format_typescript(source, {goal})`, and the `@fuzdev/tsv`
-// loader presents the same options bag over all of these flat exports (see this
-// crate's CLAUDE.md §Public API).
-
-/// Parse a goal string (`"script"` / `"module"`) for the goal-aware TS exports.
-#[cfg(any(feature = "parse", feature = "format"))]
-fn napi_goal(goal: &str) -> napi::Result<tsv_ts::Goal> {
-    tsv_ts::Goal::from_source_type(goal).ok_or_else(|| {
-        napi::Error::from_reason(format!(
-            "invalid goal '{goal}' (expected 'script' or 'module')"
-        ))
-    })
-}
-
-/// `parse_typescript` (JSON AST string) against an explicit goal.
-#[cfg(feature = "parse")]
-#[napi(js_name = "parse_typescript_with_goal", catch_unwind)]
-pub fn parse_typescript_with_goal(source: String, goal: String) -> napi::Result<String> {
-    let goal = napi_goal(&goal)?;
-    with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
-            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-        Ok(tsv_ts::convert_ast_json_string(&ast, &source))
-    })
-}
-
-/// `parse_typescript_no_locations` (span-only JSON AST string) against an explicit goal.
-#[cfg(feature = "parse")]
-#[napi(js_name = "parse_typescript_no_locations_with_goal", catch_unwind)]
-pub fn parse_typescript_no_locations_with_goal(
-    source: String,
-    goal: String,
-) -> napi::Result<String> {
-    let goal = napi_goal(&goal)?;
-    with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
-            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, &source))
-    })
-}
-
-/// `parse_internal_typescript` (parse-only, no serialization) against an explicit goal.
-#[cfg(feature = "parse")]
-#[napi(js_name = "parse_internal_typescript_with_goal", catch_unwind)]
-pub fn parse_internal_typescript_with_goal(source: String, goal: String) -> napi::Result<()> {
-    let goal = napi_goal(&goal)?;
-    with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
-            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-        std::hint::black_box(&ast);
-        Ok(())
-    })
-}
-
-/// `format_typescript` against an explicit goal — the flat counterpart of
-/// `tsv_wasm`'s `format_typescript(source, {goal})`. The goal shapes only the
-/// parse the formatter runs (at `'script'`, `await` is an ordinary identifier);
-/// formatting itself is non-configurable.
-#[cfg(feature = "format")]
-#[napi(js_name = "format_typescript_with_goal", catch_unwind)]
-pub fn format_typescript_with_goal(source: String, goal: String) -> napi::Result<String> {
-    let goal = napi_goal(&goal)?;
-    with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
-            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-        Ok(with_doc_arena(|doc_arena| {
-            tsv_ts::format_in(&ast, &source, doc_arena)
-        }))
-    })
-}
 
 //
 // Discovery: the gitignore-aware matcher + its `tsv_discover` verdicts
@@ -470,9 +443,20 @@ mod tests {
     use super::*;
 
     /// Signature shared by every `parse_<lang>` / `format_<lang>` entry point.
-    type StringFn = fn(String) -> napi::Result<String>;
+    type StringFn = fn(String, Option<String>) -> napi::Result<String>;
     /// Signature shared by every `parse_internal_<lang>` entry point.
-    type UnitFn = fn(String) -> napi::Result<()>;
+    type UnitFn = fn(String, Option<String>) -> napi::Result<()>;
+
+    /// Call at the default (Module) goal, i.e. with the goal argument omitted —
+    /// the shape every non-TypeScript caller uses.
+    fn at_default(f: StringFn, source: &str) -> napi::Result<String> {
+        f(source.to_owned(), None)
+    }
+
+    /// Call at an explicit goal.
+    fn at_goal(f: StringFn, source: &str, goal: &str) -> napi::Result<String> {
+        f(source.to_owned(), Some(goal.to_owned()))
+    }
 
     // --- format: normalizes, every language (exact output) ---
 
@@ -495,7 +479,7 @@ mod tests {
             ),
         ];
         for (label, f, input, expected) in cases {
-            assert_eq!(f(input.to_owned()).unwrap(), expected, "{label} format");
+            assert_eq!(at_default(f, input).unwrap(), expected, "{label} format");
         }
     }
 
@@ -512,7 +496,7 @@ mod tests {
             ("svelte", parse_svelte, "<div>x</div>", "Root"),
         ];
         for (label, f, src, root_type) in cases {
-            let json = f(src.to_owned()).unwrap();
+            let json = at_default(f, src).unwrap();
             let value: serde_json::Value =
                 serde_json::from_str(&json).unwrap_or_else(|e| panic!("{label}: not JSON: {e}"));
             assert_eq!(
@@ -523,32 +507,95 @@ mod tests {
         }
     }
 
-    // --- goal-aware TS parse: script accepts `await` as identifier, module rejects ---
+    // --- the goal axis: script accepts `await` as identifier, module rejects ---
 
     #[test]
-    fn parse_typescript_with_goal_switches_await() {
+    fn typescript_goal_switches_await() {
         // `await` is an ordinary identifier at Script goal, reserved at Module goal.
         let src = "var await = 1;\n";
-        assert!(parse_typescript_with_goal(src.to_owned(), "script".to_owned()).is_ok());
-        assert!(parse_typescript_with_goal(src.to_owned(), "module".to_owned()).is_err());
-        assert!(
-            parse_typescript_no_locations_with_goal(src.to_owned(), "script".to_owned()).is_ok()
-        );
-        assert!(
-            parse_typescript_no_locations_with_goal(src.to_owned(), "module".to_owned()).is_err()
-        );
-        assert!(parse_internal_typescript_with_goal(src.to_owned(), "script".to_owned()).is_ok());
-        assert!(parse_internal_typescript_with_goal(src.to_owned(), "module".to_owned()).is_err());
+        // Annotate the array type so the fn items coerce to `StringFn` (no casts).
+        let parsers: [StringFn; 2] = [parse_typescript, parse_typescript_no_locations];
+        for f in parsers {
+            assert!(at_goal(f, src, "script").is_ok());
+            assert!(at_goal(f, src, "module").is_err());
+            // An omitted goal is the Module default, not a third behavior.
+            assert!(at_default(f, src).is_err());
+        }
+        assert!(parse_internal_typescript(src.to_owned(), Some("script".to_owned())).is_ok());
+        assert!(parse_internal_typescript(src.to_owned(), Some("module".to_owned())).is_err());
+        assert!(parse_internal_typescript(src.to_owned(), None).is_err());
         // The format twin: the goal shapes the parse the formatter runs.
         assert_eq!(
-            format_typescript_with_goal("var   await=1".to_owned(), "script".to_owned()).unwrap(),
+            at_goal(format_typescript, "var   await=1", "script").unwrap(),
             "var await = 1;\n",
             "script-goal format"
         );
-        assert!(format_typescript_with_goal(src.to_owned(), "module".to_owned()).is_err());
+        assert!(at_goal(format_typescript, src, "module").is_err());
         // An invalid goal string is a thrown error, not a silent module fallback.
-        assert!(parse_typescript_with_goal(src.to_owned(), "sloppy".to_owned()).is_err());
-        assert!(format_typescript_with_goal(src.to_owned(), "sloppy".to_owned()).is_err());
+        assert!(at_goal(parse_typescript, src, "sloppy").is_err());
+        assert!(at_goal(format_typescript, src, "sloppy").is_err());
+    }
+
+    #[test]
+    fn goalless_languages_reject_a_goal_argument() {
+        // Svelte hard-wires Module and CSS has no goal, so a goal argument asks
+        // for something that cannot be honored — the caller is told rather than
+        // silently served a Module parse. The same stance `tsv_wasm`'s
+        // `read_options` takes when it rejects the key outright.
+        //
+        // Every string-returning export, not one per language: each is a
+        // separately generated entry point that calls `napi_goal` on its own
+        // line, so a refusal can be lost on exactly one of them.
+        // `parse_internal_*` returns `()` and is driven separately below.
+        let cases: [(&str, StringFn, &str); 6] = [
+            ("svelte parse", parse_svelte, "<div>x</div>"),
+            (
+                "svelte parse_no_locations",
+                parse_svelte_no_locations,
+                "<div>x</div>",
+            ),
+            ("svelte format", format_svelte, "<div>x</div>"),
+            ("css parse", parse_css, "a { color: red }"),
+            (
+                "css parse_no_locations",
+                parse_css_no_locations,
+                "a { color: red }",
+            ),
+            ("css format", format_css, "a { color: red }"),
+        ];
+        for (label, f, src) in cases {
+            // Even `"module"` — the value they would have used — is refused: the
+            // rejection is of the AXIS, so a caller cannot read agreement into it.
+            for goal in ["script", "module"] {
+                let err = at_goal(f, src, goal).unwrap_err();
+                assert!(
+                    err.reason.contains("only supported for TypeScript"),
+                    "{label} at {goal}: {}",
+                    err.reason
+                );
+            }
+            at_default(f, src).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
+        }
+
+        let internal: [(&str, UnitFn, &str); 2] = [
+            (
+                "svelte parse_internal",
+                parse_internal_svelte,
+                "<div>x</div>",
+            ),
+            ("css parse_internal", parse_internal_css, "a { color: red }"),
+        ];
+        for (label, f, src) in internal {
+            for goal in ["script", "module"] {
+                let err = f(src.to_owned(), Some(goal.to_owned())).unwrap_err();
+                assert!(
+                    err.reason.contains("only supported for TypeScript"),
+                    "{label} at {goal}: {}",
+                    err.reason
+                );
+            }
+            f(src.to_owned(), None).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
+        }
     }
 
     // --- parse_internal: parses without converting (Ok, no JSON), every language ---
@@ -561,7 +608,7 @@ mod tests {
             ("svelte", parse_internal_svelte, "<div>x</div>"),
         ];
         for (label, f, src) in cases {
-            f(src.to_owned()).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
+            f(src.to_owned(), None).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
         }
     }
 
@@ -583,12 +630,12 @@ mod tests {
             ("svelte", parse_svelte, format_svelte, "<div {"),
         ];
         for (label, parse_fn, format_fn, src) in cases {
-            let parse_err = parse_fn(src.to_owned()).unwrap_err();
+            let parse_err = at_default(parse_fn, src).unwrap_err();
             assert!(
                 !parse_err.reason.is_empty(),
                 "{label} parse: error must carry a reason"
             );
-            let format_err = format_fn(src.to_owned()).unwrap_err();
+            let format_err = at_default(format_fn, src).unwrap_err();
             assert!(
                 !format_err.reason.is_empty(),
                 "{label} format: error must carry a reason"
@@ -606,11 +653,11 @@ mod tests {
         // back-to-back formats on a warm arena must produce identical output,
         // and interleaving a parse (which drives the AST arena on its own)
         // between them must not perturb the format result.
-        let once = format_typescript("const   x=1".to_owned()).unwrap();
-        let twice = format_typescript("const   x=1".to_owned()).unwrap();
+        let once = at_default(format_typescript, "const   x=1").unwrap();
+        let twice = at_default(format_typescript, "const   x=1").unwrap();
         assert_eq!(once, twice, "second format on a warm arena diverged");
-        parse_typescript("const y = 2;".to_owned()).unwrap();
-        let after_parse = format_typescript("const   x=1".to_owned()).unwrap();
+        at_default(parse_typescript, "const y = 2;").unwrap();
+        let after_parse = at_default(format_typescript, "const   x=1").unwrap();
         assert_eq!(once, after_parse, "interleaved parse perturbed format");
     }
 
@@ -621,16 +668,16 @@ mod tests {
         // napi-rs marshals JS strings in/out and the AST carries char offsets;
         // this is the same boundary risk tsv_ffi's same-named test guards.
         let src = "const x = '€🦀';\n";
-        let json = parse_typescript(src.to_owned()).unwrap();
+        let json = at_default(parse_typescript, src).unwrap();
         assert!(json.contains("\"type\""), "parse produced no AST: {json}");
-        let formatted = format_typescript(src.to_owned()).unwrap();
+        let formatted = at_default(format_typescript, src).unwrap();
         assert!(
             formatted.contains("€🦀"),
             "multibyte content lost: {formatted}"
         );
         // Re-formatting is stable (idempotent) across the boundary.
         assert_eq!(
-            format_typescript(formatted.clone()).unwrap(),
+            at_default(format_typescript, &formatted).unwrap(),
             formatted,
             "re-format not idempotent across the boundary"
         );

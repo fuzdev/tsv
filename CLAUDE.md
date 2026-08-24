@@ -455,7 +455,7 @@ TypeScript formatting is identical for standalone `.ts` and Svelte-embedded TS, 
 tsv/
 ├── crates/
 │   ├── tsv_lang/    # Foundation (span, location, error, doc builder, printing utils)
-│   ├── tsv_arena/   # Per-thread reusable AST/doc arenas for the bindings' hot loop (tsv_ffi, tsv_napi, tsv_wasm)
+│   ├── tsv_arena/   # Shared binding substrate (tsv_ffi, tsv_napi, tsv_wasm): per-thread reusable AST/doc arenas + the goal axis
 │   ├── tsv_html/    # HTML element classification and whitespace rules
 │   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
 │   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore

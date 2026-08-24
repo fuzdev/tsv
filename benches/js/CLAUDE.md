@@ -1184,8 +1184,9 @@ benches/js/
     ├── postcss.ts         # postcss wrapper (parse-only, CSS — the parser behind prettier's CSS printer)
     ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
     ├── reject_probe.ts    # Behavioral "does this binding still REPORT a rejection" check,
-    │                      # shared by tsv's three front-ends (FFI decides by error-envelope
-    │                      # prefix, so a changed envelope would fabricate 100% coverage)
+    │                      # shared by tsv's three front-ends (FFI decides by the `out_status`
+    │                      # word, so a misread status would fabricate 100% coverage; an
+    │                      # UNWRITTEN one is caught by ffi.ts's per-call sentinel instead)
     ├── report.ts          # Summary report generation
     ├── rsvelte.ts         # rsvelte-fmt wrapper (Svelte only; COVERAGE-ONLY, never timed)
     ├── rsvelte_parse.ts   # rsvelte PARSE wrapper (N-API addon — a DIFFERENT package from rsvelte.ts,

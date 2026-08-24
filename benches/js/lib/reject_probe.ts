@@ -11,15 +11,25 @@
  *
  * tsv's own bindings share that shape, and one of them has no other guard:
  *
- * - **FFI** returns a STRING either way, so `NativeImplementation.check_error`
- *   decides "rejected" by testing the payload for the `{"error"` envelope prefix
- *   that `tsv_ffi`'s `error_result` emits. Change that envelope — a field rename, a
- *   wrapper object — and `format` silently returns the error JSON *as the formatted
- *   output*, scoring every refusal as a success.
+ * - **FFI** returns a payload either way, so `NativeImplementation.call_ffi` decides
+ *   "rejected" from the `out_status` word `tsv_ffi` writes beside `out_len`. Break
+ *   that — a caller reading the wrong slot, an export that stops writing — and
+ *   `format` silently returns the error JSON *as the formatted output*, scoring every
+ *   refusal as a success. The second of those is closed structurally rather than by
+ *   this probe: `call_ffi` seeds a `STATUS_UNWRITTEN` sentinel before every call, so
+ *   an unwritten status throws instead of inheriting the last call's verdict. This
+ *   probe is what covers the first, and it covers it BEHAVIORALLY — the only way to
+ *   ask whether a refusal still arrives as one.
  * - **N-API** and **WASM** throw natively today. Probed anyway, and for the reason
  *   the yuku wrapper gives for probing an option whose loss would be loud: a shared
  *   question asked at one site and not the others is free to drift, and the cost
  *   here is one call per row at init.
+ *
+ * The status word REPLACED a content sniff — a `startsWith('{"error"')` test on the
+ * decoded payload, sound only because tsv normalizes strings to single quotes, i.e. a
+ * correctness dependency on a *style* setting over a channel carrying arbitrary
+ * formatted source. This probe is what made that fragility legible, and it guards the
+ * replacement on exactly the same terms.
  *
  * The existing detector for the FFI case is the accept-set half of
  * `check_variant_parity` (native accepts, wasm rejects → a divergence). It is
@@ -42,9 +52,10 @@ import type { Language } from './types.ts';
  * holds an expression-position `;`.
  *
  * Svelte rather than bare TypeScript because it drives the embedding path too, and
- * shallow enough that no grammar change makes it legal. The envelope this probes is
- * language-independent (`tsv_ffi`'s `error_result` is one function for every
- * export), so one language proves the mechanism for all of them.
+ * shallow enough that no grammar change makes it legal. The refusal this probes is
+ * language-independent — `tsv_ffi` writes its status through one function
+ * (`bytes_to_ptr`) for every export, and the other two bindings throw — so one
+ * language proves the mechanism for all of them.
  */
 const REJECT_PROBE_SOURCE = '<script>let x = ;</script>';
 
@@ -65,11 +76,10 @@ export interface RejectProbeTarget {
  * optional impls follow: a failed self-check withdraws what it contaminates, and
  * for the subject of the benchmark that is every number the run would publish.
  *
- * Every operation rather than one, because they do not share an error path: on the
- * FFI binding `parse`/`parse_no_locations` read `parsed.error` off the decoded
- * wire, while `format`/`parse_internal` go through the envelope-prefix test in
- * `check_error` — two spellings, two ways to break, one of them (the second) on a
- * payload that carries no other tell.
+ * Every operation rather than one, because a binding can lose its refusal on one
+ * export and keep it on the others: each is a separate generated entry point, and
+ * `parse_internal` is the one whose payload carries no tell at all — it is empty on
+ * success, so nothing but the status distinguishes it from a refusal.
  *
  * @param binding - the row-facing name, so the throw names which one failed
  * @param impl - the binding, called through its own methods so each keeps its receiver

@@ -5,7 +5,7 @@
  */
 
 import { ffi_library_path } from './tsv_artifacts.ts';
-import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 
 // FFI symbol definitions.
@@ -32,88 +32,59 @@ import { assert_binding_reports_rejection } from './reject_probe.ts';
 // defense-in-depth, and the corpus compare independently self-verifies any
 // SAFETY finding by re-running the native format (see
 // `corpus_compare_format.ts`).
+// Every entry point has the same C signature — `(source_ptr, source_len, goal,
+// out_len, out_status) -> payload_ptr` — so the table is one shape per name,
+// with no goal-aware variants to keep in step. `goal` is 0 = Module, 1 = Script;
+// Svelte and CSS reject a non-zero code rather than ignoring it.
+const ENTRY_POINT = {
+	parameters: ['pointer', 'usize', 'u32', 'pointer', 'pointer'],
+	result: 'pointer'
+} as const;
+
 const symbols = {
-	tsv_parse_svelte: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_parse_internal_svelte: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_format_svelte: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_parse_typescript: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_parse_internal_typescript: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_format_typescript: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_parse_css: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_parse_internal_css: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
+	tsv_parse_svelte: ENTRY_POINT,
+	tsv_parse_internal_svelte: ENTRY_POINT,
+	tsv_format_svelte: ENTRY_POINT,
+	tsv_parse_typescript: ENTRY_POINT,
+	tsv_parse_internal_typescript: ENTRY_POINT,
+	tsv_format_typescript: ENTRY_POINT,
+	tsv_parse_css: ENTRY_POINT,
+	tsv_parse_internal_css: ENTRY_POINT,
+	tsv_format_css: ENTRY_POINT,
 	// no-locations parse (span-only wire) — svelte + typescript only (CSS emits no `loc`)
-	tsv_parse_svelte_no_locations: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_parse_typescript_no_locations: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
-	// goal-aware TS exports (extra `u32` goal: 0 = Module, 1 = Script) — the parse
-	// trio serves the conformance surface's test262 files; the format twin is declared
-	// for parity with the N-API addon's `format_typescript_with_goal` (unused here too)
-	tsv_parse_typescript_with_goal: {
-		parameters: ['pointer', 'usize', 'u32', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_parse_typescript_no_locations_with_goal: {
-		parameters: ['pointer', 'usize', 'u32', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_parse_internal_typescript_with_goal: {
-		parameters: ['pointer', 'usize', 'u32', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_format_typescript_with_goal: {
-		parameters: ['pointer', 'usize', 'u32', 'pointer'],
-		result: 'pointer'
-	},
-	tsv_format_css: {
-		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer'
-	},
+	tsv_parse_svelte_no_locations: ENTRY_POINT,
+	tsv_parse_typescript_no_locations: ENTRY_POINT,
 	tsv_free: {
 		parameters: ['pointer', 'usize'],
 		result: 'void'
 	}
 } as const;
 
+/** `*out_status` after a call that produced its payload (`tsv_ffi`'s `TSV_STATUS_OK`). */
+const STATUS_OK = 0;
+
+/**
+ * Written into `out_status` BEFORE every call, so an export that returns without
+ * writing it fails loudly here instead of inheriting the previous call's verdict.
+ *
+ * The buffer is persistent (see `MarshalState`), and every value the native side
+ * can legitimately write is small, so a stale slot otherwise reads as whatever the
+ * last call said — `STATUS_OK` after any success. The reject probe covers the four
+ * Svelte operations at init; this covers every export on every call, for one store.
+ * `tsv_ffi`'s own `call_raw` test helper seeds `u32::MAX` for the same reason.
+ */
+const STATUS_UNWRITTEN = 0xffffffff;
+
+/** The C-ABI goal codes (`tsv_ffi`'s `ffi_goal`). */
+const GOAL_MODULE = 0;
+const GOAL_SCRIPT = 1;
+
 type FfiFn = (
 	source: Deno.PointerValue,
 	len: number | bigint,
-	out_len: Deno.PointerValue
-) => Deno.PointerValue;
-/** Goal-aware TS symbol (parse or format): an extra `u32` goal (0 = Module, 1 = Script). */
-type FfiGoalFn = (
-	source: Deno.PointerValue,
-	len: number | bigint,
 	goal: number,
-	out_len: Deno.PointerValue
+	out_len: Deno.PointerValue,
+	out_status: Deno.PointerValue
 ) => Deno.PointerValue;
 type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
 
@@ -130,6 +101,16 @@ interface MarshalState {
 	/** Receives the output byte length; written by the native side through `out_len_ptr`. */
 	out_len_buffer: BigUint64Array;
 	out_len_ptr: Deno.PointerValue;
+	/**
+	 * Receives the call's verdict (`STATUS_OK` or not), written through
+	 * `out_status_ptr` alongside `out_len`. This — never the payload's shape — is
+	 * what tells a refusal from a formatted file; see `lib/reject_probe.ts`.
+	 *
+	 * Persistent like the rest, so `call_ffi` seeds `STATUS_UNWRITTEN` before every
+	 * call rather than reading whatever the last one left.
+	 */
+	out_status_buffer: Uint32Array;
+	out_status_ptr: Deno.PointerValue;
 	/** Grow-only UTF-8 staging for the source; re-pointed only on growth. */
 	source_buffer: Uint8Array;
 	source_ptr: Deno.PointerValue;
@@ -211,10 +192,13 @@ export class NativeImplementation extends BaseImplementation {
 		// never relocates them (see the `symbols` comment). The buffers live on
 		// the instance, so they stay trivially reachable across every call.
 		const out_len_buffer = new BigUint64Array(new ArrayBuffer(8));
+		const out_status_buffer = new Uint32Array(new ArrayBuffer(4));
 		const source_buffer = new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY));
 		this._marshal = {
 			out_len_buffer,
 			out_len_ptr: Deno.UnsafePointer.of(out_len_buffer),
+			out_status_buffer,
+			out_status_ptr: Deno.UnsafePointer.of(out_status_buffer),
 			source_buffer,
 			source_ptr: Deno.UnsafePointer.of(source_buffer),
 			result_buffer: new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY))
@@ -243,13 +227,23 @@ export class NativeImplementation extends BaseImplementation {
 			}
 		};
 
-		// This binding returns a STRING either way, so `check_error`'s envelope-prefix
-		// test is the only thing that tells a refusal from a formatted file. Prove it
-		// still fires — see `lib/reject_probe.ts`.
+		// This binding returns a payload either way, so the `out_status` word is the
+		// only thing that tells a refusal from a formatted file. Prove it still
+		// fires — see `lib/reject_probe.ts`.
 		assert_binding_reports_rejection('tsv (FFI)', this);
 	}
 
-	private call_ffi(fn: FfiFn, source: string): string {
+	/**
+	 * Drive one entry point at `goal` and return its payload, throwing when the
+	 * call reported an error.
+	 *
+	 * The verdict comes from `out_status`, read as one typed-array load beside the
+	 * length that is already read here. It used to come from a `startsWith('{"error"')`
+	 * test on the decoded payload — sound only because tsv normalizes strings to
+	 * single quotes, i.e. a correctness dependency on a STYLE setting, over a
+	 * channel that carries arbitrary formatted source (`lib/reject_probe.ts`).
+	 */
+	private call_ffi(fn: FfiFn, source: string, goal: ParseGoal = 'module'): string {
 		const m = this._marshal;
 		if (!m) throw new Error('Native library not initialized');
 
@@ -268,7 +262,14 @@ export class NativeImplementation extends BaseImplementation {
 			throw new Error(`encodeInto consumed ${read} of ${source.length} source units`);
 		}
 
-		const result_ptr = fn(m.source_ptr, written, m.out_len_ptr);
+		m.out_status_buffer[0] = STATUS_UNWRITTEN;
+		const result_ptr = fn(
+			m.source_ptr,
+			written,
+			goal === 'script' ? GOAL_SCRIPT : GOAL_MODULE,
+			m.out_len_ptr,
+			m.out_status_ptr
+		);
 
 		if (result_ptr === null) {
 			throw new Error('FFI function returned null pointer');
@@ -288,123 +289,49 @@ export class NativeImplementation extends BaseImplementation {
 		new Deno.UnsafePointerView(result_ptr).copyInto(result_bytes);
 		this.symbols.tsv_free(result_ptr, result_len);
 
-		return this.decoder.decode(result_bytes);
-	}
-
-	/**
-	 * `call_ffi` for the goal-aware TS symbols (extra `u32` goal argument). A
-	 * near-duplicate of `call_ffi` rather than a shared closure so the timed
-	 * `call_ffi` path takes no per-call indirection; this variant is only reached
-	 * from the coverage-only conformance preflight.
-	 */
-	private call_ffi_goal(fn: FfiGoalFn, source: string, goal: ParseGoal): string {
-		const m = this._marshal;
-		if (!m) throw new Error('Native library not initialized');
-
-		const max_bytes = source.length * 3;
-		if (max_bytes > m.source_buffer.length) {
-			m.source_buffer = new Uint8Array(
-				new ArrayBuffer(next_capacity(max_bytes, m.source_buffer.length))
-			);
-			m.source_ptr = Deno.UnsafePointer.of(m.source_buffer);
-		}
-		const { read, written } = this.encoder.encodeInto(source, m.source_buffer);
-		if (read !== source.length) {
-			throw new Error(`encodeInto consumed ${read} of ${source.length} source units`);
-		}
-
-		const result_ptr = fn(m.source_ptr, written, goal === 'script' ? 1 : 0, m.out_len_ptr);
-		if (result_ptr === null) {
-			throw new Error('FFI function returned null pointer');
-		}
-
-		const result_len = m.out_len_buffer[0];
-		const result_byte_count = Number(result_len);
-		if (result_byte_count > m.result_buffer.length) {
-			m.result_buffer = new Uint8Array(
-				new ArrayBuffer(next_capacity(result_byte_count, m.result_buffer.length))
+		const result = this.decoder.decode(result_bytes);
+		const status = m.out_status_buffer[0];
+		if (status === STATUS_UNWRITTEN) {
+			throw new Error(
+				`tsv left out_status unwritten — the call's verdict is unknowable, so this ` +
+					`row's coverage would be fabricated. See lib/reject_probe.ts.`
 			);
 		}
-
-		const result_bytes = m.result_buffer.subarray(0, result_byte_count);
-		new Deno.UnsafePointerView(result_ptr).copyInto(result_bytes);
-		this.symbols.tsv_free(result_ptr, result_len);
-
-		return this.decoder.decode(result_bytes);
+		if (status !== STATUS_OK) {
+			// The error payload is `error_result`'s compact `serde_json` object.
+			// Parsed only once the status has already said this is an error, so a
+			// formatted file never reaches `JSON.parse` — the loose prefix test this
+			// replaced ran one over a whole `{#if …}` file's output on every timed call.
+			let parsed;
+			try {
+				parsed = JSON.parse(result);
+			} catch {
+				throw new Error(`tsv reported an error with an unparseable payload: ${result}`);
+			}
+			throw new Error(parsed.error ?? result);
+		}
+		return result;
 	}
 
-	/** Check FFI result for error and throw if present */
-	private check_error(result: string): void {
-		// The error payload is `error_result`'s compact `serde_json` object, so the
-		// whole envelope prefix is the test. A bare `{` is NOT: a formatted Svelte
-		// file can legitimately start with one (a `{#if …}` block at position 0), and
-		// the loose test then ran a full `JSON.parse` — and a thrown SyntaxError —
-		// over that file's entire output on every timed call, a cost neither sibling
-		// binding pays (`napi.ts` throws natively, `wasm.ts` returns the string), so
-		// it would land in the cross-runtime table as a binding-boundary delta.
-		// Formatted output cannot begin `{"error"`: a `{` at statement position is a
-		// block, and tsv normalizes a Svelte mustache's string to single quotes.
-		if (!result.startsWith('{"error"')) return;
-		let parsed;
-		try {
-			parsed = JSON.parse(result);
-		} catch {
-			// Not valid JSON, not an error response
-			return;
-		}
-		if (parsed.error) {
-			throw new Error(parsed.error);
-		}
-	}
-
+	// `goal_for` withholds the goal for svelte/css, which REJECT a script code
+	// rather than ignoring it (`tsv_ffi`'s `ffi_goal`). One shared helper for all
+	// three wrappers — see its doc in `lib/types.ts`.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		const result =
-			goal && language === 'typescript'
-				? this.call_ffi_goal(this.symbols.tsv_parse_typescript_with_goal as FfiGoalFn, source, goal)
-				: this.call_ffi(this.tables.parse[language], source);
-		const parsed = JSON.parse(result);
-		if (parsed.error) {
-			throw new Error(parsed.error);
-		}
-		return parsed;
+		return JSON.parse(this.call_ffi(this.tables.parse[language], source, goal_for(language, goal)));
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		const result =
-			goal && language === 'typescript'
-				? this.call_ffi_goal(
-						this.symbols.tsv_parse_internal_typescript_with_goal as FfiGoalFn,
-						source,
-						goal
-					)
-				: this.call_ffi(this.tables.parse_internal[language], source);
-		this.check_error(result);
+		this.call_ffi(this.tables.parse_internal[language], source, goal_for(language, goal));
 	}
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
-		let result: string;
-		if (goal && language === 'typescript') {
-			result = this.call_ffi_goal(
-				this.symbols.tsv_parse_typescript_no_locations_with_goal as FfiGoalFn,
-				source,
-				goal
-			);
-		} else {
-			const fn = this.tables.parse_no_locations[language];
-			if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
-			result = this.call_ffi(fn, source);
-		}
-		const parsed = JSON.parse(result);
-		if (parsed.error) {
-			throw new Error(parsed.error);
-		}
-		return parsed;
+		const fn = this.tables.parse_no_locations[language];
+		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
+		return JSON.parse(this.call_ffi(fn, source, goal_for(language, goal)));
 	}
 
 	format(source: string, language: Language): string {
-		const result = this.call_ffi(this.tables.format[language], source);
-		this.check_error(result);
-		return result;
+		return this.call_ffi(this.tables.format[language], source);
 	}
 
 	dispose(): void {

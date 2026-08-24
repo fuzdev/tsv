@@ -28,34 +28,54 @@ The `lang_bindings!` macro generates four `extern "C"` functions per language (s
 - `tsv_parse_internal_<lang>` — Empty string (benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
 - `tsv_format_<lang>` — Formatted source
 
-Plus, outside the macro, four goal-aware TypeScript entry points taking a
-trailing goal code (`0` = Module, `1` = Script; any other code returns an error
-JSON rather than a silent default): `tsv_parse_typescript_with_goal`,
-`tsv_parse_typescript_no_locations_with_goal`,
-`tsv_parse_internal_typescript_with_goal`, and `tsv_format_typescript_with_goal`
-— the C-ABI counterparts of `tsv_napi`'s `*_with_goal` quartet and `tsv_wasm`'s
-`{goal}` option (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Format
-Options); coverage is identical across the three bindings.
-
 Plus `tsv_free(ptr, len)` for deallocation.
 
-All return-pointer functions share the signature `(source_ptr: *const u8, source_len: usize, out_len: *mut usize) -> *mut u8` — except the four goal-aware TypeScript exports (`tsv_parse_typescript_with_goal` / `tsv_parse_typescript_no_locations_with_goal` / `tsv_parse_internal_typescript_with_goal` / `tsv_format_typescript_with_goal`), which take a fourth `goal: u32` parameter before `out_len`.
+### The uniform signature
+
+Every return-pointer function has the same shape:
+
+```c
+uint8_t *tsv_<op>_<lang>(const uint8_t *source_ptr, size_t source_len,
+                         uint32_t goal, size_t *out_len, uint32_t *out_status);
+```
+
+One export per (language, operation): there is no goalless twin of a goal-aware
+export, and no arity that varies by language. A host writes one call shape and
+one symbol table.
+
+`goal` is the parse goal — `0` = Module, `1` = Script; any other code is an
+error, never a silent default. At Script goal `await` is an ordinary identifier
+and `import`/`export`/`import.meta` are syntax errors. **Svelte and CSS REJECT a
+non-zero code** rather than ignoring it: Svelte hard-wires `Module` and CSS has
+no goal axis, so a caller passing `1` there asked for something that cannot be
+honored and is told — the same stance `tsv_wasm`'s `read_options` takes when it
+rejects the `goal` key outright (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md)
+§Format Options). `tsv_napi` spells the axis as a trailing optional goal string;
+each binding has its own `lang_bindings!`, but all three read the **same**
+`parse_ast!` / `goal_allowed!` pair out of [`tsv_arena`](../tsv_arena/), so which
+languages have a goal axis is one fact in one place and coverage is identical by
+construction.
 
 ## Memory & Safety Contract
 
 - **Allocation**: tsv allocates returned buffers as `Box<[u8]>` and leaks them via `Box::into_raw`. Length is written to `*out_len`.
 - **Free**: Caller MUST call `tsv_free(ptr, *out_len)` exactly once per returned pointer. `tsv_free` no-ops on null or zero length.
-- **UTF-8 input**: `source_ptr`/`source_len` must point to valid UTF-8. Invalid UTF-8 returns an error JSON (`{"error": "Invalid UTF-8: ..."}`), not a crash. A null `source_ptr` with `source_len == 0` is accepted as the empty source (FFI hosts commonly pass (null, 0) for an empty buffer); null with a non-zero length returns an error JSON.
-- **Errors**: All errors surface as JSON-shaped output (`{"error": "..."}`) with a valid pointer the caller still must free. There is no separate error channel.
-- **Panic safety**: Every entry point wraps the work in `std::panic::catch_unwind`. Panics are caught (when built with `panic = "unwind"`) and converted to `{"error": "panic: ..."}`. Under `panic = "abort"` profiles, panics still abort — the catch is profile-dependent.
+- **UTF-8 input**: `source_ptr`/`source_len` must point to valid UTF-8. Invalid UTF-8 is reported as an error (`{"error": "Invalid UTF-8: ..."}`), not a crash. A null `source_ptr` with `source_len == 0` is accepted as the empty source (FFI hosts commonly pass (null, 0) for an empty buffer); null with a non-zero length is an error.
+- **Errors: the status word, never the payload.** `*out_status` receives `TSV_STATUS_OK` (0) or `TSV_STATUS_ERROR` (1), written exactly once per call alongside `*out_len` — one site writes both (`bytes_to_ptr`), so they cannot disagree about which call they describe. That word is the whole verdict. A failed call's payload IS a `{"error": "..."}` JSON object with a valid pointer the caller still must free, but a caller must not sniff for it: formatted output is arbitrary source text, so no prefix test is sound in general. `tsv_parse_internal_*` is the sharpest case — its success payload is empty, carrying no shape to read a verdict off at all.
+- **Panic safety**: Every entry point wraps the work in `std::panic::catch_unwind`. Panics are caught (when built with `panic = "unwind"`) and reported as `TSV_STATUS_ERROR` with a `{"error": "panic: ..."}` payload. Under `panic = "abort"` profiles, panics still abort — the catch is profile-dependent.
 
 ## Files
 
-- `src/lib.rs` — All bindings: `lang_bindings!` macro, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `ffi_goal` decoding the `u32` code), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it); deps include `tsv_arena` (`format` → `tsv_arena/format`)
 
 The in-crate test module drives every entry point in-process (real
-alloc → write `out_len` → `tsv_free` round-trip), covering the happy path per
-language, JSON-error returns on invalid syntax, the invalid-UTF-8 path, empty
-input, and `tsv_free` null/zero no-ops. It runs under `cargo test` (so CI's
+alloc → write `out_len`/`out_status` → `tsv_free` round-trip), covering the happy
+path per language, the error status on invalid syntax, the goal axis and its two
+refusals (an unknown code; a goal on a goalless language), the invalid-UTF-8 path,
+empty input, and `tsv_free` null/zero no-ops. Its `call_raw` helper pins the one
+direction of status↔payload agreement that is a contract — an error status must
+carry an `{"error": …}` payload — and deliberately leaves the converse unasserted,
+since asserting a success payload *isn't* an error object would rebuild the content
+sniff the status channel exists to retire. It runs under `cargo test` (so CI's
 `check` job exercises the native binding — the Deno/WASM smoke paths don't).
