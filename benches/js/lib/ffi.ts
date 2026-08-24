@@ -74,8 +74,9 @@ const symbols = {
 		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer'
 	},
-	// goal-aware TS parse (extra `u32` goal: 0 = Module, 1 = Script) — the
-	// conformance surface's test262 files
+	// goal-aware TS exports (extra `u32` goal: 0 = Module, 1 = Script) — the parse
+	// trio serves the conformance surface's test262 files; the format twin is declared
+	// for parity with the N-API addon's `format_typescript_with_goal` (unused here too)
 	tsv_parse_typescript_with_goal: {
 		parameters: ['pointer', 'usize', 'u32', 'pointer'],
 		result: 'pointer'
@@ -85,6 +86,10 @@ const symbols = {
 		result: 'pointer'
 	},
 	tsv_parse_internal_typescript_with_goal: {
+		parameters: ['pointer', 'usize', 'u32', 'pointer'],
+		result: 'pointer'
+	},
+	tsv_format_typescript_with_goal: {
 		parameters: ['pointer', 'usize', 'u32', 'pointer'],
 		result: 'pointer'
 	},
@@ -103,7 +108,7 @@ type FfiFn = (
 	len: number | bigint,
 	out_len: Deno.PointerValue
 ) => Deno.PointerValue;
-/** Goal-aware TS parse symbol: an extra `u32` goal (0 = Module, 1 = Script). */
+/** Goal-aware TS symbol (parse or format): an extra `u32` goal (0 = Module, 1 = Script). */
 type FfiGoalFn = (
 	source: Deno.PointerValue,
 	len: number | bigint,

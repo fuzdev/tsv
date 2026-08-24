@@ -1034,7 +1034,7 @@ The other classes a run reaches, by diff signature:
 
 #### The other half: a module comment recovered by a preceding block
 
-**Carried, not refused.** The 7 residual module-comment mismatches are the
+**Carried, not refused.** The residual module-comment mismatches are the
 **same mechanism** as the refused half (C2) —
 esrap's single comment index being re-seeked backward — reached by a different route.
 They are **CARRIED, not refused**: unlike the refused half (a module-second comment

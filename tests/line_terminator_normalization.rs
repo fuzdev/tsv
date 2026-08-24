@@ -93,7 +93,7 @@ fn css_formats_the_same_however_its_lines_end() {
 }
 
 /// The library's own fused entry points fold too — a caller that never touches the CLI
-/// still gets LF-only output. (`tsv_css` has no `format_str`; its seam is the one above.)
+/// still gets LF-only output, in every language crate.
 #[test]
 fn the_fused_format_str_entry_points_fold_as_well() {
     assert_eq!(
@@ -103,6 +103,10 @@ fn the_fused_format_str_entry_points_fold_as_well() {
     assert_eq!(
         tsv_svelte::format_str(&SVELTE.replace('\n', "\r")).expect("svelte"),
         tsv_svelte::format_str(SVELTE).expect("svelte"),
+    );
+    assert_eq!(
+        tsv_css::format_str(&CSS.replace('\n', "\r")).expect("css"),
+        tsv_css::format_str(CSS).expect("css"),
     );
 }
 
