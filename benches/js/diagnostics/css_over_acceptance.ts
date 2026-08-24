@@ -23,37 +23,115 @@
  *
  * **The one pinned thing is the reject set's SIZE** ({@link CSS_REJECTS_PIN}),
  * and that is what earns the tool its keep. The set is deterministic given the
- * pins — prettier's checkout commit, the wpt-css harvest count, and the svelte
- * oracle version are all pinned elsewhere — so a move means one of them moved, or
- * the oracle's grammar did. Without the pin, a `parseCss` that started rejecting
- * (or accepting) wholesale would silently reshape the published `parse/css`
- * coverage row with nothing to catch it.
+ * pins — the ../prettier and ../svelte checkout commits, the wpt-css harvest
+ * count, and the svelte oracle version are all pinned elsewhere — so a move means
+ * one of them moved, or the oracle's grammar did. Without the pin, a `parseCss`
+ * that started rejecting (or accepting) wholesale would silently reshape the
+ * published `parse/css` coverage row with nothing to catch it.
+ *
+ * **Two modes.** The default run is the profile above. `--pin-only` grades the
+ * pin and nothing else: it loads only the oracle (no FFI / WASM build) and is
+ * FRESHNESS-STAMPED like the suite harvests (`lib/harvest_stamp.ts` — the
+ * ../svelte + ../prettier commits, the svelte oracle version, and the two pins
+ * that shape the corpus), so a run whose inputs are unchanged skips instantly.
+ * That is what lets `bench:pins:suites` carry it as a leg beside the four
+ * harvests: the pin is re-derived on the same cadence as its siblings rather than
+ * by hand. The list itself is still built live — nothing else consumes it, so a
+ * cache would be a second thing to keep fresh; only the stamp is kept.
+ * `--if-present` (passed by that task) warn-skips when the CSS corpus is partial
+ * (an absent checkout or suite cache, or no sidecar) — the pin is a claim about
+ * the FULL corpus, so a smaller one is not a move; a manual run without the flag
+ * fails closed, matching the harvests. `--force` re-grades despite a fresh stamp.
+ * The profile run writes the same stamp once its own pin check passes.
  *
  * `svelte/compiler` appears as a row and must read 0/N: it BUILT this list, so
  * any other number means the oracle disagrees with itself and the run fails
  * rather than publishing a profile graded against a moved reference.
  *
  * Run (from the repo root):
- *   deno task css:over-acceptance
+ *   deno task css:over-acceptance             # the profile (builds FFI + WASM first)
  *   deno task css:over-acceptance --json 2>/dev/null > report.json
  *   deno task css:over-acceptance --verbose   # per-tool sample paths
+ *   deno task css:over-acceptance:pin         # the pin alone (a bench:pins:suites leg)
  */
 
-import { DevReposLoader } from '../lib/corpus.ts';
-import { CSS_REJECTS_PIN } from '../lib/gate_counts.ts';
-import { init_implementations } from '../lib/implementations.ts';
+import { CanonicalImplementation } from '../lib/canonical.ts';
+import { corpus_missing_entries, DevReposLoader } from '../lib/corpus.ts';
+import { CSS_REJECTS_PIN, WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
+import {
+	git_head,
+	HARVEST_STAMPS,
+	harvest_up_to_date,
+	short_commit,
+	type StampInputs,
+	write_stamp
+} from '../lib/harvest_stamp.ts';
+import type { InitializedImplementations } from '../lib/implementations.ts';
 import { CANONICAL_PARSER_ROWS, type TsvImplementation } from '../lib/types.ts';
+import { load_all_versions } from '../lib/versions.ts';
 
 /** Sample paths kept per tool for `--verbose` — enough to see the shape, not a dump. */
 const SAMPLE_LIMIT = 8;
 
 const json_mode = Deno.args.includes('--json');
 const verbose = Deno.args.includes('--verbose') || Deno.args.includes('-v');
+const pin_only = Deno.args.includes('--pin-only');
+const if_present = Deno.args.includes('--if-present');
+const force = Deno.args.includes('--force');
 const log = (...args: unknown[]): void => {
 	if (!json_mode) console.error(...args);
 };
 
-const impls = await init_implementations({ logger: log });
+const STAMP_PATH = HARVEST_STAMPS['css-rejects'].path;
+
+// Freshness stamp: the CSS corpus is prettier's suite (../prettier), the svelte
+// suite's own `.css` (../svelte) and the wpt-css harvest (its count pin stands in
+// for the ../wpt commit), graded by the pinned npm svelte — skip the grade when
+// all of those plus the rejects pin match the stamp. Only `--pin-only` skips: the
+// profile is the point of a default run.
+const versions = await load_all_versions();
+const svelte_commit = git_head('../svelte');
+const stamp_inputs: StampInputs = {
+	harvest: 'css-rejects',
+	svelte_commit,
+	prettier_commit: git_head('../prettier'),
+	svelte_oracle: versions.canonical.svelte,
+	wpt_pin: WPT_CSS_HARVEST_PIN,
+	rejects_pin: CSS_REJECTS_PIN
+};
+if (
+	pin_only &&
+	!force &&
+	svelte_commit !== null &&
+	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, []))
+) {
+	console.error(
+		`css-rejects pin up to date (../svelte at ${short_commit(svelte_commit)}, ` +
+			`oracle svelte@${versions.canonical.svelte}, pin ${CSS_REJECTS_PIN}) — skipping; --force to re-grade.`
+	);
+	Deno.exit(0);
+}
+
+/** Warn-and-skip under `--if-present`, fail closed otherwise. */
+const skip_or_fail = (msg: string): never => {
+	if (if_present) {
+		console.error(`  ⚠ ${msg} — skipping (--if-present)`);
+		Deno.exit(0);
+	}
+	console.error(`FAIL: ${msg}`);
+	Deno.exit(1);
+};
+
+// A pin is a claim about the FULL corpus, so a partial one is asked about before
+// anything loads — per language, so an absent test262 cache (JS) is not read as a
+// smaller CSS corpus. The profile run leaves this to the loader's own fail-fast.
+if (pin_only) {
+	const { missing, optional_missing } = await corpus_missing_entries('conformance', 'css');
+	const absent = [...missing, ...optional_missing];
+	if (absent.length > 0) {
+		skip_or_fail(`css-rejects pin: the conformance CSS corpus is partial — ${absent.join(', ')}`);
+	}
+}
 
 /**
  * The row this comparison's ORACLE reports under. Named once because the run
@@ -64,13 +142,38 @@ const impls = await init_implementations({ logger: log });
  */
 const ORACLE_ROW = CANONICAL_PARSER_ROWS.css;
 
+// The oracle alone for the pin; every impl for the profile. The full set is a
+// dynamic import so the pin leg never touches the FFI / WASM loaders it does not
+// need (and whose artifacts its task does not build).
+let impls: InitializedImplementations | null = null;
+let oracle: TsvImplementation;
+if (pin_only) {
+	const canonical = new CanonicalImplementation(versions.canonical);
+	try {
+		await canonical.init();
+	} catch (e) {
+		skip_or_fail(
+			`css-rejects pin: could not init svelte/compiler (${e instanceof Error ? e.message : e}) ` +
+				'— run `deno task bench:install`'
+		);
+	}
+	oracle = canonical;
+} else {
+	const { init_implementations } = await import('../lib/implementations.ts');
+	impls = await init_implementations({ logger: log });
+	oracle = impls.canonical;
+}
+
 /** The CSS-parsing rows, in the conformance report's display order. */
-const rows: Array<{ name: string; impl: TsvImplementation | undefined }> = [
-	{ name: ORACLE_ROW, impl: impls.canonical },
-	{ name: 'tsv', impl: impls.native },
-	{ name: 'tsv_wasm', impl: impls.wasm },
-	{ name: 'postcss', impl: impls.postcss }
-];
+const rows: Array<{ name: string; impl: TsvImplementation | undefined }> =
+	impls === null
+		? [{ name: ORACLE_ROW, impl: oracle }]
+		: [
+				{ name: ORACLE_ROW, impl: impls.canonical },
+				{ name: 'tsv', impl: impls.native },
+				{ name: 'tsv_wasm', impl: impls.wasm },
+				{ name: 'postcss', impl: impls.postcss }
+			];
 
 const accepts = (impl: TsvImplementation, source: string): boolean => {
 	try {
@@ -92,20 +195,29 @@ if (files.length === 0) {
 	Deno.exit(1);
 }
 
-// Build the reject list with the oracle itself, live. Unlike the tsc corpus this
-// needs no harvest cache: nothing else consumes the list (the CSS corpus is
-// deliberately unfiltered), so a cache would be a second thing to keep fresh.
-const oracle = impls.canonical;
+// Build the reject list with the oracle itself, live (see the module doc on why
+// there is no cache).
 const rejected = files.filter((f) => !accepts(oracle, f.content));
 
 if (rejected.length !== CSS_REJECTS_PIN) {
 	console.error(
 		`FAIL: the oracle rejects ${rejected.length} of ${files.length} CSS files ≠ pinned ` +
-			`${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's checkout, the wpt-css ` +
-			`harvest) or svelte's parseCss changed what it accepts — re-pin CSS_REJECTS_PIN in ` +
-			`lib/gate_counts.ts deliberately, after checking which.`
+			`${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's or ../svelte's checkout, ` +
+			`the wpt-css harvest) or svelte's parseCss changed what it accepts — re-pin CSS_REJECTS_PIN ` +
+			`in lib/gate_counts.ts deliberately, after checking which.`
 	);
 	Deno.exit(1);
+}
+// Stamped only once the pin check passes, so a wrong count never stamps itself fresh.
+if (svelte_commit !== null) await write_stamp(STAMP_PATH, stamp_inputs);
+
+if (pin_only) {
+	oracle.dispose();
+	console.error(
+		`css-rejects pin: parseCss rejects ${rejected.length}/${files.length} conformance CSS files ` +
+			`— matches CSS_REJECTS_PIN (stamped).`
+	);
+	Deno.exit(0);
 }
 
 interface Row {

@@ -56,7 +56,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { CORE_CRATES } from '../benches/js/lib/check_artifact_freshness.ts';
+import { CORE_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 import { assert_staged_fresh } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 

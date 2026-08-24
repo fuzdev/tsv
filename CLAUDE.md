@@ -103,7 +103,7 @@ deno task build            # workspace dev build
 deno task build:release    # workspace optimized build
 deno task build:all        # release + ffi + build:packages + build:napi:packages (everything)
 deno task build:packages   # the 6 publishable WASM bundles (npm + deno) — single source of truth shared by CI + publish.ts
-deno task build:bench      # the artifact set `bench`/`smoke` measure (ffi×3 + the 3 wasm:deno variants + the node half: napi + wasm:all:nodejs)
+deno task build:bench      # the artifact set `bench`/`smoke` measure, and what EVERY bench leg builds (ffi×3 + the 3 wasm:deno variants + the node half: napi + wasm:all:nodejs)
 deno task build:ffi        # C FFI library (:format / :parse size-only variants; :all builds all three)
 deno task build:wasm:deno  # deno-target WASM bundle (requires wasm-pack; :parse:deno / :all:deno for the other variants)
 deno task install-cli      # build the release CLI and install it to ~/.local/bin/tsv (the local daily driver)
@@ -319,10 +319,13 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (ALL 
 # The three gates above accept: -v, --json, <subtree>.
 
 deno task conformance                  # pre-release aggregate: preflights pins:audit:checkouts +
+# bench:pins:suites (the PIN-FRESHNESS leg: re-derives the conformance-view count pins no other cadence grades —
+# seconds when nothing moved, each stamped leg warn-skips an absent checkout; benches/js/CLAUDE.md §Harvests) +
 # fixtures:validate + compile:fixtures:validate (the ORACLE-FRESHNESS legs — `check` runs only each tree's
 # sidecar-free slice, which grades tsv against the committed file and so cannot see the oracle itself moving;
-# only a run that re-formats through prettier can, ~17 s for all 4288 parser/formatter fixtures), then the three
-# gates above + corpus:compare:parse --all +
+# only a run that re-formats through prettier can, ~17 s for all 4288 parser/formatter fixtures), then
+# bench:harvest:svelte-styles (re-extracting the CSS the `gates` view grades, beside the legs that read it), then the
+# three gates above + corpus:compare:parse --all +
 # corpus:compare:format --all in ONE process (benches/js/conformance.ts; oracles load once, fail-fast, FFI built once),
 # then render:audit over the version-pinned checkouts (a subprocess — drives its own sidecar). The format leg's prettier
 # calls ride a content-addressed cache (benches/js/lib/prettier_cache.ts; TSV_PRETTIER_CACHE=0 disables).
@@ -343,7 +346,7 @@ Divergence detection identifies known differences documented in the `conformance
 
 **Cross-runtime.** One harness runs under **Deno, Node, and Bun** — each emits its own runtime-labeled report (`report.{deno,node,bun}.{json,md}`), never merged; `deno task bench:compose` folds them into the combined `report.{json,md}` (what tsv.fuz.dev consumes). The native row is **FFI** under Deno, **N-API** under Node/Bun; everything else is shared runtime-neutral code. Full detail: ./benches/js/CLAUDE.md §Cross-Runtime.
 
-**Perf vs conformance surfaces.** `bench:perf` measures a **real-world-only** corpus (app + framework source) — the throughput headline; every in-scope tool must fully process every file or the run fails (`benches/js/lib/perf_omit.ts`), so coverage is 100% by construction. `bench:conformance` measures per-tool **parse coverage** over a **disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the wpt-css/test262/tsc-corpus harvests; the Svelte and tsc sets exclude what their own canonical parser rejects) — **coverage-only and node-only by design** (no timed phase; runtime-invariant). Its report splits coverage **per corpus source**, since a group's aggregate blends corpora that answer different questions (`parse/typescript` is mostly test262, i.e. ECMAScript) and each filtered set scores its own oracle at 100% by construction. Coverage counts accepts and so can only reward permissiveness; the opposite axis has a task per surface, both read inverted as profiles rather than gates — `deno task ts-repo:over-acceptance` (per-tool accepts over the files tsc's parser rejects) and `deno task css:over-acceptance` (over the files `parseCss` rejects; its reject-count pin is what makes the CSS reference row's grammar moving visible, since that surface is deliberately unfiltered). `deno task bench` = perf across all three runtimes + compose + the node coverage run. The correctness gates keep their own unchanged corpus scope. Full detail: ./benches/js/CLAUDE.md §Corpus.
+**Perf vs conformance surfaces.** `bench:perf` measures a **real-world-only** corpus (app + framework source) — the throughput headline; every in-scope tool must fully process every file or the run fails (`benches/js/lib/perf_omit.ts`), so coverage is 100% by construction. `bench:conformance` measures per-tool **parse coverage** over a **disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the wpt-css/test262/tsc-corpus harvests; the Svelte and tsc sets exclude what their own canonical parser rejects) — **coverage-only and node-only by design** (no timed phase; runtime-invariant). Its report splits coverage **per corpus source**, since a group's aggregate blends corpora that answer different questions (`parse/typescript` is mostly test262, i.e. ECMAScript) and each filtered set scores its own oracle at 100% by construction. Coverage counts accepts and so can only reward permissiveness; the opposite axis has a task per surface, both read inverted as profiles rather than gates — `deno task ts-repo:over-acceptance` (per-tool accepts over the files tsc's parser rejects) and `deno task css:over-acceptance` (over the files `parseCss` rejects; its reject-count pin is what makes the CSS reference row's grammar moving visible, since that surface is deliberately unfiltered — the pin alone is `css:over-acceptance:pin`, a stamped `bench:pins:suites` leg, and the conformance coverage run grades the same count). `deno task bench` = perf across all three runtimes + compose + the node coverage run. The correctness gates keep their own unchanged corpus scope. Full detail: ./benches/js/CLAUDE.md §Corpus.
 
 ```bash
 # One-time: install the harness's npm deps (package.json is the source of truth; both runtimes
@@ -355,19 +358,30 @@ deno task smoke         # fast sanity check that every formatter+parser produces
 
 # Benchmarks build the runtime's artifacts automatically. `bench` runs ALL three runtimes and
 # fails if node or bun is missing — Deno is the only hard dep; otherwise run the per-runtime tasks.
-deno task bench         # full refresh: perf ×3 + compose + node conformance COVERAGE (needs node AND bun)
-deno task bench:perf    # perf surface only: all three runtimes + compose
+deno task bench         # full refresh = bench:perf + bench:conformance (needs node AND bun)
+deno task bench:perf    # perf surface: build the whole artifact set ONCE, then the three :run legs + compose
 deno task bench:deno    # Deno only (no node/bun needed)
 deno task bench:node    # Node only
-deno task bench:bun     # Bun only (reuses the Node artifacts)
-deno task bench:compose # fold existing per-runtime reports → combined report.{json,md}
+deno task bench:bun     # Bun only
+#   ^ each standalone leg builds the WHOLE artifact set, not its own half: every report carries the same tsv
+#     size rows, so a half-built leg would publish the other binding's size at an older commit (deno.json
+#     `//bench:deno`; a `:run` leg WARNS when it is about to). Warm that costs ~a second, cargo + wasm-pack only.
+deno task bench:compose # fold existing per-runtime reports → combined report.{json,md}; warns when the conformance
+                        # report's commit is behind the perf siblings' (the site publishes both)
 deno task bench:deno:run   # run without rebuilding (also :node:run / :bun:run; aborts on stale artifacts)
 
 # Conformance surface: per-tool parse COVERAGE → report.conformance.node.{json,md} (entries carry null timing)
-deno task bench:conformance        # harvest + build:bench:node + coverage run
+deno task bench:conformance        # bench:pins:suites + build:bench + coverage run (also grades CSS_REJECTS_PIN)
 deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
-deno task bench:harvest            # regenerate the wpt-css + test262 + tsc-corpus + svelte-reject + svelte-styles caches
-                                   # (first four freshness-stamped, --force after harvest-logic changes; svelte-styles always re-harvests, ~2 s)
+deno task bench:harvest            # regenerate every cache = `bench:pins:suites` + `bench:harvest:svelte-styles` (the manual
+                                   # refresh-everything entry point; each caller takes only the group its corpus VIEW holds)
+deno task bench:pins:suites     # the conformance-view group: the four SUITE caches (wpt-css + test262 + tsc-corpus +
+                                   # svelte-rejects) + the CSS reject pin (`css:over-acceptance:pin`). All freshness-stamped
+                                   # (--force after harvest-logic changes) and `--if-present`. The PIN-FRESHNESS preflight of
+                                   # `deno task conformance`; `deno task doctor` reports a stamp behind its checkout
+deno task bench:harvest:svelte-styles # the PERF-view CSS cache: no stamp (live dev repos), always re-harvests ~2 s, and REQUIRES every
+                                   # dev repo, so it fails rather than warn-skips. Chained by `bench:perf`, and by `conformance` late,
+                                   # beside the `gates`-view corpus legs that read it (benches/js/CLAUDE.md §Harvests)
 
 deno task bench:deno:run -- --verbose   # per-file skip detail (counts always shown; paths/errors opt-in)
 

@@ -24,11 +24,14 @@
  * parse and format functions the bench runs. The corpus tools execute no WASM, so
  * they guard the native library alone.
  *
- * Size-only artifacts — the subset `pkg/{format,parse}/<target>` bundles and the
- * `target/ffi-{format,parse}` builds — aren't guarded: nothing runs them, and
- * `binary_sizes.ts` both degrades gracefully when they're absent and now records
- * the absence (`binary_sizes_absent`), so a report from a partially-built tree
- * says so rather than just carrying a shorter table.
+ * Size-only artifacts — every tsv build the report SIZES but this runtime does not
+ * execute (`lib/tsv_artifacts.ts`: the other binding, the subset bundles, the
+ * `target/ffi-{format,parse}` builds) — are graded too, but never fatally
+ * (`warn_stale_reported_artifacts`): nothing measures them, so a stale one can't
+ * corrupt a timing, and a `:run` exists precisely to skip their rebuild. What it CAN
+ * do is publish the other binding's size at an older commit inside a report stamped
+ * with this one, which is the warning. An absent one is `binary_sizes.ts`'s to
+ * record (`binary_sizes_absent`), so only staleness is named here.
  *
  * Escape hatch: set `BENCH_STALE_OK=1` to run anyway. A missing artifact is
  * always fatal (you can't measure what isn't there); `BENCH_STALE_OK=1`
@@ -45,37 +48,7 @@ import { fileURLToPath } from 'node:url';
 import { get_library_path } from './ffi.ts';
 import { get_napi_library_path } from './napi.ts';
 import { current_runtime, wasm_target } from './runtime.ts';
-
-/**
- * Crates whose source compiles into EVERY measured tsv artifact (the shared
- * core): the language crates plus `tsv_arena` (all three bindings' per-thread
- * reuse). Applied as the freshness floor for every check.
- *
- * `tsv_ignore` + `tsv_discover` are deliberately NOT here — they feed only the
- * WASM bundle (the `IgnoreStack` export), not `tsv_ffi` / `tsv_napi`, so they
- * live in `WASM_CRATES`. Sharing them would false-stale the native checks: a
- * `tsv_discover` edit never rebuilds the FFI (it's not in its dependency
- * graph), so the guard could never clear on a rebuild.
- *
- * Exported (with `WASM_CRATES` + `newest_source_mtime`) for the two guard
- * siblings — `scripts/run_if_stale.ts` (build-side skip) and
- * `scripts/check_staged_freshness.ts` (staged-package abort) — so every side
- * agrees on what "the sources" are. Deliberately excludes the dev-tooling
- * crates (`tsv_debug`, `tsv_cli`): they don't feed the measured artifacts, and
- * including them would force wasm rebuilds on every fixture-workflow edit.
- * (The staged guard's CLI-binary check names `tsv_cli` itself where it needs it.)
- */
-export const CORE_CRATES = ['tsv_lang', 'tsv_arena', 'tsv_html', 'tsv_ts', 'tsv_css', 'tsv_svelte'];
-
-/**
- * Crates that feed the WASM bundle beyond `CORE_CRATES`: the binding crate
- * itself plus `tsv_ignore` + `tsv_discover` (the `IgnoreStack` export, which
- * only the WASM artifact links among the measured bindings — `tsv_ffi` /
- * `tsv_napi` link neither). Used as the WASM check's `binding_crates` AND by
- * `scripts/run_if_stale.ts` + `scripts/check_staged_freshness.ts`, imported by
- * all three so no guard can drift on what feeds the bundle.
- */
-export const WASM_CRATES = ['tsv_wasm', 'tsv_ignore', 'tsv_discover'];
+import { CORE_CRATES, TSV_ARTIFACTS } from './tsv_artifacts.ts';
 
 /** Absolute path to the workspace `crates/` directory. */
 const CRATES_DIR = fileURLToPath(new URL('../../../crates', import.meta.url));
@@ -92,7 +65,7 @@ export interface ArtifactCheck {
 	 * Binding crate(s) feeding this artifact, beyond `CORE_CRATES` — e.g.
 	 * `['tsv_ffi']` for the native library, `['tsv_wasm']` for a WASM bundle.
 	 */
-	binding_crates: string[];
+	binding_crates: readonly string[];
 	/** Command that rebuilds this artifact, surfaced in the error message. */
 	rebuild: string;
 }
@@ -126,7 +99,7 @@ export function fmt_mtime(ms: number): string {
 const _mtime_cache = new Map<string, SourceMtime>();
 
 /** Newest mtime across `*.rs` files and `Cargo.toml` under the given crates. Memoized per crate set. */
-export async function newest_source_mtime(crates: string[]): Promise<SourceMtime> {
+export async function newest_source_mtime(crates: readonly string[]): Promise<SourceMtime> {
 	const key = crates.join(',');
 	const cached = _mtime_cache.get(key);
 	if (cached) return cached;
@@ -162,14 +135,8 @@ export async function newest_source_mtime(crates: string[]): Promise<SourceMtime
 	return newest;
 }
 
-/**
- * Abort the current `:run` task if any executed artifact is missing or older
- * than the crate sources that feed it. See the module doc for the rationale and
- * the `BENCH_STALE_OK=1` escape hatch. Exits the process with code 1 on a fatal
- * staleness; returns normally when everything is fresh (or only warns).
- */
-export async function check_artifact_freshness(checks: readonly ArtifactCheck[]): Promise<void> {
-	const stale_ok = env.BENCH_STALE_OK === '1';
+/** Every check whose artifact is missing or older than the sources feeding it. */
+async function find_stale(checks: readonly ArtifactCheck[]): Promise<StaleArtifact[]> {
 	let core = await newest_source_mtime(CORE_CRATES);
 	try {
 		const lock = await stat(CARGO_LOCK);
@@ -210,7 +177,18 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 			});
 		}
 	}
+	return stale;
+}
 
+/**
+ * Abort the current `:run` task if any executed artifact is missing or older
+ * than the crate sources that feed it. See the module doc for the rationale and
+ * the `BENCH_STALE_OK=1` escape hatch. Exits the process with code 1 on a fatal
+ * staleness; returns normally when everything is fresh (or only warns).
+ */
+export async function check_artifact_freshness(checks: readonly ArtifactCheck[]): Promise<void> {
+	const stale_ok = env.BENCH_STALE_OK === '1';
+	const stale = await find_stale(checks);
 	if (stale.length === 0) return;
 
 	const has_missing = stale.some((s) => s.reason === 'missing');
@@ -307,14 +285,58 @@ export function native_artifact_check(): ArtifactCheck {
  * `native_artifact_check` and pass it themselves.
  */
 export async function check_executed_artifacts(): Promise<void> {
+	await check_artifact_freshness(executed_artifact_checks());
+}
+
+/** The checks `check_executed_artifacts` runs — the runtime's native binding + its `all` bundle. */
+function executed_artifact_checks(): ArtifactCheck[] {
 	const target = wasm_target();
-	await check_artifact_freshness([
+	return [
 		native_artifact_check(),
 		{
 			label: `WASM (all/${target})`,
 			path: wasm_artifact_path('all'),
-			binding_crates: WASM_CRATES,
+			binding_crates: TSV_ARTIFACTS.tsv_wasm.binding_crates,
 			rebuild: `deno task build:wasm:all:${target}`
 		}
-	]);
+	];
+}
+
+/**
+ * Warn about every tsv artifact the report SIZES but this runtime does not execute
+ * (`TSV_ARTIFACTS` minus `executed_artifact_checks`) that is older than its sources.
+ * Never fatal, and silent on a missing one (that is `binary_sizes_absent`'s claim):
+ * nothing measures these, so the only harm is the size table publishing the other
+ * binding's build at an older commit under this run's `git_commit` — which the
+ * build-first tasks make unreachable (`build:bench` builds the whole set) and a
+ * `:run` after a crate edit does not. `BENCH_STALE_OK` is irrelevant here: the
+ * warning is the whole response.
+ */
+export async function warn_stale_reported_artifacts(): Promise<void> {
+	const executed = new Set(executed_artifact_checks().map((c) => c.path));
+	const checks: ArtifactCheck[] = Object.values(TSV_ARTIFACTS)
+		.filter((a) => !executed.has(a.path))
+		.map((a) => ({
+			label: a.label,
+			path: a.path,
+			binding_crates: a.binding_crates,
+			rebuild: a.rebuild
+		}));
+	const stale = (await find_stale(checks)).filter((s) => s.reason === 'stale');
+	if (stale.length === 0) return;
+	const lines = [
+		'',
+		'⚠ Stale size-only artifacts — the binary-size table will report an older build:'
+	];
+	for (const s of stale) {
+		lines.push(
+			`  • ${s.label}: built ${fmt_mtime(s.artifact_ms!)}, but ${s.source_path} changed ` +
+				`${fmt_mtime(s.source_ms!)}\n      rebuild: ${s.rebuild}`
+		);
+	}
+	lines.push(
+		'  (not measured, so not fatal — `deno task build:bench` refreshes the whole set)',
+		''
+	);
+	console.error(lines.join('\n'));
 }

@@ -346,9 +346,12 @@ if (no_check) {
 // parsers / prettier (corpus:compare:parse + :format, --all), and the JS parser vs
 // test262 POSITIVES (conformance:test262, pure Rust — negatives are the deferred
 // early-error frontier, reported not gated). `deno task conformance:all` runs the
-// whole set. Running them here means a release can't ship a parse/format
-// regression the in-repo gate is structurally blind to. Skipped by --no-check
-// alongside Step 3.
+// whole set behind its preflights (`pins:audit:checkouts`, `bench:pins:suites` —
+// which re-derives the suite-derived count pins nothing else grades, so a corpus
+// that moved under them fails the release rather than shipping numbers describing
+// the previous one — and the two oracle-freshness fixture legs). Running them here
+// means a release can't ship a parse/format regression the in-repo gate is
+// structurally blind to. Skipped by --no-check alongside Step 3.
 //
 // The gates need the ../svelte + ../acorn-typescript + ../typescript +
 // ../test262 checkouts, the corpus legs' pinned repos (../prettier,

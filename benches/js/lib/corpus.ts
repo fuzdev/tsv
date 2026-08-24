@@ -221,9 +221,16 @@ async function* walk_corpus(
  * relative to the project root — e.g. the test262 graded-positives list
  * written by `bench:harvest:test262`). The harvest already curated the set,
  * so `should_exclude` and entry skips don't apply; unknown extensions are
- * still dropped.
+ * still dropped, and an entry's declared `extensions` are enforced exactly as
+ * `walk_corpus` enforces them — a declaration the loader ignored would be one a
+ * per-language probe could trust and the corpus could silently contradict.
  */
-async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
+async function* load_file_list(
+	list_path: string,
+	extensions?: string[]
+): AsyncGenerator<SourceFile> {
+	const ext_set =
+		extensions === undefined ? null : new Set(extensions.map((e) => `.${e.toLowerCase()}`));
 	let raw: Array<string | { path: string; goal?: ParseGoal }>;
 	try {
 		raw = JSON.parse(await readFile(list_path, 'utf8'));
@@ -237,6 +244,7 @@ async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
 	entries.sort((a, b) => a.path.localeCompare(b.path));
 	for (const { path: relative, goal } of entries) {
 		const path = resolve(relative);
+		if (ext_set !== null && !ext_set.has(extname(path).toLowerCase())) continue;
 		const language = detect_language(path);
 		if (!language) continue;
 		try {
@@ -496,6 +504,10 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 	{
 		files_from: 'benches/js/.cache/test262_files.json',
 		tier: 'suite',
+		// Declared on the path-list entries too (the harvests write homogeneous
+		// lists), so a per-language probe (`corpus_missing_entries`) can tell which
+		// absent cache withholds which language; `load_file_list` enforces it.
+		extensions: ['js'],
 		optional: true,
 		hint: 'run `deno task bench:harvest:test262` (needs ../test262)'
 	},
@@ -511,6 +523,7 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 	{
 		files_from: 'benches/js/.cache/ts_repo_files.json',
 		tier: 'suite',
+		extensions: ['ts'],
 		optional: true,
 		hint: 'run `deno task bench:harvest:ts-repo` (needs ../typescript)'
 	}
@@ -604,13 +617,22 @@ export interface CorpusSource {
 /**
  * Check-only probe of a view's entries: the paths `stream()` would fail fast on
  * (non-optional, absent) plus the optional ones currently absent. Used by
- * `scripts/doctor.ts` — kept here so the doctor and the loader can't drift.
+ * `scripts/doctor.ts` — kept here so the doctor and the loader can't drift — and
+ * by the graders that pin a count over ONE language's slice of a view (the CSS
+ * reject pin), which pass `language` to ask only about the entries that can hold
+ * it: an absent test262 cache withholds no CSS, so it must not read as a partial
+ * CSS corpus. An entry with no `extensions` walks every language and always counts.
  */
 export async function corpus_missing_entries(
-	view: CorpusView
+	view: CorpusView,
+	language?: Language
 ): Promise<{ missing: string[]; optional_missing: string[]; total: number }> {
 	const tiers = TIERS_BY_VIEW[view];
-	const entries = CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier));
+	const holds_language = (entry: CorpusEntry): boolean =>
+		language === undefined ||
+		entry.extensions === undefined ||
+		entry.extensions.some((ext) => detect_language(`x.${ext}`) === language);
+	const entries = CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier) && holds_language(e));
 	const missing: string[] = [];
 	const optional_missing: string[] = [];
 	for (const entry of entries) {
@@ -777,7 +799,7 @@ export class DevReposLoader {
 			let count = 0;
 			const by_language: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
 			if (entry.files_from !== undefined) {
-				for await (const file of load_file_list(resolved_path)) {
+				for await (const file of load_file_list(resolved_path, entry.extensions)) {
 					count++;
 					by_language[file.language]++;
 					file.reproducible = reproducible;

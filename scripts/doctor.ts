@@ -332,6 +332,55 @@ if (exists('../typescript-go')) {
 	}
 }
 
+// --- Harvest stamps -------------------------------------------------------------
+//
+// Each stamped grade records the checkout commit(s) it ran against. A stamp whose
+// commit no longer matches its checkout's HEAD means the pin it graded describes the
+// PREVIOUS corpus: `bench:pins:suites` (a `conformance` preflight) re-derives it,
+// but nothing in `check` does, so name it here ahead of a release run. Only the
+// commit inputs are compared — the oracle-version and pin inputs are `pins:audit`'s.
+
+section('Harvest stamps (bench:pins:suites — the pin-freshness preflight)');
+try {
+	const { git_head, HARVEST_STAMPS, short_commit } =
+		await import('../benches/js/lib/harvest_stamp.ts');
+	for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
+		const heads = Object.entries(checkouts).map(([key, repo]) => ({
+			key,
+			repo,
+			head: git_head(repo)
+		}));
+		const absent = heads.filter((h) => h.head === null).map((h) => h.repo);
+		if (absent.length > 0) {
+			info(`${name}: checkout absent (${absent.join(', ')}) — ${task} warn-skips`);
+			continue;
+		}
+		let recorded: Record<string, unknown>;
+		try {
+			recorded = JSON.parse(Deno.readTextFileSync(path)) as Record<string, unknown>;
+		} catch {
+			warn(`${name}: never stamped (no ${path}) — run deno task ${task}`);
+			continue;
+		}
+		const moved = heads.filter((h) => recorded[h.key] !== h.head);
+		if (moved.length > 0) {
+			warn(
+				`${name}: stamp is behind ${moved
+					.map(
+						(h) =>
+							`${h.repo} (stamped ${typeof recorded[h.key] === 'string' ? short_commit(recorded[h.key] as string) : '?'}, now ${short_commit(h.head!)})`
+					)
+					.join(', ')} — run deno task ${task}`
+			);
+		} else ok(`${name}: stamp matches ${heads.map((h) => h.repo).join(' + ')}`);
+	}
+} catch (e) {
+	warn(
+		`cannot read the harvest stamps (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+			'usually node_modules missing; run deno task bench:install'
+	);
+}
+
 // --- Corpus entries -------------------------------------------------------------
 
 section('Corpus entries (gates + conformance views)');

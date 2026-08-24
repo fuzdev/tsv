@@ -24,6 +24,54 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 
 export type StampInputs = Record<string, string | number | null>;
 
+/** One stamped grade: where its stamp lives and which stamp keys record a checkout's HEAD. */
+export interface HarvestStamp {
+	/** Project-root-relative stamp path (under the gitignored `benches/js/.cache`). */
+	path: string;
+	/** The `deno task` that writes it — the remedy a stale-stamp message names. */
+	task: string;
+	/** Stamp key → the checkout whose `git_head` that key records. */
+	checkouts: Record<string, string>;
+}
+
+/**
+ * Every stamp, by grade name: the four suite harvests plus the CSS reject pin,
+ * which harvests nothing but is graded and stamped the same way
+ * (`diagnostics/css_over_acceptance.ts --pin-only`). Each script reads its own
+ * `path` from here and `scripts/doctor.ts` walks the table to report a stamp whose
+ * recorded checkout commit no longer matches that checkout's HEAD — one place, so a
+ * renamed stamp or a new commit input can't leave the doctor reading a file nothing
+ * writes. The `checkouts` keys are the stamp's OWN key names; a doctor probe that
+ * finds a listed key absent from the stamp reports that rather than guessing.
+ */
+export const HARVEST_STAMPS: Record<string, HarvestStamp> = {
+	'wpt-css': {
+		path: 'benches/js/.cache/wpt_css.stamp.json',
+		task: 'bench:harvest:wpt',
+		checkouts: { source_commit: '../wpt/css' }
+	},
+	test262: {
+		path: 'benches/js/.cache/test262.stamp.json',
+		task: 'bench:harvest:test262',
+		checkouts: { source_commit: '../test262' }
+	},
+	ts_repo: {
+		path: 'benches/js/.cache/ts_repo.stamp.json',
+		task: 'bench:harvest:ts-repo',
+		checkouts: { source_commit: '../typescript' }
+	},
+	'svelte-rejects': {
+		path: 'benches/js/.cache/svelte_parse_rejects.stamp.json',
+		task: 'bench:harvest:svelte-rejects',
+		checkouts: { svelte_commit: '../svelte', prettier_commit: '../prettier' }
+	},
+	'css-rejects': {
+		path: 'benches/js/.cache/css_rejects.stamp.json',
+		task: 'css:over-acceptance:pin',
+		checkouts: { svelte_commit: '../svelte', prettier_commit: '../prettier' }
+	}
+};
+
 /** `HEAD` commit of a checkout, or null when it isn't a git repo / git fails. */
 export function git_head(repo: string): string | null {
 	try {

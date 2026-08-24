@@ -41,11 +41,10 @@ import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import {
-	CORE_CRATES,
 	newest_source_mtime,
-	type SourceMtime,
-	WASM_CRATES
+	type SourceMtime
 } from '../benches/js/lib/check_artifact_freshness.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 

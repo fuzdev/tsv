@@ -40,7 +40,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 
-import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/check_artifact_freshness.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 import { assert_staged_fresh } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 

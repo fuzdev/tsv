@@ -40,6 +40,7 @@ import { basename, dirname, join, relative } from 'node:path';
 import { WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
 	git_head,
+	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
 	type StampInputs,
@@ -48,7 +49,7 @@ import {
 
 const OUT_DEFAULT = 'benches/js/.cache/wpt_css';
 const SOURCE_DEFAULT = '../wpt/css';
-const STAMP_PATH = 'benches/js/.cache/wpt_css.stamp.json';
+const STAMP_PATH = HARVEST_STAMPS['wpt-css'].path;
 
 const out_flag_index = Deno.args.indexOf('--out');
 const out_dir = out_flag_index === -1 ? OUT_DEFAULT : Deno.args[out_flag_index + 1];

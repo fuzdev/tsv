@@ -75,7 +75,13 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { type CorpusSource, DevReposLoader, format_mb, group_by_language } from './lib/corpus.ts';
+import {
+	corpus_missing_entries,
+	type CorpusSource,
+	DevReposLoader,
+	format_mb,
+	group_by_language
+} from './lib/corpus.ts';
 import { enrich_source_repos } from './lib/corpus_repos.ts';
 import { PERF_OMITS, type PerfOmit, perf_omit_matches, stale_perf_omits } from './lib/perf_omit.ts';
 import {
@@ -126,7 +132,11 @@ import {
 	LANGUAGES,
 	type SourceFile
 } from './lib/types.ts';
-import { check_executed_artifacts } from './lib/check_artifact_freshness.ts';
+import {
+	check_executed_artifacts,
+	warn_stale_reported_artifacts
+} from './lib/check_artifact_freshness.ts';
+import { CSS_REJECTS_PIN } from './lib/gate_counts.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { current_machine, current_runtime, type Machine, type Runtime } from './lib/runtime.ts';
 
@@ -531,6 +541,7 @@ if (total_files === 0) {
 // artifacts this runtime executes — FFI or N-API, plus that runtime's WASM target
 // — is `check_executed_artifacts`'s subject; override with BENCH_STALE_OK=1.
 await check_executed_artifacts();
+await warn_stale_reported_artifacts();
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
 // from the harness `node_modules`; without it, init fails with an opaque
@@ -912,6 +923,50 @@ function enforce_perf_coverage(full_corpus: boolean): void {
 			`excused no pre-flight failure in this full-corpus run, though the task each names ran:\n` +
 			stale.map((o) => `  ${o.task ?? '<any task>'}  ${o.path}: ${o.reason}`).join('\n') +
 			`\n  Delete the entry if the tool was fixed; update it if the corpus path was renamed.`
+	);
+	exit(1);
+}
+
+/**
+ * Conformance mode's one exact pin. The files `svelte/compiler`'s `parseCss`
+ * rejects are exactly the oracle row's pre-flight skips on `parse/css`, and their
+ * count is `CSS_REJECTS_PIN` — the number `diagnostics/css_over_acceptance.ts`
+ * grades (and stamps) from the same corpus. Graded here as well because this run
+ * already holds it: the published `parse/css` reference row is built from these
+ * skips, so a `parseCss` that changed what it accepts, or a corpus input that moved,
+ * would otherwise reshape that row with nothing in this surface to catch it.
+ *
+ * Only a FULL CSS corpus can be graded: a filter, a limit, or a tolerated missing
+ * entry withholds files, and a smaller reject set is then not a move. The loader
+ * tolerates an absent OPTIONAL entry (the wpt-css cache) without
+ * `BENCH_ALLOW_MISSING`, so that absence is asked separately — per language, since
+ * an absent test262 cache withholds no CSS.
+ */
+async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
+	if (!full_corpus) return;
+	const tracking = task_tracking_by_group.get('parse/css');
+	if (tracking === undefined) return; // the group did not run (no CSS files, or a parse-less surface)
+	const { missing, optional_missing } = await corpus_missing_entries(CORPUS_MODE, 'css');
+	const absent = [...missing, ...optional_missing];
+	if (absent.length > 0) {
+		log(`\nCSS_REJECTS_PIN not graded — the CSS corpus is partial: ${absent.join(', ')}`);
+		return;
+	}
+	const oracle_key = tracking.get(CANONICAL_PARSER_ROWS.css);
+	const rejects = oracle_key === undefined ? 0 : (skipped_files.get(oracle_key)?.size ?? 0);
+	if (rejects === CSS_REJECTS_PIN) {
+		// Said aloud: a silent pass reads the same as a gate that never ran.
+		log(
+			`\nCSS_REJECTS_PIN: parseCss rejects ${rejects} of ${files_by_language.css.length} — matches.`
+		);
+		return;
+	}
+	console.error(
+		`Conformance corpus: parseCss rejects ${rejects} of ${files_by_language.css.length} CSS files ` +
+			`≠ pinned CSS_REJECTS_PIN ${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's or ` +
+			`../svelte's checkout, the wpt-css harvest) or svelte's parseCss changed what it accepts — ` +
+			`re-pin in lib/gate_counts.ts deliberately, after checking which (\`deno task ` +
+			`css:over-acceptance:pin\` grades the same count and stamps it).`
 	);
 	exit(1);
 }
@@ -1713,6 +1768,8 @@ check_variant_parity();
 // `stale_perf_omits`).
 if (CORPUS_MODE === 'perf') {
 	enforce_perf_coverage(!is_limited && env.BENCH_ALLOW_MISSING !== '1');
+} else {
+	await enforce_css_reject_pin(!is_limited && env.BENCH_ALLOW_MISSING !== '1');
 }
 
 if (COVERAGE_ONLY) {

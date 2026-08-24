@@ -87,22 +87,52 @@ import type { Language } from './types.ts';
  * engineering exercise. An absent checkout, or one that isn't a git repo, is skipped, so
  * clean machines and CI still pass.
  *
- * Re-record a commit in the same change that re-pins the counts it explains.
+ * Re-record a commit in the same change that re-pins the counts it explains. The
+ * harvest-derived pins named beside each checkout ({@link SVELTE_REJECTS_PIN},
+ * {@link CSS_REJECTS_PIN}, {@link TS_REPO_CORPUS_PIN}, {@link TS_REPO_REJECTS_PIN},
+ * {@link WPT_CSS_HARVEST_PIN}, {@link TEST262_POSITIVES_PIN}) are re-derived by
+ * `deno task bench:pins:suites` — a `deno task conformance` preflight, and nothing
+ * in `deno task check` — so run it in that same change rather than leaving the move
+ * for the conformance cadence to find (docs/gate_counts.md §Where the numbers live).
+ *
+ * `pins` is graded by `gate_counts_test.ts`: every pin exported here must be named
+ * (or glob-matched) by some checkout, and every name here must exist — so a new pin
+ * cannot land without saying which checkout it was measured against, and a rename
+ * cannot leave a ghost. The one export outside the map is
+ * {@link SVELTE_STYLES_BLOCKS_MIN}, measured over the live dev repos, which have no
+ * commit to record (`UNTRACKED_PINS` in the test carries that reason).
  */
-export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: string }> = {
+export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: readonly string[] }> = {
 	'../svelte': {
 		commit: '5ccdfe355',
-		pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*'
+		pins: [
+			'SVELTE_FIXTURES_PINS',
+			'SVELTE_REJECTS_PIN',
+			'CSS_REJECTS_PIN',
+			'CORPUS_FORMAT_*',
+			'CORPUS_PARSE_*'
+		]
 	},
-	'../acorn-typescript': { commit: '923b213', pins: 'TS_FIXTURES_PINS' },
+	'../acorn-typescript': { commit: '923b213', pins: ['TS_FIXTURES_PINS'] },
 	'../typescript': {
 		commit: '637d5746b',
-		pins: 'TS_REPO_PINS, TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN'
+		pins: ['TS_REPO_PINS', 'TS_REPO_CORPUS_PIN', 'TS_REPO_REJECTS_PIN']
 	},
-	'../kit': { commit: 'c0c936124', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
-	'../svelte.dev': { commit: '996bd63e4', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
-	'../prettier': { commit: '1dcd0b05d', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
-	'../prettier-plugin-svelte': { commit: '7809486', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' }
+	'../kit': { commit: 'c0c936124', pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*'] },
+	'../svelte.dev': { commit: '996bd63e4', pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*'] },
+	'../prettier': {
+		commit: '1dcd0b05d',
+		pins: ['CSS_REJECTS_PIN', 'CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
+	},
+	'../prettier-plugin-svelte': {
+		commit: '7809486',
+		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
+	},
+	// The two suite-only checkouts: no version file to align, so their harvest
+	// stamps are the only other place the commit is recorded — listed here so
+	// `pins:audit:checkouts` names them when they move, like every other input.
+	'../wpt': { commit: '7437c7bc7', pins: ['WPT_CSS_HARVEST_PIN', 'CSS_REJECTS_PIN'] },
+	'../test262': { commit: '7153986fc', pins: ['TEST262_POSITIVES_PIN'] }
 };
 
 /** Exact expected counts for a fixtures parse-conformance gate (`lib/fixtures_gate.ts`). */
@@ -603,22 +633,31 @@ export const TS_REPO_CORPUS_PIN = 8_097;
 export const TS_REPO_REJECTS_PIN = 519;
 
 /**
- * bench:harvest:svelte-rejects — exact reject count. Measured 2026-07-06:
- * ../svelte at 8fb7ceeba, oracle svelte@5.56.4 (142 of 5648 conformance-view
- * Svelte files, re-verified after the ryanatkn.com + webdevladder.net + mdz
- * corpus additions — all their Svelte is valid); re-harvested unchanged at
- * ../svelte 20b341f10, oracle svelte@5.56.9. Fewer = the svelte/compiler oracle stopped rejecting (broken
- * import/config); more = it started rejecting wholesale — either way the cache
- * would corrupt the published coverage number.
+ * bench:harvest:svelte-rejects — exact reject count. Measured 2026-08-24: ../svelte
+ * at 5ccdfe355, oracle svelte@5.56.9, 145 of 4716 conformance-view Svelte files.
+ * Fewer = the svelte/compiler oracle stopped rejecting (broken import/config);
+ * more = it started rejecting wholesale — either way the cache would corrupt the
+ * published coverage number. Moves with the ../svelte commit in
+ * {@link GATE_CHECKOUT_COMMITS}; re-derived by `bench:pins:suites` (see there).
+ *
+ * Three of the 145 are the suite's own fixtures for CSS parser fixes that landed
+ * upstream AFTER the pinned oracle's release — namespaced type selectors
+ * (`svg|*`, `*|*`) and `nth-child`'s `of` with no whitespace after it. They are
+ * valid Svelte for the checkout and invalid for the oracle that defines validity
+ * here, so they are excluded like any other reject; taking the oracle past them
+ * returns all three to the corpus, and tsv then needs `ns|*` / `*|*`, which it
+ * rejects today in parity with this oracle.
  */
-export const SVELTE_REJECTS_PIN = 142;
+export const SVELTE_REJECTS_PIN = 145;
 
 /**
  * The conformance CSS corpus's REJECT count — files `svelte/compiler`'s `parseCss`
  * refuses — which `diagnostics/css_over_acceptance.ts` grades every `parse/css`
- * tool over. Deterministic given the pins that build the corpus: ../prettier's
- * checkout commit ({@link GATE_CHECKOUT_COMMITS}), {@link WPT_CSS_HARVEST_PIN},
- * and the svelte oracle version.
+ * tool over. Deterministic given the pins that build the corpus: the ../prettier
+ * AND ../svelte checkout commits ({@link GATE_CHECKOUT_COMMITS} — the suite ships
+ * `.css` files of its own, so this pin moves with that checkout exactly as
+ * {@link SVELTE_REJECTS_PIN} does), {@link WPT_CSS_HARVEST_PIN}, and the svelte
+ * oracle version.
  *
  * Unlike {@link SVELTE_REJECTS_PIN} this list filters NOTHING — `parseCss` is not
  * a validity oracle in either direction (it accepts malformed CSS and rejects
@@ -627,5 +666,17 @@ export const SVELTE_REJECTS_PIN = 142;
  * the CSS surface the over-acceptance axis coverage can't show, and the pin is
  * what makes the reference row's grammar moving VISIBLE instead of silently
  * reshaping the published `parse/css` numbers.
+ *
+ * Derived LIVE from the corpus rather than from a harvest cache (nothing else
+ * consumes the list), but graded and STAMPED like the harvests: `deno task
+ * css:over-acceptance:pin` is a `bench:pins:suites` leg, so it is re-derived on
+ * the same cadence as its siblings; the full `css:over-acceptance` profile grades it
+ * too. Measured 2026-08-24: ../prettier at 1dcd0b05d, ../svelte at 5ccdfe355,
+ * ../wpt at 7437c7bc7, oracle svelte@5.56.9, 240 of 22642 conformance-view CSS files.
+ *
+ * One of the 240 is `css/samples/namespaced-type-selector/expected.css`, the `.css`
+ * sibling of the namespaced-type-selector fixtures {@link SVELTE_REJECTS_PIN}
+ * describes: a single upstream CSS-parser fix lands in both counts, so a change that
+ * moves one of these pins should expect to move the other.
  */
-export const CSS_REJECTS_PIN = 239;
+export const CSS_REJECTS_PIN = 240;

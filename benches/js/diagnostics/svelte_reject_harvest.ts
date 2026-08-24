@@ -43,6 +43,7 @@ import { CanonicalImplementation } from '../lib/canonical.ts';
 import { SVELTE_REJECTS_PIN } from '../lib/gate_counts.ts';
 import {
 	git_head,
+	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
 	type StampInputs,
@@ -51,7 +52,7 @@ import {
 import { load_all_versions } from '../lib/versions.ts';
 
 const CACHE_PATH = 'benches/js/.cache/svelte_parse_rejects.json';
-const STAMP_PATH = 'benches/js/.cache/svelte_parse_rejects.stamp.json';
+const STAMP_PATH = HARVEST_STAMPS['svelte-rejects'].path;
 const if_present = Deno.args.includes('--if-present');
 const force = Deno.args.includes('--force');
 
