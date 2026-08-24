@@ -385,22 +385,25 @@ impl<'a> Printer<'a> {
     /// index-signature `]`→value-`:` gap (`build_index_signature_member_doc`), the two
     /// callee gaps that share [`Self::build_line_split_gap_doc`] — the callee→empty
     /// argument list gap (`push_empty_args`) and an optional call's callee→`?.` half
-    /// (`calls::optional_callee_gap_doc`) — the two expression-level
-    /// keyword→operand gaps — `new`→callee (`build_new_doc_with_wrapping`) and
-    /// `await`→operand (`build_await_doc`), whose tail is the WHOLE operand so a broken
-    /// argument list renders at the continuation's indent — and the switch case label's
-    /// **two** gaps (`build_switch_case_doc_inner`, both gated on line comments only):
-    /// `case`→test, where the tail is the test *and* the `:` after it, and head→`:`,
-    /// where it is the bare `:`. Adding a site means calling this, never re-deriving
+    /// (`calls::optional_callee_gap_doc`) — and the switch case label's head→`:` gap
+    /// (`build_switch_case_doc_inner`, gated on line comments only), where the tail is
+    /// the bare `:`. Adding a site means calling this, never re-deriving
     /// `indent(" " + hang_next + tail)`. See conformance_prettier.md
     /// §Uniform Forced-Continuation Indent.
+    ///
+    /// ⚠️ Every site here is a gap whose comment **trails a head**, which is what licenses
+    /// pulling the first one up onto the head's line: own-line-ness is authoring signal for
+    /// a *leading* position, not a trailing one (conformance_prettier.md §Comment Position
+    /// Philosophy). A gap whose comment leads a VALUE — the keyword→value family, the
+    /// switch label's own `case`→test gap included — takes
+    /// [`Self::append_keyword_value_line_comments`] instead, which keeps the author's line.
     ///
     /// ⚠️ The leading separator is a **hardline** where the run opens with an honored
     /// format-ignore directive ([`Printer::leading_comment_is_honored_directive`]) — the
     /// leading half of the rule [`Printer::comment_hangs_next`] states for the separators
     /// *inside* the run. Beside the preceding token a directive shares its line, which the
     /// placement floor classifies as inert, so the freeze it earns would be lost on the next
-    /// pass; the `case`→test head is the site whose freeze depends on it.
+    /// pass.
     pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {
         let d = self.d();
         let lead = if self.leading_comment_is_honored_directive(start, end) {
@@ -1890,8 +1893,22 @@ impl<'a> Printer<'a> {
     /// constraint/annotation union, to break — matching prettier's `lineSuffix`).
     /// Each **own-line** comment goes on its own line before the value; they are
     /// never joined onto one line (which would make a following `//` stop being a
-    /// delimiter — a boundary loss). Shared by type-parameter constraint/default
-    /// values (`= `/`extends`) and class-property initializers (`= `).
+    /// delimiter — a boundary loss).
+    ///
+    /// That own-line preservation is the whole reason this seam is distinct from
+    /// [`Self::build_continuation_indent`], which pulls the first comment up onto the
+    /// head's line: the comments here **lead a value**, and own-line-ness is authoring
+    /// signal for a leading position (conformance_prettier.md §Comment Position
+    /// Philosophy). Shared by type-parameter constraint/default values (`= `/`extends`),
+    /// class-property initializers (`= `), the prefix type operators (`keyof`/`typeof`),
+    /// `infer`, the predicate `is` and cast keyword→type gaps, the function-type
+    /// `=>`→return gap, a switch label's `case`→test gap, and the two expression-level
+    /// keyword→operand gaps — `new`→callee (`build_new_doc_with_wrapping`) and
+    /// `await`→operand (`build_await_doc`), whose tail is the WHOLE operand so a broken
+    /// argument list renders at the hang's indent.
+    ///
+    /// ⚠️ The caller pushes its keyword **bare** — this seam owns every separator after
+    /// it, so a keyword text carrying its own trailing space renders two.
     pub(crate) fn append_keyword_value_line_comments(
         &self,
         parts: &mut DocBuf,

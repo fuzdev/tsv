@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 74,
+	"end": 76,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,11 +10,11 @@
 			{
 				"type": "ExpressionTag",
 				"start": 0,
-				"end": 43,
+				"end": 45,
 				"expression": {
 					"type": "Identifier",
-					"start": 41,
-					"end": 42,
+					"start": 42,
+					"end": 43,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -30,34 +30,34 @@
 						{
 							"type": "Line",
 							"value": " 中文😀 line comment before expression",
-							"start": 1,
-							"end": 39
+							"start": 2,
+							"end": 40
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 43,
-				"end": 45,
+				"start": 45,
+				"end": 47,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 45,
-				"end": 73,
+				"start": 47,
+				"end": 75,
 				"expression": {
 					"type": "Identifier",
-					"start": 71,
-					"end": 72,
+					"start": 73,
+					"end": 74,
 					"loc": {
 						"start": {
-							"line": 4,
+							"line": 5,
 							"column": 26
 						},
 						"end": {
-							"line": 4,
+							"line": 5,
 							"column": 27
 						}
 					},
@@ -66,8 +66,8 @@
 						{
 							"type": "Block",
 							"value": " 中文😀 block comment ",
-							"start": 46,
-							"end": 70
+							"start": 48,
+							"end": 72
 						}
 					]
 				}
@@ -79,31 +79,31 @@
 		{
 			"type": "Line",
 			"value": " 中文😀 line comment before expression",
-			"start": 1,
-			"end": 39,
+			"start": 2,
+			"end": 40,
 			"loc": {
 				"start": {
 					"line": 1,
-					"column": 1
+					"column": 2
 				},
 				"end": {
 					"line": 1,
-					"column": 39
+					"column": 40
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " 中文😀 block comment ",
-			"start": 46,
-			"end": 70,
+			"start": 48,
+			"end": 72,
 			"loc": {
 				"start": {
-					"line": 4,
+					"line": 5,
 					"column": 1
 				},
 				"end": {
-					"line": 4,
+					"line": 5,
 					"column": 25
 				}
 			}
