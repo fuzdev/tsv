@@ -22,13 +22,11 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { OXC_WASI_BINDING } from './check_node_modules.ts';
 import type { ImplementationSet } from './implementations.ts';
-import { current_arch, current_os, current_runtime, native_library_filename } from './runtime.ts';
+import { current_arch, current_os, current_runtime } from './runtime.ts';
 import { rsvelte_binary_path } from './rsvelte.ts';
+import { type BinaryKind, TSV_ARTIFACTS } from './tsv_artifacts.ts';
 
 const exec_file = promisify(execFile);
-
-/** Binary kind for grouping comparisons */
-export type BinaryKind = 'wasm' | 'native';
 
 /** A collected binary size entry */
 export interface BinarySize {
@@ -50,15 +48,16 @@ export interface BinarySize {
  * Display labels — also the identity keys for the ratio-anchor lookups in
  * `build_display_entries`, so the producer (`collect_binary_sizes`) and the
  * consumer must reference the same constant. Renaming a label here updates both.
+ *
+ * tsv's own rows are PRODUCED from `lib/tsv_artifacts.ts`, so only the three that
+ * `build_display_entries` anchors on appear here, forwarded from that table — the
+ * other four tsv builds it reports are labelled there and looked up by nobody. A
+ * fourth anchor is one more forward, not a second spelling.
  */
 const LABELS = {
-	tsv_ffi: 'tsv (ffi)',
-	tsv_napi: 'tsv (napi)',
-	tsv_format_ffi: 'tsv format (ffi)',
-	tsv_parse_ffi: 'tsv parse (ffi)',
-	tsv_format_wasm: 'tsv_format_wasm',
-	tsv_parse_wasm: 'tsv_parse_wasm',
-	tsv_wasm: 'tsv_wasm',
+	tsv_ffi: TSV_ARTIFACTS.tsv_ffi.label,
+	tsv_napi: TSV_ARTIFACTS.tsv_napi.label,
+	tsv_wasm: TSV_ARTIFACTS.tsv_wasm.label,
 	biome_wasm: 'biome (wasm)',
 	dprint_wasm: 'dprint (wasm)',
 	oxc_parser_napi: 'oxc-parser (napi)',
@@ -246,78 +245,18 @@ function napi_binding_dirs(
 export async function collect_binary_sizes(
 	impls: ImplementationSet
 ): Promise<CollectedBinarySizes> {
-	const project_root = fileURLToPath(new URL('../../..', import.meta.url));
 	const node_modules = node_modules_dir();
 
 	// Stage 1: collect (label, kind, path) for everything that exists, and the
 	// labels reached-for but absent (see `SizeStaging`).
 	const staged: SizeStaging = { found: [], absent: [] };
 
-	// tsv native (FFI shared library) — `native`/`wasm` are required impls, so these
-	// blocks are unconditional; an absent BUILD still shows up as `absent` below.
-	const ffi_lib = native_library_filename('tsv_ffi');
-	{
-		await push_size(staged, LABELS.tsv_ffi, 'native', `${project_root}/target/release/${ffi_lib}`);
-		// tsv format-only native — the native mirror of @fuzdev/tsv_format_wasm:
-		// dropping the convert/JSON layer (and the parse exports) leaves a
-		// scope-matched comparison against oxfmt (napi), which is format-only
-		// too. Built into a separate target dir (deno task build:ffi:format) so it
-		// doesn't clobber the full libtsv_ffi the perf rows load; omitted from the
-		// table when that build hasn't been run.
-		await push_size(
-			staged,
-			LABELS.tsv_format_ffi,
-			'native',
-			`${project_root}/target/ffi-format/release/${ffi_lib}`
-		);
-		// tsv parse-only native — the native mirror of @fuzdev/tsv_parse_wasm:
-		// keeps the parse exports + the convert/JSON layer and drops the printers,
-		// so it's scope-matched to oxc-parser (napi), which also materializes a
-		// JSON AST. Separate target dir (deno task build:ffi:parse); omitted when
-		// unbuilt.
-		await push_size(
-			staged,
-			LABELS.tsv_parse_ffi,
-			'native',
-			`${project_root}/target/ffi-parse/release/${ffi_lib}`
-		);
-	}
-
-	// tsv N-API addon — the Node/Bun native path (the sibling of the FFI library
-	// Deno loads). Same engine, different binding boundary; sized from the built
-	// cdylib (the shipped `.node` is a byte-identical copy). Existence-gated rather
-	// than registry-gated: `impls.napi` is undefined under Deno, which loads the FFI
-	// library instead, but the addon's size is worth reporting from either runtime.
-	await push_size(
-		staged,
-		LABELS.tsv_napi,
-		'native',
-		`${project_root}/target/napi/${native_library_filename('tsv_napi')}`
-	);
-
-	// tsv WASM — three builds from one crate via the `format`/`parse` features:
-	// pkg/format/deno (format-only, @fuzdev/tsv_format_wasm), pkg/parse/deno
-	// (parse-only, @fuzdev/tsv_parse_wasm), and pkg/all/deno (both,
-	// @fuzdev/tsv_wasm — the bundle the bench executes).
-	{
-		await push_size(
-			staged,
-			LABELS.tsv_format_wasm,
-			'wasm',
-			`${project_root}/crates/tsv_wasm/pkg/format/deno/tsv_wasm_bg.wasm`
-		);
-		await push_size(
-			staged,
-			LABELS.tsv_parse_wasm,
-			'wasm',
-			`${project_root}/crates/tsv_wasm/pkg/parse/deno/tsv_wasm_bg.wasm`
-		);
-		await push_size(
-			staged,
-			LABELS.tsv_wasm,
-			'wasm',
-			`${project_root}/crates/tsv_wasm/pkg/all/deno/tsv_wasm_bg.wasm`
-		);
+	// tsv's own artifacts — every build the table reports, executed or size-only,
+	// from the one table the freshness guard reads too (`lib/tsv_artifacts.ts`
+	// carries each entry's rationale). Unconditional: `native`/`wasm` are required
+	// impls, so an absent BUILD still shows up as `absent` below.
+	for (const artifact of Object.values(TSV_ARTIFACTS)) {
+		await push_size(staged, artifact.label, artifact.kind, artifact.path);
 	}
 
 	// biome WASM

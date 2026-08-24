@@ -13,8 +13,8 @@
 
 import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { wasm_target } from './runtime.ts';
+import { wasm_bundle_dir } from './tsv_artifacts.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 
@@ -78,13 +78,14 @@ export class WasmImplementation extends BaseImplementation {
 	}
 
 	async init(): Promise<void> {
-		// Same segment the freshness guard resolves (`check_artifact_freshness.ts`
-		// `wasm_artifact_path`) — one derivation, so the bundle guarded is the bundle
-		// loaded.
+		// The same directory the freshness guard resolves — both sides go through
+		// `tsv_artifacts.ts`'s `wasm_bundle_dir`, so the bundle guarded is the bundle
+		// loaded (the guard names the `.wasm`, this names the `.js` glue beside it).
+		// It was two spellings of one layout under a comment already claiming
+		// otherwise, which is the shape that lets a guard vouch for a file nothing
+		// opens.
 		const target = wasm_target();
-		const wasm_path = fileURLToPath(
-			new URL(`../../../crates/tsv_wasm/pkg/all/${target}/tsv_wasm.js`, import.meta.url)
-		);
+		const wasm_path = `${wasm_bundle_dir('all', target)}/tsv_wasm.js`;
 
 		try {
 			await stat(wasm_path);

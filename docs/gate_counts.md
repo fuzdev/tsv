@@ -28,10 +28,34 @@ real move in a number is a deliberate, visible edit.
   dev repos: a small shrink warns and still writes, only a >10% collapse fails), plus
   the CSS reject count `diagnostics/css_over_acceptance.ts` grades over — derived
   live from pinned inputs rather than harvested, and the one pin whose list filters
-  nothing (see `CSS_REJECTS_PIN`). The
+  nothing (see `CSS_REJECTS_PIN`), but stamped and graded on the harvests' cadence
+  all the same (`css:over-acceptance:pin`). The
   ts-repo pair is graded by tsc itself, so its harvest stamps the **tsc version**
   alongside the checkout commit — a tsc bump can move a file between the two lists
   with the corpus unchanged.
+
+  **The suite-derived pins have exactly one cadence.** Every count above that is
+  measured over a sibling checkout (the four harvests' plus the CSS reject count) is
+  re-derived by `deno task bench:pins:suites` and by nothing in `deno task
+  check`, which never touches a checkout — so a checkout that moves leaves the pin
+  describing the previous corpus with every committed-tree gate green until that
+  group runs. Two things make that safe rather than merely documented: the group is
+  a preflight of `deno task conformance` (so a release cannot ship the old number),
+  and each leg is freshness-stamped on the checkout COMMIT — **every** checkout it
+  reads, which for the two reject pins is three apiece and neither list is the one
+  the pin is named after (CSS: `../svelte`, `../prettier`, `../wpt`; Svelte:
+  `../svelte`, `../prettier`, `../prettier-plugin-svelte`, since both prettier
+  suites' `.html` is Svelte-language corpus) — so
+  a move between upstream releases, where `pins:audit`'s version check sees nothing,
+  still re-grades. A contributor left out of a stamp is the whole failure: its pull
+  leaves the stamp reading fresh over a corpus that moved under it. A count pin is
+  never a substitute for a commit in a stamp either: an
+  edit to an existing suite file moves the corpus without moving the count. Two of
+  the pins are also graded a second time on their own surface:
+  `TEST262_POSITIVES_PIN` by `conformance:test262` (its Rust twin) and
+  `CSS_REJECTS_PIN` by the conformance coverage run (`bench:conformance`), whose
+  oracle row's `parse/css` skips are the reject set. `deno task doctor` reports a
+  stamp whose recorded commit is behind its checkout.
 - **Rust-side counts are consts** — grep `REGRESSION PIN`. test262 (discovered +
   graded-manifest) and `fixtures_validate` (total fixtures — protecting the primary
   gate against a discovery collapse) live in their own commands, while the
@@ -125,7 +149,12 @@ the number counts — including a harvest pin's provenance stamp (`Measured <dat
 When a checkout moves, re-record its **commit** in `GATE_CHECKOUT_COMMITS` in the
 same change (`git -C ../<repo> rev-parse --short HEAD`) — that struct is the single
 provenance record for what a pin was measured against (upstream version files only
-bump at release).
+bump at release) — and run `deno task bench:pins:suites` there too, so the
+suite-derived pins move with it. Each entry's `pins` list is graded by
+`benches/js/lib/gate_counts_test.ts` (in `test:deno`): every exported pin must be
+named by some checkout (or by the test's `UNTRACKED_PINS`, with a reason), and every
+name must exist — a new pin cannot land without its provenance, and a rename cannot
+leave a ghost.
 
 When re-pinning after a suite refresh, glance at the full bucket table, not just the
 changed number — a count move can mask offsetting changes. (The per-file gates —

@@ -12,15 +12,15 @@
  * the STAGED npm packages the `test:npm:*:run` / `test:napi:npm:run` tasks
  * consume.)
  *
- * Freshness inputs (newest mtime wins): every `*.rs` and `Cargo.toml` under
- * the crates that feed the WASM bundle (the run-side guard's `CORE_CRATES` +
- * `WASM_CRATES` — `tsv_wasm` plus the `tsv_ignore`/`tsv_discover` IgnoreStack
- * crates; imported, so the two sides can't drift; the dev-tooling crates
- * are deliberately out, else every `tsv_debug` fixture-workflow edit would
+ * Freshness inputs (newest mtime wins): every `*.rs` and `Cargo.toml` under the
+ * crates that feed the WASM bundle (`benches/js/lib/tsv_artifacts.ts`'s
+ * `CORE_CRATES` + `WASM_CRATES` — `tsv_wasm` plus the `tsv_ignore`/`tsv_discover`
+ * IgnoreStack crates; that module states the artifact set once for every side
+ * that must agree on it, so build-side and run-side can't drift; the dev-tooling
+ * crates are deliberately out, else every `tsv_debug` fixture-workflow edit would
  * force a pointless wasm rebuild), the workspace `Cargo.toml` + `Cargo.lock`
- * (dependency bumps), and
- * `deno.json` (the wrapped command's own flags live there, so editing a build
- * task re-triggers it). What the check CANNOT see is a toolchain change —
+ * (dependency bumps), and `deno.json` (the wrapped command's own flags live
+ * there, so editing a build task re-triggers it). What the check CANNOT see is a toolchain change —
  * a wasm-pack / wasm-opt / rustc upgrade produces different bytes from
  * identical sources — so after a toolchain update run once with
  * `TSV_BUILD_FORCE=1` (same blind spot as the harvest stamps' `--force`).
@@ -41,11 +41,10 @@ import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import {
-	CORE_CRATES,
 	newest_source_mtime,
-	type SourceMtime,
-	WASM_CRATES
+	type SourceMtime
 } from '../benches/js/lib/check_artifact_freshness.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 

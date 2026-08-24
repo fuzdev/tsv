@@ -75,7 +75,13 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { type CorpusSource, DevReposLoader, format_mb, group_by_language } from './lib/corpus.ts';
+import {
+	corpus_missing_entries,
+	type CorpusSource,
+	DevReposLoader,
+	format_mb,
+	group_by_language
+} from './lib/corpus.ts';
 import { enrich_source_repos } from './lib/corpus_repos.ts';
 import { PERF_OMITS, type PerfOmit, perf_omit_matches, stale_perf_omits } from './lib/perf_omit.ts';
 import {
@@ -126,7 +132,11 @@ import {
 	LANGUAGES,
 	type SourceFile
 } from './lib/types.ts';
-import { check_executed_artifacts } from './lib/check_artifact_freshness.ts';
+import {
+	check_executed_artifacts,
+	warn_stale_reported_artifacts
+} from './lib/check_artifact_freshness.ts';
+import { CSS_REJECTS_PIN } from './lib/gate_counts.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { current_machine, current_runtime, type Machine, type Runtime } from './lib/runtime.ts';
 
@@ -424,7 +434,11 @@ const RESULTS_DIR = './benches/js/results';
 
 log('Loading corpus...\n');
 const corpus_loader = new DevReposLoader(CORPUS_MODE, {
-	allow_missing: env.BENCH_ALLOW_MISSING === '1'
+	// The bench loads EVERY language, so it has no `{ complete_for }` posture to
+	// take here — `enforce_css_reject_pin` asks the per-language completeness
+	// question separately, and degrades that one pin to "not graded" rather than
+	// aborting a whole run over a corpus the other groups are fine with.
+	missing: env.BENCH_ALLOW_MISSING === '1' ? 'tolerate' : 'fail'
 });
 // Drain `stream()` directly instead of `load()` so we skip the loader's
 // own corpus summary — bench.ts prints its own tighter one below that
@@ -531,6 +545,7 @@ if (total_files === 0) {
 // artifacts this runtime executes — FFI or N-API, plus that runtime's WASM target
 // — is `check_executed_artifacts`'s subject; override with BENCH_STALE_OK=1.
 await check_executed_artifacts();
+await warn_stale_reported_artifacts();
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
 // from the harness `node_modules`; without it, init fails with an opaque
@@ -912,6 +927,72 @@ function enforce_perf_coverage(full_corpus: boolean): void {
 			`excused no pre-flight failure in this full-corpus run, though the task each names ran:\n` +
 			stale.map((o) => `  ${o.task ?? '<any task>'}  ${o.path}: ${o.reason}`).join('\n') +
 			`\n  Delete the entry if the tool was fixed; update it if the corpus path was renamed.`
+	);
+	exit(1);
+}
+
+/**
+ * Conformance mode's one exact pin. The files `svelte/compiler`'s `parseCss`
+ * rejects are exactly the oracle row's pre-flight skips on `parse/css`, and their
+ * count is `CSS_REJECTS_PIN` — the number `diagnostics/css_over_acceptance.ts`
+ * grades (and stamps) from the same corpus. Graded here as well because this run
+ * already holds it: the published `parse/css` reference row is built from these
+ * skips, so a `parseCss` that changed what it accepts, or a corpus input that moved,
+ * would otherwise reshape that row with nothing in this surface to catch it.
+ *
+ * Only a FULL CSS corpus can be graded: a filter, a limit, or a tolerated missing
+ * entry withholds files, and a smaller reject set is then not a move. The loader
+ * tolerates an absent OPTIONAL entry (the wpt-css cache) without
+ * `BENCH_ALLOW_MISSING`, so that absence is asked separately — per language, since
+ * an absent test262 cache withholds no CSS.
+ */
+async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
+	// Every not-graded path says so, this one included: a silent return reads
+	// exactly like a pass, and a `BENCH_LIMIT` / `BENCH_FILTER` /
+	// `BENCH_ALLOW_MISSING` run is the case where a reader is most likely to
+	// assume the pin still held.
+	if (!full_corpus) {
+		log('\nCSS_REJECTS_PIN not graded — this run does not hold the full corpus.');
+		return;
+	}
+	const tracking = task_tracking_by_group.get('parse/css');
+	if (tracking === undefined) {
+		log('\nCSS_REJECTS_PIN not graded — the parse/css group did not run.');
+		return;
+	}
+	const { missing, optional_missing } = await corpus_missing_entries(CORPUS_MODE, 'css');
+	const absent = [...missing, ...optional_missing];
+	if (absent.length > 0) {
+		log(`\nCSS_REJECTS_PIN not graded — the CSS corpus is partial: ${absent.join(', ')}`);
+		return;
+	}
+	const oracle_key = tracking.get(CANONICAL_PARSER_ROWS.css);
+	if (oracle_key === undefined) {
+		// A `0` fallback here would report "rejects 0 ≠ 240" and read as a grammar
+		// move — diagnosing a missing oracle ROW as a corpus change. It is neither:
+		// the row that built the reject set is the measurement, so its absence fails
+		// on its own terms.
+		console.error(
+			`Conformance corpus: the parse/css group ran without its oracle row ` +
+				`(${CANONICAL_PARSER_ROWS.css}), so CSS_REJECTS_PIN has nothing to grade — the reject ` +
+				`set IS that row's pre-flight skips. Check the impl registry and the row's name.`
+		);
+		exit(1);
+	}
+	const rejects = skipped_files.get(oracle_key)?.size ?? 0;
+	if (rejects === CSS_REJECTS_PIN) {
+		// Said aloud: a silent pass reads the same as a gate that never ran.
+		log(
+			`\nCSS_REJECTS_PIN: parseCss rejects ${rejects} of ${files_by_language.css.length} — matches.`
+		);
+		return;
+	}
+	console.error(
+		`Conformance corpus: parseCss rejects ${rejects} of ${files_by_language.css.length} CSS files ` +
+			`≠ pinned CSS_REJECTS_PIN ${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's, ` +
+			`../svelte's or ../wpt's checkout) or svelte's parseCss changed what it accepts — ` +
+			`re-pin in lib/gate_counts.ts deliberately, after checking which (\`deno task ` +
+			`css:over-acceptance:pin\` grades the same count and stamps it).`
 	);
 	exit(1);
 }
@@ -1702,8 +1783,11 @@ check_variant_parity();
 // Perf corpus is real-world code every in-scope tool must fully process, so a
 // per-file pre-flight failure that isn't an explicitly-reviewed `PERF_OMITS`
 // entry is a hard error — not the silent skip that would quietly erode coverage.
-// Conformance mode measures coverage (sub-100% is the metric), so this is
-// perf-only. Runs before the timed phase, so a regression fails in seconds.
+// Conformance mode measures coverage (sub-100% is the metric), so this hard error is
+// perf-only — but the other branch is not empty: conformance's own exact pin
+// (`enforce_css_reject_pin`) is graded there, at the same point and for the same
+// reason. Both run before the timed phase, so a regression fails in seconds and
+// nothing is written.
 //
 // The staleness half of the same grade is asked only of a run that could actually
 // reach every omitted file: a corpus filter, or a missing repo tolerated by
@@ -1713,6 +1797,8 @@ check_variant_parity();
 // `stale_perf_omits`).
 if (CORPUS_MODE === 'perf') {
 	enforce_perf_coverage(!is_limited && env.BENCH_ALLOW_MISSING !== '1');
+} else {
+	await enforce_css_reject_pin(!is_limited && env.BENCH_ALLOW_MISSING !== '1');
 }
 
 if (COVERAGE_ONLY) {

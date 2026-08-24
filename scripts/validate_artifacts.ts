@@ -15,12 +15,23 @@
  * Only validates artifacts that exist (skips unbuilt targets), but fails
  * if nothing was found at all.
  *
+ * Every bundle path comes from `benches/js/lib/tsv_artifacts.ts` — the same
+ * builders the bench's size table, the run-side freshness guard, the build-side
+ * skip and the three loaders resolve from. A release gate that spelled the layout
+ * itself would keep passing over the old location after a move, which is the one
+ * failure a size/smoke gate must not have.
+ *
  * Usage: deno task validate:artifacts
  */
 
-import { format_size } from './size.ts';
+import { pathToFileURL } from 'node:url';
 
-const root = new URL('..', import.meta.url);
+import {
+	wasm_bundle_dir,
+	wasm_bundle_path,
+	type WasmVariant
+} from '../benches/js/lib/tsv_artifacts.ts';
+import { format_size } from './size.ts';
 
 let passed = 0;
 let failed = 0;
@@ -41,7 +52,7 @@ function skip(msg: string): void {
 	skipped++;
 }
 
-function file_size(path: URL): number | null {
+function file_size(path: string | URL): number | null {
 	try {
 		return Deno.statSync(path).size;
 	} catch (error) {
@@ -52,7 +63,12 @@ function file_size(path: URL): number | null {
 
 // --- WASM binary size checks ---
 
-const VARIANTS = ['format', 'parse', 'all'] as const;
+// The bundle LAYOUT is `lib/tsv_artifacts.ts`'s (`wasm_bundle_dir` /
+// `wasm_bundle_path`); what varies here is the two axes this script walks. `npm` is
+// a staging directory rather than a wasm-pack target, but it holds the same two
+// files at the same place — `patch_npm_package.ts` copies the bundle in beside the
+// entry it adds — so it rides the same builder rather than a second spelling.
+const VARIANTS = ['format', 'parse', 'all'] as const satisfies readonly WasmVariant[];
 const TARGETS = ['npm', 'deno'] as const;
 
 // Measured 2026-08-21 at the 0.3 release tip (deno target; npm == deno,
@@ -138,7 +154,7 @@ const sizes: Partial<Record<`${(typeof VARIANTS)[number]}/${(typeof TARGETS)[num
 for (const target of TARGETS) {
 	for (const variant of VARIANTS) {
 		const label = `${variant}/${target}` as const;
-		const size = file_size(new URL(`crates/tsv_wasm/pkg/${label}/tsv_wasm_bg.wasm`, root));
+		const size = file_size(wasm_bundle_path(variant, target));
 		if (size === null) {
 			skip(`${label} — not built`);
 			continue;
@@ -191,6 +207,8 @@ for (const target of TARGETS) {
 
 interface SmokeTarget {
 	label: string;
+	/** ABSOLUTE path to the module entry — `wasm_bundle_dir`'s output, imported via
+	 * `pathToFileURL` rather than resolved against a repo root here. */
 	entry: string;
 	has_format: boolean;
 	has_parse: boolean;
@@ -200,11 +218,11 @@ interface SmokeTarget {
 	is_npm: boolean;
 }
 
-const smoke_entries = (variant: 'format' | 'parse' | 'all'): SmokeTarget[] => [
+const smoke_entries = (variant: WasmVariant): SmokeTarget[] => [
 	// npm package via its published Node entry (auto-init; Deno supports node:fs)
 	{
 		label: `${variant}/npm index.js`,
-		entry: `crates/tsv_wasm/pkg/${variant}/npm/index.js`,
+		entry: `${wasm_bundle_dir(variant, 'npm')}/index.js`,
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
 		is_npm: true
@@ -212,7 +230,7 @@ const smoke_entries = (variant: 'format' | 'parse' | 'all'): SmokeTarget[] => [
 	// deno-target bundle (auto-init at import)
 	{
 		label: `${variant}/deno bundle`,
-		entry: `crates/tsv_wasm/pkg/${variant}/deno/tsv_wasm.js`,
+		entry: `${wasm_bundle_dir(variant, 'deno')}/tsv_wasm.js`,
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
 		is_npm: false
@@ -224,7 +242,7 @@ const smoke_targets: SmokeTarget[] = VARIANTS.flatMap(smoke_entries);
 console.log('\n=== Deno runtime smoke ===');
 
 for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
-	const entry_url = new URL(entry, root);
+	const entry_url = pathToFileURL(entry);
 	if (file_size(entry_url) === null) {
 		skip(`${label} — not built`);
 		continue;
