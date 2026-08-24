@@ -2,8 +2,8 @@
 	"version": 13,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-08-24T13:00:43.410Z",
-	"git_commit": "5950c4ad",
+	"timestamp": "2026-08-24T15:48:48.215Z",
+	"git_commit": "831e5193",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -675,45 +675,45 @@
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3521472,
+			"bytes": 3524160,
 			"kind": "native",
-			"gzip_bytes": 1529474
+			"gzip_bytes": 1530991
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3221888,
+			"bytes": 3224720,
 			"kind": "native",
-			"gzip_bytes": 1401539
+			"gzip_bytes": 1402974
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1520752,
+			"bytes": 1520912,
 			"kind": "native",
-			"gzip_bytes": 657242
+			"gzip_bytes": 657519
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3831376,
+			"bytes": 3835168,
 			"kind": "native",
-			"gzip_bytes": 1651615
+			"gzip_bytes": 1654201
 		},
 		{
 			"label": "tsv_format_wasm",
-			"bytes": 2240493,
+			"bytes": 2243759,
 			"kind": "wasm",
-			"gzip_bytes": 838059
+			"gzip_bytes": 839803
 		},
 		{
 			"label": "tsv_parse_wasm",
-			"bytes": 928697,
+			"bytes": 928720,
 			"kind": "wasm",
-			"gzip_bytes": 361535
+			"gzip_bytes": 361562
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2503767,
+			"bytes": 2507268,
 			"kind": "wasm",
-			"gzip_bytes": 930517
+			"gzip_bytes": 932195
 		},
 		{
 			"label": "biome (wasm)",
