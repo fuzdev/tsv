@@ -36,9 +36,9 @@ side, not to the member behind it.
 
 ## The bug this guards
 
-This gap used to **drop** the comment outright. The run was emitted inside the
-breaking arm of the boundary's break/hug choice, so the hugging arm printed the
-member and nothing else — `{ x: 1 } &⏎/* c */ { y: 2 }` came out
+Emitting the run only inside the breaking arm of the boundary's break/hug choice
+**drops** the comment outright: the hugging arm prints the member and nothing else —
+`{ x: 1 } &⏎/* c */ { y: 2 }` comes out
 `{ x: 1 } & { y: 2 }`, any run length. The glued-forward spelling is pinned by
 [intersection_object_adjacent_leading_run](../intersection_object_adjacent_leading_run/);
 this fixture pins the own-line spelling, which reaches the same emitter through the

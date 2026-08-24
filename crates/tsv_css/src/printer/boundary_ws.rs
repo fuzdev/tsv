@@ -218,7 +218,7 @@ impl<'a> Printer<'a> {
     ///
     /// It is also the bounds check for the slices behind it: the offsets reaching these
     /// helpers are span arithmetic (`span.end - 1`, `m_start + text.len()`), and one that
-    /// lands mid-character used to reach a `str` slice and PANIC. The `debug_assert` keeps
+    /// lands mid-character would reach a `str` slice and PANIC. The `debug_assert` keeps
     /// that an upstream bug rather than a crash, and the release path declines instead.
     #[inline]
     pub(super) fn gap_may_hold_boundary_ws(&self, from: u32, to: u32) -> bool {
@@ -527,7 +527,7 @@ pub(super) fn prefixed_run(separator: &'static str, kept: String) -> String {
 /// Named because five readers want it and the `- 1` is not self-evident at any of them: the
 /// gap those constructs skipped a boundary run in stops a byte short of `span.end`, and an
 /// off-by-one there either swallows the closer into the run or misses the last member. It
-/// saturates because one caller used to subtract raw — a shape that is unreachable today
+/// saturates so a raw subtraction — a shape that is unreachable today
 /// (something always precedes the closer) and is a panic rather than a wrong answer the day
 /// it isn't.
 pub(super) fn closer_pos(span: Span) -> u32 {

@@ -14,8 +14,8 @@ the `[` and the `]` welds onto the key's line (`[/* c */⏎fff + ggg]: hhh`).
 Own-line-ness is a question about the comment's own neighbours, and a comment the author put
 on its own line carries that as authorship — collapsing it onto the key's line reflows a
 break the author wrote, and gluing it to the `[` is the open-delimiter relocation tsv
-declines everywhere else. tsv previously collapsed here, keying the separator on the
-comment's KIND alone (every block got a space) rather than on what surrounds it — the
+declines everywhere else. Keying the separator on the
+comment's KIND alone (every block a space) rather than on what surrounds it collapses it — the
 hand-rolled split `docs/comments.md` §Leading comments exists to prevent, and the same one
 the expression-side template interpolation carried.
 

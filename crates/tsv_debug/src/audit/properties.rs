@@ -17,7 +17,7 @@
 //!   into a falsifiable, self-verified outcome. `gap_audit` and `blank_audit` are
 //!   the consumers.
 //!
-//! The shared property set is still growing: [`f1_check`] now lives here — the
+//! The shared property set includes [`f1_check`], which lives here — the
 //! core that (wrapped in `catch_unwind` by its callers) drives the no-panic
 //! guard, the F1 idempotency fixed point, the reparse-skeleton compare, and the
 //! leaf-conservation check — and `fuzz` consumes it (as does `blank_audit`).

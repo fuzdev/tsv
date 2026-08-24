@@ -6,8 +6,7 @@ grammar keyword, so `@scope (.card) TO (.footer)` is valid.
 **tsv** accepts the uppercase form and canonicalizes `to` to lowercase;
 **prettier** accepts it too but preserves the author's case. So
 `prettier_variant_uppercase` is the form prettier keeps stable that tsv folds to
-the lowercase `input`. (tsv previously rejected the uppercase `TO` — a
-correctness bug; accepting it is the fix.)
+the lowercase `input`. (Rejecting the uppercase `TO` would be a correctness bug.)
 
 ## Reason
 

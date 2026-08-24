@@ -20,9 +20,9 @@ layout. Neither landing is the other's fixed point: tsv re-collapses prettier's
 (the divergent-variant rule this family already pins), and prettier re-expands
 tsv's, so `output_prettier.svelte` records prettier's answer on `input.svelte`.
 
-tsv previously **welded** the pair with the order reversed
+An inline emission **welds** the pair with the order reversed
 (`if (a) expr; // c1 // inj` — `// inj` swallowed into `// c1`'s text); the
-`;`→`else` gap's trailing comment now defers through the same `line_suffix`
+`;`→`else` gap's trailing comment defers through the same `line_suffix`
 run, where the flush's own separator breaks between the two
 (`doc/arena_render_suffix.rs`). `unformatted_ours_expanded.svelte` states the
 ours-only normalization from the expanded authoring.

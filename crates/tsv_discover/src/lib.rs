@@ -431,7 +431,7 @@ mod tests {
                 "{ext}"
             );
         }
-        // the cases the TypeScript fall-through used to swallow
+        // the cases a TypeScript fall-through would swallow
         for path in [
             "package-lock.json",
             "notes.md",

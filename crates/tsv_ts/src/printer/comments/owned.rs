@@ -344,8 +344,8 @@ impl<'a> Printer<'a> {
     /// so it never reaches the operator→value gap the assignment layout inspects — its
     /// `rhs_comments` is `None`. But the comment is still on the page, and prettier's
     /// `hasLeadingOwnLineComment` sees it, so the layout must ask the node instead of the
-    /// gap. This is the general rule; the cast-only `is_own_line_jsdoc_cast` node check that
-    /// used to sit in `variable.rs` was its special case.
+    /// gap. This is the general rule; a cast-only `is_own_line_jsdoc_cast` node check
+    /// would be its special case.
     ///
     /// **The answer is what the comment PRINTS as, not how many lines it spans.** General
     /// ownership binds only a **same-line glued** block (`CommentGlue::SameLine`,

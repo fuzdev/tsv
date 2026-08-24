@@ -101,25 +101,18 @@ on acorn *accepting* the input). Prettier diverges one way:
   `source` as a binding name and throws (`'=' expected`). tsv parses and keeps the
   statement stable.
 
-⚠️ **A second divergence used to be listed here and is GONE — `import defer` phase
-drop.** Prettier once formatted `import defer * as ns from 'mod'` to `import * as ns
-from 'mod'`, deleting the phase keyword and changing the import's semantics. At the
-pinned prettier (3.9.6) it preserves the phase exactly, so the entry was a standing
-false claim and is deleted rather than reworded. Two lessons the deletion is worth
-keeping for: the entry was **documented-only by deliberate choice** — a live check was
-declined as too costly — and a documented-only claim about an external oracle has no
-gate, so it rots silently; and it rotted *behind* the "none of these can be fixtures"
-belief below, which is what kept the fixture that would have caught it from existing.
-
-The dynamic `import.source(…)` / `import.defer(…)` forms have no divergence —
-prettier formats them identically to tsv. ⚠️ **"None of these can be fixtures" was
-also wrong** and is corrected in
-[conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals):
-a canonical-parser *rejection* is representable (`expected_ours.json` +
-`expected_svelte.json` holding the parse-failure marker), and
+The `import defer` phase is preserved by both formatters (no divergence), and the dynamic
+`import.source(…)` / `import.defer(…)` forms have none either — prettier formats them
+identically to tsv. Every entry in this family is fixturable: a canonical-parser *rejection*
+is representable (`expected_ours.json` + `expected_svelte.json` holding the parse-failure
+marker — see
+[conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals)),
+and
 [phase_keyword_comment](../tests/fixtures/typescript/modules/imports/phase_keyword_comment_svelte_prettier_divergence/)
-is one. The remaining printer round-trips stay in `tests/import_phase.rs` and the
-parser in the test262 suite. The `import source` throw is live-pinned by
+is one; a documented-only claim about an external oracle has no gate and rots silently, so
+each claim here is pinned by a fixture. The remaining printer round-trips stay in
+`tests/import_phase.rs` and the parser in the test262 suite. The `import source` throw is
+live-pinned by
 [source_phase](../tests/fixtures/typescript/modules/imports/source_phase_svelte_prettier_divergence/),
 whose `prettier_rejects.txt` carries the expected-error substring while
 `expected_svelte.json` carries acorn's rejection — both oracles failing in one fixture.

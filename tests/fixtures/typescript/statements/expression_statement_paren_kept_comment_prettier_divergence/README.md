@@ -16,8 +16,8 @@ a line comment, an own-line block, and a block glued to the `(` all take their o
 line inside the broken parens; a block glued to the *expression* is owned by it and
 stays inline (`(/* c */ { a: 1 })`, not a divergence).
 
-The paren-glued block was previously **dropped** (content loss): the parens
-collapsed inline, where the comment has no place to go and nothing else printed it.
+Collapsing the parens inline would **drop** the paren-glued block (content loss): the
+comment has no place to go there and nothing else prints it.
 
 The [decorated class expression](../../expressions/class/decorated_expr_open_paren_comment_prettier_divergence/)
 is the same divergence on its own layout path; when the paren is *redundant* tsv

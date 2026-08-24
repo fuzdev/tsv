@@ -519,8 +519,7 @@ fn compile_accepts_the_module_export_rule_s_exemptions() {
     // ⚠️ The hoist interaction: a hoistable top-level snippet's binding is written
     // INTO the module scope (`SnippetBlock.js:40-44`), so the export resolves and
     // there is no error — the reason module scope must be consulted BEFORE the
-    // snippet-name set. Live-probed, and the case `checklist_svelte_compiler.md`
-    // previously described the wrong way round.
+    // snippet-name set. Live-probed.
     let _ = compile_js("<script module>export { foo };</script>{#snippet foo()}static{/snippet}");
     // A snippet referencing only the MODULE script still hoists.
     let _ = compile_js(

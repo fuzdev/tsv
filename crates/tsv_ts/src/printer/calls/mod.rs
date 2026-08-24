@@ -546,8 +546,7 @@ fn chain_head_comment_window(
     // A base that OWNS its leading gap (a sealed optional chain, an IIFE callee —
     // `ChainNode::Base::paren_leading_start`) emits it INSIDE the pair it prints, so
     // the claim stops at that `(` and this prepend has nothing left to take. Claiming
-    // it here hoists the run out in front of a pair that survives, which is what both
-    // positions used to do.
+    // it here would hoist the run out in front of a pair that survives.
     if let Some(chain::ChainNode::Base {
         paren_leading_start: Some(start),
         ..

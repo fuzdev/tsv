@@ -169,8 +169,8 @@ impl<'a> Printer<'a> {
         //
         // Prettier's own position, shared with the plain call and dynamic `import()`:
         // `isTemplateLiteralSingleArg` is the first thing `printCallExpression` asks, above
-        // `printCallArguments` and every layout inside it. `new` reached the same ANSWER from
-        // further down only because the two gates it used to sit under — `anyArgEmptyLine`
+        // `printCallArguments` and every layout inside it. `new` would reach the same ANSWER from
+        // further down only because the two gates it would sit under — `anyArgEmptyLine`
         // and the composition check — are vacuous for a single argument; stating the position
         // once is what keeps the four spellings one rule rather than four that happen to
         // agree.
@@ -649,8 +649,8 @@ impl<'a> Printer<'a> {
         // own-line comments on their own lines before the first arg — preserving
         // the author's placement and source order (divergence from prettier,
         // which floats a line comment past the statement and relocates a block
-        // before `(`). Also fixes content loss: a line comment trailing `(` was
-        // previously dropped. See conformance_prettier_ts_comments.md §Comment relocation.
+        // before `(`). Also content-preserving: a line comment trailing `(` is
+        // kept. See conformance_prettier_ts_comments.md §Comment relocation.
         if has_leading_comments {
             let first_arg_start = new_expr.arguments[0].span().start;
             let gap_pc = PartitionedComments::new(

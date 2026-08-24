@@ -3,9 +3,9 @@
 The `of S` selector list in `:nth-child(An+B of S)` accepts a bare `<number>`/`<an+b>`
 term as `S` (`2n of 123`, `2n of 2n`, `3 of 7`) — the same `in_pseudo_args` production a
 direct functional-pseudo argument uses (Svelte's `read_selector_list(inside_pseudo_class)`),
-where a bare number/An+B reads as an `Nth` simple selector rather than a type selector. tsv
-previously hard-rejected these (`Unexpected token in selector: number`) because the of-list
-parse ran without `in_pseudo_args` set; both prettier and Svelte's `parseCss` accept them.
+where a bare number/An+B reads as an `Nth` simple selector rather than a type selector. An of-list
+parse run without `in_pseudo_args` set hard-rejects these (`Unexpected token in selector: number`);
+both prettier and Svelte's `parseCss` accept them, and so does tsv.
 
 `S` need not be a bare term — it is a full `<complex-real-selector-list>`, so `2n of .a 123` nests
 a two-hop complex selector (`.a` descendant a terminal `Nth "123"`; the descendant-position

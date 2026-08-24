@@ -390,13 +390,13 @@ signature — so the drop is incidental to the relocation rather than a consider
 Cataloged at
 [continuation_blank_between_comments](../tests/fixtures/typescript/syntax/comments/continuation_blank_between_comments_prettier_divergence/).
 
-The import/export header family had the same defect and is now fixed. The diagnosis there was
-**not** a comment-position question: `gap_comment_continuation_tail` simply never consulted its
-gate, keying the choice on line-vs-block alone while `comment_hangs_next` — the shared
-keyword→value rule its `export default` / `export =` siblings already use — says a single-line
-block collapses from *any* authored position. Routing the emitter through that gate made all 19
-header gaps idempotent and is what `export * from` needed too (it had been the lone header gap
-preserving the break, for want of the same collapse). That is the family's rule: ask the gate,
+The import/export header family takes the same rule, and the reason is **not** a
+comment-position question: `gap_comment_continuation_tail` must consult its gate rather than key
+the choice on line-vs-block alone, because `comment_hangs_next` — the shared keyword→value rule
+its `export default` / `export =` siblings use — says a single-line block collapses from *any*
+authored position. Routing the emitter through that gate is what makes all 19 header gaps
+idempotent, `export * from` included (the one header gap that would otherwise preserve the break,
+for want of the same collapse). That is the family's rule: ask the gate,
 don't re-derive the answer at the call site — which is why the `await`→operand and
 `new`→callee gaps route their whole run through `build_continuation_indent` rather than
 choosing a separator of their own.

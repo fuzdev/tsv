@@ -1218,7 +1218,7 @@ impl Element<'_> {
     /// The one definition of that composite. It has three callers across two crates (the
     /// element builder, the sibling-`>` dangle's eligibility test, and `tsv_debug`'s razor
     /// audit, which must agree with the printer about which bodies are the author's bytes),
-    /// and each of them used to spell it out itself — three copies of a predicate whose every
+    /// and each spelling it out itself would be three copies of a predicate whose every
     /// clause is a drift risk, down to which bytes the `lang` value is read off (see
     /// [`lang_attribute`]: the decoded text, not the raw bytes). The template question stays on
     /// the parse-time [`TagFacts`] bitfield, so the printer's hot paths keep the field load

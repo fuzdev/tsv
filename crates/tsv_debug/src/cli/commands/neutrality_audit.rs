@@ -9,7 +9,7 @@
 //! question where it should ask *on-page*) goes blind: it lays an owned comment
 //! out differently, and the comment silently changes the layout it should have
 //! forced (a call that should expand hugs, a value that should hang stays inline).
-//! Every bug in the `bug107`/`bug108` arc was one of these.
+//! A whole class of layout bugs is exactly this.
 //!
 //! This mechanizes the length-matched-control technique that found them by hand:
 //! at each glued block-comment position, format the file with the comment made

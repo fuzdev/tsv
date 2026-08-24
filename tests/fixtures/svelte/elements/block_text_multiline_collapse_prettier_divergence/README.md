@@ -10,7 +10,7 @@ two siblings render identically — the newline's *spelling* carries no signal a
 reflows it. Here the `<span>` isolated under a block parent rejoins the text line. The separator's **presence** still decides layout (a glued boundary is never
 split, since breaking there would inject a rendered space); only space↔newline is reshaped.
 
-This fixture is scoped to the diverging case alone; the text-only collapse cases it used to bundle stay a
+This fixture is scoped to the diverging case alone; the text-only collapse cases are a
 plain (non-divergence) fixture in [block_text_multiline_collapse](../block_text_multiline_collapse/).
 
 `prettier_variant_newlines.*` pins the isolated authoring: prettier keeps it stable, tsv

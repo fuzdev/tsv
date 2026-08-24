@@ -69,7 +69,7 @@ enum HeritageGap {
     /// which comments trail the comma vs lead the next item — is one derivation, and
     /// `push_inter_item_line_comment_gap` makes it once. Handing the leading half to
     /// the next item's doc would force *it* to re-derive where the previous item's tail
-    /// stopped, and two derivations of one boundary drift apart (the `bug121` class; a
+    /// stopped, and two derivations of one boundary drift apart (a
     /// block-only gap escapes this only because both sides call
     /// `is_stranded_after_comma_block` with identical arguments).
     Baked,
@@ -1575,7 +1575,7 @@ impl<'a> Printer<'a> {
                 // After-comma block(s) from the previous (block-only) gap that **hug**
                 // this item lead it, preserving the author's side of the comma:
                 // prettier keeps a block hugging the next item after the comma (leading
-                // it), and tsv previously relocated every gap block before the comma.
+                // it), and so does tsv.
                 // A **stranded** after-comma block was instead baked onto the previous
                 // item (trailing its comma) in group mode, so skip it here. When the
                 // previous gap has a line comment, its after-comma comments were baked

@@ -287,7 +287,7 @@ impl<'a> Printer<'a> {
     ///   anchor walk this replaces — what the author wrote after a multi-line block's `*/`
     ///   (`{ a: 1 } /* c⏎c2 */ // t`) follows content on its line, so no anchor has to be
     ///   advanced over the block to keep the rest of the run claimed.
-    /// - **Ending at the first line comment**, which the anchored gate used to guarantee
+    /// - **Ending at the first line comment**, which an anchored gate would guarantee
     ///   for free: a `//` runs to end of line, so nothing could share the element's line
     ///   behind one. Per-comment, every comment after a `//` starts a fresh line and would
     ///   pass the gate — and a second deferred `//` WELDS onto the first's output line,

@@ -45,7 +45,7 @@ its *expression* parser). A plain type annotation is unaffected in both.
 
 `await` carries one more bar on top, and not the reserved-word one: the **goal**
 axis (`BindingIdentifier`/`IdentifierReference : await` is a Syntax Error when the
-goal is `Module`), which tsv enforces as a landed decision rather than defers. At
+goal is `Module`), which tsv enforces as a settled decision rather than defers. At
 `Goal::Script`, outside a `[+Await]` context, it is accepted like the other two.
 Prettier accepts it under both goals — the one place its heritage line is looser
 than the rule it states.

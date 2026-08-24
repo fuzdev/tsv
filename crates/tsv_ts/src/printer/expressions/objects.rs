@@ -152,7 +152,7 @@ impl<'a> Printer<'a> {
                 // *that comment*, never on where the property starts. Keying it on the
                 // property split a run the author glued (`/* c1 */ /* c2 */⏎x: 1`) — the bug
                 // family docs/comments.md §"Leading comments" names. The emitter owns the
-                // blank-line preservation this loop used to hand-roll on both sides
+                // blank-line preservation on both sides
                 // (between two comments, and between the last one and the property), and
                 // emits a soft `line` where the run may still collapse, so an object that
                 // stays inline is decided by its group rather than by a hardcoded space.

@@ -802,8 +802,8 @@ impl<'a> Lexer<'a> {
             }
             // Unterminated: the source ran out, or a raw `<LF>` / `<CR>` ended the line the
             // literal opened on. `StringLiteral` excludes a raw LineTerminator (the character
-            // reaches one only as an escape), and acorn rejects both — this used to skip them
-            // and swallow the rest of the file up to some later quote. `<LS>` / `<PS>` are NOT
+            // reaches one only as an escape), and acorn rejects both — skipping them would
+            // swallow the rest of the file up to some later quote. `<LS>` / `<PS>` are NOT
             // here: ES2019's JSON-superset change made them legal in a string literal, and
             // being multi-byte they never match these ASCII tests anyway.
             if p >= len || bytes[p] == b'\n' || bytes[p] == b'\r' {

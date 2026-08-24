@@ -37,8 +37,8 @@
 //! 3. **Scope / sibling control** ([`IgnoreKind::Overfrozen`]) — the same injection with every
 //!    structural space OUTSIDE the node also doubled (in-region, exclusion-free) must format
 //!    byte-identically to the primary output. A surviving doubled space outside the node means
-//!    the freeze over-extends — over-freezing previously read as "honored" (the cluster-1
-//!    escape's blind spot).
+//!    the freeze over-extends — the check that keeps over-freezing from reading as
+//!    "honored".
 //! 4. **Trailing inertness** ([`IgnoreKind::TrailingFrozen`]) — the directive appended to the
 //!    END of the preceding line instead must freeze nothing: the decided placement floor
 //!    (a directive freezes only when it is alone on its line, with no exceptions — a

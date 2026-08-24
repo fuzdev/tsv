@@ -89,8 +89,8 @@
 //!   cause), and one is illegal raw inside a regex body. They stay in the content
 //!   families, where they are inert.
 //!
-//!   ⚠️ A third reason used to be listed here — "illegal raw after a string's
-//!   line-continuation backslash" — and it was **misscoped**. That hazard is
+//!   ⚠️ "Illegal raw after a string's line-continuation backslash" is NOT a
+//!   third reason — it is **misscoped** as one. That hazard is
 //!   character-INDEPENDENT: *every* code point in [`JS_WHITESPACE_CHARS`] breaks a
 //!   `\<LF>` pair identically, by turning the `\` into a `NonEscapeCharacter`
 //!   escape and stranding the `<LF>`. Excluding two characters could never have

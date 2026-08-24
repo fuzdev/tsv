@@ -1616,10 +1616,10 @@ impl<'a> Printer<'a> {
     /// `indent(parts)`. Redundant comment-free parens around the value are stripped
     /// first (prettier does the same). A hugging union (`{ ... } | null`) keeps its
     /// inline `: ` since the object owns its own expansion; `union_prints_hugged`
-    /// owns that question whole — this site used to pair the bare syntactic shape
-    /// with its own NARROWER comment scan (line comments between members only), which
-    /// let a block comment between members, or a line comment in the leading
-    /// `|`→first-member gap, read as "hug" while the printer expanded them.
+    /// owns that question whole — pairing the bare syntactic shape with a NARROWER
+    /// comment scan here (line comments between members only) would let a block comment
+    /// between members, or a line comment in the leading `|`→first-member gap, read as
+    /// "hug" while the printer expands them.
     fn build_mapped_value_tail_doc(
         &self,
         head: &KeywordValueHead<'_>,

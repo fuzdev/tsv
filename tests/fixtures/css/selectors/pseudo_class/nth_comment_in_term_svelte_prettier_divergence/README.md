@@ -29,8 +29,8 @@ Svelte's `parseCss` rejects a comment anywhere in `:nth-*()` args except before 
 (`css_expected_identifier` — its An+B scanner doesn't tokenize comments), so
 `expected_svelte.json` records the parse error. tsv accepts, per the spec.
 
-Where the term has no type-selector reading (`2n`, `-2n`) the split term used to reject
-outright; where it has one (`n`, `-n`) it read as a selector list instead — the same
+Where the term has no type-selector reading (`2n`, `-2n`) a comment-blind split term rejects
+outright; where it has one (`n`, `-n`) it reads as a selector list instead — the same
 accept-but-mis-parse shape as the leading-`-n` forms, and the reason `n /* c6 */ + 1` is
 part of this fixture's claim.
 

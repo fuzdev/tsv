@@ -695,7 +695,7 @@ impl<'a> Printer<'a> {
         // whole span lets the per-gap emitters below skip their per-gap comment scans for the
         // ~all chains that hold no comment anywhere. A *presence* flag (on-page counts owned),
         // so it fails open — it can only add work on a commented chain, never suppress a
-        // comment (the perf80 hazard). Every operand→operator / operator→operand gap the
+        // comment (the hazard any fast-path flag must avoid). Every operand→operator / operator→operand gap the
         // emitters scan lies within `[first operand start, last operand end]`.
         let chain_has_comments = self.has_comments_on_page_between(
             operands[0].span.start,
@@ -1143,10 +1143,10 @@ impl<'a> Printer<'a> {
         // `0.5 * a(...) * b(...)` inside `... + 1.0` indents the `*` continuation
         // lines relative to `0.5`).
         //
-        // One shape for every context. A `group(parens(parts))` twin — parens inside
-        // the group so the fit reserved `)` — used to be the Standalone parenthesized
-        // arm; the renderer's lookahead fits (`rest_commands`) measures the `)`
-        // either way now, and the two shapes are output-identical over the full
+        // One shape for every context. No separate `group(parens(parts))` twin (parens
+        // inside the group so the fit reserves `)`) for the Standalone parenthesized
+        // arm: the renderer's lookahead fits (`rest_commands`) measures the `)`
+        // either way, and the two shapes are output-identical over the full
         // fixture corpus, so the mode split retired with the depth-blind
         // `is_embedded()` keying.
         let operand_doc = if let Expression::BinaryExpression(inner_binary) = operand {

@@ -18,9 +18,9 @@ The position is the *only* defect: `for (const a: number of xs)` parses with
 
 **acorn-typescript accepts**, building the `VariableDeclarator` it builds for a
 variable statement — `definite: true` with the `number` annotation — having no
-for-header parameter at all. tsv built that tree until this rejection landed, and
-its printer then dropped the `!`, emitting `for (const a: number of xs)`: a silent
-deletion of authored source that re-parsed as a different program.
+for-header parameter at all. tsv rejects instead: building that tree has its printer
+drop the `!`, emitting `for (const a: number of xs)` — a silent
+deletion of authored source that re-parses as a different program.
 
 acorn-typescript is tsv's AST-**shape** target, not its correctness oracle; for
 validity the oracle is tsc, which rejects **in its parser** rather than its

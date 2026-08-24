@@ -6,7 +6,7 @@ gap holds a block comment after the type, with **no leading line comment**
 double-nested variants). The sibling
 [as_satisfies_value_trailing_comment](../as_satisfies_value_trailing_comment_prettier_divergence/)
 covers the case that also carries a leading **line** comment; here there is none,
-so bug188's line-comment hang seam never fires — a distinct mechanism.
+so the line-comment hang seam never fires — a distinct mechanism.
 
 **tsv**: strips the shell and, because a cast is a **value** position, defers the
 trailing block past the statement `;` (via `line_suffix`), matching the

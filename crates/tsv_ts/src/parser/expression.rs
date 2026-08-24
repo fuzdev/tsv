@@ -532,8 +532,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // assertions in one precedence-climbing loop. `as` / `satisfies` bind at
         // the RELATIONAL tier (`BP_AS`), left-associative, consuming a *type* on the
         // right — so `x === y as T` is `x === (y as T)` while `a + b as T` stays
-        // `(a + b) as T`. (They were previously a second phase below every binary
-        // operator, which mis-grouped `(x === y) as T`.)
+        // `(a + b) as T`. (A second phase below every binary operator would
+        // mis-group it as `(x === y) as T`.)
         loop {
             // A leading bare arrow / bare yield takes no infix operator or `as` /
             // `satisfies` assertion — it is already a complete assignment expression.

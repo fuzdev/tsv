@@ -196,7 +196,7 @@ fn compile_css_specificity_bump_resets_per_comma() {
 fn compile_css_refused_selector_shapes() {
     // The refuse-list held after slice 5: the `||` column combinator, the logical/
     // relational pseudos (`:is`/`:where`/`:has`/`:not`), `:root`, and bare
-    // pseudo-only compounds. (The four real combinators and basic `:global` now
+    // pseudo-only compounds. (The four real combinators and basic `:global`
     // compile — see `compile_css_combinator_selectors` / `compile_css_global_*`.)
     assert_unsupported(
         "<div>x</div>\n<style>div || p{ color: red }</style>",

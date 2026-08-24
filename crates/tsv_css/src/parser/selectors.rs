@@ -1283,7 +1283,7 @@ mod tests {
             "2n /* a */ /* b */ + 1)", // a run in one gap
             "2n/* a *//* b */+1)",     // a run glued to itself
             "-2n /* c */ - 3)",        // composes with the spec-only negative forms
-            "n /* c */ + 1)",          // the shape that used to MIS-PARSE as a selector list
+            "n /* c */ + 1)",          // the shape a comment-blind read MIS-PARSES as a list
             "2n- /* c */ 1)",          // <ndash-dimension> <signless-integer>
             "2n /* c */ + 1 of .x)",   // composes with of S
             "2n/* c */of .x)",         // and with a comment as the whole `of` separator
