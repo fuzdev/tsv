@@ -310,7 +310,7 @@ impl<'a> Printer<'a> {
         }
 
         // Find `:` position to split comments
-        #[allow(clippy::expect_used)] // colon must exist when key and value are present
+        #[expect(clippy::expect_used)] // colon must exist when key and value are present
         let colon_pos = find_char_skipping_comments(
             self.source.as_bytes(),
             key_end as usize,

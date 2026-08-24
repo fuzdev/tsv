@@ -25,7 +25,7 @@ use super::types::{DocContext, Mode};
 // Remaining args are the MUTABLE render state (`output`/`pos`/`should_remeasure`, plus the
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(super) fn render_fill_iterative(
     ctx: &RenderCtx<'_>,
     parts: &[DocId],
@@ -654,7 +654,7 @@ fn flow_lookahead(arena: &DocArena, rest_commands: &[ArenaCommand]) -> SmallVec<
 /// the content has rendered. That ordering is the rule, not an oversight, so those arms stay
 /// written out.
 #[inline]
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn render_pair(
     ctx: &RenderCtx<'_>,
     content: DocId,

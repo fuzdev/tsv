@@ -102,7 +102,7 @@ fn comment_from_token(
     (comment, has_line_terminator)
 }
 
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct Parser<'a, 'arena> {
     /// Bump arena that owns every AST node this parser allocates. Supplied by
     /// the caller (caller-owns-`Bump`); the returned `Program<'arena>` borrows
@@ -2176,7 +2176,7 @@ fn parse_with<'arena, T>(
 /// the `Goal::Module` form.
 // `Parser::parse` (clippy's method-path suggestion) fails the higher-ranked
 // lifetime check on `parse_with`'s `f` bound; the closure infers it.
-#[allow(clippy::redundant_closure_for_method_calls)]
+#[expect(clippy::redundant_closure_for_method_calls)]
 pub fn parse_typescript_with_goal<'arena>(
     source: &str,
     goal: Goal,

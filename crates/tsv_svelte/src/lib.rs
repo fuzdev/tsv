@@ -8,6 +8,7 @@ mod parser;
 mod printer;
 mod whitespace;
 
+pub use ast::Root;
 pub use tsv_lang::{ParseError, Result};
 
 /// Parse Svelte source code into an internal AST
@@ -104,20 +105,9 @@ pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::Do
 /// let json = tsv_svelte::convert_ast_json(&ast, source);
 /// ```
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
     serde_json::from_slice(&convert_ast_json_bytes(root, source)).expect("writer emits valid JSON")
-}
-
-/// Parse and emit the compact wire-JSON string in one call.
-///
-/// The parse analogue of [`format_str`] — the fully-fused one-shot convenience
-/// for callers that want the JSON string and never touch the AST.
-#[cfg(feature = "convert")]
-pub fn parse_to_json(source: &str) -> Result<String> {
-    let arena = bumpalo::Bump::new();
-    let root = parse(source, &arena)?;
-    Ok(convert_ast_json_string(&root, source))
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
@@ -169,7 +159,7 @@ pub fn convert_ast_json_bytes_no_locations(root: &Root<'_>, source: &str) -> Vec
 /// UTF-8 validation of the output. Byte-oriented consumers should prefer the
 /// bytes variant.
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(root, source)).expect("serde_json emits valid UTF-8")
 }
@@ -177,7 +167,7 @@ pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
 /// The `String` form of `convert_ast_json_bytes_no_locations` for `&str`
 /// boundaries (the WASM binding's `JSON.parse`, N-API strings).
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json_string_no_locations(root: &Root<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes_no_locations(root, source))
         .expect("serde_json emits valid UTF-8")
@@ -186,11 +176,10 @@ pub fn convert_ast_json_string_no_locations(root: &Root<'_>, source: &str) -> St
 /// Byte spans of the instance/module `<script>` element contents.
 ///
 /// Comments inside these spans belong to the embedded TS programs; comments
-/// outside them are template expression comments. Public so tooling can
-/// extract script contents as standalone TS (e.g. the fixture suite's
-/// typed-walk parity probes).
+/// outside them are template expression comments. The wire writer partitions
+/// the root comment list on it.
 #[cfg(feature = "convert")]
-pub fn script_content_spans(root: &Root<'_>) -> Vec<(u32, u32)> {
+pub(crate) fn script_content_spans(root: &Root<'_>) -> Vec<(u32, u32)> {
     let mut script_spans: Vec<(u32, u32)> = Vec::new();
     if let Some(script) = root.instance {
         script_spans.push((script.content.span.start, script.content.span.end));
@@ -200,5 +189,3 @@ pub fn script_content_spans(root: &Root<'_>) -> Vec<(u32, u32)> {
     }
     script_spans
 }
-
-pub use ast::Root;

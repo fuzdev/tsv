@@ -53,11 +53,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let decl = &tag.declaration;
         let emit_semicolon = decl.declarations.len() == 1 && decl.declarations[0].init.is_none();
-        let inner = tsv_ts::build_variable_declaration_doc_with_comments(
+        let inner = tsv_ts::build_variable_declaration_doc(
             d,
             decl,
             &self.ts_inputs(),
-            &self.embed,
+            self.embed,
             emit_semicolon,
         );
         d.concat(&[d.text("{"), inner, d.text("}")])

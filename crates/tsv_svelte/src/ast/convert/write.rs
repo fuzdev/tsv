@@ -1642,7 +1642,7 @@ fn write_directive_value_expression(
         write_braced_island(w, expr, span, ctx);
     } else {
         // Shorthand: the parser builds this as a synthetic `Identifier`.
-        #[allow(clippy::unreachable)]
+        #[expect(clippy::unreachable)]
         let tsv_ts::ast::internal::Expression::Identifier(id) = expr else {
             unreachable!("shorthand directive expression is always an Identifier");
         };
@@ -1812,7 +1812,7 @@ fn write_script(
 /// `<`/`>` positions, not of the `Program`'s content span. The final char-space
 /// columns are those same tag positions translated to char space, so an indented
 /// `\t<script>` reports the tag's column rather than `0`.
-#[allow(clippy::cast_possible_truncation)]
+#[expect(clippy::cast_possible_truncation)]
 fn write_script_program_fused(
     w: &mut JsonWriter,
     script: &internal::Script<'_>,

@@ -49,7 +49,7 @@ pub use write::{
 ///
 /// `pub` so the `tsv_svelte` writer reuses it for the `<script>` `Program`'s
 /// tag-line column positions (which it emits in char space directly).
-#[allow(clippy::cast_sign_loss)]
+#[expect(clippy::cast_sign_loss)]
 pub fn translate_column(
     byte_offset: u32,
     existing_column: u64,

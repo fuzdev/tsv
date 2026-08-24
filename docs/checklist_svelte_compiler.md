@@ -121,7 +121,7 @@ The oracle **accepts** a `$`-prefixed name at a function / arrow / snippet param
 - **Refused**: `$-prefixed binding {name}` — every rejected position above.
 - **Deliberate over-refusal**: a **function-expression id** and a **catch-clause parameter** are refused at *every* depth, though the oracle accepts them inside a function body (probe-verified both directions: `const g = function $$slots() {}` and `catch ($$slots)` reject at top level and accept inside `function f() { … }`; `catch ($x)` with `x` imported likewise). An over-refusal is never a refusal-contract bug, and narrowing is not portable: `WalkCtx::fn_depth` counts function *nodes*, while the oracle's non-porous increment happens at a function's **`BlockStatement`** (`scope.js:1174-1188` — a `FunctionExpression`/`ArrowFunctionExpression` scope is itself porous). So an expression-bodied arrow increments tsv's depth and not the oracle's, and a `fn_depth == 0` gate would compile the oracle-**rejected** `const h = () => function $$slots() {}` — an OVER-ACCEPTANCE, strictly worse. Buying those shapes back needs a second, oracle-shaped depth counter, for shapes no real component writes.
 - **Deliberate over-refusal**: a class-**expression** id, though the oracle accepts it: the oracle's reference analysis is name-based and counts the id as a read, so `class $$slots {}` injects `$.sanitize_slots` (a mismatch), and `class $Foo {}` drives its store rewrite to emit `class $.store_get(…) {}` — invalid JS. Declining a shape no real component writes beats reproducing either. The **escaped** spelling slips through and compiles — see [conformance_svelte_compiler.md](conformance_svelte_compiler.md#-prefixed-class-expression-id-compiles-to-invalid-js).
-- **Closed**: an **escaped** binding name (`let $x = 1`) decodes to a name the oracle rejects (it validates the DECODED `node.name`), and every guarded position DECODES it via `Identifier::name`, matching the oracle across **all six** positions — a declarator leaf, a function-declaration id, a class-declaration id, a function-expression id, an import specifier's local, and a catch-clause parameter. The same two mechanisms that carried the leak carry the fix: `refuse_dollar_binding_pattern` reads DECODED leaf names from a localized decode collector (`collect_decoded_binding_names`, a self-sufficient decode+shape-gate walk mirroring `pattern_binding_names`'s shapes — one walk, not a paired shape gate), and `refuse_dollar_binding_name` / `refuse_dollar_import_locals` decode directly instead of returning `None` on `escaped_name`. The `$props()` **declare-site key** (`props_illegal_name`, above — an escaped `$$x` key), the **reference-site** property (`rest.$$foo` written escaped), and `invalid_arguments_usage` (an escaped `arguments`) decode too. Two escaped shapes stay deliberately OUTSIDE this fix: a class-**expression** id — the oracle *accepts* it, so tsv keeps that one site span-identity and its escaped spelling compiling (the bullet above; [conformance_svelte_compiler.md](conformance_svelte_compiler.md#-prefixed-class-expression-id-compiles-to-invalid-js)) — and an escaped rest-prop ROOT binding (`collect_rest_prop_names` keeps object-root membership plain by design, a narrow `MemberCallEscapedRoot`-class residual).
+- **Escaped binding names**: an **escaped** binding name (`let $x = 1`) decodes to a name the oracle rejects (it validates the DECODED `node.name`), and every guarded position DECODES it via `Identifier::name`, matching the oracle across **all six** positions — a declarator leaf, a function-declaration id, a class-declaration id, a function-expression id, an import specifier's local, and a catch-clause parameter. The same two mechanisms that carried the leak carry the fix: `refuse_dollar_binding_pattern` reads DECODED leaf names from a localized decode collector (`collect_decoded_binding_names`, a self-sufficient decode+shape-gate walk mirroring `pattern_binding_names`'s shapes — one walk, not a paired shape gate), and `refuse_dollar_binding_name` / `refuse_dollar_import_locals` decode directly instead of returning `None` on `escaped_name`. The `$props()` **declare-site key** (`props_illegal_name`, above — an escaped `$$x` key), the **reference-site** property (`rest.$$foo` written escaped), and `invalid_arguments_usage` (an escaped `arguments`) decode too. Two escaped shapes stay deliberately OUTSIDE this fix: a class-**expression** id — the oracle *accepts* it, so tsv keeps that one site span-identity and its escaped spelling compiling (the bullet above; [conformance_svelte_compiler.md](conformance_svelte_compiler.md#-prefixed-class-expression-id-compiles-to-invalid-js)) — and an escaped rest-prop ROOT binding (`collect_rest_prop_names` keeps object-root membership plain by design, a narrow `MemberCallEscapedRoot`-class residual).
 
 **`$bindable` — Supported.** A `$bindable(fallback?)` default at a **top-level `$props()` property with a plain-identifier key and destructure value** compiles: the default is rewritten to its fallback (`void 0` when argument-less — `let { value = $bindable(42) }` → `let { value = 42 } = $$props`), the prop forces the `$$renderer.component(…)` wrapper (the oracle's `CallExpression.js:55` `needs_context`), and the component body's last statement becomes `$.bind_props($$props, { key: local, … })` — the bindable props in source order, shorthand `{ value }` when key equals local and `key: local` when renamed (`3-transform/server/visitors/CallExpression.js`, `transform-server.js`). Composes with the rest injection and with an already-firing wrapper trigger.
 
@@ -420,7 +420,7 @@ standalone repro, none of them dropped-region-specific:
 > `validator` suites — 455 files, ~2/3 deliberately invalid — are a standing corpus behind
 > `deno task compile:validation`, a path-keyed known-bug ratchet over the
 > over-acceptances they expose (`compile_validation_known.txt` is the count — a figure
-> repeated in prose only goes stale, and this one had). A *new* over-acceptance
+> repeated in prose only goes stale). A *new* over-acceptance
 > fails the gate; a pinned one that stops firing fails too, so closing a rule forces
 > removing its lines and the list cannot rot. The prose below stays the *diagnosis*; the
 > snapshot is the *measurement*. See
@@ -439,29 +439,23 @@ today shares no oracle error code with the table. So this section deliberately s
 **no total** of "rules tsv does not enforce": the honest total is the union of two
 independently-maintained lists, and nothing mechanizes the join
 (`compile_conformance_audit` checks checklist ↔ `Refusal` drift, not this). A count
-hand-maintained here against a file that changes every slice has now been wrong three
-times; read the ratchet for its own count (it stamps `shapes: N` in its header) and
+hand-maintained here against a file that changes every slice goes stale; read the ratchet
+for its own count (it stamps `shapes: N` in its header) and
 read this table for its own rows.
 
-(`dollar_prefix_invalid` was enforced first, and the three-rule
-`validate_assignment` family — `constant_assignment`, `each_item_invalid_assignment`,
-`snippet_parameter_assignment` — after it; see below and the `$`-prefixed bindings rule
-above. Then `attribute_duplicate`, `svelte_meta_invalid_placement` and
-`svelte_meta_duplicate` — see [The parse-time rules](#the-parse-time-rules) —
-and then `node_invalid_placement`, see
-[The HTML content model](#the-html-content-model). Most recently
-`attribute_invalid_name` and `slot_attribute_invalid_placement`, the two largest
-clusters in the ratchet, both ported into `validate.rs` beside `attribute_duplicate`
-— they are two checks inside the oracle's single `validate_element` /
-`validate_slot_attribute` pair, whose callers are `RegularElement.js` and
-`SvelteElement.js` only, so a **component** is exempt from both. Then
-`attribute_invalid_event_handler`, `attribute_invalid_sequence_expression`, and
-`attribute_unquoted_sequence`, three further checks in that same `validate_element`
-loop — see [The attribute-value rules](#the-attribute-value-rules). Most
-recently the five snippet/export rules — `declaration_duplicate` (both of its oracle
-call sites), `snippet_shadowing_prop`, `snippet_conflict`, `snippet_invalid_export`
-and `export_undefined` — see
-[Snippet declaration and export](#snippet-declaration-and-export).)
+The analysis rules tsv **does** enforce are stated per family below: `dollar_prefix_invalid`
+(§Runes, the `$`-prefixed bindings rule), the three-rule `validate_assignment` family
+([The `validate_assignment` family](#the-validate_assignment-family)), `attribute_duplicate` /
+`svelte_meta_invalid_placement` / `svelte_meta_duplicate` ([The parse-time
+rules](#the-parse-time-rules)), `node_invalid_placement` ([The HTML content
+model](#the-html-content-model)), `attribute_invalid_name` / `slot_attribute_invalid_placement`
+/ `attribute_invalid_event_handler` / `attribute_invalid_sequence_expression` /
+`attribute_unquoted_sequence` — checks inside the oracle's single `validate_element` /
+`validate_slot_attribute` pair, whose callers are `RegularElement.js` and `SvelteElement.js`
+only, so a **component** is exempt ([The attribute-value rules](#the-attribute-value-rules)) —
+and the five snippet/export rules (`declaration_duplicate` at both of its oracle call sites,
+`snippet_shadowing_prop`, `snippet_conflict`, `snippet_invalid_export`, `export_undefined` —
+[Snippet declaration and export](#snippet-declaration-and-export)).
 
 ⚠️ `slot_attribute_invalid_placement` is NOT the named-slot fence. The oracle
 *accepts* a `slot="…"` on a component's direct child, which tsv declines as the
@@ -470,13 +464,12 @@ the oracle *rejects* (no owner, or an owner that is not the direct parent). Merg
 them would move files out of the fenced count and flatter the achievable-parity
 denominator — see [compile_validation_ratchet.md](compile_validation_ratchet.md).
 
-⚠️ **An earlier form of this section claimed all nine were whole-component checks in
-`2-analyze`, and that claim was FALSE for three of them.** `attribute_duplicate`,
+⚠️ **Not all nine are whole-component checks in `2-analyze`.** `attribute_duplicate`,
 `svelte_meta_invalid_placement` and `svelte_meta_duplicate` are raised in
 **`phases/1-parse/state/element.js`** — the parser, not the analyzer — and each reads
-only one element's attribute list or one tag's depth. Reading them as whole-component
-deferred three cheap, high-population rules behind an architecture they never needed.
-Check the oracle's *file path* before classifying a rule by the shape of the work.
+only one element's attribute list or one tag's depth, so none of the three needs a
+whole-component pass. Check the oracle's *file path* before classifying a rule by the
+shape of the work.
 
 ⚠️ **These are Svelte *analysis-phase* rules, not deferred JS early errors** — do not
 file them under the parser's [deliberate early-error deferral](conformance_svelte.md).
@@ -496,13 +489,13 @@ octal escapes, `delete` of a plain name) reaches any of these rules.
 
 The one rule with any overlap at all is `declaration_duplicate`, and Svelte says so
 itself at `phases/scope.js:688` ("declaring function twice is also caught by acorn in
-the parse phase"). ⚠️ That caveat is **narrower than the rule**, and reading it as a
-reason to skip the rule was wrong: it covers only a JS-level duplicate declaration.
+the parse phase"). ⚠️ That caveat is **narrower than the rule** — it covers only a JS-level duplicate
+declaration.
 Neither pinned shape was one. `<script>let foo = 1;</script>{#snippet foo()}…{/snippet}`
 collides a *snippet* with a script binding, and
 `<div>{#snippet a}…{/snippet}{#snippet a}…{/snippet}</div>` collides two snippets in one
 fragment — acorn sees neither, because neither is a JS declaration. Both are ported (see
-below); the caveat retains no live consequence.
+below).
 
 #### The parse-time rules
 
@@ -689,8 +682,8 @@ no `at(-2)`, so at most one of the three can fire.
   (`SnippetBlock::span.start`) rather than name. Only a top-level snippet's span is
   inserted into the hoistable set, so a nested snippet's span is absent by
   construction: `is_hoisted` returns false for it and it lands in its enclosing block
-  body regardless of its top-level twin's verdict. Both shapes this formerly refused
-  now compile at parity — the top-level twin **hoists** (static, no instance binding),
+  body regardless of its top-level twin's verdict. Both shapes compile at parity — the
+  top-level twin **hoists** (static, no instance binding),
   leaving the nested one in the body
   (`<script>let v = 1;</script>{#snippet a()}static{/snippet}<div>{#snippet a()}{v}{/snippet}</div>{@render a()}`,
   pinned by `snippets/nested_name_hoisted`), and the top-level twin does **not** hoist,
@@ -698,7 +691,7 @@ no `at(-2)`, so at most one of the three can fire.
   `collect_hoisted_snippets`'s recursive-direct-first walk)
   (`<script>let v = 1;</script><div>{#snippet a()}nested{/snippet}</div>{#snippet a()}{v}{/snippet}{@render a()}`,
   pinned by `snippets/nested_name_body`); the fixpoint-demotion variant compiles too.
-  This retired the former `NestedSnippetNameCollision` refusal. (The per-**fragment**
+  (The per-**fragment**
   `declaration_duplicate` rule above is distinct and still refuses — it fires only when
   two snippets share a name in ONE fragment.)
 - **Refused**: `{#snippet} {name} shadows the component prop of the same name (the
@@ -780,9 +773,9 @@ entry's KIND, because the two halves of that sentence have different answers. A 
 it is a write to the local and compiles. A nested `const` does not: it is
 `declaration_kind: 'const'` to the oracle wherever it sits — `validate_no_const_assignment`
 reads the SCOPE CHAIN, not a top-level set — so it carries `constant_assignment` itself and
-the write must REFUSE. An earlier form of this scoped set treated every entry uniformly as
-"shadowed ⇒ no rule" and so **compiled writes the oracle rejects** — an over-acceptance and
-a refusal-contract violation, live-verified on
+the write must REFUSE. A scoped set that treated every entry uniformly as
+"shadowed ⇒ no rule" would **compile writes the oracle rejects** — an over-acceptance and
+a refusal-contract violation, oracle-verified on
 `const a = 1; function f() { { const a = 0; a = 2; } }` and three siblings. Storing the
 kind is what keeps the two apart, and it must stay stored: the two nested orderings have
 opposite verdicts (`let a; { const a; a = 1 }` refuses; `const a; { let a; a = 1 }`
@@ -790,15 +783,13 @@ compiles, both oracle-verified), so a set that merely knew "some open binding of
 is const" would get one of them wrong.
 
 The enumeration of declaration FORMS is a **separate** question from the kind one above.
-⚠️ An earlier form of this section claimed that incompleteness "fails in the safe
-direction — a form the walk does not record leaves no binding, so the write falls through
-to the component-level sets and still refuses". **That claim is FALSE, and it is the same
-conflation as the one above, one level out**: the fall-through refuses only when the name
-is ALSO in a component-level set. When the shadowed-out name is purely LOCAL there is no
-component-level entry to fall through to, no rule applies at all, and the write is
-ACCEPTED — an over-acceptance whenever that local was a `const`. Two such over-acceptances
-were live, both listed by the old text as safe examples, both oracle-verified
-(`constant_assignment`):
+⚠️ Incompleteness does **not** fail in the safe direction. A form the walk does not
+record leaves no binding, and the write falls through to the component-level sets — but
+the fall-through refuses only when the name is ALSO in a component-level set (the same
+conflation as the one above, one level out). When the shadowed-out name is purely LOCAL
+there is no component-level entry to fall through to, no rule applies at all, and the
+write is ACCEPTED — an over-acceptance whenever that local was a `const`. Two shapes that
+read as safe are exactly this, both oracle-verified (`constant_assignment`):
 
 ```svelte
 <script>function f(v) { switch (v) { case 1: const w = 1; break; case 2: w = 2; } }</script>
@@ -992,33 +983,33 @@ cargo run -p tsv_debug compile_corpus_compare t.svelte`.
 
 ### Mismatch classes under mutation
 
-`compile_fuzz --seed 0 --iterations 20000` produces **16 mismatches**, classified from
-the dumped mutants by diff signature. The fuzzer's operators, grading rules, and flags
-are documented in [compile_tooling.md](compile_tooling.md).
+The mismatch classes `compile_fuzz` reaches that the real-component corpus does not,
+each with its mechanism and its pin. The fuzzer's operators, grading rules, and flags are
+documented in [compile_tooling.md](compile_tooling.md). A run's mismatch *count* is a
+measurement of one seed over one corpus, not a property of the compiler, and is not
+recorded here: the seed corpus IS `tests/fixtures_compile`, so every fixture added changes
+which mutants are generated, and a count is comparable only against another run over the
+same corpus.
 
-⚠️ The count is not comparable across corpus edits. The seed corpus IS
-`tests/fixtures_compile`, so adding a fixture changes which mutants are generated;
-compare a run only against another run over the same corpus.
-
-**C1 — `{#each}` counter numbering — is CLOSED.** tsv and the oracle disagreed on
-which loop got `$$index` vs `$$index_1`/`$$index_2` because tsv allocated both
-generated each-block names from one emission-order counter. The oracle allocates them
-in two *different* passes, and therefore two different orders:
+**C1 — `{#each}` counter numbering.** The two generated each-block names cannot share
+one emission-order counter — which loop gets `$$index` vs `$$index_1`/`$$index_2` then
+disagrees with the oracle, which allocates them in two *different* passes, and
+therefore two different orders:
 
 | name | oracle pass | order | dropped `{:catch}` |
 | --- | --- | --- | --- |
 | `each_array` | 3-transform, server `EachBlock` visitor (`state.scope.root.unique`) | pre-order | not visited → consumes nothing |
 | `$$index` | scope creation, `EachBlock` visitor's trailing `node.metadata = { … }` | **post-order** (assigned *after* body + fallback) | visited → **consumes a name** |
 
-So an `{#each}` nested inside another one's fragment, or sitting in a dropped
-`{:catch}`, mis-numbered every later loop. `blocks::assign_each_index_names` now
-assigns `$$index` upfront in post-order over the whole fragment tree; `each_array`
-stays at emission. Fixtures: `blocks/each_fallback_nested_each`,
+Under one counter, an `{#each}` nested inside another one's fragment, or sitting in a
+dropped `{:catch}`, mis-numbers every later loop. `blocks::assign_each_index_names`
+assigns `$$index` upfront in post-order over the whole fragment tree; `each_array` is
+assigned at emission. Fixtures: `blocks/each_fallback_nested_each`,
 `blocks/each_index_after_dropped_catch_each`.
 
 ⚠️ Only two of those nestings are reachable today. An `{#each}` in another's **body**
 still refuses (`Refusal::NestedEach` — `env.in_each`, a separate gate on the
-unvalidated nested *emission* path), so the numbering fix is exercised by an `{#each}`
+unvalidated nested *emission* path), so the post-order numbering is exercised by an `{#each}`
 in a `{:else}` fallback and by one in a dropped `{:catch}`, which is what the two
 fixtures cover. The body case is modelled but not yet reachable; it becomes so when
 `NestedEach` lifts.
@@ -1031,23 +1022,22 @@ refuses (`Refusal::ModuleCommentAfterInstanceScript`); see
 for the mechanism, the probed boundary, and why the refusal is coarser than the
 mismatch. Zero corpus parity cost.
 
-The residual 16 by diff signature (a clean partition this time — each mutant carries
-exactly one):
+The other classes a run reaches, by diff signature:
 
-| Signature | Count | Shape |
-| --- | --- | --- |
-| `$$props` | 6 | a user `const $$props = 1` where the oracle emits `const $$sanitized_props = 1` (generated-name deconfliction) |
-| module-script comment (block-recovered) | 7 | the **other** half of the class — now **CLOSED** (carried, not refused); see below |
-| generated-function order | 1 | a `<svelte:boundary>` `failed` snippet / hoisted snippet function emitted at a different point in the body than the oracle emits it |
-| wrapper | 1 | `$$renderer.component(…)` emitted where the oracle emits none |
-| static fold | 1 | tsv folds a `{b}` read the oracle keeps as `$.escape(b)` |
+| Signature | Shape |
+| --- | --- |
+| `$$props` | a user `const $$props = 1` where the oracle emits `const $$sanitized_props = 1` (generated-name deconfliction) |
+| module-script comment (block-recovered) | the **other** half of the class — carried, not refused; see below |
+| generated-function order | a `<svelte:boundary>` `failed` snippet / hoisted snippet function emitted at a different point in the body than the oracle emits it |
+| wrapper | `$$renderer.component(…)` emitted where the oracle emits none |
+| static fold | tsv folds a `{b}` read the oracle keeps as `$.escape(b)` |
 
-#### The open half: a module comment recovered by a preceding block
+#### The other half: a module comment recovered by a preceding block
 
-**Now CLOSED (carried, not refused).** The 7 residual module-comment mismatches are the
-**same mechanism** as the closed half —
+**Carried, not refused.** The 7 residual module-comment mismatches are the
+**same mechanism** as the refused half (C2) —
 esrap's single comment index being re-seeked backward — reached by a different route.
-They are **CARRIED, not refused**: unlike the closed half (a module-second comment
+They are **CARRIED, not refused**: unlike the refused half (a module-second comment
 lands in an unrelated template expression, unreproducible), a module-first comment the
 oracle keeps carries at its authored span, which the parity bar accepts (a byte match, or
 a comment-POSITION difference the oracle sometimes forces by re-attaching into the
@@ -1091,16 +1081,15 @@ keep/drop/refuse matrix in `src/tests/module_script.rs`.
 ⚠️ Keyed to the pinned oracle's `reset_comment_index` behavior — re-probe the keep
 condition if that pin moves.
 
-⚠️ **A further class exists but did not come from this run.** `<svelte:head>` ordering —
-tsv emits `$.head(…)` *before* the hoisted snippet function where the oracle emits it
-after — is a real, hand-confirmed bug. No `--seed 0` mutant contains `<svelte:head>` at
-all, so it is tracked separately and must not be counted against a `compile_fuzz` run's
-mismatch total.
+⚠️ **`<svelte:head>` ordering is a further open class the fuzzer does not reach**: tsv
+emits `$.head(…)` *before* the hoisted snippet function where the oracle emits it after.
+The seed corpus holds no `<svelte:head>`, so no mutant contains one; it is hand-confirmed
+rather than fuzz-found.
 
 #### C5 — trailing template whitespace: the source `trimEnd` class
 
-A **sixth** class, produced by `compile_fuzz`'s `exotic_whitespace` operator and
-confirmed by hand. A document whose last character is `U+FEFF` or `U+0085` mismatches,
+A class produced by `compile_fuzz`'s `exotic_whitespace` operator and confirmed by
+hand. A document whose last character is `U+FEFF` or `U+0085` mismatches,
 and the two mismatch in **opposite directions**:
 
 | Document | tsv emits | oracle emits |

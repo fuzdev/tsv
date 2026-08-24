@@ -584,9 +584,9 @@ elements, mapped-type values) indent their continuations correctly.
 `parse` never rewrites its input — its offsets are a drop-in contract with acorn /
 Svelte / `parseCss` over the bytes on disk. Every **parse-then-format** entry point, by
 contrast, folds `<CR>` and `<CR><LF>` to `<LF>` *before* it parses
-(`tsv_lang::printing::normalize_carriage_returns`, called from `tsv_ts` / `tsv_svelte`'s
-`format_str`, the CLI's `format_source` — CSS's only parse-then-format entry point — each
-binding's format export, and `tsv_svelte_compile`'s `canonicalize_js`). tsv's output is therefore
+(`tsv_lang::printing::normalize_carriage_returns`, called from each language crate's
+`format_str`, the CLI's `format_source`, each binding's format export, and
+`tsv_svelte_compile`'s `canonicalize_js`). tsv's output is therefore
 LF-only, including inside the regions it copies verbatim — a frozen embedded body, a
 `format-ignore` region, a multi-line comment, a template literal.
 

@@ -210,10 +210,9 @@ pub(crate) fn analyze_snippets(
     // places each correctly. Only a top-level snippet's span is inserted, so a
     // nested snippet's span is absent by construction — it lands in its enclosing
     // block body, exactly where the oracle puts it, whether or not its top-level
-    // twin hoists. This is what retired the former `NestedSnippetNameCollision`
-    // refusal: both former sub-cases (the twin hoists → the nested one no longer
-    // follows it to module scope; the twin does not → both bodies, emitted in
-    // source order by `collect_hoisted_snippets`) now compile at parity.
+    // twin hoists. Both sub-cases (the twin hoists → the nested one does not
+    // follow it to module scope; the twin does not → both bodies, emitted in
+    // source order by `collect_hoisted_snippets`) compile at parity.
     //
     // `hoisted_names` carries the same fixpoint result by NAME, for the export
     // check (`validate_module_exports`) — an inherently name-based query,

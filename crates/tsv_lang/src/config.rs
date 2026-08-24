@@ -91,7 +91,7 @@ pub struct EmbedContext {
     /// Whether a JSDoc cast **leading** this expression must REFLOW its comment→`(` break —
     /// the value-gap category "answers the break by rule and CANNOT hang". The second
     /// build-time field (with `mode`), read once at the TS expression entry
-    /// (`build_expression_doc_with_comments`), which resolves the expression's left-spine
+    /// (`tsv_ts::build_expression_doc`), which resolves the expression's left-spine
     /// cast and marks it; casts nested deeper keep their width-decided layout.
     ///
     /// Set by `tsv_svelte` for every braced head whose value **hugs** its delimiters (a

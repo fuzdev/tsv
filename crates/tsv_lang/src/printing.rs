@@ -953,7 +953,7 @@ pub fn is_indentable_block_comment<'s>(mut lines: impl Iterator<Item = &'s str>)
 pub fn visual_width(s: &str, tab_width: usize) -> usize {
     if s.is_ascii() {
         // Fast path: each ASCII byte is 1 column, tabs are tab_width columns.
-        #[allow(clippy::naive_bytecount)]
+        #[expect(clippy::naive_bytecount)]
         let tab_count = s.as_bytes().iter().filter(|&&b| b == b'\t').count();
         return s.len() + tab_count * (tab_width - 1);
     }

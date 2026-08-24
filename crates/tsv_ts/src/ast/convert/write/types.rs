@@ -299,7 +299,7 @@ fn write_literal_type(w: &mut JsonWriter, lit: &internal::TSLiteralType<'_>, ctx
         internal::TSLiteralType::UnaryExpression(unary) => {
             // Negative number types like `-1`; the parser guarantees the
             // argument is a Literal.
-            #[allow(clippy::unreachable)]
+            #[expect(clippy::unreachable)]
             let internal::Expression::Literal(arg_lit) = unary.argument else {
                 unreachable!(
                     "parser only creates TSLiteralType::UnaryExpression with Literal argument"

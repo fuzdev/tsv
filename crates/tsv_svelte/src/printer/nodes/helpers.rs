@@ -535,12 +535,7 @@ impl<'a> Printer<'a> {
             return pattern;
         };
         let d = self.d();
-        let tail = tsv_ts::build_type_annotation_doc_with_comments(
-            d,
-            annotation,
-            &self.ts_inputs(),
-            &self.embed,
-        );
+        let tail = tsv_ts::build_type_annotation_doc(d, annotation, &self.ts_inputs(), self.embed);
         d.concat(&[pattern, tail])
     }
 

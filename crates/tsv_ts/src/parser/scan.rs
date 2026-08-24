@@ -451,7 +451,7 @@ fn parse_radix_f64(digits: &str, radix: u32) -> f64 {
         // exponent and is exact — making this byte-identical to `mul_add`. Keep the
         // explicit multiply-and-add as a faithful transcription of acorn's
         // `total = total * radix + val` rather than fusing it.
-        #[allow(clippy::suboptimal_flops)]
+        #[expect(clippy::suboptimal_flops)]
         {
             acc * f64::from(radix) + f64::from(c.to_digit(radix).unwrap_or(0))
         }

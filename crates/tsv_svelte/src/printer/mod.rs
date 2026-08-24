@@ -426,7 +426,7 @@ impl<'a> Printer<'a> {
         if frozen {
             self.build_frozen_node_doc(expr.span())
         } else {
-            tsv_ts::build_expression_doc_with_comments(self.d(), expr, &self.ts_inputs(), embed)
+            tsv_ts::build_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
         }
     }
 
