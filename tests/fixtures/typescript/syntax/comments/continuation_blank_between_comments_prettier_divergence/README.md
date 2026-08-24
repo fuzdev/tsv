@@ -15,7 +15,7 @@ The gap's break is **forced** (a `//` runs to end-of-line, so the tail cannot sh
 blank line is a property of a break: it survives exactly where the break survives. That is the
 same rule the value side of these constructs already follows — the `=`→value control at the end
 of this fixture keeps its blank, and so do the module-header gaps, which reach the run through a
-different emitter. The two emitters used to answer one question two ways; they no longer do.
+different emitter. The two emitters answer one question one way.
 
 ## Reason
 

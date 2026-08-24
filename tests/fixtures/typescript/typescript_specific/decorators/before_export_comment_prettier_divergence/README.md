@@ -22,8 +22,8 @@ decorator→declaration gap in a program body.
 
 ## Reason
 
-Comment position is authorship signal; ◆comment_preservation. tsv previously **dropped** all
-three comments here — the gap was scanned over an inverted range (the declaration's span starts
-at the decorator, *before* the `export` keyword the scan began at), so nothing found them;
+Comment position is authorship signal; ◆comment_preservation. A scan over an inverted range
+(the declaration's span starts at the decorator, *before* the `export` keyword a keyword-anchored
+scan begins at) finds none of the three comments here and **drops** them all;
 ◆content_preservation. See
 [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

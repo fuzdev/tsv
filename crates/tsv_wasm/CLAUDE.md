@@ -275,7 +275,7 @@ the merged package `.d.ts` (`check:ast-types` covers `tsv_ast.d.ts` alone), so a
 collision only surfaces at a consumer's compile — check names against `tsv_ast`
 before adding.
 
-That blind spot has cost twice, and the second class is now gated. A relative
+That blind spot has two classes, and the second is gated. A relative
 specifier inside a shipped `.d.ts` must carry the **`.js`** extension
 (`'./tsv_ast.js'`, which TypeScript resolves to `./tsv_ast.d.ts`): extensionless
 is TS2834/TS2835 under `moduleResolution: node16`/`nodenext`, raised from inside

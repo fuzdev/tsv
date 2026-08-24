@@ -391,8 +391,8 @@ impl<'a> Printer<'a> {
     /// member it is a spurious extra level. (Union members take their `align(2)` offset
     /// from `build_union_member_offset_doc`, which uses *this* bare variant and applies
     /// the offset itself — so they don't route through the shared `d.indent` either.)
-    /// Hence this dedicated entry point for the intersection member sites only. Fixes bug141
-    /// §Bug 2 case 3; guarded by `intersection_paren_constructor` /
+    /// Hence this dedicated entry point for the intersection member sites only. Guarded
+    /// by `intersection_paren_constructor` /
     /// `intersection_paren_conditional`.
     pub(super) fn build_intersection_member_type_doc(
         &self,

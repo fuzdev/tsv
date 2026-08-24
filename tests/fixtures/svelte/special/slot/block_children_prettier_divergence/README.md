@@ -6,8 +6,8 @@ lays out **block-style** — both tags intact, content on its own indented lines
 
 That parity is the point. `svelte:*` elements (and `<slot>`, `<title>`) run the **same** layout
 analysis as regular elements rather than a private copy of it, so "block children force multiline"
-reaches them too. A private copy is how the two drifted: a `<slot>` used to stay on one line here
-where a `<span>` expanded.
+reaches them too. A private copy is how the two drift: a `<slot>` staying on one line here
+where a `<span>` expands.
 
 Prettier keeps the content glued to the tags and dangles both delimiters
 (`prettier_variant_dangle`, which tsv normalizes to `input`). The hugged content boundary is

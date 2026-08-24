@@ -16,7 +16,7 @@ apart.
 **Acorn-typescript accepts**, welding across the break into a single
 `ExportNamedDeclaration` whose `ClassDeclaration` carries `declare: true` — the same
 tree it builds for the same-line spelling, so the line break simply vanishes. tsv
-produced that tree too until this rejection landed.
+rejects instead.
 
 acorn-typescript is tsv's AST-**shape** target, not its correctness oracle; for
 validity the oracle is tsc, which rejects, and prettier — the accept test — rejects

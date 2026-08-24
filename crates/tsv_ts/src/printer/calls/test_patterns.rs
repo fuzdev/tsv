@@ -261,8 +261,8 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     // Check if the callee matches a known test pattern. Compare the resolved
     // member-chain parts against the pattern list directly — span-identity slices,
     // a stack-only `SmallVec` — instead of building and immediately discarding a
-    // dotted callee `String` on every test-shaped call (the hot waste this path
-    // used to pay). `callee_chain_string` stays for the actual-test-call
+    // dotted callee `String` on every test-shaped call (hot waste).
+    // `callee_chain_string` stays for the actual-test-call
     // flat-layout path, which needs the owned text.
     let Some(parts) = get_member_chain_parts(call.callee) else {
         return false;

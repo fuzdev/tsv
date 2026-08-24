@@ -12,7 +12,7 @@
  *
  * Portable across runtimes: uses `node:` builtins (Deno supports them) and the
  * shared `runtime.ts` platform normalizer instead of `Deno.*`. The alternative
- * impls' bindings now live in the harness `node_modules` (flat, no version dir),
+ * impls' bindings live in the harness `node_modules` (flat, no version dir),
  * not the Deno npm cache — see benches/js/package.json.
  */
 
@@ -150,8 +150,8 @@ type StagedEntry = { entry: Omit<BinarySize, 'gzip_bytes'>; path: string };
  *
  * The absent list exists because this table is the one part of the report whose
  * COMPOSITION varies by machine — a row is emitted only if its file is on disk, so
- * an unbuilt artifact used to leave no trace at all, and a committed report's row
- * set silently described the producer's build state rather than the release. The
+ * without it an unbuilt artifact leaves no trace at all, and a committed report's row
+ * set silently describes the producer's build state rather than the release. The
  * ratios read the same either way (`biome is 18.4x tsv`), which is what makes the
  * omission easy to miss.
  */
@@ -418,7 +418,7 @@ export async function collect_binary_sizes(
 /**
  * Format an ARTIFACT size, decimal units (`B`/`KB`/`MB`, 1000-based).
  *
- * Module-local, and one of the repo's byte formatters that ALL now share this
+ * Module-local, and one of the repo's byte formatters that ALL share this
  * decimal convention: `lib/corpus.ts`'s `format_mb` (corpus totals, the one every
  * corpus-size printer routes through), `diagnostics/corpus_stats.ts`'s
  * `format_corpus_size`, `corpus_compare_format.ts`'s `format_source_size`, and

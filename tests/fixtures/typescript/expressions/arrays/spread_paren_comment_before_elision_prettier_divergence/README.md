@@ -16,7 +16,7 @@ Prettier emits the share against the spread's *own* comma instead (`prettier_int
 and then moves it on the next pass, so it needs two passes to reach the form it agrees with. We
 reach it in one.
 
-The array used to emit its share the same way prettier does, which made our own output disagree
+Emitting the share the way prettier does makes our own output disagree
 with our reprint of it — two fixed points for one document.
 
 See [conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)

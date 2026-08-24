@@ -303,19 +303,14 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
     and pinned in [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs)
     (4 files, down from 52 / 38 / 20).
 
-  The **attribute** finding this list used to lead with is closed, and it was never a
-  terminator question — the unquoted-attribute-value terminator spelled Svelte's `\s` as a raw
-  BYTE match, so all nineteen non-ASCII members of the class (and the VT its ASCII half
-  omitted) were absorbed into the value
-  (turning an expression attribute into a quoted string `svelte compile` rejects). It was one
-  of FIVE sites in `tsv_svelte` reading a Rust whitespace class where Svelte's JS `\s` was
-  meant; the crate's discipline is now stated at the top of
-  [whitespace.rs](../crates/tsv_svelte/src/whitespace.rs). Closing them took the family from
-  409 files / 194 signature groups to 277 / 175 (19 groups closed, **0 new**) and its
-  tsv-side over-rejections from 196 to 158.
+  The unquoted-attribute-value terminator is a **whitespace-class** question, not a terminator
+  one: it must spell Svelte's JS `\s` (all nineteen non-ASCII members plus VT), not a raw BYTE
+  match or a Rust whitespace class — a narrower class absorbs those characters into the value
+  and turns an expression attribute into a quoted string `svelte compile` rejects. The crate's
+  discipline (one class, Svelte's) is stated at the top of
+  [whitespace.rs](../crates/tsv_svelte/src/whitespace.rs).
 
-  The boundary-whitespace **class** finding this list led with before that is also closed, and
-  so is the selector-span residue that followed it: the CSS parser steps the whole
+  The CSS side answers the same class the same way: the CSS parser steps the whole
   `allow_whitespace()` run (`CssParser::skip_boundary_whitespace`, and its
   comment-looping twin `skip_boundary_whitespace_registering_comments`) at every juncture
   `parseCss` has one — the stylesheet body, a style rule's block and an at-rule's, the
@@ -435,9 +430,8 @@ cargo run --profile corpus -p tsv_debug --features audits census_audit ../zzz/sr
 #
 # GATED as a RATCHET over `census_audit_known.txt`, keyed (path, bucket, direction) —
 # file-level, like the compile validation ratchet (the file IS the reproducer). Born
-# EMPTY: the CSS parse-time-drop class it was argued from was fixed by hand before the
-# audit landed, so over tests/fixtures it stands as the tripwire that keeps the class
-# closed. Whole-comment drops are sanctioned in exactly ONE place — the CSS CDO/CDC
+# EMPTY: over tests/fixtures it stands as the tripwire that keeps the CSS parse-time-drop
+# class it was argued from closed. Whole-comment drops are sanctioned in exactly ONE place — the CSS CDO/CDC
 # `<!-- ... -->` span, which tsv (matching parseCss) discards WHOLESALE, CSS between the
 # markers included — and that carve-out lives in the scanner (those comments never enter
 # the input multiset), so a snapshot line is always a bug. Rejected inputs make no
@@ -712,11 +706,11 @@ only one where the gate has teeth.
 
 **Why the whole crate has to reach it — two silent coverage holes.** `cargo doc` documents a
 crate's *targets*, and a bin target whose name collides with its lib's is skipped outright.
-`tsv_debug` had exactly that shape — a `[[bin]] name = "tsv_debug"` beside an implicit lib of the
-same name — with `audit/` and `cli/` declared only in `main.rs`. Those two trees are ~36k of the
-crate's ~56k lines, so the gate graded roughly a third of it and reported green; a deliberately
-broken link in either passed. The crate is now one lib, with `main.rs` a shim over `cli`, which
-also stops the nine shared modules compiling twice (they were declared in both roots). The second
+`tsv_debug` has exactly that shape — a `[[bin]] name = "tsv_debug"` beside a lib of the same
+name — so with `audit/` and `cli/` declared only in `main.rs` (two trees that are ~36k of the
+crate's ~56k lines) the gate would grade roughly a third of it and report green, a deliberately
+broken link in either passing. The crate is therefore one lib, with `main.rs` a shim over `cli`,
+which also keeps the shared modules from compiling twice under two roots. The second
 hole is `#[cfg(feature)]`: five `audit` submodules sit behind `comment_check`, so a default-feature
 build cannot resolve a link that names them — hence `--all-features`, which reaches gated code in
 every crate, not only this one. Both holes fail the same way, which is the thing to remember about
@@ -1045,12 +1039,12 @@ reverse-applied, gated on an `objcopy .text` comparison so no stale binary could
 column), it reports 2412 findings — every one inside the fixture that pins that bug, both
 kinds, zero false positives; on the fixed tree it reports **0** across 45,905 graded widths.
 
-**Its first catch, and what it cost to find.** The fused element+tail measurement an inline-sibling
-wrap used to take was a live F1 break at every width where the wrapped element lays its own content
-out block-style — and no other gate could see it, because the strayed pass is only reachable at
-widths no fixture happened to sit at. The sweep found it on its first run past `--width 17`
-(`inline_sibling_drop_tail_wide_long` pins the razor). Green since, over both the fixture tree and
-real code, and gated in `deno task check` (~5 s at the default width).
+**What only it can see.** A fused element+tail measurement at an inline-sibling wrap is an F1
+break at every width where the wrapped element lays its own content out block-style — and no
+other gate can see it, because the strayed pass is reachable only at widths no fixture happens
+to sit at; the sweep reaches it past `--width 17` (`inline_sibling_drop_tail_wide_long` pins the
+razor). Green over both the fixture tree and real code, and gated in `deno task check` (~5 s at
+the default width).
 
 ## Format→Reparse Round-Trip Audit (`roundtrip:audit`)
 
@@ -1427,8 +1421,8 @@ reason to pad the rest.
 #  (2) Dead links - every Markdown link (relative path + #anchor) in every Markdown file
 #      in the repo (walked at run time, so a new doc is gated by existing) must resolve on
 #      disk (catches renamed/deleted fixtures, wrong ../ depth, stale anchors). That is
-#      docs/*.md, every fixture README, and the set that previously had no link gate at
-#      all: root CLAUDE.md / README.md, each crate's CLAUDE.md, the shipped
+#      docs/*.md, every fixture README, root CLAUDE.md / README.md, each crate's
+#      CLAUDE.md, the shipped
 #      crates/tsv_wasm/README_*.md, a container-directory README under tests/fixtures/.
 #      The walk shares `tsv format`'s prune policy — tsv_discover's safety nets
 #      (node_modules, .git, .sl, .hg, .svn, .jj) over tsv_ignore's IgnoreStack — so build

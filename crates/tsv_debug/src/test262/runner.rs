@@ -180,8 +180,8 @@ fn classify(relative_path: &str, content: &str) -> Classification {
     // Drop tests whose syntax tsv hasn't implemented from the graded set: scoring
     // them as parse failures measures scope, not a conformance gap. Both polarities
     // go — we shouldn't claim credit for rejecting a negative whose feature we
-    // reject wholesale either. `UNIMPLEMENTED_FEATURES` is currently empty (the
-    // import-phase proposals it once held are now parsed), so nothing matches here
+    // reject wholesale either. `UNIMPLEMENTED_FEATURES` is currently empty, so
+    // nothing matches here
     // until a new unimplemented proposal is added.
     if let Some(feature) = frontmatter.requires_unimplemented_feature() {
         return Classification::Skip(SkipReason::UnimplementedFeature(feature));
@@ -378,7 +378,7 @@ pub fn format_failure(reason: &FailureReason) -> String {
 mod tests {
     use super::*;
 
-    /// The import-phase proposals are now parsed, so a test requiring one is
+    /// The import-phase proposals are parsed, so a test requiring one is
     /// graded, not skipped — `UNIMPLEMENTED_FEATURES` is empty. (Were a future
     /// proposal added to that list, `classify` would route it to the skip bucket;
     /// the `frontmatter` predicate's own unit test covers the matching itself.)

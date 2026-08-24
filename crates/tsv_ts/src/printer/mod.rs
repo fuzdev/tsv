@@ -246,9 +246,9 @@ pub struct Printer<'a> {
     /// exists; deleting it as "the chain bail, already covered" would silently unhug every
     /// typed curried callback (`calls/curried_arrow_chain` is the fixture that says so).
     /// ⚠️ The first reader's redundancy is a fact about those two CALL SITES, not about the
-    /// predicate: it used to hold because `should_use_arrow_chain_layout` refused every
-    /// `shouldBreakChain` chain outright, and that refusal is gone (it is a break now, in
-    /// every context but the assignment RHS). A third setter that ran under a chain context
+    /// predicate: `should_use_arrow_chain_layout` does not refuse a `shouldBreakChain`
+    /// chain outright (it is a break, in every context but the assignment RHS), so the
+    /// redundancy is not guaranteed by the predicate. A third setter that ran under a chain context
     /// would make this term load-bearing.
     ///
     /// ⚠️ **Ambient, where prettier's is per-`print()`.** It therefore has to be CLEARED on

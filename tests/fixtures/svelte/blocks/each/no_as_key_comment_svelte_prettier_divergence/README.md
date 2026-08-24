@@ -12,8 +12,8 @@ Covered positions (block comments, head stays inline): leading inside the key pa
 the divergence). Each is paired with its `as`-binding counterpart, because the parity of
 the two head shapes is the point: the no-`as` form is the one whose iterable has no
 binding pattern after it, so nothing but the key itself bounds the region the head's own
-trailing-comment scan may claim, and the scan used to run all the way to the `}` — over
-the whole `, index (key)` tail — printing the key's comment a second time after the
+trailing-comment scan may claim; a scan running all the way to the `}` — over
+the whole `, index (key)` tail — prints the key's comment a second time after the
 iterable (`{#each items /* c */, i (i /* c */)}`, which neither parser accepts).
 
 Every other position in the no-`as` tail — between the iterable and the `,`, around the

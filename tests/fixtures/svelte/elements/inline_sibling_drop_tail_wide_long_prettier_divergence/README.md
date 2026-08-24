@@ -12,16 +12,16 @@ both formatters, and the divergence is which form each *reaches* from the wrap a
 
 This is the width just past
 [inline_sibling_drop_tail_flow_long](../inline_sibling_drop_tail_flow_long_prettier_divergence/),
-and it is the razor that retired the fused element+tail measurement that fixture used to pin.
+and it is the razor against a fused element+tail measurement.
 
-That measurement resolved the two boundaries meeting on the element *outside-in*: fusing element and
-tail into one unit is what pushed the leading boundary over, and the tail rode that break. It was
+Such a measurement resolves the two boundaries meeting on the element *outside-in*: fusing element and
+tail into one unit pushes the leading boundary over, and the tail rides that break. It is
 conditioned on the element sitting inside its inline-sibling wrap — a property its own output
 destroys, since the wrap exists only while the sibling and the element share a line and breaking
-that line is the fusion's whole action. Where the element stayed **intact** the two answers agreed
-by arithmetic: its closing tag sits at print width, so the tail did not fit after it either way.
+that line is the fusion's whole action. Where the element stays **intact** the two answers agree
+by arithmetic: its closing tag sits at print width, so the tail does not fit after it either way.
 A **block-styled** element puts `</a>` back at the content indent, where the tail *does* fit — so
-the same document formatted to the dropped tail and reformatted to the hugged one, forever. No
+the same document would format to the dropped tail and reformat to the hugged one, forever. No
 existing gate could see it: the strayed pass is only reachable at widths no fixture happened to sit
 at, which is why it took the width sweep (`deno task razor:audit`) to surface.
 

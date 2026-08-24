@@ -231,12 +231,12 @@ pub(crate) fn decode_unicode_escape(source: &str, pos: &mut usize) -> Result<cha
     // and NBSP inside the identifier, moving the **token boundary** and re-parsing
     // `.a\41<VT>b` as `aA` + descendant + `b` (and over-rejecting `[a=b\41<VT>c]`).
     //
-    // ⚠️ And NOT `char::is_whitespace` either, which is what this used to say JS `\s` *was*.
-    // The two differ at exactly two code points and this site got both wrong: `.a\41<ZWNBSP>b`
-    // is `aAb` to `parseCss` (U+FEFF is `\s`, so it is eaten as the terminator) and was
-    // `aA<ZWNBSP>b` here — a WIRE divergence, and a different selector — while `.a\41<NEL>b`
-    // is a `css_expected_identifier` REJECTION there (U+0085 is not `\s`) and was accepted
-    // here as `aAb`.
+    // ⚠️ And NOT `char::is_whitespace` either — that is not what JS `\s` is.
+    // The two differ at exactly two code points and a site reading it gets both wrong: `.a\41<ZWNBSP>b`
+    // is `aAb` to `parseCss` (U+FEFF is `\s`, so it is eaten as the terminator) but would be
+    // `aA<ZWNBSP>b` — a WIRE divergence, and a different selector — while `.a\41<NEL>b`
+    // is a `css_expected_identifier` REJECTION there (U+0085 is not `\s`) but would be
+    // accepted as `aAb`.
     //
     // This is a different rule from `escapes::escape_len`, and deliberately so: that one is
     // a *printer-side value scanner* whose job is "how far does this escape reach when I

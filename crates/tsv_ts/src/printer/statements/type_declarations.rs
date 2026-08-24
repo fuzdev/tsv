@@ -71,8 +71,8 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // The first disjunct needs no comment carve-out: a parenthesized element always
         // breaks once it carries one, since a trailing line comment RETAINS the shell over
         // real hardlines ([`Printer::paren_retains_for_trailing_run`]) and a leading one
-        // takes its own `hardline`. The flat-shell exclusion this arm used to carry existed
-        // only while a trailing run was deferred out past the closer, leaving the shell
+        // takes its own `hardline`. A flat-shell exclusion here would be needed only if a
+        // trailing run were deferred out past the closer, leaving the shell
         // rendering flat while still claiming a break.
         // The suffix's own `[]` is the same argument once it holds a comment
         // (`string[⏎↹// c⏎]`): the break is inside a delimiter the array owns, so it hugs
@@ -176,9 +176,7 @@ impl<'a> Printer<'a> {
         // — the uniform forced-continuation indent, the same shape as the other
         // before-`=` initializer sites (enum members, class properties, variable
         // declarators). tsv keeps these on the head side; prettier relocates them
-        // after `=` (see conformance_prettier_ts_comments.md §Comment relocation). They were
-        // previously dropped entirely when type parameters were present (content
-        // loss).
+        // after `=` (see conformance_prettier_ts_comments.md §Comment relocation).
         let pre_eq_forces_own_line = self.comments_force_own_line_between(header_end, eq_pos);
 
         if pre_eq_forces_own_line {
@@ -203,9 +201,9 @@ impl<'a> Printer<'a> {
         // after it (`type A = B; // c`), and an own-line comment drops below the `;`
         // with any author blank above it intact.
         //
-        // The last two shapes are why this is the shared emitter and not the kind-keyed
-        // loop it used to be: that loop answered "own-line?" with "is it a block?", so
-        // it pulled an own-line block up onto the value's line and ate the blank —
+        // The last two shapes are why this is the shared emitter and not a kind-keyed
+        // loop: such a loop answers "own-line?" with "is it a block?", so
+        // it pulls an own-line block up onto the value's line and eats the blank —
         // disagreeing with every other `;` in the language (docs/comments.md §Trailing
         // and dangling runs).
         let value_end = decl.type_annotation.span().end;
@@ -280,8 +278,8 @@ impl<'a> Printer<'a> {
             // so the directive-free common case pays no bracket scan.
             TSType::IndexedAccess(i) => {
                 // The object's own required pair opening is the array twin's question one
-                // construct over, so it is asked the same way — the arm used to hold only
-                // the frozen-bracket route below and the two positions then disagreed.
+                // construct over, so it is asked the same way — holding only
+                // the frozen-bracket route below would have the two positions disagree.
                 self.required_paren_pair_opens(
                     i.object_type,
                     type_needs_parens_for_indexed_access_object,
@@ -464,9 +462,9 @@ impl<'a> Printer<'a> {
             // RHS's own line when the whole RHS relocates below `=`. `Trailing` spacing
             // (`/* c */ `) omits the leading space — every arm supplies its own (the
             // hug arms a literal `" "`, the hang/fluid arms their break `line`). Mirrors
-            // the declarator's `make_init_doc` (`statements/variable.rs`); the type-alias
-            // printer used to hoist it onto the `=` head, which stranded it there when
-            // the RHS broke below (a break-after-`=` union/reference/conditional).
+            // the declarator's `make_init_doc` (`statements/variable.rs`); hoisting it
+            // onto the `=` head instead would strand it there when
+            // the RHS breaks below (a break-after-`=` union/reference/conditional).
             let lead_comment = self.build_comments_between_filtered_opt(
                 eq_pos + 1,
                 type_start,
@@ -888,9 +886,9 @@ impl<'a> Printer<'a> {
         // The opening modifier (`async`, or the `declare` a top-level ambient function
         // carries — implicit, and so absent, inside a `declare namespace`), the gap before
         // `function`, the keyword and a generator `*`: the same head the declaration and
-        // the expression print. The third site of one gap — this one used to push a bare
-        // `async ` and let the comment fall through to the `function`→name emitter,
-        // relocating it across the keyword (`async /* c */ function f(): T;` →
+        // the expression print. The third site of one gap — pushing a bare
+        // `async ` here and letting the comment fall through to the `function`→name emitter
+        // would relocate it across the keyword (`async /* c */ function f(): T;` →
         // `async function /* c */ f(): T;`).
         let head_end = self.push_function_keyword_head(
             &mut parts,

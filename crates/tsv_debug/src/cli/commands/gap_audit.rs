@@ -891,8 +891,7 @@ impl GapAuditCommand {
         // below (up to `VERIFY_EXAMPLES` formats per shape) runs only when its confidence verdict
         // is actually consumed. Safe to compute inside the still-armed-ledger / suppressed-panic
         // window: grade touches neither, reading only the snapshot file and the shape set. The
-        // `!self.update` guard preserves the original ordering (grade used to sit after the
-        // `--update` early-return), so `gaps:audit:update` still regenerates a missing snapshot
+        // `!self.update` guard keeps grade behind the `--update` early-return, so `gaps:audit:update` still regenerates a missing snapshot
         // instead of failing to read it. Reused for the report/exit decision below.
         let graded = if !self.update && default_paths && narrowed.is_empty() {
             Some(ratchet().grade(&snapshot_keys(&total.shapes))?)

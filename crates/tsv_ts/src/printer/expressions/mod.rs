@@ -905,9 +905,9 @@ impl<'a> Printer<'a> {
         // The paren frame supplies whatever parens the cast itself needs, so this arm
         // emits no second pair.
         //
-        // One gap scan serves both arms. A cast is ubiquitous, and both the shell
-        // question and the inline emission below used to open with the same binary
-        // search over `[expr_end, kw)`. The shell's two triggers are each implied by a
+        // One gap scan serves both arms. A cast is ubiquitous, and the shell
+        // question and the inline emission below would otherwise each open with the
+        // same binary search over `[expr_end, kw)`. The shell's two triggers are each implied by a
         // term of the guard: its trailing trigger needs a comment IN that gap, and its
         // leading trigger needs a `(` BEFORE the operand, which needs room for one.
         let gap_has_comments =
@@ -1574,9 +1574,9 @@ impl<'a> Printer<'a> {
         // operator (e.g., `left +\nright`), preventing the operands' internal break
         // points (like member chain dots) from firing instead.
         //
-        // Applies to every operator family. A logical operator used to be excluded here,
-        // which left a parenthesized logical base breaking its operands where the
-        // arithmetic one held them together — see conformance_prettier_ts.md §TypeScript
+        // Applies to every operator family. Excluding a logical operator here would
+        // leave a parenthesized logical base breaking its operands where the
+        // arithmetic one holds them together — see conformance_prettier_ts.md §TypeScript
         // (Parenthesized binary member base).
         if operands.len() == 2 {
             return d.group(d.concat(&[

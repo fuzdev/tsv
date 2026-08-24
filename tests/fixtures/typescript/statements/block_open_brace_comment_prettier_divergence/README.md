@@ -48,9 +48,9 @@ shape.
 A blank *above* the comment is a different question and stays erased in both — it sits
 against the delimiter, where every bracket drops it. That control is in `input.svelte` too.
 
-tsv used to drop the blank here, on the reading that a blank directly under a container's
-opening line is that container's **leading-gap** blank. The full derivation of why that
-reading did not hold — and why the answer is now one value for the whole delimiter family —
+Dropping the blank here, on the reading that a blank directly under a container's
+opening line is that container's **leading-gap** blank, is the wrong reading; the derivation —
+and why the answer is one value for the whole delimiter family —
 is in [comments.md](../../../../../docs/comments.md) §The delimiter-line question.
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

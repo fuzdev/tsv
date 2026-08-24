@@ -197,7 +197,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 KeywordKind::Debugger => self.parse_debugger_statement(),
                 // The `with` statement is sloppy-mode only and tsv is strict-only, so it
                 // is refused at its keyword rather than by an accident further along.
-                // (It used to lex as an identifier, which made `with (a);` read as a CALL
+                // (Lexing it as an identifier would make `with (a);` read as a CALL
                 // and reprint as `with(a);` — a sloppy-mode program silently
                 // reinterpreted instead of rejected.)
                 KeywordKind::With => Err(self.error_with_statement()),

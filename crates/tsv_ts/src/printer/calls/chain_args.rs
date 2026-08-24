@@ -795,7 +795,7 @@ fn build_chain_args_single(
         && !last_arg_commented
         && let Some(gap_break) = last_arg_arrow_gap_break(printer, arg)
     {
-        // ⚠️ This arm used to build ONE doc with flat parameters, which is right for a state
+        // ⚠️ Building ONE doc with flat parameters here is right for a state
         // that can fall through and wrong for one that cannot: with no `allArgsBrokenOut()`
         // behind it, a flattened signature too wide for the line simply overflowed. The two
         // printings and the ladder go together — the shared entry point owns that pairing.
@@ -1371,7 +1371,7 @@ fn build_chain_args_multi(
     // shouldExpandFirstArg is checked before shouldExpandLastArg for arrays/objects.
     //
     // The shape test (two args, block-function first, short/comment-free second) is the
-    // shared `should_expand_first_arg` — the chain used to inline a copy of it, which is how
+    // shared `should_expand_first_arg` — an inlined copy here is how
     // one of the two gets a fix and the other doesn't. Only the chain-specific refusals are
     // spelled out here.
     // The refusals are one negated disjunction rather than a run of `&& !`: the shape test
@@ -1388,8 +1388,8 @@ fn build_chain_args_multi(
             || first_arg_signature_refuses_expand_first(printer, call.arguments))
     {
         // The expand-first ladder, shared with the plain-call and `new` twins — including
-        // the tail's willBreak bail and the broken-out fallback the chain used to hand-roll
-        // beside it (`docs/comments.md` hazard 2 is answered there, once).
+        // the tail's willBreak bail and the broken-out fallback
+        // (`docs/comments.md` hazard 2 is answered there, once).
         parts.push(build_expand_first_arg_doc(
             printer,
             opener,

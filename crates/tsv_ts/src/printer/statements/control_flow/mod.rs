@@ -357,9 +357,9 @@ impl<'a> Printer<'a> {
     /// open that prettier keeps flat (`docs/comments.md` §Own-line-ness is a SOURCE
     /// question: a glued run given its own line does not own it).
     ///
-    /// ⚠️ **That is why this is NO LONGER the `own_line` bucket of
-    /// [`Self::partition_comments_by_line`]**, which it used to be an allocation-free
-    /// restatement of. The two now answer different questions rather than the same one
+    /// ⚠️ **That is why this is NOT the `own_line` bucket of
+    /// [`Self::partition_comments_by_line`]**, nor an allocation-free restatement of
+    /// it. The two answer different questions rather than the same one
     /// two ways: the partition classifies which LINE a comment leaves the anchor for —
     /// where its fixed anchors are exact — while this asks whether a comment owns a line,
     /// which only its own neighbours can answer. Both readings are now spelled where they
@@ -668,9 +668,9 @@ impl<'a> Printer<'a> {
     /// additionally forces a hardline wherever it sits, so the `//` can't swallow the
     /// body.
     ///
-    /// ⚠️ A block comment is **not** flexible here. This emitter used to normalize an
-    /// own-line block comment to trail the anchor (`if (a)⏎/* b */⏎{` → `if (a) /* b */ {`)
-    /// on the premise that prettier does the same; measured, prettier **preserves** it in
+    /// ⚠️ A block comment is **not** flexible here. Normalizing an own-line block comment
+    /// to trail the anchor (`if (a)⏎/* b */⏎{` → `if (a) /* b */ {`), on the premise that
+    /// prettier does the same, is wrong: measured, prettier **preserves** it in
     /// every construct and body kind, and the line-comment path was already preserving.
     /// Own-line-ness is authoring signal, so relocating it also cut against tsv's own
     /// comment-position stance. Pinned by
@@ -779,8 +779,8 @@ impl<'a> Printer<'a> {
     /// against, which is why prettier attaches the run to the body here and tsv has
     /// nothing to preserve by holding one member back.
     ///
-    /// This gap used to partition the anchor's line **per comment by kind** — block stays
-    /// trailing, `//` takes its own line — a four-row table measured on a SINGLE comment,
+    /// Partitioning the anchor's line **per comment by kind** — block stays
+    /// trailing, `//` takes its own line — is a four-row table measured on a SINGLE comment,
     /// which a **run** breaks four ways at once (all pinned by the `head_body_nonblock_comment_run`
     /// trio, `if` / `while` / `for`):
     ///
@@ -901,8 +901,8 @@ impl<'a> Printer<'a> {
         // `//` here (an inline one would swallow the keyword/body otherwise), so the
         // suffix flushes at that same break and the bytes are unchanged — except when the
         // previous construct's doc already ends in a deferred `//` (a `;`-relocated
-        // comment on a collapsed brace-less consequent): inline, this comment landed
-        // ahead of that pending suffix and the flush welded the two
+        // comment on a collapsed brace-less consequent): inline, this comment lands
+        // ahead of that pending suffix and the flush welds the two
         // (`if (a) expr; // c1 // inj`); deferred, they meet the flush in source order
         // and the run separator breaks between them (`doc/arena_render_suffix.rs`).
         for comment in inline_prev {
@@ -1307,10 +1307,9 @@ impl<'a> Printer<'a> {
     /// they come to disagree — the builder's fallback is harmless where it is reached in
     /// agreement and a silent change of shape where it is not.
     ///
-    /// The do-while used to be the second such caller, falling back to the plain
-    /// expression doc; that fallback was the reason its condition parens never opened,
-    /// and it now routes through [`Self::build_statement_condition_doc`] like `if` and
-    /// `while`, asking nothing itself.
+    /// The do-while routes through [`Self::build_statement_condition_doc`] like `if` and
+    /// `while`, asking nothing itself: falling back to the plain expression doc there
+    /// would keep its condition parens from ever opening.
     ///
     /// Deliberately **not** the whole `(`…`)` range: a comment *inside* the expression is
     /// that expression's own business and no reason for this layout. The negation-inline
@@ -1457,8 +1456,8 @@ impl<'a> Printer<'a> {
 
         // A comment sharing the condition's line trails it; everything else takes its
         // own line before the `)` — including one sharing the `)`'s own line, which is
-        // the bucket this gap used to drop: `if (a\n/* c */) {` printed no comment at
-        // all. There is no body `{` here to glue a block to, so the two-bucket form is
+        // the bucket a same-line/own-line split drops: `if (a\n/* c */) {` would print
+        // no comment at all. There is no body `{` here to glue a block to, so the two-bucket form is
         // the whole rule.
         let (trailing_inline, trailing_own_line) =
             self.partition_comments_trailing_vs_own_line(test_end, close_paren_pos);

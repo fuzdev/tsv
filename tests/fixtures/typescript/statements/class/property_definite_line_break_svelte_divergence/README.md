@@ -21,7 +21,7 @@ one. On a class property it does not.
 **acorn-typescript accepts**, welding across the break into the very
 `PropertyDefinition` it builds for the same-line spelling — one member with
 `definite: true` and the `number` annotation — so the line terminator simply
-vanishes. tsv built that tree until this rejection landed.
+vanishes. tsv rejects instead.
 
 acorn-typescript is tsv's AST-**shape** target, not its correctness oracle; for
 validity the oracle is tsc, which rejects. A tree that silently discards a line

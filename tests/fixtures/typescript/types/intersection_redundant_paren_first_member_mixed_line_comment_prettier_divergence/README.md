@@ -21,12 +21,12 @@ keeps `/* b */ // c` **glued** on one line. tsv holds that form too — a pair t
 author glued onto one line keeps it wherever a comment run is emitted
 (`docs/comments.md` §Trailing and dangling runs) — so the terminal is **dual-stable**:
 a `variant_glued`, pinned by the `prettier_intermediate_to_variant_*` marker
-(rule N7c). That is the same shape as the trailing counterpart below, which the two
-cases used to differ on for no reason but this seam.
+(rule N7c). That is the same shape as the trailing counterpart below; the two
+cases must not differ on it, and this seam is the only place they could.
 
 This is the intersection analog of the whole-RHS
 [type_alias_rhs_mixed_trailing_comment](../comments/type_alias_rhs_mixed_trailing_comment_prettier_divergence/)
-(bug188), extended through the first-member hoist. The trailing counterpart is
+extended through the first-member hoist. The trailing counterpart is
 [intersection_redundant_paren_first_member_trailing_line_comment](../intersection_redundant_paren_first_member_trailing_line_comment_prettier_divergence/);
 the pure-line counterpart keeps the same trail-on-`=` canonical
 ([intersection_leading_line_comment](../intersection_leading_line_comment_prettier_divergence/)).

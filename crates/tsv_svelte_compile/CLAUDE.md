@@ -133,7 +133,7 @@ project-wide conventions.
     idempotence checks and the oracle comparison both consume it.
 - `refusal.rs` — the typed catalog of refusal reasons: every declined shape is
   a `Refusal` variant carried by `CompileError::Unsupported`, with a `Display`
-  message (the human-readable reason `docs/checklist_svelte_compiler.md`
+  message (the human-readable reason `../../docs/checklist_svelte_compiler.md`
   quotes). The single source of truth for the refusal contract. The enum and its
   `thiserror` messages are inseparable (the message rides a `#[error(…)]`
   attribute per variant), so this file is the catalog and nothing else.
@@ -280,7 +280,7 @@ project-wide conventions.
   `$inspect(args).with(cb)`) that the script rewrite's drops key on.
 - `rune_guard.rs` — the rune refusal walk plus the collection passes riding the
   same exhaustive traversal: refuses any `$`-prefixed identifier reference or
-  `$`-rooted call outside the sanctioned rewrites — the sanctioned set now
+  `$`-rooted call outside the sanctioned rewrites — the sanctioned set
   includes a `$bindable(fallback?)` default at a top-level `$props()` property, a
   statement-position `$inspect(…)`, the `$state.snapshot(x)` and `$props.id()`
   declarator inits, a template-position `$state.snapshot(x)` (→ `$.snapshot`,
@@ -413,11 +413,10 @@ project-wide conventions.
   where a bind to a template-scoped const is refused; `unassignable_names` sees
   top-level script statements only and is blind to them.
 
-  ⚠️ The `{#each}` INDEX and the ITEM beside it take DIFFERENT rules, and conflating
-  them is a bug in either direction: the item is `('each', 'const')` and
-  `validate_no_const_assignment` EXCLUDES `kind === 'each'` in favor of
-  `each_item_invalid_assignment`, while the index is `('template' | 'static',
-  'const')` and carries `constant_assignment`.
+  ⚠️ The `{#each}` INDEX and the ITEM beside it take DIFFERENT rules
+  (`each_item_invalid_assignment` vs `constant_assignment`), and conflating them is a
+  bug in either direction — the oracle citations and live probes are in
+  `../../docs/checklist_svelte_compiler.md` §The `validate_assignment` family.
 - `store_rewrite.rs` — **store-access (and script-position `$derived` read)
   rewriting** for the instance script (the
   script analog of `template_value.rs`'s template value walk). A tree→tree pass over the
@@ -1085,10 +1084,10 @@ Both recurse back into `fragment.rs` through `emit_child_body`.
   boundary made three **pre-existing, general** validation over-acceptances
   REACHABLE through one — a `<svelte:head>`/`<svelte:options>` inside it
   (`svelte_meta_invalid_placement`), a duplicate `onerror` (`attribute_duplicate`),
-  and a duplicate snippet name (`declaration_duplicate`). Each failed identically
-  with no boundary in the document, so the fix was always the oracle's
-  whole-component validations, never a boundary-scoped refusal — and all are now
-  closed exactly there (the `<svelte:options>` half in the **parser**, being a
+  and a duplicate snippet name (`declaration_duplicate`). Each reproduces identically
+  with no boundary in the document, so the answer is always the oracle's
+  whole-component validations, never a boundary-scoped refusal — and all close
+  exactly there (the `<svelte:options>` half in the **parser**, being a
   fabricated node type rather than a validation miss); see
   `../../docs/checklist_svelte_compiler.md`. `{@const}` hoists a
   `const` declaration to the top of its branch body and enters the evaluator's

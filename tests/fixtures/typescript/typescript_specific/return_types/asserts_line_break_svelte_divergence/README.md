@@ -15,7 +15,7 @@ identifier"**, and prettier — whose `typescript` parser is tsc — rejects too
 **acorn-typescript accepts**, welding across the break into the very
 `TSTypePredicate` it builds for the same-line spelling — `parameterName: a`,
 `asserts: true`, `typeAnnotation: null` — so the line terminator simply vanishes.
-tsv built that tree until this rejection landed.
+tsv rejects instead.
 
 acorn-typescript is tsv's AST-**shape** target, not its correctness oracle; for
 validity the oracle is tsc, which rejects. A tree that silently discards a line

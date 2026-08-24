@@ -244,9 +244,9 @@ impl<'a> Printer<'a> {
     /// **At the LAST boundary** the next token is the decorated thing, which prettier
     /// never inline-leads, so only `Trailing` survives and everything else drops to its
     /// own line. `LeadingInline` is therefore unreachable when `is_last` — which is what
-    /// lets every caller match three arms with no guard. That collapse used to be written
+    /// lets every caller match three arms with no guard. Writing that collapse
     /// twice (an explicit `match` at the class-level printer, a `LeadingInline if !is_last`
-    /// guard at the member and parameter ones); the two agreed, but only by coincidence.
+    /// guard at the member and parameter ones) is agreement by coincidence only.
     fn classify_decorator_gap_comment(
         &self,
         comment: &Comment,

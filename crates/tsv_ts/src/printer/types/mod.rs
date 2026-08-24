@@ -626,8 +626,8 @@ impl<'a> Printer<'a> {
                 // **line** comment there runs to end of line, so the `]` cannot follow
                 // it: the brackets open, the index sits one level in, and the run
                 // takes that same interior column. Letting the comment ride out to
-                // end-of-line instead re-bound it from the index to the whole
-                // statement and landed it on a line that may already hold one, where
+                // end-of-line instead would re-bind it from the index to the whole
+                // statement and land it on a line that may already hold one, where
                 // the two weld irreversibly — see
                 // [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
                 // §Comment relocation. The expanding-union index layout is
@@ -676,8 +676,8 @@ impl<'a> Printer<'a> {
                 let mut parts: DocBuf = smallvec![inner];
                 // Comments in the element→`?` gap (`[T /* c */?]`) take the same
                 // landing the `NamedTupleMember` arm below gives the label→`?` gap
-                // (`[a /* c */?: T]`) — previously unclaimed by any emitter here, a
-                // silent drop. The element's span end is the gap's left edge: a
+                // (`[a /* c */?: T]`) — a gap no other emitter claims, so left
+                // unclaimed it is a silent drop. The element's span end is the gap's left edge: a
                 // parenthesized operand keeps its `TSType::Parenthesized` wrapper, so
                 // the scan starts after the `)`, and an in-paren comment stays inside.
                 // Only a *same-line block* comment can be here — the `?` is a
@@ -941,8 +941,8 @@ impl<'a> Printer<'a> {
     /// One gap's comment is not the other's to move. The rule is the one every bracketed
     /// type region already follows for its own trailing gap
     /// ([`comments.md`](../../../../docs/comments.md) §"a deferred run must not leave the
-    /// construct it was written in"), and this seam is where it used to be lost: the hang
-    /// fires on a LEADING `//`, so a shell carrying both satisfied the retain rule while
+    /// construct it was written in"), and this seam is where it is otherwise lost: the hang
+    /// fires on a LEADING `//`, so a shell carrying both satisfies the retain rule while
     /// already being gone.
     ///
     /// ⚠️ The shell need not BE the value: it can sit at the value's leading printed
@@ -1289,8 +1289,8 @@ impl<'a> Printer<'a> {
     /// Everything else that unwraps to a union has NO downstream emitter but the
     /// intersection's own first-member HOIST — a redundant outer layer
     /// (`((// c⏎ a | b)) & d`, `(// c⏎ (a | b)) & d`) or a pair the member rule strips —
-    /// and the hoist is a fallback this gap outranks. Left to it, the run landed wherever
-    /// the intersection was built: inside a required pair that never opened, glued to a `(`
+    /// and the hoist is a fallback this gap outranks. Left to it, the run lands wherever
+    /// the intersection is built: inside a required pair that never opens, glued to a `(`
     /// with the operand un-indented and the `)` welded to its tail. The reparse then reads
     /// the comment from that `(`'s own gap and prints the opened shape, so the two passes
     /// disagreed — at the optional tuple element, the union member, the array element, the

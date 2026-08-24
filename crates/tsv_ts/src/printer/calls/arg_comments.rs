@@ -1144,7 +1144,7 @@ impl<'a> PartitionedComments<'a> {
     ///
     /// The two are one step. The pull moves the comment's line, not its membership, so the
     /// blank the author left under it rides along ([`Printer::push_delimiter_glued_blank`]
-    /// carries that rule and why the families used to drop it) — and every delimiter-line
+    /// carries that rule) — and every delimiter-line
     /// pull in the call and list families emits through here rather than re-deriving half
     /// of it.
     pub(crate) fn emit_delimiter_line_pull(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
@@ -1169,8 +1169,7 @@ impl<'a> PartitionedComments<'a> {
     /// above it, so the blank was DROPPED where prettier keeps it, and only a prettier
     /// compare could show it — the dropped-blank output is its own fixed point.
     /// `is_next_line_empty` is that predicate, and it already steps over a trailing
-    /// comment on the argument's own line, which is what the hand-rolled `check_start`
-    /// below used to do by hand.
+    /// comment on the argument's own line, so no hand-rolled `check_start` is needed.
     pub(super) fn has_blank_line_in_gap(&self, printer: &Printer<'_>) -> bool {
         let check_end = if !self.leading.is_empty() {
             self.leading[0].span.start
@@ -1221,7 +1220,7 @@ impl<'a> PartitionedComments<'a> {
     /// the comma, so every block lands after it), this keeps a before-comma block in
     /// its authored position. Shared by the `new`-argument non-last paths
     /// (`build_new_doc_with_wrapping` and `build_call_args_with_blank_lines`) so they
-    /// can't drift — both used to relocate the block past the comma.
+    /// can't drift and relocate the block past the comma.
     pub(super) fn emit_trailing_comments_around_comma(
         &self,
         parts: &mut DocBuf,

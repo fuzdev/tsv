@@ -127,8 +127,8 @@ level up, precisely the masking that hunk-aware detection exists to prevent.
 
 It does **not** read the answer out of the `fixtures[]`
 arrays: those are a hand-maintained mirror of a computable fact, and the two diverge badly
-— most detected fixtures are simply unlisted. That drift is what produced every mislisting
-and stale path the audit has had to repair, so listing gaps are now reported as
+— most detected fixtures are simply unlisted. That drift produces mislistings and stale
+paths, so listing gaps are reported as
 bookkeeping, below the detection headline, and only a genuine gap (a fixture pinning a
 prettier form that no pattern explains) exits 1.
 

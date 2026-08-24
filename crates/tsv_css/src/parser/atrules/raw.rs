@@ -153,7 +153,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         }
 
         // Add space before boolean operators (and, or, not) or comments if not preceded by space
-        // Note: @scope preludes are now parsed structurally, so they don't go through this code
+        // Note: @scope preludes are parsed structurally, so they don't go through this code
         let is_bool_op = is_boolean_operator(parser);
         let is_comment = matches!(parser.current_kind, TokenKind::Comment);
 
@@ -206,7 +206,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         parser.advance()?;
 
         // Add space after boolean operators, comments, commas, or ':' if not followed by whitespace
-        // Note: @scope preludes are now parsed structurally, so they don't go through this code
+        // Note: @scope preludes are parsed structurally, so they don't go through this code
         if normalize_whitespace && !parser.check(TokenKind::Whitespace) {
             if is_bool_op {
                 prelude.push(' ');

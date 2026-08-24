@@ -145,9 +145,9 @@ export interface TsvImplementation {
  *
  * Each wrapper states which languages it can parse and which it can format; `[]`
  * means "none", which is how a parse-only tool (yuku, oxc's wasm binding) and a
- * format-only one (biome, dprint, rsvelte-fmt) say so. Every class previously
- * carried a `static PARSE_LANGUAGES`/`FORMAT_LANGUAGES` pair plus two one-line
- * `.includes()` methods, and the "none" case had drifted into two spellings — an
+ * format-only one (biome, dprint, rsvelte-fmt) say so. A per-class
+ * `static PARSE_LANGUAGES`/`FORMAT_LANGUAGES` pair plus two one-line
+ * `.includes()` methods lets the "none" case drift into two spellings — an
  * empty array in most, a hand-rolled `return false` in others — so the same fact
  * read two different ways depending on which file you opened.
  *

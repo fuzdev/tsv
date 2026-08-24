@@ -261,13 +261,12 @@ pub(crate) fn emit_fragment<'arena>(
                     // from the output, which is content loss. Better a loud bug.
                     //
                     // KNOWN STATIC-SAFETY DEBT, consciously taken: routing the refusal
-                    // through the shared mapping split ONE exhaustive match into two
-                    // that must agree on which kinds are handled, so a disagreement the
-                    // old single match made unrepresentable is now merely a runtime
-                    // panic. The trade bought a single home for the refusal set (the
-                    // census read a hand-mirrored copy before, and the two had already
-                    // drifted); panicking rather than dropping keeps the worst case
-                    // loud. Closing it statically would mean generating this dispatch's
+                    // through the shared mapping splits ONE exhaustive match into two
+                    // that must agree on which kinds are handled, so a disagreement a
+                    // single match would make unrepresentable is merely a runtime
+                    // panic. The trade buys a single home for the refusal set (a
+                    // hand-mirrored census copy drifts); panicking rather than dropping
+                    // keeps the worst case loud. Closing it statically would mean generating this dispatch's
                     // handled arms from the same table, which their per-kind bodies do
                     // not fit — not attempted.
                     SpecialElementKind::SvelteComponent { .. }

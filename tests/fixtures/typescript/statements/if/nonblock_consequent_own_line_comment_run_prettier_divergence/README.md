@@ -22,8 +22,8 @@ other's fixed point: tsv re-collapses prettier's (the family's standing rule), a
 prettier re-expands tsv's, so `output_prettier.svelte` records prettier's answer on
 `input.svelte`.
 
-tsv previously printed the own-line pre-`;` comment as real text whose line closed
-only at the `else` break, so the `;`→`else` comment's deferred run flushed welded onto
+Printing the own-line pre-`;` comment as real text whose line closes
+only at the `else` break has the `;`→`else` comment's deferred run flush welded onto
 it (`// c2 // c3` — the second comment becoming the first's text). In clause position
 the whole terminator-gap run now defers through the same `line_suffix` machinery,
 dedented to the construct's level, so the run meets the flush in authored order with

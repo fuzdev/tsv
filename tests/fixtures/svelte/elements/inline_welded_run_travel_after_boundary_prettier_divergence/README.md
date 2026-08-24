@@ -44,7 +44,7 @@ byte-identical in all four multiline cases; only its predecessor varies:
   predecessor as case 1 with the weld removed. It has always travelled too.
 
 The two controls are what make this a rule rather than a special case: they bracket the two axes
-(predecessor kind, welded-or-spaced) on which the answer used to differ. A run's fill leads with a
+(predecessor kind, welded-or-spaced) on which the answer must not differ. A run's fill leads with a
 `line` exactly when its predecessor is a tag or an element, which shifts the fill's
 content/separator parity by one — and the forced-break measurement was reached only on the
 word-leading parity, so `text1 var(<Comp …>` travelled while `{expr1} var(<Comp …>` welded and

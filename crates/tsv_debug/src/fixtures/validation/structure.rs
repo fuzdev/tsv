@@ -27,6 +27,7 @@ use crate::fixtures::{
 /// S14: `expected_ours.json` MUST be in svelte divergence dirs
 /// S15: `expected_svelte.json` MUST be in svelte divergence dirs
 /// S16: Svelte divergence dirs CANNOT have `expected.json`
+/// S17: `expected_ours.json` and `expected_svelte.json` must differ (identical content is no divergence)
 /// S18: `prettier_nonconvergent.txt` requires a prettier divergence dir and CANNOT
 ///      coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`,
 ///      `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`,

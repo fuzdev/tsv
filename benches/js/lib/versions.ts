@@ -146,7 +146,7 @@ function dep_version(deps: Record<string, string>, name: string): string {
  * The pins file has three readers asking three different questions — what version
  * labels a report (below), does the install match the pin
  * (`check_node_modules.ts`), and what version to force-fetch the oxc wasi binding
- * at (`install_deps.ts`) — and each one previously spelled out the path, the read
+ * at (`install_deps.ts`) — each of which would otherwise spell out the path, the read
  * and the cast for itself. One spelling here means the file's LOCATION and SHAPE
  * are stated once; each caller still owns its own question and its own failure
  * posture.

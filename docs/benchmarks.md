@@ -245,8 +245,7 @@ Things the published numbers measure that aren't quite what they look like.
   interleaves task order — the settle bounds the carryover rather than eliminating
   order as a variable.
 - **Measurement stability is disclosed, not assumed.** Every published `Nx` divides
-  two means, so it inherits both means' noise — and nothing in the report used to
-  say how noisy either was. A per-runtime report now carries a **§Unstable Rows**
+  two means, so it inherits both means' noise. A per-runtime report carries a **§Unstable Rows**
   section for any row whose cv (`std_dev / mean`, post-outlier-removal) reaches 10%,
   and the cross-runtime report names the **within-noise** deltas whose difference is
   smaller than the combined cv of the two rows they divide. Both are reading aids,
@@ -442,7 +441,7 @@ prettier. Load-bearing on two axes:
   conservative reading instead of fabricating a 100% row, and `init` additionally
   proves a real syntax error still lands as fatal.
 - **oxfmt (NAPI)** — fast formatter; TypeScript, JS, CSS, Svelte (experimental).
-  As of 0.57 the native Rust formatter handles **JS/TS *and* CSS**; only **Svelte**
+  The native Rust formatter handles **JS/TS *and* CSS**; only **Svelte**
   routes through a JS-side fallback into oxfmt's **bundled prettier**
   (`dist/apis-*.js` `formatFile` → `prettier.format`) plus a bundled svelte plugin,
   with `prettier-plugin-oxfmt` formatting the embedded `<script>` through the
