@@ -653,11 +653,13 @@ export const SVELTE_REJECTS_PIN = 145;
 /**
  * The conformance CSS corpus's REJECT count — files `svelte/compiler`'s `parseCss`
  * refuses — which `diagnostics/css_over_acceptance.ts` grades every `parse/css`
- * tool over. Deterministic given the pins that build the corpus: the ../prettier
- * AND ../svelte checkout commits ({@link GATE_CHECKOUT_COMMITS} — the suite ships
- * `.css` files of its own, so this pin moves with that checkout exactly as
- * {@link SVELTE_REJECTS_PIN} does), {@link WPT_CSS_HARVEST_PIN}, and the svelte
- * oracle version.
+ * tool over. Deterministic given the inputs that build the corpus: the ../prettier,
+ * ../svelte AND ../wpt checkout commits ({@link GATE_CHECKOUT_COMMITS} — the svelte
+ * suite ships `.css` files of its own, so this pin moves with that checkout exactly
+ * as {@link SVELTE_REJECTS_PIN} does), and the svelte oracle version.
+ * {@link WPT_CSS_HARVEST_PIN} is one more input but NOT a substitute for ../wpt's
+ * commit: it is a file COUNT, and an edit to an existing wpt test moves the content
+ * this pin reads without moving it.
  *
  * Unlike {@link SVELTE_REJECTS_PIN} this list filters NOTHING — `parseCss` is not
  * a validity oracle in either direction (it accepts malformed CSS and rejects
@@ -671,7 +673,7 @@ export const SVELTE_REJECTS_PIN = 145;
  * consumes the list), but graded and STAMPED like the harvests: `deno task
  * css:over-acceptance:pin` is a `bench:pins:suites` leg, so it is re-derived on
  * the same cadence as its siblings; the full `css:over-acceptance` profile grades it
- * too. Measured 2026-08-24: ../prettier at 1dcd0b05d, ../svelte at 5ccdfe355,
+ * too, and stamps the same three checkout commits. Measured 2026-08-24: ../prettier at 1dcd0b05d, ../svelte at 5ccdfe355,
  * ../wpt at 7437c7bc7, oracle svelte@5.56.9, 240 of 22642 conformance-view CSS files.
  *
  * One of the 240 is `css/samples/namespaced-type-selector/expected.css`, the `.css`

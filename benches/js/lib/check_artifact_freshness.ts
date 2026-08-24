@@ -43,12 +43,13 @@
  */
 
 import { readdir, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { get_library_path } from './ffi.ts';
 import { get_napi_library_path } from './napi.ts';
 import { current_runtime, wasm_target } from './runtime.ts';
-import { CORE_CRATES, TSV_ARTIFACTS } from './tsv_artifacts.ts';
+import { CORE_CRATES, TSV_ARTIFACTS, wasm_bundle_path } from './tsv_artifacts.ts';
 
 /** Absolute path to the workspace `crates/` directory. */
 const CRATES_DIR = fileURLToPath(new URL('../../../crates', import.meta.url));
@@ -227,19 +228,6 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 	if (fatal) exit(1);
 }
 
-/** Path to the executed WASM bundle's compiled `.wasm` for the given variant —
- * the runtime's own wasm-pack target (Deno → `deno`, Node/Bun → `nodejs`).
- * Module-local since `check_executed_artifacts` below became the one caller; the
- * entry points ask for the CHECK, not for a path to assemble one from. */
-function wasm_artifact_path(variant: 'format' | 'parse' | 'all'): string {
-	return fileURLToPath(
-		new URL(
-			`../../../crates/tsv_wasm/pkg/${variant}/${wasm_target()}/tsv_wasm_bg.wasm`,
-			import.meta.url
-		)
-	);
-}
-
 /**
  * The check for the native binding this runtime EXECUTES: the C-FFI library
  * under Deno (`Deno.dlopen`), the N-API addon under Node/Bun (`process.dlopen`).
@@ -295,7 +283,11 @@ function executed_artifact_checks(): ArtifactCheck[] {
 		native_artifact_check(),
 		{
 			label: `WASM (all/${target})`,
-			path: wasm_artifact_path('all'),
+			// This runtime's own wasm-pack target (Deno → `deno`, Node/Bun → `nodejs`),
+			// which is why it is not `TSV_ARTIFACTS.tsv_wasm.path`: that row reports the
+			// `deno` bundle from every runtime, and under Node/Bun the executed one is a
+			// different file (correctly graded as size-only there).
+			path: wasm_bundle_path('all', target),
 			binding_crates: TSV_ARTIFACTS.tsv_wasm.binding_crates,
 			rebuild: `deno task build:wasm:all:${target}`
 		}
@@ -313,9 +305,16 @@ function executed_artifact_checks(): ArtifactCheck[] {
  * warning is the whole response.
  */
 export async function warn_stale_reported_artifacts(): Promise<void> {
-	const executed = new Set(executed_artifact_checks().map((c) => c.path));
+	// Both sides now come from `tsv_artifacts.ts`'s builders, so a path that DIFFERS
+	// here differs for a reason rather than by spelling — the two axes a loader owns.
+	// A `TSV_FFI_PROFILE=corpus` run executes `target/corpus` while the size table
+	// reports `target/release`, and Node/Bun execute the `nodejs` bundle while the
+	// table reports the `deno` one; in both cases the reported build really is
+	// unmeasured here, which is exactly what this warning is about. `resolve` stays
+	// as normalization, not as the thing holding the comparison together.
+	const executed = new Set(executed_artifact_checks().map((c) => resolve(c.path)));
 	const checks: ArtifactCheck[] = Object.values(TSV_ARTIFACTS)
-		.filter((a) => !executed.has(a.path))
+		.filter((a) => !executed.has(resolve(a.path)))
 		.map((a) => ({
 			label: a.label,
 			path: a.path,

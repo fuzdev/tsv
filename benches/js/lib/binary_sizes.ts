@@ -48,6 +48,11 @@ export interface BinarySize {
  * Display labels — also the identity keys for the ratio-anchor lookups in
  * `build_display_entries`, so the producer (`collect_binary_sizes`) and the
  * consumer must reference the same constant. Renaming a label here updates both.
+ *
+ * tsv's own rows are PRODUCED from `lib/tsv_artifacts.ts`, so only the three that
+ * `build_display_entries` anchors on appear here, forwarded from that table — the
+ * other four tsv builds it reports are labelled there and looked up by nobody. A
+ * fourth anchor is one more forward, not a second spelling.
  */
 const LABELS = {
 	tsv_ffi: TSV_ARTIFACTS.tsv_ffi.label,

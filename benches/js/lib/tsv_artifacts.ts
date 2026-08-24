@@ -7,6 +7,22 @@
  * (`binary_sizes.ts`). A path or crate list spelled in two of them is how a guard
  * ends up vouching for an artifact the table sizes from somewhere else.
  *
+ * The LOADERS are readers too, and that is the half worth stating: the guard's
+ * subject has to be the file the loader actually opens, so `ffi.ts`, `napi.ts` and
+ * `wasm.ts` build their paths from this module's exported builders
+ * ({@link ffi_library_path}, {@link napi_library_path}, {@link wasm_bundle_dir} /
+ * {@link wasm_bundle_path}) rather than re-deriving the layout. Only the two AXES a loader varies stay its
+ * own — the FFI profile (`TSV_FFI_PROFILE`) and the wasm-pack target — which is
+ * exactly why the freshness guard's executed-vs-size-only split can be a path
+ * comparison at all: an entry differing there is a real difference, not a spelling.
+ *
+ * Still spelled elsewhere, and deliberately: `deno.json`'s wasm build tasks pass
+ * `--target <path>` to `run_if_stale.ts` (a task string can't call a function),
+ * `scripts/build_napi_packages.ts` carries `target/napi/…` as the DEFAULT of an
+ * `--artifact` flag CI overrides per target, and `scripts/validate_artifacts.ts`
+ * walks the `npm` staging dirs this table has no rows for. Those are the remaining
+ * places a layout move has to be mirrored by hand.
+ *
  * Node-modules-free by construction (only `node:` builtins + `runtime.ts`): the
  * build-side scripts import it, and `typecheck:scripts` walks them on a bare
  * checkout — a `type` import from the size table was enough to drag that whole
@@ -63,6 +79,39 @@ const PROJECT_ROOT = fileURLToPath(new URL('../../..', import.meta.url)).replace
 const FFI_LIB = native_library_filename('tsv_ffi');
 
 /**
+ * The C-FFI shared library for a cargo profile — `release` for the measured
+ * artifact, `corpus` for the unwinding build the corpus tools load
+ * (`TSV_FFI_PROFILE`). The profile is the caller's axis; the layout is this
+ * module's.
+ */
+export function ffi_library_path(profile: string): string {
+	return `${PROJECT_ROOT}/target/${profile}/${FFI_LIB}`;
+}
+
+/** The N-API addon — one build, the `napi` profile (release + unwind). */
+export function napi_library_path(): string {
+	return `${PROJECT_ROOT}/target/napi/${native_library_filename('tsv_napi')}`;
+}
+
+/** The three wasm-pack builds, by the cargo features each selects. */
+export type WasmVariant = 'format' | 'parse' | 'all';
+
+/**
+ * A wasm-pack output directory, holding `tsv_wasm_bg.wasm` beside the `tsv_wasm.js`
+ * glue — so the guard's subject and the loader's import resolve from one expression.
+ * The target is the caller's axis (Deno loads `deno`, Node/Bun `nodejs`); the size
+ * table pins `deno`, since the `.wasm` is the same bytes under either.
+ */
+export function wasm_bundle_dir(variant: WasmVariant, target: string): string {
+	return `${PROJECT_ROOT}/crates/tsv_wasm/pkg/${variant}/${target}`;
+}
+
+/** The compiled `.wasm` in that directory — the size table's row and the guard's subject. */
+export function wasm_bundle_path(variant: WasmVariant, target: string): string {
+	return `${wasm_bundle_dir(variant, target)}/tsv_wasm_bg.wasm`;
+}
+
+/**
  * Every tsv build the bench REPORTS. Which of these a runtime EXECUTES is the
  * freshness guard's question (`executed_artifact_checks`); the size table reports
  * all seven from every runtime, existence-gated rather than registry-gated, so the
@@ -74,7 +123,7 @@ export const TSV_ARTIFACTS = {
 	tsv_ffi: {
 		label: 'tsv (ffi)',
 		kind: 'native',
-		path: `${PROJECT_ROOT}/target/release/${FFI_LIB}`,
+		path: ffi_library_path('release'),
 		binding_crates: ['tsv_ffi'],
 		rebuild: 'deno task build:ffi'
 	},
@@ -105,7 +154,7 @@ export const TSV_ARTIFACTS = {
 	tsv_napi: {
 		label: 'tsv (napi)',
 		kind: 'native',
-		path: `${PROJECT_ROOT}/target/napi/${native_library_filename('tsv_napi')}`,
+		path: napi_library_path(),
 		binding_crates: ['tsv_napi'],
 		rebuild: 'deno task build:napi'
 	},
@@ -115,21 +164,21 @@ export const TSV_ARTIFACTS = {
 	tsv_format_wasm: {
 		label: 'tsv_format_wasm',
 		kind: 'wasm',
-		path: `${PROJECT_ROOT}/crates/tsv_wasm/pkg/format/deno/tsv_wasm_bg.wasm`,
+		path: wasm_bundle_path('format', 'deno'),
 		binding_crates: WASM_CRATES,
 		rebuild: 'deno task build:wasm:deno'
 	},
 	tsv_parse_wasm: {
 		label: 'tsv_parse_wasm',
 		kind: 'wasm',
-		path: `${PROJECT_ROOT}/crates/tsv_wasm/pkg/parse/deno/tsv_wasm_bg.wasm`,
+		path: wasm_bundle_path('parse', 'deno'),
 		binding_crates: WASM_CRATES,
 		rebuild: 'deno task build:wasm:parse:deno'
 	},
 	tsv_wasm: {
 		label: 'tsv_wasm',
 		kind: 'wasm',
-		path: `${PROJECT_ROOT}/crates/tsv_wasm/pkg/all/deno/tsv_wasm_bg.wasm`,
+		path: wasm_bundle_path('all', 'deno'),
 		binding_crates: WASM_CRATES,
 		rebuild: 'deno task build:wasm:all:deno'
 	}

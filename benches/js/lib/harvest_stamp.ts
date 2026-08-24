@@ -43,8 +43,12 @@ export interface HarvestStamp {
  * renamed stamp or a new commit input can't leave the doctor reading a file nothing
  * writes. The `checkouts` keys are the stamp's OWN key names; a doctor probe that
  * finds a listed key absent from the stamp reports that rather than guessing.
+ *
+ * `as const satisfies` rather than a bare `Record` annotation: the five scripts read
+ * their own entry by key, and under a `Record<string, …>` a renamed key still
+ * typechecks and fails at runtime — which is the drift this table exists to prevent.
  */
-export const HARVEST_STAMPS: Record<string, HarvestStamp> = {
+export const HARVEST_STAMPS = {
 	'wpt-css': {
 		path: 'benches/js/.cache/wpt_css.stamp.json',
 		task: 'bench:harvest:wpt',
@@ -68,9 +72,13 @@ export const HARVEST_STAMPS: Record<string, HarvestStamp> = {
 	'css-rejects': {
 		path: 'benches/js/.cache/css_rejects.stamp.json',
 		task: 'css:over-acceptance:pin',
-		checkouts: { svelte_commit: '../svelte', prettier_commit: '../prettier' }
+		checkouts: {
+			svelte_commit: '../svelte',
+			prettier_commit: '../prettier',
+			wpt_commit: '../wpt'
+		}
 	}
-};
+} as const satisfies Record<string, HarvestStamp>;
 
 /** `HEAD` commit of a checkout, or null when it isn't a git repo / git fails. */
 export function git_head(repo: string): string | null {

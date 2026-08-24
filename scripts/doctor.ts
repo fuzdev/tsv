@@ -25,6 +25,7 @@
  */
 
 import { probe_node_modules } from '../benches/js/lib/check_node_modules.ts';
+import { git_head, HARVEST_STAMPS, short_commit } from '../benches/js/lib/harvest_stamp.ts';
 import { native_library_filename } from '../benches/js/lib/runtime.ts';
 import { type AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
 
@@ -341,44 +342,41 @@ if (exists('../typescript-go')) {
 // commit inputs are compared — the oracle-version and pin inputs are `pins:audit`'s.
 
 section('Harvest stamps (bench:pins:suites — the pin-freshness preflight)');
-try {
-	const { git_head, HARVEST_STAMPS, short_commit } =
-		await import('../benches/js/lib/harvest_stamp.ts');
-	for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
-		const heads = Object.entries(checkouts).map(([key, repo]) => ({
-			key,
-			repo,
-			head: git_head(repo)
-		}));
-		const absent = heads.filter((h) => h.head === null).map((h) => h.repo);
-		if (absent.length > 0) {
-			info(`${name}: checkout absent (${absent.join(', ')}) — ${task} warn-skips`);
-			continue;
-		}
-		let recorded: Record<string, unknown>;
-		try {
-			recorded = JSON.parse(Deno.readTextFileSync(path)) as Record<string, unknown>;
-		} catch {
-			warn(`${name}: never stamped (no ${path}) — run deno task ${task}`);
-			continue;
-		}
-		const moved = heads.filter((h) => recorded[h.key] !== h.head);
-		if (moved.length > 0) {
-			warn(
-				`${name}: stamp is behind ${moved
-					.map(
-						(h) =>
-							`${h.repo} (stamped ${typeof recorded[h.key] === 'string' ? short_commit(recorded[h.key] as string) : '?'}, now ${short_commit(h.head!)})`
-					)
-					.join(', ')} — run deno task ${task}`
-			);
-		} else ok(`${name}: stamp matches ${heads.map((h) => h.repo).join(' + ')}`);
+for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
+	const heads = Object.entries(checkouts).map(([key, repo]) => ({
+		key,
+		repo,
+		head: git_head(repo)
+	}));
+	const absent = heads.filter((h) => h.head === null).map((h) => h.repo);
+	if (absent.length > 0) {
+		info(`${name}: checkout absent (${absent.join(', ')}) — ${task} warn-skips`);
+		continue;
 	}
-} catch (e) {
-	warn(
-		`cannot read the harvest stamps (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
-			'usually node_modules missing; run deno task bench:install'
-	);
+	let recorded: Record<string, unknown>;
+	try {
+		recorded = JSON.parse(Deno.readTextFileSync(path)) as Record<string, unknown>;
+	} catch {
+		warn(`${name}: never stamped (no ${path}) — run deno task ${task}`);
+		continue;
+	}
+	// A key the stamp does not carry at all is reported as such rather than as a
+	// moved commit: that is what an input ADDED since the stamp was written looks
+	// like, and "stamped ?" reads as a corrupt SHA.
+	const moved = heads
+		.map((h) => ({ ...h, recorded: recorded[h.key] }))
+		.filter((h) => h.recorded !== h.head);
+	if (moved.length > 0) {
+		warn(
+			`${name}: stamp is stale for ${moved
+				.map((h) =>
+					typeof h.recorded === 'string'
+						? `${h.repo} (stamped ${short_commit(h.recorded)}, now ${short_commit(h.head!)})`
+						: `${h.repo} (no \`${h.key}\` recorded — the stamp predates that input)`
+				)
+				.join(', ')} — run deno task ${task}`
+		);
+	} else ok(`${name}: stamp matches ${heads.map((h) => h.repo).join(' + ')}`);
 }
 
 // --- Corpus entries -------------------------------------------------------------

@@ -25,7 +25,7 @@
 // lockfile (`deno task pins:lock`) and update `LOCKED_TRANSITIVE` in
 // scripts/check_canonical_pins.ts if a transitive pin moved with it, run
 // `deno task fixtures:update` and review the churn, run the two sidecar-dependent gates
-// `deno task check` cannot (`compile:validation`, `bench:harvest`), and grep the repo for
+// `deno task check` cannot (`compile:validation`, `bench:pins:suites`), and grep the repo for
 // the OLD version string — prose that restates a pin goes silently stale, and nothing gates
 // it. See docs/benchmarks.md §"Canonical baseline is coupled" for the full procedure.
 //

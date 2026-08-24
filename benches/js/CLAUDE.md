@@ -33,7 +33,7 @@ grades); the reference halves live in `docs/`:
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `typecheck:scripts` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save `roundtrip:audit:prettier`, which gates the pinned `../prettier` format suites when that checkout is present (a loud skip when not; ~0.1 s) | every commit; the CI `check` job |
+| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save `roundtrip:audit:prettier`, which gates the pinned `../prettier` format suites when that checkout is present (a loud skip when not; ~0.1 s) | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache), then `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
@@ -559,6 +559,16 @@ deno task test:deno:canonical
 # so a new subdirectory is covered the day it appears. NOT gated, for the same reason
 # as the line above: the harness imports npm by bare specifier, and CI's `check` job
 # installs no node_modules. Run it after a harness, scripts, or sidecar change.
+#
+# The node-modules-free part of the harness IS gated, and mostly for free: `deno check`
+# walks transitive imports, so `typecheck:scripts` already covers the loader/guard core
+# through scripts/'s own graph (check_artifact_freshness, ffi, napi, tsv_artifacts,
+# runtime, types, reject_probe) and `test:deno` covers gate_counts. `typecheck:bench-core`
+# names the orphans nothing else reaches — `lib/wasm.ts`, `lib/harvest_stamp.ts` and
+# `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl
+# wrappers also check on a bare checkout, but only because their npm imports are
+# dynamic, and gating them would impose that import style on modules whose job is
+# loading npm (deno.json `//typecheck:bench-core`).
 deno task typecheck:js
 ```
 
@@ -682,7 +692,7 @@ it; to investigate ad-hoc run `BENCH_CORPUS=conformance node benches/js/bench.ts
 
 ```bash
 deno task bench:harvest            # everything = :suites + :svelte-styles
-deno task bench:pins:suites     # the conformance-view group: the four SUITE caches + the CSS reject
+deno task bench:pins:suites        # the conformance-view group: the four SUITE caches + the CSS reject
                                    # pin; the pin-freshness preflight
 deno task bench:harvest:wpt        # ../wpt/css <style> blocks → .cache/wpt_css
 deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
@@ -710,8 +720,12 @@ always re-harvests, rewrites only changed files).
 (`suite`-tier, so they appear in the CONFORMANCE view and nowhere else) plus
 `css:over-acceptance:pin`, which harvests nothing — nothing consumes the CSS reject
 list, so it is rebuilt live — but grades `CSS_REJECTS_PIN` over the same view and
-stamps the same way. `bench:harvest:svelte-styles` produces a `real`-tier entry, so
-it appears in the PERF and GATES views and never in the conformance one. Each caller
+stamps the same way, recording all three checkout commits it reads (`../svelte`,
+`../prettier`, `../wpt`). `WPT_CSS_HARVEST_PIN` is stamped beside them but cannot
+stand in for that last commit: it is a file COUNT, and an edit to an existing wpt
+test moves the CSS this pin grades without moving it.
+`bench:harvest:svelte-styles` produces a `real`-tier entry, so it appears in the
+PERF and GATES views and never in the conformance one. Each caller
 therefore takes one group: `bench:perf` chains the styles harvest alone (its own view
 holds it), `bench:conformance` chains the suites alone (its holds those), and `deno
 task conformance` — whose corpus legs read the `gates` view — chains the suites as
@@ -889,12 +903,16 @@ stays fatal); see the module doc for why stale is a hard error by default.
 **The size-only artifacts are graded too, as a warning.** The bench's size table
 reports every tsv build from every runtime (the other binding, the subset bundles,
 the `ffi-{format,parse}` builds — `lib/tsv_artifacts.ts`, the one table the guard,
-the build-side skip and the size table all read), and nothing executes those, so a
-`:run` after a crate edit would silently publish the other binding's size at an
-older commit inside a report stamped with this one. `warn_stale_reported_artifacts`
-names each stale one before the run (never fatal — nothing measures them; a missing
-one is `binary_sizes_absent`'s to record); the build-first tasks build the whole
-set, so there it is unreachable.
+the build-side skip, the size table and the three LOADERS all read), and nothing
+executes those, so a `:run` after a crate edit would silently publish the other
+binding's size at an older commit inside a report stamped with this one.
+`warn_stale_reported_artifacts` names each stale one before the run (never fatal —
+nothing measures them; a missing one is `binary_sizes_absent`'s to record); the
+build-first tasks build the whole set, so there it is unreachable. The
+executed-vs-size-only split is a PATH comparison, which is sound only because both
+sides come from that module's builders: what remains is the two axes a loader owns
+(`TSV_FFI_PROFILE`, the wasm-pack target), where a differing path is a real
+difference rather than a spelling.
 
 **The staged-package sibling: the npm test `:run` tasks abort too.**
 `test:npm[:parse|:all]:run` and `test:napi:npm:run` skip their builds for the same
@@ -1141,8 +1159,10 @@ benches/js/
     │                      # they scope themselves along two DECLARED axes — root + DeclarationPolicy)
     ├── tsc.ts             # tsc wrapper (parse-only, conformance surface only) + the shared
     │                      # `typescript` loader and parse call the harvest reuses
-    ├── tsv_artifacts.ts   # The measured tsv artifacts: crate lists + per-build path/label/rebuild, read
-    │                      # by the freshness guard, run_if_stale and the size table alike
+    ├── tsv_artifacts.ts   # The measured tsv artifacts: crate lists + per-build path/label/rebuild, read by
+    │                      # the freshness guard, run_if_stale and the size table alike — and the path
+    │                      # BUILDERS the three loaders (ffi/napi/wasm) resolve from, so what a guard
+    │                      # checks is the file its loader opens
     ├── types.ts           # Shared types + `BaseImplementation` (the language-support pair)
     ├── versions.ts        # Version loading from package.json
     ├── wasm.ts            # WASM module loader (WasmImplementation — deno/nodejs target)

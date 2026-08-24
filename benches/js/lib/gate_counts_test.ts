@@ -23,12 +23,24 @@ const UNTRACKED_PINS: Record<string, string> = {
 		'a MINIMUM over the live dev repos (perf-view `real` tier), which are unversioned working trees'
 };
 
+/**
+ * Exported constants that are NOT pinned counts — each with the reason, same posture
+ * as {@link UNTRACKED_PINS}. The pin list is computed as "every `export const` minus
+ * these" rather than matched on the `_PIN` / `_PINS` / `_MIN` suffixes the module
+ * happens to use: a suffix match grades only the names that already look like pins,
+ * so a future `export const FOO_COUNT` would be invisible to BOTH directions below —
+ * the same missing-provenance shape this file exists to close.
+ */
+const NON_PIN_EXPORTS: Record<string, string> = {
+	GATE_CHECKOUT_COMMITS: 'the provenance table itself — what the pins are graded against'
+};
+
 const source = readFileSync(new URL('./gate_counts.ts', import.meta.url), 'utf8');
 
-/** Every exported pin constant, by the suffixes the module uses for them. */
-const exported_pins = [...source.matchAll(/^export const ([A-Z0-9_]+(?:_PIN|_PINS|_MIN))\b/gm)].map(
-	(m) => m[1]!
-);
+/** Every exported constant this module declares, minus the declared non-pins. */
+const exported_pins = [...source.matchAll(/^export const ([A-Za-z0-9_]+)\b/gm)]
+	.map((m) => m[1]!)
+	.filter((name) => !(name in NON_PIN_EXPORTS));
 
 /** Whether a `pins` entry (exact name, or a `PREFIX_*` glob) names `pin`. */
 const names = (entry: string, pin: string): boolean =>
@@ -43,6 +55,15 @@ Deno.test('gate_counts exports the pins this test expects to grade', () => {
 	ok(exported_pins.length >= 10, `found only ${exported_pins.length} exported pins`);
 	ok(exported_pins.includes('CSS_REJECTS_PIN'));
 	ok(exported_pins.includes('CORPUS_FORMAT_MATCH_MIN'));
+});
+
+Deno.test('NON_PIN_EXPORTS lists only constants that exist', () => {
+	for (const name of Object.keys(NON_PIN_EXPORTS)) {
+		ok(
+			new RegExp(`^export const ${name}\\b`, 'm').test(source),
+			`${name} is not an export of gate_counts.ts`
+		);
+	}
 });
 
 Deno.test('every exported pin names the checkout it was measured against', () => {

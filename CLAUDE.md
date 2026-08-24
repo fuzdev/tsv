@@ -148,6 +148,12 @@ deno task typecheck:js   # deno check over the bench harness, scripts/ + the tsv
 deno task typecheck:scripts # deno check over scripts/ alone — node-modules-free, so this one DOES gate in `check`
 #                          (nothing else typechecks the release scripts, and `deno run` doesn't).
 #                          `scripts/doctor.ts` is the one exclusion: its corpus probe reaches the bench node_modules
+deno task typecheck:bench-core # the bench modules that are DELIBERATELY node-modules-free and that
+#                          scripts/'s import graph does not reach — `lib/{wasm,harvest_stamp}.ts` +
+#                          `compose_reports.ts` — so the harness's loader/guard core and its report composer
+#                          gate too. The rest of that core rides `typecheck:scripts` (deno check walks
+#                          transitive imports) or `test:deno`. NOT the maximal checkable set: the impl
+#                          wrappers qualify only because their npm imports are dynamic. See deno.json's `//` note
 deno task test           # cargo test
 deno task lint           # cargo clippy
 cargo fmt                # format Rust code
@@ -323,7 +329,7 @@ deno task conformance                  # pre-release aggregate: preflights pins:
 # seconds when nothing moved, each stamped leg warn-skips an absent checkout; benches/js/CLAUDE.md §Harvests) +
 # fixtures:validate + compile:fixtures:validate (the ORACLE-FRESHNESS legs — `check` runs only each tree's
 # sidecar-free slice, which grades tsv against the committed file and so cannot see the oracle itself moving;
-# only a run that re-formats through prettier can, ~17 s for all 4288 parser/formatter fixtures), then
+# only a run that re-formats through prettier can, ~17 s for all 4307 parser/formatter fixtures), then
 # bench:harvest:svelte-styles (re-extracting the CSS the `gates` view grades, beside the legs that read it), then the
 # three gates above + corpus:compare:parse --all +
 # corpus:compare:format --all in ONE process (benches/js/conformance.ts; oracles load once, fail-fast, FFI built once),
@@ -375,7 +381,7 @@ deno task bench:conformance        # bench:pins:suites + build:bench + coverage 
 deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
 deno task bench:harvest            # regenerate every cache = `bench:pins:suites` + `bench:harvest:svelte-styles` (the manual
                                    # refresh-everything entry point; each caller takes only the group its corpus VIEW holds)
-deno task bench:pins:suites     # the conformance-view group: the four SUITE caches (wpt-css + test262 + tsc-corpus +
+deno task bench:pins:suites        # the conformance-view group: the four SUITE caches (wpt-css + test262 + tsc-corpus +
                                    # svelte-rejects) + the CSS reject pin (`css:over-acceptance:pin`). All freshness-stamped
                                    # (--force after harvest-logic changes) and `--if-present`. The PIN-FRESHNESS preflight of
                                    # `deno task conformance`; `deno task doctor` reports a stamp behind its checkout

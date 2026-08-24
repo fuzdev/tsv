@@ -945,7 +945,11 @@ function enforce_perf_coverage(full_corpus: boolean): void {
 async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
 	if (!full_corpus) return;
 	const tracking = task_tracking_by_group.get('parse/css');
-	if (tracking === undefined) return; // the group did not run (no CSS files, or a parse-less surface)
+	if (tracking === undefined) {
+		// Every not-graded path says so: a silent return reads exactly like a pass.
+		log('\nCSS_REJECTS_PIN not graded — the parse/css group did not run.');
+		return;
+	}
 	const { missing, optional_missing } = await corpus_missing_entries(CORPUS_MODE, 'css');
 	const absent = [...missing, ...optional_missing];
 	if (absent.length > 0) {
@@ -953,7 +957,19 @@ async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
 		return;
 	}
 	const oracle_key = tracking.get(CANONICAL_PARSER_ROWS.css);
-	const rejects = oracle_key === undefined ? 0 : (skipped_files.get(oracle_key)?.size ?? 0);
+	if (oracle_key === undefined) {
+		// A `0` fallback here would report "rejects 0 ≠ 240" and read as a grammar
+		// move — diagnosing a missing oracle ROW as a corpus change. It is neither:
+		// the row that built the reject set is the measurement, so its absence fails
+		// on its own terms.
+		console.error(
+			`Conformance corpus: the parse/css group ran without its oracle row ` +
+				`(${CANONICAL_PARSER_ROWS.css}), so CSS_REJECTS_PIN has nothing to grade — the reject ` +
+				`set IS that row's pre-flight skips. Check the impl registry and the row's name.`
+		);
+		exit(1);
+	}
+	const rejects = skipped_files.get(oracle_key)?.size ?? 0;
 	if (rejects === CSS_REJECTS_PIN) {
 		// Said aloud: a silent pass reads the same as a gate that never ran.
 		log(
@@ -963,8 +979,8 @@ async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
 	}
 	console.error(
 		`Conformance corpus: parseCss rejects ${rejects} of ${files_by_language.css.length} CSS files ` +
-			`≠ pinned CSS_REJECTS_PIN ${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's or ` +
-			`../svelte's checkout, the wpt-css harvest) or svelte's parseCss changed what it accepts — ` +
+			`≠ pinned CSS_REJECTS_PIN ${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's, ` +
+			`../svelte's or ../wpt's checkout) or svelte's parseCss changed what it accepts — ` +
 			`re-pin in lib/gate_counts.ts deliberately, after checking which (\`deno task ` +
 			`css:over-acceptance:pin\` grades the same count and stamps it).`
 	);
@@ -1757,8 +1773,11 @@ check_variant_parity();
 // Perf corpus is real-world code every in-scope tool must fully process, so a
 // per-file pre-flight failure that isn't an explicitly-reviewed `PERF_OMITS`
 // entry is a hard error — not the silent skip that would quietly erode coverage.
-// Conformance mode measures coverage (sub-100% is the metric), so this is
-// perf-only. Runs before the timed phase, so a regression fails in seconds.
+// Conformance mode measures coverage (sub-100% is the metric), so this hard error is
+// perf-only — but the other branch is not empty: conformance's own exact pin
+// (`enforce_css_reject_pin`) is graded there, at the same point and for the same
+// reason. Both run before the timed phase, so a regression fails in seconds and
+// nothing is written.
 //
 // The staleness half of the same grade is asked only of a run that could actually
 // reach every omitted file: a corpus filter, or a missing repo tolerated by

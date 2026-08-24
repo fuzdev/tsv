@@ -41,9 +41,12 @@ real move in a number is a deliberate, visible edit.
   describing the previous corpus with every committed-tree gate green until that
   group runs. Two things make that safe rather than merely documented: the group is
   a preflight of `deno task conformance` (so a release cannot ship the old number),
-  and each leg is freshness-stamped on the checkout COMMIT, so a move between
-  upstream releases — where `pins:audit`'s version check sees nothing — still
-  re-grades. Two of the pins are also graded a second time on their own surface:
+  and each leg is freshness-stamped on the checkout COMMIT — every checkout it
+  reads, which for the CSS pin is three (`../svelte`, `../prettier`, `../wpt`) — so
+  a move between upstream releases, where `pins:audit`'s version check sees nothing,
+  still re-grades. A count pin is never a substitute for a commit in a stamp: an
+  edit to an existing suite file moves the corpus without moving the count. Two of
+  the pins are also graded a second time on their own surface:
   `TEST262_POSITIVES_PIN` by `conformance:test262` (its Rust twin) and
   `CSS_REJECTS_PIN` by the conformance coverage run (`bench:conformance`), whose
   oracle row's `parse/css` skips are the reject set. `deno task doctor` reports a

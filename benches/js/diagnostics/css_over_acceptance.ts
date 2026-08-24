@@ -30,10 +30,12 @@
  * published `parse/css` coverage row with nothing to catch it.
  *
  * **Two modes.** The default run is the profile above. `--pin-only` grades the
- * pin and nothing else: it loads only the oracle (no FFI / WASM build) and is
+ * pin and nothing else: it loads only the oracle (no FFI / WASM build, though the
+ * CORPUS load is still the whole conformance view — 79.5k files to reach 22.6k CSS,
+ * since the loader has no language axis, ~10 s warm) and is
  * FRESHNESS-STAMPED like the suite harvests (`lib/harvest_stamp.ts` — the
- * ../svelte + ../prettier commits, the svelte oracle version, and the two pins
- * that shape the corpus), so a run whose inputs are unchanged skips instantly.
+ * ../svelte + ../prettier + ../wpt commits, the svelte oracle version, and the two
+ * pins that shape the corpus), so a run whose inputs are unchanged skips instantly.
  * That is what lets `bench:pins:suites` carry it as a leg beside the four
  * harvests: the pin is re-derived on the same cadence as its siblings rather than
  * by hand. The list itself is still built live — nothing else consumes it, so a
@@ -85,16 +87,22 @@ const log = (...args: unknown[]): void => {
 const STAMP_PATH = HARVEST_STAMPS['css-rejects'].path;
 
 // Freshness stamp: the CSS corpus is prettier's suite (../prettier), the svelte
-// suite's own `.css` (../svelte) and the wpt-css harvest (its count pin stands in
-// for the ../wpt commit), graded by the pinned npm svelte — skip the grade when
-// all of those plus the rejects pin match the stamp. Only `--pin-only` skips: the
-// profile is the point of a default run.
+// suite's own `.css` (../svelte) and the wpt-css harvest (../wpt), graded by the
+// pinned npm svelte — skip the grade when all of those plus the rejects pin match
+// the stamp. Only `--pin-only` skips: the profile is the point of a default run.
+//
+// Each source checkout is stamped by COMMIT, `../wpt` included. Its harvest count
+// pin is stamped too but cannot stand in for the commit: wpt supplies 22310 of the
+// 22642 CSS files, and an edit to an existing test moves content without moving the
+// count — so a wpt pull would re-run `bench:harvest:wpt`, rewrite the cache, and
+// leave this grade stamped fresh over a corpus that changed under it.
 const versions = await load_all_versions();
 const svelte_commit = git_head('../svelte');
 const stamp_inputs: StampInputs = {
 	harvest: 'css-rejects',
 	svelte_commit,
 	prettier_commit: git_head('../prettier'),
+	wpt_commit: git_head('../wpt'),
 	svelte_oracle: versions.canonical.svelte,
 	wpt_pin: WPT_CSS_HARVEST_PIN,
 	rejects_pin: CSS_REJECTS_PIN
