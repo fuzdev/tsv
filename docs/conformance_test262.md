@@ -17,9 +17,9 @@ changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,544 graded after skips).
 
 - Positive (should parse) — 42,113 passed, 0 failed
-- Negative (should reject) — 1,858 passed, 2,573 failed
+- Negative (should reject) — 1,864 passed, 2,567 failed
 
-- **Overall**: 43,971/46,544 (94.5%)
+- **Overall**: 43,977/46,544 (94.5%)
 - **Positive pass rate**: 100% — every test tsv grades and that should parse does,
   graded at each test's declared goal (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
 - **Skipped**: 2,592 (sloppy mode: 2,520, unimplemented feature: 0, runtime: 38, resolution: 34)

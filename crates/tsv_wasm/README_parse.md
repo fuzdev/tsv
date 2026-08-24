@@ -46,7 +46,7 @@ Unknown option keys throw, whatever their value — a typo like `{locatons: fals
 
 A second argument that isn't an object throws too, arrays included. That makes `sources.map(parse_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => parse_typescript(s))`.
 
-Deeply nested input has a ceiling: the WASM stack is 1 MiB, which is roughly 1,600 levels of nesting (for comparison, acorn gives up around 500 and prettier around 800). Past it the call traps with `memory access out of bounds`, and unlike a parse error that **poisons the instance** — every later call throws the same thing. `reinstantiate()` is the recovery: it synchronously swaps in a fresh instance from the already-compiled module (no recompile — same environment constraints as `init_sync`), and every import keeps working against it. Real code is nowhere near this ceiling; generated and minified code can be.
+Deeply nested input has a ceiling: the WASM stack is 1 MiB, which is roughly 1,600 levels of the loosest shape, nested parens (for comparison, acorn gives up around 500 and prettier around 800, measured the same way) — deeply nested *statements* cost several times more stack per level, so treat that figure as a ceiling rather than a floor. Past the ceiling the call traps with `memory access out of bounds`, and unlike a parse error that **poisons the instance** — every later call throws the same thing. `reinstantiate()` is the recovery: it synchronously swaps in a fresh instance from the already-compiled module (no recompile — same environment constraints as `init_sync`), and every import keeps working against it. Real code is nowhere near this ceiling; generated and minified code can be.
 
 ### Reconstructing line/column
 
