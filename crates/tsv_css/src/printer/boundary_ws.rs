@@ -72,6 +72,20 @@
 // LOCATES a part by stepping trivia is retracing one of these skips, so its class must be the
 // skip's. One that is narrower reports the RUN as the part's start.
 //
+// ## The document precondition
+//
+// Every claim above is a per-site question — asked once per selector, per combinator, per
+// at-rule, per comment, per selector-list comma and per DECLARATION — and on real code every
+// one of them answers "nothing". [`source_holds_boundary_ws`] settles that for the whole
+// document ONCE, and [`Printer::holds_boundary_ws`] carries the answer: a source with no
+// member of the class anywhere cannot have one inside any gap of it, so the three claim entry
+// points ([`Printer::gap_boundary_ws`], [`Printer::preserved_boundary_ws`] and
+// [`Printer::gap_may_hold_boundary_ws`], which every other claim routes through) return their
+// empty answer before scanning anything. It is a strict SUPERSET of what any claim can read —
+// the whole source, not a region — so it can only turn a claim off where the claim would have
+// come back empty on its own, and the two claim shapes stay the sole deciders of what the run
+// actually is.
+//
 // ## Residue
 //
 // Two positions still drop the run: the stylesheet's own trailing whitespace (the outermost
@@ -104,7 +118,23 @@ impl<'a> Printer<'a> {
     /// lead gap). At the stylesheet level there is no such container, which is where the
     /// block-level residue lives — see
     /// [`tests/css_boundary_whitespace.rs`](../../../../tests/css_boundary_whitespace.rs).
+    ///
+    /// `#[inline]` for the gate alone — the scan stays out of line. Every claim is asked far
+    /// more often than it answers, so what the caller needs folded in is the branch, not the
+    /// work behind it: with the test at the call site the empty answer costs no call, no
+    /// `String` to construct and drop, and no `is_empty` test the caller cannot see through.
+    /// The same split is why [`Self::boundary_run`] returns its flag from the scan it already
+    /// ran rather than making the caller ask twice.
+    #[inline]
     pub(super) fn gap_boundary_ws(&self, floor: Option<u32>, anchor: u32) -> String {
+        if !self.holds_boundary_ws {
+            return String::new();
+        }
+        self.scan_gap_boundary_ws(floor, anchor)
+    }
+
+    /// [`Self::gap_boundary_ws`]'s scan, past the document precondition.
+    fn scan_gap_boundary_ws(&self, floor: Option<u32>, anchor: u32) -> String {
         let mut out = match floor {
             Some(floor) => self.boundary_ws_in_gap_before_anchor(floor, anchor),
             None => String::new(),
@@ -127,11 +157,20 @@ impl<'a> Printer<'a> {
     /// Returns an owned `String` because the members need not be contiguous in source; the
     /// common no-run case returns an empty one and costs a scan of a gap that is a handful
     /// of bytes.
+    ///
+    /// Gated inline, scanned out of line — see [`Self::gap_boundary_ws`] for why the split is
+    /// where the per-site cost of this family actually lives.
+    #[inline]
     pub(super) fn boundary_ws_in_gap(&self, from: u32, to: u32) -> String {
-        let mut out = String::new();
         if !self.gap_may_hold_boundary_ws(from, to) {
-            return out;
+            return String::new();
         }
+        self.scan_boundary_ws_in_gap(from, to)
+    }
+
+    /// [`Self::boundary_ws_in_gap`]'s sweep, past the gap's own guard.
+    fn scan_boundary_ws_in_gap(&self, from: u32, to: u32) -> String {
+        let mut out = String::new();
         let (from, to) = (from as usize, to as usize);
         let bytes = self.source.as_bytes();
         let mut i = from;
@@ -181,7 +220,13 @@ impl<'a> Printer<'a> {
     /// helpers are span arithmetic (`span.end - 1`, `m_start + text.len()`), and one that
     /// lands mid-character used to reach a `str` slice and PANIC. The `debug_assert` keeps
     /// that an upstream bug rather than a crash, and the release path declines instead.
+    #[inline]
     pub(super) fn gap_may_hold_boundary_ws(&self, from: u32, to: u32) -> bool {
+        // The document precondition first: a source with no member anywhere has none in this
+        // gap either, and the test is a field read where the one below is a scan of the gap.
+        if !self.holds_boundary_ws {
+            return false;
+        }
         let (from, to) = (from as usize, to as usize);
         if from >= to || to > self.source.len() {
             return false;
@@ -237,7 +282,19 @@ impl<'a> Printer<'a> {
     /// builders need it, since a comment anywhere in the selector routes to the other one.
     /// Pass `0` only where the run genuinely precedes everything printed so far: a complex
     /// selector's first compound, whose leading run sits *before* `complex.span.start`.
+    ///
+    /// Gated inline, scanned out of line — see [`Self::gap_boundary_ws`] for why the split is
+    /// where the per-site cost of this family actually lives.
+    #[inline]
     pub(super) fn preserved_boundary_ws(&self, floor: u32, start: u32) -> &'a str {
+        if !self.holds_boundary_ws {
+            return "";
+        }
+        self.scan_preserved_boundary_ws(floor, start)
+    }
+
+    /// [`Self::preserved_boundary_ws`]'s backward scan, past the document precondition.
+    fn scan_preserved_boundary_ws(&self, floor: u32, start: u32) -> &'a str {
         let (run_start, holds_member) = self.boundary_run(floor, start);
         // The common answer, settled by the scan that just ran rather than by a second pass:
         // every member of this class is non-ASCII, so an all-ASCII run carries nothing to
@@ -431,6 +488,23 @@ pub(super) fn name_run_separator_after(before: &str) -> &'static str {
     }
 }
 
+/// A claim's ASCII TAIL removed — for the two junctures whose separator the printer emits
+/// AFTER the run rather than before it (an explicit combinator's `line`, a declaration's
+/// `: `). Keeping the author's trailing space there would stack with the regenerated one and
+/// grow the line a column per pass; every other claim sits flush against the token it
+/// precedes and has no tail to trim.
+///
+/// The empty answer — every claim's answer on real code — returns before `trim_end_matches`,
+/// whose char-predicate machinery is an out-of-line call that a per-declaration and
+/// per-combinator site pays whether or not there is anything to trim.
+#[inline]
+pub(super) fn trim_regenerated_separator(kept: &str) -> &str {
+    if kept.is_empty() {
+        return kept;
+    }
+    kept.trim_end_matches(|c: char| c.is_ascii_whitespace())
+}
+
 /// `separator` ahead of `kept`, or `kept` untouched when there is no run to separate.
 ///
 /// The doc-builder counterpart of [`Printer::push_boundary_ws_after_name`]: those claims hand
@@ -458,6 +532,69 @@ pub(super) fn prefixed_run(separator: &'static str, kept: String) -> String {
 /// it isn't.
 pub(super) fn closer_pos(span: Span) -> u32 {
     span.end.saturating_sub(1)
+}
+
+/// Whether `source` holds a member of the boundary class ANYWHERE — the document-level
+/// precondition named in this module's §The document precondition, asked once per
+/// [`Printer`] and read by every claim.
+///
+/// Whole-source and unbounded on purpose. A bound would have to be argued against every claim
+/// site's reach — including [`Printer::write_head_boundary_ws`], whose scan is unfloored and
+/// walks *backwards* out of the first node — and an argument that is wrong anywhere silently
+/// deletes the author's bytes, which is the failure mode this whole module exists to prevent.
+/// Answering over more source than any claim can read is the direction that cannot be wrong:
+/// it can only decline the fast path, never take it wrongly.
+///
+/// The scan is the class's own definition read as a byte property: every member is at or above
+/// U+00A0 (`is_boundary_only_whitespace` is JS `\s` MINUS its ASCII members), so a member's
+/// UTF-8 encoding always has the high bit set, and only the bytes that do need decoding at
+/// all. [`next_non_ascii`] steps the ASCII a 32-byte block per branch and the decode runs on
+/// what it lands on, so a stylesheet whose only non-ASCII characters are content (an arrow in
+/// a `content:` string, an emoji in a comment) pays one word-wise pass and a handful of
+/// decodes.
+pub(super) fn source_holds_boundary_ws(source: &str) -> bool {
+    let bytes = source.as_bytes();
+    let mut i = 0;
+    loop {
+        // Resumed at a char boundary every time, so the first high-bit byte at or after `i`
+        // is a UTF-8 LEAD byte and the slice below always splits cleanly.
+        i = next_non_ascii(bytes, i);
+        let Some(c) = source[i..].chars().next() else {
+            return false;
+        };
+        if crate::whitespace::is_boundary_only_whitespace(c) {
+            return true;
+        }
+        i += c.len_utf8();
+    }
+}
+
+/// Index of the first byte at or after `from` with its high bit set, or `bytes.len()`.
+///
+/// Word-at-a-time for the same reason `tsv_lang::printing`'s line-terminator candidate scan
+/// is: the needle is sparse (a real stylesheet holds a handful of non-ASCII bytes in a
+/// hundred kilobytes), so a per-byte compare spends all of its work confirming misses. "Is
+/// any lane non-ASCII" is a bit test rather than an equality, so four words fold into one
+/// branch — and where that branch fires the byte loop below locates the hit, which costs at
+/// most one block and happens at most once per non-ASCII CHARACTER in the document.
+#[inline]
+fn next_non_ascii(bytes: &[u8], from: usize) -> usize {
+    const BLOCK: usize = 32;
+    const HIGH: u64 = 0x8080_8080_8080_8080;
+    let mut i = from;
+    // One slice of KNOWN length per block, split into whole words with no remainder, so the
+    // four loads carry no bounds check of their own — a block is one compare and one branch.
+    while let Some(block) = bytes[i..].first_chunk::<BLOCK>() {
+        let (words, _) = block.as_chunks::<8>();
+        if words.iter().fold(0, |acc, w| acc | u64::from_le_bytes(*w)) & HIGH != 0 {
+            break;
+        }
+        i += BLOCK;
+    }
+    while i < bytes.len() && bytes[i].is_ascii() {
+        i += 1;
+    }
+    i
 }
 
 /// Whether `c` continues a CSS identifier — the single predicate behind both askers.
