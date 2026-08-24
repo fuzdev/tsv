@@ -719,6 +719,97 @@ Two practical rules:
   the least contaminated estimator), never a single pair, and keep a control
   corpus the lever's code never runs.
 
+### A per-site precondition is only as cheap as its fold
+
+A question asked once per construct — per declaration, per selector, per
+combinator, per comma — is a per-site *tax*, and the way to retire it is a
+document-level precondition that answers for all of them at once. The CSS
+boundary-whitespace claims are the worked case: every member of that class is
+non-ASCII ([`printer/boundary_ws.rs`](../crates/tsv_css/src/printer/boundary_ws.rs)),
+so a source with none anywhere cannot have one in any gap of it, and one scan of
+the source retires every claim in the document.
+
+**The precondition is not the expensive half — its fold is.** Wall figures below
+are against the same tree with the claim family absent, three binaries
+interleaved in one session (8 ABBA rounds, per-round paired, cv < 0.6%); the
+instruction column is the layout-free one:
+
+| build | print | total | instructions (191 KB corpus, 200 iterations) |
+| --- | --- | --- | --- |
+| claim family, no precondition | +8.5..+10.7% | +5.0..+7.0% | 8.677 G |
+| precondition as a plain `bool` field read | −3.2%* | — | 8.504 G |
+| the same read, gate `#[inline]` + scan out of line | +1.7..+3.1% | +0.7..+2.3% | 8.414 G |
+| claim entry points stubbed to a constant | +2.3%* | — | 8.321 G |
+| claim family absent entirely | 0 | 0 | 8.240 G |
+
+\* measured against the ungated build rather than against the absent one; the
+column is a ladder, not one run. The wall ranges span two `.css` corpora
+(191 KB / 516 KB) and several sessions — see the next section for why they are
+this wide while the instruction column is not.
+
+The first and third rows differ **only** in where the branch lives. With the
+whole function out of line, every site still pays a call, a returned `String` to
+construct and drop, and an `is_empty` the caller cannot see through — barely
+half the win. Splitting each claim into an `#[inline]` gate over an out-of-line
+scan recovers most of the rest. `#[inline(always)]` on top of that measured
+**zero** further change (8.4276 G vs 8.4275 G): once the branch folds, nothing
+is left to fold.
+
+The last two rows are the standing residual, and worth naming because it is
+**not** recoverable at this design: a runtime flag cannot delete the branch or
+the empty `String` the way a compile-time constant can, and the whole-source
+scan itself costs ~0.3% of the CSS print phase. Roughly ~2% of that phase is
+therefore intrinsic to having the claims at all, and the remaining ~2.3% belongs
+to the *other* work in that family — the parser's own boundary skipping, the
+blank-line rule, the declaration-tail scan — not to the claims. **A CSS baseline
+comparison that reaches back past this family should expect ~+2% print and read
+it as paid-for correctness, not as a fresh regression.**
+
+Two rules fall out:
+
+- **Grade a precondition on the counter that shows the fold.** `instructions:u`
+  separates the three rows above cleanly; the wall clock on the middle row was
+  contaminated (next section).
+- **A cheap scan can look expensive when it is attributed by subtraction.**
+  Reading the first fold's shortfall as "the document scan must cost 5%" was
+  wrong by an order of magnitude — `perf report` put the scan at 0.14% of the
+  run, inlined into the printer's constructor. Attribute with the profile, not
+  with the difference between two other numbers.
+
+### A phase column is a control only for code the other phase never runs
+
+`tsv_debug profile` splits parse from format, which invites reading the parse
+column as a free control for a printer change. It is not one. A CSS-printer-only
+change repeatedly moved the **CSS parse** column by −2 to −4% across rebuilds —
+impossible as work, and reproducible within a build (cv < 0.6%, consistent in
+every one of 8 interleaved rounds). Changing the printer's inlining moves code
+the parser shares a binary with; one build's parser lands better than another's,
+and a phase column that runs alternately with the changed phase inherits its
+i-cache footprint too.
+
+The drift is also **per session**, not just per build: the same three binaries
+read `old → head` parse at +1.6%, +2.7% and +4.1% in three sittings, while the
+print column held +8.5..+9.6% across all of them. `total` inherits whichever way
+the parse column happened to land, so it is not the safe headline either.
+
+What to do about it:
+
+- **Keep the control in a different language.** A pure-`.ts` corpus (§Measurement
+  corpora) exercises none of the CSS path — and it makes the artifact visible in
+  the other direction, since its *own* parse column moved +2.8..+4.1% for all
+  three CSS binaries, none of which touch `tsv_ts`. Its `total` read +0.05%,
+  which is what makes the CSS number attributable.
+- **Interleave every binary in ONE session, against a common baseline.** A
+  two-way A/B run twice cannot tell a session's drift from the change; a
+  three-way rotation measures both deltas against the same round of the same
+  baseline, and the drift cancels.
+- **Headline the phase the change is in**, and say what the neighbouring column
+  did rather than folding it in silently.
+- **Distrust a phase delta the change cannot explain, in either direction.** A
+  parse column that *improves* on a printer-only change is the same artifact as
+  one that regresses, and taking the flattering half is how a layout win gets
+  banked as an optimization.
+
 ### An `inline(never)` leaf's real cost is paid by its caller
 
 `#[inline(never)]` on a hot leaf is often correct — it is how the fixed-width

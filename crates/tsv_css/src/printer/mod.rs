@@ -63,6 +63,10 @@ pub(crate) struct Printer<'a> {
     /// keyframe-selector keywords can be lowercased (they're case-insensitive
     /// keywords there; outside keyframes a `from`/`to` type selector is preserved).
     pub(crate) in_keyframes: bool,
+    /// Whether `source` holds a boundary-whitespace member ANYWHERE — the document-level
+    /// precondition every claim in [`boundary_ws`] is gated on. See
+    /// [`boundary_ws::source_holds_boundary_ws`] for why one scan can answer for all of them.
+    pub(crate) holds_boundary_ws: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -99,6 +103,7 @@ impl<'a> Printer<'a> {
             comments,
             line_breaks,
             in_keyframes: false,
+            holds_boundary_ws: boundary_ws::source_holds_boundary_ws(source),
         }
     }
 
