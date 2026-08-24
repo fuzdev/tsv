@@ -1,45 +1,34 @@
-{ // c
-	foo
-}
+{// c
+foo}
 {@html // c
-	expr
-}
+expr}
 {@render // c
-	fn()
-}
-{@debug // c
-	x
-}
+fn()}
+{@debug x}
 {#if // c
-	cond
-}
+cond}
 	yes
 {/if}
 {#if a}
 	a
 {:else if // c
-	b
-}
+b}
 	b
 {/if}
 {#each // c
-	items
-as item}
+items as item}
 	{item}
 {/each}
 {#each items as item (// c
-	item.id
-)}
+item.id)}
 	{item}
 {/each}
 {#await // c
-	promise
-then val}
+promise then val}
 	{val}
 {/await}
 {#key // c
-	expr
-}
+expr}
 	text
 {/key}
 {#each list as it}
@@ -50,8 +39,7 @@ then val}
 {/each}
 <div
 	{...// c
-		expr
-	}
+	expr}
 ></div>
 <input
 	bind:value={
@@ -61,41 +49,31 @@ then val}
 />
 <div
 	{@attach // c
-		fn
-	}
+	fn}
 ></div>
 <div
-	data-attr={ // c
-		expr
-	}
+	data-attr={// c
+	expr}
 ></div>
 <button
-	on:click={
-		// c
-		fn
-	}
+	on:click={// c
+	fn}
 >
 	text
 </button>
 <div
-	class:class1={
-		// c
-		cond
-	}
+	class:class1={// c
+	cond}
 ></div>
 <div
-	use:fn={
-		// c
-		expr
-	}
+	use:fn={// c
+	expr}
 ></div>
 <svelte:element
-	this={ // c
-		tag
-	}
+	this={// c
+	tag}
 ></svelte:element>
 <svelte:component
-	this={ // c
-		Comp
-	}
+	this={// c
+	Comp}
 ></svelte:component>

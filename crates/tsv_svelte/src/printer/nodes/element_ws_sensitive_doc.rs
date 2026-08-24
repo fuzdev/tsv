@@ -490,7 +490,7 @@ impl<'a> Printer<'a> {
         // The `}` hugs the frozen slice's last line here, as it does on every
         // dangle-suppressed path — inside a whitespace-significant element the dangle is
         // off by construction (`block_dangle_allowed`).
-        let open_doc = self.head_open_doc(IF_BLOCK_OPEN, head.frozen);
+        let open_doc = self.head_open_doc(IF_BLOCK_OPEN, head.layout.opens_own_line());
         let mut parts: DocBuf = smallvec![open_doc, head.doc, d.text("}"), body_doc];
 
         if let Some(alt) = &block.alternate {
@@ -510,7 +510,7 @@ impl<'a> Printer<'a> {
             let head = self.build_else_if_expr_doc(else_if, false);
 
             let body_doc = self.build_whitespace_sensitive_content_doc(else_if.consequent.nodes);
-            parts.push(self.head_open_doc(ELSE_IF_BLOCK_OPEN, head.frozen));
+            parts.push(self.head_open_doc(ELSE_IF_BLOCK_OPEN, head.layout.opens_own_line()));
             parts.push(head.doc);
             parts.push(d.text("}"));
             parts.push(body_doc);
@@ -543,7 +543,7 @@ impl<'a> Printer<'a> {
             false,
         );
 
-        let open_doc = self.head_open_doc(EACH_BLOCK_OPEN, head.frozen);
+        let open_doc = self.head_open_doc(EACH_BLOCK_OPEN, head.layout.opens_own_line());
         let mut opening: DocBuf = smallvec![open_doc, head.doc];
 
         if let Some(context) = &block.context {

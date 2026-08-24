@@ -316,7 +316,7 @@ impl<'a> Printer<'a> {
     /// same range (every caller passes one `comment_end` to both), so this is the same verdict
     /// asked once.
     ///
-    /// `head.frozen` drops the opening literal's trailing space (`Printer::head_open_doc`):
+    /// `head.layout.opens_own_line()` drops the opening literal's trailing space (`Printer::head_open_doc`):
     /// the head's content begins with its own hardline, so the space would be trailing
     /// whitespace on the keyword's line. Everything below is unchanged — the frozen
     /// content's hardline breaks the head group, so the clause + `}` take the same dangle
@@ -335,14 +335,14 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let HeadExpr {
             doc: expr_doc,
-            frozen,
+            layout,
             ends_with_line_comment,
             // A block head builds its own final shape (`build_expression_doc_for_block`
             // applies the continuation indent in place), so there is never a debt here.
             owes_continuation_indent: _,
         } = head;
-        let hug = ends_at_base_closer(expr) && !frozen;
-        let open_doc = self.head_open_doc(open, frozen);
+        let hug = ends_at_base_closer(expr) && !layout.opens_own_line();
+        let open_doc = self.head_open_doc(open, layout.opens_own_line());
         let (close_text, group_id, clause) = closer.parts();
         let close = d.text(close_text);
         if ends_with_line_comment {
@@ -902,7 +902,7 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         let key = block.key.as_ref()?;
         let key_head = self.build_each_key_expr(key, allow_wrapping || in_multiline_context);
-        if key_head.frozen || block.context.is_none() {
+        if key_head.layout.opens_own_line() || block.context.is_none() {
             return Some(self.build_prefixed_head_doc("(", key_head, ")"));
         }
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);

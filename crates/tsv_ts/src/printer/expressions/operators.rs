@@ -1284,10 +1284,16 @@ impl<'a> Printer<'a> {
         };
 
         match gap {
-            KeywordOperandGap::Continuation => d.concat(&[
-                d.text("await"),
-                self.build_continuation_indent(keyword_end, argument_start, argument_doc),
-            ]),
+            KeywordOperandGap::Continuation => {
+                let mut parts: DocBuf = smallvec![d.text("await")];
+                self.append_keyword_value_line_comments(
+                    &mut parts,
+                    keyword_end,
+                    argument_start,
+                    argument_doc,
+                );
+                d.concat(&parts)
+            }
             KeywordOperandGap::Inline(Some(run)) => {
                 d.concat(&[d.text("await "), run, argument_doc])
             }

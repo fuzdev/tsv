@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 64,
+	"end": 66,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,11 +10,11 @@
 			{
 				"type": "ExpressionTag",
 				"start": 0,
-				"end": 38,
+				"end": 40,
 				"expression": {
 					"type": "Identifier",
-					"start": 36,
-					"end": 37,
+					"start": 37,
+					"end": 38,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -30,34 +30,34 @@
 						{
 							"type": "Line",
 							"value": " line comment before expression",
-							"start": 1,
-							"end": 34
+							"start": 2,
+							"end": 35
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 38,
-				"end": 40,
+				"start": 40,
+				"end": 42,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 40,
-				"end": 63,
+				"start": 42,
+				"end": 65,
 				"expression": {
 					"type": "Identifier",
-					"start": 61,
-					"end": 62,
+					"start": 63,
+					"end": 64,
 					"loc": {
 						"start": {
-							"line": 4,
+							"line": 5,
 							"column": 21
 						},
 						"end": {
-							"line": 4,
+							"line": 5,
 							"column": 22
 						}
 					},
@@ -66,8 +66,8 @@
 						{
 							"type": "Block",
 							"value": " block comment ",
-							"start": 41,
-							"end": 60
+							"start": 43,
+							"end": 62
 						}
 					]
 				}
@@ -79,31 +79,31 @@
 		{
 			"type": "Line",
 			"value": " line comment before expression",
-			"start": 1,
-			"end": 34,
+			"start": 2,
+			"end": 35,
 			"loc": {
 				"start": {
 					"line": 1,
-					"column": 1
+					"column": 2
 				},
 				"end": {
 					"line": 1,
-					"column": 34
+					"column": 35
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " block comment ",
-			"start": 41,
-			"end": 60,
+			"start": 43,
+			"end": 62,
 			"loc": {
 				"start": {
-					"line": 4,
+					"line": 5,
 					"column": 1
 				},
 				"end": {
-					"line": 4,
+					"line": 5,
 					"column": 20
 				}
 			}

@@ -195,10 +195,11 @@ impl<'a> Printer<'a> {
     /// things do, and each is a `true`; a caller that answers off its freeze verdict alone
     /// has only found the first of them:
     ///
-    /// 1. a **freeze** — [`Printer::indent_frozen_head`], at every prefixed head.
+    /// 1. **content that opens on its own line** — a freeze, or a leading `//` the author
+    ///    put on its own line: [`Printer::indent_own_line_head`], at every prefixed head.
     /// 2. an **always-block** value — `wrap_in_block_structure`, the `bind:` path.
     /// 3. a **leading line comment** hanging a braced head's continuation —
-    ///    [`Printer::leading_line_comment_hangs_value`], at every braced head: the block
+    ///    [`Printer::head_layout`], at every braced head: the block
     ///    heads, the prefixed tags, and the unprefixed `{…}` values alike.
     /// 4. the **break-after-operator** layout of a `{@const}` init, which indents the value
     ///    under the `=` while the tag's `}` stays outside — `build_assignment_tag_doc`.
@@ -700,7 +701,7 @@ impl<'a> Printer<'a> {
     ///
     /// Returns the [`Printer::honored_directive_in_gap`] verdict alongside the doc — see
     /// [`Self::build_expression_with_comments_doc`] for why the verdict travels back out.
-    /// A frozen head is already broken (`Printer::indent_frozen_head`), so its caller owes
+    /// An own-line head is already broken (`Printer::indent_own_line_head`), so its caller owes
     /// it the space-less prefix and must not hug its tail onto the slice's last line.
     pub(super) fn build_expression_doc_for_block(
         &self,

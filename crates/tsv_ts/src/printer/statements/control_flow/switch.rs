@@ -267,8 +267,12 @@ impl<'a> Printer<'a> {
             //
             // Resolved before the layout rather than at the emission, because the layout has
             // to KEEP the directive's own line for the freeze to survive tsv's own second
-            // pass: trailing the keyword a directive is inert under the placement floor, so
-            // the continuation arm below is gated on the freeze as well as on a line comment.
+            // pass: trailing the keyword a directive is inert under the placement floor. The
+            // hanging arm below preserves an own-line comment for free, so the freeze rides
+            // it — but only the `//` spelling reaches that arm on its own, and a directive
+            // spelled as an own-line BLOCK (`/* prettier-ignore */`) puts no line comment in
+            // the gap at all. That is what the freeze disjunct in the gate buys: without it
+            // the inline arm reflows the block onto the `case` line and the freeze is lost.
             let frozen = self.value_head_frozen_span(test_gap_start, test.span());
             let test_doc = self.wrap_statement_test_parens(
                 test,
@@ -287,17 +291,32 @@ impl<'a> Printer<'a> {
             if frozen.is_some() || self.has_line_comments_between(test_gap_start, test_start) {
                 // A `//` here runs to end-of-line, so emitting the gap inline would swallow
                 // the test AND its `:` into the comment (`case // c x:`, which does not
-                // reparse) — the head→`:` gap's argument one construct earlier. The uniform
-                // forced-continuation indent, and the same emitter: the run trails `case`
-                // (its own space comes from the continuation, so the keyword sheds the one
-                // the inline arm carries) and the test drops one level. Every comment in the
+                // reparse) — the head→`:` gap's argument one construct earlier. Where the
+                // test goes is then the keyword→value family's answer, not this gap's: a
+                // comment here **leads** the test, and own-line-ness is authoring signal for
+                // a leading position (conformance_prettier.md §Comment Position Philosophy),
+                // so the shared seam trails a same-line comment after `case`, keeps each
+                // own-line comment on the line the author gave it, and hangs the test one
+                // level in below the run — the same layout `keyof`/`typeof`, `infer`, a type
+                // parameter's `extends`/`=` and a class-property `=` take. The keyword is
+                // pushed bare: the seam owns every separator after it. Every comment in the
                 // gap goes through it, so a block sharing the gap with a `//` keeps its place
                 // in the run instead of being skipped along with it — a block prints inline
                 // where a line comment defers, so emitting them apart would reorder the two.
-                // Prettier keeps the test flush at the case's own indent instead — see
+                // Prettier pulls the first comment up onto the `case` line and keeps the test
+                // flush at the case's own indent instead — see
                 // conformance_prettier_ts_comments.md §Comment relocation.
+                //
+                // The head→`:` gap below keeps the *other* answer, and the same corollary is
+                // why: a comment there trails the head, so its own line is layout rather than
+                // association and it pulls up to the uniform forced-continuation form.
                 parts.push(d.text("case"));
-                parts.push(self.build_continuation_indent(test_gap_start, test_start, test_doc));
+                self.append_keyword_value_line_comments(
+                    &mut parts,
+                    test_gap_start,
+                    test_start,
+                    test_doc,
+                );
             } else {
                 parts.push(d.text("case "));
                 if let Some(comments) = self.build_comments_between_filtered_opt(

@@ -40,9 +40,11 @@ Two things indent that content, and the controls pin that they are the only diff
 Each **control** is the same head with the leading comment removed — `{#if cond // c2}` and
 `{@html expr // c2}`: nothing indents the content there, the comment's own break is already on
 the right column, and the `}` lands in the same place. So the fixture asserts one closer column
-reached two ways rather than two layouts. The `{@html // c1⏎\texpr}` case is the third arm: the
-content hangs but the run does *not* end in a line comment, so there is no break for the `}` to
-reuse and it hugs the value — the indent and the dangle are separate questions.
+reached two ways rather than two layouts. The `{@html // c1⏎\texpr⏎}` case is the third arm and
+the same column a third way: the content hangs but the run does *not* end in a line comment, so
+there is no break for the `}` to reuse and it emits its own. **Which arm indented the content
+is never the question** — that it is indented at all is, so the closer answers identically
+whether the break came from a comment, a freeze, or the layout.
 
 Prettier's `{@const}` output is additionally **corrupt** — it emits an unmatched paren and
 relocates the comment past the tag (`{@const a = item && cond)} // c`), then throws on its

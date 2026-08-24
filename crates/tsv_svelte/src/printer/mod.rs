@@ -105,19 +105,31 @@ fn range_marker(comment: &internal::HtmlComment, source: &str) -> Option<RangeMa
     }
 }
 
-/// A head's content doc plus whether that head **froze** it — the pair every head builder
-/// hands back, and the one argument [`Printer::build_prefixed_head_doc`] assembles from.
+/// A head's content doc plus whether that content **opens on its own line** — the pair every
+/// head builder hands back, and the one argument [`Printer::build_prefixed_head_doc`]
+/// assembles from.
 ///
 /// **The rationale every head builder shares, stated once here.** The verdict comes back
-/// OUT of the builder rather than going in, because it selects the value's doc (verbatim vs
-/// formatted) AND the head's layout (space-less prefix, no tail hug, already broken), and
-/// those must never disagree — a hugged frozen value would pull the directive flush against
-/// the `{`, an inert placement that loses the freeze on the second pass. Threading them as
-/// two values let a caller pass one and forget the other; as one value there is nothing to
-/// forget, and a caller that can't supply the flag can't supply a wrong one.
+/// OUT of the builder rather than going in, because it selects the head's whole layout
+/// (space-less prefix, no tail hug, already broken) and those parts must never disagree —
+/// a hugged one would pull the run flush against the `{`. Threading them as separate values
+/// let a caller pass one and forget the other; as one value there is nothing to forget, and
+/// a caller that can't supply the flag can't supply a wrong one.
 ///
-/// `doc` is the head's content in its **final shape** — a frozen one is already broken onto
-/// its own indented lines ([`Printer::indent_frozen_head`]), because the block heads consume
+/// **Two things open a head's content on its own line, and the layout is the same for both**
+/// ([`Printer::head_layout`]):
+///
+/// - a **freeze** — flush against the `{` a directive sits in a placement the floor calls
+///   inert, so the freeze it earned would be gone on the next pass;
+/// - an **own-line leading `//`** — the comment leads the head's VALUE, so where the author
+///   put it is authoring signal (conformance_prettier.md §Comment Position Philosophy) and
+///   pulling it up onto the prefix's line would relocate it.
+///
+/// The first is why the field existed; the second is the ordinary form the freeze turned
+/// out to be a special case of.
+///
+/// `doc` is the head's content in its **final shape** — an own-line one is already broken onto
+/// its own indented lines ([`Printer::indent_own_line_head`]), because the block heads consume
 /// it directly rather than through the prefixed-head assembler.
 ///
 /// `ends_with_line_comment` records that the content's last emitted comment was a **line**
@@ -132,18 +144,57 @@ fn range_marker(comment: &internal::HtmlComment, source: &str) -> Option<RangeMa
 /// `owes_continuation_indent` is the one field that qualifies `doc`'s final-shape claim, and
 /// only for the head whose *caller* chooses the layout ([`Printer::build_expression_content_with_comments`],
 /// the unprefixed `{…}`). It says a leading line comment hangs this content one level in
-/// ([`Printer::leading_line_comment_hangs_value`]) and the builder could not apply the indent
+/// ([`HeadLayout::HangsAfterOpen`]) and the builder could not apply the indent
 /// itself, because its caller may already supply one: an assembler that block-wraps the
 /// content (`wrap_in_block_structure`) has paid the debt, and one that hugs its braces has
 /// not. Every builder that owns its own assembly applies the indent in place and returns
-/// `false` — the debt is always settled exactly once. `false` for a frozen head, whose
-/// [`Printer::indent_frozen_head`] is the same indent one level up.
+/// `false` — the debt is always settled exactly once. `false` for an own-line head, whose
+/// [`Printer::indent_own_line_head`] is the same indent one level up.
 #[derive(Clone, Copy)]
 pub(in crate::printer) struct HeadExpr {
     pub(in crate::printer) doc: DocId,
-    pub(in crate::printer) frozen: bool,
+    pub(in crate::printer) layout: HeadLayout,
     pub(in crate::printer) ends_with_line_comment: bool,
     pub(in crate::printer) owes_continuation_indent: bool,
+}
+
+/// How a braced head's content sits between its delimiters — the three states
+/// [`Printer::head_layout`] resolves, as one value rather than two bools, because the fourth
+/// combination (the opening literal sheds its space but the closer hugs) is not a shape.
+///
+/// The two hanging arms differ in **one** thing, and deliberately only that: where the run's
+/// first comment sits. Everything downstream of it — the content's indent, the dangling
+/// closer, the [`Printer::trailing_comment_docs`] `closer_owns_break` answer — is shared, so
+/// the two authorings of one head produce the same geometry around a comment in two places.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum HeadLayout {
+    /// Nothing in the gap forces a break: the content stays on the head's line and the closer
+    /// hugs it (`{@html expr}`).
+    Inline,
+    /// A `//` the author wrote **after the opening literal**: it keeps that line, the value
+    /// hangs one level in, and the closer drops to the head's own column
+    /// (`{@html // c⏎\texpr⏎}`).
+    HangsAfterOpen,
+    /// The content opens on its **own** line — a freeze, or a `//` the author put on its own
+    /// line. As `HangsAfterOpen`, plus: the opening literal sheds its trailing space (the
+    /// content supplies its own hardline) and the whole run hangs with the value
+    /// (`{@html⏎\t// c⏎\texpr⏎}`).
+    OpensOwnLine,
+}
+
+impl HeadLayout {
+    /// Whether the content begins on a line of its own — the opening literal sheds its
+    /// trailing space, and an unprefixed `{` needs no separator before the run.
+    pub(in crate::printer) const fn opens_own_line(self) -> bool {
+        matches!(self, Self::OpensOwnLine)
+    }
+
+    /// Whether anything **indents** this content — which is the same question as whether the
+    /// closer drops to its own line, and as [`Printer::trailing_comment_docs`]'s
+    /// `closer_owns_break`. One accessor so a caller cannot answer the three differently.
+    pub(in crate::printer) const fn indents_content(self) -> bool {
+        !matches!(self, Self::Inline)
+    }
 }
 
 /// Printer state for building output
@@ -393,10 +444,10 @@ impl<'a> Printer<'a> {
     ///   assignment layout; an attribute value starts from [`EmbedContext::default`],
     ///   not the host's.
     /// - the **post-processing** — `remove_lines` for an inline block head,
-    ///   [`Self::indent_frozen_head`] for a prefixed head, nothing for the rest. The
+    ///   [`Self::indent_own_line_head`] for a prefixed head, nothing for the rest. The
     ///   leading-line-comment continuation indent is NOT in this list: it is a property
-    ///   of the *comment*, not of the head, so it is
-    ///   [`Self::leading_line_comment_hangs_value`] and every braced head asks it.
+    ///   of the *comment*, not of the head, so it is [`Self::head_layout`] and every
+    ///   braced head asks it.
     ///
     /// A value whose leading comment is a **JSDoc cast** rides one more per-head verdict:
     /// `EmbedContext::jsdoc_cast_cannot_hang`, the "answers the break by rule and CANNOT
@@ -413,7 +464,7 @@ impl<'a> Printer<'a> {
     /// docs/conformance_prettier_svelte.md §Svelte: Own-line JSDoc cast at a braced head.
     ///
     /// ⚠️ **Hanging it instead is measured WRONG, not merely incomplete** — answering
-    /// [`Self::leading_line_comment_hangs_value`] `true` for the shape indents the value but
+    /// [`Self::head_layout`] a hanging arm for the shape indents the value but
     /// leaves the comment glued to `{#if ` (it is *owned*, riding inside the value's doc), so
     /// the output still reads as mid-line and still collapses — and it drags the heads whose
     /// group can't flatten into the same non-convergence. Measured on branch, reverted.
@@ -467,44 +518,52 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether a **leading line comment** in a braced head's `head`→value gap hangs the
-    /// value one level in — tsv's [§Uniform Forced-Continuation
-    /// Indent](../../../../docs/conformance_prettier.md), asked with one spelling at every
-    /// braced head so the family cannot answer it three ways again.
+    /// Resolve a braced head's [`HeadLayout`] from its `head`→value gap — the ONE spelling of
+    /// that question, so the family cannot answer it three ways again.
     ///
-    /// A `//` runs to end of line, so what follows it starts a genuine continuation line and
-    /// takes the continuation indent — the same shape the head gets when *width* wraps it:
+    /// A **`//` in the gap** is what takes the head off `Inline`: it runs to end of line, so
+    /// the value cannot stay on the head's line. Which hanging arm it takes is then the
+    /// author's, read off the run's FIRST comment: written after the opening literal it keeps
+    /// that line (`HangsAfterOpen`), written on its own line it keeps *that*
+    /// (`OpensOwnLine`). The comment leads the head's VALUE, and own-line-ness is authoring
+    /// signal for a leading position (conformance_prettier.md §Comment Position Philosophy),
+    /// so collapsing the two would relocate one of them. Prettier collapses both onto the
+    /// head's line, at every braced head.
     ///
-    /// ```text
-    /// {#if a &&        {#if // c        {@html a &&        {@html // c
-    ///     b            \tcond               b}             \texpr}
-    /// }                }
-    /// ```
+    /// A **freeze** short-circuits to `OpensOwnLine`: an honored directive flush against the
+    /// prefix is inert under the placement floor, so the break is what makes the freeze
+    /// survive a second pass, not a nicety. It is the same shape the own-line authoring
+    /// reaches on its own — the freeze is a special case of it, not a rule beside it.
     ///
-    /// The rule is keyed on **that** the head broke, not on why; flush, the value sits at the
-    /// column of the sibling template nodes around it and reads as one of them.
-    ///
-    /// A leading BLOCK comment is deliberately excluded, multi-line or not. It ends with a
+    /// A leading **block** comment is deliberately excluded, multi-line or not. It ends with a
     /// space, never a hardline: a single-line one doesn't break the head at all, and a
     /// multi-line one's newlines live *inside* its verbatim source span, which renders with no
     /// context indent by design (the interior stays as authored), so its continuation is the
-    /// comment's own line and there is nothing to indent.
-    ///
-    /// A **frozen** head takes the same indent from one level up
-    /// ([`Self::indent_frozen_head`], which also supplies the hardline that puts the directive
-    /// on its own line), so the verdict short-circuits on `frozen` and owes no scan.
-    ///
-    /// ⚠️ This is also [`Self::trailing_comment_docs`]'s `closer_owns_break` — the indent is
-    /// literally the thing that question asks about — so it has to be taken ABOVE the trailing
-    /// run rather than read off the arm that applies it.
-    pub(in crate::printer) fn leading_line_comment_hangs_value(
+    /// comment's own line and there is nothing to indent. A gap holding only blocks is
+    /// `Inline`.
+    pub(in crate::printer) fn head_layout(
         &self,
         gap_start: u32,
         value_start: u32,
         frozen: bool,
-    ) -> bool {
-        !frozen
-            && comments_to_emit_in_range(self.comments, gap_start, value_start).any(|c| !c.is_block)
+    ) -> HeadLayout {
+        if frozen {
+            return HeadLayout::OpensOwnLine;
+        }
+        let mut run = comments_to_emit_in_range(self.comments, gap_start, value_start).peekable();
+        let Some(first) = run.peek() else {
+            return HeadLayout::Inline;
+        };
+        let first_own_line =
+            tsv_lang::source_scan::has_newline_before_position(self.source, first.span.start);
+        if !run.any(|c| !c.is_block) {
+            return HeadLayout::Inline;
+        }
+        if first_own_line {
+            HeadLayout::OpensOwnLine
+        } else {
+            HeadLayout::HangsAfterOpen
+        }
     }
 
     /// The **clarity parens** an assignment used as a value needs (`{@html (a = b)}`,
@@ -537,21 +596,21 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// The frozen head's content, broken onto its own indented lines: a hardline, then the
-    /// directive run and the verbatim slice one level in.
+    /// An own-line head's content, broken onto its own indented lines: a hardline, then the
+    /// gap's comment run and the value one level in.
     ///
-    /// A **prefixed** braced head (`{@html`, `{#if`, `{...`) has no own-line form of its
-    /// own — its ordinary emitter pulls a leading comment run flush onto the prefix's line,
-    /// which is what prettier does too. That placement is inert under tsv's floor, so a
-    /// freeze printed there would be gone on the second pass; the break is what makes the
-    /// freeze survive, not a nicety. The unprefixed `{…}` values reach the same shape
-    /// through `wrap_in_block_structure`, and the hardline here is also what breaks the
-    /// enclosing head group — a [`Self::verbatim_source_doc`] slice is deliberately opaque
-    /// to `will_break`, so it cannot break anything by itself.
+    /// The shape [`HeadLayout::OpensOwnLine`] selects, for both of its causes. A
+    /// **frozen** head needs it because a directive flush against the prefix is inert under
+    /// tsv's floor and the freeze would be gone on the second pass; an **own-line leading
+    /// run** needs it because pulling the comment up onto the prefix's line relocates it. The
+    /// unprefixed `{…}` values reach the same shape through `wrap_in_block_structure`, and the
+    /// hardline here is also what breaks the enclosing head group — a
+    /// [`Self::verbatim_source_doc`] slice is deliberately opaque to `will_break`, so a frozen
+    /// one cannot break anything by itself.
     ///
     /// The caller supplies the prefix via [`Self::head_open_doc`] and its own closing token
     /// after the break.
-    pub(in crate::printer) fn indent_frozen_head(&self, content: DocId) -> DocId {
+    pub(in crate::printer) fn indent_own_line_head(&self, content: DocId) -> DocId {
         let d = self.d();
         d.indent_hardline(content)
     }
@@ -559,29 +618,26 @@ impl<'a> Printer<'a> {
     /// A braced head's assembled content wearing whatever **indents** it — the one ladder
     /// every head builder's final shape comes out of.
     ///
-    /// A **frozen** head takes [`Self::indent_frozen_head`], which also supplies the hardline
-    /// that puts the directive on its own line; a **hung** one
-    /// ([`Self::leading_line_comment_hangs_value`]) takes the plain indent; anything else
-    /// stays where it is. The freeze is applied inside the builder that knows it happened
-    /// rather than at the assembler, so every caller assembles the same shape
+    /// [`HeadLayout::OpensOwnLine`] takes [`Self::indent_own_line_head`], which also supplies
+    /// the hardline that opens the line; [`HeadLayout::HangsAfterOpen`] takes the plain
+    /// indent, the run's first comment having already ended the opening literal's line;
+    /// [`HeadLayout::Inline`] stays where it is. The layout is resolved inside the builder
+    /// that knows it rather than at the assembler, so every caller assembles the same shape
     /// ([`Self::build_prefixed_head_doc`]).
     ///
-    /// ⚠️ `frozen || hangs` is also exactly what the builder owes
+    /// ⚠️ [`HeadLayout::indents_content`] is also exactly what the builder owes
     /// [`Self::trailing_comment_docs`] as `closer_owns_break` — the indent applied here is
     /// literally the thing that question asks about. One ladder for both so the applied
     /// indent and the closer's break cannot disagree.
     pub(in crate::printer) fn indent_head_content(
         &self,
         content: DocId,
-        frozen: bool,
-        hangs: bool,
+        layout: HeadLayout,
     ) -> DocId {
-        if frozen {
-            self.indent_frozen_head(content)
-        } else if hangs {
-            self.d().indent(content)
-        } else {
-            content
+        match layout {
+            HeadLayout::OpensOwnLine => self.indent_own_line_head(content),
+            HeadLayout::HangsAfterOpen => self.d().indent(content),
+            HeadLayout::Inline => content,
         }
     }
 
@@ -610,24 +666,33 @@ impl<'a> Printer<'a> {
         content_end: u32,
         frozen: bool,
     ) -> HeadExpr {
-        let hangs = self.leading_line_comment_hangs_value(gap_start, value.start, frozen);
+        let layout = self.head_layout(gap_start, value.start, frozen);
         let leading_docs = self.leading_comment_docs(gap_start, value.start);
         let (trailing_docs, ends_with_line_comment) =
-            self.trailing_comment_docs(value.end, content_end, frozen || hangs);
+            self.trailing_comment_docs(value.end, content_end, layout.indents_content());
         let body = self.concat_with_surrounding_comments(leading_docs, value_doc, trailing_docs);
         HeadExpr {
-            doc: self.indent_head_content(body, frozen, hangs),
-            frozen,
+            doc: self.indent_head_content(body, layout),
+            layout,
             ends_with_line_comment,
             owes_continuation_indent: false,
         }
     }
 
-    /// The opening literal of a prefixed head, as a doc. A **frozen** head drops the
-    /// literal's trailing space: its content begins with its own hardline, so the space
-    /// would be trailing whitespace on the prefix's line.
-    pub(in crate::printer) fn head_open_doc(&self, open: &'static str, frozen: bool) -> DocId {
-        self.d().text(if frozen { open.trim_end() } else { open })
+    /// The opening literal of a prefixed head, as a doc. A [`HeadLayout::OpensOwnLine`] head
+    /// drops the literal's trailing space: its content
+    /// begins with its own hardline, so the space would be trailing whitespace on the
+    /// prefix's line.
+    pub(in crate::printer) fn head_open_doc(
+        &self,
+        open: &'static str,
+        opens_own_line: bool,
+    ) -> DocId {
+        self.d().text(if opens_own_line {
+            open.trim_end()
+        } else {
+            open
+        })
     }
 
     /// A whole prefixed head — the opening literal, the content, the closing token — for
@@ -642,7 +707,7 @@ impl<'a> Printer<'a> {
     /// existing dangle supply the break. Both paths render the same content shape.
     ///
     /// `head.doc` is the content in its final shape — already through
-    /// [`Self::indent_frozen_head`] when frozen (see [`HeadExpr`]).
+    /// [`Self::indent_own_line_head`] when the content opens on its own line (see [`HeadExpr`]).
     pub(in crate::printer) fn build_prefixed_head_doc(
         &self,
         open: &'static str,
@@ -650,24 +715,24 @@ impl<'a> Printer<'a> {
         close: &'static str,
     ) -> DocId {
         let d = self.d();
-        if !head.frozen {
+        if !head.layout.indents_content() {
             // Nothing indents this content, so a trailing line comment's own `hardline` is
             // already the break the `}` needs, on the right column.
             return d.concat(&[d.text(open), head.doc, d.text(close)]);
         }
-        // A run-final line comment already broke the line, dedented out of the frozen
-        // content's indent (`build_trailing_js_comment_doc`), so the closer reuses that
-        // break and lands at the head's own column — where it also lands with no trailing
-        // comment at all. A second break would render as a blank line above it.
+        // Whatever indented the content, the closer drops to the head's own column — the
+        // question is [`HeadLayout::indents_content`], never which arm indented it, so the two
+        // hanging authorings of one head differ in the comment's line and in nothing else.
+        //
+        // A run-final line comment already broke the line, dedented out of that indent
+        // (`build_trailing_js_comment_doc`), so the closer reuses that break and lands where
+        // it also lands with no trailing comment at all. A second break would render as a
+        // blank line above it.
+        let open_doc = self.head_open_doc(open, head.layout.opens_own_line());
         if head.ends_with_line_comment {
-            return d.concat(&[self.head_open_doc(open, true), head.doc, d.text(close)]);
+            return d.concat(&[open_doc, head.doc, d.text(close)]);
         }
-        d.concat(&[
-            self.head_open_doc(open, true),
-            head.doc,
-            d.hardline(),
-            d.text(close),
-        ])
+        d.concat(&[open_doc, head.doc, d.hardline(), d.text(close)])
     }
 
     /// A head's content for an assembler that **hugs** its delimiters — the one seam that

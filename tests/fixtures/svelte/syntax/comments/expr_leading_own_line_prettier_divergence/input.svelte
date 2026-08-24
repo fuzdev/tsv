@@ -1,43 +1,53 @@
-{ // c
+{
+	// c
 	foo
 }
-{@html // c
+{@html
+	// c
 	expr
 }
-{@render // c
+{@render
+	// c
 	fn()
 }
-{@debug // c
+{@debug
+	// c
 	x
 }
-{#if // c
+{#if
+	// c
 	cond
 }
 	yes
 {/if}
 {#if a}
 	a
-{:else if // c
+{:else if
+	// c
 	b
 }
 	b
 {/if}
-{#each // c
+{#each
+	// c
 	items
 as item}
 	{item}
 {/each}
-{#each items as item (// c
+{#each items as item (
+	// c
 	item.id
 )}
 	{item}
 {/each}
-{#await // c
+{#await
+	// c
 	promise
 then val}
 	{val}
 {/await}
-{#key // c
+{#key
+	// c
 	expr
 }
 	text
@@ -49,7 +59,8 @@ then val}
 	{it}
 {/each}
 <div
-	{...// c
+	{...
+		// c
 		expr
 	}
 ></div>
@@ -60,12 +71,14 @@ then val}
 	}
 />
 <div
-	{@attach // c
+	{@attach
+		// c
 		fn
 	}
 ></div>
 <div
-	data-attr={ // c
+	data-attr={
+		// c
 		expr
 	}
 ></div>
@@ -90,12 +103,14 @@ then val}
 	}
 ></div>
 <svelte:element
-	this={ // c
+	this={
+		// c
 		tag
 	}
 ></svelte:element>
 <svelte:component
-	this={ // c
+	this={
+		// c
 		Comp
 	}
 ></svelte:component>

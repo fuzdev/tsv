@@ -1,8 +1,9 @@
 <button
-	on:click={// comment
+	on:click={ // comment
 		() => {
 			fn();
-		}}
+		}
+	}
 >
 	text
 </button>

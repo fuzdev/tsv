@@ -4,7 +4,7 @@
 // {@const} initializer break rules.
 
 use crate::ast::internal;
-use crate::printer::{HeadExpr, Printer};
+use crate::printer::{HeadExpr, HeadLayout, Printer};
 use tsv_lang::Span;
 use tsv_lang::comments_in_source_range;
 use tsv_lang::doc::arena::DocId;
@@ -19,6 +19,12 @@ const RENDER_TAG_OPEN: &str = "{@render ";
 // No trailing space — the space (when content follows) is emitted separately,
 // and the `.len()` derives the offset past the keyword for comment scanning.
 const DEBUG_TAG_OPEN: &str = "{@debug";
+/// [`DEBUG_TAG_OPEN`] as the head assembler wants it — carrying the separating space every
+/// other tag's opening literal carries. The space-less spelling above stays, because it also
+/// **measures** the keyword (`{@debug}` with no identifiers is a valid tag), and
+/// [`Printer::head_open_doc`] trims this one back for a head whose content opens on its own
+/// line.
+const DEBUG_TAG_OPEN_SPACED: &str = "{@debug ";
 const AT_CONST_TAG_OPEN: &str = "{@const ";
 
 impl<'a> Printer<'a> {
@@ -316,7 +322,7 @@ impl<'a> Printer<'a> {
             // This builder emits its own trailing run, so it answers `ends_with_line_comment`
             // off that one run rather than from a second scan that could disagree with it.
             //
-            // `closer_owns_break: true` — `indent_frozen_head` below indents this content, and
+            // `closer_owns_break: true` — `indent_own_line_head` below indents this content, and
             // the freeze is the first of the four things that do, so a run-final `//` must
             // break one level out or the `}` lands at the identifier list's column.
             let (trailing_docs, ends_with_line_comment) = self.trailing_comment_run_docs(
@@ -324,12 +330,12 @@ impl<'a> Printer<'a> {
                 true,
             );
             frozen_parts.extend(trailing_docs);
-            let doc = self.indent_frozen_head(d.concat(&frozen_parts));
+            let doc = self.indent_own_line_head(d.concat(&frozen_parts));
             return self.build_prefixed_head_doc(
-                DEBUG_TAG_OPEN,
+                DEBUG_TAG_OPEN_SPACED,
                 HeadExpr {
                     doc,
-                    frozen: true,
+                    layout: HeadLayout::OpensOwnLine,
                     ends_with_line_comment,
                     owes_continuation_indent: false,
                 },
@@ -337,16 +343,17 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // The shared braced-head rule ([`Printer::leading_line_comment_hangs_value`]), over
-        // the keyword→first-identifier gap. Taken before the parts are assembled because it
-        // is also the dedent the trailing run below owes — `trailing_comment_docs`'
-        // `closer_owns_break`, spelled out by hand here since this builder emits its own run.
-        let hangs = tag.identifiers.first().is_some_and(|first| {
-            self.leading_line_comment_hangs_value(last_end, first.span().start, false)
+        // The shared braced-head layout ([`Printer::head_layout`]), over the
+        // keyword→first-identifier gap. Taken before the parts are assembled because
+        // `indents_content` is also the dedent the trailing run below owes —
+        // `trailing_comment_docs`' `closer_owns_break`, spelled out by hand here since this
+        // builder emits its own run.
+        let layout = tag.identifiers.first().map_or(HeadLayout::Inline, |first| {
+            self.head_layout(last_end, first.span().start, false)
         });
 
         // Content only — the prefix and the `}` are added below, so `hangs` can indent
-        // exactly what sits between them (the shape `indent_frozen_head` reaches on the
+        // exactly what sits between them (the shape `indent_own_line_head` reaches on the
         // frozen arm above, and `Printer::build_prefixed_head_doc` on every other tag).
         let mut parts = DocBuf::new();
 
@@ -397,14 +404,23 @@ impl<'a> Printer<'a> {
         // the run's LAST comment can supply the break the `}` reuses, so only it takes the
         // dedent. [`Printer::trailing_comment_run_docs`] rather than its lookup-bearing
         // wrapper: this builder stands on the in-source axis its doc comment above explains.
-        let (trailing_docs, _) = self.trailing_comment_run_docs(
+        let (trailing_docs, ends_with_line_comment) = self.trailing_comment_run_docs(
             comments_in_source_range(self.comments, last_end, tag_end),
-            hangs,
+            layout.indents_content(),
         );
         parts.extend(trailing_docs);
 
-        let content = self.indent_head_content(d.concat(&parts), false, hangs);
-        d.concat(&[d.text("{@debug "), content, d.text("}")])
+        let content = self.indent_head_content(d.concat(&parts), layout);
+        self.build_prefixed_head_doc(
+            DEBUG_TAG_OPEN_SPACED,
+            HeadExpr {
+                doc: content,
+                layout,
+                ends_with_line_comment,
+                owes_continuation_indent: false,
+            },
+            "}",
+        )
     }
 
     /// Build a doc for {@render snippet(args)}

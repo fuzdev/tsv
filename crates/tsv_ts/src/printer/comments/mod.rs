@@ -1760,12 +1760,21 @@ impl<'a> Printer<'a> {
     /// the shared `comment_hangs_next`), so the two sites cannot answer differently:
     ///
     /// - It **hangs** (a line comment, or a multiline block the author broke after) →
-    ///   [`KeywordOperandGap::Continuation`]: the caller emits its keyword bare and wraps
-    ///   its WHOLE tail in [`Printer::build_continuation_indent`], the uniform
-    ///   forced-continuation indent (conformance_prettier.md §Uniform Forced-Continuation
-    ///   Indent). The tail is the whole operand — for `new`, callee, type arguments and
-    ///   argument list alike — so a tail that breaks internally renders at the
-    ///   continuation's indent rather than at the outer column.
+    ///   [`KeywordOperandGap::Continuation`]: the caller emits its keyword bare and hands
+    ///   its WHOLE tail to [`Printer::append_keyword_value_line_comments`], the
+    ///   keyword→value seam (conformance_prettier.md §Uniform Forced-Continuation Indent
+    ///   for the indent, §Comment Position Philosophy for the run placement — a comment
+    ///   here leads the operand, so an own-line one keeps its line rather than pulling up
+    ///   to trail the keyword). The tail is the whole operand — for `new`, callee, type
+    ///   arguments and argument list alike — so a tail that breaks internally renders at
+    ///   the continuation's indent rather than at the outer column.
+    ///
+    ///   ⚠️ Only the two keyword sites take that seam. The third consumer — a preserved
+    ///   grouping pair's `(`→inner run — takes
+    ///   [`Printer::build_value_slot_continuation_indent`] instead, for the reason stated
+    ///   there: it sits in a slot whose separator someone else already emitted, so the
+    ///   seam's own leading hardline would be a second break. It shares this router only
+    ///   for the split, never for the emission.
     /// - Otherwise — a **single-line block in ANY authored position** (glued, trailing the
     ///   keyword, or on its own line) → [`KeywordOperandGap::Inline`]. Nothing forces it
     ///   off the line, so it trails inline and the author's break is reflowed: the

@@ -32,6 +32,7 @@ use crate::printer::expressions::functions::{
 use crate::printer::{
     ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
 };
+use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -39,14 +40,19 @@ use tsv_lang::doc::arena::DocId;
 impl<'a> Printer<'a> {
     /// Build a Doc for a new expression with argument wrapping.
     ///
-    /// The `new`→callee gap is one of the two expression-level keyword→operand gaps
-    /// (`await`'s is the other) that take the [uniform forced-continuation
-    /// indent](Printer::build_continuation_indent): a `//` there runs to end-of-line, so
-    /// the callee cannot stay on the keyword's line, and the whole tail — callee, type
+    /// The `new`→callee gap is one of the two expression-level keyword→**value** gaps
+    /// (`await`'s is the other), so it takes the family's shared seam,
+    /// [`Printer::append_keyword_value_line_comments`]: a `//` there runs to end-of-line,
+    /// so the callee cannot stay on the keyword's line, and the whole tail — callee, type
     /// arguments **and** argument list — drops one level rather than landing flush, where
     /// it would read as a sibling statement. The tail is built keyword-less for that
     /// reason: indenting the callee alone would leave a broken argument list rendering at
     /// the outer column.
+    ///
+    /// The seam, not [`Printer::build_continuation_indent`], because a comment here
+    /// **leads the callee**: own-line-ness is authoring signal for a leading position
+    /// (conformance_prettier.md §Comment Position Philosophy), so an own-line comment
+    /// keeps its line instead of being pulled up to trail `new`.
     pub(super) fn build_new_doc_with_wrapping(
         &self,
         new_expr: &internal::NewExpression<'_>,
@@ -61,10 +67,14 @@ impl<'a> Printer<'a> {
         match self.keyword_operand_gap(keyword_end, callee_start) {
             KeywordOperandGap::Continuation => {
                 let tail = self.build_new_doc_after_keyword(new_expr, d.empty(), frozen);
-                d.concat(&[
-                    d.text("new"),
-                    self.build_continuation_indent(keyword_end, callee_start, tail),
-                ])
+                let mut parts: DocBuf = smallvec![d.text("new")];
+                self.append_keyword_value_line_comments(
+                    &mut parts,
+                    keyword_end,
+                    callee_start,
+                    tail,
+                );
+                d.concat(&parts)
             }
             KeywordOperandGap::Inline(run) => {
                 let keyword = match run {

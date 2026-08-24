@@ -1555,6 +1555,57 @@ Deno.test(
 );
 
 Deno.test(
+	'forced_continuation_indent: positive - Svelte prefixed head, closer dropped to its own line',
+	() => {
+		// tsv drops a braced head's closer once the content indents, so the hunk has one
+		// more added line than removed — still whitespace-only, so `fold_dropped_closer`
+		// restores the shape the re-indent test measures.
+		const prettier = '{@html // c\nexpr}';
+		const ours = '{@html // c\n\texpr\n}';
+		const ctx = make_context(ours, prettier, 'svelte');
+		const match = run_pattern('forced_continuation_indent', ctx);
+		assertNotEquals(match, null);
+	}
+);
+
+Deno.test(
+	'forced_continuation_indent: positive - unprefixed `{` head line carries the separator',
+	() => {
+		// The head line itself changes here (tsv separates the brace from the comment), so
+		// the hunk opens ON the head and `split_leading_head` supplies it — including at
+		// line 0, where there is no line above the hunk to read one from.
+		const prettier = '{// c\na}';
+		const ours = '{ // c\n\ta\n}';
+		const ctx = make_context(ours, prettier, 'svelte');
+		const match = run_pattern('forced_continuation_indent', ctx);
+		assertNotEquals(match, null);
+	}
+);
+
+Deno.test(
+	'forced_continuation_indent: negative - a line-leading `{ //` in TYPESCRIPT is a block statement',
+	() => {
+		// The bare-brace clause is language-gated: with the space allowed, `{ // c` is a
+		// shape the TS printer can produce (a block statement), so only markup may claim it.
+		const prettier = '{// c\na;\n}';
+		const ours = '{ // c\n\ta;\n}';
+		const ctx = make_context(ours, prettier, 'typescript');
+		const match = run_pattern('forced_continuation_indent', ctx);
+		assertEquals(match, null);
+	}
+);
+
+Deno.test('forced_continuation_indent: negative - an extra added line that is not a closer', () => {
+	// The fold is what keeps the whitespace-only safety argument: only a closers-only
+	// trailing line may be folded back, never a line carrying content.
+	const prettier = '{@html // c\nexpr}';
+	const ours = '{@html // c\n\texpr\n\tmore}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test(
 	'forced_continuation_indent: negative - body-open-brace comment is a different gap',
 	() => {
 		// The keyword must IMMEDIATELY precede the comment. Here the comment trails the

@@ -10,7 +10,7 @@
 // Uses Doc IR for all formatting - build_*_doc methods are the canonical implementations.
 
 use crate::ast::internal;
-use crate::printer::{CommentRun, HeadExpr, Printer};
+use crate::printer::{CommentRun, HeadExpr, HeadLayout, Printer};
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -853,13 +853,19 @@ impl<'a> Printer<'a> {
         // after one (`{a // c⏎/* d */}`) leaves no break for the `}` to reuse, so that run
         // takes the ordinary block form. `head` carries the answer off the emitted run.
         let d = self.d();
-        let inner = if head.frozen {
-            // Never hug a frozen value: the hug supplies its own braces with no block to
-            // break, so the directive would end up sharing the `{`'s line — inert under the
-            // placement floor, and the freeze would be gone on the next pass. The block
-            // itself needs no forcing; the directive's own hardline (see
-            // `build_leading_js_comment_doc`) breaks the group from inside.
+        let inner = if head.layout.opens_own_line() {
+            // Never hug a value whose content opens on its own line: the hug supplies its own
+            // braces with no block to break, so the leading run would end up sharing the
+            // `{`'s line — which relocates an own-line comment, and for a directive is inert
+            // under the placement floor, losing the freeze on the next pass. The block itself
+            // needs no forcing; the run's own hardline (see `build_leading_js_comment_doc`)
+            // breaks the group from inside.
             self.wrap_in_block_structure(head.doc, head.ends_with_line_comment)
+        } else if head.layout == HeadLayout::HangsAfterOpen {
+            // The run stays on the `{`'s line, so the block form's softline — which breaks
+            // BEFORE it — is the wrong shape; this is the same geometry with the break moved
+            // past the run.
+            self.wrap_hanging_head_braces(head)
         } else if is_hugged || head.ends_with_line_comment {
             // Hugged: the expression's internal doc handles wrapping — and this arm supplies
             // no indent of its own, so it is the one that owes the continuation indent.
@@ -893,7 +899,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_unprefixed_value_doc`], whose doc carries that rule.
     ///
     /// A leading line comment hangs the value the same way
-    /// ([`Printer::leading_line_comment_hangs_value`]) and so answers that question too — but
+    /// ([`Printer::head_layout`]) and so answers that question too — but
     /// unlike the two above it cannot apply its own indent here, because which of this head's
     /// callers-of-a-caller supplies one is decided *after* this returns (`is_hugged` and
     /// `ends_with_line_comment` pick between hugged braces and block structure). It rides out
@@ -907,7 +913,7 @@ impl<'a> Printer<'a> {
         let Some(span) = tag_span else {
             return HeadExpr {
                 doc: self.build_unprefixed_value_doc(expr, false, host),
-                frozen: false,
+                layout: HeadLayout::Inline,
                 ends_with_line_comment: false,
                 owes_continuation_indent: false,
             };
@@ -923,11 +929,11 @@ impl<'a> Printer<'a> {
         // block-wrapping ones by their own structure, the hugging ones by paying
         // `owes_continuation_indent` — so the closer's answer is the same either way, and it
         // is taken here, above the run.
-        let hangs = self.leading_line_comment_hangs_value(gap_start, value_start, frozen);
+        let layout = self.head_layout(gap_start, value_start, frozen);
         let (trailing_comments, ends_with_line_comment) = self.trailing_comment_docs(
             expr.span().end,
             span.end - 1,
-            frozen || host.always_block() || hangs,
+            layout.indents_content() || host.always_block(),
         );
 
         HeadExpr {
@@ -936,10 +942,39 @@ impl<'a> Printer<'a> {
                 expr_doc,
                 trailing_comments,
             ),
-            frozen,
+            layout,
             ends_with_line_comment,
-            owes_continuation_indent: hangs && !host.always_block(),
+            // An `OpensOwnLine` head takes the block form at every caller, whose `indent(…)`
+            // IS the continuation indent — so the debt is already settled and claiming it
+            // again would double the level. `HangsAfterOpen` keeps the debt: its caller emits
+            // the `{`-line run itself and owes the indent below it
+            // ([`Printer::wrap_hanging_head_braces`]).
+            owes_continuation_indent: layout == HeadLayout::HangsAfterOpen && !host.always_block(),
         }
+    }
+
+    /// The [`HeadLayout::HangsAfterOpen`] twin of [`Self::wrap_in_block_structure`], for the
+    /// unprefixed `{…}` hosts: `{ // c⏎\texpr⏎}`.
+    ///
+    /// Same geometry as the block form — content indented one level, closer on its own line at
+    /// the brace's column — with the break moved **past** the run's first comment instead of
+    /// before it, and a space in its place. The space is what the prefixed heads get for free
+    /// from their opening literal (`{@html `, `{#if `); without it the comment welds to the
+    /// delimiter (`{// c`) and reads as glued rather than as trailing the brace.
+    ///
+    /// `head.owes_continuation_indent` is the indent this arm pays
+    /// ([`Printer::hug_head_content`]); a run-final `//` already ended the line, so the closer
+    /// reuses that break rather than adding a second one.
+    fn wrap_hanging_head_braces(&self, head: HeadExpr) -> DocId {
+        let d = self.d();
+        let ends_line = head.ends_with_line_comment;
+        let content = self.hug_head_content(head);
+        let close = if ends_line {
+            d.text("}")
+        } else {
+            d.concat(&[d.hardline(), d.text("}")])
+        };
+        d.concat(&[d.text("{ "), content, close])
     }
 
     /// Wrap expression content in block structure: `{\n\texpr\n}`
@@ -1257,11 +1292,15 @@ impl<'a> Printer<'a> {
             UnprefixedHost::Tag,
         );
 
-        if head.frozen {
-            // A frozen value takes the broken block form, which supplies its own braces — so
-            // the directive keeps its own line; flush against the `{` it would be inert and
-            // the freeze would be lost on the second pass.
+        if head.layout.opens_own_line() {
+            // A value whose content opens on its own line takes the broken block form, which
+            // supplies its own braces — so the leading run keeps the line the author gave it;
+            // flush against the `{` an own-line comment is relocated, and a directive is inert
+            // and its freeze lost on the second pass.
             return self.wrap_in_block_structure(head.doc, head.ends_with_line_comment);
+        }
+        if head.layout == HeadLayout::HangsAfterOpen {
+            return self.wrap_hanging_head_braces(head);
         }
         d.concat(&[d.text("{"), self.hug_head_content(head), d.text("}")])
     }
