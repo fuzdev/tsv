@@ -270,7 +270,7 @@ wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/parse/deno
 
 ### Publishing
 
-npm-only, three packages from one WASM crate:
+npm-only. Three packages from the WASM crate, plus the N-API set below:
 
 - `@fuzdev/tsv_format_wasm` — format only (`--no-default-features --features format`)
 - `@fuzdev/tsv_parse_wasm` — parse only; bundles hand-maintained `tsv_ast.d.ts` (`crates/tsv_wasm/types/`) + the pure-JS `no-locations` line/column reconstruction helper (`crates/tsv_wasm/npm/locations.js` + `.d.ts`)
@@ -329,7 +329,7 @@ deno task conformance                  # pre-release aggregate: preflights pins:
 # seconds when nothing moved, each stamped leg warn-skips an absent checkout; benches/js/CLAUDE.md §Harvests) +
 # fixtures:validate + compile:fixtures:validate (the ORACLE-FRESHNESS legs — `check` runs only each tree's
 # sidecar-free slice, which grades tsv against the committed file and so cannot see the oracle itself moving;
-# only a run that re-formats through prettier can, ~17 s for all 4307 parser/formatter fixtures), then
+# only a run that re-formats through prettier can, ~17 s for all ~4,300 parser/formatter fixtures), then
 # bench:harvest:svelte-styles (re-extracting the CSS the `gates` view grades, beside the legs that read it), then the
 # three gates above + corpus:compare:parse --all +
 # corpus:compare:format --all in ONE process (benches/js/conformance.ts; oracles load once, fail-fast, FFI built once),
@@ -492,7 +492,7 @@ tsv/
 
 The line tsv draws: **preserve when the position carries authorship signal, or when relocating would lose information** (the common case). But tsv will **deliberately trail** a same-line line comment past a *pure separator* when doing so is **lossless and the position carries no signal** — e.g. a comment between a list element and its comma (`A // c⏎, B` → `A, // c`): the comma is structure, the comment trails the element either way, and per-element line breaks keep even multiple comments distinct, so tsv matches Prettier. That carve-out is a deliberate choice, **not** a gap to close. (Contrast the name→`=`/`:`/`?` binding cases, where two comments *would* collide on one trailing line — there tsv preserves + continuation-indents to stay lossless, diverging from Prettier's merge.)
 
-The **opening-delimiter** rule is now uniform across the printer: a `//` the author glued to an opening delimiter keeps that line at every one of them — `fn(`, `new(`, `import(`, `function f(`, `[`, `{`, `Array<`, a retained type paren shell's `(`, a required operand pair's `(` (an assignment target, an instantiation head, a non-null / sealed-chain shell, a chain's sealed or IIFE base, an IIFE callee, a function tag), a unary comment-holder's `(`, `return (` / `throw (`, the aligned union-member object's `{`, and every statement header (`if` / `while` / do-while / `switch` / `catch`, all three `for` spellings). **Two** emitters state it — `Printer::split_open_delimiter_glued_run` (the paren shells, the operand pairs, the unary holder, the restricted-production hang, every statement header) and `Printer::delimiter_line_comment_prefix` (the container and call families, and the aligned object's `{`) — and the author blank *below* the pulled comment **survives at all of them**, one value for the whole family via `Printer::push_delimiter_glued_blank` (the pull moves the comment's line, not its membership; prettier keeps the blank everywhere too). A blank *above* the comment sits against the delimiter and stays erased. See ./docs/comments.md §The delimiter-line question. Prettier's own answer is **not** uniform: it un-glues at most of them, **glues** at for-in / for-of, and relocates the comment out of the parens entirely at do-while — so each is a cataloged divergence. Do not confuse any of them with the *sanctioned* union/intersection carve-out in §Comment Handling below (a non-last member's redundant paren shell strips and its deferred `//` flushes at the per-member break, `Printer::type_member_separator_follows`) — that one is a deliberate lossless choice the catalog owns. When a fix changes comment handling, default to preserving position; matching Prettier is fine only when trailing is lossless and the position carries no signal — otherwise add a `_prettier_divergence` fixture. Full principles: ./docs/conformance_prettier.md §Comment Position Philosophy; the divergence catalog: ./docs/conformance_prettier_ts_comments.md §Comment relocation.
+The **opening-delimiter** rule is uniform across the printer: a `//` the author glued to an opening delimiter keeps that line at every one of them — `fn(`, `new(`, `import(`, `function f(`, `[`, `{`, `Array<`, a retained type paren shell's `(`, a required operand pair's `(` (an assignment target, an instantiation head, a non-null / sealed-chain shell, a chain's sealed or IIFE base, an IIFE callee, a function tag), a unary comment-holder's `(`, `return (` / `throw (`, the aligned union-member object's `{`, and every statement header (`if` / `while` / do-while / `switch` / `catch`, all three `for` spellings). **Two** emitters state it — `Printer::split_open_delimiter_glued_run` (the paren shells, the operand pairs, the unary holder, the restricted-production hang, every statement header) and `Printer::delimiter_line_comment_prefix` (the container and call families, and the aligned object's `{`) — and the author blank *below* the pulled comment **survives at all of them**, one value for the whole family via `Printer::push_delimiter_glued_blank` (the pull moves the comment's line, not its membership; prettier keeps the blank everywhere too). A blank *above* the comment sits against the delimiter and stays erased. See ./docs/comments.md §The delimiter-line question. Prettier's own answer is **not** uniform: it un-glues at most of them, **glues** at for-in / for-of, and relocates the comment out of the parens entirely at do-while — so each is a cataloged divergence. Do not confuse any of them with the *sanctioned* union/intersection carve-out in §Comment Handling below (a non-last member's redundant paren shell strips and its deferred `//` flushes at the per-member break, `Printer::type_member_separator_follows`) — that one is a deliberate lossless choice the catalog owns. When a fix changes comment handling, default to preserving position; matching Prettier is fine only when trailing is lossless and the position carries no signal — otherwise add a `_prettier_divergence` fixture. Full principles: ./docs/conformance_prettier.md §Comment Position Philosophy; the divergence catalog: ./docs/conformance_prettier_ts_comments.md §Comment relocation.
 
 - ./docs/conformance_prettier.md - Where we differ from Prettier (and why) — the shared frame;
   the per-language catalogs are ./docs/conformance_prettier_css.md,
@@ -596,7 +596,7 @@ and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 
 ### Commands
 
-**Input methods** (consistent across content-processing commands): a file path (parser auto-detected from extension), `--content <string> --parser <type>`, or `--stdin --parser <type>` (`svelte|typescript|css`).
+**Input methods** (consistent across content-processing commands): a file path (parser auto-detected from extension), `--content <string> --parser <type>`, or `--stdin --parser <type>` (`svelte|typescript|css`) — except the single-language commands (`canonical_compile`, `compile_compare`, `line_width`), which take `--content`/`--stdin` with no `--parser`.
 
 **Content-Processing Commands:**
 
@@ -684,7 +684,7 @@ cargo run -p tsv_debug format_prettier file.svelte
 cargo run -p tsv_debug line_width file.svelte
 ```
 
-**Fixture Management Commands** (all accept positional patterns, multiple = OR; `fixtures_validate` and `fixtures_update_parsed` also take `--list`):
+**Fixture Management Commands** (the `fixture*` commands accept positional patterns, multiple = OR; `fixtures_validate` and `fixtures_update_parsed` also take `--list`; the audits below take no patterns — `canonicalize_audit` takes paths):
 
 ```bash
 # fixture_init - create/reinit a fixture (formats through prettier + generates expected.json)

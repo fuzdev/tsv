@@ -766,7 +766,8 @@ structurally cannot see a missing second — so the stamp's `checkouts` table
 (`lib/harvest_stamp.ts`) and that `pins` list are kept in agreement by hand.
 
 **Why the preflight exists.** Those count pins are re-derived by no other cadence —
-`deno task check` never touches a checkout — and a checkout that moves between
+`deno task check` re-derives no pin; its one sibling-checkout leg (`roundtrip:audit:prettier`)
+grades a property, not a count — and a checkout that moves between
 upstream RELEASES gives `pins:audit` no version to fail on, which is exactly how
 they once went stale unnoticed (the two suite-only checkouts, `../wpt` and
 `../test262`, are in `GATE_CHECKOUT_COMMITS` for the same reason, so

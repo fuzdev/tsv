@@ -13,12 +13,12 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | audit | task | catches | gating |
 | --- | --- | --- | --- |
 | [Swallow](#line-comment-swallow-audit-swallowaudit) | `swallow:audit` | `//` line comment followed by content on one output line (silent content loss) | `deno task check`; `audit:corpus` (real code) |
-| [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check` |
+| [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check`; `audit:corpus` (real code) |
 | [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops — and `//` swallows — in gaps no fixture covers | `deno task check` (ratchet) |
 | [Wire injection](#wire-injection-audit-wireaudit) | `wire:audit` | a WIRE divergence from the canonical parser that only a spelling no corpus contains reveals — the parse-side sibling of gap injection | on demand (⚠️ red by design) |
 | [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run — plus the blank-DROP absorb pin (a new kind of silently-eaten blank) | `deno task check` (ratchet) |
-| [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet) |
-| [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet) |
+| [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet); `audit:corpus` (real code) |
+| [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet); `audit:corpus` (real code) |
 | [Print width](#print-width-audit-widthaudit) | `width:audit` | a new KIND of over-width output line — the shape a hard-limit bug takes | `deno task check` (ratchet) |
 | [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node, misbind a trailing directive, over-freeze, or lose the freeze on pass 2 | `deno task check` (ratchet) |
 | [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
@@ -28,10 +28,10 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; commit drift (warn) | `deno task conformance` (preflight) |
-| [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check` |
+| [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check`; `audit:corpus` (real code) |
 | [Razor sweep](#print-width-razor-sweep-razoraudit) | `razor:audit` | width-keyed layout bugs — an F1 break at some column, and the stray line-head boundary space that is its OWN fixed point | `deno task check` |
-| [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present) |
-| [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check` |
+| [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present); `audit:corpus` (real code) |
+| [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check`; `audit:corpus` (real code) |
 | [Render equivalence](#render-equivalence-audit-renderaudit) | `render:audit` | `tsv format` changing what a Svelte component renders | `deno task conformance` (release) |
 | [Layout neutrality](#layout-neutrality-audit-neutrality_audit) | — | a layout gate reading comment *ownership* instead of page occupancy | dev tool (pre-ownership-change) |
 | [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` | panic / non-idempotency / structural divergence on arbitrary input | `deno task check` |
@@ -43,6 +43,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `deno task check` |
 | [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `deno task check` |
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
+| [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `deno task check` (`cargo test --test fixtures_tests`); freshness in `deno task conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
 
 ⚠️ **Editing whitespace in a fixture is never local to that fixture.** The three
 injection ratchets — [gaps](#gap-injection-audit-gapsaudit),
@@ -291,8 +292,8 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   readers' whitespace-trimmed slice, not the comment lexer. Because the family is a census
   and its whole finding set is this one bug, closing it takes the run to zero — which makes
   `ws` a candidate to become a **green gate at zero**, not a ratchet: there would be nothing
-  left to pin. (Its 83 tsv-side rejections are a separate triage list, tier-4 by the release
-  bar and routed to the 0.4 over-rejection sweep.)
+  left to pin. (Its 83 tsv-side rejections are a separate triage list — tier-4 by the robustness
+  bar, so over-rejection-sweep material rather than this audit's.)
 - **`terminators`** (sampled: 277 files / 175 signature groups), by file count over
   `tests/fixtures` — two groups, neither of them a line-*class* question despite the family
   that surfaced them:
@@ -513,7 +514,7 @@ So the triage note in the snapshot header holds — a new `inner` shape is a **q
 - **Not a bug list.** A pinned shape is a *kind of line that exists*, not a defect. Triage a new one against §Print Width Philosophy before pinning it; the sanctioned overruns are real and numerous (~480 lines over `tests/fixtures`, dominated by fixture prose headers a formatter never rewraps).
 - **Shape collision — the residual blind spot, and it is NOT closable by a fourth key component.** A width bug whose line happens to open, close inside, and end like an existing pinned shape passes. The key is a silhouette, not a proof; it catches new *kinds*, and a same-kind regression needs a fixture. The distribution says how concentrated that risk is: the fattest shape holds 45% of the lines and the top three hold 65%, so most of the corpus's absorbing power sits in a handful of buckets. `inner` (above) drains the specific bug class the fattest ones could hide; what remains is a *breakable* line — one with a real seam tsv failed to take — landing on a pinned silhouette. No third component separates that, because **nothing in the finished text distinguishes a seam tsv declined from one it never had** — that is a property of the artifact being measured, not a gap in the key, which is why no amount of further silhouette engineering reaches it. The rejected render-time hook (above) is the design that tried to read the seam instead of the text, and it is blind for its own, worse reason.
 
-  Worked example, found by triaging this audit over real code rather than hypothesized: tsv granted the flat test-call layout to `test('<long name>', (a, b) => { … })` and broke the callback's *parameter list* to chase the width, where prettier keeps the parameters flat — and to two 3-argument shapes prettier's `isTestCall` excludes outright, where prettier breaks every argument out and holds 100 (see [conformance_prettier.md §Print Width Philosophy](./conformance_prettier.md#print-width-philosophy)). Those emitted an over-width line ending in `(`, whose shape is `svelte IDENT…(` — **already pinned**, so the ratchet stayed green on all of it. That is the blind spot behaving exactly as described, and the only thing that reached it was a fixture with a parameterized callback: `test_functions`, the fixture that pins this layout, uses only parameterless ones, so the two cases are now held by [test_functions_params](../tests/fixtures/typescript/expressions/calls/test_functions_params/) and [test_functions_timeout](../tests/fixtures/typescript/expressions/calls/test_functions_timeout/) instead.
+  Worked example, found by triaging this audit over real code rather than hypothesized: tsv granted the flat test-call layout to `test('<long name>', (a, b) => { … })` and broke the callback's *parameter list* to chase the width, where prettier keeps the parameters flat — and to two 3-argument shapes prettier's `isTestCall` excludes outright, where prettier breaks every argument out and holds 100 (see [conformance_prettier.md §Print Width Philosophy](./conformance_prettier.md#print-width-philosophy)). Those emitted an over-width line ending in `(`, whose shape is `svelte IDENT…(` — **already pinned**, so the ratchet stayed green on all of it. That is the blind spot behaving exactly as described, and the only thing that reached it was a fixture with a parameterized callback: `test_functions`, the fixture that pins this layout, uses only parameterless ones, so the two cases are held by [test_functions_params](../tests/fixtures/typescript/expressions/calls/test_functions_params/) and [test_functions_timeout](../tests/fixtures/typescript/expressions/calls/test_functions_timeout/) instead.
 
   So the honest answer is the one already stated: **a same-kind regression needs a fixture**, and the ratchet's job is new kinds. Read this audit's real-code output as a *triage list* for finding those fixtures — which is what produced the example above — never as a verdict.
 - **Vacuous on a corpus with no wide lines.** `FIXTURES_FORMATTED_MIN` guards the file count, not the line count.
@@ -854,8 +855,10 @@ is what carries a writer change; this gate is the backstop.
 deno task pins:audit
 ```
 
-**What it proves.** That the canonical oracle is *one* version rather than five. The five
-pin sites that must be identical:
+**What it proves.** That the canonical oracle is *one* version rather than five — and, since
+a version and an option are both pins on what the oracle EMITS, that the prettier OPTIONS
+agree too (`benches/js/lib/canonical.ts` `PRETTIER_OPTIONS` vs the sidecar's inline call,
+`check_prettier_option_agreement`). The five pin sites that must be identical:
 
 1. `sidecar.ts` `VERSIONS` — what `tsv_debug check` reports;
 2. `sidecar.ts` static `npm:` import specifiers — what the sidecar actually runs;

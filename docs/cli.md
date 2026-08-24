@@ -106,9 +106,10 @@ All content-processing commands support three input methods:
 
 `parse` and `format` also take `--goal script|module` (TypeScript only; default
 `module`). It selects the parse goal: at `script`, `await` is an ordinary identifier
-and `import`/`export`/`import.meta` are errors. It applies to `--content`/`--stdin`
-only — file paths are always formatted as modules (Svelte and CSS have no goal), and
-passing `--goal` with a path argument is a usage error (exit 2 for `format`). Both
+and `import`/`export`/`import.meta` are errors. For `format` it applies to
+`--content`/`--stdin` only — file paths are always formatted as modules (Svelte and CSS
+have no goal), and a path argument with `--goal` is a usage error (exit 2); `parse`
+honors `--goal` on file paths too. Both
 goals are strict; see [conformance_test262.md §Strict Mode Only, Explicit Goal Axis](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
 
 `parse` also takes `--no-locations`: it emits the span-only wire — `start`/`end`

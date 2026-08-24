@@ -338,7 +338,7 @@ Things the published numbers measure that aren't quite what they look like.
     empty AST plus `diagnostics`, so without reading them every file counts as
     accepted and the coverage row reads 100% regardless of what it parsed — the
     same fabricated-coverage failure the oxc WASI binding's consume-once `errors`
-    getter produced. Caught here by construction and by `warn_variant_parity`,
+    getter produced. Caught here by construction and by `check_variant_parity`,
     which pairs `yuku-parser` with `yuku-parser-wasm`. Only `severity: 'error'`
     rejects — treating a warning/hint as a failure would under-report coverage.
 

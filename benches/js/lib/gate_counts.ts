@@ -63,7 +63,7 @@
  * The Rust-side pins (test262 discovery + graded manifest, `fixtures_validate`
  * fixture count) live as consts in their commands — grep `REGRESSION PIN`. The
  * as-authored audits' formatted-file count is one shared const,
- * `FIXTURES_FORMATTED_MIN` in `crates/tsv_debug/src/audit/sweep.rs`: they walk
+ * `FIXTURES_FORMATTED_MIN` in `crates/tsv_debug/src/audit/vacuity.rs`: they walk
  * one corpus under one skip policy, so a per-audit pin would only let their
  * slack drift apart. See docs/gate_counts.md.
  */
@@ -538,9 +538,9 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 
 /**
  * corpus:compare:format --all — EXACT per-language `partial` divergence count over the
- * REPRODUCIBLE subset (same semantics as `CORPUS_FORMAT_UNKNOWN_PIN`). svelte is 0 because
- * all 5 live svelte partials — the fuz fill-family `.svelte` pages — are in the non-gating
- * WARN, not the gate.
+ * REPRODUCIBLE subset (same semantics as `CORPUS_FORMAT_UNKNOWN_PIN`). svelte carries ONE
+ * gated partial; the live svelte partials — the fuz fill-family `.svelte` pages — sit in the
+ * non-gating WARN, not the gate.
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
