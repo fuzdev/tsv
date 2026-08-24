@@ -37,7 +37,7 @@ real move in a number is a deliberate, visible edit.
   **The suite-derived pins have exactly one cadence.** Every count above that is
   measured over a sibling checkout (the four harvests' plus the CSS reject count) is
   re-derived by `deno task bench:pins:suites` and by nothing in `deno task
-  check`, which never touches a checkout — so a checkout that moves leaves the pin
+  check`, whose one sibling-checkout leg (`roundtrip:audit:prettier`) re-derives no pin — so a checkout that moves leaves the pin
   describing the previous corpus with every committed-tree gate green until that
   group runs. Two things make that safe rather than merely documented: the group is
   a preflight of `deno task conformance` (so a release cannot ship the old number),
@@ -51,14 +51,17 @@ real move in a number is a deliberate, visible edit.
   leaves the stamp reading fresh over a corpus that moved under it. A count pin is
   never a substitute for a commit in a stamp either: an
   edit to an existing suite file moves the corpus without moving the count. Two of
-  the pins are also graded a second time on their own surface:
+  the pins are also re-DERIVED a second time on their own surface (a third,
+  `TS_REPO_REJECTS_PIN`, gets a weaker cache-staleness check from
+  `ts_repo_over_acceptance.ts`):
   `TEST262_POSITIVES_PIN` by `conformance:test262` (its Rust twin) and
   `CSS_REJECTS_PIN` by the conformance coverage run (`bench:conformance`), whose
   oracle row's `parse/css` skips are the reject set. `deno task doctor` reports a
   stamp whose recorded commit is behind its checkout.
 - **Rust-side counts are consts** — grep `REGRESSION PIN`. test262 (discovered +
-  graded-manifest) and `fixtures_validate` (total fixtures — protecting the primary
-  gate against a discovery collapse) live in their own commands, while the
+  graded-manifest + the `--gate` positive count, `POSITIVE_PASSED_PIN`), `fixtures_validate`
+  (total fixtures — protecting the primary gate against a discovery collapse) and
+  `variant_audit` (`VARIANTS_GRADED_MIN`) live in their own commands, while the
   as-authored audits (`swallow_audit`, `fabrication_audit`, `census_audit`,
   `width_audit`, `comment_audit`) share `FIXTURES_FORMATTED_MIN` in
   `crates/tsv_debug/src/audit/vacuity.rs` — formatted files, closing their
@@ -124,7 +127,9 @@ split is only about the layout/count pins.
 
 Pins apply only to FULL runs (default suite root, `--all`, default harvest source) —
 subtree and filtered runs legitimately grade a slice. Harvest pins fail **before**
-writing, so a wrong cache never replaces a good one (the `SVELTE_STYLES_BLOCKS_MIN`
+writing, so a wrong cache never replaces a good one — except the wpt harvest, which writes
+first and REMOVES the whole cache on a pin miss, so loaders see absent rather than
+wrong-sized (the `SVELTE_STYLES_BLOCKS_MIN`
 drift band still holds this: only a collapse fails-before-writing; a small shrink
 warns and writes valid data). CI runs only the committed-tree pins (`check.yml` is a
 clean checkout — no sibling clones); the rest are dev-machine gates at
@@ -184,7 +189,7 @@ They guard different granularities. Checkout alignment
 ([`pins:audit:checkouts`](audits.md#checkout-alignment-audit-pinsauditcheckouts))
 compares `package.json` versions — but an upstream repo's version only bumps at
 release, so commits landing between releases change the SUITE without changing the
-version (proven on day one: a `../svelte` pull added one test fixture at the same
+version (proven on day one: a `../svelte` pull added three test inputs at the same
 declared version — the count pin caught it; the version check couldn't).
 Conversely the count pins can't tell one release from another if the counts happen
 to coincide. Version alignment catches release-level skew; count pins catch
