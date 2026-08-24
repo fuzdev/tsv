@@ -393,9 +393,13 @@ impl<'arena> PrivateIdentifier<'arena> {
     }
 }
 
-// No `size_of` guards on the hot AST enums: the arena layout deliberately favors
-// traversal locality over node size, keeping recursive children that the parser
-// reads constantly inline (`Expression`/`Statement`/`TSType` fields and the fat
-// variants) rather than arena-boxing them for a smaller enum. Boxing them shrank
-// the slice element but added a pointer-chase on hot format-read paths that cost
-// more than the density win, so the inline form stands.
+// The hot AST enums are deliberately NOT boxed down to a smaller node: the arena
+// layout favors traversal locality over node size, keeping recursive children that
+// the parser reads constantly inline (`Expression`/`Statement`/`TSType` fields and
+// the fat variants) rather than arena-boxing them. Boxing them shrank the slice
+// element but added a pointer-chase on hot format-read paths that cost more than the
+// density win, so the inline form stands. The `size_of` asserts at the top of this
+// file are the OTHER HALF of that trade, not a contradiction of it: the inline form
+// buys read locality and pays a recursion ceiling (`docs/cli.md` §Recursion Depth),
+// and pinning the two widths is what makes a variant that widens either enum fail the
+// build instead of silently lowering that ceiling.
