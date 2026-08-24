@@ -25,9 +25,13 @@ use wasm_bindgen::prelude::*;
 // next call's `reset()`, and both helpers park their arena outside the
 // thread-local while it is in use, so a trap here leaves a callable instance
 // (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
+// The goal-axis macros come from the same crate, so the three bindings share ONE
+// definition of which languages have a goal rather than three hand-synced copies.
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::{goal_allowed, parse_ast};
 
 // WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
 // format path is allocation-heavy (doc IR, output string, memo vecs) and
@@ -572,33 +576,6 @@ fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError
         }
     }
     Ok(parsed)
-}
-
-/// The per-language parse call behind the uniform exports. `goal` (TypeScript)
-/// threads `Options.goal` into `parse_with_goal`; `nogoal` (Svelte, CSS)
-/// ignores it — the option key is already rejected by `read_options`.
-#[cfg(any(feature = "parse", feature = "format"))]
-macro_rules! parse_ast {
-    (goal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {
-        $lang::parse_with_goal($source, $goal, $arena)
-    };
-    (nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {{
-        // Consume the (always-`Module`) goal so the options binding stays used
-        // in every expansion.
-        let _ = $goal;
-        $lang::parse($source, $arena)
-    }};
-}
-
-/// Whether `read_options` accepts the `goal` key for this language.
-#[cfg(any(feature = "parse", feature = "format"))]
-macro_rules! goal_allowed {
-    (goal) => {
-        true
-    };
-    (nogoal) => {
-        false
-    };
 }
 
 /// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` /

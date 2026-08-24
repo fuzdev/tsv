@@ -143,7 +143,9 @@ cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # forma
 deno task check          # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
 deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, node_modules freshness, oracle checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes them) — except the explicitly optional experimental-typechecker tier, informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
-deno task typecheck:features # cargo check of tsv_wasm under each single feature (format / parse alone) — the per-package builds; gates in `check`
+deno task typecheck:features # cargo check of all three binding crates (tsv_wasm / tsv_ffi / tsv_napi) under each
+#                          single feature (format / parse alone) — the per-package builds `cargo check --workspace`
+#                          (unified, defaults ON) and clippy's `--all-features` UNION both miss; gates in `check`
 deno task typecheck:js   # deno check over the bench harness, scripts/ + the tsv_debug sidecar (the JS/TS cargo can't see).
 #                          NOT in `check` — needs `deno task bench:install`, and CI installs no node_modules
 deno task typecheck:scripts # deno check over scripts/ alone — node-modules-free, so this one DOES gate in `check`
@@ -455,7 +457,7 @@ TypeScript formatting is identical for standalone `.ts` and Svelte-embedded TS, 
 tsv/
 ├── crates/
 │   ├── tsv_lang/    # Foundation (span, location, error, doc builder, printing utils)
-│   ├── tsv_arena/   # Per-thread reusable AST/doc arenas for the bindings' hot loop (tsv_ffi, tsv_napi, tsv_wasm)
+│   ├── tsv_arena/   # Shared binding substrate (tsv_ffi, tsv_napi, tsv_wasm): per-thread reusable AST/doc arenas + the goal axis
 │   ├── tsv_html/    # HTML element classification and whitespace rules
 │   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
 │   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore

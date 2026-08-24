@@ -2,7 +2,7 @@
 name = "tsv_arena"
 version.workspace = true
 edition.workspace = true
-description = "Per-thread reusable arenas for tsv's binding hot loop"
+description = "Shared substrate for tsv's bindings: per-thread reusable arenas and the goal axis"
 license.workspace = true
 repository.workspace = true
 
