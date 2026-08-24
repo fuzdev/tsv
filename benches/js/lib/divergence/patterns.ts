@@ -285,12 +285,67 @@ function is_in_css_context(hunk: DiffHunk, ctx: DetectionContext): boolean {
 }
 
 /**
+ * The two line lists a whitespace-shape test reads. Named so the tests can run over a
+ * NORMALIZED pair (see [`fold_dropped_closer`]) rather than only over a literal hunk.
+ */
+type HunkLines = Pick<DiffHunk, 'added_lines' | 'removed_lines'>;
+
+/**
+ * A hunk re-rooted past a leading line that is the construct's own HEAD, or `null` when it
+ * does not open with one.
+ *
+ * A continuation hunk normally starts at the continuation, with the head sitting above it in
+ * our file. It starts one line EARLIER when the head line itself changed — which it does at
+ * an unprefixed `{…}`, where tsv puts a space between the delimiter and a trailing comment
+ * (`{ // c`) that prettier welds (`{// c`). That is still a whitespace-only difference, so
+ * the head is handed back for the depth measurement and the rest is measured as before.
+ *
+ * Whitespace-only is checked across the WHOLE line, not just its indent: the difference here
+ * is interior.
+ */
+function split_leading_head(hunk: HunkLines): { head: string; rest: HunkLines } | null {
+	const { added_lines: add, removed_lines: rem } = hunk;
+	if (add.length < 2 || rem.length < 2) return null;
+	const bare = (line: string): string => line.replace(/\s+/g, '');
+	if (bare(add[0]) !== bare(rem[0])) return null;
+	return {
+		head: add[0],
+		rest: { added_lines: add.slice(1), removed_lines: rem.slice(1) }
+	};
+}
+
+/**
+ * The same hunk with a construct's CLOSER folded back onto the line above it, or `null`
+ * when the hunk is not that shape.
+ *
+ * tsv drops a braced head's closer to its own line whenever something indents the head's
+ * content, so a comment-forced continuation there shows up as ONE more added line than
+ * removed (`\texpr}` → `\texpr` + `}`) and the pure-re-indent tests reject it — even though
+ * the divergence is still whitespace-only, and still the one §Uniform Forced-Continuation
+ * Indent describes ("the `}` column moves with the indent and is the same question").
+ * Folding restores the shape those tests were written for.
+ *
+ * The fold is deliberately narrow: exactly one extra line, made of closers alone. That keeps
+ * the safety argument the caller rests on — the folded pair still differs only in
+ * whitespace, so claiming the hunk cannot mask a content change.
+ */
+function fold_dropped_closer(hunk: DiffHunk): HunkLines | null {
+	const add = hunk.added_lines;
+	if (add.length !== hunk.removed_lines.length + 1 || add.length < 2) return null;
+	const closer = add[add.length - 1].trim();
+	if (!/^[)\]}]+$/.test(closer)) return null;
+	const folded = add.slice(0, -1);
+	folded[folded.length - 1] += closer;
+	return { added_lines: folded, removed_lines: hunk.removed_lines };
+}
+
+/**
  * Whether a hunk is a pure re-indent: ours and prettier carry the same lines in the
  * same order, each differing only by leading whitespace (so no token can be lost),
  * with at least one line's indentation actually changing. Indentation-only by
  * construction, so claiming such a hunk can never mask a content change.
  */
-function is_pure_reindent(hunk: DiffHunk): boolean {
+function is_pure_reindent(hunk: HunkLines): boolean {
 	const rem = hunk.removed_lines;
 	const add = hunk.added_lines;
 	if (rem.length === 0 || rem.length !== add.length) return false;
@@ -322,7 +377,7 @@ function leading_ws(line: string): string {
  * @param hunk - The pure-re-indent hunk under test
  * @param head - Our line immediately above it (the construct the comment split)
  */
-function indents_one_level_below(hunk: DiffHunk, head: string): boolean {
+function indents_one_level_below(hunk: HunkLines, head: string): boolean {
 	const added = hunk.added_lines;
 	const removed = hunk.removed_lines;
 	if (added.length === 0) return false;
@@ -1886,7 +1941,11 @@ const short_expr_100: DivergencePattern = {
  * @param prev_ours - Our line immediately above the hunk (the split construct head)
  * @param first_added - The hunk's first re-indented line, on our side
  */
-function forced_continuation_site(prev_ours: string, first_added: string): string | null {
+function forced_continuation_site(
+	prev_ours: string,
+	first_added: string,
+	language: string
+): string | null {
 	// `: Type` annotations — a `:` after an annotation target (identifier / `)` /
 	// `]` / `}` / `>`) carrying a trailing line comment, via the shared
 	// `build_type_annotation_doc`. A line-leading `:` (a ternary branch) is excluded
@@ -1936,14 +1995,18 @@ function forced_continuation_site(prev_ours: string, first_added: string): strin
 	//
 	//  - a prefixed tag or block head (`{@html // c`, `{...// c`, `{#if // c`) —
 	//    unambiguous markup;
-	//  - an attribute or directive value (`data-attr={// c`, `on:click={// c`) — the
+	//  - an attribute or directive value (`data-attr={ // c`, `on:click={ // c`) — the
 	//    space-less `={` is markup only, since a TS assignment prints ` = {`;
-	//  - the bare `{expr}` tag as the whole line (`{// c`) — tsv's TS printer never
-	//    glues a `//` to an opening brace, putting it on the next line instead.
+	//  - the bare `{expr}` tag as the whole line (`{ // c`), which is markup only in a
+	//    SVELTE file: a line-leading `{` in TypeScript is a block statement, and one
+	//    carrying a trailing `//` prints the same way, so this clause is language-gated
+	//    rather than resting on the brace alone. (It used to rest on the weld — tsv never
+	//    glued a `//` to an opening brace — but tsv now separates the two at an unprefixed
+	//    braced head, so the weld is no longer the discriminator.)
 	if (
 		/\{(?:@(?:html|render|debug|attach)\b|\.\.\.|#\w+\b|:else if\b)[ \t]*\/\//.test(prev_ours) ||
 		/=\{[ \t]*\/\//.test(prev_ours) ||
-		/^[ \t]*\{\/\//.test(prev_ours)
+		(language === 'svelte' && /^[ \t]*\{[ \t]*\/\//.test(prev_ours))
 	) {
 		return 'Svelte braced head';
 	}
@@ -1992,15 +2055,33 @@ const forced_continuation_indent: DivergencePattern = {
 		const sites = new Set<string>();
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			// Indentation-only by construction, so claiming the hunk can never mask a
-			// content change — the whole basis for this detector being safe to widen.
-			if (!is_pure_reindent(hunk)) return false;
-			const start = hunk.ours_range?.start;
-			if (start == null || start === 0) return false;
-			const head = ours_lines[start - 1] ?? '';
+			// content change — the whole basis for this detector being safe to widen. A
+			// Svelte braced head also drops its CLOSER to its own line when the content
+			// indents, which is one extra added line and still whitespace-only, so the
+			// shape tests run over the folded pair ([`fold_dropped_closer`]).
+			const folded = is_pure_reindent(hunk) ? hunk : fold_dropped_closer(hunk);
+			if (folded === null) return false;
+			// Normally the head sits above the hunk; it sits INSIDE it when the head line
+			// itself changed ([`split_leading_head`], the unprefixed `{ // c` separator).
+			// Both arms end in the same pair — a head line and the continuation under it —
+			// but only the first needs a line above the hunk at all, so the
+			// nothing-above-us guard belongs on that arm rather than ahead of the choice
+			// (an unprefixed tag at line 0 is exactly the case it used to reject).
+			const split = is_pure_reindent(folded) ? null : split_leading_head(folded);
+			const lines = split?.rest ?? folded;
+			let head: string;
+			if (split !== null) {
+				head = split.head;
+			} else {
+				const start = hunk.ours_range?.start;
+				if (start == null || start === 0) return false;
+				head = ours_lines[start - 1] ?? '';
+			}
+			if (!is_pure_reindent(lines)) return false;
 			// "one level" below the head, as the rule states it: any other depth is a
 			// different layout difference and stays unclaimed.
-			if (!indents_one_level_below(hunk, head)) return false;
-			const site = forced_continuation_site(head, hunk.added_lines[0]);
+			if (!indents_one_level_below(lines, head)) return false;
+			const site = forced_continuation_site(head, lines.added_lines[0], ctx.language);
 			if (site === null) return false;
 			sites.add(site);
 			return true;

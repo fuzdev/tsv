@@ -23,25 +23,32 @@ The whole braced family is enumerated because the rule is what makes them agree,
 this they did not: the block heads and the `{@const}` init hung the value, the
 block-structure directives (`bind:`, `class:`, `use:`, `on:`) hung it inside their braces, and
 the prefixed tags, the `{expr}` tag and plain attribute values left it flush — three answers
-to one question. The three shapes that remain differ only in what the *host* does with its
-delimiters, never in whether the value hangs:
+to one question.
 
-- **continuation indent, hugged `}`** — the prefixed tags (`{@html}`, `{@render}`,
-  `{@debug}`, `{...}`, `{@attach}`), the `{expr}` tag, and attribute values.
-- **continuation indent, dangling closer** — the block heads, whose `}` drops to base
-  whatever broke the head ([§Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks);
+**The closer is the same answer everywhere too.** Whatever indents a head's content, its
+closer drops to the head's own column — one question, never which arm indented it — so a
+hugging host and a block head land it identically. What still differs is only how each host
+spells that closer:
+
+- the prefixed tags (`{@html}`, `{@render}`, `{@debug}`, `{...}`, `{@attach}`), the `{expr}`
+  tag and attribute values close with their own `}`. An unprefixed `{` also takes the space
+  before the comment that every prefixed literal already carries (`{ // c`), so this
+  authoring and the own-line one
+  ([expr_leading_own_line](./../expr_leading_own_line_prettier_divergence/)) differ in the
+  comment's line and in nothing else;
+- the block heads drop their `}` to base whatever broke the head
+  ([§Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks);
   [condition_breaking_comment](../../../blocks/if/condition_breaking_comment_prettier_divergence/)
-  is that shape's own fixture), and the `{#each}` **key**, a head of its own inside the head:
-  its `)` drops the same way and the tag's `}` continues on that line, and the construct goes
-  multiline for a broken key exactly as for a broken head expression — the two `{#each}` cases
-  here are the same shape asked of the head and of its key
-  ([each/key_long](../../../blocks/each/key_long_prettier_divergence/)).
-- **block form** — a directive value that block-wraps (`bind:` always; `class:`, `use:` and
-  `on:` whenever the expression does not self-expand), where the block's own `indent` is the
-  hang, so the comment takes its own line inside the braces and the value the next; and the
-  `{@const}` init, whose break-after-operator layout indents the comment and the value
-  together under the `=`. A directive whose expression *does* self-expand hugs its braces
-  instead and takes the first shape
+  is that shape's own fixture), and the `{#each}` **key** is a head of its own inside the
+  head: its `)` drops the same way and the tag's `}` continues on that line, and the construct
+  goes multiline for a broken key exactly as for a broken head expression — the two `{#each}`
+  cases here are the same shape asked of the head and of its key
+  ([each/key_long](../../../blocks/each/key_long_prettier_divergence/));
+- a directive value that block-wraps (`bind:` always; `class:`, `use:` and `on:` whenever the
+  expression does not self-expand) reaches the shape through the block's own `indent`, and the
+  `{@const}` init through its break-after-operator layout, which indents the comment and the
+  value together under the `=`. A directive whose expression *does* self-expand hugs its
+  braces instead and takes the first shape
   ([on/line_comment](../../../directives/on/line_comment_prettier_divergence/)).
 
 `{@debug // c⏎x}` is the one position where prettier does not merely flatten the continuation
