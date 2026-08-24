@@ -120,7 +120,12 @@ it — deferring carries it out of the construct it was written in
 back to; a trailing one does not.
 
 A corollary the before-`:`/`=` gaps make explicit: **own-line-ness is authoring
-signal for a leading position, not a trailing one.** A single-line block comment
+signal for a leading position, not a trailing one.** The sharpest witness is a
+switch case label, which holds one gap of each kind two tokens apart: an own-line
+`//` between `case` and its test keeps its line (it leads the test), while one
+between that test and the `:` pulls up to trail it (it trails the head) — see the
+two [Switch `case`](./conformance_prettier_ts_comments.md#comment-relocation)
+entries. A single-line block comment
 that trails a head token (a key before its `:`, a name before its `=`) has its
 unforced breaks collapsed — it stays in its authored gap, inline
 (`a /* c */: 1`) — while a comment that leads a value (after the `:`/`=`) keeps
@@ -169,8 +174,13 @@ its tail:
   continuation indent](./conformance_prettier_ts_comments.md#comment-relocation).
 - **Prefix type operators** — the `keyof`/`typeof` operand hang
   (`type A = keyof // c⏎\t\tB`), shared via `append_keyword_value_line_comments` with
-  type-parameter constraint/default values and class-property initializers. See
+  type-parameter constraint/default values, class-property initializers and a switch
+  label's `case`→test gap. See
   [Prefix type-operator operand hang](./conformance_prettier_ts_comments.md#comment-relocation).
+  ⚠️ That seam is this rule's **keyword→value** half, and it differs from every other
+  site below in one respect: an **own-line** comment there keeps its own line rather
+  than pulling up to trail the head, because it *leads a value* (the corollary in
+  [§Comment Position Philosophy](#comment-position-philosophy)).
 - **`: Type` annotations** — the colon→type continuation (`prop: // c⏎\tType`), via
   the shared `build_type_annotation_doc`, **uniformly for union, intersection, and
   simple types** and in **every** context: property signatures
@@ -251,7 +261,10 @@ its tail:
 - **`await`→operand and `new`→callee** — the two expression-level keyword→operand
   gaps (`new // c⏎\tFoo();`, `await // c⏎\tfn();`). The whole tail rides the
   continuation — callee, type arguments and argument list — so a broken argument list
-  renders at the continuation's own indent. `yield` is excluded (a newline after it is
+  renders at the continuation's own indent. ⚠️ Like the prefix type operators above,
+  these are **keyword→value** gaps: they share the indent but not the run placement,
+  so an own-line comment keeps its own line here rather than pulling up to trail the
+  keyword. `yield` is excluded (a newline after it is
   ASI, which would split the statement) and so is the unary family, which takes a
   comment-holder shell instead; the statement-header keyword→`(` gaps
   (`if`/`while`/`switch`/`for`/`for await`) keep a flush continuation uniformly and are
@@ -278,10 +291,14 @@ its tail:
   own-line-ness is authoring signal for a leading position, the two authorings are **both**
   stable under tsv while prettier collapses them; see [Value-arrow `=>`→body / chain head
   glued line comment](./conformance_prettier_ts_comments.md#comment-relocation).
-- **Switch `case`→test and case head→`:`** — the label's two gaps, one rule. The
-  separator gap (`case x // c⏎\t\t\t:`) hangs the bare `:` itself; the keyword→test
-  gap one step earlier (`case // c⏎\t\t\tx:`) hangs the test *and* that `:`.
-  Inlining either swallows the colon into the comment (content loss). See
+- **Switch `case`→test and case head→`:`** — the label's two gaps, one *continuation*
+  and two answers to where the run sits. The separator gap (`case x // c⏎\t\t\t:`)
+  hangs the bare `:` itself and is a site of this rule outright; the keyword→test gap
+  one step earlier (`case // c⏎\t\t\tx:`) hangs the test *and* that `:`, but takes its
+  run placement from the **keyword→value** seam above — so an own-line comment there
+  keeps its own line (`case⏎\t\t\t// c⏎\t\t\tx:`) where the separator gap pulls one up.
+  The split is the corollary, not the construct: a comment leads the test but trails
+  the head. Inlining either swallows the colon into the comment (content loss). See
   [Switch `case`→test line comment](./conformance_prettier_ts_comments.md#comment-relocation)
   and [Switch case head→`:` line comment](./conformance_prettier_ts_comments.md#comment-relocation). A labeled statement's
   name→`:` gap is not a site of this rule — both formatters hoist the comment to
@@ -300,15 +317,32 @@ its tail:
   the `{@const}` init (through its break-after-operator layout), and the block heads
   ([condition_breaking_comment](../tests/fixtures/svelte/blocks/if/condition_breaking_comment_prettier_divergence/)).
   Prettier keeps the continuation flush at all of them, and strips the comment outright
-  at `{@debug}`. The **`}` column** moves with the indent and is the same question —
-  a run-final `//` supplies the break the closer reuses, so that break must be emitted
-  one level out or the closer lands at the *content's* column
+  at `{@debug}`. ⚠️ Like the keyword→value gaps above, these gaps hold a comment that
+  **leads a value**, so the indent is this rule's but the run's **placement** is
+  [§Comment Position Philosophy](#comment-position-philosophy)'s: a comment the author
+  wrote on its **own line** keeps that line, the head breaking before it and the run and
+  value hanging together (`{@html⏎\t// c⏎\texpr⏎}`), where prettier pulls it up onto the
+  head's line at every one of them
+  ([expr_leading_own_line](../tests/fixtures/svelte/syntax/comments/expr_leading_own_line_prettier_divergence/),
+  the same sweep). That shape is not new — it is the one an honored `prettier-ignore` in
+  this gap already took, because a directive flush against the prefix is inert under the
+  placement floor; one resolver now answers both (`Printer::head_layout`), so the freeze
+  is a special case of the ordinary own-line form rather than a rule beside it. And the
+  two authorings differ in **that placement alone**: an unprefixed `{` takes the same
+  space before a trailing comment (`{ // c`) that every prefixed literal already carries,
+  so nothing but the comment's line moves between them.
+  The **`}` column** moves with the indent and is the same question — a run-final `//`
+  supplies the break the closer reuses, so that break must be emitted one level out or the
+  closer lands at the *content's* column
   ([expr_trailing_indented_content](../tests/fixtures/svelte/syntax/comments/expr_trailing_indented_content_prettier_divergence/)).
-  What differs across the family is only what each **host** does with its delimiters —
-  a block head dangles its `}` at base ([§Svelte: Blocks](./conformance_prettier_svelte.md#svelte-blocks)), a prefixed
-  tag hugs it, and a value that always block-wraps (`bind:`, and any directive whose
-  expression does not self-expand) reaches the same hang through the block's own
-  `indent`, with the comment on its own line inside the braces.
+  **Whatever indents the content, the closer drops to the head's own column** — one
+  question (`HeadLayout::indents_content`), never which arm indented it, so a hugging host
+  and a block head land it identically. What still differs across the family is only how
+  each **host** spells its delimiters: a block head's closer is its `}` at base
+  ([§Svelte: Blocks](./conformance_prettier_svelte.md#svelte-blocks)), a prefixed tag's is
+  its own `}`, an `{#each}` key's its `)`, and a value that always block-wraps (`bind:`,
+  and any directive whose expression does not self-expand) reaches the same shape through
+  the block's own `indent`.
 
 **Two gaps are outside this rule, and the grammar is what excludes them**: an
 `as`/`satisfies` cast's operand→keyword gap and a postfix `++`/`--`'s
@@ -398,8 +432,8 @@ block collapses from *any* authored position. Routing the emitter through that g
 header gaps idempotent and is what `export * from` needed too (it had been the lone header gap
 preserving the break, for want of the same collapse). That is the family's rule: ask the gate,
 don't re-derive the answer at the call site — which is why the `await`→operand and
-`new`→callee gaps route their whole run through `build_continuation_indent` rather than
-choosing a separator of their own.
+`new`→callee gaps route their whole run through `append_keyword_value_line_comments` rather
+than choosing a separator of their own.
 
 Prettier is split here and not along tsv's line: it preserves the blank for a declarator and
 an object value while collapsing it (with a relocation) for a class property, a parameter
