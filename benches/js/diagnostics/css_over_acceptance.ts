@@ -107,18 +107,6 @@ const stamp_inputs: StampInputs = {
 	wpt_pin: WPT_CSS_HARVEST_PIN,
 	rejects_pin: CSS_REJECTS_PIN
 };
-if (
-	pin_only &&
-	!force &&
-	svelte_commit !== null &&
-	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, []))
-) {
-	console.error(
-		`css-rejects pin up to date (../svelte at ${short_commit(svelte_commit)}, ` +
-			`oracle svelte@${versions.canonical.svelte}, pin ${CSS_REJECTS_PIN}) — skipping; --force to re-grade.`
-	);
-	Deno.exit(0);
-}
 
 /** Warn-and-skip under `--if-present`, fail closed otherwise. */
 const skip_or_fail = (msg: string): never => {
@@ -133,12 +121,32 @@ const skip_or_fail = (msg: string): never => {
 // A pin is a claim about the FULL corpus, so a partial one is asked about before
 // anything loads — per language, so an absent test262 cache (JS) is not read as a
 // smaller CSS corpus. The profile run leaves this to the loader's own fail-fast.
+//
+// Asked BEFORE the stamp, and that order is the point: the other harvests pass
+// their own cache to `harvest_up_to_date`, so a wiped cache re-runs them, while
+// this grade writes no cache to name — a stamp-only test would skip as "fresh"
+// over a corpus the wpt cache has been deleted out of (`bench:clean` does exactly
+// that). This probe answers the same question for every CSS entry at once rather
+// than re-spelling one cache path, and costs a stat apiece.
 if (pin_only) {
 	const { missing, optional_missing } = await corpus_missing_entries('conformance', 'css');
 	const absent = [...missing, ...optional_missing];
 	if (absent.length > 0) {
 		skip_or_fail(`css-rejects pin: the conformance CSS corpus is partial — ${absent.join(', ')}`);
 	}
+}
+
+if (
+	pin_only &&
+	!force &&
+	svelte_commit !== null &&
+	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, []))
+) {
+	console.error(
+		`css-rejects pin up to date (../svelte at ${short_commit(svelte_commit)}, ` +
+			`oracle svelte@${versions.canonical.svelte}, pin ${CSS_REJECTS_PIN}) — skipping; --force to re-grade.`
+	);
+	Deno.exit(0);
 }
 
 /**

@@ -67,7 +67,14 @@ export const HARVEST_STAMPS = {
 	'svelte-rejects': {
 		path: 'benches/js/.cache/svelte_parse_rejects.stamp.json',
 		task: 'bench:harvest:svelte-rejects',
-		checkouts: { svelte_commit: '../svelte', prettier_commit: '../prettier' }
+		// Three, because the Svelte-language conformance corpus is three suites:
+		// ../svelte's tests plus both prettier suites' `.html` files, which the
+		// loader reads as Svelte (98 / 40 / 7 of the pinned 145 rejects).
+		checkouts: {
+			svelte_commit: '../svelte',
+			prettier_commit: '../prettier',
+			prettier_plugin_svelte_commit: '../prettier-plugin-svelte'
+		}
 	},
 	'css-rejects': {
 		path: 'benches/js/.cache/css_rejects.stamp.json',

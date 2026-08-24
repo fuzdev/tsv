@@ -16,12 +16,20 @@
  * exactly why the freshness guard's executed-vs-size-only split can be a path
  * comparison at all: an entry differing there is a real difference, not a spelling.
  *
- * Still spelled elsewhere, and deliberately: `deno.json`'s wasm build tasks pass
+ * The release gate is a reader too: `scripts/validate_artifacts.ts` sizes and
+ * smoke-imports every `pkg/<variant>/<target>` bundle through
+ * {@link wasm_bundle_dir} / {@link wasm_bundle_path}, walking `npm` as one more
+ * target — a staging directory rather than a wasm-pack one, but the same two files
+ * at the same place. A size gate that spelled the layout itself would keep passing
+ * over the old location after a move.
+ *
+ * Still spelled elsewhere, and deliberately — the remaining places a layout move
+ * has to be mirrored by hand: `deno.json`'s wasm build tasks pass
  * `--target <path>` to `run_if_stale.ts` (a task string can't call a function),
- * `scripts/build_napi_packages.ts` carries `target/napi/…` as the DEFAULT of an
- * `--artifact` flag CI overrides per target, and `scripts/validate_artifacts.ts`
- * walks the `npm` staging dirs this table has no rows for. Those are the remaining
- * places a layout move has to be mirrored by hand.
+ * `scripts/build_napi_packages.ts` carries `target/napi/…` and `target/release/…`
+ * as the DEFAULTS of flags CI overrides per target, and
+ * `scripts/patch_npm_package.ts` writes the `npm` staging dir this table only
+ * reads.
  *
  * Node-modules-free by construction (only `node:` builtins + `runtime.ts`): the
  * build-side scripts import it, and `typecheck:scripts` walks them on a bare
@@ -101,6 +109,11 @@ export type WasmVariant = 'format' | 'parse' | 'all';
  * glue — so the guard's subject and the loader's import resolve from one expression.
  * The target is the caller's axis (Deno loads `deno`, Node/Bun `nodejs`); the size
  * table pins `deno`, since the `.wasm` is the same bytes under either.
+ *
+ * `npm` is a fourth value the release gate passes: a STAGING directory rather than
+ * a wasm-pack target (`scripts/patch_npm_package.ts` writes it), but it holds the
+ * same two files at the same place, so it is one more target here rather than a
+ * second spelling of the layout.
  */
 export function wasm_bundle_dir(variant: WasmVariant, target: string): string {
 	return `${PROJECT_ROOT}/crates/tsv_wasm/pkg/${variant}/${target}`;

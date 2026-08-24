@@ -943,10 +943,16 @@ function enforce_perf_coverage(full_corpus: boolean): void {
  * an absent test262 cache withholds no CSS.
  */
 async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
-	if (!full_corpus) return;
+	// Every not-graded path says so, this one included: a silent return reads
+	// exactly like a pass, and a `BENCH_LIMIT` / `BENCH_FILTER` /
+	// `BENCH_ALLOW_MISSING` run is the case where a reader is most likely to
+	// assume the pin still held.
+	if (!full_corpus) {
+		log('\nCSS_REJECTS_PIN not graded — this run does not hold the full corpus.');
+		return;
+	}
 	const tracking = task_tracking_by_group.get('parse/css');
 	if (tracking === undefined) {
-		// Every not-graded path says so: a silent return reads exactly like a pass.
 		log('\nCSS_REJECTS_PIN not graded — the parse/css group did not run.');
 		return;
 	}

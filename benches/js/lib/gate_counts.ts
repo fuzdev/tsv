@@ -120,13 +120,20 @@ export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: reado
 	},
 	'../kit': { commit: 'c0c936124', pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*'] },
 	'../svelte.dev': { commit: '996bd63e4', pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*'] },
+	// Both prettier suites are Svelte-language inputs in the conformance view —
+	// prettier's `tests/format/html` and the plugin's `test` are `.html` files the
+	// loader reads as Svelte — so both feed {@link SVELTE_REJECTS_PIN} as well as
+	// the CSS and corpus pins: of its 145 rejects, 40 come from ../prettier and 7
+	// from ../prettier-plugin-svelte. A pin lists EVERY checkout it was measured
+	// over, not just the one it is named after; `gate_counts_test.ts` grades that
+	// each pin names at least one, which cannot see a missing second.
 	'../prettier': {
 		commit: '1dcd0b05d',
-		pins: ['CSS_REJECTS_PIN', 'CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
+		pins: ['SVELTE_REJECTS_PIN', 'CSS_REJECTS_PIN', 'CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
 	},
 	'../prettier-plugin-svelte': {
 		commit: '7809486',
-		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
+		pins: ['SVELTE_REJECTS_PIN', 'CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
 	},
 	// The two suite-only checkouts: no version file to align, so their harvest
 	// stamps are the only other place the commit is recorded — listed here so
@@ -634,11 +641,18 @@ export const TS_REPO_REJECTS_PIN = 519;
 
 /**
  * bench:harvest:svelte-rejects — exact reject count. Measured 2026-08-24: ../svelte
- * at 5ccdfe355, oracle svelte@5.56.9, 145 of 4716 conformance-view Svelte files.
+ * at 5ccdfe355, ../prettier at 1dcd0b05d, ../prettier-plugin-svelte at 7809486,
+ * oracle svelte@5.56.9, 145 of 4716 conformance-view Svelte files.
  * Fewer = the svelte/compiler oracle stopped rejecting (broken import/config);
  * more = it started rejecting wholesale — either way the cache would corrupt the
- * published coverage number. Moves with the ../svelte commit in
- * {@link GATE_CHECKOUT_COMMITS}; re-derived by `bench:pins:suites` (see there).
+ * published coverage number. Re-derived by `bench:pins:suites` (see there).
+ *
+ * Moves with THREE checkout commits in {@link GATE_CHECKOUT_COMMITS}, not just the
+ * one it is named after: the Svelte-language conformance corpus is the svelte
+ * suite plus both prettier suites' `.html` (which the loader reads as Svelte), and
+ * the split of the 145 is 98 / 40 / 7. The harvest stamps all three, so a pull of
+ * any of them re-grades this pin rather than leaving it describing the previous
+ * corpus.
  *
  * Three of the 145 are the suite's own fixtures for CSS parser fixes that landed
  * upstream AFTER the pinned oracle's release — namespaced type selectors

@@ -364,7 +364,9 @@ deno task smoke         # fast sanity check that every formatter+parser produces
 
 # Benchmarks build the runtime's artifacts automatically. `bench` runs ALL three runtimes and
 # fails if node or bun is missing — Deno is the only hard dep; otherwise run the per-runtime tasks.
-deno task bench         # full refresh = bench:perf + bench:conformance (needs node AND bun)
+deno task bench         # full refresh = bench:perf + bench:conformance + a closing bench:compose
+#                         # (needs node AND bun; the second compose folds the just-rebuilt conformance
+#                         #  report's vintage, which bench:perf's own compose ran too early to see)
 deno task bench:perf    # perf surface: build the whole artifact set ONCE, then the three :run legs + compose
 deno task bench:deno    # Deno only (no node/bun needed)
 deno task bench:node    # Node only

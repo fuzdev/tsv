@@ -604,7 +604,9 @@ mirrors the live set and can only shrink.
 deno task bench:install   # one-time: install harness npm deps
 
 # Run benchmarks (builds the runtime's artifacts automatically).
-deno task bench           # full refresh = bench:perf + bench:conformance
+deno task bench           # full refresh = bench:perf + bench:conformance + a closing bench:compose
+#                           # (bench:perf composes too, but before bench:conformance rewrites the report
+#                           #  whose vintage the combined one carries — deno.json `//bench`)
 deno task bench:perf      # perf surface: build:bench ONCE, then the three :run legs + compose
 deno task bench:deno      # Deno only (no node/bun needed)
 deno task bench:node      # Node only
@@ -720,10 +722,10 @@ always re-harvests, rewrites only changed files).
 (`suite`-tier, so they appear in the CONFORMANCE view and nowhere else) plus
 `css:over-acceptance:pin`, which harvests nothing — nothing consumes the CSS reject
 list, so it is rebuilt live — but grades `CSS_REJECTS_PIN` over the same view and
-stamps the same way, recording all three checkout commits it reads (`../svelte`,
-`../prettier`, `../wpt`). `WPT_CSS_HARVEST_PIN` is stamped beside them but cannot
-stand in for that last commit: it is a file COUNT, and an edit to an existing wpt
+stamps the same way. `WPT_CSS_HARVEST_PIN` is stamped beside them but cannot
+stand in for `../wpt`'s commit: it is a file COUNT, and an edit to an existing wpt
 test moves the CSS this pin grades without moving it.
+
 `bench:harvest:svelte-styles` produces a `real`-tier entry, so it appears in the
 PERF and GATES views and never in the conformance one. Each caller
 therefore takes one group: `bench:perf` chains the styles harvest alone (its own view
@@ -736,6 +738,18 @@ The split is also what keeps that preflight tolerant: every suite leg is
 it cannot see, while the styles harvest loads the perf view, where every dev repo is
 REQUIRED, and fails outright — which is why it is not in front of the repo-local
 fixture gates.
+
+**A stamp records every checkout its grade READS, not the one it is named after.**
+Both reject pins are measured over THREE, and neither list is guessable from the
+name: `CSS_REJECTS_PIN` over `../svelte` + `../prettier` + `../wpt`, and
+`SVELTE_REJECTS_PIN` over `../svelte` + `../prettier` + `../prettier-plugin-svelte`
+— both prettier suites ship `.html`, which the loader reads as Svelte, and they
+contribute 40 and 7 of its 145 rejects. A contributor left out is the whole failure
+mode: its pull leaves the stamp reading fresh over a corpus that moved under it,
+and `GATE_CHECKOUT_COMMITS.pins` then records a provenance the grade doesn't have.
+`gate_counts_test.ts` grades that each pin names AT LEAST one checkout, which
+structurally cannot see a missing second — so the stamp's `checkouts` table
+(`lib/harvest_stamp.ts`) and that `pins` list are kept in agreement by hand.
 
 **Why the preflight exists.** Those count pins are re-derived by no other cadence —
 `deno task check` never touches a checkout — and a checkout that moves between

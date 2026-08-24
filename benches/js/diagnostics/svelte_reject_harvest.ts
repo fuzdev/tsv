@@ -23,11 +23,12 @@
  * open to the un-filtered corpus (disclosed in its log). A manual run WITHOUT
  * the flag fails closed instead, matching the wpt/test262 harvests. `--force`
  * re-harvests despite a fresh stamp (default runs skip when the ../svelte +
- * ../prettier commits, the svelte oracle pin, and the rejects pin all match —
- * see `lib/harvest_stamp.ts`). The stamp deliberately ignores the live dev
- * repos in the conformance view: their Svelte is valid by assumption (rejects
- * come from the suite trees), and the exact rejects pin re-validates whenever
- * the harvest does run.
+ * ../prettier + ../prettier-plugin-svelte commits, the svelte oracle pin, and the
+ * rejects pin all match — see `lib/harvest_stamp.ts`; all three checkouts ship
+ * Svelte-language corpus, so all three are stamped). The stamp deliberately
+ * ignores the live dev repos in the conformance view: their Svelte is valid by
+ * assumption (rejects come from the suite trees), and the exact rejects pin
+ * re-validates whenever the harvest does run.
  *
  * Run (from repo root):
  *   deno run --allow-read --allow-write=benches/js/.cache --allow-env --allow-net \
@@ -59,14 +60,19 @@ const force = Deno.args.includes('--force');
 async function main(): Promise<void> {
 	const versions = await load_all_versions();
 
-	// Freshness stamp: the graded suite trees come from ../svelte (+ prettier's
-	// html suite from ../prettier) and the oracle is the pinned npm svelte —
-	// skip the grade when all of those plus the rejects pin match the stamp.
+	// Freshness stamp: the graded Svelte-language trees are ../svelte's tests plus
+	// BOTH prettier suites' `.html` (the loader reads that extension as Svelte),
+	// and the oracle is the pinned npm svelte — skip the grade when all of those
+	// plus the rejects pin match the stamp. All three checkouts are stamped
+	// because all three produce rejects (98 / 40 / 7 of the pinned count): a
+	// contributor left out is one whose pull leaves this stamp reading fresh over
+	// a corpus that moved under it.
 	const svelte_commit = git_head('../svelte');
 	const stamp_inputs: StampInputs = {
 		harvest: 'svelte-rejects',
 		svelte_commit,
 		prettier_commit: git_head('../prettier'),
+		prettier_plugin_svelte_commit: git_head('../prettier-plugin-svelte'),
 		svelte_oracle: versions.canonical.svelte,
 		rejects_pin: SVELTE_REJECTS_PIN
 	};
