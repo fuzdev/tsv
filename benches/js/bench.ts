@@ -434,7 +434,11 @@ const RESULTS_DIR = './benches/js/results';
 
 log('Loading corpus...\n');
 const corpus_loader = new DevReposLoader(CORPUS_MODE, {
-	allow_missing: env.BENCH_ALLOW_MISSING === '1'
+	// The bench loads EVERY language, so it has no `{ complete_for }` posture to
+	// take here — `enforce_css_reject_pin` asks the per-language completeness
+	// question separately, and degrades that one pin to "not graded" rather than
+	// aborting a whole run over a corpus the other groups are fine with.
+	missing: env.BENCH_ALLOW_MISSING === '1' ? 'tolerate' : 'fail'
 });
 // Drain `stream()` directly instead of `load()` so we skip the loader's
 // own corpus summary — bench.ts prints its own tighter one below that

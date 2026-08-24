@@ -18,10 +18,13 @@
  *
  * Machine-local, regenerable (like the wpt/test262 harvest caches): paths are
  * absolute and the cache is gitignored. `--if-present` (passed by the
- * `bench:harvest:svelte-rejects` task) warn-and-skips when `../svelte` or the
- * `node_modules` sidecar is absent, leaving no cache — the loader then fails
- * open to the un-filtered corpus (disclosed in its log). A manual run WITHOUT
- * the flag fails closed instead, matching the wpt/test262 harvests. `--force`
+ * `bench:harvest:svelte-rejects` task) warn-and-skips when the `node_modules`
+ * sidecar or ANY Svelte-contributing checkout is absent (`../svelte`,
+ * `../prettier`, `../prettier-plugin-svelte` — the refusal comes from the
+ * loader's `{ complete_for: 'svelte' }` policy, so the list is derived from
+ * `CORPUS_ENTRIES` rather than restated here), leaving no cache — the loader then
+ * fails open to the un-filtered corpus (disclosed in its log). A manual run
+ * WITHOUT the flag fails closed instead, matching the wpt/test262 harvests. `--force`
  * re-harvests despite a fresh stamp (default runs skip when the ../svelte +
  * ../prettier + ../prettier-plugin-svelte commits, the svelte oracle pin, and the
  * rejects pin all match — see `lib/harvest_stamp.ts`; all three checkouts ship
@@ -39,8 +42,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 
-import { DevReposLoader } from '../lib/corpus.ts';
 import { CanonicalImplementation } from '../lib/canonical.ts';
+import { load_pinned_language_corpus } from '../lib/corpus.ts';
 import { SVELTE_REJECTS_PIN } from '../lib/gate_counts.ts';
 import {
 	git_head,
@@ -50,6 +53,7 @@ import {
 	type StampInputs,
 	write_stamp
 } from '../lib/harvest_stamp.ts';
+import type { SourceFile } from '../lib/types.ts';
 import { load_all_versions } from '../lib/versions.ts';
 
 const CACHE_PATH = 'benches/js/.cache/svelte_parse_rejects.json';
@@ -102,15 +106,23 @@ async function main(): Promise<void> {
 	// Load the conformance view but only grade Svelte files. `apply_reject_cache:
 	// false` is load-bearing — this harvest PRODUCES that cache, so it must see the
 	// un-filtered corpus (otherwise it excludes the files it needs to grade and, on
-	// a re-run, rewrites the cache empty). `allow_missing` lets a machine without
-	// the wpt/test262 suite caches (css/js — no Svelte) still harvest the full
-	// Svelte set; a missing ../svelte warn-and-skips under --if-present.
-	let files;
+	// a re-run, rewrites the cache empty).
+	//
+	// `load_pinned_language_corpus` carries the exact tolerance this harvest needs,
+	// and saying it any other way has been the bug: a machine without the
+	// wpt/test262 suite caches (css/js — no Svelte) still harvests the full Svelte
+	// set, while a missing ../svelte / ../prettier / ../prettier-plugin-svelte —
+	// each a real contributor to the pinned count (98 / 40 / 7) — refuses HERE,
+	// where --if-present can warn-and-skip it. A blanket tolerance instead let those
+	// three through to the exact-count check below, which then reported a missing
+	// checkout as `pinned count mismatch … re-pin in lib/gate_counts.ts` — the one
+	// diagnosis that is never right for an absent input.
+	let svelte: SourceFile[];
 	try {
-		files = await new DevReposLoader('conformance', {
-			allow_missing: true,
+		svelte = await load_pinned_language_corpus('conformance', 'svelte', {
+			logger: (m) => console.error(m),
 			apply_reject_cache: false
-		}).load((m) => console.error(m));
+		});
 	} catch (e) {
 		const msg = `svelte_reject_harvest: could not load conformance corpus (${e instanceof Error ? e.message : e})`;
 		if (if_present) {
@@ -119,8 +131,6 @@ async function main(): Promise<void> {
 		}
 		throw new Error(msg);
 	}
-
-	const svelte = files.filter((f) => f.language === 'svelte');
 	const rejects: string[] = [];
 	for (const f of svelte) {
 		try {

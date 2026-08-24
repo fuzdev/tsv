@@ -615,24 +615,48 @@ export interface CorpusSource {
 }
 
 /**
- * Check-only probe of a view's entries: the paths `stream()` would fail fast on
- * (non-optional, absent) plus the optional ones currently absent. Used by
+ * Whether an entry can contribute files of `language` — the one predicate behind
+ * both the check-only probe below and the loader's `{ complete_for }` refusal, so
+ * the two can never disagree about which absent entry withholds which language.
+ *
+ * Deliberately conservative in one direction: an entry that declares no
+ * `extensions` walks every language and therefore answers YES for all three. That
+ * over-counts (`../prettier/tests/format/typescript` ships no CSS), and it is the
+ * safe side — the alternative is knowing an entry's language mix without walking
+ * it, which is exactly what an ABSENT entry forbids.
+ */
+function entry_holds_language(entry: CorpusEntry, language: Language): boolean {
+	return (
+		entry.extensions === undefined ||
+		entry.extensions.some((ext) => detect_language(`x.${ext}`) === language)
+	);
+}
+
+/**
+ * Check-only probe of a view's entries: the paths a default (`'fail'`) `stream()`
+ * would refuse — non-`optional` and absent — plus the `optional` ones currently
+ * absent, so a caller can apply whichever reading its own policy takes. Used by
  * `scripts/doctor.ts` — kept here so the doctor and the loader can't drift — and
- * by the graders that pin a count over ONE language's slice of a view (the CSS
- * reject pin), which pass `language` to ask only about the entries that can hold
- * it: an absent test262 cache withholds no CSS, so it must not read as a partial
- * CSS corpus. An entry with no `extensions` walks every language and always counts.
+ * by a grader that must degrade a pin to "not graded" rather than abort (the
+ * bench's `enforce_css_reject_pin`), which passes `language` to ask only about the
+ * entries that can hold it: an absent test262 cache withholds no CSS, so it must
+ * not read as a partial CSS corpus.
+ *
+ * A grader that LOADS the corpus should not call this and then load — it should
+ * load with `{ missing: { complete_for: language } }` and let the refusal come
+ * from the loader, so the question is asked by the code that acts on the answer.
+ * The one caller that legitimately asks first is a stamp-guarded grade, which has
+ * to answer "may I trust the stamp?" BEFORE the stamp short-circuits the load
+ * (`diagnostics/css_over_acceptance.ts`).
  */
 export async function corpus_missing_entries(
 	view: CorpusView,
 	language?: Language
 ): Promise<{ missing: string[]; optional_missing: string[]; total: number }> {
 	const tiers = TIERS_BY_VIEW[view];
-	const holds_language = (entry: CorpusEntry): boolean =>
-		language === undefined ||
-		entry.extensions === undefined ||
-		entry.extensions.some((ext) => detect_language(`x.${ext}`) === language);
-	const entries = CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier) && holds_language(e));
+	const entries = CORPUS_ENTRIES.filter(
+		(e) => tiers.includes(e.tier) && (language === undefined || entry_holds_language(e, language))
+	);
 	const missing: string[] = [];
 	const optional_missing: string[] = [];
 	for (const entry of entries) {
@@ -691,12 +715,35 @@ export async function corpus_present_dirs_for_tiers(
 }
 
 /**
+ * What an ABSENT corpus entry means to this run — one value rather than a boolean,
+ * because the three answers are not two: a grader that pins an exact count needs a
+ * tolerance the other two cannot express, and spelling it as
+ * `allow_missing: true` is what let one leg silently grade a partial corpus.
+ *
+ * - `'fail'` (default) — a non-`optional` absent entry throws; an `optional` one
+ *   (the derived harvest caches) warns. The ordinary gate posture.
+ * - `'tolerate'` — every absent entry warns. The explicit opt-in behind
+ *   `BENCH_ALLOW_MISSING=1`; the resulting numbers are not comparable and the run
+ *   says so.
+ * - `{ complete_for: Language }` — the PIN posture: an absent entry that can hold
+ *   that language throws **whether or not it is `optional`**, and one that cannot
+ *   warns. `optional` marks an entry a normal run may proceed without, which is a
+ *   different claim from "this count still describes the whole corpus" — an exact
+ *   pin graded over a corpus one harvest short is not a smaller measurement, it is
+ *   a wrong one, and it reports as a moved pin.
+ *
+ * Note the asymmetry `{ complete_for }` exists to state: it is STRICTER than
+ * `'fail'` on the optional entries and LOOSER on the required ones it cannot be
+ * affected by. Neither boolean value is a substitute for it in either direction.
+ */
+export type MissingEntryPolicy = 'fail' | 'tolerate' | { complete_for: Language };
+
+/**
  * Loads one view of `CORPUS_ENTRIES`.
  * Paths are relative to cwd. Missing entries FAIL FAST (before any file is
- * yielded) unless the entry is `optional` (the derived harvest caches, warned)
- * or `allow_missing` is set — a silently smaller corpus makes perf numbers
- * non-comparable and lets a correctness gate pass while grading less than it
- * claims. The view is required — it's load-bearing (it decides what a number
+ * yielded) per the `missing` policy above — a silently smaller corpus makes perf
+ * numbers non-comparable and lets a correctness gate pass while grading less than
+ * it claims. The view is required — it's load-bearing (it decides what a number
  * or a gate verdict means), so every construction site picks one explicitly:
  * `gates` for anything gate-like (the pre-split corpus the sanction lists and
  * divergence coverage were reviewed against), `perf`/`conformance` for the
@@ -704,7 +751,7 @@ export async function corpus_present_dirs_for_tiers(
  */
 export class DevReposLoader {
 	readonly view: CorpusView;
-	readonly allow_missing: boolean;
+	readonly missing: MissingEntryPolicy;
 	/**
 	 * Whether the `conformance` view applies the Svelte canonical-reject cache
 	 * (`SVELTE_REJECT_CACHE`). Default true. The reject **harvest** itself must set
@@ -724,10 +771,10 @@ export class DevReposLoader {
 
 	constructor(
 		view: CorpusView,
-		options?: { allow_missing?: boolean; apply_reject_cache?: boolean }
+		options?: { missing?: MissingEntryPolicy; apply_reject_cache?: boolean }
 	) {
 		this.view = view;
-		this.allow_missing = options?.allow_missing ?? false;
+		this.missing = options?.missing ?? 'fail';
 		this.apply_reject_cache = options?.apply_reject_cache ?? true;
 	}
 
@@ -736,37 +783,59 @@ export class DevReposLoader {
 		const entries = CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier));
 
 		// Fail fast on missing entries — all existence checks up front, before
-		// any file is yielded, so a partial corpus can't be half-processed.
+		// any file is yielded, so a partial corpus can't be half-processed. Which
+		// absence is fatal is `this.missing`'s question, asked per entry so the
+		// `{ complete_for }` policy can refuse an OPTIONAL entry (a pin's corpus is
+		// not complete without it) while waving through a REQUIRED one that holds
+		// none of its language.
+		const complete_for = typeof this.missing === 'object' ? this.missing.complete_for : null;
+		// Prefer an entry's own remedy (a harvest task for the derived caches);
+		// otherwise a concrete `git clone` line for a known suite/framework checkout.
+		// Shared by the tolerated line and the refusal, because a reader who is TOLD
+		// about an absence wants the fix just as much as one who is stopped by it.
+		const remedy_for = (entry: CorpusEntry): string | null =>
+			entry.hint ?? clone_hint(entry_source(entry));
+		const suffix = (remedy: string | null): string => (remedy ? ` (${remedy})` : '');
 		const present: CorpusEntry[] = [];
 		const missing: string[] = [];
 		for (const entry of entries) {
 			const entry_path = entry_source(entry);
 			if (await fs_exists(resolve(entry_path))) {
 				present.push(entry);
-			} else if (entry.optional) {
-				logger(
-					`  ⚠ optional corpus entry missing: ${entry_path}${entry.hint ? ` — ${entry.hint}` : ''}`
-				);
-			} else {
-				// Prefer an entry's own remedy (a harvest task for the derived
-				// caches); otherwise a concrete `git clone` line for a known
-				// suite/framework checkout.
-				const remedy = entry.hint ?? clone_hint(entry_path);
-				missing.push(entry_path + (remedy ? ` (${remedy})` : ''));
+				continue;
 			}
+			const fatal =
+				complete_for !== null
+					? entry_holds_language(entry, complete_for)
+					: this.missing === 'fail' && !entry.optional;
+			if (!fatal) {
+				// Each tolerated absence names WHY it was tolerated: `optional` is the
+				// standing one, a `{ complete_for }` pass-through is a language claim,
+				// and a `'tolerate'` pass-through is the explicit opt-in that makes the
+				// run's numbers incomparable — the loudest of the three, and the one a
+				// reader must not mistake for the standing case.
+				const why = entry.optional
+					? 'optional'
+					: complete_for !== null
+						? `holds no ${complete_for}`
+						: 'PARTIAL CORPUS — BENCH_ALLOW_MISSING';
+				logger(`  ⚠ corpus entry missing (${why}): ${entry_path}${suffix(remedy_for(entry))}`);
+				continue;
+			}
+			missing.push(entry_path + suffix(remedy_for(entry)));
 		}
 		if (missing.length > 0) {
-			if (this.allow_missing) {
-				for (const m of missing) {
-					logger(`  ⚠ corpus entry missing (allow_missing): ${m}`);
-				}
-			} else {
-				throw new Error(
-					`Missing corpus entr${missing.length === 1 ? 'y' : 'ies'} (${this.view} view): ` +
-						`${missing.join(', ')} — clone the missing repo(s), or opt into a partial ` +
-						`corpus with allow_missing (BENCH_ALLOW_MISSING=1 for the bench).`
-				);
-			}
+			throw new Error(
+				`Missing corpus entr${missing.length === 1 ? 'y' : 'ies'} (${this.view} view): ` +
+					`${missing.join(', ')} — clone the missing repo(s) or run the named harvest` +
+					// The remedy a PIN grader must never be offered: tolerating the gap is
+					// what makes the count wrong, so it is told to restore the input instead.
+					(complete_for === null
+						? ". Or opt into a partial corpus with `missing: 'tolerate'` " +
+							'(BENCH_ALLOW_MISSING=1 for the bench).'
+						: `. This run grades an exact ${complete_for} pin, so a partial corpus ` +
+							'has no tolerant mode — it would report as a moved pin.')
+			);
 		}
 
 		this.sources = [];
@@ -864,6 +933,36 @@ export class DevReposLoader {
 		log_corpus_summary(files, logger);
 		return files;
 	}
+}
+
+/**
+ * One view's files for ONE language, loaded under the posture an exact count pin
+ * requires: `{ complete_for: language }`, so any absent entry that could hold that
+ * language THROWS — `optional` ones included, since a pin is a claim about the
+ * whole corpus and `optional` only says a normal run may proceed without it.
+ *
+ * This exists so the posture is not a thing each grader has to remember. Every
+ * pinned-count grader does the same two steps — load the view, keep one language —
+ * and the two that spelled them out separately BOTH got the tolerance wrong in the
+ * same direction, tolerating an absent contributor and then reporting the shortfall
+ * as a moved pin. Reach for this rather than `new DevReposLoader` whenever the
+ * number that comes out is compared against a constant; the throw is the caller's
+ * to translate (a `--if-present` warn-skip, usually).
+ *
+ * NOT a substitute for `corpus_missing_entries` in a STAMPED grade: a stamp is
+ * consulted before anything loads, so "may I trust the stamp?" has to be asked
+ * before this is ever called (see `diagnostics/css_over_acceptance.ts`).
+ */
+export async function load_pinned_language_corpus(
+	view: CorpusView,
+	language: Language,
+	options?: { logger?: Logger; apply_reject_cache?: boolean }
+): Promise<SourceFile[]> {
+	const files = await new DevReposLoader(view, {
+		missing: { complete_for: language },
+		apply_reject_cache: options?.apply_reject_cache
+	}).load(options?.logger ?? console.log);
+	return files.filter((f) => f.language === language);
 }
 
 //

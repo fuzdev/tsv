@@ -52,6 +52,11 @@ export const HARVEST_STAMPS = {
 	'wpt-css': {
 		path: 'benches/js/.cache/wpt_css.stamp.json',
 		task: 'bench:harvest:wpt',
+		// `../wpt/css`, not `../wpt`, and the difference is deliberate even though the
+		// two report the same SHA: this harvest stamps whatever `--source` it actually
+		// read, whose default is that subtree. (`css-rejects` below names `../wpt`
+		// because it consumes the repo through this harvest's CACHE and has no
+		// `--source` of its own.)
 		checkouts: { source_commit: '../wpt/css' }
 	},
 	test262: {

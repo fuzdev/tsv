@@ -340,6 +340,14 @@ if (exists('../typescript-go')) {
 // PREVIOUS corpus: `bench:pins:suites` (a `conformance` preflight) re-derives it,
 // but nothing in `check` does, so name it here ahead of a release run. Only the
 // commit inputs are compared — the oracle-version and pin inputs are `pins:audit`'s.
+//
+// Graded PER CHECKOUT, never all-or-nothing on the first absent one. Two reasons,
+// both of which the earlier short-circuit got wrong: an absent checkout would hide
+// a MOVED sibling in the same stamp (the two reject pins carry three checkouts
+// apiece), and this doctor cannot know what the task will do about the absence —
+// `css:over-acceptance:pin` reads the wpt CACHE, not `../wpt`, so it grades happily
+// with that checkout gone. So report the fact observed here, and leave the task's
+// own `--if-present` verdict to the task.
 
 section('Harvest stamps (bench:pins:suites — the pin-freshness preflight)');
 for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
@@ -348,22 +356,27 @@ for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) 
 		repo,
 		head: git_head(repo)
 	}));
-	const absent = heads.filter((h) => h.head === null).map((h) => h.repo);
-	if (absent.length > 0) {
-		info(`${name}: checkout absent (${absent.join(', ')}) — ${task} warn-skips`);
+	const absent = heads.filter((h) => h.head === null);
+	const gradable = heads.filter((h) => h.head !== null);
+	// Named on every line below, so a ✓ never reads as "all three agree" when one
+	// of the three was never compared.
+	const aside =
+		absent.length === 0 ? '' : ` (${absent.map((h) => h.repo).join(', ')} not checked out)`;
+	if (gradable.length === 0) {
+		info(`${name}: no checkout to grade against${aside}`);
 		continue;
 	}
 	let recorded: Record<string, unknown>;
 	try {
 		recorded = JSON.parse(Deno.readTextFileSync(path)) as Record<string, unknown>;
 	} catch {
-		warn(`${name}: never stamped (no ${path}) — run deno task ${task}`);
+		warn(`${name}: never stamped (no ${path}) — run deno task ${task}${aside}`);
 		continue;
 	}
 	// A key the stamp does not carry at all is reported as such rather than as a
 	// moved commit: that is what an input ADDED since the stamp was written looks
 	// like, and "stamped ?" reads as a corrupt SHA.
-	const moved = heads
+	const moved = gradable
 		.map((h) => ({ ...h, recorded: recorded[h.key] }))
 		.filter((h) => h.recorded !== h.head);
 	if (moved.length > 0) {
@@ -374,9 +387,9 @@ for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) 
 						? `${h.repo} (stamped ${short_commit(h.recorded)}, now ${short_commit(h.head!)})`
 						: `${h.repo} (no \`${h.key}\` recorded — the stamp predates that input)`
 				)
-				.join(', ')} — run deno task ${task}`
+				.join(', ')} — run deno task ${task}${aside}`
 		);
-	} else ok(`${name}: stamp matches ${heads.map((h) => h.repo).join(' + ')}`);
+	} else ok(`${name}: stamp matches ${gradable.map((h) => h.repo).join(' + ')}${aside}`);
 }
 
 // --- Corpus entries -------------------------------------------------------------

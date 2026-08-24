@@ -58,7 +58,7 @@
  */
 
 import { CanonicalImplementation } from '../lib/canonical.ts';
-import { corpus_missing_entries, DevReposLoader } from '../lib/corpus.ts';
+import { corpus_missing_entries, load_pinned_language_corpus } from '../lib/corpus.ts';
 import { CSS_REJECTS_PIN, WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
 	git_head,
@@ -69,7 +69,7 @@ import {
 	write_stamp
 } from '../lib/harvest_stamp.ts';
 import type { InitializedImplementations } from '../lib/implementations.ts';
-import { CANONICAL_PARSER_ROWS, type TsvImplementation } from '../lib/types.ts';
+import { CANONICAL_PARSER_ROWS, type SourceFile, type TsvImplementation } from '../lib/types.ts';
 import { load_all_versions } from '../lib/versions.ts';
 
 /** Sample paths kept per tool for `--verbose` — enough to see the shape, not a dump. */
@@ -108,8 +108,15 @@ const stamp_inputs: StampInputs = {
 	rejects_pin: CSS_REJECTS_PIN
 };
 
-/** Warn-and-skip under `--if-present`, fail closed otherwise. */
-const skip_or_fail = (msg: string): never => {
+/**
+ * Warn-and-skip under `--if-present`, fail closed otherwise.
+ *
+ * The annotation is on the CONST rather than only on the arrow's return type: that
+ * is the form TypeScript requires before it will treat a call as terminating
+ * control flow, so every `skip_or_fail(...)` below narrows like a `throw` and the
+ * code after it needs no `!`.
+ */
+const skip_or_fail: (msg: string) => never = (msg) => {
 	if (if_present) {
 		console.error(`  ⚠ ${msg} — skipping (--if-present)`);
 		Deno.exit(0);
@@ -118,16 +125,21 @@ const skip_or_fail = (msg: string): never => {
 	Deno.exit(1);
 };
 
-// A pin is a claim about the FULL corpus, so a partial one is asked about before
-// anything loads — per language, so an absent test262 cache (JS) is not read as a
-// smaller CSS corpus. The profile run leaves this to the loader's own fail-fast.
+// Completeness is asked TWICE, and the two askings answer different questions —
+// which is why neither is redundant:
 //
-// Asked BEFORE the stamp, and that order is the point: the other harvests pass
-// their own cache to `harvest_up_to_date`, so a wiped cache re-runs them, while
-// this grade writes no cache to name — a stamp-only test would skip as "fresh"
-// over a corpus the wpt cache has been deleted out of (`bench:clean` does exactly
-// that). This probe answers the same question for every CSS entry at once rather
-// than re-spelling one cache path, and costs a stat apiece.
+//  1. HERE, before the stamp: "may I trust the stamp?" The other harvests pass
+//     their own cache to `harvest_up_to_date`, so a wiped cache re-runs them,
+//     while this grade writes no cache to name — a stamp-only test would skip as
+//     "fresh" over a corpus the wpt cache has been deleted out of (`bench:clean`
+//     does exactly that). Only `--pin-only` reaches a stamp, so only it asks here.
+//  2. At LOAD, for both modes: "is what I am about to grade complete?" — the
+//     loader's `{ complete_for: 'css' }` policy below, which refuses an absent CSS
+//     entry whether or not it is `optional`. That one is not skippable and needs
+//     no caller to remember it.
+//
+// Both are per-language, so an absent test262 cache (JS) is never read as a
+// smaller CSS corpus. This one costs a stat per CSS entry.
 if (pin_only) {
 	const { missing, optional_missing } = await corpus_missing_entries('conformance', 'css');
 	const absent = [...missing, ...optional_missing];
@@ -180,17 +192,6 @@ if (pin_only) {
 	oracle = impls.canonical;
 }
 
-/** The CSS-parsing rows, in the conformance report's display order. */
-const rows: Array<{ name: string; impl: TsvImplementation | undefined }> =
-	impls === null
-		? [{ name: ORACLE_ROW, impl: oracle }]
-		: [
-				{ name: ORACLE_ROW, impl: impls.canonical },
-				{ name: 'tsv', impl: impls.native },
-				{ name: 'tsv_wasm', impl: impls.wasm },
-				{ name: 'postcss', impl: impls.postcss }
-			];
-
 const accepts = (impl: TsvImplementation, source: string): boolean => {
 	try {
 		impl.parse(source, 'css');
@@ -203,11 +204,26 @@ const accepts = (impl: TsvImplementation, source: string): boolean => {
 // The conformance view is the surface this profile explains — prettier's CSS
 // suite plus the wpt-css harvest, both pinned. The `gates`/`perf` views would
 // fold in live dev repos, whose churn the pin cannot survive.
-const files = (await new DevReposLoader('conformance').load(log)).filter(
-	(f) => f.language === 'css'
-);
+//
+// `load_pinned_language_corpus` in BOTH modes, and the profile mode is why it is
+// here rather than folded into the `--pin-only` probe above: the wpt-css cache is
+// an `optional` entry, so an ordinary load warns and carries on, and the pin check
+// below then reports an unharvested cache as `the oracle rejects 22 of 332 …
+// re-pin CSS_REJECTS_PIN`. Every mode of this tool grades that pin, so no mode may
+// load a partial CSS corpus.
+let files: SourceFile[];
+try {
+	files = await load_pinned_language_corpus('conformance', 'css', { logger: log });
+} catch (e) {
+	skip_or_fail(
+		`css-rejects: could not load a complete conformance CSS corpus ` +
+			`(${e instanceof Error ? e.message : e})`
+	);
+}
 if (files.length === 0) {
-	console.error('FAIL: no CSS files in the conformance corpus — a partial checkout or harvest.');
+	// Unreachable via an absent entry (the loader refuses those above); this catches
+	// the other way to get an empty set — every CSS entry present but empty.
+	console.error('FAIL: no CSS files in the conformance corpus — every CSS entry is empty.');
 	Deno.exit(1);
 }
 
@@ -235,6 +251,26 @@ if (pin_only) {
 	);
 	Deno.exit(0);
 }
+
+if (impls === null) {
+	// Unreachable: `--pin-only` exited above and the profile branch initializes the
+	// whole set. Stated as a throw rather than four `!`s so an edit that moves that
+	// exit fails here, naming the invariant, instead of dereferencing null.
+	throw new Error('css-rejects: reached the profile rows with no implementation set');
+}
+
+/**
+ * The CSS-parsing rows, in the conformance report's display order. Declared BELOW
+ * the `--pin-only` exit, which is what lets it name the profile's four rows
+ * unconditionally: the pin leg builds none of them, and hoisting this would need a
+ * one-element arm answering a question the control flow has already settled.
+ */
+const rows: Array<{ name: string; impl: TsvImplementation | undefined }> = [
+	{ name: ORACLE_ROW, impl: impls.canonical },
+	{ name: 'tsv', impl: impls.native },
+	{ name: 'tsv_wasm', impl: impls.wasm },
+	{ name: 'postcss', impl: impls.postcss }
+];
 
 interface Row {
 	name: string;

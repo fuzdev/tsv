@@ -734,10 +734,24 @@ task conformance` — whose corpus legs read the `gates` view — chains the sui
 its PIN-FRESHNESS preflight and the styles harvest later, immediately ahead of those
 legs. `bench:harvest` runs both and stays the manual refresh-everything entry point.
 The split is also what keeps that preflight tolerant: every suite leg is
-`--if-present` and warn-skips a checkout (or, for the CSS pin, a partial CSS corpus)
-it cannot see, while the styles harvest loads the perf view, where every dev repo is
-REQUIRED, and fails outright — which is why it is not in front of the repo-local
-fixture gates.
+`--if-present` and warn-skips an input it cannot see, while the styles harvest loads
+the perf view, where every dev repo is REQUIRED, and fails outright — which is why
+it is not in front of the repo-local fixture gates.
+
+**What "an input it cannot see" means is the loader's to decide, not each leg's.**
+A pinned count is a claim about the WHOLE corpus, so the two reject pins load
+through `load_pinned_language_corpus` (`lib/corpus.ts`), which takes the
+`{ complete_for: <language> }` missing-entry policy: an absent entry that could hold
+that language throws — **`optional` ones included**, since `optional` says only that
+an ordinary run may proceed without it — while one that cannot hold it warns and is
+skipped. That is what lets the svelte-rejects leg harvest its full 145 on a machine
+with no wpt/test262 caches (css/js — no Svelte) and still refuse, warn-skippably, when
+`../prettier-plugin-svelte` is gone. Spelling the tolerance as a plain "allow
+missing" instead is the bug this shape exists to prevent: the leg then grades a
+short corpus and reports it as `pinned count mismatch … re-pin in gate_counts.ts`,
+which is the one diagnosis that is never right for an absent input. Reach for that
+helper, not a bare `DevReposLoader`, whenever the number coming out is compared to a
+constant.
 
 **A stamp records every checkout its grade READS, not the one it is named after.**
 Both reject pins are measured over THREE, and neither list is guessable from the
@@ -1099,6 +1113,16 @@ harvested yet), and `BENCH_ALLOW_MISSING=1` opts the bench into a partial corpus
 Reports carry `corpus_sources` so any tolerated gap is disclosed rather than
 invisible.
 
+Which absence is fatal is `MissingEntryPolicy`, picked per construction site rather
+than left to a boolean, because there are three answers and not two: `'fail'` (the
+default above), `'tolerate'` (`BENCH_ALLOW_MISSING`), and `{ complete_for: <language> }`
+— the posture a run grading an exact count needs. That last one is STRICTER than
+`'fail'` on the `optional` entries (a pin over a corpus one harvest short is not a
+smaller measurement, it is a wrong one) and LOOSER on the required entries that hold
+none of its language, and neither boolean substitutes for it in either direction.
+Callers that grade a pin should take it through `load_pinned_language_corpus` rather
+than picking it by hand — see §Harvests.
+
 ## Architecture
 
 ```
@@ -1134,7 +1158,9 @@ benches/js/
     ├── check_artifact_freshness.ts # Native/WASM artifact staleness guard (§Artifact Freshness Guard)
     ├── check_node_modules.ts # node_modules preflight: exists + every exact pin (and the oxc wasi binding) matches installed
     ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
-    ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
+    ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins) + the
+    │                      # missing-entry policy every caller picks (`MissingEntryPolicy`) and the
+    │                      # pinned-count front door that picks it for you (`load_pinned_language_corpus`)
     ├── corpus_repos.ts    # Per-source repo origin + commit, DETECTED from each checkout, so the
     │                      # report's source links pin to the measured code
     ├── diff.ts            # Line-based diff utilities (LCS algorithm)
