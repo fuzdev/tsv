@@ -313,7 +313,7 @@ mod tests {
         let source = format!("<script lang=\"ts\">\n{body}\n</script>");
         // Test inputs are hardcoded valid sources; a parse failure should panic
         let arena = bumpalo::Bump::new();
-        #[allow(clippy::expect_used)]
+        #[expect(clippy::expect_used)]
         let root = crate::parse(&source, &arena).expect("parse");
         crate::convert_ast_json(&root, &source)
     }
@@ -335,7 +335,7 @@ mod tests {
     /// Parse a whole component and return the public JSON AST.
     fn convert_component(source: &str) -> Value {
         let arena = bumpalo::Bump::new();
-        #[allow(clippy::expect_used)]
+        #[expect(clippy::expect_used)]
         let root = crate::parse(source, &arena).expect("parse");
         crate::convert_ast_json(&root, source)
     }

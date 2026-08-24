@@ -6,7 +6,7 @@
 > For divergence catalogs, see ./conformance_prettier.md (its §Catalogs table indexes the
 > per-language catalogs) and ./conformance_svelte.md.
 
-**Terminology**: `prettier_variant_*` = prettier-stable, our formatter normalizes to input. `variant_*` = both formatters keep stable, NOT input. `divergent_variant_*` = prettier-stable, our formatter rewrites to a distinct third stable form (NOT input, NOT the form).
+**Terminology**: the three prettier-stable-form kinds (`prettier_variant_*` / `variant_*` / `divergent_variant_*`) are defined once, in [fixture_naming.md](./fixture_naming.md)'s Terminology note.
 
 ## Quick Start
 
@@ -820,7 +820,7 @@ The empty custom-property value divergence ([CSS: Values](./conformance_prettier
 **Worked example:**
 
 ```
-# Found: function_polygon_long/output_prettier.svelte
+# Found: polygon_long/output_prettier.svelte
 # Prettier keeps .long case inline (doesn't wrap at threshold)
 # Our implementation: wraps at threshold
 # Analysis: Prettier's behavior is consistent with other function wrapping
@@ -887,9 +887,6 @@ per-kind checks are the S/C/F/N rules in [All Validation Rules](#all-validation-
 6. **Dual-stable forms** — `variant_*.*`: both formatters keep the file stable; neither normalizes it to `input`.
 7. **Divergent-variant forms** — `divergent_variant_*.*`: prettier keeps the form stable; ours rewrites it to a *third* stable form, so three stable forms coexist.
 
-The three prettier-stable-form kinds differ only in what our formatter does:
-`prettier_variant_*` — ours → `input`; `variant_*` — ours keeps it (dual-stable);
-`divergent_variant_*` — ours → a distinct third stable form (NOT `input`, NOT the form).
 
 **Notes**:
 

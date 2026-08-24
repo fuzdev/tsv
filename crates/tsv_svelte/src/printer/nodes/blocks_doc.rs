@@ -1424,7 +1424,7 @@ impl<'a> Printer<'a> {
         // list). A head the parser could not read never gets here: it is a parse error, so
         // `type_parameters` is `Some` whenever the source wrote a `<…>`.
         let type_params_part = if let Some(decl) = &block.type_parameters {
-            tsv_ts::build_type_parameters_doc_with_comments(d, decl, &self.ts_inputs(), &self.embed)
+            tsv_ts::build_type_parameters_doc(d, decl, &self.ts_inputs(), self.embed)
         } else {
             d.empty()
         };
@@ -1437,16 +1437,16 @@ impl<'a> Printer<'a> {
         // printer a real function signature uses, so interior comments (`{ a = /* c */ 1 }`),
         // boundary comments (`a /* c */, b`), the single-pattern hug, and nesting-depth
         // expansion all match a standalone parameter list.
-        // `build_function_params_doc_with_comments` emits the `(…)` with no group of its
+        // `build_function_params_doc` emits the `(…)` with no group of its
         // own — the `group` below drives the wrap.
         let params_inner = match block.params_paren {
-            Some(paren) => tsv_ts::build_function_params_doc_with_comments(
+            Some(paren) => tsv_ts::build_function_params_doc(
                 d,
                 block.parameters,
                 Some(paren.start),
                 Some(paren.end),
                 &self.ts_inputs(),
-                &self.embed,
+                self.embed,
             ),
             None => d.text("()"),
         };

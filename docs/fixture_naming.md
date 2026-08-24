@@ -419,9 +419,7 @@ await_new_operand_own_line_block_comment_prettier_divergence/
 **For documenting dual-stable and divergent-variant forms** (`variant_*.*` / `divergent_variant_*.*`):
 
 All three prettier-stable-form kinds are prettier-idempotent and differ only in what
-our formatter does — `prettier_variant_*`: ours → `input`; `variant_*`: ours keeps it
-(dual-stable); `divergent_variant_*`: ours → a distinct third stable form (three stable
-forms coexist). Suffixes describe the form, e.g. `variant_compact`, `variant_wrapped`,
+our formatter does (the Terminology note at the top of this doc). Suffixes describe the form, e.g. `variant_compact`, `variant_wrapped`,
 `divergent_variant_own_line` (heritage keyword own-line form), `divergent_variant_spaces`
 (a blank-line form). Validation: rules N9/N11 + C3b/C3c in ./fixture_overview.md;
 README.md required.

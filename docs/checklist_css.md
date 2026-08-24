@@ -736,7 +736,7 @@ Corrections](conformance_svelte.md#css-corrections); the classes are:
   fallback, or an `@supports` `<general-enclosed>` — is content, not a terminator
 - Pseudo-element arguments (`::slotted()`, `::part()`) — internal parsing with
   Svelte-compatible public output. `parseCss` reads *every* pseudo-element argument as a
-  selector list and (since svelte 5.56.9) emits it as `PseudoElementSelector.args`; tsv
+  selector list and emits it as `PseudoElementSelector.args`; tsv
   models `::part( <ident>+ )` per CSS Shadow Parts instead — an ident run, not selectors —
   and projects it onto that selector-list shape at the wire boundary, so the public output
   matches while the internal AST keeps the per-ident spans the printer needs

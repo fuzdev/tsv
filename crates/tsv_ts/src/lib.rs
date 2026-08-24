@@ -76,6 +76,28 @@ pub struct PrinterInputs<'a> {
     pub has_format_ignore: bool,
 }
 
+impl<'a> PrinterInputs<'a> {
+    /// Build the per-document environment, deriving the two presence flags from the
+    /// comment list. The one place that scan lives — call it **once per document**
+    /// (`tsv_svelte` copies the flags it computed at construction into its per-island
+    /// `ts_inputs()`; see the field docs for why the scan must not move there).
+    pub fn for_document(
+        source: &'a str,
+        comments: &'a [ast::Comment],
+        line_breaks: &'a [u32],
+    ) -> Self {
+        PrinterInputs {
+            source,
+            comments,
+            line_breaks,
+            has_owned_comments: comments.iter().any(|c| c.owned_by_node),
+            has_format_ignore: comments
+                .iter()
+                .any(|c| is_format_ignore_directive(c.content(source))),
+        }
+    }
+}
+
 /// Build an *output* printer — pre-sizes the output buffer to the source
 /// length for the rendering path. Used by the entry points that write the
 /// buffer and return a `String` (`format`, `format_canonical`).
@@ -220,26 +242,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     // an embedded `<script>` never reaches here.
     #[cfg(feature = "comment_check")]
     tsv_lang::comment_ledger::register_parsed(source, program.comments);
-
-    // Fill the arena-parked line-break table (one warm table across a
-    // multi-file driver's files instead of a fresh Vec per file).
-    let mut line_breaks = arena.take_line_breaks_scratch();
-    build_line_breaks_into(source, &mut line_breaks);
-    let inputs = PrinterInputs {
-        source,
-        comments: program.comments,
-        line_breaks: &line_breaks,
-        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
-        has_format_ignore: program
-            .comments
-            .iter()
-            .any(|c| is_format_ignore_directive(c.content(source))),
-    };
-    let mut printer = make_printer(arena, &inputs, EmbedContext::default());
-    printer.print_program(program);
-    let output = printer.into_string();
-    arena.park_line_breaks_scratch(line_breaks);
-    output
+    format_program_in(program, source, arena, false)
 }
 
 /// Format a program with newline-derived authoring intent **erased** — the
@@ -281,24 +284,28 @@ pub fn format_canonical(program: &Program<'_>, source: &str) -> String {
 /// [`format_canonical`] into a caller-provided doc arena (see [`format_in`] for
 /// the arena-reuse contract).
 pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
-    // Build with the real line-break table (comment classification needs it), then
-    // switch the printer into canonical mode — which empties the *layout* table so
-    // blank-line / expansion reads collapse, while comment classification keeps the
-    // real table (`set_canonical`).
+    format_program_in(program, source, arena, true)
+}
+
+/// The shared body of [`format_in`] and [`format_canonical_in`]: fill the arena-parked
+/// line-break table (one warm table across a multi-file driver's files instead of a fresh
+/// Vec per file), build the printer, render. `canonical` switches the printer into
+/// canonical mode after construction — the build takes the real table (comment
+/// classification needs it) and `set_canonical` then empties only the *layout* table, so
+/// blank-line / expansion reads collapse while classification keeps the real lines.
+fn format_program_in(
+    program: &Program<'_>,
+    source: &str,
+    arena: &DocArena,
+    canonical: bool,
+) -> String {
     let mut line_breaks = arena.take_line_breaks_scratch();
     build_line_breaks_into(source, &mut line_breaks);
-    let inputs = PrinterInputs {
-        source,
-        comments: program.comments,
-        line_breaks: &line_breaks,
-        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
-        has_format_ignore: program
-            .comments
-            .iter()
-            .any(|c| is_format_ignore_directive(c.content(source))),
-    };
+    let inputs = PrinterInputs::for_document(source, program.comments, &line_breaks);
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
-    printer.set_canonical();
+    if canonical {
+        printer.set_canonical();
+    }
     printer.print_program(program);
     let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks);
@@ -313,23 +320,10 @@ pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena
 /// CLI's `--pretty`); byte-oriented consumers should call
 /// `convert_ast_json_bytes` directly.
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Value {
     serde_json::from_slice(&convert_ast_json_bytes(program, source))
         .expect("writer emits valid JSON")
-}
-
-/// Parse (`Goal::Module`) and emit the compact wire-JSON string in one call.
-///
-/// The parse analogue of [`format_str`] — the fully-fused one-shot convenience
-/// for callers that want the JSON string and never touch the AST directly.
-/// Batch/byte-oriented consumers thread [`parse`] + [`convert_ast_json_bytes`]
-/// instead.
-#[cfg(feature = "convert")]
-pub fn parse_to_json(source: &str) -> Result<String> {
-    let arena = bumpalo::Bump::new();
-    let program = parse(source, &arena)?;
-    Ok(convert_ast_json_string(&program, source))
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
@@ -397,7 +391,7 @@ fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations
 /// UTF-8 validation of the output. Byte-oriented consumers should prefer the
 /// bytes variant.
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(program, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
@@ -406,7 +400,7 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
 /// The `String` form of `convert_ast_json_bytes_no_locations` for `&str`
 /// boundaries (the WASM binding's `JSON.parse`, N-API strings).
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json_string_no_locations(program: &Program<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes_no_locations(program, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
@@ -428,7 +422,7 @@ pub fn convert_ast_json_string_no_locations(program: &Program<'_>, source: &str)
 // The `Parser::parse` method-path form clippy suggests for the bare `parser.parse()`
 // closure fails the higher-ranked lifetime check on `with_embedding_parser`'s `f`
 // bound (the closure lets the compiler infer it), so allow the closure here.
-#[allow(clippy::redundant_closure_for_method_calls)]
+#[expect(clippy::redundant_closure_for_method_calls)]
 pub fn parse_embedded<'arena>(
     source: &str,
     base_offset: usize,
@@ -484,16 +478,20 @@ pub fn parse_expression_with_comments<'arena>(
     })
 }
 
-/// Parse an expression and convert it to a binding pattern.
+/// Parse a binding pattern — an expression converted to a pattern, plus an optional
+/// `: T` annotation — and return it with the comments it collected.
 ///
-/// This parses an expression and then converts it to a pattern:
+/// The expression-to-pattern conversion:
 /// - ObjectExpression → ObjectPattern
 /// - ArrayExpression → ArrayPattern
 /// - SpreadElement → RestElement
 /// - AssignmentExpression → AssignmentPattern
 /// - Identifier → Identifier (unchanged)
 ///
-/// Used for parsing destructuring patterns in contexts like `@const {a, b} = expr`.
+/// Used for the Svelte block positions that take a destructuring or typed binding:
+/// `{@const {a, b} = expr}`, `{:then num: number}`, `{:catch error: Error}`. The
+/// annotation attaches through [`attach_pattern_type_annotation`], and the pattern
+/// (plus annotation) must fill the whole slice.
 ///
 /// # Arguments
 ///
@@ -502,12 +500,10 @@ pub fn parse_expression_with_comments<'arena>(
 ///
 /// # Returns
 ///
-/// * `Ok(Expression)` - The parsed pattern (ObjectPattern, ArrayPattern, etc.)
+/// * `Ok((pattern, comments))` - The parsed pattern (ObjectPattern, ArrayPattern, …) and
+///   the comments this sub-parse consumed — a caller that drops them drops the comment
+///   outright (see [`parse_type_annotation_partial`])
 /// * `Err(ParseError)` - If parsing or conversion fails
-///   Parse a pattern with comments, handling optional type annotations.
-///
-/// Used in Svelte block contexts (`{:then}`, `{:catch}`) where patterns
-/// may have type annotations (e.g., `{:then num: number}`).
 pub fn parse_pattern_with_comments<'arena>(
     source: &str,
     base_offset: usize,
@@ -715,7 +711,7 @@ pub fn parse_expression_partial_with_comments<'arena>(
 /// binding parses, so returning either would register every comment in the head twice.
 // The method-path form clippy suggests fails the higher-ranked lifetime check on
 // `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
-#[allow(clippy::redundant_closure_for_method_calls)]
+#[expect(clippy::redundant_closure_for_method_calls)]
 pub fn parse_type_extent(source: &str, base_offset: usize, arena: &bumpalo::Bump) -> Result<usize> {
     with_embedding_parser(source, base_offset, arena, |parser| parser.type_extent())
 }
@@ -741,27 +737,27 @@ pub fn parse_statement_with_comments<'arena>(
 /// `emit_semicolon` is `false` for embedders that supply their own terminator
 /// (Svelte declaration tags close with `}`). Set `inputs.comments` to `&[]` when
 /// no comments need to be preserved.
-pub fn build_variable_declaration_doc_with_comments(
+pub fn build_variable_declaration_doc(
     arena: &DocArena,
     decl: &VariableDeclaration<'_>,
     inputs: &PrinterInputs<'_>,
-    embed: &EmbedContext,
+    embed: EmbedContext,
     emit_semicolon: bool,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, *embed);
+    let printer = make_doc_printer(arena, inputs, embed);
     printer.build_variable_declaration_doc(decl, emit_semicolon, None)
 }
 
 /// Build a DocId for a TypeScript expression with comments in the caller's arena.
 ///
 /// Set `inputs.comments` to `&[]` when no comments need to be preserved.
-pub fn build_expression_doc_with_comments(
+pub fn build_expression_doc(
     arena: &DocArena,
     expression: &Expression<'_>,
     inputs: &PrinterInputs<'_>,
-    embed: &EmbedContext,
+    embed: EmbedContext,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, *embed);
+    let printer = make_doc_printer(arena, inputs, embed);
     printer.build_root_expression_doc(expression)
 }
 
@@ -794,15 +790,15 @@ pub fn build_comment_doc(
 /// are the source positions of the `(` and `)` (for leading / dangling / trailing comment
 /// lookup). Emits no group of its own — the caller's surrounding group controls breaking.
 /// Used by `tsv_svelte` for `{#snippet}` parameters.
-pub fn build_function_params_doc_with_comments(
+pub fn build_function_params_doc(
     arena: &DocArena,
     params: &[Expression<'_>],
     params_start: Option<u32>,
     trailing_comments_end: Option<u32>,
     inputs: &PrinterInputs<'_>,
-    embed: &EmbedContext,
+    embed: EmbedContext,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, *embed);
+    let printer = make_doc_printer(arena, inputs, embed);
     printer.build_params_doc_with_comments(params, params_start, trailing_comments_end)
 }
 
@@ -814,13 +810,13 @@ pub fn build_function_params_doc_with_comments(
 /// generic list all match a standalone declaration. The emitted doc includes its own group and
 /// the surrounding `<` / `>`, breaking independently of the parameter list. Used by `tsv_svelte`
 /// for `{#snippet}` generics.
-pub fn build_type_parameters_doc_with_comments(
+pub fn build_type_parameters_doc(
     arena: &DocArena,
     type_parameters: &TSTypeParameterDeclaration<'_>,
     inputs: &PrinterInputs<'_>,
-    embed: &EmbedContext,
+    embed: EmbedContext,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, *embed);
+    let printer = make_doc_printer(arena, inputs, embed);
     printer.build_type_parameter_declaration_doc_wrapping(type_parameters)
 }
 
@@ -833,13 +829,13 @@ pub fn build_type_parameters_doc_with_comments(
 /// builds itself (its own comment-preserving path) and which therefore has to
 /// append the annotation tail explicitly — an identifier binding gets it for free
 /// from the TypeScript pattern printer.
-pub fn build_type_annotation_doc_with_comments(
+pub fn build_type_annotation_doc(
     arena: &DocArena,
     annotation: &TSTypeAnnotation<'_>,
     inputs: &PrinterInputs<'_>,
-    embed: &EmbedContext,
+    embed: EmbedContext,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, *embed);
+    let printer = make_doc_printer(arena, inputs, embed);
     printer.build_type_annotation_doc_public(annotation)
 }
 
@@ -858,16 +854,7 @@ pub fn build_program_doc(
     line_breaks: &[u32],
     embed: EmbedContext,
 ) -> DocId {
-    let inputs = PrinterInputs {
-        source,
-        comments: program.comments,
-        line_breaks,
-        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
-        has_format_ignore: program
-            .comments
-            .iter()
-            .any(|c| is_format_ignore_directive(c.content(source))),
-    };
+    let inputs = PrinterInputs::for_document(source, program.comments, line_breaks);
     let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)
 }

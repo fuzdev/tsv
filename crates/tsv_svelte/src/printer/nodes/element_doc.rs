@@ -114,7 +114,7 @@ pub(super) struct ElementParts<'arena> {
 /// A named struct rather than a tuple: these are seven independent bools that would otherwise
 /// be positional and silently misorderable at the call site (the same reason
 /// [`MultilineInputs`](super::element_analysis) exists).
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy)]
 pub(super) struct TagClass {
     pub(super) kind: ElementKind,

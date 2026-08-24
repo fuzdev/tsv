@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // ≥2 lines: `build_comment_doc` only routes newline-containing content
         // here, with `line_spans` holding each line's byte range in `content`.
-        #[allow(clippy::unreachable)] // content has a newline ⇒ split yields ≥2 lines
+        #[expect(clippy::unreachable)] // content has a newline ⇒ split yields ≥2 lines
         let [first, middle @ .., last] = line_spans else {
             unreachable!("multi-line comment");
         };
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
 
         // ≥2 lines: `build_comment_doc` only routes newline-containing content
         // here, with `line_spans` holding each line's byte range in `content`.
-        #[allow(clippy::unreachable)] // content retains the newline ⇒ split yields ≥2 lines
+        #[expect(clippy::unreachable)] // content retains the newline ⇒ split yields ≥2 lines
         let Some((first, rest)) = line_spans.split_first() else {
             unreachable!("multi-line comment");
         };

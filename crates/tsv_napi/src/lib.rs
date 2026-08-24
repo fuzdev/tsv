@@ -277,6 +277,8 @@ pub struct IgnoreStack {
 impl IgnoreStack {
     /// An empty stack (ignores nothing until layers are added).
     #[napi(constructor, catch_unwind)]
+    // `allow`, not `expect`: the lint fires without it, but through the `#[napi]` expansion
+    // an expectation never registers as fulfilled.
     #[allow(clippy::new_without_default)] // napi exports the constructor
     pub fn new() -> IgnoreStack {
         IgnoreStack {
@@ -450,6 +452,7 @@ fn or_undefined(value: Option<String>) -> Either<String, Undefined> {
 /// genuinely in flight.
 #[cfg(feature = "panic_probe")]
 #[napi(js_name = "__panic_probe", catch_unwind)]
+// `allow`, not `expect`: same `#[napi]`-expansion artifact as `IgnoreStack::new` above.
 #[allow(clippy::panic)] // panicking is the export's entire purpose
 pub fn panic_probe() {
     with_ast_arena(|arena| {

@@ -206,8 +206,7 @@ fn compile_places_a_nested_snippet_named_after_a_top_level_snippet() {
     // sides — a fragment is a fresh scope, so the oracle places the two
     // declarations independently. The hoist decision is keyed by snippet IDENTITY
     // (`SnippetAnalysis`'s span set), so the nested twin never inherits the
-    // top-level one's verdict; both former sub-cases now COMPILE (they were the
-    // retired `NestedSnippetNameCollision` refusal). Byte-parity is pinned by the
+    // top-level one's verdict; both sub-cases COMPILE. Byte-parity is pinned by the
     // `snippets/nested_name_{hoisted,body}` compile fixtures; these assertions pin
     // the placement directly and cover the fixpoint case (b′) that has no fixture.
 

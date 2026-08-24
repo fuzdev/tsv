@@ -165,7 +165,7 @@ pub struct TSParameterProperty<'arena> {
 
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`
 #[derive(Debug, Clone)]
-#[allow(clippy::struct_excessive_bools)] // independent flags, not a state machine
+#[expect(clippy::struct_excessive_bools)] // independent flags, not a state machine
 pub struct MethodDefinition<'arena> {
     /// Decorators applied to this method
     pub decorators: Option<&'arena [Decorator<'arena>]>,
@@ -209,7 +209,7 @@ pub enum PropertyModifier {
 /// Property definition in a class body: `name = value;` or `name;`
 ///
 /// Unlike methods, properties use `=` for initialization.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct PropertyDefinition<'arena> {
     /// Decorators applied to this property

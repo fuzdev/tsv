@@ -208,7 +208,7 @@ pub(super) fn build_call_doc_with_wrapping(
     if test_call_flat {
         // Check for trailing comments on last arg. The empty-args case returned
         // above, so `arguments` is non-empty here and `.last()` is always `Some`.
-        #[allow(clippy::unreachable)] // empty args already returned above ⇒ last() is Some
+        #[expect(clippy::unreachable)] // empty args already returned above ⇒ last() is Some
         let Some(last_arg) = call.arguments.last() else {
             unreachable!("a test call requires arguments");
         };

@@ -267,7 +267,7 @@ impl<'a> Printer<'a> {
         content_end: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        #[allow(clippy::expect_used)] // "from" must exist in a valid import/export declaration
+        #[expect(clippy::expect_used)] // "from" must exist in a valid import/export declaration
         let from_end = self
             .find_keyword_end("from", decl_start, source.span.start)
             .expect("'from' keyword must exist in import/export declaration");

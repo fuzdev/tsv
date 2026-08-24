@@ -473,7 +473,7 @@ ES2015 module syntax with ES2025 additions.
 - Multiple `implements`
 - `declare class`
 
-**Decorators** (a TC39 proposal — not in any ECMAScript edition; shipped in TS 5.0):
+**Decorators** (a TC39 proposal — not in any ECMAScript edition):
 
 - Class decorators (`@decorator class C {}`)
 - Decorated class expressions (`x = @dec class {}`)
@@ -495,8 +495,8 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 
 **Other Features**:
 
-- `override` modifier - TS 4.3, including the `abstract override` pair. `abstract override` is tsc's canonical order and the only one it accepts; tsv prints that order (as prettier does) whichever way the source spells it
-- `accessor` keyword - ES2022/TS 4.9
+- `override` modifier, including the `abstract override` pair. `abstract override` is tsc's canonical order and the only one it accepts; tsv prints that order (as prettier does) whichever way the source spells it
+- `accessor` keyword
 - Parameter properties (`constructor(public x: T)`) — all modifiers: `public`/`private`/`protected`, `override`, `readonly` (canonical order `accessibility → override → readonly`)
 
 ---
@@ -592,7 +592,7 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 - Angle-bracket assertion (`<Type>expr`)
 - `as const` assertion
 - Non-null assertion (`expr!`)
-- `satisfies` operator - TS 4.9
+- `satisfies` operator
 
 ### Type Aliases
 
@@ -699,13 +699,13 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 - Generic interfaces
 - Generic type aliases
 
-**Advanced Generics** (TS 4.7+):
+**Advanced Generics**:
 
-- Const type parameters (`<const T>`) - TS 5.0
-- Variance modifiers (`in`, `out`) - TS 4.7
+- Const type parameters (`<const T>`)
+- Variance modifiers (`in`, `out`)
 - Modifiers in any ORDER (`<const in T>`, `<in const T>`, `<out in T>`) — tsc's parser collects them order-free and leaves the ordering rules ("'const' modifier must precede 'in' modifier", TS1029 for the variance pair) to its grammar checker, so tsv defers them alongside the context one; prettier formats every spelling. A **repeat** is the exception tsv rejects (`<out out T>` → `Duplicate modifier: 'out'`, matching acorn): a duplicate is invalid in every context and adjudicable from the construct alone — the unconditional-local bucket — where tsc again defers (TS1030) and prettier collapses it. The repeat check sits behind the name test, so a trailing repeat that IS the name is untouched (`<out out>`)
 - `out` as a type parameter NAME (`<out>`, `<out, T>`, `<out = string>`, `<in out>`, `<out out>`) — the variance keyword is contextual, so it is a modifier only when a name can still follow it (tsc's `nextTokenCanFollowModifier`); the test is the next token's shape, which is why `<out extends string>` keeps `out` a modifier and then rejects for want of a name, in tsc, prettier and acorn alike
-- Type instantiation expressions (`fn<T>`) - TS 4.7
+- Type instantiation expressions (`fn<T>`)
 - A numeric type argument may omit its integer part (`fn<.5>`, `fn<A[.5]>`, `fn<keyof .5>`) — the spec's `.`-led `DecimalLiteral` production is a literal type like any other, so acorn reads each as an instantiation. The `.` opens one only where a **digit** follows it: everywhere else it is a member tail on what precedes it, and after an operator keyword both readings are live — `p < keyof.a > (t, u)` is a comparison on the value `keyof.a` (prettier's tsc parser rejects that line outright, see [conformance_prettier_ts.md](./conformance_prettier_ts.md) §Prettier rejects valid input)
 
 ### Function TypeScript Features
@@ -730,7 +730,7 @@ A **finished (Stage 4)** TC39 proposal — `../../proposals/finished-proposals.m
 expected publication year of 2027, so the grammar is settled but has not yet landed in a
 published edition. It is absent from the `../../ecma262/` draft, and that proves nothing either
 way: a finished proposal is one that "is (or soon will be) included in the latest draft", so
-the draft's silence is not evidence of an earlier stage. Shipped in TS 5.2. Svelte's parser
+the draft's silence is not evidence of an earlier stage. Svelte's parser
 rejects it; tsv is native — see
 [conformance_svelte.md](./conformance_svelte.md#typescript-corrections).
 

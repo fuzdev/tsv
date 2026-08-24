@@ -121,7 +121,7 @@ while the rest drop. The keep condition (a block STARTS before the comment, and 
 target exists) is bidirectionally exact against the pinned oracle; three reprint-divergent
 sub-classes still refuse (multi-line block comment, erased-region comment, format-ignore).
 Full condition and fixtures:
-[checklist_svelte_compiler.md §The open half](checklist_svelte_compiler.md#the-open-half-a-module-comment-recovered-by-a-preceding-block).
+[checklist_svelte_compiler.md §The other half](checklist_svelte_compiler.md#the-other-half-a-module-comment-recovered-by-a-preceding-block).
 
 No fixture is proposed: a refusal is not expressible as a compile fixture (those require
 a successful compile), and the shape is an oracle print artifact — pinning its *output*

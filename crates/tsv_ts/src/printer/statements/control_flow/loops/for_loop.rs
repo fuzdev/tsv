@@ -1092,7 +1092,7 @@ impl<'a> Printer<'a> {
     /// `for (` opening is built in split form (`" "` + `"("`) so the optional
     /// `await` keyword slots in between — render-identical to for-in's fused
     /// `" ("`.
-    #[allow(clippy::too_many_arguments)] // one cohesive for-in/of assembly; a bundle would re-thread the same values
+    #[expect(clippy::too_many_arguments)] // one cohesive for-in/of assembly; a bundle would re-thread the same values
     fn build_for_in_of_statement_with_body_doc(
         &self,
         left: &internal::ForInOfLeft<'_>,
@@ -1331,7 +1331,7 @@ impl<'a> Printer<'a> {
     /// hand-rolled `hardline` per comment there split a run the author glued and erased
     /// an author blank between two own-line comments, which is that twin's rustdoc
     /// verbatim.
-    #[allow(clippy::too_many_arguments)] // the breaking layout shares the inline one's prebuilt parts; a bundle would re-thread them
+    #[expect(clippy::too_many_arguments)] // the breaking layout shares the inline one's prebuilt parts; a bundle would re-thread them
     fn build_for_in_of_with_line_comments(
         &self,
         right: &Expression<'_>,

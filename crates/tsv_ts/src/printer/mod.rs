@@ -328,7 +328,7 @@ pub struct Printer<'a> {
     /// included, because the host has no operator line to end and the hardline would
     /// strand the `(` at the head's own column ([`Printer::build_jsdoc_cast_doc`]).
     ///
-    /// Set once per expression entry (`build_expression_doc_with_comments` →
+    /// Set once per expression entry (`tsv_ts::build_expression_doc` →
     /// [`Printer::mark_jsdoc_cast_cannot_hang_gap`]) on the value's **left-spine** cast —
     /// the one whose comment leads the value, the same `leading_jsdoc_cast` walk the TS
     /// hang predicates use — and never touched during the walk, unlike

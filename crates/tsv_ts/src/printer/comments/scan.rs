@@ -286,7 +286,7 @@ impl<'a> Printer<'a> {
 
     /// Find the comma position between two adjacent list elements,
     /// skipping over any comments in between.
-    #[allow(clippy::expect_used)]
+    #[expect(clippy::expect_used)]
     pub(crate) fn find_list_comma(&self, elem_end: u32, next_start: u32) -> u32 {
         find_char_skipping_comments(
             self.source.as_bytes(),

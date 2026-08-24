@@ -90,6 +90,21 @@ pub fn format(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
     printer::format_css(stylesheet, source)
 }
 
+/// Parse and format `source` in one call.
+///
+/// The fully-fused one-shot convenience (the CSS twin of `tsv_ts::format_str` /
+/// `tsv_svelte::format_str`), for callers that just want the formatted string and
+/// never touch the AST. Batch drivers thread [`parse`] + [`format_in`] instead.
+pub fn format_str(source: &str) -> Result<String> {
+    // The format path's line-terminator fold, ahead of the parse (see
+    // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
+    // alone so its offsets stay a drop-in contract with `parseCss`'s.
+    let source = tsv_lang::printing::normalize_carriage_returns(source);
+    let arena = bumpalo::Bump::new();
+    let stylesheet = parse(&source, &arena)?;
+    Ok(format(&stylesheet, &source))
+}
+
 /// Format into a caller-provided doc arena.
 ///
 /// Identical output to [`fn@format`], but the doc IR is built into `arena` instead
@@ -138,7 +153,7 @@ pub fn format_embedded_in(
 /// (the CLI's `--pretty`, the fixture gate); byte-oriented consumers should
 /// call `convert_ast_json_bytes` directly.
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_json::Value {
     serde_json::from_slice(&convert_ast_json_bytes(stylesheet, source))
         .expect("writer emits valid JSON")
@@ -175,7 +190,7 @@ pub fn convert_ast_json_bytes_no_locations(
 /// WASM binding's `JSON.parse`, N-API strings): same wire bytes plus one
 /// UTF-8 validation of the output.
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(stylesheet, source))
         .expect("serde_json emits valid UTF-8")

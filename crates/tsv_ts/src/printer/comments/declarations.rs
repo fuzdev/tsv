@@ -262,7 +262,7 @@ impl<'a> Printer<'a> {
         marker: u8,
     ) -> u32 {
         let d = self.d();
-        #[allow(clippy::expect_used)] // Parser guarantees the marker exists when the flag is set
+        #[expect(clippy::expect_used)] // Parser guarantees the marker exists when the flag is set
         let pos = find_char_skipping_comments(
             self.source.as_bytes(),
             after as usize,

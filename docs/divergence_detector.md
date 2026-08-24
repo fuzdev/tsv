@@ -223,9 +223,9 @@ Four buckets, in rough priority order:
 
 Note that a pattern detecting no *documented* fixture is not thereby dead —
 `empty_statement_removal` detects none yet fires on 3 corpus files, so check
-`--audit-patterns` (the corpus-side view) before concluding. `block_multiline_attrs_hug`
-was the one pattern dead by every measure (0 corpus files, 0 committed fixture pairs, 0
-documented) and has been deleted.
+`--audit-patterns` (the corpus-side view) before concluding. A pattern dead by every
+measure (0 corpus files, 0 committed fixture pairs, 0 documented) is deleted, not kept as
+a placeholder.
 
 ## Pattern Registry
 

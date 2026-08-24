@@ -508,7 +508,7 @@ pub enum CachedWidth {
 /// indicates a bug — docs containing source spans must use resolved print
 /// functions (the ones threading the document source).
 #[inline]
-#[allow(clippy::expect_used)] // Intentional: SourceSpan without source is a programming error
+#[expect(clippy::expect_used)] // Intentional: SourceSpan without source is a programming error
 pub(super) fn resolve_text<'a>(
     text: &'a DocText,
     source: Option<&'a str>,

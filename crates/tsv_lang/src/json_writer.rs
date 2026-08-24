@@ -489,7 +489,7 @@ impl JsonWriter {
     /// call sites was measured and is a **wash** (fuz_app −0.02%, zzz +0.03%
     /// instructions), so it is not worth the code size. Don't re-mint it.
     #[inline]
-    #[allow(clippy::expect_used)]
+    #[expect(clippy::expect_used)]
     pub fn string(&mut self, s: &str) {
         if needs_escape(s.as_bytes()) {
             serde_json::to_writer(&mut self.buf, s).expect("Vec<u8> write is infallible");
@@ -503,7 +503,7 @@ impl JsonWriter {
     /// A non-integral `f64` (the rare literal tail) — `serde_json`'s ryu
     /// formatting, matching `serde_json::Number` serialization.
     #[inline]
-    #[allow(clippy::expect_used)]
+    #[expect(clippy::expect_used)]
     pub fn f64(&mut self, n: f64) {
         serde_json::to_writer(&mut self.buf, &n).expect("Vec<u8> write is infallible");
     }

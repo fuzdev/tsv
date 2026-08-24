@@ -43,7 +43,7 @@ These steps match CLAUDE.md's numbered list. Each is expanded in a section below
 6. VALIDATE — deno task fixtures:validate <pattern>, add unformatted_* variants
 ```
 
-**Approval Gate**: Never proceed past step 4 without explicit user approval. Present the fixture content and failing diff, then wait for "lgtm" or feedback. **If the user gives feedback requiring fixture changes, redo steps 1-3 and return to step 4 — the gate resets every time the fixture changes.** Variants (step 6) don't need separate approval unless complex (divergence fixtures).
+**Approval Gate** (step 4) is a hard stop — what to present, and how the gate resets on rework, is stated once under [Steps 3-4](#steps-3-4-see-it-fail--approval-gate).
 
 **Failing tests are the normal starting point.** When you create a fixture for a feature that doesn't exist yet, tests will fail. That's the workflow — the fixture defines the target, implementation catches up.
 
@@ -282,9 +282,9 @@ deno task fixtures:validate <pattern>
 - The failing diff
 - Your proposed fix approach
 
-Wait for explicit approval before writing ANY implementation code. This is a hard stop — not a suggestion.
+Wait for explicit approval ("lgtm" or feedback) before writing ANY implementation code. This is a hard stop — not a suggestion.
 
-**The gate resets on rework.** If the user gives feedback that requires changing the fixture (naming, structure, cases, etc.), redo steps 1-3 and return here for approval again. Every version of the fixture must pass through this gate before implementation begins.
+**The gate resets on rework.** If the user gives feedback that requires changing the fixture (naming, structure, cases, etc.), redo steps 1-3 and return here for approval again. Every version of the fixture must pass through this gate before implementation begins. Variants (step 6) don't need separate approval unless complex (divergence fixtures).
 
 ---
 

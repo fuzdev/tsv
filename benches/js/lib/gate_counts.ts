@@ -6,33 +6,12 @@
  * green run. This is `scripts/validate_artifacts.ts`'s tight-bounds philosophy
  * applied to counts: every real move in a number is a deliberate, visible edit.
  *
- * Three pin categories, chosen per surface:
- *
- * - **Exact pins** (`*_PINS` / `*_PIN`) — surfaces whose inputs are pinned or
- *   committed: the fixtures gates and harvests (suite checkouts version-gated
- *   by `deno task pins:audit`) and ts-repo/test262/wpt (checkouts updated
- *   deliberately). Any mismatch — up or down — fails. No slack: slack lets
- *   small regressions creep and silently widens after every refresh.
- * - **Minimums** (`*_MIN`) — success counts. Two flavors: the FORMAT `match`
- *   minimum (`CORPUS_FORMAT_MATCH_MIN`) is over the REPRODUCIBLE subset (pinned
- *   framework + prettier suites), so it's exact-on-aligned-checkouts — the
- *   minimum is only there so a fixed win needn't re-pin; over pinned inputs a
- *   drop is always a real regression. The PARSE `compared` minimum
- *   (`CORPUS_PARSE_COMPARED_MIN`) and the committed-fixtures audits stay
- *   genuine live-growth minimums (dev repos / reviewed fixture diffs grow, so
- *   growth passes, a drop fails) — except `SVELTE_STYLES_BLOCKS_MIN`, which
- *   counts pure input material off daily-churning repos, so a small drop only
- *   warns and only a >10% collapse fails (see its comment).
- * - **Failure-bucket pins** (`*_PIN`, exact two-sided `!==`): the triage buckets
- *   on `corpus:compare:* --all`. The FORMAT `unknown`/`partial` pins are over
- *   the REPRODUCIBLE subset (deterministic on aligned checkouts — the live dev
- *   repos are a non-gating WARN); the PARSE tsv-side parse-failure pin stays over
- *   the live corpus (a tsv over-rejection of real code is a regression wherever
- *   it occurs). A rise fails until triaged — fix it, add a divergence
- *   detector/sanction, or consciously re-pin (a legitimately-unsupported new
- *   file); a drop also fails, so the pin ratchets DOWN deliberately and wins
- *   stay recorded. **SAFETY (content loss) always gates over EVERY file,
- *   reproducible or live — data loss is never churn.**
+ * Three pin categories, chosen per surface — exact pins (`*_PINS` / `*_PIN`),
+ * minimums (`*_MIN`), and failure-bucket pins (exact two-sided `!==`). What each
+ * means, which surface takes which, and why (the reproducible-subset rule, the
+ * `SVELTE_STYLES_BLOCKS_MIN` drift band, SAFETY gating over EVERY file) is stated
+ * once in docs/gate_counts.md §Semantics; the per-constant docstrings below carry
+ * only what is specific to that constant.
  *
  * Pins are enforced only on FULL runs (default suite root, `--all`, default
  * harvest source) — a subtree or filtered run legitimately grades a slice.

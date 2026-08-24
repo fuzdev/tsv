@@ -17,7 +17,7 @@ use super::super::expression::ParsedExpr;
 /// modifier set, the (possibly computed) key, and the optional/type-param
 /// markers. `parse_class_member` builds this, then dispatches to
 /// `finish_method_member` / `finish_property_member`.
-#[allow(clippy::struct_excessive_bools)] // independent modifier flags, not a state machine
+#[expect(clippy::struct_excessive_bools)] // independent modifier flags, not a state machine
 struct ClassMemberHeader<'arena> {
     start: usize,
     decorators: &'arena [Decorator<'arena>],

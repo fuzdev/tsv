@@ -136,7 +136,7 @@ fn admissible_group_state(
 /// common node kind), and there are only two call sites, one per render loop.
 /// Forcing it measured instructions −0.8% on both corpora with cycles and
 /// branch-misses down alongside — a real win, not an icache artifact.
-#[allow(clippy::inline_always)]
+#[expect(clippy::inline_always)]
 #[inline(always)]
 fn render_text(
     text: &super::types::DocText,
@@ -283,7 +283,7 @@ pub(super) fn render_line_break(
 /// the whole render loop — so it calls the arm instead.
 // Remaining args are the mutable render state, deliberately unbundled — see
 // `render_doc_core`.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 #[inline]
 fn render_line_node(
     ctx: &RenderCtx<'_>,
@@ -702,7 +702,7 @@ fn render_doc_iterative(
 // Remaining args are the MUTABLE render state (`output`/`pos`/`should_remeasure`, plus the
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn render_doc_core<P: RenderPolicy>(
     ctx: &RenderCtx<'_>,
     doc: DocId,
@@ -1159,7 +1159,7 @@ pub(super) fn render_single_doc(
 // Remaining args are the MUTABLE render state (`output`/`pos`/`should_remeasure`, plus the
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(super) fn render_single_doc_inner(
     ctx: &RenderCtx<'_>,
     doc: DocId,

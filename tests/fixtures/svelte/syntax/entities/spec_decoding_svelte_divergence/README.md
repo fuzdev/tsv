@@ -6,7 +6,7 @@ than a choice Svelte made, so tsv decodes them. See
 [conformance_svelte.md §Entity Decoding Corrections](../../../../../../docs/conformance_svelte.md#entity-decoding-corrections)
 for the catalog entry.
 
-## The three cases
+## The four cases
 
 **Uppercase hex** (`&#X41;` → `A`). The
 [numeric character reference state](https://html.spec.whatwg.org/multipage/parsing.html#numeric-character-reference-state)

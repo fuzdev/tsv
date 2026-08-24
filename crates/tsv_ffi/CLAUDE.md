@@ -28,18 +28,18 @@ The `lang_bindings!` macro generates four `extern "C"` functions per language (s
 - `tsv_parse_internal_<lang>` — Empty string (benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
 - `tsv_format_<lang>` — Formatted source
 
-Plus, outside the macro, three goal-aware TypeScript parse entry points taking a
-trailing goal code (`0` = Module, else Script): `tsv_parse_typescript_with_goal`,
+Plus, outside the macro, four goal-aware TypeScript entry points taking a
+trailing goal code (`0` = Module, `1` = Script; any other code returns an error
+JSON rather than a silent default): `tsv_parse_typescript_with_goal`,
 `tsv_parse_typescript_no_locations_with_goal`,
-`tsv_parse_internal_typescript_with_goal`. **Parse only** — there is no
-`tsv_format_typescript_with_goal`, so a Script-goal *format* is unreachable over
-the C ABI, unlike `tsv format --goal` and `tsv_wasm`'s
-`format_typescript(src, {goal})` (see
-[../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Format Options).
+`tsv_parse_internal_typescript_with_goal`, and `tsv_format_typescript_with_goal`
+— the C-ABI counterparts of `tsv_napi`'s `*_with_goal` quartet and `tsv_wasm`'s
+`{goal}` option (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Format
+Options); coverage is identical across the three bindings.
 
 Plus `tsv_free(ptr, len)` for deallocation.
 
-All return-pointer functions share the signature `(source_ptr: *const u8, source_len: usize, out_len: *mut usize) -> *mut u8` — except the three goal-aware TypeScript exports (`tsv_parse_typescript_with_goal` / `tsv_parse_typescript_no_locations_with_goal` / `tsv_parse_internal_typescript_with_goal`), which take a fourth `goal: u32` parameter before `out_len`.
+All return-pointer functions share the signature `(source_ptr: *const u8, source_len: usize, out_len: *mut usize) -> *mut u8` — except the four goal-aware TypeScript exports (`tsv_parse_typescript_with_goal` / `tsv_parse_typescript_no_locations_with_goal` / `tsv_parse_internal_typescript_with_goal` / `tsv_format_typescript_with_goal`), which take a fourth `goal: u32` parameter before `out_len`.
 
 ## Memory & Safety Contract
 
