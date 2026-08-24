@@ -40,6 +40,7 @@ import { join } from 'node:path';
 import { TEST262_POSITIVES_PIN } from './lib/gate_counts.ts';
 import {
 	git_head,
+	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
 	type StampInputs,
@@ -50,7 +51,7 @@ const TEST262_ROOT = '../test262';
 const CACHE_DIR = 'benches/js/.cache';
 const MANIFEST_PATH = `${CACHE_DIR}/test262_manifest.json`;
 const FILES_PATH = `${CACHE_DIR}/test262_files.json`;
-const STAMP_PATH = `${CACHE_DIR}/test262.stamp.json`;
+const STAMP_PATH = HARVEST_STAMPS.test262.path;
 
 const if_present = Deno.args.includes('--if-present');
 const force = Deno.args.includes('--force');

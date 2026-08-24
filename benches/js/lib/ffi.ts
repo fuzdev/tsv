@@ -4,8 +4,7 @@
  * Uses Deno.dlopen to call the Rust library directly for maximum performance.
  */
 
-import { fileURLToPath } from 'node:url';
-import { native_library_filename } from './runtime.ts';
+import { ffi_library_path } from './tsv_artifacts.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 
@@ -118,9 +117,7 @@ type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
  * The corpus comparison task sets this to "corpus" for panic recovery.
  */
 export function get_library_path(): string {
-	const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
-	const target_dir = fileURLToPath(new URL('../../../target', import.meta.url));
-	return `${target_dir}/${profile}/${native_library_filename('tsv_ffi')}`;
+	return ffi_library_path(Deno.env.get('TSV_FFI_PROFILE') ?? 'release');
 }
 
 /** Persistent marshalling buffers + their externalized pointers (see the `symbols` comment). */

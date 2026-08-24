@@ -895,7 +895,10 @@ over restating the number.
 Two things a bump can invalidate that `deno task check` does **not** cover, because
 both are sidecar-dependent: `deno task compile:validation` (the ratchet's
 `ORACLE-ERROR` line is a claim about oracle behavior, explicitly held "until the pin
-moves") and `deno task bench:harvest` (`SVELTE_REJECTS_PIN` counts what the oracle
-rejects). Run both. Svelte-source line anchors in
+moves") and `deno task bench:pins:suites` (`SVELTE_REJECTS_PIN` and
+`CSS_REJECTS_PIN` count what the oracle rejects — both stamp the oracle version, so
+the bump re-grades them; the group is a `deno task conformance` preflight, so a
+release run does catch a trip, but at the worst moment for the diagnosis). Run both.
+Svelte-source line anchors in
 [checklist_svelte_compiler.md](checklist_svelte_compiler.md) are the third — nothing
 gates a line number, so spot-check a few.

@@ -394,7 +394,7 @@ if (run_checkouts) {
 			// The recorded commits are abbreviated, so compare on the prefix.
 			if (!head.startsWith(commit)) {
 				drifted.push(
-					`${repo}: measured at ${commit}, now at ${head.slice(0, commit.length)} — pins: ${pins}`
+					`${repo}: measured at ${commit}, now at ${head.slice(0, commit.length)} — pins: ${pins.join(', ')}`
 				);
 			}
 		}

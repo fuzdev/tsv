@@ -24,8 +24,7 @@
  */
 
 import { stat } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { native_library_filename } from './runtime.ts';
+import { napi_library_path } from './tsv_artifacts.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 
@@ -59,8 +58,7 @@ export interface NapiAddon {
  * `target/napi/` is the workspace `napi` profile's output — release + unwind,
  * the shipped panic contract. */
 export function get_napi_library_path(): string {
-	const project_root = fileURLToPath(new URL('../../../', import.meta.url));
-	return `${project_root}target/napi/${native_library_filename('tsv_napi')}`;
+	return napi_library_path();
 }
 
 /**

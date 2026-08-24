@@ -96,6 +96,7 @@ import { basename, join } from 'node:path';
 import { TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN } from './lib/gate_counts.ts';
 import {
 	git_head,
+	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
 	type StampInputs,
@@ -139,7 +140,7 @@ const DECLARATIONS = 'skip' as const;
 const CACHE_DIR = 'benches/js/.cache';
 const FILES_PATH = `${CACHE_DIR}/ts_repo_files.json`;
 const REJECTS_PATH = `${CACHE_DIR}/ts_repo_rejects.json`;
-const STAMP_PATH = `${CACHE_DIR}/ts_repo.stamp.json`;
+const STAMP_PATH = HARVEST_STAMPS.ts_repo.path;
 
 /**
  * `TS1490` — "File appears to be binary". An ENCODING verdict, not a grammar one:
