@@ -13,7 +13,7 @@
  * JS string in and the returned `String` out. `parse_<lang>` returns a JSON
  * string (parity with FFI/WASM — the host `JSON.parse`s it), and engine errors
  * surface as thrown JS errors (napi-rs converts the `napi::Error`), so there is
- * no `{"error": …}` envelope to inspect — a throw just propagates. A Rust PANIC
+ * no status out-param to read (the FFI shape) — a throw just propagates. A Rust PANIC
  * surfaces the same way: every export carries `catch_unwind` and the `napi`
  * profile unwinds, so a panic throws instead of aborting the host (stack
  * overflow excepted — that still aborts).
@@ -25,29 +25,30 @@
 
 import { stat } from 'node:fs/promises';
 import { napi_library_path } from './tsv_artifacts.ts';
-import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
+import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 
-/** The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI). */
+/**
+ * The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI).
+ *
+ * One export per (language, operation), each taking the goal as a trailing
+ * OPTIONAL argument (`'script'`/`'module'`; omitted = module) — there is no
+ * goalless twin to pick between. Svelte and CSS REJECT a set goal rather than
+ * ignoring it, so the wrappers below withhold it for them.
+ */
 export interface NapiAddon {
-	parse_svelte: (source: string) => string;
-	parse_internal_svelte: (source: string) => void;
-	format_svelte: (source: string) => string;
-	parse_typescript: (source: string) => string;
-	parse_internal_typescript: (source: string) => void;
-	format_typescript: (source: string) => string;
-	parse_css: (source: string) => string;
-	parse_internal_css: (source: string) => void;
-	format_css: (source: string) => string;
+	parse_svelte: (source: string, goal?: string) => string;
+	parse_internal_svelte: (source: string, goal?: string) => void;
+	format_svelte: (source: string, goal?: string) => string;
+	parse_typescript: (source: string, goal?: string) => string;
+	parse_internal_typescript: (source: string, goal?: string) => void;
+	format_typescript: (source: string, goal?: string) => string;
+	parse_css: (source: string, goal?: string) => string;
+	parse_internal_css: (source: string, goal?: string) => void;
+	format_css: (source: string, goal?: string) => string;
 	// span-only wire — svelte + typescript only (CSS emits no `loc`)
-	parse_svelte_no_locations: (source: string) => string;
-	parse_typescript_no_locations: (source: string) => string;
-	// goal-aware TS (`'script'`/`'module'`) — parse for the conformance surface's
-	// test262 files; format is the flat counterpart of tsv_wasm's `{goal}` bag
-	parse_typescript_with_goal: (source: string, goal: string) => string;
-	parse_typescript_no_locations_with_goal: (source: string, goal: string) => string;
-	parse_internal_typescript_with_goal: (source: string, goal: string) => void;
-	format_typescript_with_goal: (source: string, goal: string) => string;
+	parse_svelte_no_locations: (source: string, goal?: string) => string;
+	parse_typescript_no_locations: (source: string, goal?: string) => string;
 	// test-only panic-contract probe — present only when built with the
 	// `panic_probe` cargo feature (`deno task test:napi`); absent in published
 	// builds, so `test_napi.ts` skips its contract test when undefined
@@ -69,11 +70,11 @@ export function get_napi_library_path(): string {
  * charged to whichever row it sat under, which belongs to no impl.
  */
 interface NapiTables {
-	parse: Record<Language, (source: string) => string>;
-	parse_internal: Record<Language, (source: string) => void>;
+	parse: Record<Language, (source: string, goal?: string) => string>;
+	parse_internal: Record<Language, (source: string, goal?: string) => void>;
 	/** Span-only wire — svelte + typescript only (CSS emits no `loc`). */
-	parse_no_locations: Partial<Record<Language, (source: string) => string>>;
-	format: Record<Language, (source: string) => string>;
+	parse_no_locations: Partial<Record<Language, (source: string, goal?: string) => string>>;
+	format: Record<Language, (source: string, goal?: string) => string>;
 }
 
 export class NapiImplementation extends BaseImplementation {
@@ -137,31 +138,24 @@ export class NapiImplementation extends BaseImplementation {
 		assert_binding_reports_rejection('tsv (N-API)', this);
 	}
 
+	// `goal_for` withholds the goal for svelte/css, which REJECT a set goal rather
+	// than ignoring it (`tsv_napi`'s `napi_goal`). One shared helper for all three
+	// wrappers — see its doc in `lib/types.ts`.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		// `parse_<lang>` returns a JSON string (the engine throws on parse error);
 		// materialize it the same way ffi.ts / wasm.ts do for an apples-to-apples
-		// `tsv-json`-style row. A test262 goal routes through the goal-aware TS export.
-		if (goal && language === 'typescript') {
-			return JSON.parse(this.addon.parse_typescript_with_goal(source, goal));
-		}
-		return JSON.parse(this.tables.parse[language](source));
+		// `tsv-json`-style row.
+		return JSON.parse(this.tables.parse[language](source, goal_for(language, goal)));
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		if (goal && language === 'typescript') {
-			this.addon.parse_internal_typescript_with_goal(source, goal);
-			return;
-		}
-		this.tables.parse_internal[language](source);
+		this.tables.parse_internal[language](source, goal_for(language, goal));
 	}
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
-		if (goal && language === 'typescript') {
-			return JSON.parse(this.addon.parse_typescript_no_locations_with_goal(source, goal));
-		}
 		const fn = this.tables.parse_no_locations[language];
 		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
-		return JSON.parse(fn(source));
+		return JSON.parse(fn(source, goal_for(language, goal)));
 	}
 
 	format(source: string, language: Language): string {

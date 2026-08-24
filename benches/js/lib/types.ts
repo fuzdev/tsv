@@ -59,6 +59,24 @@ export const CANONICAL_FORMATTER_ROW = 'prettier';
  */
 export type ParseGoal = 'script' | 'module';
 
+/**
+ * The goal to hand a tsv binding for `language`, or `undefined` to withhold it.
+ *
+ * The goal is TypeScript's alone: all three tsv bindings REJECT a set goal on a
+ * language that has none (`tsv_ffi`'s `ffi_goal`, `tsv_napi`'s `napi_goal`,
+ * `tsv_wasm`'s `read_options`), rather than ignoring it — a caller must not be
+ * able to believe it selected a goal that was silently dropped. So each wrapper
+ * withholds it for svelte/css.
+ *
+ * ONE function for all three wrappers rather than a copy each, on the rule
+ * `lib/reject_probe.ts` follows: a second spelling of the same question is free
+ * to drift into asking a different one. Only test262 files carry a goal at all
+ * and those are TS, so this never fires in practice — it is here so the three
+ * wrappers cannot come to disagree about a question they all ask.
+ */
+export const goal_for = (language: Language, goal?: ParseGoal): ParseGoal | undefined =>
+	language === 'typescript' ? goal : undefined;
+
 /** A source file loaded into memory for benchmarking. */
 export interface SourceFile {
 	/** Absolute path to the file */
@@ -115,7 +133,10 @@ export interface TsvImplementation {
 	/**
 	 * Parse source and return AST (as object or JSON string). `goal` (TS only;
 	 * default `module`) selects the parse goal for the conformance surface's
-	 * test262 files; ignored for svelte/css and by tools without a goal axis.
+	 * test262 files; ignored by tools without a goal axis. Each tsv wrapper
+	 * WITHHOLDS it for svelte/css rather than passing it through — those bindings
+	 * reject a set goal on a language that has no goal axis, so a caller cannot
+	 * believe it selected one that was silently dropped.
 	 */
 	parse(source: string, language: Language, goal?: ParseGoal): unknown;
 

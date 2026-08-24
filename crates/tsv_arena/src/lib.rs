@@ -1,4 +1,13 @@
-//! Per-thread reusable arenas for tsv's binding hot loop.
+//! The substrate tsv's three bindings share: per-thread reusable arenas for the
+//! hot loop, and the goal axis their exports are generated over.
+//!
+//! Both halves are here for one reason — `tsv_ffi`, `tsv_napi` and `tsv_wasm`
+//! would otherwise hand-sync them, and each encodes a contract too subtle to
+//! keep three copies of honest (see the crate's CLAUDE.md §Why this crate
+//! exists). The arenas are the bulk of it and are described below; the goal
+//! macros ([`parse_ast!`], [`goal_allowed!`]) sit at the bottom of this file.
+//!
+//! # The arenas
 //!
 //! The bindings (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are invoked once per file
 //! in tight loops — formatters, editor save hooks, benchmarks. Allocating a
@@ -120,6 +129,62 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
         |arena| arena.reset(),
         |arena| f(arena),
     )
+}
+
+//
+// The goal axis
+//
+// The second thing all three bindings would otherwise hand-sync. Each one
+// spells the parse goal in its host's idiom — `tsv_ffi` a `u32` code, `tsv_napi`
+// a trailing optional string, `tsv_wasm` one key of an options bag — but the
+// axis underneath is one question asked three times, so it is answered once
+// here. The macros carry no arena; they live beside the helpers because this
+// crate is where the bindings' shared substrate goes rather than in any one of
+// them (see the crate's CLAUDE.md §Why this crate exists).
+
+/// The per-language parse call behind each binding's uniform exports.
+///
+/// The `$goalness` tag is the language's goal axis, fixed at the
+/// `lang_bindings!` invocation: `goal` (TypeScript) threads the decoded goal
+/// into `parse_with_goal`; `nogoal` (Svelte, CSS) ignores it — a set goal is
+/// already rejected by the binding's own goal decoder, which reads the same tag
+/// through [`goal_allowed!`].
+///
+/// `$lang` and `$arena` resolve in the caller's scope, so this crate needs no
+/// dependency on the language crates.
+///
+/// ```ignore
+/// let ast = parse_ast!(goal, tsv_ts, source, goal, arena)?;
+/// ```
+#[macro_export]
+macro_rules! parse_ast {
+    (goal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {
+        $lang::parse_with_goal($source, $goal, $arena)
+    };
+    (nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {{
+        // Consume the (always-`Module`) goal so the binding stays used in every
+        // expansion.
+        let _ = $goal;
+        $lang::parse($source, $arena)
+    }};
+}
+
+/// Whether the binding's goal decoder accepts a set goal for this language —
+/// the same `$goalness` tag [`parse_ast!`] reads, so the two can never disagree
+/// about which languages have a goal axis.
+///
+/// A language with no axis **rejects** a set goal rather than ignoring it, so a
+/// caller cannot believe it selected one that was silently dropped. Each binding
+/// spells the refusal in its host's idiom; this macro only says which languages
+/// owe one.
+#[macro_export]
+macro_rules! goal_allowed {
+    (goal) => {
+        true
+    };
+    (nogoal) => {
+        false
+    };
 }
 
 #[cfg(test)]
@@ -259,5 +324,43 @@ mod tests {
             tsv_lang::doc::arena_print_doc(arena, id, &tsv_lang::EmbedContext::default())
         });
         assert_eq!(after, "after", "the slot must be usable after nesting");
+    }
+
+    // The goal axis: one `$goalness` tag driving two macros, tested here rather
+    // than three times over in the bindings. A stand-in language module gives
+    // `parse_ast!` the two entry points every language crate exposes, so the
+    // DISPATCH is pinned without this crate depending on any of them.
+
+    mod fake_lang {
+        pub fn parse(source: &str, arena: &str) -> String {
+            format!("parse({source}, {arena})")
+        }
+        pub fn parse_with_goal(source: &str, goal: &str, arena: &str) -> String {
+            format!("parse_with_goal({source}, {goal}, {arena})")
+        }
+    }
+
+    #[test]
+    fn parse_ast_dispatches_on_the_goalness_tag() {
+        assert_eq!(
+            parse_ast!(goal, fake_lang, "src", "script", "arena"),
+            "parse_with_goal(src, script, arena)",
+            "`goal` must thread the goal into `parse_with_goal`"
+        );
+        assert_eq!(
+            parse_ast!(nogoal, fake_lang, "src", "script", "arena"),
+            "parse(src, arena)",
+            "`nogoal` must drop the goal and take the goalless entry point"
+        );
+    }
+
+    #[test]
+    fn goal_allowed_matches_the_same_tag() {
+        // Bound to locals first: the macro expands to a literal, and an
+        // `assert!(true)` is a clippy error under the workspace's `-D warnings`.
+        let has_axis: bool = goal_allowed!(goal);
+        let no_axis: bool = goal_allowed!(nogoal);
+        assert!(has_axis, "TypeScript has a goal axis");
+        assert!(!no_axis, "Svelte and CSS have none");
     }
 }

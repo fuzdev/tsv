@@ -113,12 +113,13 @@ const read_options = (options, noun, has_locations, has_goal) => {
 	return parsed;
 };
 
-// The TS parse wire against the resolved options — always the goal-aware
-// native exports (`'module'` matches the goalless ones exactly).
+// The TS parse wire against the resolved options. The addon has one export per
+// (language, operation), each taking the goal as a trailing optional argument —
+// there is no goalless twin to pick between.
 const ts_parse_json = (source, opts) =>
 	opts.locations
-		? addon.parse_typescript_with_goal(source, opts.goal)
-		: addon.parse_typescript_no_locations_with_goal(source, opts.goal);
+		? addon.parse_typescript(source, opts.goal)
+		: addon.parse_typescript_no_locations(source, opts.goal);
 
 const svelte_parse_json = (source, opts) =>
 	opts.locations ? addon.parse_svelte(source) : addon.parse_svelte_no_locations(source);
@@ -149,7 +150,7 @@ export const format_svelte = (source, options) => {
 	return addon.format_svelte(source);
 };
 export const format_typescript = (source, options) =>
-	addon.format_typescript_with_goal(source, read_options(options, 'format', false, true).goal);
+	addon.format_typescript(source, read_options(options, 'format', false, true).goal);
 export const format_css = (source, options) => {
 	read_options(options, 'format', false, false);
 	return addon.format_css(source);
