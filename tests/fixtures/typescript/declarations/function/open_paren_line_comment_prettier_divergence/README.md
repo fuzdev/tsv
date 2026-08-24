@@ -29,9 +29,9 @@ across the open-delimiter trailing-comment family (call `(`, function-type `(`,
 call/construct signature `(`, object/array `{`/`[`, type-param `<`, …), via the
 shared `Printer::delimiter_line_comment_prefix` helper. This fixture extends that
 uniform rule to value-level function definitions — function declarations,
-function expressions, and arrows — which previously relocated the comment (an
-un-principled split from the function-*type* and *signature* `(`, which already
-preserved).
+function expressions, and arrows — relocating there would be an
+un-principled split from the function-*type* and *signature* `(`, which
+preserve.
 
 Prettier is inconsistent here: it floats the comment past a function
 declaration but relocates it onto its own line for a function expression / arrow.

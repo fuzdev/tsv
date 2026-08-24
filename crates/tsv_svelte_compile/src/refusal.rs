@@ -577,8 +577,8 @@ pub enum Refusal {
     /// A nested `{#each}` — the emission path is not yet validated.
     ///
     /// This refusal originally read "the oracle's unique-name allocation order is
-    /// not reproducible". That claim is **false** and was retired: the two orders
-    /// are now both modelled (`each_array` pre-order at emission, `$$index`
+    /// not reproducible". That claim is **false**: the two orders
+    /// are both modelled (`each_array` pre-order at emission, `$$index`
     /// post-order upfront — see `blocks::assign_each_index_names`), and a nested
     /// `{#each}` probes at parity. What remains unvalidated is the rest of the
     /// nested emission surface (a keyed inner each, `animate:` placement,

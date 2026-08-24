@@ -12,7 +12,7 @@
 /// since both share `classify`).
 ///
 /// Currently empty: the import-phase proposals (`source-phase-imports`
-/// with its `…-module-source` companion, and `import-defer`) are now parsed —
+/// with its `…-module-source` companion, and `import-defer`) are parsed —
 /// `import source …` / `import defer …` and `import.source(…)` / `import.defer(…)`
 /// — so their tests are graded. Add a `features:` name here when tsv meets a new
 /// proposal it doesn't yet parse; drop it again once the syntax lands.
@@ -378,7 +378,7 @@ flags: [module]
 
     #[test]
     fn test_requires_unimplemented_feature() {
-        // The import-phase proposals are now parsed, so they are graded, not
+        // The import-phase proposals are parsed, so they are graded, not
         // filtered — `UNIMPLEMENTED_FEATURES` is empty.
         let source_phase = r"/*---
 features: [source-phase-imports, dynamic-import]

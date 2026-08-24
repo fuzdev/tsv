@@ -16,9 +16,9 @@
 //! Both scan for a **run** — two newlines separated by horizontal whitespace only. A newline
 //! *total* (`count >= 2`) is not a third option: two SEPARATE single breaks (`\ntext1\ntext2`)
 //! reach it with no blank line present, so a total coincides with the authoring signal only on a
-//! string that is nothing but whitespace. This module used to carry one, and every call site it
-//! reached turned out to be a string with content in it — trailing text after a `format-ignore`
-//! range end, a range marker between a section comment and its section. Don't reintroduce it: a
+//! string that is nothing but whitespace, and every call site that would reach such a
+//! predicate is a string with content in it — trailing text after a `format-ignore`
+//! range end, a range marker between a section comment and its section. Don't introduce it: a
 //! caller that "knows" its string is pure whitespace is one refactor away from being wrong.
 //!
 //! A module doc rather than a plain comment on purpose: the table's intra-doc links are then

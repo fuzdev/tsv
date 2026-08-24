@@ -116,8 +116,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `span` is the element's span AND the token's: a middle/tail token starts
     /// at the prior `}` (`Lexer::continue_template_from_brace` stamps
     /// `start: brace_start`), which is exactly where the element starts, so the
-    /// two are never distinct. The type-template path used to thread a separate
-    /// `brace_start` for this and it was always the same value.
+    /// two are never distinct.
     ///
     /// Call BEFORE `advance()` — this reads the current token's text and its
     /// decoded value.

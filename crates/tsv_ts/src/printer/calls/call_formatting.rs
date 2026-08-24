@@ -296,9 +296,9 @@ pub(super) fn build_call_doc_with_wrapping(
     // Prettier's `anyArgEmptyLine` (`print/call-arguments.js`): an author blank line in ANY
     // inter-argument gap forces `allArgsBrokenOut()` — and that test sits ABOVE
     // `shouldExpandFirstArg` / `shouldExpandLastArg`, so the blank defeats every specialized
-    // layout rather than being asked about after one has been chosen. tsv used to ask it only
-    // at the bottom of this dispatcher, below every early return, so the blank survived a
-    // plain argument list and was silently eaten by each hug / expand / composition path — the
+    // layout rather than being asked about after one has been chosen. Asking it only
+    // at the bottom of this dispatcher, below every early return, would let the blank survive a
+    // plain argument list and be silently eaten by each hug / expand / composition path — the
     // blank-DROP class (docs/blank_audit.md), invisible to every gate but a prettier compare.
     // Hoisted here as a DECLINE conjunct on those arms rather than as an early return, so a
     // call whose gaps also hold comments still reaches `build_call_with_arg_comments` (which

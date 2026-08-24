@@ -22,8 +22,8 @@ takes — the two cases at the end of this fixture (`class B // c⏎{`, `interfa
 are the controls, unchanged by this rule and cataloged as
 [Heritage last item before `{`](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
 The value-level function definitions — function declaration, class method, getter,
-constructor, function expression, object method — used to answer the same gap prettier's
-way, absorbing into the body, which made the catalog's "consistent with tsv's handling of
+constructor, function expression, object method — answering the same gap prettier's
+way there, absorbing into the body, would make the catalog's "consistent with tsv's handling of
 line comments before block bodies across all statement types" false of exactly this family.
 They now share the one answer.
 

@@ -74,7 +74,7 @@ fn span_of(node: &serde_json::Value) -> Option<(usize, usize)> {
 /// carries a `Program` span.)
 ///
 /// TODO: `<style>` content is still unnamed, so no comment is probed there. `Style` carries
-/// a `content_span` that names it in one line, and the prerequisite is now met — the ledger
+/// a `content_span` that names it in one line, and the prerequisite is met — the ledger
 /// registers CSS in-block `CssBlockChild::Comment` AST nodes (a declaration-VALUE comment is
 /// still never lexed as a `Comment`, so it stays outside the model by construction), so
 /// probing `<style>` now exercises a genuinely guarded surface rather than mostly a

@@ -24,8 +24,8 @@ type A = [
 The shell strips, so its `//` ends up in the required pair's own leading gap — which is
 exactly where the reparse finds it, and where the author would have written it bare. The
 pair's emitter therefore owns the run and the shell declines its copy; left to itself the
-shell emitted a bare `hardline` at whatever indent it was built at plus a `flush_break` that
-opened the group it landed in, so the two passes disagreed (an F1 violation, not a
+shell emits a bare `hardline` at whatever indent it was built at plus a `flush_break` that
+opens the group it lands in, so the two passes disagree (an F1 violation, not a
 divergence). `input` is the fixed point the **bare** authoring already settles on —
 `unformatted_ours_paren_shell.svelte` and `unformatted_ours_paren_layer.svelte` are the same
 comment written one and two paren layers out, and both must land here.
@@ -87,4 +87,4 @@ tightly as the grammar allows: bare at the optional element (`[(⏎// c1⏎B) ex
 E?]`), and with the author's pair at the intersection member, where dropping it would
 re-associate the type (`J & (K) extends L ? M : N` is a conditional, not an intersection).
 `unformatted_ours_paren_layer.svelte` adds one more redundant layer at every case — the
-authoring that used to stop the descent dead.
+authoring a shallow descent stops dead at.

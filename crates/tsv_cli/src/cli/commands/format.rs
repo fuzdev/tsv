@@ -354,13 +354,13 @@ const DISCOVERY_BATCH: usize = 8;
 ///
 /// **A refused thread narrows the pool; it never fails the run.** `--jobs` is a
 /// user-supplied number, so the OS refusing the *n*th thread is an ordinary outcome
-/// of an ordinary argument — and `Builder::spawn_scoped`'s `Err` used to reach an
-/// `expect` here, which made this the one `format` argument that could answer with a
+/// of an ordinary argument — and `Builder::spawn_scoped`'s `Err` must not reach an
+/// `expect` here, which would make this the one `format` argument that answers with a
 /// panic where every other bad one exits 2 with a message. On the streamed path it
-/// was worse than a crash: the panic unwound past [`FileQueue::finish`], so every
-/// worker already parked on the condvar stayed parked, and `thread::scope` joins the
-/// pool *before* it resumes a panic — the process hung holding N thread stacks
-/// instead of dying (see [`ReleasePoolOnUnwind`], which now covers that gap for any
+/// is worse than a crash: the panic unwinds past [`FileQueue::finish`], so every
+/// worker already parked on the condvar stays parked, and `thread::scope` joins the
+/// pool *before* it resumes a panic — the process hangs holding N thread stacks
+/// instead of dying (see [`ReleasePoolOnUnwind`], which covers that gap for any
 /// other unwind through the producer).
 ///
 /// Narrowing is safe because the work is *claimed*, not partitioned: however few
@@ -600,8 +600,8 @@ fn format_streamed(
         // A pool the OS refused outright leaves this thread as the only worker. It
         // has already walked, so nothing streams — but the alternative is a run that
         // formats nothing and reports every file as a panic from a worker that never
-        // existed (the slot sweep below), which is the same lie `--jobs 0` used to
-        // tell. The queue is finished, so this drains what the walk left and stops.
+        // existed (the slot sweep below), which is the lie an unclamped `--jobs 0`
+        // would tell. The queue is finished, so this drains what the walk left and stops.
         if handles.is_empty() {
             claimed = drain_queue(&queue, check);
         }

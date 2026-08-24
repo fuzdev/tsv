@@ -119,9 +119,8 @@ impl<'a> Printer<'a> {
     /// A `//` the author parked after the `(` stays there in every other spelling —
     /// `fn( // c`, `new Foo( // c`, `obj.fn( // c`, `require( // c`, a cataloged
     /// divergence from prettier, which relocates it to the argument's leading line — and
-    /// both `import(…)` spellings used to be the family's lone dissenters, relocating it
-    /// and matching prettier instead. Nothing pinned either, so it was an unconsidered
-    /// difference rather than a decision. Routing the share through
+    /// both `import(…)` spellings take the same answer (a dissent there would be an
+    /// unconsidered difference, not a decision). Routing the share through
     /// [`Printer::delimiter_line_comment_prefix`] is what makes it one rule: the same
     /// pull, the same "only when the shell breaks anyway" gate, and the same
     /// pulled-comment exclusion. Pinned by
@@ -1451,10 +1450,10 @@ impl<'a> Printer<'a> {
     /// [`Self::shell_value_keeps_own_parens`], asked by the builder that acts on it and by
     /// the caller that must not double the pair.
     ///
-    /// ⚠️ **One question, one predicate, one AXIS.** The two sides used to spell this
+    /// ⚠️ **One question, one predicate, one AXIS.** Spelling this on the two sides
     /// separately AND on different axes — the caller counting comments **on page**, the
-    /// builder only those it would **emit** — so an owned comment in the gap would have had
-    /// the caller skip a wrap the builder never made, stripping the value's clarity parens.
+    /// builder only those it would **emit** — has an owned comment in the gap make
+    /// the caller skip a wrap the builder never makes, stripping the value's clarity parens.
     /// This is a layout gate ("does anything occupy the page here?"), so the on-page axis is
     /// the correct one for both (`docs/comments.md` §the three axes).
     fn shell_gap_retains_parens(
@@ -1802,8 +1801,8 @@ impl<'a> Printer<'a> {
     /// stays put and takes the operator's tail with it onto a continuation line;
     /// that gap is answered by [`Printer::build_operator_value_continuation`], which
     /// the caller consults first. Emitting such a comment here would swallow the
-    /// operator into it; leaving it to the RHS emitter relocated it *past* the
-    /// operator, which is what this gap used to do.
+    /// operator into it; leaving it to the RHS emitter would relocate it *past* the
+    /// operator.
     ///
     /// `op_pos` is the operator's offset, found once by the caller
     /// ([`Printer::find_operator_in_source`]) and shared with that gate.

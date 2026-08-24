@@ -47,10 +47,9 @@ otherwise need its own file):
   carries the signal.
 - `unformatted_ours_own_line.svelte` — the comment authored on its **own** line with a blank
   below (`export default⏎/* c */⏎⏎x`). tsv reflows it inline; prettier pulls the comment onto
-  the keyword line but keeps the break, landing on `prettier_variant_blank`. This authoring
-  used to be its own fixture, sanctioned as a comment-*position* divergence; under the
+  the keyword line but keeps the break, landing on `prettier_variant_blank`. Under the
   uniform rule tsv and prettier agree on the comment's position and only the break differs,
-  so it folds in here.
+  so this authoring is a break case here, not a comment-*position* divergence of its own.
 
 See [conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position);
 cataloged in [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

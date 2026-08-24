@@ -75,10 +75,10 @@ impl<'a> Printer<'a> {
             // `with`→`{` gap. See attributes_empty_comment_prettier_divergence.
             //
             // The run goes through the shared empty-container emitter, not a loop of its
-            // own: a hand-rolled one separated the comments with a plain `" "`, which
-            // WELDED the run (`/* c1 */ /* c2 */` reparsing as one) and, behind a `//`,
-            // swallowed the `}` and the `;` with it — output that does not reparse from
-            // input canonical Svelte accepts. Only a `//` that landed LAST was pushed
+            // own: a hand-rolled one separating the comments with a plain `" "`
+            // WELDS the run (`/* c1 */ /* c2 */` reparsing as one) and, behind a `//`,
+            // swallows the `}` and the `;` with it — output that does not reparse from
+            // input canonical Svelte accepts; only a `//` that lands LAST is pushed
             // clear, which is exactly the kind test `docs/comments.md` §Trailing and
             // dangling runs names as the trap. The shared emitter breaks the braces open
             // whenever the run holds a line comment and keeps a lone fitting block inline

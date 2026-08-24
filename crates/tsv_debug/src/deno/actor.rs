@@ -46,9 +46,9 @@ const SIDECAR_LOCK: &str = include_str!("deno.lock");
 /// Deno config for the sidecar: an import map (ensures acorn-typescript uses the
 /// same acorn instance) plus the FROZEN lockfile above.
 ///
-/// `frozen` is what makes a lockfile usable here at all. It was previously
-/// `"lock": false`, because concurrent sidecars (several test binaries under
-/// `cargo test --workspace`) contended on a shared `deno.lock` written next to
+/// `frozen` is what makes a lockfile usable here at all: with `"lock": false`
+/// instead, concurrent sidecars (several test binaries under
+/// `cargo test --workspace`) contend on a shared `deno.lock` written next to
 /// the tempdir config files. A frozen lock is read-only — deno resolves against
 /// it and never writes it back — and each sidecar is handed its own tempfile
 /// copy, so there is no shared file to contend on in the first place.

@@ -12,8 +12,8 @@ and
 What this fixture adds is what happens **inside** that continuation: the `=`→value gap
 keeps its own rule there. A comment the author gave a line of its own leads the value from
 its own line, exactly as it does when nothing precedes the `=`; only a comment on the `=`'s
-line stays on it. The continuation used to glue the run to the operator with an
-unconditional space, which made this the one arm of the family that flattened that
+line stays on it. Gluing the run to the operator with an
+unconditional space would make this the one arm of the family that flattens that
 distinction.
 
 For an honored `prettier-ignore` that was worse than a layout difference. A directive
@@ -24,7 +24,7 @@ is its own fixed point. Keeping the directive's line is what makes the freeze su
 round trip.
 
 Three cases carry the rest of that "same rule inside as outside" claim, because each is a
-way the gap's own answer used to stop at the continuation's edge:
+way the gap's own answer could stop at the continuation's edge:
 
 - **`c10` — an own-line JSDoc cast.** A cast OWNS its comment, so the gap's to-emit lookup
   reports the gap empty; but the cast prints a hardline of its own between the comment and

@@ -26,8 +26,8 @@
 // `parse_declaration` then walks again for its facts. `scan_rule_or_declaration` runs the
 // shared loop with the verdict latch on (`WANT_VERDICT`), so that one walk answers the
 // disambiguation *and*, for a declaration, produces the `ValueFacts` the parser stashes for
-// `parse_declaration` to reuse — fusing what used to be two separate byte scans per
-// non-custom declaration into one. The verdict tracks paren depth only (walk1's model): a
+// `parse_declaration` to reuse — one walk where two separate byte scans per
+// non-custom declaration would otherwise run. The verdict tracks paren depth only (walk1's model): a
 // `;` inside `[…]` really does end the disambiguation run, even though the value scan (which
 // tracks `[]`/`{}` too) reads past it — the shared loop maintains both, and the two agree
 // on the verdict because paren depth evolves identically in each.
@@ -606,8 +606,8 @@ fn trim_end(bytes: &[u8], from: usize, to: usize) -> usize {
 /// here rather than by the byte scan.
 ///
 /// Seeks into the **whole source**, unlike [`scan_rule_or_declaration_tokens`], which lexes
-/// a slice. The asymmetry is shape only: this walk stands in for one the *parser* used to
-/// drive on its own lexer, the rule walk for a temp lexer over a slice. Both report a lexer
+/// a slice. The asymmetry is shape only: this walk stands in for the *parser* driving
+/// its own lexer, the rule walk for a temp lexer over a slice. Both report a lexer
 /// error at the same document position, since each lexer carries the offset of what it
 /// scans.
 fn scan_value_tokens(

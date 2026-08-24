@@ -111,12 +111,11 @@ shape that no longer fires). It is the only kind here that loses **code** rather
 comment, so a run that holds still names its share (`○ of those, N SWALLOW shape(s) …`) rather
 than letting a bare `✓` over the whole file read as "no swallows".
 
-It was **staged report-only** through its first phase, and the reason is worth keeping: the
-check only arms on a text node carrying a whole comment, and at the time only `tsv_ts`'s
-emitters spelled one that way — `tsv_svelte`'s built `text("//") + content` and were invisible
-to it. Freezing a shape set that half the printers could not produce would have pinned a
-property of the *instrument*. Every Svelte comment emitter now routes through the one-node
-form, so the arm is whole and the class ratchets.
+The check arms only on a text node carrying a **whole** comment, which is a contract on the
+emitters: one that builds `text("//") + content` is invisible to it, and freezing a shape set
+that half the printers cannot produce would pin a property of the *instrument*. Every comment
+emitter in `tsv_ts` and `tsv_svelte` routes through the one-node form, so the arm is whole and
+the class ratchets.
 
 Two properties still differ from the ledger kinds. It is **not self-verified** — a swallow is
 observed directly on the rendered output (like `blank_audit`'s F1/reparse kinds), so the

@@ -98,7 +98,7 @@ script second.
 tsv's behavior (omitting the comment) is the more defensible one, but the parity bar's
 comment-position tolerance does not cover this — the comment crosses into an unrelated
 subtree, which is a comment *presence* difference in that subtree, not a position one.
-So it is a MISMATCH, and "more defensible" does not exempt it: **tsv now refuses the
+So it is a MISMATCH, and "more defensible" does not exempt it: **tsv refuses the
 whole ordering** (`Refusal::ModuleCommentAfterInstanceScript`) rather than emit differing
 output. Any comment inside a `<script module>` whose content starts after the instance
 `<script>`'s refuses, whatever the template does with it.
@@ -162,8 +162,8 @@ spelling: an **escaped** id (`const C = class \u0024Foo {};`) reaches the refusa
 through `dollar_identifier_name` → `identifier_name`, which returns `None` whenever
 `escaped_name` is set, so tsv **compiles** it while the oracle emits the same
 ungrammatical `class $.store_get(…) {}` (probe-verified). That is not one of the six
-escaped binding over-acceptances the escaped-identifier residual covered (now closed —
-those six decode via `Identifier::name` and refuse); here the oracle *accepts* a
+escaped binding over-acceptances the escaped-identifier residual covers (those six
+decode via `Identifier::name` and refuse); here the oracle *accepts* a
 class-expression id, so slipping past the refusal is parity on the rule — it lands on
 this oracle defect instead. Refusing the unescaped spelling is a
 deliberate over-refusal — the oracle compiles these, so refusing costs achievable parity — but the

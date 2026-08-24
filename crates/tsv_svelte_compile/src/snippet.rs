@@ -120,8 +120,7 @@ pub(crate) fn analyze_snippets(
 
     // A duplicate snippet name in one fragment (root-level included) is refused
     // upstream by `validate.rs`'s `refuse_duplicate_snippet_names`, which ports the
-    // oracle's per-fragment scope rule rather than the root-only slice this pass
-    // used to carry — so two `function` declarations can never be emitted here.
+    // oracle's per-fragment scope rule rather than a root-only slice — so two `function` declarations can never be emitted here.
     let top_level_names: NameSet = top_level
         .iter()
         .filter_map(|s| snippet_name(s, source).map(str::to_string))

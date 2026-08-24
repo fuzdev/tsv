@@ -174,8 +174,8 @@ impl<'a> Printer<'a> {
     /// [`Self::push_leading_comment_run`] and why it cannot simply delegate.
     ///
     /// ⚠️ **Both runs take this rule because glue is the AUTHOR's, not the seam's.** The
-    /// stripped-paren run used to hardline unconditionally, so `(/* b */ // c⏎ b)` came out
-    /// with the block and the line on separate lines — a pair the author wrote on one. The
+    /// stripped-paren run hardlining unconditionally would put `(/* b */ // c⏎ b)`'s block
+    /// and line on separate lines — a pair the author wrote on one. The
     /// enclosing divergence sanctions only the run's POSITION (tsv leads the member, prettier
     /// trails the previous one); it says nothing about the run's interior, where prettier
     /// glues exactly as tsv does everywhere else.
@@ -243,8 +243,8 @@ impl<'a> Printer<'a> {
     /// comment's `*/`, a `hardline` when there is a newline both before its `/*`
     /// and after its `*/`, otherwise a space. The `line` lets the member stay
     /// glued inline when the union fits and break onto its own line when the
-    /// union expands (the leading-pipe form), matching Prettier — tsv previously
-    /// hardcoded a space, gluing a member onto a multi-line comment's `*/` line.
+    /// union expands (the leading-pipe form), matching Prettier; a hardcoded
+    /// space would glue a member onto a multi-line comment's `*/` line.
     /// Returns an empty doc when the range has no block comment.
     ///
     /// Asked by the UNION only for its first member: a block between two union members
@@ -1242,9 +1242,9 @@ impl<'a> Printer<'a> {
     ) -> bool {
         // The `:`→union gap is this site's own question; the hug itself is not
         // re-derived here but delegated (via `type_arg_union_prints_hugged`) to
-        // [`Self::union_prints_hugged`]. This gate used to spell out its own subset of
-        // that predicate's comment checks and missed the leading `|`→first-member line
-        // comment, so a comment that made the printer decline the hug still read as
+        // [`Self::union_prints_hugged`]. A gate spelling out its own subset of
+        // that predicate's comment checks misses the leading `|`→first-member line
+        // comment, so a comment that makes the printer decline the hug still reads as
         // "hug" here and kept `: ` glued while the members exploded below it.
         self.type_arg_union_prints_hugged(value_type)
             && !self.has_comments_to_emit_between(gap_start, gap_end)
@@ -2536,7 +2536,7 @@ impl<'a> Printer<'a> {
     ///   block/trailing decline);
     /// - a **bare** inner strips its parens entirely, so the whole leading run (block +
     ///   line) hoists here and the stripped inner is built via `build_hang_value_doc`
-    ///   (which re-attaches any trailing comment) — mirroring the bug188 keyword→value
+    ///   (which re-attaches any trailing comment) — mirroring the keyword→value
     ///   seam. Gated on a leading **line** comment (the hang trigger): a mixed
     ///   (`(/* b */ // c⏎ A) & B`) or trailing (`(// c⏎ A /* t */) & B`) shell hoists and
     ///   settles on the same fixed point the bare authoring does; a block-only or

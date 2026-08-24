@@ -50,7 +50,7 @@ function create_bar(value: number, max: number, width = 40): string {
  * `[internal, json]` — one pair per tsv tier. The ratio between the two IS the
  * JSON-materialization cost, which is the only thing either reader below renders.
  *
- * ONE table because this is one fact with three readers, and it used to be three
+ * ONE table because this is one fact with three readers, not three
  * separate statements: which rows are internal, which json row each internal row
  * pairs with (terminal summary), and the same pairing again (markdown note). The
  * partner lookup was the fragile one — it chose the json row by testing the
@@ -593,7 +593,7 @@ export function alternative_version_parts(versions: AlternativeVersionInfo): str
 
 /**
  * Versions block for the terminal run. (Corpus counts already print at the
- * top of the run, so this used to duplicate them — now versions only.)
+ * top of the run, so this is versions only.)
  */
 export function generate_versions_info(versions: ReportVersions): string {
 	const lines: string[] = [];
@@ -1050,8 +1050,8 @@ function build_comparison_data(
  * missing from one surface is the exact failure the notes exist to prevent.
  *
  * Presence is asked of ALL sections at once, with no like-tier check of its own —
- * which the oxc predicate used to carry, so that a cross-tier oxc cell couldn't
- * earn the apples-to-apples note. That check is now structural: `COMPARISON_SECTIONS`
+ * the like-tier check that keeps a cross-tier oxc cell from earning the
+ * apples-to-apples note is structural: `COMPARISON_SECTIONS`
  * assigns `oxc-parser` to the native section and `oxc-parser-wasm` to the wasm one,
  * so a cross-tier cell cannot be built. Move a row between tiers and the guarantee
  * moves with it — re-tier the note's opponent entry too.
@@ -1115,9 +1115,9 @@ function comparison_notes(
  * `svelte/compiler for svelte + css, acorn-typescript for typescript` — inverted
  * out of `CANONICAL_PARSER_ROWS` rather than spelled out.
  *
- * The note it feeds used to name FILE EXTENSIONS (`.svelte`/`.css` vs `.ts`), which
- * read naturally but left this module's last hand-written canonical-parser fact
- * sitting one line under the tables the record now names — the same drift
+ * Naming FILE EXTENSIONS (`.svelte`/`.css` vs `.ts`) in the note it feeds would
+ * read naturally but leave this module's last hand-written canonical-parser fact
+ * sitting one line under the tables the record names — the same drift
  * `CANONICAL_PARSER_ROWS` exists to close, reachable here because the extensions
  * are not in it and so nothing could check the sentence. Languages are what the
  * record holds AND what the tables key on (`parse svelte`, `parse css`), so the

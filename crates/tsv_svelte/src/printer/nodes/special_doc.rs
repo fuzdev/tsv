@@ -20,12 +20,11 @@ impl<'a> Printer<'a> {
     ///
     /// Runs the same analyze → layout → build pipeline as regular elements: `svelte:*` elements
     /// only differ in how their name and attributes are built (a static tag name; a synthesized
-    /// `this={…}`), so everything downstream of [`ElementParts`] is shared. They used to carry
-    /// their own copies of the hug predicates and of the multiline decision, and the copies had
-    /// drifted — `<slot>` never went multiline for block children
-    /// (`<slot><div>a</div><div>b</div></slot>` stayed on one line, where `<span>` expands), and
-    /// the special path still dangled its tag delimiters after regular elements had moved to
-    /// block-style layout.
+    /// `this={…}`), so everything downstream of [`ElementParts`] is shared. Copies of the hug
+    /// predicates and of the multiline decision here would drift — a `<slot>` that never goes
+    /// multiline for block children (`<slot><div>a</div><div>b</div></slot>` on one line, where
+    /// `<span>` expands), a special path that dangles its tag delimiters where regular elements
+    /// are block-style.
     pub(super) fn build_special_element_doc(
         &self,
         element: &internal::SpecialElement<'_>,
@@ -300,8 +299,8 @@ impl<'a> Printer<'a> {
     /// Routes through [`Printer::build_expression_tag_doc`], the same emitter every other
     /// `{…}` attribute value uses, so the `{`→expression and expression→`}` gaps print
     /// rather than being skipped. Rebuilding those gaps here instead would fork the
-    /// leading-comment rule at yet another site — and skipping them is exactly how this
-    /// binding used to drop every comment in its expression.
+    /// leading-comment rule at yet another site — and skipping them drops every comment
+    /// in its expression.
     fn build_this_braced_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
         let d = self.d();
         d.concat(&[d.text("this="), self.build_expression_tag_doc(tag)])

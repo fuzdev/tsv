@@ -764,11 +764,11 @@ impl<'a> Printer<'a> {
                 // `!next_owns_line` guard routes it here so the trailing chain can carry an
                 // authored blank). An element still inside
                 // its inline-sibling wrap (`group([line, el])` — a spaced comment or a
-                // control-flow block put it there) used to keep a JOINT `group([el, line])`
-                // instead, so the two boundaries meeting on the element resolved outside-in:
-                // fusing element and tail into one measurement is what pushed the leading boundary
-                // over, and the tail then rode that break. It bought a single fixed point for the
-                // comment boundary at the price of a line — but it was conditioned on a property
+                // control-flow block put it there) must not keep a JOINT `group([el, line])`
+                // instead: the two boundaries meeting on the element would resolve outside-in —
+                // fusing element and tail into one measurement pushes the leading boundary
+                // over, and the tail then rides that break. That buys a single fixed point for the
+                // comment boundary at the price of a line, conditioned on a property
                 // its own output destroys. The wrap exists only while the sibling and the element
                 // share a line, and breaking that line is the join's whole action; the next parse
                 // sees no wrap and arrives here. Where the element stayed intact the two answers
@@ -886,8 +886,8 @@ impl<'a> Printer<'a> {
                 // the run idempotent. A `group([line, node])` here breaks all-or-nothing and
                 // flip-flops across passes (the Fill-idempotency bug class).
                 //
-                // Two conditions that used to split these cases apart are deliberately gone, and
-                // both removals are load-bearing:
+                // Two conditions that would split these cases apart are deliberately absent, and
+                // both absences are load-bearing:
                 // - the `breakable_exprs` hard-width carve-out (a plain trailing space when the
                 //   run held another break-capable tag) — see the leading branch;
                 // - the `multiline` gate on the flow follower. `multiline` is the CONTAINER's
@@ -1112,11 +1112,11 @@ impl<'a> Printer<'a> {
     ///
     /// Two callers reach here: the **terminal fold**, and the authored-newline **probe arm**
     /// (whose `build_tail` merely wraps the element in its `flow_break_probe` context — no
-    /// layout is added, so the two boundaries stay independent). A non-terminal tail used to
-    /// take a joint `group([el, line])` through here for the wrapped shapes, fusing the two
-    /// boundaries so they resolved outside-in; that fusion is retired — it was conditioned on
+    /// layout is added, so the two boundaries stay independent). A non-terminal tail must not
+    /// take a joint `group([el, line])` through here for the wrapped shapes: fusing the two
+    /// boundaries resolves them outside-in, conditioned on
     /// the wrap, which its own leading break destroys (`inline_sibling_drop_tail_wide_long`) —
-    /// and a SPACE-spelled tail boundary is now the text fill's own `leading_line`, decided per
+    /// and a SPACE-spelled tail boundary is the text fill's own `leading_line`, decided per
     /// width from the element's actual end column.
     fn rejoin_inside_leading_wrap(
         &self,

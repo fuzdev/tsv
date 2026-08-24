@@ -371,7 +371,7 @@ The line between the last two bullets is **"can it affect the result from here"*
 
 `$$slots` is not a fence — tsv intends to support it — so closing this means porting the oracle's whole-component validation, not widening the presence match. That is separate work from the dropped-region walk.
 
-The sibling hole, a dropped `{#snippet s()}` plus `export { s }` from a module script, is **closed**: the export rule is ported in `validate.rs` (see [Snippet declaration and export](#snippet-declaration-and-export--closed)). ⚠️ Its former statement here was also imprecise — a `{#snippet}` exported from a module script is *only* an error when the oracle cannot **hoist** it, which a dropped one never can be. A plain top-level `{#snippet s()}` beside `export { s }` compiles on both sides.
+The sibling hole, a dropped `{#snippet s()}` plus `export { s }` from a module script, is **closed**: the export rule is ported in `validate.rs` (see [Snippet declaration and export](#snippet-declaration-and-export)). ⚠️ Its former statement here was also imprecise — a `{#snippet}` exported from a module script is *only* an error when the oracle cannot **hoist** it, which a dropped one never can be. A plain top-level `{#snippet s()}` beside `export { s }` compiles on both sides.
 
 **Everything else keeps compiling** in a dropped `{:catch}`: `<svelte:component>`, `<svelte:self>` (under an `{#if}`), `<svelte:fragment>` and a `slot="…"` component child (both as a component's children), plus the unfenced `<svelte:element>` and `<svelte:boundary>` (the latter with one open exception, below). That set is clean on both axes — verified by reading the writers, not by probing: the whole-component fields a phase-2 validation reads (`slot_names`, `uses_slots`, `uses_render_tags`, `event_directive_node`, `uses_event_attributes`, `snippets`) are written only by `SlotElement` / an `$$slots` `Identifier` / `RenderTag` / `OnDirective` / an event `Attribute` / `SnippetBlock`, and none of those constructs is one of them. Refusing them to make the fence uniform would trade correct output for nothing. `let:` is likewise on neither axis (its only check, `let_directive_invalid_placement`, is local to its parent) but refuses anyway, to keep the fenced `on:`/`let:` pair in one census bucket. Only the placement-restricted metas (`<svelte:head>`, `<svelte:window>`, `<svelte:body>`, `<svelte:document>`) are unreachable, rejected by the oracle inside any block.
 
@@ -405,7 +405,7 @@ boundary inside a discarded branch.
 
 `RegularElement.js` and `SvelteElement.js` push **every** element into `analysis.elements`, which drives CSS pruning (`2-analyze/index.js` → `prune(analysis.css.ast, analysis.elements)`). An element in a `{:catch}` therefore keeps a CSS rule alive in the oracle's output.
 
-tsv's element census **descends all three `{#await}` arms**, `{:catch}` included, even though the catch arm never reaches SSR output. Pruning is decided before emission is — `css-prune.js:1110-1111` pushes `pending`/`then`/`catch` alike — so a selector matching only catch content is KEPT and scoped, exactly as the oracle does. Excluding it previously made such a selector match nothing and over-refuse (`css selector … matches no element`).
+tsv's element census **descends all three `{#await}` arms**, `{:catch}` included, even though the catch arm never reaches SSR output. Pruning is decided before emission is — `css-prune.js:1110-1111` pushes `pending`/`then`/`catch` alike — so a selector matching only catch content is KEPT and scoped, exactly as the oracle does. Excluding it makes such a selector match nothing and over-refuse (`css selector … matches no element`).
 
 Marking an element emission never reaches is safe: `element_scope` is a span lookup performed at emission, so an unemitted element is never queried and contributes nothing to the output. This is the same widening `<svelte:boundary>` needs for its `pending`-discarded children — but it needs no distinct census owner, because `is_block` holds `AwaitBlock` (`css-prune.js:1240-1246`), so the upward sibling walk continues through it as `Owner::Await` already models. The census leaf set is deliberately **wider** than the emitted set in exactly these two places.
 
@@ -416,7 +416,7 @@ implements the oracle's *emission*, not its *analysis*, so a component the oracl
 analyzer rejects can still compile. Each row below is an over-acceptance with a
 standalone repro, none of them dropped-region-specific:
 
-> **This inventory is now GATED, not just described.** Svelte's own `compiler-errors` +
+> **This inventory is GATED, not just described.** Svelte's own `compiler-errors` +
 > `validator` suites — 455 files, ~2/3 deliberately invalid — are a standing corpus behind
 > `deno task compile:validation`, a path-keyed known-bug ratchet over the
 > over-acceptances they expose (`compile_validation_known.txt` is the count — a figure
@@ -447,9 +447,9 @@ read this table for its own rows.
 `validate_assignment` family — `constant_assignment`, `each_item_invalid_assignment`,
 `snippet_parameter_assignment` — after it; see below and the `$`-prefixed bindings rule
 above. Then `attribute_duplicate`, `svelte_meta_invalid_placement` and
-`svelte_meta_duplicate` — see [The parse-time rules](#the-parse-time-rules--closed) —
+`svelte_meta_duplicate` — see [The parse-time rules](#the-parse-time-rules) —
 and then `node_invalid_placement`, see
-[The HTML content model](#the-html-content-model--closed). Most recently
+[The HTML content model](#the-html-content-model). Most recently
 `attribute_invalid_name` and `slot_attribute_invalid_placement`, the two largest
 clusters in the ratchet, both ported into `validate.rs` beside `attribute_duplicate`
 — they are two checks inside the oracle's single `validate_element` /
@@ -457,11 +457,11 @@ clusters in the ratchet, both ported into `validate.rs` beside `attribute_duplic
 `SvelteElement.js` only, so a **component** is exempt from both. Then
 `attribute_invalid_event_handler`, `attribute_invalid_sequence_expression`, and
 `attribute_unquoted_sequence`, three further checks in that same `validate_element`
-loop — see [The attribute-value rules](#the-attribute-value-rules--closed). Most
+loop — see [The attribute-value rules](#the-attribute-value-rules). Most
 recently the five snippet/export rules — `declaration_duplicate` (both of its oracle
 call sites), `snippet_shadowing_prop`, `snippet_conflict`, `snippet_invalid_export`
 and `export_undefined` — see
-[Snippet declaration and export](#snippet-declaration-and-export--closed).)
+[Snippet declaration and export](#snippet-declaration-and-export).)
 
 ⚠️ `slot_attribute_invalid_placement` is NOT the named-slot fence. The oracle
 *accepts* a `slot="…"` on a component's direct child, which tsv declines as the
@@ -487,7 +487,7 @@ Each is implemented in phase 2 over the Svelte AST, in Svelte-domain terms:
 | `component_invalid_directive` | `phases/2-analyze/visitors/shared/component.js:81` |
 | `slot_snippet_conflict` | `phases/2-analyze/index.js:862` |
 
-The clearest case is the one now closed, `dollar_prefix_invalid`: it is literally
+The clearest case is `dollar_prefix_invalid`: it is literally
 `node.name.startsWith('$')` on a binding — a **reserved-prefix** rule Svelte owns, not
 a JS one. `let $$slots = 1;` is valid JavaScript, and tsc — [this repo's oracle for
 what is really an error](../CLAUDE.md#strict-mode-only) — accepts it under `--strict`.
@@ -504,7 +504,7 @@ collides a *snippet* with a script binding, and
 fragment — acorn sees neither, because neither is a JS declaration. Both are ported (see
 below); the caveat retains no live consequence.
 
-#### The parse-time rules — closed
+#### The parse-time rules
 
 **Closed.** Two oracle rules, both raised in `phases/1-parse/state/element.js`, both
 enforced by one upfront whole-document walk (`validate.rs`) run at the top of
@@ -543,7 +543,7 @@ which never runs on a dropped region, so one of them in a `{:catch}` compiled. T
 over-acceptance survived every gate until the differential fuzzer found it, and it is
 the concrete cost of siting an emission-independent rule at an emitter.
 
-#### The HTML content model — closed
+#### The HTML content model
 
 **Closed.** `node_invalid_placement` — markup a browser would REPAIR by moving,
 removing, or inserting elements, which breaks Svelte's assumptions about component
@@ -587,7 +587,7 @@ this refusal; the two files it does catch (`AppControlsTable.svelte`,
 `Action_History.svelte`, both `<th>` directly inside `<thead>`) are oracle-rejected
 already, for an unrelated `legacy_export_invalid`. Both carry genuine invalid markup.
 
-#### The attribute-value rules — closed
+#### The attribute-value rules
 
 **Closed.** Three more checks from the oracle's `validate_element` loop (one of them
 via the shared `validate_attribute`), ported into `validate.rs` beside
@@ -651,7 +651,7 @@ Corpus cost: **zero**, measured the substitution-immune way — neither bucket a
 a corpus run's `refusal_reasons`, which holds only oracle-ACCEPTED files, so a bucket
 substitution would be visible there. Parity and refused counts both unmoved.
 
-#### Snippet declaration and export — closed
+#### Snippet declaration and export
 
 **Closed.** Five pinned over-acceptances, from two oracle sites, all ported into
 `validate.rs` — three from `phases/2-analyze/visitors/SnippetBlock.js` and two from
@@ -681,9 +681,8 @@ no `at(-2)`, so at most one of the three can fire.
   `:1335`). ⚠️ The scope is the enclosing **fragment**, not the component: every
   `Fragment` visitor opens a child scope and `declare` forwards to the parent only for
   `var`/`import`, so two `{#snippet a}` siblings collide while
-  `<div>{#snippet a}…{/snippet}</div>` plus a root-level `{#snippet a}` do not. tsv
-  previously enforced only the root-level slice of this, in `snippet.rs`; the rule now
-  rides `validate.rs`'s per-fragment walk and `snippet.rs` carries none of it.
+  `<div>{#snippet a}…{/snippet}</div>` plus a root-level `{#snippet a}` do not. The rule
+  rides `validate.rs`'s per-fragment walk; `snippet.rs` carries none of it.
 - **Compiles**: a nested `{#snippet}` sharing a top-level snippet's name — the oracle
   places the two declarations independently (a fragment is a fresh scope), and so does
   tsv now that `SnippetAnalysis`'s hoist product is keyed by snippet **identity**
@@ -749,7 +748,7 @@ Corpus cost: **zero**, measured the substitution-immune way — none of the five
 buckets appears in a corpus run's `refusal_reasons`, which holds only oracle-ACCEPTED
 files, so a bucket substitution would be visible there.
 
-#### The `validate_assignment` family — closed
+#### The `validate_assignment` family
 
 **Closed.** Three oracle rules, one refusal, because the oracle itself is one function:
 `validate_assignment` (`phases/2-analyze/visitors/shared/utils.js:18-40`, which calls
@@ -765,10 +764,10 @@ suite's samples put the write.
 - **Refused**: `assignment to an {#each} item (the oracle's each_item_invalid_assignment)` — a write to an `{#each}` context binding. Block-scoped to the block's body and fallback (the oracle's child scope, `phases/scope.js:1244`/`:1280`), and checked only for a whole-`Identifier` target, both matching the oracle. Runes-only there; this compiler is unconditionally runes-only.
 - **Refused**: `assignment to a {#snippet} parameter (the oracle's snippet_parameter_assignment)` — a write to a `{#snippet}` parameter (`phases/scope.js:1342`). NOT runes-gated in the oracle.
 
-**The shadowing over-refusal is closed.** Set membership was name-based where the oracle
-is scope-sensitive, so a nested re-declaration sharing a name with a component `const` or
-import — an ordinary helper reusing a name for its own local — over-refused. The
-`needs_context` walk now carries a **scoped** JS-binding stack (`Nc::js_scope`) beside the
+**Shadowing is scope-sensitive, as the oracle is.** Name-based set membership would
+over-refuse a nested re-declaration sharing a name with a component `const` or import —
+an ordinary helper reusing a name for its own local. The `needs_context` walk carries a
+**scoped** JS-binding stack (`Nc::js_scope`) beside the
 cumulative `shadowed` union: a function parameter and name, a `catch` parameter, a
 `for`-head binding, and a nested `let`/`const`/`var`/`class`/function declaration are
 pushed at their declaration and popped when their scope closes, and a lookup scans
@@ -806,7 +805,7 @@ were live, both listed by the old text as safe examples, both oracle-verified
 <script>function g() { z = 1; const z = 2; return z; }</script>
 ```
 
-Both are now **closed**, in the refusing direction only: a `switch` gets ONE block scope
+Both refuse, matching the oracle in the refusing direction only: a `switch` gets ONE block scope
 shared by all its cases (the oracle's `SwitchStatement: create_block_scope`,
 `phases/scope.js`), and a block's `const` declarations are hoisted into scope before its
 statements are walked, mirroring the oracle's scope PRE-PASS (`create_scopes` runs to
@@ -842,8 +841,8 @@ nests inside a template one, so a handler parameter shadowing a `{@const}` still
 and before `each_items`/`snippet_params` — the safe order, since the const rule fires at
 any pattern depth while those two fire only on a whole-identifier target. The `bind:`
 half closed with it (`BindDirective.js:181` reaches the same validator): a
-`bind:this={v}` to a `{:then}` value or a `{@const}` name, previously pinned as a
-current-behavior over-acceptance, now refuses as the oracle's `constant_binding`.
+`bind:this={v}` to a `{:then}` value or a `{@const}` name refuses as the oracle's
+`constant_binding`.
 
 ⚠️ **The `{#each}` INDEX and the ITEM beside it take DIFFERENT rules**, and conflating
 them is a bug in either direction. The item is declared `('each', 'const')` (`:1244`) and
@@ -860,41 +859,36 @@ rule that fires whatever the target is, `const` or not — so the most natural r
 green while the residual was fully live. That the rule is target-independent is itself
 live-verified: `<script>let n = 0;</script>{(n = 2)}` is COMPILED by the oracle and
 refused by tsv under that same message. The two unmasked positions are an event-handler
-arrow (`onclick={() => (c = 2)}`) and a write inside a dropped `{:catch}`. Measured over
-nine probes (three forms × three positions) before the fix: the oracle rejects all nine
-as `constant_assignment`, tsv over-accepted the six unmasked ones; after it, all nine
-refuse, and `compile_corpus_compare` now names the tsv-side reason on each, so "tsv also
-declines" can be told from "tsv declines for the reason under test" mechanically.
+arrow (`onclick={() => (c = 2)}`) and a write inside a dropped `{:catch}`. Over nine
+probes (three forms × three positions) the oracle rejects all nine as
+`constant_assignment` and so does tsv, and `compile_corpus_compare` names the tsv-side
+reason on each, so "tsv also declines" can be told from "tsv declines for the reason under
+test" mechanically.
 
-**Closing the shadowing over-refusal did not move corpus parity, and the earlier claim that
-it would is falsified.** This section previously recorded that the family cost one parity
-point, on the evidence that
+**The shadowing rule has no corpus-parity cost, and a rename experiment cannot show
+otherwise.** Its only corpus member is
 `../svelte/packages/svelte/tests/runtime-runes/samples/mutation-local/main.svelte` — a
 `const x = localMutation(1)` beside a `function localMutation(input) { let x = input; … x =
-2; … }` — was the rule's only corpus member and that "renaming the inner local reaches
-parity byte-for-byte, so the file's only blocker is this rule". The rename experiment
-**cannot discriminate**: renaming the inner local removes the name collision, which clears
-*two* independent name-based residuals at once. Isolating them shows the file has a second
-blocker. With the write kept but the template read of `x` removed, the file now reaches
-parity (it refused `constant_assignment` before this change) — so the assignment rule is
-genuinely closed. With the template read present, it refuses `static evaluation not
-portable: binding x is not statically modeled`: the evaluator marks a component binding
-`Opaque` when its name appears in `fn_declared`, the whole-component union of names
-declared inside any function-like subtree, which exists to compensate for `reassigned`
-being shadow-naive. So `mutation-local` moves buckets rather than reaching parity, and the
-corpus totals hold at parity **1370** / refused **1041** / 0 MISMATCH / 0 over-acceptance
-over 2996 files. The measurement that shows the change fired is the bucket membership, not
-the totals: `InvalidAssignmentTarget` goes from one member to **none**, and `static
-evaluation not portable` gains exactly that path.
+2; … }` — and renaming the inner local **cannot discriminate** which rule blocks it:
+the rename removes the name collision, which clears *two* independent name-based residuals
+at once. Isolated, the file has a second blocker. With the write kept but the template read
+of `x` removed it reaches parity, so the assignment rule is not what holds it; with the
+template read present it refuses `static evaluation not portable: binding x is not
+statically modeled`: the evaluator marks a component binding `Opaque` when its name appears
+in `fn_declared`, the whole-component union of names declared inside any function-like
+subtree, which exists to compensate for `reassigned` being shadow-naive. So
+`mutation-local` sits in the `static evaluation not portable` bucket, not
+`InvalidAssignmentTarget` (which has **no** corpus member), and the corpus totals hold at
+parity **1370** / refused **1041** / 0 MISMATCH / 0 over-acceptance over 2996 files.
 
-Narrowing that second residual is its own slice, and the scoped set built here is the
-substrate for it — `reassigned` is collected at the same two write positions that now
-consult `js_scope`, so a write resolving to a local need not mark the component binding.
+Narrowing that second residual is its own slice, and the scoped set is the substrate for
+it — `reassigned` is collected at the same two write positions that consult `js_scope`, so
+a write resolving to a local need not mark the component binding.
 But relaxing an `Opaque` binding to foldable is the **unsafe** direction (a wrong fold is a
 MISMATCH, not an over-refusal), so it wants its own safety analysis rather than a
 follow-on edit here.
 
-#### `dollar_prefix_invalid` — closed, and wider than one carve-out
+#### `dollar_prefix_invalid` — wider than one carve-out
 
 **Closed.** The rule is enforced by the `$`-prefixed binding refusal above
 (`Refusal::DollarPrefixedBinding`, `rune_guard.rs`), and the fuzzer's largest
@@ -1029,10 +1023,10 @@ in a `{:else}` fallback and by one in a dropped `{:catch}`, which is what the tw
 fixtures cover. The body case is modelled but not yet reachable; it becomes so when
 `NestedEach` lifts.
 
-**C2 — the module→instance half of the module-script comment class — is CLOSED.** A
-comment in a `<script module>` placed *after* the `<script>` was emitted by the oracle
-(into an unrelated template expression) and dropped by tsv. That ordering now refuses
-(`Refusal::ModuleCommentAfterInstanceScript`); see
+**C2 — the module→instance half of the module-script comment class — refuses.** A
+comment in a `<script module>` placed *after* the `<script>` is emitted by the oracle
+into an unrelated template expression, a position tsv cannot reproduce, so the ordering
+refuses (`Refusal::ModuleCommentAfterInstanceScript`); see
 [conformance_svelte_compiler.md](conformance_svelte_compiler.md#module-script-comment-teleported-into-the-instance-script)
 for the mechanism, the probed boundary, and why the refusal is coarser than the
 mismatch. Zero corpus parity cost.
@@ -1053,7 +1047,7 @@ exactly one):
 **Now CLOSED (carried, not refused).** The 7 residual module-comment mismatches are the
 **same mechanism** as the closed half —
 esrap's single comment index being re-seeked backward — reached by a different route.
-They are now **CARRIED, not refused**: unlike the closed half (a module-second comment
+They are **CARRIED, not refused**: unlike the closed half (a module-second comment
 lands in an unrelated template expression, unreproducible), a module-first comment the
 oracle keeps carries at its authored span, which the parity bar accepts (a byte match, or
 a comment-POSITION difference the oracle sometimes forces by re-attaching into the
@@ -1244,14 +1238,13 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | `<svelte:boundary>` with the `failed={expr}` / `pending={expr}` **attribute** forms — a deferred gap, not a fence: precedence against a same-named snippet is asymmetric (`failed`: the snippet wins; `pending`: the attribute wins), and a statically-nullish `pending` emits an extra `if`/`else` fork keyed on the evaluator's `is_defined` | **Refused**: `<svelte:boundary> {name}={…} attribute form` |
 | `<svelte:options>` | **Refused**: `<svelte:options>` |
 
-#### Validation holes a `<svelte:boundary>` could reach — closed
+#### Validation holes a `<svelte:boundary>` could reach
 
 Emitting a `<svelte:boundary>` rather than refusing it made three **pre-existing,
 general** over-acceptances (tsv compiles what the oracle rejects) reachable through
-one. None was boundary-specific — each failed identically with no boundary in the
-document — so the prediction was that every fix would land on the oracle's
-whole-component validations, never on `emit_boundary`. All three are now closed, and
-all three landed exactly there:
+one. None is boundary-specific — each reproduces identically with no boundary in the
+document — so all three close on the oracle's whole-component validations, never on
+`emit_boundary`:
 
 | Shape | Oracle error | Boundary-free analog that over-accepted identically | Closed at |
 | --- | --- | --- | --- |
@@ -1264,7 +1257,7 @@ That last one is why `emit_boundary`'s fragment split takes the first snippet of
 name without refusing a second: the oracle's server visitor does pair `filter` with
 `find`, but it never has to choose — scope analysis has already rejected the
 duplicate, and now so has tsv's. See
-[Snippet declaration and export](#snippet-declaration-and-export--closed).
+[Snippet declaration and export](#snippet-declaration-and-export).
 
 ### select-family
 

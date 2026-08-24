@@ -16,9 +16,9 @@ import {                   import {
 This is the named-specifier analog of the sanctioned namespace `*`→`as` gap
 (`import * //c⏎as ns`): the same shared renamed-specifier printer (`build_renamed_specifier_doc`)
 routes both `as` gaps through the shared header-gap continuation helpers, so a line comment can't
-swallow the `as` or the renamed binding. The before-`as` `//` case is a **content-loss** fix —
-tsv previously emitted `a //c as b` on one line, dropping `as b` into the comment (the local
-binding silently changed `b` → `a`, and the output no longer reparsed). A same-line block comment
+swallow the `as` or the renamed binding. The before-`as` `//` case is **content preservation** —
+emitting `a //c as b` on one line drops `as b` into the comment (the local
+binding silently changes `b` → `a`, and the output no longer reparses). A same-line block comment
 trails inline in both formatters.
 
 The "one indent level, not a staircase" rendering is the same rule the multi-gap

@@ -419,10 +419,10 @@ fn compile_refuses_comment_before_a_detached_erased_region() {
 
 #[test]
 fn compile_carries_comments_through_the_context_wrapper() {
-    // A comment plus `needs_context` used to print TWICE: the wrapper
-    // statement's appendix span left the function body's leading-comment
-    // window spanning the whole script, and the arrow's own block — anchored
-    // on the same script start — swept it again. The wrapper's fictional span
+    // A comment plus `needs_context` prints TWICE if the wrapper statement's
+    // appendix span leaves the function body's leading-comment window spanning
+    // the whole script, since the arrow's own block — anchored on the same
+    // script start — sweeps it again. The wrapper's fictional span
     // makes the arrow's block the sole owner, which is the oracle's placement.
     assert_eq!(
         compile_js(

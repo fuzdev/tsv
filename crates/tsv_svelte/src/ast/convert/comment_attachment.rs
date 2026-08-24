@@ -271,11 +271,11 @@ fn window_queue<'a>(template_comments: &[&'a Comment], start: u32, end: u32) -> 
 /// subset of it, so it can never walk past that validated region either.
 ///
 /// ⚠️ The whitespace class is [`is_svelte_ws`](crate::whitespace::is_svelte_ws) — acorn's,
-/// which this mimics — and NOT the
-/// ASCII `b' ' | b'\t' | b'\r' | b'\n'` byte match it used to be. A non-ASCII JS `\s`
-/// between an expression and its trailing comment (`{expr<NBSP>/* c */}`) ended the scan
-/// early, so the comment lost the `trailingComments` attachment canonical emits — and the
-/// root `comments` array lost it too. Stepping by the character's WIDTH is what keeps the
+/// which this mimics — and NOT an
+/// ASCII `b' ' | b'\t' | b'\r' | b'\n'` byte match. With that class a non-ASCII JS `\s`
+/// between an expression and its trailing comment (`{expr<NBSP>/* c */}`) ends the scan
+/// early, so the comment loses the `trailingComments` attachment canonical emits — and the
+/// root `comments` array loses it too. Stepping by the character's WIDTH is what keeps the
 /// non-ASCII arm on a character boundary.
 fn scan_past_trailing_comments(source: &str, start: u32, limit: u32) -> u32 {
     let bytes = source.as_bytes();

@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn detects_match_indices_and_rmatch_indices() {
         // The position-anchoring `(r)match_indices` forms are the same class as
-        // find/rfind (this is what `find_keyword_end` used to drop comments).
+        // find/rfind (a keyword-end scan spelled this way drops comments).
         assert_eq!(
             qualifying_find_line("for (i, _) in s.match_indices(\" and \") {").as_deref(),
             Some("for (i, _) in s.match_indices(\" and \") {")

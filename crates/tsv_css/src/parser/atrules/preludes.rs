@@ -502,8 +502,8 @@ fn parse_condition_part<'arena>(
         }
     }
 
-    // Build the part. The buffer's outer whitespace is trimmed the way the whole
-    // content used to be: only the first and last segments can carry any, and both
+    // Build the part. The buffer's outer whitespace is trimmed as one whole:
+    // only the first and last segments can carry any, and both
     // are `Text` whenever a selector segment is present — the function name opens
     // the part and its `)` closes it.
     //

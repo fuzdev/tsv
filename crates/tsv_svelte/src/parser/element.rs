@@ -446,9 +446,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// without it (`svelte_element_missing_this`) and the component likewise
     /// (`svelte_component_missing_this`), and tsv is a drop-in for that parser. Rejecting
     /// here rather than fabricating a placeholder is load-bearing, not pedantry — the
-    /// invented binding used to reach the printer and be emitted as source the author never
+    /// invented binding would reach the printer and be emitted as source the author never
     /// wrote (a spurious `this=""` / `this={null}`), and the element's zero-span placeholder
-    /// literal panicked when formatted (`format_string_literal_from_ast` slicing `""[1..len-1]`).
+    /// literal panics when formatted (`format_string_literal_from_ast` slicing `""[1..len-1]`).
     ///
     /// The component's *other* rejection — a `this` that is not an `{expression}` — belongs
     /// to [`Self::parse_special_element_attributes`] instead, which is where the difference

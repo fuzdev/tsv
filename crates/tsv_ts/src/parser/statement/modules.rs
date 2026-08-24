@@ -216,8 +216,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // statement-position and `export default` siblings the break leaves nothing
             // valid behind: an export needs a Declaration, and a bare `async` is not one.
             // So `export async⏎function b() {}` is a syntax error rather than two
-            // statements — acorn and Svelte both reject it, where tsv used to weld the two
-            // halves into one async function nobody wrote.
+            // statements — acorn and Svelte both reject it; welding the two halves into
+            // one async function nobody wrote would be an over-acceptance.
             TokenKind::Keyword(KeywordKind::Async) => {
                 if self.peek_kind() != TokenKind::Keyword(KeywordKind::Function)
                     || self.peek_preceded_by_line_terminator()
@@ -379,8 +379,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // prettier both read `export default abstract;` then `class Base {}`). acorn
         // instead welds across the break into one exported abstract class; tsv followed it
         // there, which silently deleted the line terminator. Falling through to the
-        // expression arm also makes the bare `export default abstract;` parse, which the
-        // unconditional `class` demand used to reject. Computed before the match for the
+        // expression arm also makes the bare `export default abstract;` parse, which an
+        // unconditional `class` demand would reject. Computed before the match for the
         // same borrow reason as `is_default_interface`.
         let is_default_abstract_class = self.current_value() == "abstract"
             && self.peek_is(&TokenKind::Keyword(KeywordKind::Class))

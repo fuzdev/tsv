@@ -37,8 +37,8 @@ than inside its continuation. Prettier's form there is **information-destructive
 comments onto one line in reverse order (`* as // c10 // c9`), the second `//` becoming text inside
 the first. tsv keeps each distinct, in order, on its own line.
 
-Preserving is a **content-loss** fix, not a layout preference: tsv previously emitted the whole gap
-inline ahead of the comma (`import a // c1, { b } from './a';`), running the `//` over the comma,
+Preserving is **content preservation**, not a layout preference: emitting the whole gap
+inline ahead of the comma (`import a // c1, { b } from './a';`) runs the `//` over the comma,
 the specifiers, `from`, the source and the `;` — lost CODE, and output that does not reparse.
 
 See [conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)

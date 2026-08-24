@@ -14,9 +14,9 @@ function/constructor-**type**
 the stranded form is stable only once the params wrap, since a list that fits collapses and
 the block hugs the next param in both formatters.
 
-This printer used to answer the gap a **third** way, and neither of the other two: it
-emitted the whole inter-param gap as the previous param's trailing run, so the comment came
-out *before* the comma — the very relocation this family declines to make, made by tsv. The
+A **third** answer, neither of the other two, is emitting
+the whole inter-param gap as the previous param's trailing run, so the comment comes
+out *before* the comma — the very relocation this family declines to make. The
 seam is now the shared one ([`Printer::push_item_trailing_run`] for the claimed trailing
 prefix, [`Printer::push_stranded_after_comma_blocks`] for the stranded remainder, and the
 shared leading emitter for what neither claimed), so the three parameter families answer it

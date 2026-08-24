@@ -309,7 +309,7 @@ impl BoundFile {
     /// kind component of the key disambiguates them — no same-kind collisions
     /// exist (verified via `-Zprint-type-sizes`), so `(address, kind)` is a total
     /// key. `require_node_id(addr_of(&method), NodeKind::MethodDefinition)` and
-    /// `require_node_id(addr_of(&method.value), NodeKind::FunctionExpression)` now
+    /// `require_node_id(addr_of(&method.value), NodeKind::FunctionExpression)`
     /// resolve to their respective distinct ids (pinned by
     /// `method_and_value_resolve_distinctly` below).
     #[must_use]

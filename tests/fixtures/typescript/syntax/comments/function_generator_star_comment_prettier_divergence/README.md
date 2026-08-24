@@ -9,11 +9,11 @@ into the body.
 - Input: `function /* a */ *a() {}` — Prettier: `function* /* a */ a() {}` — Ours: the same
 - Input: `const b = function /* b */ *() {}` — Prettier: `function* () /* b */ {}` (into the body) — Ours: `function* /* b */ ()`
 
-The glued spelling (`function/* b */*()`) used to **drop** the comment outright: the
-printer stepped its cursor one byte past `function` for the `*` instead of finding
-it, so with a comment in between the cursor landed *inside* the comment and the
-emitter whose range started there skipped it. The spaced spelling survived only
-because one byte happened to stop short of the comment. The `*` is found now.
+The glued spelling (`function/* b */*()`) is where a printer stepping its cursor one
+byte past `function` for the `*` instead of finding it **drops** the comment outright:
+with a comment in between the cursor lands *inside* the comment and the
+emitter whose range starts there skips it, and the spaced spelling survives only
+because one byte happens to stop short of the comment. The `*` is found, not assumed.
 
 Keeping the comment *before* the `*` would be the comment-position default, and it
 is what the `async`→`*` method gap already does

@@ -11,7 +11,7 @@ two siblings render identically; the newline's *spelling* carries no signal and 
 per width. That is the same convergence
 [inline_sibling_newline_flow](../../elements/inline_sibling_newline_flow_prettier_divergence/)
 pins for a text↔sibling boundary — here the separator is a whitespace-only node standing
-*between two non-text siblings*, which is the shape that used to keep its structural break.
+*between two non-text siblings*, which is the shape whose structural break the rule does not keep.
 
 The tag case is where the two formatters part. Prettier trims a space-only boundary before an
 inline **element** to a collapsible break (so `</span>` ` ` `<span>` reflows and both formatters

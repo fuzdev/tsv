@@ -14,14 +14,14 @@ a further sibling behind it, here a control-flow block — adds a second boundar
 independent decisions and are measured as such: the tail's boundary is the text fill's own `line`,
 answered from wherever the closing tag ended up.
 
-The two boundaries used to be fused instead, so that they resolved *outside-in*: measuring element
-and tail as one unit is what pushed the leading boundary over, and the tail then rode that break.
-That bought a single fixed point for the comment boundary at the price of a line, but it was
+Fusing the two boundaries instead resolves them *outside-in*: measuring element
+and tail as one unit pushes the leading boundary over, and the tail then rides that break.
+That buys a single fixed point for the comment boundary at the price of a line, but it is
 conditioned on a property its own output destroys — the wrap exists only while the sibling and the
 element share a line, and breaking that line is the fused measurement's whole action. Where the
-element stayed intact the fused and per-width answers agreed by arithmetic; where the element was
-wide enough to lay its own content out block-style they did not, and the document formatted to one
-form and reformatted to the other forever
+element stays intact the fused and per-width answers agree by arithmetic; where the element is
+wide enough to lay its own content out block-style they do not, and the document formats to one
+form and reformats to the other forever
 ([inline_sibling_drop_tail_wide_long](../inline_sibling_drop_tail_wide_long_prettier_divergence/)
 pins that razor).
 

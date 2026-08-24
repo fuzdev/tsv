@@ -514,7 +514,7 @@ impl<'a> Printer<'a> {
         // The run is emitted OUTSIDE any parens the argument needs — the gap belongs to the
         // `...`, not to a pair the printer must emit, so it answers one way whether or not
         // the argument's precedence happens to require one. That is `await`→operand's rule
-        // verbatim, and this site used to break it: opening the shell first moved a comment
+        // verbatim, and opening the shell first breaks it: it moves a comment
         // the author wrote BEFORE the `(` to after it (`.../* c */ (a ?? b)` →
         // `...(/* c */ a ?? b)`), re-associating it from the spread to the operand. A comment
         // the author wrote INSIDE those parens is glued to the argument and therefore owned,

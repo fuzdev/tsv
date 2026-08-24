@@ -162,8 +162,8 @@ impl<'a> Printer<'a> {
     /// ⚠️ **A line comment must reach the doc as ONE node**, which is why this returns a
     /// whole-`span` slice rather than assembling `text("//") + <content>`. The swallow
     /// check arms on a text node carrying the entire comment
-    /// (`DocArena::line_comment_source_span`), so the split spelling — which is what all
-    /// three sites used to hand-roll — presents nothing for it to tag, and every `//`
+    /// (`DocArena::line_comment_source_span`), so the split spelling — a hand-rolled
+    /// `text("//") + content` — presents nothing for it to tag, and every `//`
     /// this crate prints goes unguarded. Spelling, not intent, decides whether an emitter
     /// is instrumented; keep new emitters on this function or on
     /// `tsv_ts::build_comment_doc`, whose line arm is the same instrumented node.
@@ -284,9 +284,9 @@ impl<'a> Printer<'a> {
     /// verbatim node, and for the **multi-line block** the `<script>` twin's form:
     /// TypeScript formatting is context-free, so a `*`-aligned interior reindents to
     /// context, any other interior is preserved verbatim, and the break propagates via a
-    /// `MultilineText`. The verbatim source span this site used to emit made the
+    /// `MultilineText`. Emitting the verbatim source span instead would make the
     /// comment's interior columns a fixed point of whatever the author wrote — the same
-    /// comment held N distinct stable forms, one per authoring
+    /// comment holding N distinct stable forms, one per authoring
     /// (`expr_trailing_multiline_prettier_divergence`). `build_comment_doc` tags the
     /// print-once ledger itself, so this builder must **not** tag again.
     ///

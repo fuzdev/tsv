@@ -956,9 +956,9 @@ impl<'a> Printer<'a> {
                 // Blank line before the next property, on prettier's `isNextLineEmpty` —
                 // the same question the object LITERAL asks, through the same helper,
                 // because `printObject` prints `ObjectExpression` and `ObjectPattern`
-                // through one path. The range-based predicate this used to ask cannot
-                // express it: it counted the newlines in the gap, so a blank *after* a
-                // comma the author pushed onto its own line (`a1⏎,⏎⏎b1`) read as an author
+                // through one path. A range-based predicate cannot
+                // express it: counting the newlines in the gap, a blank *after* a
+                // comma the author pushed onto its own line (`a1⏎,⏎⏎b1`) reads as an author
                 // blank and was preserved, where prettier collapses it.
                 let next_start = obj.properties[i + 1].span().start;
                 self.push_item_blank_separator(&mut prop_parts, trailing.end_pos, next_start);
@@ -1003,8 +1003,8 @@ impl<'a> Printer<'a> {
                     // and prints through `build_assignment_pattern_doc` — the same
                     // builder every other binding default uses (array element,
                     // non-shorthand property, standalone parameter). Delegating rather
-                    // than re-deriving `key = default` here is load-bearing: this arm
-                    // used to reach into `pat.right` directly and so never acquired
+                    // than re-deriving `key = default` here is load-bearing: an arm
+                    // reaching into `pat.right` directly never acquires
                     // that builder's `=`→value freeze (`value_head_frozen_span`) or its
                     // `ParenContext::DefaultValue` wrap, making the shorthand the one
                     // position where an own-line `prettier-ignore` was ignored and an
@@ -1133,8 +1133,8 @@ impl<'a> Printer<'a> {
         // The three sub-questions must match the array EXPRESSION's gate
         // (`arrays.rs`'s `has_expanding_comments`) — this asked only two, and a comment
         // shape that expands `[a, b /* x⏎y */]` but not `const [a, b /* x⏎y */] = arr` is
-        // a bug every time. It was: only the expanded path emits the dangling comments
-        // after the last element, so a multi-line one landed on the grouped path and was
+        // a bug every time: only the expanded path emits the dangling comments
+        // after the last element, so a multi-line one landing on the grouped path would be
         // DROPPED outright (fixture `array_own_line_multiline_comment_expand`).
         // `has_own_line_block_comments_in_bracket_list` deliberately skips multi-line
         // comments — the multi-line question is this separate predicate's, not its.

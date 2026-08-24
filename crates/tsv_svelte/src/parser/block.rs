@@ -182,9 +182,8 @@ enum EachHeadSplit {
 ///
 /// ⚠️ Asking the type grammar is the point, and a bracket-depth byte scan cannot replace
 /// it. `<`/`>` are not a bracket pair, so an arrow's `>` closes a depth nothing opened:
-/// the scan that used to live here counted depth in a signed integer, `A<() => string>`
-/// drove it **negative**, and every later candidate died against a `depth == 0` test that
-/// could no longer be true — which is how the head split came to reject `{#each fns as
+/// a signed depth counter goes **negative** at `A<() => string>`, and every later candidate
+/// dies against a `depth == 0` test that can no longer be true — rejecting `{#each fns as
 /// A<() => string> as item}`. A mapped type is the same question one step subtler: its
 /// `[K in T as U]` spells an `as` that is no separator, and it survives a depth scan only
 /// because brackets happen to nest it — the type grammar knows it outright.
@@ -673,8 +672,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The consumed extent is the ANNOTATION's own end. Reporting where the
         // sub-parse's lexer stopped hands the tail back with a trailing comment
         // silently eaten — canonical Svelte rejects one there
-        // (`{#each xs as x: T /* c */}` → `expected_token`), and tsv used to accept it
-        // and drop the comment.
+        // (`{#each xs as x: T /* c */}` → `expected_token`), and accepting it here
+        // would drop the comment.
         let annotation_end = ta.span.end as usize;
         tsv_ts::attach_pattern_type_annotation(&mut expr, ta, self.arena)?;
         Ok((expr, annotation_end))
@@ -824,9 +823,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // none — its first body is the pending phase — while each shorthand fills its
         // own, which is exactly the state canonical's `next` guards the continuations
         // against. Naming it here is what lets all three forms share one continuation
-        // loop below: the shorthand arms used to carry their own copy of it, and a
-        // duplicate-clause guard added to one copy would silently not apply to the
-        // others.
+        // loop below: with a copy per shorthand arm, a duplicate-clause guard added
+        // to one copy would silently not apply to the others.
         let head_clause = match (shorthand_then, shorthand_catch) {
             (Some(value_str), _) => Some((AwaitClause::Then, value_str)),
             (_, Some(error_str)) => Some((AwaitClause::Catch, error_str)),
@@ -1009,8 +1007,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // the cut decides which characters are inside the run, so a trim answering a
         // different question would either leave a member in or take a non-member out.
         //
-        // ⚠️ The cut used to be `c != ' '` — a LITERAL SPACE — which made this the narrowest
-        // whitespace class in the parser and broke the two-word `{:else if}` in both
+        // ⚠️ A cut of `c != ' '` — a LITERAL SPACE — would make this the narrowest
+        // whitespace class in the parser and break the two-word `{:else if}` in both
         // directions at once. A separator Svelte's `allow_whitespace` crosses but a space
         // isn't (a tab, a NEWLINE, or any non-ASCII JS `\s`) ended the run at `else`, so
         // `{:else⏎if x}` read as a plain `{:else}` and the `if x` then failed the head's `}`
@@ -1374,7 +1372,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // The wrapper is literally a `function` declaration, so the match holds by
             // construction — stated as an error rather than an `if let` so a head whose
             // pieces went nowhere can never reach the printer as a silently empty
-            // signature (the shape the raw-text fallback used to produce).
+            // signature (the shape a raw-text fallback would produce).
             let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first() else {
                 return Err(
                     self.error_expected_at("snippet signature", content_offset + head_start)
@@ -1656,7 +1654,7 @@ mod tests {
 
         // No SECOND `as`: the head's first one was already the separator. A binding that
         // is no type at all takes this arm too — a destructuring default is a pattern,
-        // and an arrow inside one used to drop the bracket depth to a false zero and
+        // and an arrow inside one would drop a bracket-depth scan to a false zero and
         // split the head at the `as` buried in it. So does a run that consumed a
         // `satisfies` link and THEN reached a pattern: the item is still the binding.
         for input in [

@@ -1,5 +1,5 @@
 // The whole crate lives here, so `main.rs` is a shim over `cli` and every module —
-// including the two the binary alone used to own, `audit` and `cli` — is reachable by
+// `audit` and `cli` included — is reachable by
 // the integration tests in `tests/` and documented by `cargo doc`.
 pub mod audit;
 pub mod cli;

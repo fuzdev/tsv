@@ -368,9 +368,9 @@ pub fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
 /// - a parameter that is not a plain identifier (destructuring, default, rest).
 ///
 /// ⚠️ **It is a BREAK, not a refusal of the chain layout**, and the name says so because
-/// reading it the other way is the bug it has already caused: spelled as
-/// "has a return type", it was used to route such a chain *out* of
-/// `build_arrow_chain_doc` entirely, which silently dropped the break in every position
+/// reading it the other way is a bug: spelled as
+/// "has a return type", it routes such a chain *out* of
+/// `build_arrow_chain_doc` entirely, which silently drops the break in every position
 /// where nothing else owned one (call argument, binaryish operand). The one site that still
 /// declines on it is the assignment RHS, where `choose_layout` answers the same question
 /// with `AssignmentLayout::BreakAfterOperator` and so renders the break itself — see

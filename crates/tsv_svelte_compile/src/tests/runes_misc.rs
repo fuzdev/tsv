@@ -258,7 +258,7 @@ fn compile_rune_optional_chain_declarator_refuses() {
     // net-new MISMATCH (`$state.snapshot?.()`, where the oracle emits
     // `$.snapshot(x)` and unwrapping to `x` diverged) and a pre-existing
     // optional-chain over-acceptance family for the placement-restricted runes
-    // (the oracle rejects those, tsv used to compile them). Both the
+    // (the oracle rejects those). Both the
     // optional-call and optional-member spellings, over every declarator-unwrap
     // rune.
     // Each source is paired with the rune the refusal must name: an

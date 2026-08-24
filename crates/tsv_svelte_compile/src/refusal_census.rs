@@ -254,7 +254,7 @@ fn collect<'arena>(
 ) {
     // Structural top-level guards. These are field-presence facts, not rules with
     // hidden state — reproduced directly (a shared extraction would only wrap a
-    // `.is_some()`), matching `compile_server`'s bails. A plain module script now
+    // `.is_some()`), matching `compile_server`'s bails. A plain module script
     // compiles, so the census flags only the cheaply-detectable module refusal:
     // a default export (the oracle's `module_illegal_default_export`) — either
     // `export default X` or an `export { x as default }` specifier, the latter via

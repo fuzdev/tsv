@@ -163,8 +163,8 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Resolve how a class header lays its heritage out — the whole of the decision
-    /// both class printers used to spell out identically, over the positions
+    /// Resolve how a class header lays its heritage out — the whole of the decision,
+    /// shared by both class printers, over the positions
     /// [`Self::class_heritage_positions`] already computed.
     ///
     /// Group mode is the structural rule ([`Self::should_class_group_mode`]) OR a
@@ -410,10 +410,10 @@ impl<'a> Printer<'a> {
     /// group so the body's hardlines don't pollute the header's fit check.
     ///
     /// The header→body `{` gap is resolved here for **every** class shape, declaration and
-    /// expression alike — bare name, anonymous, heritage, type params. It used to be gated
-    /// by an `emit_pre_body_comments` flag the class-expression printer set false for its
-    /// bare-name / anonymous forms, which emitted the gap themselves; those two routes then
-    /// answered it differently from their own siblings (collapsing a broke-after multiline
+    /// expression alike — bare name, anonymous, heritage, type params. Gating it
+    /// by an `emit_pre_body_comments` flag a class-expression printer sets false for its
+    /// bare-name / anonymous forms, emitting the gap itself, has those two routes
+    /// answer it differently from their own siblings (collapsing a broke-after multiline
     /// block, and emitting a stray space before the brace). A flag meaning "another emitter
     /// already claimed this range" is the `docs/comments.md` §3 hazard, not a knob.
     pub(in crate::printer) fn build_class_header_doc(

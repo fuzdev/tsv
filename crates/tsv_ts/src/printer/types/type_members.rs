@@ -341,8 +341,8 @@ impl<'a> Printer<'a> {
         // With type parameters the `new`→`<T>` gap is its own seam and the `>`→`(` gap
         // below is the head gap. WITHOUT them the `new`→`(` gap IS the head gap, so it
         // routes through the same shared emitter — its own separator deferred to that
-        // call, which is why the keyword is pushed bare here. It used to emit its run
-        // inline with a flush continuation, disagreeing with the constructor TYPE's
+        // call, which is why the keyword is pushed bare here. Emitting its run
+        // inline with a flush continuation would disagree with the constructor TYPE's
         // identical `new`→`(` gap (`type C = new // c⏎\t(p: A) => A`) on the one axis
         // §Uniform Forced-Continuation Indent makes uniform.
         let new_paren_gap = match (new_keyword_end, type_parameters) {

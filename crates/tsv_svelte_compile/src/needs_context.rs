@@ -547,8 +547,8 @@ pub(crate) fn collect_constant_names(
 ///
 /// The TEMPLATE-scoped consts — a `{@const}`, a `{:then}`/`{:catch}` value, an
 /// `{#each}` index — were the one gap of this shape that was NOT safe (`const` to
-/// the oracle, purely template-local, so an unrecorded one fell through to nothing
-/// at all and the write was accepted). They are now recorded in
+/// the oracle, purely template-local, so an unrecorded one would fall through to nothing
+/// at all and the write be accepted). They are recorded in
 /// [`Nc::template_consts`], which the lookup below consults between `js_scope` and
 /// the two template-rule sets.
 ///

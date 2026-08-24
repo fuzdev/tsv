@@ -272,7 +272,7 @@ pub struct AuditSignature {
 
 /// Outcome of walking prettier's chain from an anchor (see [`AuditSignature::walk`]).
 ///
-/// `Collapsed` and `Truncated` used to share one `None` reading, and the conflation was a
+/// `Collapsed` and `Truncated` must not share one `None` reading — the conflation is a
 /// live mis-remediation: a reader mapping a mid-chain prettier ERROR to "the chain
 /// collapsed" prescribes regenerating — which deletes the signature and, with it, the
 /// multi-pass claim. The two now name themselves.

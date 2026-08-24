@@ -447,7 +447,7 @@ impl<'a> LocationMapper<'a> {
     ///
     /// `inline(always)`: plain `#[inline]` was declined here — it outlined as
     /// a 3.4% standalone symbol — and the writer's node header then paid
-    /// perf131's cost, an opaque call mid-staged-run forcing every following
+    /// for an opaque call mid-staged-run forcing every following
     /// append to re-load the stage cursor. Forcing it turned the whole change
     /// from **+0.14%** instructions to **−1.72%**, with cycles moving
     /// alongside. Four call sites, so the code-size exposure is bounded (the

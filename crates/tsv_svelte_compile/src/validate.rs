@@ -25,7 +25,7 @@
 //! Rules whose inputs *are* emission state stay at their emitter, where that state
 //! lives — e.g. the SSR-inert special elements' children / illegal-attribute /
 //! invalid-bind guards in `fragment.rs`. Their *placement* and *duplicate* rules
-//! used to live there too and were moved here for exactly the reason above.
+//! live here, not there, for exactly the reason above.
 //!
 //! **Oracle phase**: phase 1's parse-time element rules
 //! (`phases/1-parse/state/element.js`) plus the phase-2 validations that fire on a
@@ -64,11 +64,11 @@ use tsv_ts::ast::internal::{
 /// the meta tags legal only as a direct child of the component root, and legal at
 /// most once per component.
 ///
-/// ⚠️ Both rules were previously enforced for the SSR-inert three
+/// ⚠️ Enforcing either rule for the SSR-inert three
 /// (`svelte:window`/`svelte:body`/`svelte:document`) at their **emitter** in
-/// `fragment.rs`. That site never runs on a region SSR drops, so one of these in a
-/// `{:catch}` compiled — a live over-acceptance the fuzzer found. The rule lives
-/// here now, and only here; `fragment.rs` keeps the checks whose inputs really are
+/// `fragment.rs` misses a region SSR drops: that site never runs there, so one of
+/// these in a `{:catch}` compiles — an over-acceptance. The rule lives
+/// here, and only here; `fragment.rs` keeps the checks whose inputs really are
 /// emission state (children, illegal attributes, invalid binds).
 ///
 /// `svelte:options` is in the oracle's map too, and both its halves are covered

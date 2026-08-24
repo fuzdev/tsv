@@ -19,9 +19,9 @@ A one-member composite prints as its member — the `&` / `|` never renders — 
 between that operator and the member lands exactly where the operator-less authoring would
 put it: in the ENCLOSING gap. Two windows, contiguous in source, one run, one emitter.
 
-The leading-edge seam (`Printer::head_stripped_paren_shell`) used to decline any
-leading-operator composite whose gap held a comment, because a **multi-member** intersection
-emits that gap itself and a claim over only the shell would hand the enclosing gap bytes
+The leading-edge seam (`Printer::head_stripped_paren_shell`) declines a **multi-member**
+leading-operator composite whose gap holds a comment, because that intersection
+emits the gap itself and a claim over only the shell would hand the enclosing gap bytes
 nobody partitioned to it. With one member there is no such emitter: the composite's own head
 region opens at the operator (`HeadShell::region_start`) and the composite stands down
 (`Printer::composite_head_region_claimed`).

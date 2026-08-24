@@ -8,7 +8,7 @@
  * the pinned framework source) plus the version-pinned Prettier format suites, so a robustness
  * regression fails loudly instead of shipping in the VS Code extension's format-on-save.
  *
- * `check`'s `roundtrip:audit:prettier` leg now shares this driver's prettier suites (one list,
+ * `check`'s `roundtrip:audit:prettier` leg shares this driver's prettier suites (one list,
  * exported by `scripts/roundtrip_audit_prettier.ts`), so the reparse question is asked on every
  * commit. That does not move the bar stated above: it is ONE property over hand-written edge
  * cases, while the legs below ask eight over real source.

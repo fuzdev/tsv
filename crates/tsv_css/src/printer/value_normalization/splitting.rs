@@ -561,7 +561,7 @@ mod tests {
     fn test_collapse_whitespace_runs() {
         // Every whitespace run — spaces, tabs, newlines, and mixed — collapses to a
         // single space. The newline-free multi-space case is the one a newline-only
-        // collapse used to leave verbatim, diverging from prettier.
+        // collapse would leave verbatim, diverging from prettier.
         assert_eq!(collapse_whitespace_runs(".a  >  .  >  .b"), ".a > . > .b");
         assert_eq!(collapse_whitespace_runs(".a\t>\t.b"), ".a > .b");
         assert_eq!(collapse_whitespace_runs(".a >\n> .b"), ".a > > .b");

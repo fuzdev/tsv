@@ -10,9 +10,9 @@
  * 4. Reporting the genuine detection gaps, and separately the `fixtures[]`
  *    listing drift
  *
- * **Coverage is computed, not declared.** The audit used to answer "is this
- * fixture covered?" by looking it up in the patterns' hand-maintained
- * `fixtures[]` arrays — which measures bookkeeping, not detection. The two
+ * **Coverage is computed, not declared.** Answering "is this fixture covered?"
+ * by looking it up in the patterns' hand-maintained `fixtures[]` arrays
+ * measures bookkeeping, not detection. The two
  * diverge badly: the great majority of fixtures the old audit called uncovered
  * are detected by some pattern and merely unlisted. Worse, a hand-maintained
  * mirror of a computable fact drifts, and that drift produced every mislisting
@@ -22,7 +22,7 @@
  * (`fixture_cases.ts` — the same machinery `fixture_coverage_test.ts` uses),
  * and `fixtures[]` is demoted to what it is genuinely good for: an EXPLICIT
  * ASSERTION that a named pattern claims a named fixture, gated by that test.
- * A listing gap is now reported as bookkeeping, not as a coverage hole.
+ * A listing gap is reported as bookkeeping, not as a coverage hole.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -556,7 +556,7 @@ export function format_audit_report(report: AuditReport): string {
 		lines.push('');
 	}
 
-	// Broken references — listed first, above the orphans they used to hide among
+	// Broken references — listed first, above the orphans they would otherwise hide among
 	if (report.missing_pattern_fixtures.length > 0) {
 		lines.push('BROKEN Pattern Fixtures (claimed path has no directory on disk):');
 		lines.push('-'.repeat(50));

@@ -329,9 +329,9 @@ impl<'a> Lexer<'a> {
                 // regex literals — so no delimiter buried in one can be mistaken for the
                 // end of the expression or of the attribute. Hand-tracking a subset of
                 // those is the "comment-aware delimiter scan" bug class (see
-                // `tsv_debug scan_audit`): this scan used to track braces and strings but
-                // not comments or regex, so `title="{/* ` */ b}"` and `title="{f(/"/)}"`
-                // desynced it and it ran to EOF — an over-rejection of Svelte-valid input.
+                // `tsv_debug scan_audit`): a scan tracking braces and strings but
+                // not comments or regex is desynced by `title="{/* ` */ b}"` and
+                // `title="{f(/"/)}"` and runs to EOF — an over-rejection of Svelte-valid input.
                 //
                 // `parse_attribute_value` (attribute.rs) re-walks the same value to split
                 // it into Text and ExpressionTag parts, and reaches the same answer the

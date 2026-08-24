@@ -164,10 +164,10 @@ fn compile_refuses_a_static_block_that_declares_nothing() {
     );
     // ⚠️ It also swallows the oracle's rune EXEMPTION inside a static block — a
     // `var state = $state(0)` there keeps its initializer (no scope, so no
-    // re-declare) and the oracle does NOT reclassify. tsv refused this already, on
-    // its rune-guard path (a `$state` call inside a class body); the fence now
+    // re-declare) and the oracle does NOT reclassify. tsv refuses this on
+    // its rune-guard path (a `$state` call inside a class body) and the fence
     // refuses it first. Either way it is a refusal, never a wrong compile, and the
-    // exemption arm for this shape was unreachable even before the fence.
+    // exemption arm for this shape is unreachable.
     assert_unsupported(
         "<script>\n\tclass C {\n\t\tstatic {\n\t\t\tvar state = $state(0);\n\t\t\tconsole.log(state);\n\t\t}\n\t}\n\tconst x = $state(1);\n</script>\n<p>{x}{C}</p>",
         "rune $state whose base is also an instance binding",
@@ -182,7 +182,7 @@ fn compile_allows_ordinary_class_using_code_with_no_static_block() {
     let _ = compile_js(
         "<script>\n\tclass C {\n\t\tstatic label = 'c';\n\t\tstatic make() {\n\t\t\treturn new C();\n\t\t}\n\t}\n\tlet count = $state(0);\n</script>\n<p>{count}{C.label}</p>",
     );
-    // A class EXPRESSION in the shapes the enumerated walk used to descend into,
+    // A class EXPRESSION in the shapes an enumerated walk descends into,
     // with no static block anywhere: still compiles.
     let _ = compile_js(
         "<script>\n\tconst K = class {\n\t\tvalue = 1;\n\t};\n\tlet count = $state(0);\n</script>\n<p>{count}{K}</p>",

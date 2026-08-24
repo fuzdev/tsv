@@ -709,8 +709,8 @@ impl<'a> Printer<'a> {
     /// The shared width-decided angle-list body: `<` + softline-indented,
     /// comma-separated items with their inline block comments + `>` — the one core
     /// behind all three `<…>` families (type-parameter declarations, call/`new`
-    /// instantiations, and type-position type arguments), which previously
-    /// hand-rolled this layout independently. Returns the UNGROUPED concat: the
+    /// instantiations, and type-position type arguments), so none hand-rolls
+    /// this layout independently. Returns the UNGROUPED concat: the
     /// declaration's callers control the group themselves (e.g. the interface
     /// header); the type-argument callers wrap it in a group.
     ///
@@ -758,9 +758,9 @@ impl<'a> Printer<'a> {
             // `line` is the one that matters here: a glued run the author gave its own
             // line (`<A,⏎/* c1 */ /* c2 */⏎B>`) collapses onto the item when this list
             // fits and breaks above it when it doesn't — one fixed point for both
-            // authorings. A hardcoded space reached the second, and the expansion gate
-            // ([`Printer::block_comment_owns_its_line`]) used to hide that by routing
-            // every own-line run to the all-hardline builder instead.
+            // authorings. A hardcoded space would reach the second, and an expansion gate
+            // ([`Printer::block_comment_owns_its_line`]) routing every own-line run to
+            // the all-hardline builder would hide that.
             if has_comments {
                 inner_parts.extend(self.build_leading_comments_multiline(
                     prev_end,
@@ -825,9 +825,9 @@ impl<'a> Printer<'a> {
     /// **Argument count changes nothing here.** A single argument is the N=1 form of
     /// the list and takes the list's layout — delimiter-line comment on the `<` line,
     /// body indented, `>` dangling — exactly as a multi-argument list does. A
-    /// single-argument leading *line* comment used to hug `<`/`>` instead
-    /// (`foo<// c⏎A>`); that hug was the one shape in the family answering the layout
-    /// question by count, and it is retired. The surviving divergence is the
+    /// single-argument leading *line* comment does NOT hug `<`/`>`
+    /// (`foo<// c⏎A>`); that hug would be the one shape in the family answering the
+    /// layout question by count. The divergence is the
     /// delimiter-line placement itself, which is the multi-argument entry's
     /// (`type_args_open_angle_comment`) — prettier drops the comment to its own line
     /// at every count. See `type_position_parens_leading_line_comment`.

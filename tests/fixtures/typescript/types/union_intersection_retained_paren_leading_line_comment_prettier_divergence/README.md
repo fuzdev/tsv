@@ -47,9 +47,9 @@ would be a break its reparse has no cause to reproduce). All three are written w
 the comment **glued** to the `(`, and keep that line — the same authorship
 `FirstIntersection` above records — but the shape around it is the shared opener's:
 one normalizing space, the value indented into the shell, the `)` on its own line.
-They used to weld instead (`| (// c⏎↹↹  () => B)` — no space, the value never
-indented, the `)` on its tail), which is the third form the shared opener exists to
-prevent, and which made the own-line authoring of the same comment collapse onto it
+Welding instead (`| (// c⏎↹↹  () => B)` — no space, the value never
+indented, the `)` on its tail) is the third form the shared opener exists to
+prevent, and it makes the own-line authoring of the same comment collapse onto it
 rather than stand as its own fixed point. The gate that chose between the two shapes
 stopped reading the caller's `ShellLeadingRun`: that licence is granted on an
 upstream emitter having already placed the run, which is true of an intersection's

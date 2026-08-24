@@ -13,10 +13,10 @@
 //!
 //! Both the snippet hoist analysis (`snippet.rs`) and the `needs_context` walk
 //! (`needs_context.rs`) must see every attribute expression the compiled output
-//! can reference. They previously hand-wrote the same iteration and drifted:
-//! the component-spread arm existed in one but not the other, so a top-level
-//! snippet whose only instance-binding reference sat in a `<Foo {...binding} />`
-//! spread was wrongly module-hoisted — a runtime `ReferenceError` the reparse
+//! can reference. Two hand-written copies of the same iteration drift: a
+//! component-spread arm present in one but not the other has a top-level
+//! snippet whose only instance-binding reference sits in a `<Foo {...binding} />`
+//! spread wrongly module-hoisted — a runtime `ReferenceError` the reparse
 //! self-validation cannot catch (a free reference parses fine). This module is
 //! the single definition of "reference-bearing attribute expression"; an
 //! attribute shape that newly reaches emission must be added HERE so every

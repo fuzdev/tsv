@@ -721,8 +721,8 @@ impl<'a> Printer<'a> {
         // for the gaps it emits — the inter-head ones, via `arrow_gap_leading_run` — but
         // never for the TERMINAL `=>`→body gap: `chain_comment_outside_emitted_regions`
         // leaves that region out of the chain's emitted set, so a comment there declines
-        // the chain layout and lands in the arms below. (It used to decline for a comment
-        // anywhere in the chain at all, which made the whole flattened layout dead code.)
+        // the chain layout and lands in the arms below. (Declining for a comment
+        // anywhere in the chain at all would make the whole flattened layout dead code.)
         if has_own_line_comment {
             // Own-line or line comments — always break. A run the author GLUED to `=>`
             // keeps that line first; only what is left resumes on the leading-run route.

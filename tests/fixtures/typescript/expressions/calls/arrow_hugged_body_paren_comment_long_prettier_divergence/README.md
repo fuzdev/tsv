@@ -18,9 +18,9 @@ reassembles the argument from a signature doc and a body doc and so skips the ar
 body-end→arrow-end gap — the region where the authored `)` and any comment before it live.
 The **object/array** terminal is the opposite: its states render the argument's own
 expand-last printing, which emits that gap, so the head arguments stay inline and only the
-terminal expands. Those rows exist because tsv used to refuse there too, and the refusal
-was visible twice over — the single-argument spelling of the same layout hugged while the
-multi-argument one broke every argument out, and the broken-out form was not even a fixed
+terminal expands. Those rows exist because refusing there too is
+visible twice over — the single-argument spelling of the same layout hugs while the
+multi-argument one breaks every argument out, and the broken-out form is not even a fixed
 point (the object it leaves written multi-line reads as a source-multiline break on the
 next pass, and the inline state wins). `unformatted_ours_compact` carries the one-line
 authoring, which is where that shows: the hug's own output is multi-line either way.

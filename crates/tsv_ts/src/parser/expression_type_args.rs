@@ -408,9 +408,9 @@ fn check_indexed_type_pattern(bytes: &[u8], pos: usize) -> bool {
 /// [`type_operator_commits`]).
 ///
 /// The whole-word test is [`is_word_at`], the same one every other keyword lookahead
-/// asks. This used to hand-roll its own boundary and got two character classes wrong
-/// in the same direction: `$` was read as *ending* the word (so `string$` matched
-/// `string`), and so was every byte `>= 0x80` (so `stringµ` did too). Either way an
+/// asks. A hand-rolled boundary gets two character classes wrong in the same
+/// direction: `$` read as *ending* the word (so `string$` matches `string`), and
+/// every byte `>= 0x80` too (so `stringµ` does). Either way an
 /// ordinary identifier went down the keyword arm rather than the identifier arm's
 /// filter [`check_identifier_type_arg_pattern`].
 ///

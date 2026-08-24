@@ -17,7 +17,7 @@ impl<'a> Printer<'a> {
     /// Used for `try /* c */ {`, `catch (e) /* c */ {`, `catch /* c */ {`, `finally /* c */ {`.
     ///
     /// The keyword anchor for `push_header_to_body_gap` — see there for the gap's comment
-    /// rules. Emitting this gap inline instead (the pre-`bug164` shape) relocated an
+    /// rules. Emitting this gap inline instead would relocate an
     /// own-line `//` up onto the keyword line (`try⏎// c⏎{` → `try // c⏎{`), which the
     /// `if`/`while` `)`→`{` siblings never do.
     fn append_keyword_to_body_comments(&self, parts: &mut DocBuf, token_end: u32, body_start: u32) {

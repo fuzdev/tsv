@@ -93,7 +93,7 @@ deno task conformance:tsc-check:update                           # re-pin the co
 # roundtrip: filter by path substring (skips the pins). run: triage filters --test <substr> /
 #   --code <n> / --variant k=v / --family {dup,flow,all} skip the pins (invariant gates still
 #   hold); --emit-manifest <path>, --report <path> (full-run only), --update (full-run only).
-# check-test: --variant k=v (repeatable); --dump-flow dumps the first unit's control-flow
+# check-test: --variant k=v (one variant); --dump-flow dumps the first unit's control-flow
 #   graph as Graphviz DOT instead of the diagnostic diff.
 ```
 

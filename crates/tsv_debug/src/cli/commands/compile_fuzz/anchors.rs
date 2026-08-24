@@ -743,8 +743,8 @@ mod tests {
 
     #[test]
     fn declared_names_claim_destructured_bindings() {
-        // The bug this guards: the scan used to report `value` (the property KEY) and
-        // miss `v` (the binding), so a donor graft emitted a second `let v` — a mutant
+        // The bug this guards: a scan reporting `value` (the property KEY) and
+        // missing `v` (the binding) has a donor graft emit a second `let v` — a mutant
         // the oracle cannot parse.
         let names = declared_names("let { value: v = $bindable(), open = false } = $props();");
         assert!(names.contains(&"v".to_string()), "{names:?}");

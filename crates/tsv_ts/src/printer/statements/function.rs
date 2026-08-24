@@ -146,12 +146,12 @@ impl<'a> Printer<'a> {
     /// the keyword→name gap begins.
     ///
     /// Shared by the function **declaration**, the function **expression** and the
-    /// bodiless **overload signature**, which used to answer the modifier→`function` gap
-    /// three ways: the declaration emitted it (preserving the author's position,
-    /// `async /* c */ function f() {}`) while the other two pushed a bare `"async "` and
-    /// let the gap's comments fall through to whichever emitter came next — the
+    /// bodiless **overload signature**, which must answer the modifier→`function` gap
+    /// one way: emitting it (preserving the author's position,
+    /// `async /* c */ function f() {}`) rather than pushing a bare `"async "` and
+    /// letting the gap's comments fall through to whichever emitter comes next — the
     /// keyword→name gap for a named function, the parameter list for an anonymous one —
-    /// relocating them **across the `function` keyword**. Prettier relocates here too,
+    /// which relocates them **across the `function` keyword**. Prettier relocates here too,
     /// and inconsistently (into the body for an anonymous function, after the keyword for
     /// a named one), so it is no oracle; the declaration's answer is tsv's, and now there
     /// is one of it. See `docs/conformance_prettier_ts_comments.md` §Comment relocation.
@@ -200,10 +200,10 @@ impl<'a> Printer<'a> {
         if !modifier_keywords.is_empty() {
             // The `async`→`function` gap, through the line-comment-SAFE emitter (it
             // returns the bare separating space when the gap is empty). An inline
-            // emitter here swallowed the whole declaration head onto a `//`'s line —
-            // reachable because the statement parser used to weld `async⏎function f() {}`
+            // emitter here would swallow the whole declaration head onto a `//`'s line —
+            // reachable only if the statement parser welded `async⏎function f() {}`
             // into one async function instead of splitting it per `async [no
-            // LineTerminator here] function`. Both halves are fixed; the emitter stays
+            // LineTerminator here] function`, which it does not; the emitter stays
             // the safe one rather than resting on the parser's guarantee.
             parts.push(self.build_keyword_to_name_comments(cursor, function_pos.unwrap_or(cursor)));
         }
@@ -219,9 +219,9 @@ impl<'a> Printer<'a> {
             // where the spaced spelling already put it and where prettier puts it in a
             // declaration.
             //
-            // Advancing the cursor here is what dropped the comment: `cursor + 1` assumed
-            // the `*` was adjacent, so with a comment between the two the cursor landed
-            // INSIDE the comment and the caller's range began past the comment's own
+            // Advancing the cursor here would drop the comment: `cursor + 1` assumes
+            // the `*` is adjacent, so with a comment between the two the cursor lands
+            // INSIDE the comment and the caller's range begins past the comment's own
             // start, where the emitter skips it (`function/* c */*g() {}` →
             // `function* g() {}`). The spaced spelling survived only because one byte
             // happened to stop short of the comment.

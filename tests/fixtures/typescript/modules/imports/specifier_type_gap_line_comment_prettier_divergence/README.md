@@ -16,8 +16,8 @@ import {                   import {
 The modifier-gap analog of the same specifier's
 [rename `as` gaps](../specifier_as_gap_line_comment_prettier_divergence/), and the same shared
 renamed-specifier printer (`build_renamed_specifier_doc`) routes both through the shared
-header-gap continuation helpers — so a `//` can't swallow the name (the gap previously had no
-emitter at all, and every comment in it was **dropped**). A same-line block comment trails
+header-gap continuation helpers — so a `//` can't swallow the name (a gap with no
+emitter **drops** every comment in it). A same-line block comment trails
 inline in both formatters (`type /* c3 */ D`).
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)

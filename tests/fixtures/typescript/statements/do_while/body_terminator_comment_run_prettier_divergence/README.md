@@ -24,11 +24,11 @@ pinned in `audit_signature_pre_terminator.txt`). The `;` and the `while` head ar
 structure between the comments and the condition; tsv does not carry a comment across
 them.
 
-tsv previously welded the pair from the pre-`;` authoring (`// c2 // c3` — the second
-comment becoming the first's text; `input` itself was already stable): the own-line
-pre-`;` comment printed as real text whose line closed only at the `while` break,
-where the `;`→`while` comment's deferred run flushed onto it. That authoring is the
-`unformatted_ours_pre_terminator` form. In clause position the whole terminator-gap run now defers through the same
+Printing the own-line pre-`;` comment as real text whose line closes only at the `while`
+break welds the pair from the pre-`;` authoring (`// c2 // c3` — the second comment
+becoming the first's text; `input` itself is stable either way), since the `;`→`while`
+comment's deferred run flushes onto it. That authoring is the
+`unformatted_ours_pre_terminator` form. In clause position the whole terminator-gap run defers through the same
 `line_suffix` machinery, dedented to the construct's level, so the run meets the flush
 in authored order with the separator breaking between members
 (`doc/arena_render_suffix.rs`).

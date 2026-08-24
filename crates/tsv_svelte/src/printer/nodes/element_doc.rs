@@ -83,10 +83,10 @@ impl ElementKind {
 /// [`internal::Element`] and [`internal::SpecialElement`] are distinct AST types that print
 /// the same shape: a name, attributes, a fragment, and an open/close tag pair. Projecting
 /// both onto one view lets the layout decisions (multiline-ness, boundary modes, hugging)
-/// live in a single place. They used to be duplicated — `special_doc.rs` carried its own
-/// hug predicates and its own multiline decision, and the copies had drifted: `<slot>` never
-/// went multiline for block children, and the special path still dangled its delimiters
-/// where regular elements had moved to block-style.
+/// live in a single place. A `special_doc.rs` carrying its own hug predicates and its own
+/// multiline decision drifts from this one (a `<slot>` that never goes multiline for block
+/// children, a special path that dangles its delimiters where regular elements are
+/// block-style).
 ///
 /// `name` is the tag-name doc, reused by both the opening and the closing tag (a span-identity
 /// `source_span` slice for a regular element, static text for a `svelte:*` one).
@@ -691,11 +691,10 @@ impl<'a> Printer<'a> {
         if attr_docs.is_empty() {
             d.concat(&[d.text("<"), name])
         } else {
-            // Always the attr-keyed trailing break. main's `hug_start && !is_empty` fast path
-            // (emit the attr concat alone, skipping an `empty()` child) optimized a branch this
-            // file no longer has: a hugged open tag used to suppress the trailing break, which is
-            // exactly the delimiter-dangle machinery the block-style stance removed. There is no
-            // `empty()` child left to avoid, and `hug_start`/`is_empty` are no longer parameters.
+            // Always the attr-keyed trailing break. There is deliberately no `hug_start &&
+            // !is_empty` fast path (emitting the attr concat alone, skipping an `empty()` child):
+            // a hugged open tag suppressing the trailing break is exactly the delimiter-dangle
+            // machinery the block-style stance excludes, and there is no `empty()` child to avoid.
             let sl = d.softline();
             let inner = d.concat(&[d.concat(attr_docs), d.dedent(sl)]);
             let attr_group = if force_break {
@@ -1012,9 +1011,9 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let name_doc = d.source_span_ident(element.name_span);
-        // The attr-keyed opening tag every other element path takes — this used to carry a
-        // hand-rolled copy of it (same softline, same dedent, same indent), which is the
-        // two-copies-drift this crate's `ElementParts` doc warns about, one tag lower down.
+        // The attr-keyed opening tag every other element path takes — a hand-rolled copy of
+        // it here (same softline, same dedent, same indent) would be the two-copies-drift
+        // this crate's `ElementParts` doc warns about, one tag lower down.
         // The group wraps `build_opening_tag`'s output plus the `>` the helper deliberately
         // leaves to its caller (see [`Printer::end_tag`] for the same split at the other tag).
         let opening_tag = d.group(d.concat(&[
@@ -1333,9 +1332,9 @@ impl<'a> Printer<'a> {
 
             // Preserve the author's placement: a comment on its own line stays on its
             // own line; a comment on the same line as the preceding token stays
-            // trailing it (inline). This already held for block comments; it now
-            // extends to line comments (a `//` the author put after the tag name or
-            // an attribute is kept there rather than relocated to its own line).
+            // trailing it (inline). Block and line comments alike (a `//` the author
+            // put after the tag name or an attribute is kept there rather than
+            // relocated to its own line).
             if is_own_line {
                 docs.push(d.hardline());
             } else {

@@ -339,8 +339,8 @@ impl<'a> Printer<'a> {
     /// keeps that line, and a `//` always breaks. Both authorings are fixed points, which is
     /// what the *type*-side spelling of this same gap already guaranteed
     /// (conformance_prettier_ts_comments.md §A template-literal interpolation is
-    /// authoring-dependent) — the expression side used to key its separator on the comment's
-    /// KIND alone and gave every block a space, collapsing an own-line block onto the value's
+    /// authoring-dependent) — keying the expression side's separator on the comment's
+    /// KIND alone would give every block a space, collapsing an own-line block onto the value's
     /// line and reflowing a break the author wrote. That is the hand-rolled `is_block` split
     /// `docs/comments.md` §Leading comments exists to prevent, and it is also what made an
     /// own-line block DIRECTIVE inert here, since the floor reads only a directive alone on

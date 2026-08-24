@@ -231,8 +231,8 @@ impl<'a> Printer<'a> {
     /// `lineSuffix`), a block stays inline ([`Self::build_trailing_comment_doc`]). The
     /// suffix flushes at the layout's own following hardline, so the bytes are identical
     /// to an inline emission — except when the ELEMENT's doc already ends in a deferred
-    /// `//` (a stripped shell's comment): an inline `//` here landed AHEAD of that
-    /// pending suffix, which then flushed welded behind it (`a | b // inj // c2`,
+    /// `//` (a stripped shell's comment): an inline `//` here lands AHEAD of that
+    /// pending suffix, which then flushes welded behind it (`a | b // inj // c2`,
     /// reordered and reparsing as one comment). Deferred, the two meet the flush in
     /// source order and the run separator breaks between them
     /// (`doc/arena_render_suffix.rs`). Sound because every caller's separator lands on a
@@ -605,8 +605,8 @@ impl<'a> Printer<'a> {
     /// Whether `comment` was already emitted as the PREVIOUS item's trailing run — it
     /// shares `anchor`'s source line — so this leading / end-of-body run must skip it.
     ///
-    /// The single home for a question **eight** emitters used to answer with their own
-    /// `is_same_line` call: the two statement-list leading runs (block body, switch
+    /// The single home for a question **eight** emitters ask, none with an
+    /// `is_same_line` call of its own: the two statement-list leading runs (block body, switch
     /// consequent), the class-member, type-literal-member and enum-member leading runs, and
     /// the three end-of-body runs (program, block, the shared
     /// [`Self::build_trailing_body_comments_doc`] — which the object literal now reaches

@@ -22,9 +22,9 @@ Same rule as the simple-callee form
 ([open_paren_comment](../open_paren_comment_prettier_divergence/)), applied to
 the member-chain call path: a comment the author parked after `(` is a trailing
 comment on that line, so tsv preserves it in place rather than relocating it.
-This also fixes a source-order bug — when a block comment trails `(` and an
+Source order holds too — when a block comment trails `(` and an
 own-line comment leads the first arg (`obj.method( /* paren */\n\t// lead\n\ta`),
-tsv previously reversed them; it now keeps `/* paren */` on the `(` line and
+tsv keeps `/* paren */` on the `(` line and
 `// lead` on its own line, in source order. When the author writes the comment
 on its own line, both formatters keep it there — the two positions are
 dual-stable.

@@ -23,9 +23,9 @@ leaves the gap comment one level out, at the statement's indent;
 `input.svelte` itself is a fixed point for **both** formatters, and the
 `unformatted_ours_*` variants state the ours-only one-pass normalization.
 
-tsv previously **welded** the pair (`a & // inj // line comment` — reordered,
+An inline emission **welds** the pair (`a & // inj // line comment` — reordered,
 and reparsing as one comment whose text contains the second); the gap comment
-now defers through the same `line_suffix` run, where the flush's own separator
+defers through the same `line_suffix` run, where the flush's own separator
 breaks between the two (`doc/arena_render_suffix.rs`).
 
 Reason: print-once over the weld, authored order preserved. See

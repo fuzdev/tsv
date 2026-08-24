@@ -34,8 +34,8 @@ struct BoundaryBreaks {
 impl BoundaryBreaks {
     /// Both edges newline-authored — the both-or-neither expansion signal.
     ///
-    /// A lone leading break is not an expansion signal on its own: it used to
-    /// harden the opening tag while leaving the children built inline, producing
+    /// A lone leading break is not an expansion signal on its own: hardening the
+    /// opening tag on it while leaving the children built inline produces
     /// a third stable form. See [`Printer::compute_element_layout`].
     fn both(self) -> bool {
         self.leading && self.trailing
@@ -75,7 +75,7 @@ struct MultilineInputs {
 ///
 /// It once had a second reader, a mirror answering what a width-broken element's OUTPUT
 /// re-parses as, so that the tail boundary after such an element could pre-empt the next pass.
-/// That reader is gone: the tail boundary's space spelling is now decided per width at every
+/// There is no such reader: the tail boundary's space spelling is decided per width at every
 /// site, and its newline spelling reads the actual render (the flow probe), so nothing needs
 /// to predict the re-parse.
 fn content_is_text_only(nodes: &[FragmentNode<'_>]) -> bool {
@@ -188,12 +188,12 @@ impl<'a> Printer<'a> {
     ///   prettier agrees.
     ///
     /// ⚠️ **A prose-free run reaches no fill answer here, and there is deliberately no third path
-    /// for one.** A `{a} {b}` disjunct used to grant one — a one-line whitespace separator between
-    /// two non-text siblings, in a run the author left on one line — on the reading that the author
-    /// had put the siblings on one line themselves. It is gone, because after the readers were
-    /// unified it could no longer change an answer: this predicate is consulted only by the two
+    /// for one.** A `{a} {b}` disjunct granting one — a one-line whitespace separator between
+    /// two non-text siblings, in a run the author left on one line, on the reading that the author
+    /// had put the siblings on one line themselves — cannot change an answer with the readers
+    /// unified: this predicate is consulted only by the two
     /// interior-newline arms of [`Self::has_source_breaks_in_content`], and both ask it *of a text
-    /// node that carries a newline*. A run that disjunct accepted had none — every newline-bearing
+    /// node that carries a newline*. A run that disjunct accepts has none — every newline-bearing
     /// node in it would have had to be prose, and a run with prose already reaches `true` through
     /// the prose path below (a one-line separator is itself a seam, so the seam conjunct is
     /// satisfied whenever the pair test is). So its whole distinct contribution was prose-free runs
@@ -284,9 +284,9 @@ impl<'a> Printer<'a> {
     /// one-sided authoring answers by the boundary rule alone
     /// (`elements/boundary_air_one_sided_prettier_divergence`).
     ///
-    /// This used to be mirrored by a second predicate asking what a width-broken element's
-    /// OUTPUT re-parses as, so the tail boundary after such an element could answer in advance
-    /// what the next pass would. The mirror is gone — a tail boundary's space spelling is
+    /// There is deliberately no mirror predicate asking what a width-broken element's OUTPUT
+    /// re-parses as (so the tail boundary after such an element could answer in advance what
+    /// the next pass would) — a tail boundary's space spelling is
     /// decided per width from the closing tag's own column, and its newline spelling is
     /// layout-keyed at render (the flow probe — [`tsv_lang::doc::DocContext::flow_break_probe`]
     /// / `hold_line_after_broken_flow` — holds the tail's line exactly when the unit actually
@@ -344,8 +344,8 @@ impl<'a> Printer<'a> {
         // Both boundaries authored — the air is the author's, whatever the content is made of.
         // This is the SAME question the block arm above answers with `boundary.leading`, so
         // asking it identically for the other two kinds is what makes one
-        // rule out of three: an inline element used to fold air a component in the identical
-        // shape kept, a split keyed on the container's classification rather than on anything the
+        // rule out of three: folding air at an inline element that a component in the identical
+        // shape keeps would be a split keyed on the container's classification rather than on anything the
         // rule is about (`<span>` / `<a>` / `<td>` / `<label>` vs `<Comp>` / `<p>`).
         //
         // The conjunct removed here was `!is_fill`, on the reasoning that a run with a whitespace
@@ -647,8 +647,8 @@ impl<'a> Printer<'a> {
         // fit. A glued authoring and a spaced one therefore build the identical doc — which is why
         // there is no separate hug mode (the boundary run is trimmed either way), and why a source
         // break at just ONE boundary is not an expansion signal on its own: the rule is
-        // both-or-neither (`has_source_breaks_in_content`). A lone leading break used to harden the
-        // opening while leaving the children built inline, producing a third stable form (broken
+        // both-or-neither (`has_source_breaks_in_content`). A lone leading break hardening the
+        // opening while the children stay built inline would produce a third stable form (broken
         // tags, children still flowing on one line).
         //
         // `<pre>`/`<textarea>` are dispatched to `build_whitespace_sensitive_element_doc` before

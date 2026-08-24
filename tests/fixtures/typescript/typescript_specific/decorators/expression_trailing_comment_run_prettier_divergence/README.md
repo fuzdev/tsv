@@ -20,9 +20,9 @@ text contains the second, so `// c4` stops existing as a comment.
 welded landing (`variant_paren_comment.svelte` — tsv keeps the fused comment
 verbatim, since it reparses as one); the divergence is entirely in how the
 authored form normalizes, which is what
-`unformatted_ours_paren_comment.svelte` states. tsv previously reached
+`unformatted_ours_paren_comment.svelte` states. An inline emission reaches
 prettier's weld with the order **reversed** (`// c4 // inj`); the decorator's
-trailing comment now defers through the same `line_suffix` run, where the
+trailing comment defers through the same `line_suffix` run, where the
 flush's own separator breaks between the two (`doc/arena_render_suffix.rs`).
 
 Reason: print-once over the weld, authored order preserved. See

@@ -963,7 +963,7 @@ fn build_arrow_gap_break_expanded(
 /// The whole gap-break layout for a **lone** argument — the entry point all three
 /// single-argument printers take (plain call, `new`, member chain).
 ///
-/// Three near-copies of these four lines used to sit one per printer, which is the standing
+/// Three near-copies of these four lines, one per printer, is the standing
 /// hazard this file exists to hold: the three trees answer argument layout separately and
 /// drift. They differ only in what a caller genuinely owns — its `opener`, its argument
 /// builder, and whether it has a leading run to prepend — so those are the parameters and the
@@ -1275,7 +1275,7 @@ pub(super) fn build_arrow_hug_printed_doc(
 /// The whole hug layout for a **lone** huggable arrow argument (`callee((x) => …)`) — the
 /// entry point all three single-argument printers take (plain call, `new`, member chain).
 ///
-/// Three near-copies of these two steps used to sit one per printer, which is the standing
+/// Three near-copies of these two steps, one per printer, is the standing
 /// hazard this file exists to hold: the three trees answer argument layout separately and
 /// drift. They differ only in what a caller genuinely owns — its `opener`, its argument
 /// builder, and whether it has a leading run to prepend — so those are the parameters and the

@@ -148,8 +148,8 @@ enum Bucket {
     /// A `Some` is the reason tsv declined, keyed on the refusal's stable
     /// [`Refusal::bucket_key`](tsv_svelte_compile::Refusal::bucket_key) (or an
     /// error kind for a non-refusal decline). The probe already ran tsv here — it
-    /// is how the over-acceptance is detected — and the reason used to be
-    /// discarded, leaving NO tsv-side readout for an oracle-rejected file on any
+    /// is how the over-acceptance is detected — so discarding the reason would
+    /// leave NO tsv-side readout for an oracle-rejected file on any
     /// surface (`compile_compare --json` emits nothing when the oracle rejects).
     /// Keeping it turns "tsv also declines" into "tsv declines because X", which
     /// is what distinguishes a refusal that catches the shape under test from one

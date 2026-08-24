@@ -19,12 +19,11 @@ Prettier's two destinations here are keyed on whether a name follows, so its
 placement is no oracle.
 
 The declaration, the expression and the bodiless overload signature are printed by
-three different builders, and they used to answer this gap three ways: the
-declaration preserved, while the other two emitted a bare `async ` and let the
-gap's comments fall through to whichever emitter came next — the keyword→name gap
-for a named function, the parameter list for an anonymous one — which is how the
-comment ended up on prettier's side of the `function` keyword. All three share one
-head emitter now (`Printer::push_function_keyword_head`), and each caller reads its
+three different builders, which must answer this gap one way: emitting a bare
+`async ` and letting the gap's comments fall through to whichever emitter comes
+next — the keyword→name gap for a named function, the parameter list for an anonymous
+one — is how a comment ends up on prettier's side of the `function` keyword. All three
+share one head emitter (`Printer::push_function_keyword_head`), and each caller reads its
 following gap from the cursor that emitter returns: reading it from the node's span
 start instead re-claimed the region and printed the comment twice.
 

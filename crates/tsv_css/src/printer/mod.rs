@@ -727,7 +727,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn print_css_comment(&mut self, comment: &Comment) {
         // One of the crate's two comment-emission seams (the other is
         // `comment_blocks_in_range`). Also prints the *AST-node* comments — a
-        // `CssBlockChild::Comment` — whose span is now registered too (by
+        // `CssBlockChild::Comment` — whose span is registered too (by
         // `register_stylesheet_comments` at the format entry), so this emit matches a
         // registered entry and this seam records it, same as for a detached comment.
         #[cfg(feature = "comment_check")]

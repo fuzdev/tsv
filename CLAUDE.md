@@ -143,6 +143,7 @@ cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # forma
 deno task check          # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
 deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, node_modules freshness, oracle checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes them) — except the explicitly optional experimental-typechecker tier, informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
+deno task typecheck:features # cargo check of tsv_wasm under each single feature (format / parse alone) — the per-package builds; gates in `check`
 deno task typecheck:js   # deno check over the bench harness, scripts/ + the tsv_debug sidecar (the JS/TS cargo can't see).
 #                          NOT in `check` — needs `deno task bench:install`, and CI installs no node_modules
 deno task typecheck:scripts # deno check over scripts/ alone — node-modules-free, so this one DOES gate in `check`
@@ -155,6 +156,7 @@ deno task typecheck:bench-core # the bench modules that are DELIBERATELY node-mo
 #                          transitive imports) or `test:deno`. NOT the maximal checkable set: the impl
 #                          wrappers qualify only because their npm imports are dynamic. See deno.json's `//` note
 deno task test           # cargo test
+deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests (compiled out by default); gates in `check`
 deno task lint           # cargo clippy
 cargo fmt                # format Rust code
 tsv format .             # format the repo's own TS/JS — tsv formats itself (`--check` in the gate)
@@ -1034,7 +1036,7 @@ comment is claimed too — skipping it drops it, and leaving it to lead the next
 outside every item span, where a `is_same_line(prev_end, …)` gate is blind to both. **Both arms
 ask it** — a `//` glued to that `)` trails its element too, and `is_own_line_comment` cannot
 answer, its `!is_block` short-circuit calling every line comment own-line — so the run must then
-**end at the first line comment**, which the anchored gate used to guarantee for free: a second
+**end at the first line comment**, which an anchored gate would guarantee for free: a second
 deferred `//` welds onto the first's line and swallows the code behind it. The seam's **anchor**
 is likewise the element's PRINTED end: where the element node's span swallows a stripped `)`
 (a destructuring `Property`, an `AssignmentPattern`) the scan starts past the shell's interior and

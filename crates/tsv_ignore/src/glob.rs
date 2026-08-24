@@ -43,8 +43,8 @@ pub(crate) enum ClassItem {
 /// prefixes, so the inner glob match wants O(1) indexed character access. For an
 /// ASCII segment — every segment of essentially every real path — the segment's
 /// own bytes already *are* that array, so the flag buys the whole amortization
-/// with no collection at all: one `is_ascii` word-scan per segment replaces the
-/// `Vec<char>` it used to collect (a heap allocation, plus its `realloc` growth
+/// with no collection at all: one `is_ascii` word-scan per segment instead of
+/// collecting a `Vec<char>` (a heap allocation, plus its `realloc` growth
 /// chain, per segment per query). `text` also powers the cheap `&str` anchor
 /// comparison in `Layer::relativize`.
 #[derive(Debug)]

@@ -41,9 +41,9 @@ impl ForHeaderSpans {
     /// The three region accessors are what keep an ABSENT clause's comments from
     /// leaking into the next clause's region. A boundary chained over the absent
     /// clauses instead (`init_start.or(test_start).or(update_start)`) reaches past the
-    /// separators that delimit the slots, so one comment landed in two regions and was
-    /// printed twice — or, where only the skipped-over region had an emitter, in none
-    /// and was dropped. The `;` positions are the slot boundaries; every region is
+    /// separators that delimit the slots, so one comment lands in two regions and is
+    /// printed twice — or, where only the skipped-over region has an emitter, in none
+    /// and is dropped. The `;` positions are the slot boundaries; every region is
     /// bounded by them.
     fn init_region_end(&self) -> Option<u32> {
         self.init_start.or(self.first_semi)
@@ -92,7 +92,7 @@ impl ForHeaderSpans {
 /// [`Printer::matching_close_paren`] is a depth-tracked scan across the whole header,
 /// so locating the pair once and threading it is the difference between one such scan
 /// per `for` and three — the header-end probe, the header builder, and the empty-header
-/// builder each used to redo it. Every consumer has to agree on the same pair anyway:
+/// builder would each redo it. Every consumer has to agree on the same pair anyway:
 /// the `)` is what bounds the header's comment regions, so two callers disagreeing
 /// about it would bound them differently.
 ///
@@ -947,8 +947,7 @@ impl<'a> Printer<'a> {
     /// (#19188) dropped the space it used to put before `)` → `for (…; cond;)`, not
     /// `for (…; cond; )`.
     ///
-    /// Only the trailing form used to be emitted, so an own-line comment here was
-    /// dropped.
+    /// Emitting only the trailing form would drop an own-line comment here.
     fn push_for_update_trailing_comments(
         &self,
         parts: &mut DocBuf,
@@ -1214,8 +1213,8 @@ impl<'a> Printer<'a> {
     ///
     /// One seam for both header layouts (inline + line-comment), so an iterable cannot be
     /// parenthesized in one and bare in the other — the same reason a ternary's two
-    /// layouts share `parenthesize_ternary_branch`. Both used to spell a bare
-    /// `build_expression_doc` here, which is why the pair was missing from both.
+    /// layouts share `parenthesize_ternary_branch`. A bare `build_expression_doc`
+    /// in each is how the pair goes missing from both.
     fn build_for_in_of_right_doc(&self, right: &Expression<'_>) -> DocId {
         let doc = self.build_expression_doc(right);
         if needs_parens(right, ParenContext::ForInOfRight, self.in_for_init.get()) {
@@ -1625,9 +1624,9 @@ impl<'a> Printer<'a> {
             let gap_breaks = self.header_to_body_gap_breaks(header_end, body_start);
             let (tail, group_it) = if self.has_comments_to_emit_between(header_end, body_start) {
                 if matches!(stmt.body, Statement::EmptyStatement(_)) {
-                    // Asked FIRST: the empty-body arm below is guarded by this branch, so
-                    // a comment in the gap used to route the `;` through `adjustClause`
-                    // and indent it. An empty body has no clause — prettier returns `";"`
+                    // Asked FIRST: the empty-body arm below is guarded by this branch;
+                    // asked later, a comment in the gap would route the `;` through
+                    // `adjustClause` and indent it. An empty body has no clause — prettier returns `";"`
                     // — so the run stays trailing `)` and the `;` sits flush, which is
                     // what the shared emitter (`if` / `while` / for-x) delivers.
                     let mut tail = DocBuf::new();
@@ -1893,8 +1892,7 @@ impl<'a> Printer<'a> {
                         // keeps its place and drops `= value` to a continuation line
                         // indented one level; anything else stays inline before the `=`
                         // (`let a /* c */ = 0`). A gap this printer skips is a gap whose
-                        // comment is dropped outright, which is what this one used to do
-                        // for every comment kind in it.
+                        // comment is dropped outright.
                         let before_eq = self.has_comments_to_emit_between(id_end, eq_pos);
                         let after_eq = self.has_comments_to_emit_between(eq_pos + 1, init_start);
                         let continuation = before_eq

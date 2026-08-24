@@ -71,7 +71,7 @@ This is the one gap no enclosing emitter can see: a head declines for a composit
 does not know its RHS's first member will freeze. The leading-edge descent therefore asks
 the intersection itself, in `Printer::head_stripped_paren_shell`'s intersection link. And
 the freeze must then actually happen: the hoist that relocates a first member's in-shell
-line comment used to win over it, so the `//` spelling lost the freeze outright while the
+line comment must not win over it, or the `//` spelling loses the freeze outright while the
 block spelling (`(/* c */ U) & V`,
 [union_prettier_ignore_paren_shell_comment](../union_prettier_ignore_paren_shell_comment_prettier_divergence/))
 kept it — the union's member loop already suppressed its own stripped run for a frozen

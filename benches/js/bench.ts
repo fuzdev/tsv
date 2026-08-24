@@ -1691,7 +1691,7 @@ async function run_benchmark_group(
 		// 100ms inter-task cooldown is the only timer-dependent await in
 		// the loop, so dropping it sidesteps the hang.
 		// See benches/js/CLAUDE.md → Known Issues.
-		// The inter-task SETTLE the cooldown used to supply is not lost with it:
+		// An inter-task SETTLE is still provided without it:
 		// each task's `setup` forces a major GC (`settle_heap`), which is both
 		// timer-free and uniform across the three runtimes — a runtime-conditional
 		// cooldown would put a settle under Node/Bun and none under Deno, biasing
@@ -1883,7 +1883,7 @@ interface BaselineEntry {
  * Package versions used in the benchmark run — the report's `ReportVersions`
  * (canonical oracles + whichever alternatives loaded) plus tsv's own. Adding an
  * impl means extending `AlternativeVersionInfo` in `lib/report.ts`, one place,
- * rather than the three hand-kept field lists this used to be.
+ * rather than three hand-kept field lists.
  */
 interface BaselineVersions extends ReportVersions {
 	/** tsv's own version, from `Cargo.toml` `[workspace.package]` (the binary under test). */
@@ -2471,7 +2471,7 @@ function flatten_results_for_baseline(groups: GroupResults[]): BenchmarkResult[]
  * Round-trips on `_load` and surfaces as `baseline_metadata` on `_compare` —
  * the library doesn't interpret these fields, we use them ourselves to warn
  * on corpus drift (and to display the same `corpus`/`versions`/`binary_sizes`
- * context the old custom baseline used to carry).
+ * context).
  */
 function build_baseline_metadata(data: Baseline): Record<string, unknown> {
 	return {
@@ -2499,8 +2499,8 @@ async function save_baseline(data: Baseline): Promise<void> {
  * Compare current results against the stored baseline. Uses Welch's t-test
  * (via `benchmark_baseline_compare`) for significance, methodology-change
  * detection for per-task budget drift, and OR-gated noise warnings on
- * high-cv or high-outlier-ratio rows. The flat ±5% ops/sec gate that lived
- * here previously is gone — see `benchmark_baseline_compare` and the
+ * high-cv or high-outlier-ratio rows. There is deliberately no flat ±5% ops/sec
+ * gate — see `benchmark_baseline_compare` and the
  * fairness caveats in docs/benchmarks.md.
  */
 async function compare_baseline(current: Baseline): Promise<void> {

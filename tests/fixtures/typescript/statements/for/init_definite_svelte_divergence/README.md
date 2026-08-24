@@ -23,9 +23,9 @@ is wrong — only that a `for` head is not a variable statement.
 
 **acorn-typescript accepts**, building the `VariableDeclarator` it builds for the
 statement spelling — `definite: true` with the `number` annotation — because it
-has no for-header parameter at all. tsv built that tree until this rejection
-landed, and its printer then dropped the `!` on the way out, emitting `for (let
-a: number; ;)`: a silent deletion of authored source that re-parsed as a
+has no for-header parameter at all. tsv rejects instead: building that tree has
+its printer drop the `!` on the way out, emitting `for (let
+a: number; ;)` — a silent deletion of authored source that re-parses as a
 different program.
 
 acorn-typescript is tsv's AST-**shape** target, not its correctness oracle; for

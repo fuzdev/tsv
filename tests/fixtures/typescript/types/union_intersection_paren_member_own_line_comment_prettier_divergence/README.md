@@ -29,8 +29,8 @@ type T =
 
 Per Comment Position Philosophy: the comment is inside the parenthesized member,
 so tsv associates it with that member rather than hoisting it to the surrounding
-intersection. tsv previously **dropped** this comment (content loss — it
-collapsed the member inline, where a leading line comment cannot go); preserving
-it is the fix.
+intersection. Collapsing the member inline would **drop** it (content loss — a
+leading line comment cannot go there); preserving
+it is the rule.
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

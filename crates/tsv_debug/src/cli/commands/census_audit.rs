@@ -31,8 +31,7 @@ use super::profile::resolve_seed_files;
 ///
 /// Graded as a RATCHET over `census_audit_known.txt`, keyed `(path, bucket, direction)` —
 /// file-level, like the compile validation ratchet. Every line is a known bug; the file
-/// shrinking is the goal. Born EMPTY over `tests/fixtures` (the CSS parse-time-drop class it
-/// was argued from was fixed by hand before it landed); its standing role there is the
+/// shrinking is the goal. Born EMPTY over `tests/fixtures`; its standing role there is the
 /// tripwire that keeps whole-comment conservation closed, and its discovery yield is external
 /// corpora — its first sweep over the prettier suites found a live `as const` code swallow
 /// and four line-comment merges no other gate could see.

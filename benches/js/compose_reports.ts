@@ -263,7 +263,7 @@ const unavailable_rows_by_runtime = new Map<Runtime, ReadonlySet<string> | null>
  * A sibling from the brief `version` 10–11 window recorded failures WITHOUT rows;
  * those contribute nothing here too, and unlike the cases above that is a shortfall
  * of the data rather than a claim about it. Neither version was ever a released
- * sibling — the field and its rows landed in one change — so the state is only
+ * sibling — the field and its rows exist only together — so the state is only
  * reachable from a local run made mid-change, and it clears on the next full
  * `bench:perf`. Their `reason`s survive in `sources[].unavailable` either way.
  *
@@ -438,8 +438,8 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * field here that qualifies a number this report prints rather than adding one.
  *
  * 10: `partial_rows[]` — rows one sibling measured and another doesn't carry, with
- * no recorded load failure to explain it. Kept beside 11 rather than replaced by it:
- * both landed before any consumer saw either, so a reader at 11 would otherwise find
+ * no recorded load failure to explain it. Kept beside 11 rather than replaced by it,
+ * so a reader at 11 does not find
  * one of the two fields undocumented at the only place this file documents them.
  *
  * 12: `within_noise[]` entries carry `samples` — `[base runtime, cell runtime]`
@@ -494,7 +494,7 @@ const MIN_NOISE_SAMPLES = 10;
  *
  * Measured when this was written: across the three committed reports, 6 of 44
  * node/deno deltas land inside their combined cv, all six at ~1.00x — and one of
- * the six rests on 7 timings a side, which is exactly the cell this guard now
+ * the six rests on 7 timings a side, which is exactly the cell this guard
  * declines to call. So it currently confirms "no difference" rather than
  * overturning anything; it is here for the case it does overturn.
  */

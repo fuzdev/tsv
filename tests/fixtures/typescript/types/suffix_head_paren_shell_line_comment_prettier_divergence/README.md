@@ -26,12 +26,12 @@ and
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
 
 The **leading edge** is what this fixture adds to the rule. The keyword→value hang seam
-(`Printer::keyword_value_stripped_paren_hang`) used to fire only where the shell *was* the
-value, so a shell one link down was stripped by its own emitter instead — which emits a bare
-`hardline` at whatever indent it is built at, and the enclosing gap's indent was never
+(`Printer::keyword_value_stripped_paren_hang`) must fire here too, not only where the shell
+*is* the value; otherwise a shell one link down is stripped by its own emitter instead — which
+emits a bare `hardline` at whatever indent it is built at, with the enclosing gap's indent never
 applied. That flush form is nobody's fixed point: the reparse finds the comment in the
 keyword→value gap, where the hang applies the indent, so the first pass and the second
-disagreed — an F1 violation at every site below. The comment is authored in one gap and must
+disagree — an F1 violation at every site below. The comment is authored in one gap and must
 be emitted by one emitter, the enclosing gap's, on both passes; the shell declines its own
 copy for the duration of the build.
 

@@ -302,9 +302,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // also admits `let` / `yield`, whose bar is a strict-mode early error tsv defers
         // (tsc's parser accepts them too). That is one question to answer in one place;
         // re-narrowing here would mint a third name channel and restore the very
-        // asymmetry this call removed. `void` used to ride along and does NOT belong —
-        // it is a genuine `ReservedWord`, and this was the only position that could see
-        // the difference, which is why the fix went to `can_be_identifier` itself.
+        // asymmetry this call avoids. `void` does NOT belong —
+        // it is a genuine `ReservedWord`, and this is the only position that can see
+        // the difference, which is why the answer lives in `can_be_identifier` itself.
         let id = self.with_fn_context(is_async, is_generator, |p| {
             if let Some(name) = p.try_function_name() {
                 let (id_start, id_end) = p.current_pos();

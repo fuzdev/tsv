@@ -238,12 +238,11 @@ pub(super) fn render_fill_iterative(
                 break;
             }
             if !content_fits {
-                // The glued head may not drop ([`is_glued_head`]) — Case 3 has guarded it since the
-                // flag landed, and this case reaches `offset == 0` only for a ONE-item fill, which
-                // until `DocArena::as_fill` no builder produced with the flag on. So the arm was
-                // unreachable and the guard was never needed; it is now, because a lone glued word
-                // between two elements (`</code>.w<b>…`) is exactly that fill. The run renders in
-                // place instead, paying the overflow the way an unguarded head always has.
+                // The glued head may not drop ([`is_glued_head`]) — Case 3 guards it too, and this
+                // case reaches `offset == 0` only for a ONE-item fill, which only `DocArena::as_fill`
+                // produces with the flag on: a lone glued word between two elements
+                // (`</code>.w<b>…`) is exactly that fill. The run renders in place instead, paying
+                // the overflow the way an unguarded head always has.
                 if !is_glued_head(context, offset) {
                     let line_start_pos = line_start_column(indent, render, embed);
                     if *pos != line_start_pos {

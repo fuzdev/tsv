@@ -60,7 +60,7 @@ to the pristine output, i.e. the blank was silently deleted). Two deliberate des
   verdict**: triage it against prettier (if prettier collapses the blank there too, re-pin; if
   prettier keeps it, it is a blank-DROP bug — fix it instead). New and stale classes both fail the
   gate, so a new kind of silently-eaten blank cannot land silently and the list cannot rot.
-- **The key is coarse on purpose.** ~80% of injections absorb, so the bug ratchet's fine token
+- **The key is coarse on purpose.** ~81% of injections absorb, so the bug ratchet's fine token
   shape would pin the fixture tree's whole token-adjacency vocabulary (~5.7k shapes, measured) and
   mint new ones on ordinary fixture PRs — the churn that gets gates turned off. A node-edge class
   (~525 over `tests/fixtures`; the snapshot header carries the exact count) ≈ one emitter decision, the grain a triage verdict actually covers.

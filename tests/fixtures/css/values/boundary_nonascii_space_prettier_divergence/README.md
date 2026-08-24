@@ -31,19 +31,18 @@ and its bytes are preserved verbatim — the same lossless form it emits for the
 analog `content: a'y'` (tsv keeps `a'y'`; prettier splits to `a 'y'`) and for the list
 case above. Both formatters keep their own output idempotent.
 
-This pins a former **content loss** — a boundary non-ASCII space was silently dropped
-(`content: <NBSP>'z'` → `content: 'z'`). Two sites dropped it, both now fixed:
+This pins a **content-loss** class — a boundary non-ASCII space silently dropped
+(`content: <NBSP>'z'` → `content: 'z'`). Two sites can drop it:
 
-- **The value-boundary trim** (`value/mod.rs::locate_value`) used the Unicode-aware
-  `str::trim*`, which strips a boundary non-ASCII space. It now trims CSS whitespace only
+- **The value-boundary trim** (`value/mod.rs::locate_value`) trims CSS whitespace only
   (the escape-aware `escapes::trim_start_css` / `trim_end_preserving_escape`), matching CSS
-  Syntax 3 §4.2's ASCII-only whitespace definition — so a **trailing** space survives (it is
+  Syntax 3 §4.2's ASCII-only whitespace definition — the Unicode-aware `str::trim*` strips
+  a boundary non-ASCII space — so a **trailing** space survives (it is
   inside the declaration value's extent).
-- **The lexer's whitespace scan** treated every `char::is_whitespace()` code point as CSS
-  whitespace, so a **leading** space after the `:` was skipped as part of the
-  colon→value gap before the value even began. It now excludes the non-ASCII identifier
-  code points (U+00A0 and above), so a leading NBSP/em space opens the value's first
-  token instead of vanishing.
+- **The lexer's whitespace scan** excludes the non-ASCII identifier code points (U+00A0
+  and above) — treating every `char::is_whitespace()` code point as CSS whitespace skips a
+  **leading** space after the `:` as part of the colon→value gap before the value even
+  begins — so a leading NBSP/em space opens the value's first token instead of vanishing.
 
 `input.svelte` is tsv's inline form; `output_prettier.svelte` is prettier's split form.
 

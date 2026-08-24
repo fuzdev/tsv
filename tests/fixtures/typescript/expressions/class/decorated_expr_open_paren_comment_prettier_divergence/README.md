@@ -30,10 +30,9 @@ divergence every required-paren expression statement shares
 ```
 
 Per Comment Position Philosophy: the comment sits after the opening `(`, so tsv
-keeps it there rather than hoisting it before the parens. tsv previously
-**dropped** this comment (content loss — the bare parenthesized decorated class
-expression collapsed inline, where an own-line comment cannot go); preserving it
-is the fix. Newly surfaced by decorated-class-**expression** support. A block
+keeps it there rather than hoisting it before the parens. Collapsing the bare
+parenthesized decorated class expression inline would **drop** it (content loss —
+an own-line comment cannot go there); preserving it is the rule. A block
 glued to the `(` (`(/* c */⏎ @decorator …`) takes the same own-line place inside
 the broken parens; one glued to the *decorator* is owned by it and stays inline.
 

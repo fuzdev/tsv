@@ -16,8 +16,8 @@ export {                   export {
 
 Import and export named specifiers share one renamed-specifier printer
 (`build_renamed_specifier_doc`), so the `type`→name gap routes through the same header-gap
-continuation helpers as the `as` gaps beside it — a `//` can't swallow the name (the gap
-previously had no emitter at all, and every comment in it was **dropped**). A same-line block
+continuation helpers as the `as` gaps beside it — a `//` can't swallow the name (a gap
+with no emitter **drops** every comment in it). A same-line block
 comment trails inline in both.
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)

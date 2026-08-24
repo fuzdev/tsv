@@ -237,8 +237,8 @@ pub enum DocNode {
 // arena text pool ([`DocText::Pooled`], `MultilineText`), never in per-node
 // owned `String`s, so `DocArena::reset()`'s `clear()` and the arena's drop
 // free the node store without walking every node to run destructors on the
-// <1% that used to own heap payloads. A new heap-owning variant would silently
-// reintroduce that walk on every reset across all surfaces (CLI workers,
+// few that would carry a payload. A heap-owning variant would silently
+// introduce that walk on every reset across all surfaces (CLI workers,
 // FFI/N-API/WASM thread-local reuse) — this guard makes it a compile error;
 // route the payload through the pool instead.
 const _: () = assert!(!std::mem::needs_drop::<DocNode>());
@@ -2271,9 +2271,8 @@ impl DocArena {
     /// containing a comment or a source newline down a *different* branch, so nothing that
     /// must break can reach here.
     ///
-    /// The two used to be one function that kept prettier's name while quietly doing this,
-    /// which is how a multi-line comment in a flattened arrow signature got its newline
-    /// deleted. Two questions, two names.
+    /// Folding the two into one function under prettier's name is how a multi-line comment
+    /// in a flattened arrow signature gets its newline deleted. Two questions, two names.
     pub fn atomize(&self, id: DocId) -> DocId {
         self.flatten_lines_impl(id, FlattenMode::Atomize)
     }

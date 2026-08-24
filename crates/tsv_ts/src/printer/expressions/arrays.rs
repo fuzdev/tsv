@@ -453,11 +453,11 @@ impl<'a> Printer<'a> {
     ///
     /// The one spelling of that reach, shared by [`Self::build_array_group_doc`]'s
     /// end-of-array scan and [`Self::build_array_doc_with_expanding_comments`]'s final
-    /// scan. The two used to ask it differently — "any to-emit comment in the interior"
-    /// vs "own-line BLOCKS in it" — which agreed only because
-    /// [`Self::end_scan_emits_comment`]'s same-line arm discarded the difference
-    /// downstream. That is the drift-risk shape the anchor rule beside it has already
-    /// been bitten by, so the two are stated once.
+    /// scan. Asking it two ways — "any to-emit comment in the interior"
+    /// vs "own-line BLOCKS in it" — agrees only because
+    /// [`Self::end_scan_emits_comment`]'s same-line arm discards the difference
+    /// downstream: the drift-risk shape the anchor rule beside it guards against, so
+    /// the two are stated once.
     ///
     /// `None` when the array holds no real element: there is nothing to scan past.
     fn end_scan_start(&self, arr: &internal::ArrayExpression<'_>) -> Option<u32> {

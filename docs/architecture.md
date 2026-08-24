@@ -1022,10 +1022,9 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
 
 Issues that need architectural decisions before building future tools.
 
-- **Scope/symbol resolution** — Syntax-only ASTs today. Meaningful linting requires name resolution. *(When: before linter.)*
+- **Scope/symbol resolution** — The shipped ASTs are syntax-only; meaningful linting requires name resolution. The experimental `tsv_check` binder (`crates/tsv_check`, consumed only by `tsv_debug`) is the candidate answer, but nothing shipped links it. *(When: before linter.)*
 - **Error recovery** — Fail-fast parsers block LSP/linter (need partial ASTs from broken code); also required for full CSS-spec compliance — CSS Syntax 3 §5.5 recovery (drop the bad rule, keep parsing), see conformance_svelte.md §CSS Parser Scope. *(When: for full CSS-spec compliance (CSS) / before LSP/linter.)*
-- **Span encoding** — Byte offsets vs UTF-16 code units. LSP protocol uses UTF-16; mismatch = position bugs. *(When: before LSP.)*
-- **Source maps** — Compiler must map output positions to input. How do spans survive transforms? *(When: before compiler.)*
+- **Source maps** — A shipped compiler must map output positions to input; the experimental `tsv_svelte_compile` emits none. How do spans survive transforms? *(When: before the compiler ships.)*
 - **Cancellation** — LSP operations must be cancellable mid-parse. Current parser has no cancellation points. *(When: before LSP.)*
 
 ## References
