@@ -64,7 +64,7 @@ macro_rules! special_element_kind_table {
         /// Both consumers read it, so the refusal set and its detection can never
         /// drift: `clean_nodes` (which refuses) and the census's
         /// `collect_template_nodes` (which detects the same shape as a co-blocker)
-        /// used to hand-mirror the allow-list. The key is per variant rather than a
+        /// must not each hand-mirror the allow-list. The key is per variant rather than a
         /// flat `"special element"`, so the corpus census can break the bucket down
         /// without a hand-run per-tag cross-reference.
         ///

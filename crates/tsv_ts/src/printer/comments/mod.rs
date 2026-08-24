@@ -366,7 +366,7 @@ impl<'a> Printer<'a> {
     /// only `c1` has a newline before it and only `c2` has one after, so neither takes the
     /// hardline: `c1` glues to `c2` and `c2` takes the **soft `line`** that collapses when
     /// the list fits and breaks when it doesn't. Asking the RUN instead — "does the object
-    /// the author glued end the line?" — is the reading this gate used to take, and it
+    /// the author glued end the line?" — is the wrong reading: it
     /// forces open a list prettier keeps flat at every one of these families (params, type
     /// params, type args, function-type params, call args, tuples, intersections, all
     /// measured). The soft `line` is what makes the two authorings one fixed point, and it
@@ -1115,8 +1115,8 @@ impl<'a> Printer<'a> {
     /// author's — `fn(// c` and `fn(   // c` both normalize to one space
     /// ([`comments.md`](../../../../docs/comments.md) §The delimiter-line question). A
     /// caller therefore emits its bare delimiter text and concatenates this; writing
-    /// `"( "` itself is the rule spelled a second time, which is how the two shells that
-    /// used to own a copy of this function came to disagree with it.
+    /// `"( "` itself is the rule spelled a second time, which is how a shell owning a
+    /// copy of this function comes to disagree with it.
     ///
     /// The author blank BELOW the pulled comment rides with it, for every caller — see
     /// [`Self::push_delimiter_glued_blank`], which this pushes and the list / call families
@@ -1156,14 +1156,14 @@ impl<'a> Printer<'a> {
     /// [`Self::push_paren_shell_leading_run`]) and prettier keeps it at every construct —
     /// call, `new`, `[`, `{`, `if`, `return (`, `yield` — from its own un-glued placement.
     ///
-    /// ⚠️ It used to be a two-valued axis (`DelimiterGluedBlank`, now gone), the list and call
-    /// families dropping the blank on the reading that a blank directly under a container's
-    /// opening line is that container's LEADING-GAP blank. Two things sank it. The null
-    /// control it rested on (`fn(⏎⏎a)`, no comment) measures a different gap — delimiter→
+    /// ⚠️ It is NOT a two-valued axis (a per-family `DelimiterGluedBlank`) with the list and
+    /// call families dropping the blank on the reading that a blank directly under a container's
+    /// opening line is that container's LEADING-GAP blank. Two things sink that reading. The
+    /// null control it rests on (`fn(⏎⏎a)`, no comment) measures a different gap — delimiter→
     /// content, which both formatters clear here too — while the blank in question is
     /// comment→content, which tsv itself keeps from the un-glued authoring of the same
-    /// comment. And the premise was true only *after* tsv's own pull put the comment on that
-    /// line, so the blank's fate turned on whether the author had glued the comment to the
+    /// comment. And the premise is true only *after* tsv's own pull puts the comment on that
+    /// line, so the blank's fate would turn on whether the author had glued the comment to the
     /// delimiter: `fn(⏎// c⏎⏎a)` kept it and `fn( // c⏎⏎a)` did not, one authored blank with
     /// two fates.
     ///
@@ -1597,7 +1597,7 @@ impl<'a> Printer<'a> {
                 // intent, not layout this continuation gets to collapse. Same answer as
                 // the value side of these very constructs
                 // (`build_comments_between_filtered_opt`'s blank arm); the two emitters
-                // used to answer it two ways. See conformance_prettier.md §Authored
+                // must answer it the same way. See conformance_prettier.md §Authored
                 // breaks in value position. Only meaningful across a `hardline`: an
                 // inline run has no lines to separate.
                 self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
@@ -1834,9 +1834,9 @@ impl<'a> Printer<'a> {
     /// `build_rhs_comments_opt` — a decorator is the clear case (`@dec /* c */⏎class`),
     /// since its following declaration owns its own line regardless.
     ///
-    /// ⚠️ Don't grow an example list here without probing each entry: this comment
-    /// previously named `await` operands and object property values as keeping the
-    /// break, and **both actually collapse** (`await /* c */ x`, `k: /* c */ 1`).
+    /// ⚠️ Don't grow an example list here without probing each entry: `await`
+    /// operands and object property values look like they keep the break, and
+    /// **both actually collapse** (`await /* c */ x`, `k: /* c */ 1`).
     /// The gluing/non-gluing split is a property of each call site, so the call sites
     /// are the source of truth, not a list here.
     ///

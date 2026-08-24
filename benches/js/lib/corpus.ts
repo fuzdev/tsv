@@ -363,7 +363,7 @@ interface CorpusEntryBase {
  * A corpus entry plus its tier, carrying exactly one file source: a directory to
  * walk (`path`, relative to project root) or a harvest-produced JSON path list
  * (`files_from`, also project-root-relative). The union enforces the
- * "exactly one of" invariant the type used to only assert in a doc comment —
+ * "exactly one of" invariant (which a doc comment alone cannot enforce) —
  * so `entry_source` narrows to a plain `string` without a non-null assertion.
  */
 type CorpusEntry =

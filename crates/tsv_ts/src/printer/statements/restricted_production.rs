@@ -124,7 +124,6 @@ impl<'a> Printer<'a> {
             } else {
                 smallvec![d.text(keyword), d.text(" ("), expr_doc]
             };
-            // Trailing comments in the operand→`;` gap were previously DROPPED here.
             // A line comment trails after the `;` in both keywords (`(a = b); // c`).
             // A same-line block comment differs (prettier is inconsistent between the
             // two): `return` keeps it INSIDE the parens (`return (a = b /* c */);`,

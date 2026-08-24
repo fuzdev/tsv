@@ -46,10 +46,10 @@ use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_nam
 /// legitimate. So the scan asks the **parse**: a violation is a space at a line head *inside a
 /// fragment `Text` node*, which excludes every one of those by node kind.
 ///
-/// Its first catch was a live F1 break in the fused element+tail measurement that the
-/// inline-sibling wrap used to take — invisible to every other gate because the strayed pass is
-/// only reachable at widths no fixture happened to sit at
-/// (`inline_sibling_drop_tail_wide_long`). Green since, and gated in `deno task check`.
+/// What only it can see: an F1 break in a fused element+tail measurement at an
+/// inline-sibling wrap — invisible to every other gate because the strayed pass is
+/// reachable only at widths no fixture happens to sit at
+/// (`inline_sibling_drop_tail_wide_long`). Gated in `deno task check`.
 ///
 /// Pure Rust — no Deno. Defaults to `tests/fixtures`, `.svelte` seeds only (the class is
 /// Svelte inline layout; the TS and CSS printers have no fill-boundary bake).

@@ -33,7 +33,7 @@ authored position ([§Authored breaks in value
 position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position)).
 Prettier instead keeps the break *and* relocates past `from`, a form it holds stable
 while tsv rewrites it to a third stable form — hence `divergent_variant_own_line.svelte`.
-The `export *`/`export type *` gaps are the ones where tsv used to preserve that break,
-making them the lone header gaps out of step with `import … from`.
+Preserving that break at the `export *`/`export type *` gaps would make them the lone
+header gaps out of step with `import … from`.
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

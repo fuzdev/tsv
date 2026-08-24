@@ -11,8 +11,7 @@ where the user placed it — before the brace.
   the next line).
 
 Per Comment Position Philosophy — we preserve user intent when prettier moves a
-comment to a different syntactic position. Fixing this also closed a **content-loss
-bug**: tsv previously *dropped* this comment entirely (`import /* c */ { a }` →
+comment to a different syntactic position. Preserving is also **content preservation**: a gap with no emitter *drops* the comment entirely (`import /* c */ { a }` →
 `import { a }`). The `import type … { a }` (type→`{`) gap and the empty-braces
 (`import /* c */ {}`) gap were already preserved; this is the non-type
 named-specifier case. Sibling of the export `keyword_brace_comment` divergence and

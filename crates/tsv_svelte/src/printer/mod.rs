@@ -445,9 +445,9 @@ impl<'a> Printer<'a> {
     ///   not the host's.
     /// - the **post-processing** — `remove_lines` for an inline block head,
     ///   [`Self::indent_own_line_head`] for a prefixed head, nothing for the rest. The
-    ///   leading-line-comment continuation indent used to sit in this list, on the block
-    ///   heads alone; it is a property of the *comment*, not of the head, so it is now
-    ///   [`Self::head_layout`] and every braced head asks it.
+    ///   leading-line-comment continuation indent is NOT in this list: it is a property
+    ///   of the *comment*, not of the head, so it is [`Self::head_layout`] and every
+    ///   braced head asks it.
     ///
     /// A value whose leading comment is a **JSDoc cast** rides one more per-head verdict:
     /// `EmbedContext::jsdoc_cast_cannot_hang`, the "answers the break by rule and CANNOT

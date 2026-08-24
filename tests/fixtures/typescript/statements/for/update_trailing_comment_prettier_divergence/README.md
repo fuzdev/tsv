@@ -14,7 +14,7 @@ The update→`)` gap is the update clause's own region — the header's closing 
 all that terminates it, exactly as with an
 [empty update slot](../empty_slot_comment_prettier_divergence/), where prettier
 relocates the same way. Not preserving drops the comment: the gap has no other
-emitter (only the same-line trail did), which is what tsv used to do.
+emitter (only the same-line trail).
 
 A comment sharing the update's line trails it in both formatters — the third case is
 a control, not a divergence.

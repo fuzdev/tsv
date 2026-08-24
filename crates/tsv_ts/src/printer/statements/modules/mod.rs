@@ -392,8 +392,8 @@ impl<'a> Printer<'a> {
         // end-of-line) or a **multiline** block the author broke after hangs the value.
         // A single-line block does not: nothing forces it off the line, so the author's
         // break is ordinary layout and is reflowed (§Authored breaks in value position).
-        // This gap used to carve itself out via `comment_hangs_binary_operand`,
-        // which also hangs a single-line block — that made `export default` the lone
+        // Carving this gap out via `comment_hangs_binary_operand`,
+        // which also hangs a single-line block, would make `export default` the lone
         // value gap preserving an unforced break, disagreeing with its own twin
         // `export =`. Prettier keeps the break at both; tsv reflows at both.
         if self.comments_force_own_line_between(keyword_end, decl_start) {

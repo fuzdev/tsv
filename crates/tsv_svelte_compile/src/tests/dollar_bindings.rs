@@ -253,7 +253,7 @@ fn compile_allows_dollar_prefixed_binding_positions_the_oracle_exempts() {
     // (declared in scopes past its `function_depth <= 1` gate), so over-refusing
     // there would break components the oracle compiles. Probe-verified
     // oracle-accepted; the `$$slots` cases also carry a genuine `$$slots`
-    // reference, the cross the name-keyed carve-out used to conflate.
+    // reference, the cross a name-keyed carve-out conflates.
     //
     // ⚠️ Read the coverage narrowly: every case below is named `$$slots`, and
     // that is not a stylistic choice — it is the ONLY `$`-prefixed name this

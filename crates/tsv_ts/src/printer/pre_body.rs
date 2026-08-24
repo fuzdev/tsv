@@ -164,10 +164,10 @@ impl<'a> Printer<'a> {
     ///
     /// ⚠️ The brace **must** leave the line when a `//` is in the gap: emitted inline it
     /// would be swallowed into the comment's text (`gen() // c {`), output that does not
-    /// reparse. This path used to relocate such a comment *into the body* instead — the
-    /// one move across `{` tsv declines everywhere else, and the reason the catalog's
-    /// "consistent with tsv's handling of line comments before block bodies across all
-    /// statement types" was false of exactly this family.
+    /// reparse. Relocating such a comment *into the body* instead is the one move across
+    /// `{` tsv declines everywhere, and would make the catalog's "consistent with tsv's
+    /// handling of line comments before block bodies across all statement types" false of
+    /// exactly this family.
     ///
     /// Sharing the emitter is also what gives this gap its **format-ignore** opt-in: a
     /// directive alone on a line here freezes the body, and keeping it on its own line is

@@ -430,9 +430,8 @@ fn compile_switch_case_const_shares_one_scope() {
 
 #[test]
 fn compile_each_item_assignment_refuses_the_checklist_repro() {
-    // The exact repro `docs/checklist_svelte_compiler.md` carried as an open
-    // over-acceptance until this rule landed — pinned so the doc's claim that the
-    // row is closed cannot silently rot.
+    // The exact repro `docs/checklist_svelte_compiler.md` cites — pinned so the doc's
+    // claim cannot silently rot.
     assert_unsupported(
         "<script>let b = 1;</script>{#each [0] as b}<button onclick={() => { b++; }}>x</button>{/each}",
         "an {#each} item",

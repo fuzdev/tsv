@@ -563,7 +563,7 @@ frozen argument takes the uniform forced-continuation indent its `await`/`new` s
 
 **Absent hosts are tracked gaps, not sanctioned differences** — honoring a directive is a
 per-position opt-in the printer makes at each value head, so an absent host reformats rather
-than freezing, exactly as every host above did before its own cluster landed. Two neighbours
+than freezing. Two neighbours
 were probed and cleared: a computed **member**'s `[`→index gap already freezes (only its layout
 parts), and a class heritage's `extends`→superClass gap freezes under neither formatter —
 prettier relocates the directive above `extends` and normalizes the value too, so there the
@@ -858,8 +858,7 @@ merely redundant tsv drops them and the directive leads the statement, matching 
   ◆content_preservation — `@dec⏎export⏎// c⏎class C {}`. The declaration's span opens at the
   decorator, so this gap is *inside* it, and a directive there freezes nothing in either tool —
   the mirror image of the decorator→declaration gap above. Prettier hoists a line comment above
-  `export` and trails a block comment on the decorator; tsv keeps both in place. tsv previously
-  **dropped** every comment in this gap, scanning it over an inverted range —
+  `export` and trails a block comment on the decorator; tsv keeps both in place —
   [before export](../tests/fixtures/typescript/typescript_specific/decorators/before_export_comment_prettier_divergence/)
 
 **On prefixed Svelte braced heads.** The head rule reaches one delimiter further out: a `{`

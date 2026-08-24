@@ -8,7 +8,7 @@ authored-air document. The width-broken and newline-authored *content* spellings
 the non-terminal tail's **space** spelling after the element must answer identically in both: per
 width, from the closing tag's own column — the same rule
 [inline_wide_content_text_sibling_long](../inline_wide_content_text_sibling_long_prettier_divergence/)
-pins without the wrap. The joint element+boundary measurement the text-only twin used to keep has
+pins without the wrap. A joint element+boundary measurement has
 no stable answer here: width-breaking the element *creates* the newline-authored document, whose
 own pass hugs the tail per width, so a joint first pass reaches the fixed point only on the
 second pass — the regeneration invariant outranked the outside-in preference for any element

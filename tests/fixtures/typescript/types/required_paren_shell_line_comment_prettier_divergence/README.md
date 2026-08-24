@@ -60,8 +60,8 @@ only where it renders once they are.*
   two ways.
 - **Z2** — the same pair carrying a **leading** run as well. Two of the seven positions
   have a keyword→value hang seam in front of the pair
-  (`Printer::keyword_value_stripped_paren_hang`), and a leading `//` used to take it —
-  stripping the very pair the operand needs, re-adding it bare, and lifting the trailing
+  (`Printer::keyword_value_stripped_paren_hang`), and a leading `//` must not take it —
+  that strips the very pair the operand needs, re-adds it bare, and lifts the trailing
   `//` out past the `;` (`keyof // c1⏎(A3 extends B3 ? C3 : D3); // c2`, prettier's form),
   where a second trailing comment then welds onto it. This is the prefix operator's; the
   constraint's is below. The other five have no hang seam and already retained.

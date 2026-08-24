@@ -7,8 +7,8 @@ Prettier: absorbs it into the switch body, or into the discriminant parens
 
 ## Reason
 
-⚠️ **This gap previously produced unreparseable output.** The run was emitted inline and then
-a bare `" {"` appended, so a line comment **swallowed the opening brace**:
+⚠️ **An inline emission here produces unreparseable output.** With the run emitted inline and then
+a bare `" {"` appended, a line comment **swallows the opening brace**:
 
 ```js
 switch (a) // c1 {     ← the `{` is inside the comment; `case 1:` then fails to parse

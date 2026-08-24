@@ -138,9 +138,9 @@ pub(crate) fn comment_census(source: &str, parser: ParserType) -> CensusMultiset
 ///
 /// ⚠️ The class is **[`tsv_lang::is_js_whitespace`], not ASCII `[ \t]` and not Rust's
 /// `White_Space`** — because the trims it models are JS `String.prototype.trim*` calls.
-/// It used to be ASCII-narrow on the argument that an NBSP at a line edge is CONTENT; at a
-/// line comment's end and inside an indentable block that is no longer true (prettier
-/// deletes it there, and so does tsv), so the census read a sanctioned trim as a rewrite.
+/// An ASCII-narrow class, on the argument that an NBSP at a line edge is CONTENT, is wrong
+/// at a line comment's end and inside an indentable block (prettier deletes it there, and
+/// so does tsv), where the census would read a sanctioned trim as a rewrite.
 /// The narrowness that argument was protecting is kept where it is still true, by giving
 /// the verbatim kinds **no trim at all** — which is stricter than the old blanket
 /// `[ \t]`, not looser.

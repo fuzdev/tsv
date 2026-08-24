@@ -719,9 +719,9 @@ fn write_generic_island(
 /// is where that expression's own parse began (`1-parse/acorn.js`, `get_comment_handlers`).
 ///
 /// One `Span` argument rather than the two loose offsets, because the defect this guards is
-/// keying the window on some *other* node: `<svelte:element this={x} />` used to pass the
-/// enclosing element's span, so a comment earlier in the tag head fell inside the window and
-/// attached to the expression as a `leadingComments` entry the canonical parser never emits.
+/// keying the window on some *other* node: passing `<svelte:element this={x} />`'s enclosing
+/// element span puts a comment earlier in the tag head inside the window, attaching it to the
+/// expression as a `leadingComments` entry the canonical parser never emits.
 /// A directive passes its whole attribute span rather than the braces — an equivalent
 /// window, since no comment can sit between a directive head and its `{` (both parsers
 /// reject there) and none can follow the `}` inside the span's tail (at most a closing

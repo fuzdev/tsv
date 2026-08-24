@@ -644,9 +644,9 @@ pub(crate) fn resolve_profile_files(
 ///
 /// The profiling-side twin of [`resolve_seed_files_named`], down to the `subject`
 /// noun and the `keep` polarity — the two share [`resolve_and_keep`], and reading
-/// the same way matters more than the two lines it saves: this one used to take
-/// the predicate INVERTED (`excluded`), so the file held two resolvers whose
-/// filter arguments meant opposite things.
+/// the same way matters more than the two lines it saves: two resolvers whose
+/// filter arguments mean opposite things (`keep` here, `excluded` there) is the
+/// trap.
 ///
 /// # Errors
 ///

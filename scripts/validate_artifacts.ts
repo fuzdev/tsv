@@ -80,7 +80,7 @@ const TARGETS = ['npm', 'deno'] as const;
 // change. Recentered here because two measures had walked to within ~3% of a
 // band edge (`all` and `all − format`) — a release-time change would have
 // discovered them as a publish failure instead of as a visible size move.
-// The smallest identifiable contributor at the tail is `reinstantiate` (#886),
+// The smallest identifiable contributor at the tail is `reinstantiate`,
 // which adds an export to every variant; parse moving least is the expected
 // shape, since most of the run's work landed in the printers.
 //

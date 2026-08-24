@@ -128,8 +128,8 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a>(
 /// (`shouldInline` includes `node.computed`), so a computed access stays glued to the
 /// object and sheds width by breaking its own brackets instead (`computed_lookup_doc`).
 /// Giving it a segment of its own would put a softline before the `[`, which prettier
-/// never emits — and, because the brackets used to be unbreakable, was tsv's only way to
-/// fit an overlong computed access.
+/// never emits — and the breakable brackets make it unnecessary for fitting an overlong
+/// computed access.
 fn starts_segment(node: &ChainNode<'_>) -> bool {
     node.is_member() && !node.is_computed()
 }

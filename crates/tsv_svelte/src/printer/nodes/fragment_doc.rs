@@ -418,10 +418,10 @@ impl<'a> Printer<'a> {
                 // ([`LeadBoundary::SpacedBare`]) and `glued_lead` guards the text's own boundary as
                 // before.
                 //
-                // ⚠️ The space is a **bare** `line` there, NOT the `group([line, …])` wrap this
-                // comment used to name: the comment run ends the inline run, so its separator is the
-                // parent group's to resolve. Naming the wrap here is what made the first fix attempt
-                // reach for `Spaced` and break F1 — see the variant's own note.
+                // ⚠️ The space is a **bare** `line` there, NOT a `group([line, …])` wrap: the
+                // comment run ends the inline run, so its separator is the parent group's to
+                // resolve. Reading it as the wrap is what makes a fix reach for `Spaced` and
+                // break F1 — see the variant's own note.
                 pending_glued_prefix = Some((prefix, i));
                 glued_run_consumed_until = text_idx;
             } else {
@@ -955,7 +955,7 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for a node sequence in multiline / block context.
     ///
-    /// The single entry point for the formerly-separate "path 1" line-buffer printer: it now
+    /// The multiline-mode entry point: it
     /// delegates to the unified [`Self::build_nodes_doc_trimmed`] in `multiline` mode (trimmed
     /// boundaries; prettier's `printChildren` model — block-child softlines + `forceBreakContent`,
     /// `splitTextToDocs` boundary hardlines, the control-flow-block `in_multiline_context` /

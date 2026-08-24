@@ -161,7 +161,7 @@ crates (the open-convention stance):
 - **VS Code extension** (`vscode_extension_tsv_format`) — assembles an
   `IgnoreStack` per open document and calls `is_ignored(rel, false) ||
   is_path_pruned(rel)`. It has no directory walk, so `is_path_pruned` is its entry
-  to the shared prune policy; it no longer reconstructs the heuristic walk in TS.
+  to the shared prune policy, so it never reconstructs the heuristic walk in TS.
 - **`tsv_debug`** — reuses `FORMATTABLE_EXTENSIONS`, `is_safety_net`, and
   `HEURISTIC_DIRS` in its audit seed resolution and corpus walkers
   (`profile.rs`), so the audits scan exactly the file set the formatter would.

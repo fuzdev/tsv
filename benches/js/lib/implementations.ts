@@ -823,8 +823,8 @@ export interface DefinedRow {
  * the policy question, asked of `get_benchmark_tasks` and answered against
  * `impls.complete`.
  *
- * Two callers, both of which were previously asking the availability-dependent
- * version and getting a subtly wrong answer:
+ * Two callers, for which the availability-dependent version gives a subtly
+ * wrong answer:
  *
  * - the report's row-composition guards (`SURFACE_DISCLOSURES`, the `DISPLAY_ORDER`
  *   check). Asked of the LIVE set, an `excluded` claim passes vacuously whenever

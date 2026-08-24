@@ -19,11 +19,10 @@ use super::parser_impl::SvelteParser;
 // `{@a}`. All four are errors in Svelte. The comment forms (`{/* c */ x}`, `{// c⏎ x}`)
 // need no special case: they are simply valid JS.
 //
-// A `brace_starts_expression` helper here used to mirror the *lexer's* brace dispatch
-// and read those four as literal text. That over-accepted (the canonical parser rejects
-// all four), and the literal text then round-tripped into output tsv's own parser
-// rejects: an unquoted `a={/a` was re-emitted quoted as `a="{/a"`, where the `{`
-// reopens as an expression and runs unterminated.
+// A helper mirroring the *lexer's* brace dispatch and reading those four as literal text
+// over-accepts (the canonical parser rejects all four), and the literal text then
+// round-trips into output tsv's own parser rejects: an unquoted `a={/a` re-emitted quoted
+// as `a="{/a"`, where the `{` reopens as an expression and runs unterminated.
 
 /// Svelte's `regex_token_ending_character = /[\s=/>"']/` — the characters that end an
 /// attribute/directive name run (`read_tag` in `1-parse/state/element.js`). Everything else
@@ -1094,8 +1093,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             //
             // ⚠️ A `char` question, not a byte one, exactly like `is_attr_name_terminator`
             // and the static twin's `[^>\s]+` run: the `\s` arm is Unicode
-            // ([`is_svelte_ws`]), so the whole ASCII-byte spelling this used to carry
-            // (`b' ' | b'\t' | b'\n' | b'\r' | b'\x0C'`) was too NARROW by twenty of the
+            // ([`is_svelte_ws`]), so an ASCII-byte spelling
+            // (`b' ' | b'\t' | b'\n' | b'\r' | b'\x0C'`) is too NARROW by twenty of the
             // class's twenty-five code points — every non-ASCII member, plus the VT it
             // spelled its ASCII half without. One fell to the non-terminator arm and was absorbed
             // into the value — which both changed the wire (`value` became an array where

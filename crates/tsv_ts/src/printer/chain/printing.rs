@@ -91,7 +91,7 @@ pub(crate) fn print_node_inner<'a>(
                             // The chain-for-parens operand doc, so the whole operand chain is
                             // what stays flat. Every operator family — arithmetic, logical
                             // (`&&`/`||`), and nullish (`??`) — is laid out identically. A
-                            // logical base used to skip this wrapper and break at its own
+                            // logical base skipping this wrapper would break at its own
                             // operators instead, welding the closing `).member` onto the last
                             // operand — a third layout matching neither tsv's arithmetic shape
                             // nor prettier's. See conformance_prettier_ts.md §TypeScript

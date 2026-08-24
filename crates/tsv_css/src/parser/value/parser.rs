@@ -1217,7 +1217,7 @@ mod tests {
     #[test]
     fn test_comment_interior_comma_is_not_a_separator() {
         // The corruption this opacity exists to prevent: the comma inside the comment
-        // used to split the element in two, and the halves came back re-tokenized —
+        // would split the element in two, and the halves would come back re-tokenized —
         // interior whitespace collapsed, the body broken at its own comma, `#FFF` and
         // `.5px` normalized *inside* the comment.
         let source = "color 0.3s /* keep   this,  #FFF  .5px */, background 0.3s";
