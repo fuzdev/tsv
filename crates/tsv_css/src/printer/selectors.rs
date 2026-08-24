@@ -33,7 +33,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 
 use super::Printer;
-use super::boundary_ws::{closer_pos, prefixed_run, skip_gap_trivia};
+use super::boundary_ws::{closer_pos, prefixed_run, skip_gap_trivia, trim_regenerated_separator};
 use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -332,7 +332,7 @@ impl<'a> Printer<'a> {
             return;
         };
         let kept = self.gap_boundary_ws(floor, cs.start);
-        let kept = kept.trim_end_matches(|c: char| c.is_ascii_whitespace());
+        let kept = trim_regenerated_separator(&kept);
         if !kept.is_empty() {
             let separator = floor.map_or("", |floor| self.name_run_separator(floor));
             if !separator.is_empty() {

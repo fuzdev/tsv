@@ -6,6 +6,7 @@
 //! - Width-based wrapping for long lists
 //! - Doc building for width calculations
 
+use super::boundary_ws::trim_regenerated_separator;
 use super::{Printer, value_normalization};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::Span;
@@ -372,9 +373,9 @@ impl<'a> Printer<'a> {
         // ASCII-trimmed like the combinator's: the separator that follows is regenerated, so
         // keeping the author's space before the colon would print one this formatter never
         // writes.
-        let kept = self
-            .preserved_boundary_ws(decl.span.start, decl.span.start + decl.colon_pos() as u32)
-            .trim_end_matches(|c: char| c.is_ascii_whitespace());
+        let kept = trim_regenerated_separator(
+            self.preserved_boundary_ws(decl.span.start, decl.span.start + decl.colon_pos() as u32),
+        );
         if !kept.is_empty() {
             self.write(kept);
         }

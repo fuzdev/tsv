@@ -247,6 +247,13 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         if self.current_kind != TokenKind::Identifier {
             return 0;
         }
+        // Every member of the class is non-ASCII, so an ASCII head byte settles this before
+        // the `str` range index below (two char-boundary checks) and before any decode. Asked
+        // of every IDENTIFIER token at every juncture — the densest token in a stylesheet —
+        // where the answer is `0` in every document that holds no member at all.
+        if self.source.as_bytes()[self.current_start].is_ascii() {
+            return 0;
+        }
         crate::whitespace::boundary_prefix_len(&self.source[self.current_start..self.current_end])
     }
 
