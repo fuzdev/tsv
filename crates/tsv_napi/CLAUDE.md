@@ -24,6 +24,8 @@ Mirrors `tsv_ffi` / `tsv_wasm`:
 - `parse` (default) — `parse_<lang>` + `parse_internal_<lang>` exports, and the `convert` layer on each language crate
 - `panic_probe` (test-only, never default) — the `__panic_probe` export driving the panic-contract test; see §Marshalling & errors
 
+Unlike `tsv_ffi`'s and `tsv_wasm`'s, **no build task produces a single-feature `tsv_napi`** — the addon always ships both halves, and the split exists so the crate mirrors its siblings. `deno task typecheck:features` (in `check`) `cargo check`s each half on its own, so the declared sets can't rot unbuilt; neither `cargo check --workspace` (features unified, defaults ON) nor clippy's `--all-features` union sees a subset.
+
 ## Public API
 
 The `lang_bindings!` macro generates four `#[napi]` functions per language (svelte, typescript, css); the `format`/`parse` features gate which are emitted:

@@ -237,11 +237,11 @@ export class NativeImplementation extends BaseImplementation {
 	 * Drive one entry point at `goal` and return its payload, throwing when the
 	 * call reported an error.
 	 *
-	 * The verdict comes from `out_status`, read as one typed-array load beside the
-	 * length that is already read here. It used to come from a `startsWith('{"error"')`
-	 * test on the decoded payload — sound only because tsv normalizes strings to
-	 * single quotes, i.e. a correctness dependency on a STYLE setting, over a
-	 * channel that carries arbitrary formatted source (`lib/reject_probe.ts`).
+	 * The verdict comes from `out_status`, read as one typed-array load the moment
+	 * the call returns. It used to come from a `startsWith('{"error"')` test on the
+	 * decoded payload — sound only because tsv normalizes strings to single quotes,
+	 * i.e. a correctness dependency on a STYLE setting, over a channel that carries
+	 * arbitrary formatted source (`lib/reject_probe.ts`).
 	 */
 	private call_ffi(fn: FfiFn, source: string, goal: ParseGoal = 'module'): string {
 		const m = this._marshal;
@@ -275,6 +275,20 @@ export class NativeImplementation extends BaseImplementation {
 			throw new Error('FFI function returned null pointer');
 		}
 
+		// The verdict BEFORE `out_len` is touched. One site writes both (`tsv_ffi`'s
+		// `bytes_to_ptr`), so an unwritten status means an unwritten length too — and
+		// the stale one left by the previous call would size a `copyInto` past this
+		// allocation and hand `tsv_free` a length that isn't the payload's, which is
+		// UB rather than a failed assertion. Leaking the pointer is the right trade:
+		// a length this call did not write cannot be freed.
+		const status = m.out_status_buffer[0];
+		if (status === STATUS_UNWRITTEN) {
+			throw new Error(
+				`tsv left out_status unwritten — the call's verdict is unknowable, so this ` +
+					`row's coverage would be fabricated. See lib/reject_probe.ts.`
+			);
+		}
+
 		const result_len = m.out_len_buffer[0];
 		const result_byte_count = Number(result_len);
 		if (result_byte_count > m.result_buffer.length) {
@@ -290,13 +304,6 @@ export class NativeImplementation extends BaseImplementation {
 		this.symbols.tsv_free(result_ptr, result_len);
 
 		const result = this.decoder.decode(result_bytes);
-		const status = m.out_status_buffer[0];
-		if (status === STATUS_UNWRITTEN) {
-			throw new Error(
-				`tsv left out_status unwritten — the call's verdict is unknowable, so this ` +
-					`row's coverage would be fabricated. See lib/reject_probe.ts.`
-			);
-		}
 		if (status !== STATUS_OK) {
 			// The error payload is `error_result`'s compact `serde_json` object.
 			// Parsed only once the status has already said this is an error, so a

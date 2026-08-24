@@ -205,7 +205,9 @@ unsafe fn error_result(message: &str, out_len: *mut usize, out_status: *mut u32)
 /// hard-wires `Module` and CSS has no goal, so a caller passing `1` there asked
 /// for something that cannot be honored and must be told — the same stance
 /// `tsv_wasm`'s `read_options` takes when it rejects the `goal` key outright. Any
-/// unrecognized code is an error whatever the language.
+/// unrecognized code is an error whatever the language, and the expectation it
+/// names is that language's own — a goalless one is never told that `1` would
+/// have worked, which is the code the arm above it refuses.
 #[cfg(any(feature = "parse", feature = "format"))]
 fn ffi_goal(goal: u32, allowed: bool) -> Result<tsv_ts::Goal, String> {
     match goal {
@@ -216,20 +218,16 @@ fn ffi_goal(goal: u32, allowed: bool) -> Result<tsv_ts::Goal, String> {
                 .to_string(),
         ),
         other => Err(format!(
-            "invalid goal code {other} (expected 0 = module or 1 = script)"
+            "invalid goal code {other} (expected {})",
+            if allowed {
+                "0 = module or 1 = script"
+            } else {
+                "0 = module"
+            }
         )),
     }
 }
 
-/// Generate `tsv_parse_<lang>` / `tsv_parse_<lang>_no_locations` /
-/// `tsv_parse_internal_<lang>` / `tsv_format_<lang>` C FFI functions for one
-/// language module.
-///
-/// # Safety (applies to every generated function)
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - `out_status` must point to a valid `u32` for writing the status
-/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
 // Per-language compound-op helpers: parse the source into a per-thread AST arena
 // and run the conversion/format/no-op over it. Every language crate is
 // interner-free (identifier and element/attribute names are span-identity), so
@@ -282,6 +280,15 @@ macro_rules! parse_format {
     }};
 }
 
+/// Generate `tsv_parse_<lang>` / `tsv_parse_<lang>_no_locations` /
+/// `tsv_parse_internal_<lang>` / `tsv_format_<lang>` C FFI functions for one
+/// language module.
+///
+/// # Safety (applies to every generated function)
+/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
+/// - `out_len` must point to a valid `usize` for writing output length
+/// - `out_status` must point to a valid `u32` for writing the status
+/// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
 // One export per (language, operation) — every one taking the same five
 // arguments. The `$goalness` axis decides only whether a non-Module goal CODE is
 // accepted, never the arity: an FFI host writes one call shape and one symbol
@@ -716,6 +723,11 @@ mod tests {
         // Never a silent Script (or Module) default — and the refusal is the
         // CODE's, not the language's, so a goalless language owes it too (its own
         // `only supported for TypeScript` message covers code 1 alone).
+        //
+        // The EXPECTATION the message names is the language's own, which is the
+        // half a shared string would get wrong: a goalless language must not be
+        // told `1 = script` would have worked, since that is exactly the code the
+        // arm above refuses.
         let ts: [FfiFn; 4] = [
             tsv_parse_typescript,
             tsv_parse_typescript_no_locations,
@@ -725,6 +737,10 @@ mod tests {
         for f in ts {
             let msg = call_err_goal(f, "var x = 1;\n", 2);
             assert!(msg.contains("invalid goal code 2"), "{msg}");
+            assert!(
+                msg.contains("1 = script"),
+                "TypeScript may take a script goal: {msg}"
+            );
         }
         for (language, src) in [
             ("svelte", "<div>x</div>\n"),
@@ -735,6 +751,10 @@ mod tests {
                 assert!(
                     msg.contains("invalid goal code 2"),
                     "{language} {op}: {msg}"
+                );
+                assert!(
+                    !msg.contains("script"),
+                    "{language} {op}: a goalless language must not be offered a script goal: {msg}"
                 );
             }
         }

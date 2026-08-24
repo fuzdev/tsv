@@ -64,10 +64,6 @@ fn napi_goal(goal: Option<String>, allowed: bool) -> napi::Result<tsv_ts::Goal> 
     })
 }
 
-/// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` N-API
-/// functions for one language module. The `js_name` literals keep the JS export
-/// names snake_case for parity with `tsv_wasm` (napi-rs would otherwise
-/// camelCase them).
 // Per-language compound-op helpers: parse the source into a per-thread AST arena
 // and run the conversion/format/no-op over it. Every language crate is
 // interner-free (identifier and element/attribute names are span-identity), so
@@ -113,6 +109,10 @@ macro_rules! parse_format {
     }};
 }
 
+/// Generate `parse_<lang>` / `parse_<lang>_no_locations` /
+/// `parse_internal_<lang>` / `format_<lang>` N-API functions for one language
+/// module. The `js_name` literals keep the JS export names snake_case for parity
+/// with `tsv_wasm` (napi-rs would otherwise camelCase them).
 // One export per (language, operation), each taking the same `(source, goal?)`
 // arguments. The `$goalness` axis decides only whether a goal ARGUMENT is
 // accepted, never the arity: there is no goalless twin of a goal-aware export to

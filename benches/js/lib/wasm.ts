@@ -169,9 +169,11 @@ export class WasmImplementation extends BaseImplementation {
 	// regardless — does exactly that. The same helper the two native wrappers use;
 	// see its doc in `lib/types.ts`.
 	//
-	// ⚠️ The other two build the bag only when a goal survives `goal_for`, because
-	// they are TIMED: an unconditional object literal allocates on every call —
-	// harness-side allocation charged to whichever row it sat under (`WasmTables`).
+	// ⚠️ All three are TIMED rows, and an unconditional object literal allocates on
+	// every call — harness-side allocation charged to whichever row it sat under
+	// (`WasmTables`). `parse_no_locations` pays it because it MUST carry
+	// `locations: false` and so has no bag-free path; `parse` and `parse_internal`
+	// have one and take it whenever `goal_for` withholds the goal.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		const resolved = goal_for(language, goal);
 		return this.tables.parse[language](source, resolved ? { goal: resolved } : undefined);
