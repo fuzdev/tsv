@@ -98,7 +98,7 @@ pub struct IgnoreStack {
 impl IgnoreStack {
     /// An empty stack (ignores nothing until layers are added).
     #[wasm_bindgen(constructor)]
-    #[allow(clippy::new_without_default)] // wasm-bindgen exports the constructor
+    #[expect(clippy::new_without_default)] // wasm-bindgen exports the constructor
     pub fn new() -> IgnoreStack {
         IgnoreStack {
             inner: tsv_ignore::IgnoreStack::new(),

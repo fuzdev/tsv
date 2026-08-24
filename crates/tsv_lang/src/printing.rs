@@ -234,9 +234,9 @@ pub fn ecmascript_lines(text: &str) -> impl Iterator<Item = &str> {
 /// Call this on a source string **before parsing it to FORMAT**, and never before parsing it
 /// for the wire AST: the fold shifts byte offsets, and `parse`'s offsets are a drop-in
 /// contract with acorn / Svelte / `parseCss` over the author's own bytes. Every
-/// parse-then-format entry point does it — `tsv_ts` / `tsv_svelte`'s `format_str`, the CLI's
-/// `format_source` (CSS's only one, having no `format_str` of its own), each binding's format
-/// export, and `canonicalize_js` — so no printer ever sees a `<CR>`.
+/// parse-then-format entry point does it — each language crate's `format_str`, the CLI's
+/// `format_source`, each binding's format export, and `canonicalize_js` — so no printer ever
+/// sees a `<CR>`.
 /// It is also where prettier answers the same question (`normalizeEndOfLine`, in
 /// `normalizeInputAndOptions`, ahead of the parse).
 ///
@@ -953,7 +953,7 @@ pub fn is_indentable_block_comment<'s>(mut lines: impl Iterator<Item = &'s str>)
 pub fn visual_width(s: &str, tab_width: usize) -> usize {
     if s.is_ascii() {
         // Fast path: each ASCII byte is 1 column, tabs are tab_width columns.
-        #[allow(clippy::naive_bytecount)]
+        #[expect(clippy::naive_bytecount)]
         let tab_count = s.as_bytes().iter().filter(|&&b| b == b'\t').count();
         return s.len() + tab_count * (tab_width - 1);
     }

@@ -272,6 +272,13 @@ impl<'a> Printer<'a> {
         // across a multi-file driver's files); `into_string` parks it back.
         let mut line_breaks = arena.take_line_breaks_scratch();
         tsv_lang::printing::build_line_breaks_into(source, &mut line_breaks);
+        // The two document-level presence flags come from the one scan `tsv_ts` owns
+        // (`PrinterInputs::for_document`); `ts_inputs()` copies them per island.
+        let tsv_ts::PrinterInputs {
+            has_owned_comments,
+            has_format_ignore,
+            ..
+        } = tsv_ts::PrinterInputs::for_document(source, comments, &line_breaks);
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
@@ -279,10 +286,8 @@ impl<'a> Printer<'a> {
             arena,
             source,
             comments,
-            has_owned_comments: comments.iter().any(|c| c.owned_by_node),
-            has_format_ignore: comments
-                .iter()
-                .any(|c| is_format_ignore_directive(c.content(source))),
+            has_owned_comments,
+            has_format_ignore,
             line_breaks,
             block_dangle_allowed: Cell::new(true),
             root_inline_run_block_starts: RefCell::new(FxHashSet::default()),
@@ -477,7 +482,7 @@ impl<'a> Printer<'a> {
         if frozen {
             self.build_frozen_node_doc(expr.span())
         } else {
-            tsv_ts::build_expression_doc_with_comments(self.d(), expr, &self.ts_inputs(), embed)
+            tsv_ts::build_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
         }
     }
 

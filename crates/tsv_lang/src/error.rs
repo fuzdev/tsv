@@ -224,7 +224,7 @@ impl ParseError {
     }
 
     /// Source exceeds the 4 GB cap the `u32` span offsets assume.
-    pub fn file_too_large(size: usize, max: usize) -> Self {
+    fn file_too_large(size: usize, max: usize) -> Self {
         ParseError::new(ParseErrorKind::FileTooLarge { size, max })
     }
 

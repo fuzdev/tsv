@@ -454,7 +454,7 @@ impl<'a> LocationMapper<'a> {
     /// `parse` WASM bundle moved +0.16%, and `format` — which builds without
     /// the `json` feature — stayed flat at +21 B, confirming the growth is
     /// confined to the convert path).
-    #[allow(clippy::inline_always)]
+    #[expect(clippy::inline_always)]
     #[inline(always)]
     pub fn span_positions(&self, start: u32, end: u32) -> ((u32, Position), (u32, Position)) {
         let ((start_line, start_line_byte), (end_line, end_line_byte)) =

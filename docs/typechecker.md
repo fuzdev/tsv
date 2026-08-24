@@ -12,10 +12,11 @@ Treat it as a bet that has not paid out yet, not as a roadmap item with a date.
 
 **Not in any shipped artifact.** No format or parse artifact links the crate —
 `tsv_cli`, `tsv_ffi`, `tsv_wasm`, and `tsv_napi` never reference it. The only
-consumer is `tsv_debug`, the dev-tooling binary. Verify with:
+consumer is `tsv_debug`, the dev-tooling binary (the workspace root reaches it only through
+its dev-dependency on `tsv_debug`). Verify with:
 
 ```bash
-cargo tree -i tsv_check   # only tsv_debug
+cargo tree -i tsv_check   # tsv_debug (+ the workspace root, via its dev-dependency on tsv_debug)
 ```
 
 It stays a workspace member, so `cargo check` / `cargo test` / `cargo clippy` cover it

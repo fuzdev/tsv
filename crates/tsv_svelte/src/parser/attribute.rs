@@ -413,7 +413,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 head_span,
                 expression_tag_span,
             })),
-            #[allow(clippy::unreachable)] // Style returns early; transitions are built above
+            #[expect(clippy::unreachable)] // Style returns early; transitions are built above
             DirectiveType::Style
             | DirectiveType::Transition
             | DirectiveType::In

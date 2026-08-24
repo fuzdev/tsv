@@ -156,7 +156,7 @@ impl SwallowTracker {
     /// two of these must not interleave), matches the `SwallowTracker` trait methods
     /// that forward here, and is what the signature must be anyway if `PENDING` ever
     /// moves off the thread-local into the struct.
-    #[allow(clippy::needless_pass_by_ref_mut)]
+    #[expect(clippy::needless_pass_by_ref_mut)]
     pub(crate) fn on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
         PENDING.with(|p| {
             let mut pending = p.borrow_mut();

@@ -294,7 +294,7 @@ impl<'a> Printer<'a> {
             // stripping).
             let mut line_gap = None;
             let head = if has_comments {
-                #[allow(clippy::expect_used)] // extends always present for a constraint
+                #[expect(clippy::expect_used)] // extends always present for a constraint
                 let extends_pos = self
                     .find_keyword_in_range(prev_end, constraint.span().start, "extends")
                     .expect("extends keyword must exist when constraint is present");
@@ -324,7 +324,7 @@ impl<'a> Printer<'a> {
             // `build_hang_value_doc`.
             let mut line_gap = None;
             let head = if has_comments {
-                #[allow(clippy::expect_used)] // = must exist when a default is present
+                #[expect(clippy::expect_used)] // = must exist when a default is present
                 let eq_pos = find_char_skipping_comments(
                     self.source.as_bytes(),
                     prev_end as usize,

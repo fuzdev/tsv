@@ -848,7 +848,7 @@ pipeline order.
   under-report (leave a mismatch unclosed) but never keep a comment the oracle drops.
   A kept comment whose reprint would diverge refuses (multi-line block comment,
   erased-region comment, format-ignore), mirroring the instance-side rules. Full
-  condition + fixtures: `../../docs/checklist_svelte_compiler.md` §The open half.
+  condition + fixtures: `../../docs/checklist_svelte_compiler.md` §The other half.
 - `script_rewrite.rs` — the per-statement rune rewrites
   (`rewrite_script_statement`). Oracle phase 3, **server**: `$props()` →
   `$$props` (span-stolen),

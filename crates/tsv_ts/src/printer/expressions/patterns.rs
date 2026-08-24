@@ -1065,7 +1065,7 @@ impl<'a> Printer<'a> {
                     // seam emits them and hangs the local when one forces a break.
                     let mut value_gap: Option<(u32, u32)> = None;
                     if self.has_comments_to_emit_between(key_region_end, value_start) {
-                        #[allow(clippy::expect_used)]
+                        #[expect(clippy::expect_used)]
                         // Parser guarantees `:` exists in destructuring property
                         let colon_pos = find_char_skipping_comments(
                             self.source.as_bytes(),

@@ -672,7 +672,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
         // Forgiving-list `Invalid`s are filtered before convert (see
         // `write_selector_list_filtered`); the non-filtering path (rule preludes)
         // never contains them.
-        #[allow(clippy::unreachable)]
+        #[expect(clippy::unreachable)]
         internal::SimpleSelector::Invalid { .. } => {
             unreachable!("Invalid selectors should be filtered in write_selector_list_filtered")
         }
@@ -776,7 +776,7 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &internal::PseudoClassArgs<'_>, c
 /// that combinator. `ident_spans` is always non-empty (the parser rejects an empty
 /// `::part()`).
 fn write_part_args(w: &mut JsonWriter, ident_spans: &[Span], ctx: &Ctx<'_>) {
-    #[allow(clippy::unreachable)]
+    #[expect(clippy::unreachable)]
     let (Some(first), Some(last)) = (ident_spans.first(), ident_spans.last()) else {
         unreachable!("::part() always names at least one part — the parser rejects an empty arg")
     };

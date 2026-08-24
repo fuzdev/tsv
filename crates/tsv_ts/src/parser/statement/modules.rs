@@ -1162,7 +1162,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         Some(ModuleExportName::Identifier(id)) => id,
                         // Unreachable: import-side `right` is only ever set from
                         // `try_binding_name` or an `as` keyword token.
-                        #[allow(clippy::unreachable)] // import rename target is never a string
+                        #[expect(clippy::unreachable)] // import rename target is never a string
                         Some(ModuleExportName::Literal(_)) => {
                             unreachable!("import rename target is never a string literal")
                         }

@@ -1207,6 +1207,8 @@ benches/js/
     ├── types.ts           # Shared types + `BaseImplementation` (the language-support pair)
     ├── versions.ts        # Version loading from package.json
     ├── wasm.ts            # WASM module loader (WasmImplementation — deno/nodejs target)
+    ├── wire_inject.ts     # The wire:audit's MANUFACTURED inputs: whitespace injected into every
+    │                      # Svelte tag/block head, each variant graded against the canonical wire
     ├── yuku.ts            # yuku-parser wrapper, BOTH bindings from one class (parse-only)
     └── divergence/        # Divergence detection module
         ├── mod.ts         # Main exports
@@ -1214,6 +1216,8 @@ benches/js/
         ├── patterns.ts    # Known divergence pattern detectors (with traceability)
         ├── panic_errors.ts    # Native-panic classification (shared by both corpus tools)
         ├── expected_errors.ts # Expected-error fixtures (parse-rejection cases)
+        ├── fixture_cases.ts   # Detector cases derived from the committed divergence fixtures
+        │                      # (input = ours, the pinned prettier file = theirs; no sidecar)
         └── validation.ts  # Audit: cross-ref patterns vs conformance_prettier*.md
 ```
 
@@ -1366,7 +1370,7 @@ internal state), the coverage report and skip counts make it visible without
   `await wait(cooldown_ms)`, which never fires. Workaround: `cooldown_ms: 0` in
   `run_benchmark_group`'s `Benchmark` config. Async measurement loops (`prettier`,
   `oxfmt` itself) are unaffected because their per-iteration awaits resolve via
-  microtasks, not timers. The inter-task SETTLE the cooldown used to supply is not
+  microtasks, not timers. The inter-task SETTLE the cooldown would supply is not
   lost with it: each task's untimed `setup` forces a major GC (`settle_heap`), which
   is timer-free and uniform across the three runtimes — a runtime-conditional
   cooldown would put a settle under Node/Bun and none under Deno, biasing the very

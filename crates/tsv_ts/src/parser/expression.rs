@@ -2094,7 +2094,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Bang => UnaryOperator::Bang,
             TokenKind::Tilde => UnaryOperator::Tilde,
             // Private helper; the dispatcher routes only -/+/!/~ here.
-            #[allow(clippy::unreachable)] // caller dispatches on the same token set
+            #[expect(clippy::unreachable)] // caller dispatches on the same token set
             _ => unreachable!("parse_unary_expression called with non-unary operator"),
         };
         self.advance()?;
@@ -2130,7 +2130,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Void) => UnaryOperator::Void,
             TokenKind::Keyword(KeywordKind::Delete) => UnaryOperator::Delete,
             // Private helper; the dispatcher routes only typeof/void/delete here.
-            #[allow(clippy::unreachable)] // caller dispatches on the same token set
+            #[expect(clippy::unreachable)] // caller dispatches on the same token set
             _ => unreachable!("parse_unary_keyword_expression called with non-keyword operator"),
         };
         self.advance()?;
@@ -2333,7 +2333,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::PlusPlus => UpdateOperator::Increment,
             TokenKind::MinusMinus => UpdateOperator::Decrement,
             // Private helper; the dispatcher routes only ++/-- here.
-            #[allow(clippy::unreachable)] // caller dispatches on the same token set
+            #[expect(clippy::unreachable)] // caller dispatches on the same token set
             _ => unreachable!("parse_prefix_update_expression called with non-update operator"),
         };
         self.advance()?;

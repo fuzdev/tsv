@@ -135,7 +135,7 @@ unsafe fn bytes_to_ptr(payload: impl Into<Vec<u8>>, out_len: *mut usize) -> *mut
 /// Same contract as [`bytes_to_ptr`], which renders the payload.
 unsafe fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
     let error = serde_json::json!({ "error": message });
-    #[allow(clippy::unwrap_used)] // JSON serialization of simple object won't fail
+    #[expect(clippy::unwrap_used)] // JSON serialization of simple object won't fail
     let json = serde_json::to_string(&error).unwrap();
     // SAFETY: `out_len` validity is the caller's contract, forwarded.
     unsafe { bytes_to_ptr(json, out_len) }
@@ -305,26 +305,29 @@ lang_bindings!(
 //
 // The parse goal is TypeScript-only (Svelte `<script>` is always a module; CSS
 // has no goal), so these live outside `lang_bindings!` rather than threading a
-// meaningless goal through svelte/css. The goalless `tsv_parse_typescript*`
-// exports remain the `Module` default; these mirror them against an explicit
-// goal code (`0` = Module, anything else = Script). At Script goal, `await` is
-// an ordinary identifier and `import`/`export`/`import.meta` are syntax errors.
-// See `tsv parse --goal` and `tsv_ts::parse_with_goal`.
+// meaningless goal through svelte/css. The goalless `tsv_parse_typescript*` /
+// `tsv_format_typescript` exports remain the `Module` default; these mirror them
+// against an explicit goal code (`0` = Module, `1` = Script; any other code is an
+// error, never a silent default). At Script goal, `await` is an ordinary
+// identifier and `import`/`export`/`import.meta` are syntax errors. See `tsv
+// parse --goal` / `tsv format --goal` and `tsv_ts::parse_with_goal`.
 //
-// `tsv_wasm` no longer shares this shape: there the goal is one key of a
-// per-call options bag threaded through its own `lang_bindings!`, and it reaches
-// the FORMAT exports as well. Here only parse is goal-aware, so a Script-goal
-// format has no counterpart over the C ABI (`tsv format --goal` and
-// `format_typescript(src, {goal})` both do). See `crates/tsv_wasm/CLAUDE.md`
-// §Format Options.
+// `tsv_wasm` spells the same axis as one key of a per-call options bag
+// (`format_typescript(src, {goal})`), and `tsv_napi` as a trailing goal string;
+// coverage is identical across the three bindings — parse (all three wires) and
+// format. See `crates/tsv_wasm/CLAUDE.md` §Format Options.
 
-/// Map the C-ABI goal code to `tsv_ts::Goal` (`0` = Module, else Script).
-#[cfg(feature = "parse")]
-fn ffi_goal(goal: u32) -> tsv_ts::Goal {
-    if goal == 0 {
-        tsv_ts::Goal::Module
-    } else {
-        tsv_ts::Goal::Script
+/// Map the C-ABI goal code to `tsv_ts::Goal` (`0` = Module, `1` = Script). Any
+/// other code is an error — a caller that passes garbage gets told, rather than
+/// silently parsing under a goal it did not ask for.
+#[cfg(any(feature = "parse", feature = "format"))]
+fn ffi_goal(goal: u32) -> Result<tsv_ts::Goal, String> {
+    match goal {
+        0 => Ok(tsv_ts::Goal::Module),
+        1 => Ok(tsv_ts::Goal::Script),
+        other => Err(format!(
+            "invalid goal code {other} (expected 0 = module or 1 = script)"
+        )),
     }
 }
 
@@ -342,9 +345,10 @@ pub unsafe extern "C" fn tsv_parse_typescript_with_goal(
 ) -> *mut u8 {
     unsafe {
         with_source_string(source_ptr, source_len, out_len, |source| {
+            let goal = ffi_goal(goal)?;
             with_ast_arena(|arena| {
-                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
-                    .map_err(|e| e.to_string())?;
+                let ast =
+                    tsv_ts::parse_with_goal(source, goal, arena).map_err(|e| e.to_string())?;
                 Ok(tsv_ts::convert_ast_json_bytes(&ast, source))
             })
         })
@@ -365,9 +369,10 @@ pub unsafe extern "C" fn tsv_parse_typescript_no_locations_with_goal(
 ) -> *mut u8 {
     unsafe {
         with_source_string(source_ptr, source_len, out_len, |source| {
+            let goal = ffi_goal(goal)?;
             with_ast_arena(|arena| {
-                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
-                    .map_err(|e| e.to_string())?;
+                let ast =
+                    tsv_ts::parse_with_goal(source, goal, arena).map_err(|e| e.to_string())?;
                 Ok(tsv_ts::convert_ast_json_bytes_no_locations(&ast, source))
             })
         })
@@ -389,12 +394,46 @@ pub unsafe extern "C" fn tsv_parse_internal_typescript_with_goal(
 ) -> *mut u8 {
     unsafe {
         with_source_string(source_ptr, source_len, out_len, |source| {
+            let goal = ffi_goal(goal)?;
             with_ast_arena(|arena| {
-                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
-                    .map_err(|e| e.to_string())?;
+                let ast =
+                    tsv_ts::parse_with_goal(source, goal, arena).map_err(|e| e.to_string())?;
                 // See `parse_internal!` — this must stay inside the arena closure.
                 std::hint::black_box(&ast);
                 Ok(Vec::new())
+            })
+        })
+    }
+}
+
+/// `tsv_format_typescript` against an explicit goal — the C-ABI counterpart of
+/// `tsv_napi`'s `format_typescript_with_goal` and `tsv_wasm`'s
+/// `format_typescript(src, {goal})`. The goal shapes only the parse the formatter
+/// runs (at Script goal `await` is an ordinary identifier); formatting itself is
+/// non-configurable.
+///
+/// # Safety
+/// See the module-level safety contract.
+#[cfg(feature = "format")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsv_format_typescript_with_goal(
+    source_ptr: *const u8,
+    source_len: usize,
+    goal: u32,
+    out_len: *mut usize,
+) -> *mut u8 {
+    unsafe {
+        with_source_string(source_ptr, source_len, out_len, |source| {
+            let goal = ffi_goal(goal)?;
+            // The format path's line-terminator fold, as in `parse_format!`.
+            let normalized = tsv_lang::printing::normalize_carriage_returns(source);
+            let source = normalized.as_ref();
+            with_ast_arena(|arena| {
+                let ast =
+                    tsv_ts::parse_with_goal(source, goal, arena).map_err(|e| e.to_string())?;
+                Ok(with_doc_arena(|doc_arena| {
+                    tsv_ts::format_in(&ast, source, doc_arena)
+                }))
             })
         })
     }
@@ -587,6 +626,23 @@ mod tests {
             ))
             .is_some()
         );
+        // The format twin: the goal shapes the parse the formatter runs.
+        assert_eq!(
+            call_goal(tsv_format_typescript_with_goal, "var   await=1", SCRIPT),
+            "var await = 1;\n"
+        );
+        assert!(error_message(&call_goal(tsv_format_typescript_with_goal, src, MODULE)).is_some());
+        // An unknown goal code is an error, never a silent Script (or Module) default.
+        for f in [
+            tsv_parse_typescript_with_goal,
+            tsv_parse_typescript_no_locations_with_goal,
+            tsv_parse_internal_typescript_with_goal,
+            tsv_format_typescript_with_goal,
+        ] {
+            let msg = error_message(&call_goal(f, "var x = 1;\n", 2))
+                .expect("goal code 2 must be rejected");
+            assert!(msg.contains("invalid goal code 2"), "{msg}");
+        }
     }
 
     // --- format_panic renders each payload variant (pure, no panic needed) ---

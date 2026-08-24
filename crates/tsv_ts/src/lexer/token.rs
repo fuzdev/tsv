@@ -657,6 +657,8 @@ const fn keyword_encode_wide(s: &str) -> u128 {
 /// compare set tiny, and the `const { … }` encodings are compile-time constants so
 /// this is pure integer comparison.
 #[inline]
+// `allow`, not `expect`: the lint fires without it, but the expectation never registers as
+// fulfilled — neither on the fn nor on the `use` item itself — so `expect` reads as dead.
 #[allow(clippy::enum_glob_use)] // 49 arms — the glob keeps the per-length tables readable
 fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
     use KeywordKind::*;

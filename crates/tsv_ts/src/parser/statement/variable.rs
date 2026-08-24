@@ -14,7 +14,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Let) => VariableDeclarationKind::Let,
             TokenKind::Keyword(KeywordKind::Var) => VariableDeclarationKind::Var,
             // Callers only invoke this with the current token on const/let/var.
-            #[allow(clippy::unreachable)] // precondition: current token is const/let/var
+            #[expect(clippy::unreachable)] // precondition: current token is const/let/var
             _ => unreachable!("current_variable_kind requires a const/let/var keyword token"),
         }
     }

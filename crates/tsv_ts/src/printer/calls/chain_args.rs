@@ -250,7 +250,7 @@ pub(super) fn build_call_args_doc_for_chain_standard_expanded(
 /// and the inline leading-comment doc. Built once, then moved into whichever
 /// branch runs (mirrors `ClassMemberHeader` in the class parser).
 #[derive(Clone, Copy)]
-#[allow(clippy::struct_excessive_bools)] // independent prologue flags, not a state machine
+#[expect(clippy::struct_excessive_bools)] // independent prologue flags, not a state machine
 struct ChainArgsContext {
     paren_open: u32,
     prefix: &'static str,

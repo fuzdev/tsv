@@ -764,7 +764,7 @@ See ./docs/conformance_test262.md (command interface; §Differential for the tsv
 
 **Typechecker conformance (`tsc_conformance`) — EXPERIMENTAL, may never ship.**
 `tsv_check` is a from-scratch TypeScript binder + checker; no shipped artifact links it
-(`cargo tree -i tsv_check` → only `tsv_debug`), and the parser and formatter are never modified in
+(`cargo tree -i tsv_check` → `tsv_debug`, plus the workspace root's dev-dependency on it), and the parser and formatter are never modified in
 service of it. `tsv_debug tsc_conformance` grades it against tsgo's committed `.errors.txt`
 baselines (`../typescript-go`, pin `168e7015`), surfaced as **on-demand** tasks — none in
 `deno task check`, `deno task conformance`, or release gating, and `../typescript-go` is not a
@@ -819,30 +819,22 @@ This is one instance of a broader stance: **the parser is deliberately permissiv
 **`parse` never rewrites its input** — its byte offsets are a drop-in contract with
 acorn / Svelte / `parseCss` over the author's own bytes. **Every parse-then-format entry
 point folds `<CR>` / `<CR><LF>` to `<LF>` before it parses**
-(`tsv_lang::printing::normalize_carriage_returns`, from `tsv_ts` / `tsv_svelte`'s
-`format_str`, the CLI's `format_source` — CSS's only parse-then-format entry point — each
-binding's format export, and `canonicalize_js`), so tsv's output is LF-only
-even inside the regions it copies verbatim. Ahead of the parse is the only place that
-answers it once: the printers ask "where are the lines?" in several places that split on
-`'\n'` alone (`Comment::multiline`, `is_indentable_block_comment`), and folding the
-finished string instead leaves those disagreeing with the output — the same document
-then formats two ways on two passes.
-`<LS>` / `<PS>` are deliberately NOT folded. Full rationale + spec citations:
-./docs/architecture.md#line-terminators-parse-takes-the-authors-bytes-format-folds-first
+(`tsv_lang::printing::normalize_carriage_returns` — each language crate's `format_str`, the
+CLI's `format_source`, each binding's format export, `canonicalize_js`), so tsv's output is
+LF-only even inside the regions it copies verbatim. Ahead of the parse is the only place
+that answers it once: the printers ask "where are the lines?" in several places that split
+on `'\n'` alone, and folding the finished string instead leaves those disagreeing with the
+output — the same document then formats two ways on two passes. `<LS>` / `<PS>` are
+deliberately NOT folded.
 
-**Counting them is a separate question, and the Svelte wire answers it TWO ways** — because
-Svelte's parser does. Svelte's own positions (`locate-character`) open a line at `\n` alone:
-the spine, `name_loc`, CSS `loc`, a `Program`'s own `loc`, and the `character`-bearing
-identifiers `read_identifier` builds. Everything **acorn** parses carries acorn's, the
-ECMAScript class. And it is not one table per class either: acorn seeds its counter **once per
-parse**, over whatever prefix Svelte prepared for that island (blanked to LF for `<script>` /
-`read_pattern` / `read_type_annotation`, raw for every `read_expression` island, the bare
-`{const …}` / `{let …}` statement, and the snippet-parameter list), and skips `[lineStart, startPos)` outright. `tsv_ts::AcornSeed`
-carries that per-parse difference, `tsv_svelte`'s `Root::acorn_regions` records where each
-parse began, and the ECMAScript tracker is built only when the two classes actually differ —
-which `LocationTracker::new_with_map` reports out of the scan it already runs, so a source with
-no lone `<CR>` / `<LS>` / `<PS>` pays nothing. Full model:
-./docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse
+**Counting lines is a separate question, and the Svelte wire answers it TWO ways** — because
+Svelte's parser does: Svelte's own positions open a line at `\n` alone, everything acorn parses
+carries the ECMAScript class, seeded **once per acorn parse** over whatever prefix Svelte
+prepared for that island (`tsv_ts::AcornSeed`, `Root::acorn_regions`), and the ECMAScript
+tracker is built only when the two classes actually differ. Full rationale, spec citations and
+the per-island seeding table:
+./docs/architecture.md#line-terminators-parse-takes-the-authors-bytes-format-folds-first and
+./docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse.
 
 ### Language-Level concerns (classification)
 
@@ -875,27 +867,24 @@ Comments are stored **separately from AST nodes** in a flat `Comment` array at t
 level (`Program.comments`, `CssStyleSheet.comments`, `Root.comments`); the printer finds
 them via O(log n) binary search on span positions. `Comment` (`tsv_lang/src/comment.rs`)
 is a `Copy` POD of spans + flags — text is recovered on demand via
-`Comment::content(source)`, never stored owned. The full model — fields, ownership
-doctrine, hazards, and the leading-comment emitter rules — lives in ./docs/comments.md.
-**Read it before touching comment handling in any printer.** The always-loaded core:
+`Comment::content(source)`, never stored owned. **The full model — fields, ownership
+doctrine, the three lookup axes, the five hazards, and every emitter rule — is
+./docs/comments.md. Read it before touching comment handling in any printer.** What follows
+is the always-loaded core: the doctrine, the axes, and one line per rule naming its seam,
+each pointing at its section there.
 
 **Owned comments** (`owned_by_node`, set by the parser): **every glued block comment is
 owned** — bound to the token after it and printed by that node's doc rather than by the
 enclosing gap, so a paren synthesized around an ENCLOSING expression can never land
-between them. A bundler annotation
-(`/* @__PURE__ */`), a JSDoc cast (`/** @type {T} */ (x)` — handed to the `JsdocCast`
-node), and a plain glued comment bind identically; `owned ⇒ is_block`, so no line comment
-is ever owned. **Ownership is a fact about who PRINTS a comment, never about whether it
-EXISTS** — every bug in this class has been a violation of that sentence.
-
-⚠️ **"The innermost node its token begins" holds only because that node prints FIRST**, and
-a **paren-less arrow** breaks it: its span starts at its own sole parameter, so both nodes
-answer the position-keyed lookup while the arrow still prints a synthesized `(` ahead of the
-parameter. The arrow keeps the claim and the parameter is suppressed
-(`Printer::with_owned_comment_claimed_above`) — pushing the claim down would move the comment
-inside a paren the author never wrote, and declining the bind would give up
-`OwnedCommentEffect` for the shape. A suppression is only a de-duplication where some
-enclosing node provably claims; otherwise it is hazard 1 spelled backwards.
+between them. A bundler annotation (`/* @__PURE__ */`), a JSDoc cast (handed to the
+`JsdocCast` node) and a plain glued comment bind identically; `owned ⇒ is_block`, so no
+line comment is ever owned. **Ownership is a fact about who PRINTS a comment, never about
+whether it EXISTS** — every bug in this class has been a violation of that sentence. The one
+node that breaks "the innermost node its token begins prints it" is the **paren-less arrow**
+(its span starts at its sole parameter, and it prints a synthesized `(` ahead of it): the arrow
+keeps the claim and the parameter is suppressed (`Printer::with_owned_comment_claimed_above`) —
+a suppression is only a de-duplication where some enclosing node provably claims
+([docs/comments.md §Owned comments](docs/comments.md#owned-comments--the-one-crack-in-the-detached-model)).
 
 A comment can be asked about along exactly **three** axes, and the lookup API
 (`tsv_lang::comment`) makes the caller name which:
@@ -912,154 +901,74 @@ A comment can be asked about along exactly **three** axes, and the lookup API
 `comments_in_source_after`. Every name states its axis, so a miswire reads as a category
 error at the call site. Two standing corollaries: a **zero-comment fast gate** guarding a
 whole builder is an **on-page** question (an emit-keyed one blinds every layout gate it
-guards); a **blank-line scan** is an **in-source** question (step over every comment in
-the gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller emits).
+guards); a **blank-line scan** is an **in-source** question (step over every comment in the
+gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller emits).
 
-⚠️ **Five hazards, all of which have bitten** (full text + war stories in
-./docs/comments.md): (1) an owned comment nothing prints is a DROPPED comment — a builder
-that *reassembles* a node instead of routing through `build_expression_doc` must claim it
-on its own seam (`prepend_owned_leading_comment_at`); (2) an owned comment travels
-*inside* its node's doc, so the gap around it can't see it — ask the node instead
-(`owned_leading_comment_effect`, the single seam for that question); (3) a region the
-parser *lifts out* of its container is still inside the container's gap, so two emitters
-print it (`AttrGaps::claimed` is that seam) — and ownership masks it: only a line comment
-(never owned) exposes the double-print; (4) an **alternate-layout container builder** that
-emits only its children's docs runs no gap lookup, so every leading / inter-item /
-trailing / empty-container comment is DROPPED — hand a commented container to its
-comment-aware twin (gate BEFORE the empty arm) or share the per-item emission seam;
-ownership masks this one in mirror image (the glued *leading* comment is owned and
-survives, so a leading-comment repro reports the builder healthy); (5) an owned comment a
-blank scan CROSSES **fabricates a blank line** — it is skipped by the emit axis but still
-occupies its bytes, so a scan measuring a distance reads its interior newlines as an author
-blank. The gaps that can hold one are exactly those ending at an EXPRESSION START (a
-brace-less header→body, a binary operator→operand, a ternary `?`→branch), and the fix is
-the in-source ceiling (`blank_scan_end`) at the scan's far end. Guards: the **print-once
-ledger** (`comments:audit`) is the structural guard on the first four but only sees a
-document AS AUTHORED — a wholly comment-blind builder stays green until some file puts a
-comment there; the **injection audits** (`gaps:audit`) are the discovery arm for hazard 4;
-the **census** (`census:audit`) lexes trivia off raw input AND output, so a comment a
-parse path consumed without registering (invisible to the ledger by construction), a
-merge, or an interior rewrite still counts. **Hazard 5 no gate reaches at all** — nothing is
-dropped or rewritten and the fabricated line is its own fixed point, so only a prettier
-`compare` finds it.
+⚠️ **Five hazards, all of which have bitten** (full text in
+[docs/comments.md §The five hazards](docs/comments.md#the-five-hazards)): (1) an owned
+comment nothing prints is a DROPPED comment — a builder that *reassembles* a node instead of
+routing through `build_expression_doc`, or *replaces* its doc with a frozen slice, must claim
+on its own seam (`prepend_owned_leading_comment_at`, `build_frozen_node_doc`); (2) an owned
+comment travels *inside* its node's doc, so the gap around it can't see it — ask the node
+(`owned_leading_comment_effect`); (3) a region the parser *lifts out* of its container is still
+inside the container's gap, so two emitters print it (`AttrGaps::claimed`) — ownership masks
+this one, only a line comment exposes the double-print; (4) an **alternate-layout container
+builder** that emits only its children's docs runs no gap lookup, so every gap comment is
+DROPPED — hand a commented container to its comment-aware twin, gating BEFORE the empty arm;
+(5) an owned comment a blank scan CROSSES **fabricates a blank line** — the fix is the in-source
+ceiling (`blank_scan_end`) at the scan's far end. Guards: the **print-once ledger**
+(`comments:audit`) is the structural guard on 1–4 but sees a document only AS AUTHORED; the
+**injection audits** (`gaps:audit`) are the discovery arm for 4; the **census** (`census:audit`)
+sees a comment a parse path consumed without registering. **Hazard 5 no gate reaches at all** —
+the fabricated line is its own fixed point, so only a prettier `compare` finds it.
 
-⚠️ **Leading comments have one rule and one emitter** — `Printer::push_leading_comment_run`
-(prettier's `printLeadingComment`), with `Printer::comment_hugs_next` as the single glue
-test and `Printer::push_leading_run_separator` for the two hand-rolled always-broken
-sites. Don't hand-roll `is_block && is_same_line(...)` at a new site or re-derive the
-anchor+separator inline — keying the hug on the *item* rather than on *what follows the
-comment* was a whole bug family, and asking the whole `(`→value RANGE instead of the
-comment's own neighbours is the same error one step out (it splits an author-glued run and
-forces the shell open). A caller that owns a shell asks the emitter, which **returns
-whether it pushed a hardline** — tsv has no `propagateBreaks`, so a break inside the run is
-invisible to the group that must open for it. Whether the soft `line` after a leading run collapses is
-per-element grouping (the array family groups each element → collapses; the params family
-doesn't → breaks), mirrored from prettier; full rule in ./docs/comments.md.
+**The emitter rules — one emitter per question, never a hand-rolled copy.** Each is stated in
+full in docs/comments.md; here is the seam to reach for:
 
-⚠️ **A run at the END of a container takes its separator BEFORE each comment**, never after
-— `Printer::build_trailing_body_comments_doc` where a last item precedes it (`prev_end ==
-0` being the program's `}`-less form) and `Printer::push_dangling_comment_run` where the
-run is the container's only content. The "separator after each non-last comment"
-formulation must ask the comment's **kind**, and its answer — "a block needs no break" —
-is false as soon as another comment follows, welding that comment onto the block's line
-(`/* c1 *//* c2 */`). The weld is **lossless** and idempotent, so the ledger, census, F1,
-fuzzer, and round-trip are all blind to it; only a prettier `compare` finds it — which is
-why the rule lives in one emitter per question rather than at each container.
-
-⚠️ **A trailing GAP inside a construct is the third emitter of that same rule** —
-`Printer::push_trailing_comments_in_range` (a paren shell's `)`, an indexed access's `]`, a
-mapped-type member's value). It asks the separator question of the **source** ("did the
-author give this comment its own line?"), since these comments may be legitimately glued,
-and the break rides **inside** the `line_suffix` — a real break between two deferred
-comments splits the very construct they sit in. Only a **line** comment defers by
-construction; a block defers solely to stay behind one. Back-to-back emission welds the run,
-and an inline block mixed into a deferred one **reorders** it — so open-coding this loop is
-the recurring bug rather than a shortcut. Its float-out sibling
-(`Printer::append_trailing_paren_comments`, a stripped grouping paren's orphaned region)
-defers an **own-line block** too, which makes that reorder reachable there — and a run whose
-enclosing layout is already vertical takes real breaks instead
-(`Printer::push_anchored_trailing_run`).
-
-⚠️ **A run's ANCHOR advances over each comment it emits.** Own-line-ness is a question about
-a comment's own neighbours, so re-asking a *fixed* anchor per comment
-(`has_newline_between(node_end, c.span.start)`) reads the second half of an author-glued
-pair across the first, calls it own-line, and splits it — the same defect as the kind-keyed
-separator above, reached without ever asking the glue question. The anchor is legitimate
-only for the run's **first** comment, where the thing behind it really is the node.
-
-⚠️ **A deferred run must not leave the construct it was written in.** Deferring is *end of
-line*, not *escape*: a construct that closes without breaking carries the comment past its
-own closer, re-binding it and landing it on a line that may already hold a deferred comment,
-where the two weld irreversibly. So a **line** comment in one of these gaps forces its
-construct **open** — the closer drops to its own line and the comment flushes inside. Every
-bracketed type region does this (`{}`, `<>`, tuple `[]`, function-type `()`, indexed-access
-`[]`), and a paren shell is **retained** rather than stripped for the same reason. The one
-sanctioned exception is a union / intersection member a `|`/`&` separator still **follows**,
-whose per-member break ends the line where the shell ends
-(`Printer::type_member_separator_follows`); the last member has no separator and retains.
-The break that sanctioned strip forces is **flush-scoped** (`DocArena::flush_break`, not
-`break_parent`): only the group the deferred run actually flushes in breaks — an
-intermediate composite with no line after the suffix stays flat, since forcing it was a
-break the reparse could not reproduce. Unscoped `break_parent` after a deferred suffix
-stays correct only where the comment's construct is *retained* (its doc regenerates
-identically each pass); a strip changes the reparse geometry and needs the scoped node.
-
-⚠️ **A deferred run's FLUSH must end the line, so a `lineSuffixBoundary` belongs only where
-nothing else does.** The renderer drains the buffer at a break-mode `line` or at a boundary,
-and both then emit the newline (prettier pushes `hardlineWithoutBreakParent` there) — a flush
-that ends inline lets the deferred `//` swallow the code after it, output that doesn't
-reparse. Because the boundary breaks on its own, planting one in front of a doc's own forced
-break renders a blank line instead. `arena_fits` answers the same question at measure time:
-a boundary reached with a suffix pending doesn't fit. And the flush is itself a **run** —
-two suffixes drain onto one line, so it owes the separator every other run owes
-(`doc::arena_render_suffix`, the renderer-level floor under the build-time askers, and the
-only one that can see whether the two actually share a line: the same source welds or does
-not depending on print width). Prettier's flush is a bare push with no separator at all.
-
-⚠️ **A comma-separated list asks about one gap TWICE** — the previous element's trailing
-run and the next element's leading run — and the two must **partition** it: unclaimed is a
-DROP, doubly-claimed a DOUBLE-PRINT. `collect_trailing_comments` / `push_element_comma_trailing`
-state that split once (object literal, both patterns, specifier list, enum members); the array
-literal states its own as a POSITION rather than two filters (`element_gap_split`, each
-emitter taking a range), which is what keeps its three readers — trailing, leading, end-of-array
-scan — from drifting apart; the **call-argument family** (plain call, `new`, member chain,
-`import()`) states it as `PartitionedComments::for_routed_arg_gap` — the partition and its
-hugging **route** as ONE step, since partitioning without the route silently reclassifies every
-hugging comment as stranded, moving it with nothing dropped and no gate firing. Three standing
-rules: the leading scan resumes at the trailing run's
-**end**, never past the separator — a comment before a comma the author pushed onto its own line
-(`a: 1⏎// c⏎, b`) belongs to neither side otherwise, which was a live drop at four sites; the
-claimed run must stay a **prefix** of the gap, so a same-line block ahead of a deferred line
-comment is claimed too — skipping it drops it, and leaving it to lead the next element
-**reorders** it past the `line_suffix`; and the gate is the **source** reading
-(`comment_follows_content_on_its_line`), since a stripped `)` and the comma itself sit in the gap
-outside every item span, where a `is_same_line(prev_end, …)` gate is blind to both. **Both arms
-ask it** — a `//` glued to that `)` trails its element too, and `is_own_line_comment` cannot
-answer, its `!is_block` short-circuit calling every line comment own-line — so the run must then
-**end at the first line comment**, which an anchored gate would guarantee for free: a second
-deferred `//` welds onto the first's line and swallows the code behind it. The seam's **anchor**
-is likewise the element's PRINTED end: where the element node's span swallows a stripped `)`
-(a destructuring `Property`, an `AssignmentPattern`) the scan starts past the shell's interior and
-nothing else emits it. And an **elision opens no
-gap of its own**: the anchor stays the last REAL element's split however many holes intervene,
-so a comment slides *forward* past their (structural) commas to the element it leads — or, past
-the last one, to the list's own trailing position. Counting commas instead handed the region to
-seams that print nothing, which was a DROP every time; no blank line is measured across a hole
-either. **The expansion gate over the seam asks the same source question**, in four spellings —
-one per family shape (bracketed lists, object/type literal, call arguments, parameter lists) — and
-an item-boundary reading there expands a list that fits, a third fixed point neither the bare
-authoring nor prettier produces. The **width** emitters ask the seam too, as a range
-(`inline_trailing_run_end`): claiming `[item_end, comma)` wholesale trails an own-line comment onto
-the *previous* item, sliding it BACKWARD across that item's comma. A **deferred** run leads the next
-item, so its last comment takes the leading separator (`comment_hugs_next`, keyed on the source
-right after the `*/` — never on where the item starts, which the list's own comma sits between), and
-an author blank belongs ahead of it and **forces the break**, since a soft `line` cannot carry one —
-but WHICH blank is the **family's** rule (`BlankRule`), not the arm's, and answering the hugging arm
-with the params rule gave the tuple a blank prettier collapses. And a scan measuring a **distance**
-rather than claiming a comment takes the other end of the shell (`element_shell_end`): anchored
-inside, it reads the erased `)`'s line breaks as an author blank and fabricates one — in every
-trailing dangling run, so a container that HAND-ROLLS that run (the object literal did) gets to be
-wrong about it separately. Full text: [docs/comments.md](docs/comments.md) §The element-comma seam.
+- **Leading runs** — `Printer::push_leading_comment_run` (prettier's `printLeadingComment`),
+  with `Printer::comment_hugs_next` the single glue test, keyed on what follows the *comment*,
+  never on the item. A caller that owns a shell asks the emitter, which **returns whether it
+  pushed a hardline** (tsv has no `propagateBreaks`). Whether the soft `line` after a run
+  collapses is the family's per-element grouping, mirrored from prettier (array family groups →
+  collapses; params family doesn't → breaks).
+  [§Leading comments](docs/comments.md#leading-comments-one-rule-one-emitter),
+  [§Array family vs params family](docs/comments.md#array-family-vs-params-family-whether-the-soft-line-collapses).
+- **Trailing and dangling runs** take their separator BEFORE each comment, never after
+  (`Printer::build_trailing_body_comments_doc`, `Printer::push_dangling_comment_run`); a run's
+  **anchor advances** over each comment it emits; a trailing GAP inside a construct
+  (`Printer::push_trailing_comments_in_range`) asks the source and carries the break **inside**
+  the `line_suffix`. The kind-keyed "a block needs no break" formulation welds
+  `/* c1 *//* c2 */` — lossless and idempotent, so blind to every gate but a prettier `compare`.
+  [§Trailing and dangling runs](docs/comments.md#trailing-and-dangling-runs-the-separator-goes-before-each-comment-never-after).
+- **A deferred run must not leave the construct it was written in** — a `//` in a bracketed
+  type region or a paren shell forces it **open**; the one sanctioned strip is a non-last
+  union/intersection member (`Printer::type_member_separator_follows`), whose forced break is
+  flush-scoped (`DocArena::flush_break`, not `break_parent`). The **flush must end the line** (a
+  `lineSuffixBoundary` belongs only where nothing else does; `arena_fits` treats a boundary with
+  a suffix pending as not fitting), and the flush is itself a run owing the separator
+  (`doc::arena_render_suffix`). [same section].
+- **Own-line-ness is a SOURCE question** (`Printer::comment_follows_content_on_its_line` /
+  `comment_hugs_next`), never an item-boundary `is_same_line(prev_end, …)`: a stripped `)`, the
+  comma, and another comment all sit outside item spans.
+  [§Own-line-ness](docs/comments.md#own-line-ness-is-a-source-question-at-every-gap).
+- **The element-comma seam** — the previous element's trailing run and the next element's
+  leading run must PARTITION the gap: unclaimed is a DROP, doubly-claimed a DOUBLE-PRINT
+  (`Printer::collect_trailing_comments` / `push_element_comma_trailing`; the array literal's
+  `element_gap_split`; the call family's `PartitionedComments::for_routed_arg_gap`, partition and
+  hugging route as ONE step). The claim is a PREFIX ending at the first `//`; the leading scan
+  resumes at the trailing run's end, never past the separator; the anchor is the element's
+  PRINTED end (`Expression::printed_end`); an elision opens no gap of its own; WHICH blank is
+  the family's rule (`BlankRule`), measured from `element_shell_end`.
+  [§The element-comma seam](docs/comments.md#the-element-comma-seam-the-two-runs-must-partition-the-gap).
+- **The statement-gap seam** — a comment whose glued chain reaches the next statement's line
+  LEADS it (`Printer::comment_leads_next_item`); `trailing_claim_end` states the split as a
+  position both sides take.
+  [§The statement-gap seam](docs/comments.md#the-statement-gap-seam-the-claim-stops-where-the-next-statements-line-begins).
+- **The delimiter line** — a `//` glued to an opening delimiter keeps that line at every
+  delimiter (§Conformance above), through two emitters (`Printer::split_open_delimiter_glued_run`,
+  `Printer::delimiter_line_comment_prefix`), with the author blank below it kept everywhere
+  (`Printer::push_delimiter_glued_blank`).
+  [§The delimiter-line question](docs/comments.md#the-delimiter-line-question-one-rule-read-at-three-points).
 
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see
