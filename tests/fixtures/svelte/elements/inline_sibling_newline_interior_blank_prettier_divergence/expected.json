@@ -1,0 +1,147 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 546,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 393,
+				"data": "\n\tAn authored blank line INSIDE one text node (`text1 text2⏎⏎text3 text4`, one Text node) is\n\tnot a run boundary: the flow rule's scan partitions NODES and can bound a run only at a\n\tblank on a text's EDGE, while the fill collapses the interior blank either way — under\n\tboth formatters. So the sibling newlines beside such a node flow with the run's prose,\n\twhere prettier holds them.\n"
+			},
+			{
+				"type": "Text",
+				"start": 393,
+				"end": 395,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 395,
+				"end": 469,
+				"data": " a two-word half on each side of the blank, beside inline siblings "
+			},
+			{
+				"type": "Text",
+				"start": 469,
+				"end": 470,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 470,
+				"end": 545,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 471
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 472
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 473,
+							"end": 475,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 475,
+							"end": 495,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 2,
+									"character": 476
+								},
+								"end": {
+									"line": 11,
+									"column": 6,
+									"character": 480
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 481,
+										"end": 488,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 495,
+							"end": 520,
+							"raw": " text1 text2 text3 text4 ",
+							"data": " text1 text2 text3 text4 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 520,
+							"end": 540,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 47,
+									"character": 521
+								},
+								"end": {
+									"line": 11,
+									"column": 51,
+									"character": 525
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 526,
+										"end": 533,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 540,
+							"end": 541,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

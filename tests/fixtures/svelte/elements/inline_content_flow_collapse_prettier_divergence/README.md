@@ -22,13 +22,22 @@ and both are already sanctioned:
 The last four cases pin the interior side of the second rule's predicate. What lets those
 newlines reflow rather than expand the element is that the content is a **fill to reflow
 into** — asked of the RUN, never of the separator's shape or
-the sibling count. A separator carrying words (`text1`) is as much a fill as a space-only one,
+the sibling count. A separator carrying words (`text1 text2`) is as much a fill as a space-only one,
 and a lone element beside prose is one too, so all of them must reach the same form the
 space-separated twin already reaches. Otherwise one document has two layouts depending on
 whether the author happened to put words between the siblings.
 
-The predicate's other conjunct is a **whitespace seam** to reflow at, and the negative is pinned
-next door: glued content (`<a>{expr}text</a>`) is a single unbreakable unit with nothing to
+The predicate's **prose** conjunct has its negative pinned next door: a run holding a single word
+is a label with no fill to reflow into, so its interior newline is the author's structure and
+selects the element's layout instead of collapsing — see
+[inline_interior_newline_label_hold](../inline_interior_newline_label_hold_prettier_divergence/),
+which carries this fixture's own shape with a one-word separator (`<code>a</code> <code>b</code>,`)
+beside it. That is why the separators here carry **two** words: a one-word separator would make
+these cases labels, and the fixture would be asserting the collapse on a run that has no fill —
+green by way of the trim rather than by the rule it names.
+
+The predicate's other conjunct is a **whitespace seam** to reflow at, and its negative is pinned
+next door too: glued content (`<a>{expr}text</a>`) is a single unbreakable unit with nothing to
 reflow, so there the boundary *is* the only signal and the authored lines stay — see
 [inline_multiline_nontext](../inline_multiline_nontext/), where prettier agrees.
 

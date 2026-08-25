@@ -1,27 +1,27 @@
 <p>
-	text1
+	text1 text2
 	<a href="/x">
 		{expr1}
 	</a>
-	text2
+	text3
 	<a href="/y">
 		{expr2}
 	</a>
-	text3.
+	text4.
 </p>
 
 <p>
-	text4
+	text5 text6
 	<a href="/z">{expr3}</a>
-	text5
+	text7
 </p>
 
 <span>
-	text6
+	text8 text9
 	<Comp>
 		{#if cond}
-			text7
+			text10
 		{/if}
 	</Comp>
-	text8.
+	text11.
 </span>

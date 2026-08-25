@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 33,
+	"end": 39,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,25 +10,25 @@
 			{
 				"type": "Text",
 				"start": 0,
-				"end": 6,
-				"raw": "text1 ",
-				"data": "text1 "
+				"end": 12,
+				"raw": "text1 text2 ",
+				"data": "text1 text2 "
 			},
 			{
 				"type": "RegularElement",
-				"start": 6,
-				"end": 26,
+				"start": 12,
+				"end": 32,
 				"name": "span",
 				"name_loc": {
 					"start": {
 						"line": 1,
-						"column": 7,
-						"character": 7
+						"column": 13,
+						"character": 13
 					},
 					"end": {
 						"line": 1,
-						"column": 11,
-						"character": 11
+						"column": 17,
+						"character": 17
 					}
 				},
 				"attributes": [],
@@ -37,8 +37,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 12,
-							"end": 19,
+							"start": 18,
+							"end": 25,
 							"raw": "inline1",
 							"data": "inline1"
 						}
@@ -47,10 +47,10 @@
 			},
 			{
 				"type": "Text",
-				"start": 26,
-				"end": 32,
-				"raw": " text2",
-				"data": " text2"
+				"start": 32,
+				"end": 38,
+				"raw": " text3",
+				"data": " text3"
 			}
 		]
 	},

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 25,
+	"end": 32,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -33,25 +33,25 @@
 			{
 				"type": "Text",
 				"start": 9,
-				"end": 15,
-				"raw": " text ",
-				"data": " text "
+				"end": 22,
+				"raw": " text1 text2 ",
+				"data": " text1 text2 "
 			},
 			{
 				"type": "Component",
-				"start": 15,
-				"end": 24,
+				"start": 22,
+				"end": 31,
 				"name": "Comp2",
 				"name_loc": {
 					"start": {
 						"line": 1,
-						"column": 16,
-						"character": 16
+						"column": 23,
+						"character": 23
 					},
 					"end": {
 						"line": 1,
-						"column": 21,
-						"character": 21
+						"column": 28,
+						"character": 28
 					}
 				},
 				"attributes": [],

@@ -55,51 +55,51 @@
 
 <!-- control: a comment keeps its authored line -->
 <p>
-	text1
+	text1 text2
 	<!-- c -->
-	text2
+	text3 text4
 </p>
 
 <!-- control: a comment BOUNDS the run without sterilizing it — it keeps its own line, and the
      inline runs on BOTH sides of it still flow. Without this the comment control above is equally
      satisfied by "a run holding a comment keeps every line", which is a different rule -->
 <p>
-	text1
+	text1 text2
 	<span>inline1</span>
-	text2
-	<!-- c -->
 	text3
+	<!-- c -->
+	text4 text5
 	<span>inline2</span>
-	text4
+	text6
 </p>
 
 <!-- control: a `<br />` bounds the run exactly as a comment does — its newline is a rendered
      line break, not a spelling of a space, so it keeps its own line while the runs on both
      sides still flow -->
 <p>
-	text1
+	text1 text2
 	<span>inline1</span>
-	text2
-	<br />
 	text3
+	<br />
+	text4 text5
 	<span>inline2</span>
-	text4
+	text6
 </p>
 
 <!-- control: a blank line still breaks -->
 <p>
-	text1
+	text1 text2
 
 	<span>inline1</span>
 
-	text2
+	text3 text4
 </p>
 
 <!-- control: a block sibling takes its own line; the inline run before it still flows -->
 <div>
-	text1
+	text1 text2
 	<span>inline1</span>
-	text2
+	text3
 	<div>block1</div>
-	text3 text4
+	text4 text5
 </div>

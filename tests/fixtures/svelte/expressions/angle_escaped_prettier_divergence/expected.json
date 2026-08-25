@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 96,
+	"end": 130,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,24 +10,24 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 51,
-				"data": " Two escaped-bracket tags on adjacent lines "
+				"end": 74,
+				"data": " Two escaped-bracket tags on adjacent lines, with prose in the run "
 			},
 			{
 				"type": "Text",
-				"start": 51,
-				"end": 52,
+				"start": 74,
+				"end": 75,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 52,
-				"end": 57,
+				"start": 75,
+				"end": 80,
 				"expression": {
 					"type": "Literal",
-					"start": 53,
-					"end": 56,
+					"start": 76,
+					"end": 79,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -44,19 +44,19 @@
 			},
 			{
 				"type": "Text",
-				"start": 57,
-				"end": 60,
+				"start": 80,
+				"end": 83,
 				"raw": "div",
 				"data": "div"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 60,
-				"end": 65,
+				"start": 83,
+				"end": 88,
 				"expression": {
 					"type": "Literal",
-					"start": 61,
-					"end": 64,
+					"start": 84,
+					"end": 87,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -73,19 +73,19 @@
 			},
 			{
 				"type": "Text",
-				"start": 65,
-				"end": 66,
+				"start": 88,
+				"end": 89,
 				"raw": " ",
 				"data": " "
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 66,
-				"end": 71,
+				"start": 89,
+				"end": 94,
 				"expression": {
 					"type": "Literal",
-					"start": 67,
-					"end": 70,
+					"start": 90,
+					"end": 93,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -102,19 +102,19 @@
 			},
 			{
 				"type": "Text",
-				"start": 71,
-				"end": 75,
+				"start": 94,
+				"end": 98,
 				"raw": "code",
 				"data": "code"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 75,
-				"end": 80,
+				"start": 98,
+				"end": 103,
 				"expression": {
 					"type": "Literal",
-					"start": 76,
-					"end": 79,
+					"start": 99,
+					"end": 102,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -130,21 +130,28 @@
 				}
 			},
 			{
+				"type": "Text",
+				"start": 103,
+				"end": 114,
+				"raw": "text1 text2",
+				"data": "text1 text2"
+			},
+			{
 				"type": "ExpressionTag",
-				"start": 80,
-				"end": 85,
+				"start": 114,
+				"end": 119,
 				"expression": {
 					"type": "Literal",
-					"start": 81,
-					"end": 84,
+					"start": 115,
+					"end": 118,
 					"loc": {
 						"start": {
 							"line": 2,
-							"column": 29
+							"column": 40
 						},
 						"end": {
 							"line": 2,
-							"column": 32
+							"column": 43
 						}
 					},
 					"value": "<",
@@ -153,27 +160,27 @@
 			},
 			{
 				"type": "Text",
-				"start": 85,
-				"end": 90,
+				"start": 119,
+				"end": 124,
 				"raw": "/code",
 				"data": "/code"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 90,
-				"end": 95,
+				"start": 124,
+				"end": 129,
 				"expression": {
 					"type": "Literal",
-					"start": 91,
-					"end": 94,
+					"start": 125,
+					"end": 128,
 					"loc": {
 						"start": {
 							"line": 2,
-							"column": 39
+							"column": 50
 						},
 						"end": {
 							"line": 2,
-							"column": 42
+							"column": 53
 						}
 					},
 					"value": ">",
