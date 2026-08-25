@@ -10,10 +10,11 @@
 	what does not flow: a control-flow block, whose width is not fixed (packing a run of them
 	overflows the line, and the overflow is paid by expanding their bodies); the fully hugged
 	authoring, which stays hugged; a comment, which keeps its authored line; a blank line, which
-	still breaks; and a block sibling, which still takes its own line. Two of those controls also
-	carry an inline run beside the bounding sibling, re-authored in every variant, so "the run it
-	bounds still flows" is DEMONSTRATED rather than asserted — a sibling that owns its own line
-	ends a run, it does not sterilize one.
+	still breaks; a block sibling, which still takes its own line; and a `<br />`, a rendered line
+	break whose newline mirrors the render. Three of those controls also carry an inline run
+	beside the bounding sibling, re-authored in every variant, so "the run it bounds still flows"
+	is DEMONSTRATED rather than asserted — a sibling that owns its own line ends a run, it does
+	not sterilize one.
 -->
 <p>
 	text1
@@ -61,6 +62,17 @@
 	text1
 	<span>inline1</span> text2
 	<!-- c -->
+	text3
+	<span>inline2</span> text4
+</p>
+
+<!-- control: a `<br />` bounds the run exactly as a comment does — its newline is a rendered
+     line break, not a spelling of a space, so it keeps its own line while the runs on both
+     sides still flow -->
+<p>
+	text1
+	<span>inline1</span> text2
+	<br />
 	text3
 	<span>inline2</span> text4
 </p>
