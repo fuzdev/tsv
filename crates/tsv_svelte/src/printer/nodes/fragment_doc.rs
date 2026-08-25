@@ -20,9 +20,10 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
 
 /// The treatment of an inline child doc's LEADING boundary, decided at the unit's head — the
-/// argument to [`Printer::push_inline_child_doc`]. Four mutually exclusive cases. The two SPACED
-/// ones are one boundary told apart by the FOLLOWER — whether it owns a fill for the separator to
-/// be measured against — while a spaced boundary and a glued one exclude each other structurally: a
+/// argument to [`Printer::push_inline_child_doc`]. Five mutually exclusive cases. The SPACED ones
+/// are one boundary told apart by the FOLLOWER — whether it owns a fill for the separator to be
+/// measured against — and, for a follower that does, by whether the authored newline before it is
+/// the layout-keyed hold; a spaced boundary and a glued one exclude each other structurally: a
 /// previous text that trimmed a boundary space cannot also be glued
 /// ([`Printer::text_glued_after`] fails on a whitespace tail), so no caller ever holds two at once.
 #[derive(Clone, Copy)]
@@ -31,6 +32,15 @@ pub(super) enum LeadBoundary {
     /// (prettier's `handleWhitespaceOfPrevTextNode`): lead with a collapsible `line` inside a
     /// group — a space when the fill fits, a break when it wraps.
     Spaced,
+    /// [`Self::Spaced`] whose leading `line` carries the layout-keyed hold
+    /// (`tsv_lang::doc::DocContext::hold_line_after_broken_flow`): it renders as a forced break
+    /// when the flow probe on the previous sibling answered yes — the sibling rendered multiline
+    /// — and as the ordinary collapsible `line` otherwise. The separator handler arms it for an
+    /// authored single newline whose run flows ([`Printer::handle_separator_text_child`]'s
+    /// `arm_hold`); the wrap itself measures exactly as [`Self::Spaced`], since the flag rides on
+    /// the `line` inside it (`DocArena::inline_sibling_line_group_held`, whose inverse
+    /// `strip_leading_line_group_ex` reports it so a rejoin re-wraps held-as-held).
+    SpacedHeld,
     /// The same deferred boundary in front of a sibling that ENDS the inline run — a comment, a
     /// `{@debug}`: a **bare** collapsible `line`, a space while the parent group is flat and a
     /// newline once it breaks. The block arm spells its own answer the same way
@@ -54,6 +64,25 @@ pub(super) enum LeadBoundary {
     Glued,
     /// An ordinary boundary already carried by the surrounding docs: push bare.
     Plain,
+}
+
+/// The boundary a text child defers to the sibling after it — prettier's
+/// `handleWhitespaceOfPrevTextNode`, plus tsv's layout-keyed hold on it. Written by
+/// [`Printer::handle_text_child`] (reset at entry, armed by its separator handler), taken once
+/// per iteration by the sibling loop in `build_nodes_doc_trimmed` (`std::mem::take`, so no
+/// dispatch arm can leak a stale value by forgetting to reset), and read by every follower arm
+/// through [`LeadBoundary`]. One value rather than two loose bools because the two flags are one
+/// signal — `held` is meaningless without `trimmed` — and both must be reset together.
+#[derive(Clone, Copy, Default)]
+pub(super) struct DeferredBoundary {
+    /// The previous text trimmed a boundary space and left the separator to this sibling to
+    /// emit — the wrap for an inline element or component, a bare `line` for a run-ending
+    /// comment / `{@debug}`, a block's own `break_before`.
+    pub(super) trimmed: bool,
+    /// That deferred separator is the layout-keyed hold ([`LeadBoundary::SpacedHeld`]): an
+    /// authored newline whose run flows, after a predecessor now carrying the flow probe.
+    /// Inert without `trimmed`.
+    pub(super) held: bool,
 }
 
 /// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — prettier's
@@ -144,7 +173,8 @@ impl<'a> Printer<'a> {
         // - Inline elements → wrapped with group([line, element]) when the boundary before
         //   them asks for it (the trailing boundary is the following text fill's own line)
         let mut child_docs = d.pooled_docbuf();
-        let mut handle_whitespace_of_prev_text = false;
+        // The boundary the previous text child deferred to the next sibling (see the type).
+        let mut deferred = DeferredBoundary::default();
 
         // forceBreakContent (prettier-plugin-svelte): a fragment that mixes a block element
         // with more than one child breaks, so each block lands on its own line. tsv hardens the
@@ -225,7 +255,7 @@ impl<'a> Printer<'a> {
                         child_docs.push(self.d().hardline());
                     }
                     child_docs.push(raw_doc);
-                    handle_whitespace_of_prev_text = false;
+                    deferred = DeferredBoundary::default();
                     format_ignore_next = false;
                 }
                 continue;
@@ -260,7 +290,10 @@ impl<'a> Printer<'a> {
             // and for a comment / `{@debug}` that deletion is render-visible. Adding a dispatch arm
             // means deciding what its boundary looks like ([`LeadBoundary`]), never letting the
             // snapshot fall through.
-            let prev_text_ws = std::mem::take(&mut handle_whitespace_of_prev_text);
+            let DeferredBoundary {
+                trimmed: prev_text_ws,
+                held: prev_text_held,
+            } = std::mem::take(&mut deferred);
 
             if matches!(node, FragmentNode::Text(_)) {
                 self.handle_text_child(
@@ -274,7 +307,7 @@ impl<'a> Printer<'a> {
                         prev_sibling_head,
                     },
                     &mut child_docs,
-                    &mut handle_whitespace_of_prev_text,
+                    &mut deferred,
                 );
             } else if multiline && self.is_block_element_node(node) {
                 // Block element (div, p, block component): own-line via softlines +
@@ -341,7 +374,9 @@ impl<'a> Printer<'a> {
                 // The unit's leading-boundary treatment — the glue test is asked at the unit's
                 // HEAD (`i`, where every inline doc below is built), so it names the boundary in
                 // front of the whole unit. See `LeadBoundary`.
-                let lead = if prev_text_ws {
+                let lead = if prev_text_ws && prev_text_held {
+                    LeadBoundary::SpacedHeld
+                } else if prev_text_ws {
                     LeadBoundary::Spaced
                 } else if self.leading_boundary_glued(trimmed_nodes, i, content_bounds.0) {
                     LeadBoundary::Glued
@@ -606,6 +641,9 @@ impl<'a> Printer<'a> {
                 // the named constructor keeps the two in lockstep — a shape drift here would silently
                 // return `None` there and reintroduce the stray-space non-idempotency.
                 child_docs.push(self.d().inline_sibling_line_group(node_doc));
+            }
+            LeadBoundary::SpacedHeld => {
+                child_docs.push(self.d().inline_sibling_line_group_held(node_doc));
             }
             LeadBoundary::SpacedBare => {
                 child_docs.push(self.d().line());
@@ -887,8 +925,15 @@ impl<'a> Printer<'a> {
             Some(FragmentNode::Text(t)) => {
                 let raw = t.raw(self.source);
                 let is_empty_ws = t.is_collapsible_ws_only;
-                // idx+2 is an inline element (prettier's `isInlineElement`, excludes components)
-                let next2_inline = self.next_is_inline_element(trimmed_nodes, i + 1);
+                // idx+2 is an inline element OR a component — one follower kind here, as at the
+                // whitespace-only separator: the block supplies the break after itself for both,
+                // so the separator's deferred boundary (`DeferredBoundary::trimmed`) stays off for both and the
+                // space is neither re-emitted (a stray line-head space) nor dropped (the glued
+                // `</div><Comp />` that pass 2 re-breaks — a period-2 cycle). Prettier's
+                // `isInlineElement` excludes the component here and re-breaks it via the
+                // separator's plain `line` instead.
+                let next2_inline = self.next_is_inline_element(trimmed_nodes, i + 1)
+                    || self.next_is_component(trimmed_nodes, i + 1);
                 (!is_empty_ws || next2_inline) && !text_starts_with_linebreak(raw)
             }
             Some(_) => true,
@@ -1112,21 +1157,15 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether the node at `trimmed_nodes[i + 1]` is a **non-block component** — the follower
-    /// [`Self::next_is_inline_element`] excludes, named from the other side so the exclusion can
-    /// be acted on rather than merely fallen through.
-    ///
-    /// A space-separated component sibling breaks to its own line once its container does, so it
-    /// is the one flowing follower that must NOT take the inline-sibling wrap
-    /// (`group([line, element])`, whose per-width break packs it onto the preceding sibling's
-    /// line). Its separator still *flows* — a bare `line` renders as the space it replaced while
-    /// the fragment fits, so a one-line `<p>text1 <span>x</span> <Comp /></p>` is untouched; what
-    /// the component declines is deciding that boundary on its own width, independently of
-    /// whether the container broke. `handle_text_child`'s
-    /// whitespace-only-separator site asks this in BOTH of its arms — the multiline arm reaches
-    /// the same answer by falling past `trim_to_collapsible` to a bare `line`, and the
-    /// non-multiline arm asks here — because a run's interior may not depend on why its container
-    /// went multiline. A **block** component is excluded for the same reason
-    /// `next_is_inline_element` excludes block elements: it owns its own line already.
+    /// [`Self::next_is_inline_element`] excludes (prettier's `isInlineElement` admits only a
+    /// `RegularElement`), named from the other side so the whitespace-only-separator site can
+    /// re-admit it: there a component takes the inline-sibling wrap exactly as an inline element
+    /// does, in BOTH multiline arms, so a component pair packs per width from either spelling
+    /// (`inline_adjacent_component_flow`). Holding it instead — prettier's answer — gives one
+    /// prose run two answers, the text-adjacent boundaries hugging while the pair splits; and
+    /// holding it in only ONE arm is the two-pass cycle `bug371` hit. A **block** component is
+    /// excluded for the same reason `next_is_inline_element` excludes block elements: it owns its
+    /// own line already.
     pub(super) fn next_is_component(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
         matches!(trimmed_nodes.get(i + 1), Some(FragmentNode::Element(el))
             if el.kind == internal::ElementKind::Component && !self.is_block_element(el))
@@ -1136,9 +1175,9 @@ impl<'a> Printer<'a> {
     /// in a text↔element fill boundary on *either* side (the preceding-element fold trigger and
     /// the following-element flow boundary). Any non-block `Element`/`SpecialElement`; block
     /// elements and every non-element node are excluded. Unlike [`Self::next_is_inline_element`]
-    /// (a sibling-only predicate that *excludes* components, because a space-separated component
-    /// sibling breaks to its own line), this includes components: a wide `<Comp>` adjacent to
-    /// flowing text is the case the Fill-idempotency fix targets.
+    /// (a sibling-only predicate that *excludes* components, mirroring prettier's
+    /// `isInlineElement`), this includes components: a wide `<Comp>` adjacent to flowing text is
+    /// the case the Fill-idempotency fix targets.
     ///
     /// Over a follower, this set is today exactly [`Self::next_is_inline_element`] ∪
     /// [`Self::next_is_component`] — the two halves prettier's `isInlineElement` splits. That is
