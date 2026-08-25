@@ -1,8 +1,10 @@
-<Foo/>   <Bar/>
+<Foo/>
+<Bar/>
 
 {a}   {b}
 
 <section>
-<Baz/>   <Qux/>
+<Baz/>
+<Qux/>
 <p>text</p>
 </section>

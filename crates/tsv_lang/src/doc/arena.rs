@@ -1440,6 +1440,25 @@ impl DocArena {
         self.group(self.concat(&[self.line(), x]))
     }
 
+    /// The inline-sibling wrap whose leading `line` carries
+    /// [`DocContext::hold_line_after_broken_flow`] — `group([WithContext(line, hold), X])`: the
+    /// line renders as a forced break when the immediately preceding flow probe answered yes,
+    /// and as the ordinary collapsible boundary otherwise (the renderer's `WithContext` arm reads
+    /// the flag off the `Line`). The flag rides INSIDE the wrap rather than on a wrapper around
+    /// it, so the wrap measures exactly as [`Self::inline_sibling_line_group`] does — a fits walk
+    /// descends through `WithContext` and sees an ordinary line — and so that
+    /// [`Self::strip_leading_line_group_ex`] still matches it and can report which form it found.
+    /// Built by `push_inline_child_doc` in `tsv_svelte` for `LeadBoundary::SpacedHeld`, the
+    /// layout-keyed sibling boundary.
+    #[inline]
+    pub fn inline_sibling_line_group_held(&self, x: DocId) -> DocId {
+        let held_line = self.with_context(
+            self.line(),
+            DocContext::default().with_hold_line_after_broken_flow(true),
+        );
+        self.group(self.concat(&[held_line, x]))
+    }
+
     /// `id` as a `Fill`, wrapping it in a one-part fill when it is not already one.
     ///
     /// A [`DocContext`] carrying a **render-side** flag ([`DocContext::break_before_wide_flow`],
@@ -1476,6 +1495,16 @@ impl DocArena {
     /// continuation line, which the next pass reads as indentation and drops (non-idempotent).
     #[inline]
     pub fn strip_leading_line_group(&self, id: DocId) -> Option<DocId> {
+        self.strip_leading_line_group_ex(id).map(|(x, _)| x)
+    }
+
+    /// [`Self::strip_leading_line_group`] over both wrap forms: returns the inner `X` and whether
+    /// the wrap was the HELD one ([`Self::inline_sibling_line_group_held`], its leading line
+    /// hold-flagged), so a caller that strips, rebuilds around `X` and re-wraps can reproduce
+    /// the lead it found — dropping the hold on a rejoin would silently un-hold a boundary the
+    /// author wrote. Round-trip-tested against both producers.
+    #[inline]
+    pub fn strip_leading_line_group_ex(&self, id: DocId) -> Option<(DocId, bool)> {
         let nodes = self.nodes.borrow();
         let DocNode::Group {
             contents,
@@ -1499,13 +1528,20 @@ impl DocArena {
         let [first, x] = range.resolve(&children) else {
             return None;
         };
-        if !matches!(
-            nodes[first.index()],
-            DocNode::Line(LineKind::Normal | LineKind::Soft)
-        ) {
-            return None;
-        }
-        Some(*x)
+        let held = match &nodes[first.index()] {
+            DocNode::Line(LineKind::Normal | LineKind::Soft) => false,
+            DocNode::WithContext { doc, context }
+                if context.hold_line_after_broken_flow()
+                    && matches!(
+                        nodes[doc.index()],
+                        DocNode::Line(LineKind::Normal | LineKind::Soft)
+                    ) =>
+            {
+                true
+            }
+            _ => return None,
+        };
+        Some((*x, held))
     }
 
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
@@ -3166,6 +3202,28 @@ mod inline_sibling_line_group_tests {
             a.strip_leading_line_group(a.inline_sibling_line_group(x)),
             Some(x),
             "strip_leading_line_group must be the exact inverse of inline_sibling_line_group",
+        );
+    }
+
+    #[test]
+    fn strip_leading_line_group_ex_round_trips_both_forms() {
+        let a = DocArena::new();
+        let x = a.text("x");
+        assert_eq!(
+            a.strip_leading_line_group_ex(a.inline_sibling_line_group(x)),
+            Some((x, false)),
+            "the plain wrap strips to its inner doc and reports NOT held",
+        );
+        assert_eq!(
+            a.strip_leading_line_group_ex(a.inline_sibling_line_group_held(x)),
+            Some((x, true)),
+            "the held wrap strips to its inner doc and reports held — a rejoin must re-wrap held",
+        );
+        // The plain matcher strips the held wrap too (it is the same shape to every reader that
+        // does not re-wrap), so a caller that only needs `X` sees no difference.
+        assert_eq!(
+            a.strip_leading_line_group(a.inline_sibling_line_group_held(x)),
+            Some(x)
         );
     }
 

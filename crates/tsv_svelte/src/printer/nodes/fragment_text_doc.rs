@@ -12,7 +12,7 @@
 // a fill, and the questions are about its own two boundary runs).
 
 use super::element_doc::MultilineCause;
-use super::fragment_doc::text_starts_with_linebreak;
+use super::fragment_doc::{DeferredBoundary, text_starts_with_linebreak};
 use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{FragmentNode, Text, is_collapsible_ws_char, split_collapsible_ws};
 use crate::printer::Printer;
@@ -141,7 +141,8 @@ impl<'a> Printer<'a> {
     /// reaches it is about that gap ([`Self::handle_separator_text_child`]). A content text
     /// **owns a `fill`**, and its rules are about the two boundary runs on its own edges plus the
     /// words between them ([`Self::handle_content_text_child`]). They share exactly this dispatch
-    /// and the `handle_whitespace_of_prev_text` reset; nothing flows from one to the other.
+    /// and the reset of the deferred boundary ([`DeferredBoundary`] — whose `held` half only the
+    /// separator handler arms); nothing flows from one to the other.
     ///
     /// Each handler derives the sibling-kind facts it actually asks about, and the sets differ —
     /// a separator asks `next_is_inline_el` / `next_is_component` / `next_is_block_el`, which the
@@ -156,29 +157,24 @@ impl<'a> Printer<'a> {
         i: usize,
         ctx: TextChildContext,
         child_docs: &mut DocBuf,
-        handle_whitespace_of_prev_text: &mut bool,
+        deferred: &mut DeferredBoundary,
     ) {
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
             return;
         };
-        *handle_whitespace_of_prev_text = false;
+        *deferred = DeferredBoundary::default();
         if text.is_collapsible_ws_only {
-            self.handle_separator_text_child(
-                trimmed_nodes,
-                i,
-                text,
-                ctx,
-                child_docs,
-                handle_whitespace_of_prev_text,
-            );
+            self.handle_separator_text_child(trimmed_nodes, i, text, ctx, child_docs, deferred);
         } else {
+            // A content text only ever TRIMS a boundary (its trailing run); the hold is the
+            // separator handler's alone.
             self.handle_content_text_child(
                 trimmed_nodes,
                 i,
                 text,
                 ctx,
                 child_docs,
-                handle_whitespace_of_prev_text,
+                &mut deferred.trimmed,
             );
         }
     }
@@ -195,11 +191,13 @@ impl<'a> Printer<'a> {
         text: &Text,
         ctx: TextChildContext,
         child_docs: &mut DocBuf,
-        handle_whitespace_of_prev_text: &mut bool,
+        deferred: &mut DeferredBoundary,
     ) {
         let TextChildContext {
             cause,
             run_has_prose,
+            content_bounds,
+            prev_sibling_head,
             ..
         } = ctx;
         let multiline = cause.is_multiline();
@@ -207,6 +205,44 @@ impl<'a> Printer<'a> {
         // handler's set; the content path derives its own overlapping one.
         let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
         let next_node = trimmed_nodes.get(i + 1);
+        let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
+        // AN AUTHORED NEWLINE BEFORE AN INLINE SIBLING FOLLOWS THE PREDECESSOR'S RENDERED
+        // LAYOUT — the sibling twin of the text-tail rule in `handle_content_text_child`, and
+        // one mechanism with it: the popped predecessor carries `flow_break_probe` (the renderer
+        // records whether its subtree actually emitted a newline), and the follower's
+        // inline-sibling wrap leads with a hold-flagged line ([`LeadBoundary::SpacedHeld`],
+        // which renders as a forced break exactly when the probe answered yes). So
+        // `</span>⏎<b>x</b>` beside a block-styled `<span>` keeps the sibling's own line,
+        // while the same authoring beside a fitting `<span>` reflows with the run and converges
+        // with the space spelling — layout-keyed at render, with no measurement change (the
+        // flag rides on the wrap's own `line`, so every fits walk sees the ordinary wrap).
+        //
+        // The same exclusions as the text-tail arm, for the same reasons: a TAG predecessor
+        // (its break lands inside its own expression, so the tag-pile reading does not arise —
+        // `)}⏎<b>` keeps the per-width hug), and a GLUED-headed predecessor (a fresh probe
+        // context around its doc would bury the welded-run marker from the flow walk). The
+        // space spelling never takes this rule: it stays the wrap's per-width hug, so the
+        // boundary is dual-stable beside a multiline unit and single-form beside a fitting one.
+        // Cataloged in conformance_prettier_svelte.md §Svelte: Inline content block-style ("An
+        // authored newline after the closing tag"); `elements/sibling_newline_after_multiline`.
+        //
+        // Both arms below ask it, so one run's interior does not depend on WHY its container
+        // went multiline — a hold in one arm alone is the two-pass cycle `bug371` hit.
+        let arm_hold = |child_docs: &mut DocBuf, deferred: &mut DeferredBoundary| {
+            if !self.leading_boundary_glued(trimmed_nodes, prev_sibling_head, content_bounds.0)
+                && let Some(last_doc) = child_docs.pop()
+            {
+                let d = self.d();
+                let flagged = self.rejoin_inside_leading_wrap(last_doc, |el| {
+                    d.with_context(
+                        el,
+                        tsv_lang::doc::DocContext::default().with_flow_break_probe(true),
+                    )
+                });
+                child_docs.push(flagged);
+                deferred.held = true;
+            }
+        };
         // A declaration tag on either side owns its own line ([`Self::is_own_line_declaration`]),
         // and the run between it and this text is render-free — the tag hoists out of the fragment,
         // so that run is an edge run whichever side of the tag it sits on. This text therefore
@@ -311,18 +347,32 @@ impl<'a> Printer<'a> {
             // and becomes a two-pass cycle the moment it doesn't
             // (`inline_content_spaced_tags_tail_long`).
             //
-            // ⚠️ A **component** follower is the other exception, and it is that same parity
-            // read the other way round: the multiline arm below never wraps one — its
-            // `trim_to_collapsible` excludes components on purpose (a space-separated
-            // component sibling breaks to its own line, which is prettier's answer too), so
-            // the separator falls through to a bare `line` there. Wrapping it *here* gave one
-            // prose run two interiors again, and this half is the one that packs: a preceding
-            // sibling that renders multiline leaves the closing tag at a short column, the
-            // wrap's per-width break then fits the component after it, and the emitted
-            // container boundary newline makes the NEXT pass read `SourceBreaks` and split the
-            // pair back apart — a two-pass cycle whose first form is also a prettier
-            // divergence ([`Printer::next_is_component`]).
-            if (next_is_tag && !separator_flows) || next_is_component {
+            // ⚠️ A **component** follower takes the inline-sibling wrap here exactly as an inline
+            // element does, and the multiline arm below wraps it too (`next_is_inline_flow`).
+            // The two arms MUST agree on that: the one time they did not — this arm wrapping,
+            // the multiline arm holding the component on its own line (prettier's
+            // `isInlineElement` split) — a preceding sibling that rendered multiline left the
+            // closing tag at a short column, the wrap's per-width break fit the component after
+            // it, and the emitted container boundary newline made the NEXT pass read
+            // `SourceBreaks` and take the other arm's policy, splitting the pair back apart. The
+            // cure for that cycle is one policy in both arms, not a hold in both: a component is
+            // inline flow content like a `<span>`, so the pair packs per width from either
+            // spelling (`inline_adjacent_component_flow`).
+            // The layout-keyed hold (`arm_hold` above). `run_has_prose` is not computed on this
+            // path, so the candidate asks the two neighbours directly — a tag follower always
+            // flows, an inline element or component flows by kind. A TAG follower that takes
+            // the hold takes the wrap with it (the `!*hold_next_lead` below): its bare `line`
+            // renders flat past a multiline predecessor (`</a> {expr}` through a glued head),
+            // which is the one answer the multiline arm never gives that boundary — the arm
+            // disagreement this whole handler is built to avoid.
+            if text.newline_count == 1
+                && !prev_is_tag
+                && (next_is_inline_el || next_is_component || next_is_tag)
+                && self.neighbour_newline_flows(prev_node)
+            {
+                arm_hold(child_docs, deferred);
+            }
+            if next_is_tag && !separator_flows && !deferred.held {
                 child_docs.push(d.line());
             } else {
                 // Defer the separator to the next sibling, which leads with it. NOT only "the
@@ -331,7 +381,7 @@ impl<'a> Printer<'a> {
                 // wrap for an inline element or component that owns a fill, a bare `line` for a
                 // run-ending comment / `{@debug}`. A follower whose arm ignored the flag simply
                 // deleted the space, which is why the reader set has to stay total.
-                *handle_whitespace_of_prev_text = true;
+                deferred.trimmed = true;
             }
             return;
         }
@@ -385,14 +435,28 @@ impl<'a> Printer<'a> {
         // `line`) is what made the first attempt flip-flop: pass 1 wrote a newline that pass 2
         // then re-read as flowable and collapsed.
         let newline_count = if ws_flows { 0 } else { newline_count };
+        // An inline element and a component are one follower kind at this boundary: both take
+        // the inline-sibling wrap (`group([line, el])`) that the next sibling leads with. Prettier's
+        // `isInlineElement` admits only a `RegularElement`, so it prints the separator before a
+        // component as a plain `line` that breaks with the container while the text-adjacent
+        // boundaries of the same run hug — one run, two answers, in a line that fits. tsv answers
+        // the run once (`inline_adjacent_component_flow`).
+        let next_is_inline_flow = next_is_inline_el || next_is_component;
+        // The layout-keyed hold (`arm_hold` above): a FLOWING single newline — the one this arm
+        // re-spells as the space — before an inline element, component or tag, after a non-tag
+        // predecessor. The separator still takes the space arm verbatim below; the hold changes
+        // only how the follower's wrap RENDERS its leading line.
+        if ws_flows && !prev_is_tag && (next_is_inline_flow || next_is_tag) {
+            arm_hold(child_docs, deferred);
+        }
         let trim_to_collapsible =
-            (next_is_inline_el && newline_count == 0) || (next_is_block_el && newline_count < 2);
+            (next_is_inline_flow && newline_count == 0) || (next_is_block_el && newline_count < 2);
         if trim_to_collapsible {
             // prettier: `handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`. When the
             // previous sibling is a block element its own `handle_block_child` already supplies
             // the separating break, so the next inline element is NOT wrapped in
             // `group([line, el])` (which would strand a leading space after the block's break).
-            // `handle_whitespace_of_prev_text` signals the trimmed boundary to the *next*
+            // `deferred.trimmed` signals the trimmed boundary to the *next*
             // sibling. For a next **block** element it must stay set so the block's
             // `handle_block_child` emits its `break_before` (tsv keeps the text node intact,
             // unlike prettier which trims it, so the flag IS the "boundary was trimmed" signal).
@@ -401,7 +465,7 @@ impl<'a> Printer<'a> {
             // sibling is a block, its own `handle_block_child` already supplies the break, so the
             // inline element is NOT wrapped in `group([line, el])` (which would strand a leading
             // space after the block's break — `block_before_inline`).
-            *handle_whitespace_of_prev_text = !next_is_inline_el || !prev_is_block_el;
+            deferred.trimmed = !next_is_inline_flow || !prev_is_block_el;
         } else if newline_count >= 1 {
             if newline_count >= 2 {
                 child_docs.push(d.hardline());
@@ -421,7 +485,7 @@ impl<'a> Printer<'a> {
             // before a tag keeps the bare `line`: its neighbour may be a **comment**, whose own
             // line is authorship (`<!-- c -->` `{expr}` must not weld — `root_expressions_spaced`),
             // and the flow predicate is exactly what excludes it.
-            *handle_whitespace_of_prev_text = true;
+            deferred.trimmed = true;
         } else {
             child_docs.push(d.line());
         }
@@ -653,7 +717,10 @@ impl<'a> Printer<'a> {
                 // `tsv_lang::doc::DocContext::flow_break_probe` and in the catalog entry).
                 // Cataloged in conformance_prettier_svelte.md §Svelte:
                 // Inline content block-style ("An authored newline after the closing tag");
-                // `elements/tail_newline_after_multiline_prettier_divergence`.
+                // `elements/tail_newline_after_multiline_prettier_divergence`. The same rule
+                // before an inline SIBLING — element, component, tag, void — is the separator
+                // handler's `arm_hold` (`elements/sibling_newline_after_multiline`): one probe,
+                // one hold flag, read off the sibling wrap's leading line instead of a fill.
                 //
                 // Excluded, each falling through to the arms below unchanged:
                 // - a TAG predecessor (`{expr}⏎text`) keeps the unconditional flow — a tag's
@@ -842,8 +909,9 @@ impl<'a> Printer<'a> {
         // group([line, expr]) wrapping forces a newline before multiline expressions;
         // trailing_line lets fill decide whether to break (same approach as leading_line).
         //
-        // For non-tag inline elements: set handle_whitespace_of_prev_text so the next
-        // element gets wrapped with group([line, element]).
+        // For non-tag inline elements: set the deferred boundary (`DeferredBoundary::trimmed`,
+        // this handler's `handle_whitespace_of_prev_text`) so the next element gets wrapped with
+        // group([line, element]).
         let mut trailing_line = false;
         // Count newlines in the trailing whitespace run (multiline structural-break detection).
         let trailing_ws_newlines = if has_trailing_ws {
@@ -1124,8 +1192,12 @@ impl<'a> Printer<'a> {
         build_tail: impl FnOnce(DocId) -> DocId,
     ) -> DocId {
         let d = self.d();
-        match d.strip_leading_line_group(last_doc) {
-            Some(inner) => d.inline_sibling_line_group(build_tail(inner)),
+        match d.strip_leading_line_group_ex(last_doc) {
+            Some((inner, false)) => d.inline_sibling_line_group(build_tail(inner)),
+            // A HELD wrap re-wraps held: the element's own lead is the layout-keyed hold
+            // (`LeadBoundary::SpacedHeld`), and the tail built around it must not drop that —
+            // `</span>⏎<b>x</b>⏎text2` holds the `<b>` and folds `text2` after it.
+            Some((inner, true)) => d.inline_sibling_line_group_held(build_tail(inner)),
             None => build_tail(last_doc),
         }
     }
